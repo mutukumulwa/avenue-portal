@@ -1,26 +1,55 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+@theme {
+  --color-avenue-indigo: #292a83;
+  --color-avenue-indigo-hover: #435ba1;
+  --color-avenue-pink: #f5c6b6;
+
+  /* Neutrals */
+  --color-avenue-text-heading: #212529;
+  --color-avenue-text-body: #848e9f;
+  --color-avenue-text-muted: #6c757d;
+  --color-avenue-bg: #ffffff;
+  --color-avenue-bg-alt: #e6e7e8;
+  --color-avenue-border: #eeeeee;
+  --color-avenue-border-subtle: #e7ebef;
+  --color-avenue-divider: #dcdcdc;
+
+  /* Functional */
+  --color-avenue-success: #28a745;
+  --color-avenue-error: #dc3545;
+  --color-avenue-info: #17a2b8;
+  --color-avenue-whatsapp: #25d366;
+
+  /* Typography */
+  --font-heading: "Quicksand", "Nunito", "Poppins", sans-serif;
+  --font-body: "Lato", "Open Sans", "Helvetica Neue", sans-serif;
+  --font-ui: "Roboto", "Lato", sans-serif;
+
+  /* Radii */
+  --radius-pill: 50px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+:root {
+  --background: #ffffff;
+  --foreground: #212529;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #ffffff; /* Keep white for now to adhere to medical design */
+    --foreground: #212529;
   }
 }
 
 body {
+  color: var(--color-avenue-text-body);
   background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-body);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: var(--color-avenue-text-heading);
+  font-family: var(--font-heading);
+  font-weight: 700;
 }

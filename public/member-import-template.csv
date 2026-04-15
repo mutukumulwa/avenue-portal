@@ -1,0 +1,7 @@
+firstName,lastName,dateOfBirth,gender,relationship,principalIdNumber,idNumber,phone,email,isExample
+John,Kamau,1980-04-15,MALE,PRINCIPAL,,30123456,0712345678,john.kamau@example.com,true
+Grace,Kamau,1983-09-22,FEMALE,SPOUSE,30123456,,0723456789,grace.kamau@example.com,true
+Brian,Kamau,2010-01-10,MALE,CHILD,30123456,,,brian.kamau@example.com,true
+Amina,Kamau,2013-06-30,FEMALE,CHILD,30123456,,,,true
+Peter,Ochieng,1975-11-05,MALE,PRINCIPAL,,40987654,0733001122,,true
+Joyce,Ochieng,1979-03-17,FEMALE,SPOUSE,40987654,,,joyce.ochieng@example.com,true

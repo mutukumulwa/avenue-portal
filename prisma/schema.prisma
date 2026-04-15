@@ -1,0 +1,1290 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── TENANT ──────────────────────────────────────────────
+model Tenant {
+  id           String   @id @default(cuid())
+  name         String
+  slug         String   @unique
+  logoUrl      String?
+  primaryColor String   @default("#292A83")
+  accentColor  String   @default("#435BA1")
+  warmColor    String   @default("#F5C6B6")
+  fontHeading  String   @default("Quicksand")
+  fontBody     String   @default("Lato")
+  domain       String?  @unique
+  config       Json     @default("{}")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  users           User[]
+  groups          Group[]
+  members         Member[]
+  packages        Package[]
+  claims          Claim[]
+  preauths        PreAuthorization[]
+  providers       Provider[]
+  brokers         Broker[]
+  endorsements    Endorsement[]
+  invoices        Invoice[]
+  quotations      Quotation[]
+  exceptionLogs    ExceptionLog[]
+  chartOfAccounts  ChartOfAccount[]
+  journalEntries   JournalEntry[]
+  fraudAlerts      ClaimFraudAlert[]
+  complaints       Complaint[]
+}
+
+// ─── USERS & AUTH ────────────────────────────────────────
+enum UserRole {
+  SUPER_ADMIN
+  CLAIMS_OFFICER
+  FINANCE_OFFICER
+  UNDERWRITER
+  CUSTOMER_SERVICE
+  MEDICAL_OFFICER
+  REPORTS_VIEWER
+  BROKER_USER
+  MEMBER_USER
+  HR_MANAGER
+}
+
+model User {
+  id           String    @id @default(cuid())
+  tenantId     String
+  tenant       Tenant    @relation(fields: [tenantId], references: [id])
+  email        String
+  passwordHash String
+  firstName    String
+  lastName     String
+  role         UserRole
+  isActive     Boolean   @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Link to broker or member profile
+  brokerId String? @unique
+  broker   Broker? @relation(fields: [brokerId], references: [id])
+  memberId String? @unique
+  member   Member? @relation(fields: [memberId], references: [id])
+  groupId  String?
+  group    Group?  @relation("HRManagerGroup", fields: [groupId], references: [id])
+
+  auditLogs                AuditLog[]
+  claimReviews             Claim[]          @relation("ClaimReviewer")
+  raisedExceptions         ExceptionLog[]   @relation("ExceptionRaisedBy")
+  resolvedExceptions       ExceptionLog[]   @relation("ExceptionResolvedBy")
+  submittedServiceRequests ServiceRequest[] @relation("SRSubmitter")
+  respondedServiceRequests ServiceRequest[] @relation("SRResponder")
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+}
+
+// ─── GROUPS / ORGANIZATIONS ─────────────────────────────
+enum GroupStatus {
+  PROSPECT
+  PENDING
+  ACTIVE
+  SUSPENDED
+  LAPSED
+  TERMINATED
+}
+
+enum PaymentFrequency {
+  MONTHLY
+  QUARTERLY
+  SEMI_ANNUAL
+  ANNUAL
+}
+
+model Group {
+  id                 String           @id @default(cuid())
+  tenantId           String
+  tenant             Tenant           @relation(fields: [tenantId], references: [id])
+  name               String
+  industry           String?
+  registrationNumber String?
+  contactPersonName  String
+  contactPersonPhone String
+  contactPersonEmail String
+  address            String?
+  county             String?
+  packageId          String
+  package            Package          @relation(fields: [packageId], references: [id])
+  packageVersionId   String?
+  packageVersion     PackageVersion?  @relation(fields: [packageVersionId], references: [id])
+  brokerId           String?
+  broker             Broker?          @relation(fields: [brokerId], references: [id])
+  paymentFrequency   PaymentFrequency @default(ANNUAL)
+  contributionRate   Decimal // Per-member contribution amount
+  effectiveDate      DateTime
+  renewalDate        DateTime
+  status             GroupStatus      @default(PENDING)
+  suspendedAt        DateTime?
+  suspensionReason   String?
+  terminatedAt       DateTime?
+  notes              String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  members         Member[]
+  benefitTiers    GroupBenefitTier[]
+  endorsements    Endorsement[]
+  invoices        Invoice[]
+  payments        Payment[]
+  documents       Document[]
+  activityLogs    ActivityLog[]
+  quotations      Quotation[]
+  hrManagers      User[]             @relation("HRManagerGroup")
+  serviceRequests ServiceRequest[]
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([brokerId])
+}
+
+// ─── SERVICE REQUESTS (HR MODULE) ───────────────────────
+enum ServiceRequestCategory {
+  MEMBER_QUERY
+  CLAIM_QUERY
+  INVOICE_QUERY
+  CARD_REQUEST
+  BENEFIT_QUERY
+  GENERAL
+}
+
+enum ServiceRequestPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum ServiceRequestStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+model ServiceRequest {
+  id            String                 @id @default(cuid())
+  tenantId      String
+  groupId       String
+  group         Group                  @relation(fields: [groupId], references: [id])
+  submittedById String
+  submittedBy   User                   @relation("SRSubmitter", fields: [submittedById], references: [id])
+  subject       String
+  category      ServiceRequestCategory
+  priority      ServiceRequestPriority @default(NORMAL)
+  status        ServiceRequestStatus   @default(OPEN)
+  body          String
+  response      String?
+  respondedAt   DateTime?
+  respondedById String?
+  respondedBy   User?                  @relation("SRResponder", fields: [respondedById], references: [id])
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  @@index([tenantId])
+  @@index([groupId])
+  @@index([status])
+}
+
+// Named benefit tiers within a group — e.g., "Executive → Platinum", "Staff → Silver"
+model GroupBenefitTier {
+  id               String   @id @default(cuid())
+  groupId          String
+  group            Group    @relation(fields: [groupId], references: [id])
+  name             String // e.g., "Executive", "Senior Management", "Staff"
+  packageId        String
+  package          Package  @relation(fields: [packageId], references: [id])
+  contributionRate Decimal // Override contribution rate for this tier
+  description      String?
+  isDefault        Boolean  @default(false) // One tier per group can be the default
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  members Member[]
+
+  @@unique([groupId, name])
+  @@index([groupId])
+}
+
+// ─── MEMBERS ─────────────────────────────────────────────
+enum MemberStatus {
+  PENDING_ACTIVATION
+  ACTIVE
+  SUSPENDED
+  LAPSED
+  TERMINATED
+}
+
+enum MemberRelationship {
+  PRINCIPAL
+  SPOUSE
+  CHILD
+  PARENT
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+model Member {
+  id               String             @id @default(cuid())
+  tenantId         String
+  tenant           Tenant             @relation(fields: [tenantId], references: [id])
+  memberNumber     String // e.g., AVH-2024-00001
+  groupId          String
+  group            Group              @relation(fields: [groupId], references: [id])
+  firstName        String
+  lastName         String
+  otherNames       String?
+  idNumber         String? // National ID / Passport
+  dateOfBirth      DateTime
+  gender           Gender
+  phone            String?
+  email            String?
+  photoUrl         String?
+  relationship     MemberRelationship @default(PRINCIPAL)
+  principalId      String? // If dependent, links to principal member
+  principal        Member?            @relation("Dependents", fields: [principalId], references: [id])
+  dependents       Member[]           @relation("Dependents")
+  packageId        String // Inherited from group tier or set directly
+  package          Package            @relation(fields: [packageId], references: [id])
+  packageVersionId String?
+  packageVersion   PackageVersion?    @relation(fields: [packageVersionId], references: [id])
+  benefitTierId    String? // Optional: links to a GroupBenefitTier
+  benefitTier      GroupBenefitTier?  @relation(fields: [benefitTierId], references: [id])
+  enrollmentDate   DateTime
+  activationDate   DateTime?
+  status           MemberStatus       @default(PENDING_ACTIVATION)
+  waitingPeriodEnd DateTime? // General waiting period end
+  smartCardNumber  String? // SMART card number if integrated
+  slade360MemberId String? // Slade360 member ID if integrated
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
+
+  claims          Claim[]
+  preauths        PreAuthorization[]
+  benefitUsages   BenefitUsage[]
+  endorsements    Endorsement[]      @relation("EndorsementMember")
+  complaints      Complaint[]
+  user            User?
+  correspondences Correspondence[]
+  activityLogs    ActivityLog[]
+
+  @@unique([tenantId, memberNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([groupId])
+  @@index([principalId])
+  @@index([idNumber])
+}
+
+// ─── PACKAGES & BENEFITS ────────────────────────────────
+enum PackageType {
+  INDIVIDUAL
+  FAMILY
+  GROUP
+  CORPORATE
+}
+
+enum PackageStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+model Package {
+  id                 String        @id @default(cuid())
+  tenantId           String
+  tenant             Tenant        @relation(fields: [tenantId], references: [id])
+  name               String // "Avenue Essential"
+  description        String?
+  type               PackageType   @default(GROUP)
+  annualLimit        Decimal // Overall annual limit in KES
+  perVisitLimit      Decimal?
+  contributionAmount Decimal // Per-member annual contribution
+  status             PackageStatus @default(DRAFT)
+  minAge             Int           @default(0)
+  maxAge             Int           @default(65)
+  dependentMaxAge    Int           @default(24)
+  exclusions         String[] // List of excluded conditions
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  versions         PackageVersion[]
+  currentVersionId String?            @unique
+  currentVersion   PackageVersion?    @relation("CurrentVersion", fields: [currentVersionId], references: [id])
+  groups           Group[]
+  members          Member[]
+  benefitTiers     GroupBenefitTier[]
+
+  @@index([tenantId])
+}
+
+model PackageVersion {
+  id              String          @id @default(cuid())
+  packageId       String
+  package         Package         @relation(fields: [packageId], references: [id])
+  versionNumber   Int
+  effectiveFrom   DateTime
+  effectiveTo     DateTime?
+  benefits        BenefitConfig[]
+  facilityAccess  String[] // Provider IDs or "ALL_AVENUE" / "ALL_NETWORK"
+  pricingModelUrl String? // URL to uploaded pricing model (Excel/Python)
+  pricingConfig   Json? // Structured pricing parameters
+  createdAt       DateTime        @default(now())
+
+  currentForPackage Package? @relation("CurrentVersion")
+  groups            Group[]
+  members           Member[]
+
+  @@unique([packageId, versionNumber])
+}
+
+enum BenefitCategory {
+  INPATIENT
+  OUTPATIENT
+  MATERNITY
+  DENTAL
+  OPTICAL
+  MENTAL_HEALTH
+  CHRONIC_DISEASE
+  SURGICAL
+  AMBULANCE_EMERGENCY
+  LAST_EXPENSE
+  WELLNESS_PREVENTIVE
+  REHABILITATION
+  CUSTOM
+}
+
+model BenefitConfig {
+  id                 String          @id @default(cuid())
+  packageVersionId   String
+  packageVersion     PackageVersion  @relation(fields: [packageVersionId], references: [id])
+  category           BenefitCategory
+  customCategoryName String? // If category == CUSTOM
+  annualSubLimit     Decimal // KES
+  perVisitLimit      Decimal?
+  copayPercentage    Decimal         @default(0) // e.g., 10 = 10%
+  waitingPeriodDays  Int             @default(0)
+  notes              String?
+  exclusions         String[]
+
+  benefitUsages BenefitUsage[]
+
+  @@index([packageVersionId])
+}
+
+model BenefitUsage {
+  id              String        @id @default(cuid())
+  memberId        String
+  member          Member        @relation(fields: [memberId], references: [id])
+  benefitConfigId String
+  benefitConfig   BenefitConfig @relation(fields: [benefitConfigId], references: [id])
+  periodStart     DateTime // Start of the benefit period (usually enrollment anniversary)
+  periodEnd       DateTime
+  amountUsed      Decimal       @default(0)
+  claimCount      Int           @default(0)
+  lastUpdated     DateTime      @default(now())
+
+  @@unique([memberId, benefitConfigId, periodStart])
+  @@index([memberId])
+}
+
+// ─── ENDORSEMENTS ───────────────────────────────────────
+// Endorsements track mid-term changes to a group's membership
+
+enum EndorsementType {
+  MEMBER_ADDITION // New member joins mid-term
+  MEMBER_DELETION // Member exits mid-term
+  DEPENDENT_ADDITION // New dependent added
+  DEPENDENT_DELETION // Dependent removed
+  PACKAGE_UPGRADE // Member/group moves to higher package
+  PACKAGE_DOWNGRADE // Member/group moves to lower package
+  AGE_BAND_CHANGE // Age reclassification
+  BENEFIT_MODIFICATION // Change in benefits (e.g., maternity rider added)
+  SALARY_CHANGE // If contribution is salary-based
+  GROUP_DATA_CHANGE // Contact info, payment terms change
+  TIER_CHANGE // Member moved between benefit tiers within the same group
+  CORRECTION // Error correction
+}
+
+enum EndorsementStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  APPLIED // Changes have been applied to the system
+  CANCELLED
+}
+
+model Endorsement {
+  id                String            @id @default(cuid())
+  tenantId          String
+  tenant            Tenant            @relation(fields: [tenantId], references: [id])
+  endorsementNumber String // e.g., END-2025-00001
+  groupId           String
+  group             Group             @relation(fields: [groupId], references: [id])
+  type              EndorsementType
+  status            EndorsementStatus @default(DRAFT)
+  effectiveDate     DateTime
+  requestedDate     DateTime          @default(now())
+  requestedBy       String? // User ID or "BROKER" or "SYSTEM"
+
+  // The member(s) affected
+  memberId String? // For member-level endorsements
+  member   Member? @relation("EndorsementMember", fields: [memberId], references: [id])
+
+  // Change details stored as structured JSON
+  // Examples:
+  // MEMBER_ADDITION: { firstName, lastName, dob, gender, idNumber, relationship, dependents[] }
+  // MEMBER_DELETION: { reason, lastDay, refundEligible }
+  // PACKAGE_UPGRADE: { fromPackageId, toPackageId }
+  changeDetails Json
+
+  // Financial impact
+  proratedAmount  Decimal? // Pro-rata premium adjustment (+ = additional, - = refund)
+  previousPremium Decimal? // What the group was paying before
+  newPremium      Decimal? // What they'll pay after
+  premiumDelta    Decimal? // Difference
+
+  // Approval
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  reviewNotes     String?
+  rejectionReason String?
+
+  // Application
+  appliedAt DateTime?
+  appliedBy String?
+
+  documents    Document[]
+  activityLogs ActivityLog[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@unique([tenantId, endorsementNumber])
+  @@index([tenantId])
+  @@index([groupId])
+  @@index([tenantId, status])
+}
+
+// ─── CLAIMS ─────────────────────────────────────────────
+enum ClaimStatus {
+  RECEIVED
+  UNDER_REVIEW
+  APPROVED
+  PARTIALLY_APPROVED
+  DECLINED
+  PAID
+  APPEALED
+  APPEAL_APPROVED
+  APPEAL_DECLINED
+  VOID
+}
+
+enum ClaimSource {
+  MANUAL // Entered by admin
+  PREAUTH // Converted from pre-authorization
+  SMART // Received via SMART integration
+  SLADE360 // Received via Slade360 EDI
+  HMS // Received from hospital HMS
+  BATCH // Batch upload from facility
+}
+
+enum ServiceType {
+  OUTPATIENT
+  INPATIENT
+  DAY_CASE
+  EMERGENCY
+}
+
+model Claim {
+  id              String            @id @default(cuid())
+  tenantId        String
+  tenant          Tenant            @relation(fields: [tenantId], references: [id])
+  claimNumber     String // e.g., CLM-2025-00001
+  memberId        String
+  member          Member            @relation(fields: [memberId], references: [id])
+  providerId      String
+  provider        Provider          @relation(fields: [providerId], references: [id])
+  preauthId       String?           @unique // If converted from pre-auth
+  preauth         PreAuthorization? @relation(fields: [preauthId], references: [id])
+  source          ClaimSource       @default(MANUAL)
+  serviceType     ServiceType
+  dateOfService   DateTime
+  admissionDate   DateTime? // For inpatient
+  dischargeDate   DateTime?
+  lengthOfStay    Int? // Calculated days
+  attendingDoctor String?
+
+  // Diagnosis — stored as JSON array of { code, description, isPrimary }
+  diagnoses Json // [{ icdCode: "E11.9", description: "Type 2 diabetes", isPrimary: true }]
+
+  // Procedures — stored as JSON array of { code, description, quantity, unitCost, totalCost }
+  procedures Json // [{ cptCode: "99213", description: "Office visit", qty: 1, unitCost: 2500, total: 2500 }]
+
+  // Financial
+  billedAmount    Decimal
+  approvedAmount  Decimal @default(0)
+  copayAmount     Decimal @default(0)
+  excessAmount    Decimal @default(0) // Amount exceeding benefit limit
+  paidAmount      Decimal @default(0)
+  memberLiability Decimal @default(0) // Total member pays (copay + excess)
+
+  // Benefit allocation
+  benefitCategory BenefitCategory
+  benefitUsageId  String?
+
+  // Status & workflow
+  status             ClaimStatus @default(RECEIVED)
+  assignedReviewerId String?
+  assignedReviewer   User?       @relation("ClaimReviewer", fields: [assignedReviewerId], references: [id])
+  receivedAt         DateTime    @default(now())
+  reviewStartedAt    DateTime?
+  decidedAt          DateTime?
+  paidAt             DateTime?
+  turnaroundDays     Int? // Calculated: decidedAt - receivedAt
+
+  // Decline info
+  declineReasonCode String? // PREEXISTING, EXCLUSION, BENEFIT_EXHAUSTED, WAITING_PERIOD, INVALID_DOCS, NON_COVERED_FACILITY, FRAUD_SUSPECTED, OTHER
+  declineNotes      String?
+
+  // Appeal info
+  appealDate      DateTime?
+  appealNotes     String?
+  appealDecision  String?
+  appealDecidedAt DateTime?
+
+  // Integration references
+  smartClaimRef    String? // SMART claim reference
+  slade360ClaimRef String? // Slade360 eClaim reference
+  externalRef      String? // Any external reference
+
+  hasException     Boolean           @default(false)
+  claimLines       ClaimLine[]
+  documents        Document[]
+  adjudicationLogs AdjudicationLog[]
+  exceptionLogs    ExceptionLog[]    @relation("ClaimExceptions")
+  paymentVoucherId String?
+  paymentVoucher   PaymentVoucher?   @relation(fields: [paymentVoucherId], references: [id])
+
+  fraudAlerts      ClaimFraudAlert[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, claimNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([memberId])
+  @@index([providerId])
+  @@index([preauthId])
+}
+
+enum ClaimLineCategory {
+  CONSULTATION
+  LABORATORY
+  PHARMACY
+  IMAGING
+  PROCEDURE
+  OTHER
+}
+
+model ClaimLine {
+  id              String            @id @default(cuid())
+  claimId         String
+  claim           Claim             @relation(fields: [claimId], references: [id])
+  lineNumber      Int
+  serviceCategory ClaimLineCategory @default(CONSULTATION)
+  description     String
+  icdCode         String? // Diagnosis code for this line (may differ from claim header)
+  cptCode         String?
+  quantity        Int               @default(1)
+  unitCost        Decimal
+  billedAmount    Decimal
+  tariffRate      Decimal? // Contracted rate from provider tariff
+  approvedAmount  Decimal           @default(0)
+  isException     Boolean           @default(false) // Manual override applied
+  exceptionRef    String? // Reference code for exception
+  notes           String?
+
+  @@index([claimId])
+}
+
+model AdjudicationLog {
+  id         String   @id @default(cuid())
+  claimId    String
+  claim      Claim    @relation(fields: [claimId], references: [id])
+  userId     String
+  action     String // RECEIVED, REVIEW_STARTED, APPROVED, DECLINED, MORE_INFO_REQUESTED, ESCALATED, HELD, PAID, APPEALED, APPEAL_DECIDED
+  fromStatus String?
+  toStatus   String
+  amount     Decimal? // If amount was adjusted
+  notes      String?
+  createdAt  DateTime @default(now())
+
+  @@index([claimId])
+}
+
+// ─── PRE-AUTHORIZATION ──────────────────────────────────
+enum PreauthStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  DECLINED
+  EXPIRED // Approved but validity period passed without use
+  CONVERTED_TO_CLAIM // Approved and claim was created
+  CANCELLED
+}
+
+model PreAuthorization {
+  id            String        @id @default(cuid())
+  tenantId      String
+  tenant        Tenant        @relation(fields: [tenantId], references: [id])
+  preauthNumber String // e.g., PA-2025-00001
+  memberId      String
+  member        Member        @relation(fields: [memberId], references: [id])
+  providerId    String
+  provider      Provider      @relation(fields: [providerId], references: [id])
+  submittedBy   String // "MEMBER", "PROVIDER", "ADMIN", "BROKER"
+  status        PreauthStatus @default(SUBMITTED)
+
+  // Clinical info
+  diagnoses             Json // Same format as Claim.diagnoses
+  procedures            Json // Same format as Claim.procedures
+  estimatedCost         Decimal
+  clinicalNotes         String?
+  serviceType           ServiceType @default(OUTPATIENT)
+  expectedDateOfService DateTime?
+
+  // Benefit check at time of submission
+  benefitCategory  BenefitCategory
+  benefitRemaining Decimal? // Snapshot of remaining benefit at time of request
+
+  // Approval details
+  approvedAmount Decimal?
+  approvedBy     String?
+  approvedAt     DateTime?
+  validFrom      DateTime? // Validity period start
+  validUntil     DateTime? // Validity period end (e.g., 30 days from approval)
+
+  // Decline details
+  declineReasonCode String?
+  declineNotes      String?
+  declinedBy        String?
+  declinedAt        DateTime?
+
+  // Conversion to claim
+  claimId     String?
+  claim       Claim?
+  convertedAt DateTime?
+
+  documents    Document[]
+  activityLogs ActivityLog[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@unique([tenantId, preauthNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([memberId])
+}
+
+// ─── PROVIDERS / FACILITIES ─────────────────────────────
+enum ProviderType {
+  HOSPITAL
+  CLINIC
+  PHARMACY
+  LABORATORY
+  DENTAL
+  OPTICAL
+  REHABILITATION
+}
+
+enum ProviderTier {
+  OWN // Avenue's own facilities
+  PARTNER // Contracted partner facilities
+  PANEL // Wider panel
+}
+
+model Provider {
+  id                 String       @id @default(cuid())
+  tenantId           String
+  tenant             Tenant       @relation(fields: [tenantId], references: [id])
+  name               String
+  type               ProviderType
+  tier               ProviderTier @default(PARTNER)
+  address            String?
+  county             String?
+  phone              String?
+  email              String?
+  contactPerson      String?
+  servicesOffered    String[] // ["Inpatient", "Outpatient", "Maternity", "Surgery", "Pharmacy", "ICU"]
+  contractStatus     String       @default("ACTIVE") // ACTIVE, PENDING, EXPIRED
+  contractStartDate  DateTime?
+  contractEndDate    DateTime?
+  paymentTermDays    Int          @default(30) // e.g. Net 30, Net 14
+  creditLimit        Decimal? // Maximum outstanding payable (KES)
+  contractNotes      String? // Free-text contract summary / special terms
+  smartProviderId    String? // SMART provider code
+  slade360ProviderId String? // Slade360 provider code
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  tariffs          ProviderTariff[]
+  diagnosisTariffs ProviderDiagnosisTariff[]
+  claims           Claim[]
+  preauths         PreAuthorization[]
+
+  @@index([tenantId])
+  @@index([tenantId, tier])
+}
+
+model ProviderTariff {
+  id            String    @id @default(cuid())
+  providerId    String
+  provider      Provider  @relation(fields: [providerId], references: [id])
+  cptCode       String?
+  serviceName   String
+  agreedRate    Decimal // KES — overrides standard CPT charge for this provider
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([providerId])
+  @@index([providerId, cptCode])
+}
+
+// Diagnosis-based bundled rates — e.g. malaria admission = KES 8,000/day flat
+model ProviderDiagnosisTariff {
+  id             String    @id @default(cuid())
+  providerId     String
+  provider       Provider  @relation(fields: [providerId], references: [id])
+  icdCode        String // ICD-10 code this rate applies to
+  diagnosisLabel String // Human-readable label (copied at time of creation)
+  bundledRate    Decimal? // Fixed package rate for the whole episode (KES)
+  perDayRate     Decimal? // Per diem rate (KES/day) — for inpatient
+  notes          String? // Any special conditions or inclusions
+  effectiveFrom  DateTime
+  effectiveTo    DateTime?
+  createdAt      DateTime  @default(now())
+
+  @@index([providerId])
+  @@index([providerId, icdCode])
+}
+
+// ─── BROKERS ─────────────────────────────────────────────
+model Broker {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  name          String // Company name
+  contactPerson String
+  phone         String
+  email         String
+  address       String?
+  licenseNumber String? // IRA license
+  status        String   @default("ACTIVE")
+  dateOnboarded DateTime @default(now())
+
+  // Commission structure
+  firstYearCommissionPct Decimal  @default(0) // % of first-year contribution
+  renewalCommissionPct   Decimal  @default(0) // % of renewal contribution
+  flatFeePerMember       Decimal? // Alternative: flat fee per member
+  commissionStructure    Json? // Complex tiered structures
+
+  groups      Group[]
+  commissions Commission[]
+  documents   Document[]
+  user        User?
+  quotations  Quotation[]
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([tenantId])
+}
+
+model Commission {
+  id                   String    @id @default(cuid())
+  brokerId             String
+  broker               Broker    @relation(fields: [brokerId], references: [id])
+  period               String // "2025-03" (year-month)
+  groupId              String?
+  contributionReceived Decimal
+  commissionRate       Decimal // The applicable rate
+  commissionAmount     Decimal
+  paymentStatus        String    @default("PENDING") // PENDING, APPROVED, PAID
+  paidAt               DateTime?
+  paymentReference     String?
+  createdAt            DateTime  @default(now())
+
+  @@index([brokerId])
+  @@index([brokerId, period])
+}
+
+// ─── BILLING & FINANCE ──────────────────────────────────
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIALLY_PAID
+  PAID
+  OVERDUE
+  VOID
+}
+
+model Invoice {
+  id            String        @id @default(cuid())
+  tenantId      String
+  tenant        Tenant        @relation(fields: [tenantId], references: [id])
+  invoiceNumber String // e.g., INV-2025-00001
+  groupId       String
+  group         Group         @relation(fields: [groupId], references: [id])
+  period        String // "2025-03"
+  memberCount   Int
+  ratePerMember Decimal
+  totalAmount   Decimal
+  paidAmount    Decimal       @default(0)
+  balance       Decimal // totalAmount - paidAmount
+  dueDate       DateTime
+  status        InvoiceStatus @default(DRAFT)
+  sentAt        DateTime?
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  payments Payment[]
+
+  @@unique([tenantId, invoiceNumber])
+  @@index([tenantId])
+  @@index([groupId])
+}
+
+model Payment {
+  id              String    @id @default(cuid())
+  groupId         String
+  group           Group     @relation(fields: [groupId], references: [id])
+  invoiceId       String?
+  invoice         Invoice?  @relation(fields: [invoiceId], references: [id])
+  amount          Decimal
+  paymentDate     DateTime
+  paymentMethod   String // BANK_TRANSFER, CHEQUE, MPESA, CARD
+  referenceNumber String?
+  notes           String?
+  reconciledAt    DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([groupId])
+  @@index([invoiceId])
+}
+
+model PaymentVoucher {
+  id            String    @id @default(cuid())
+  voucherNumber String
+  providerId    String
+  totalAmount   Decimal
+  claimCount    Int
+  status        String    @default("PENDING") // PENDING, APPROVED, PROCESSED
+  processedAt   DateTime?
+  processedBy   String?
+  createdAt     DateTime  @default(now())
+
+  claims Claim[]
+}
+
+// ─── QUOTATIONS ─────────────────────────────────────────
+enum QuotationStatus {
+  DRAFT
+  SENT
+  REVISED
+  ACCEPTED
+  DECLINED
+  EXPIRED
+}
+
+model Quotation {
+  id          String  @id @default(cuid())
+  tenantId    String
+  tenant      Tenant  @relation(fields: [tenantId], references: [id])
+  quoteNumber String // e.g., QUO-2025-00001
+  groupId     String? // If quoting for existing group (renewal)
+  group       Group?  @relation(fields: [groupId], references: [id])
+  brokerId    String? // If submitted by broker
+  broker      Broker? @relation(fields: [brokerId], references: [id])
+  createdBy   String // User ID
+
+  // Prospect info (if new group)
+  prospectName     String?
+  prospectContact  String?
+  prospectEmail    String?
+  prospectIndustry String?
+
+  // Quote details
+  packageId      String?
+  memberCount    Int
+  dependentCount Int             @default(0)
+  ageBands       Json? // [{ minAge, maxAge, count, rate }]
+  ratePerMember  Decimal
+  annualPremium  Decimal // Total annual contribution
+  loadings       Json? // { claimsHistory: 15, industry: 5 } — percentage loadings
+  discounts      Json? // { groupSize: -10, loyaltyYears: -5 }
+  finalPremium   Decimal // After loadings/discounts
+  pricingNotes   String?
+  validUntil     DateTime
+  status         QuotationStatus @default(DRAFT)
+
+  // If using uploaded pricing model
+  pricingModelId String?
+  pricingModel   PricingModel? @relation(fields: [pricingModelId], references: [id])
+
+  documents Document[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@unique([tenantId, quoteNumber])
+  @@index([tenantId])
+}
+
+model PricingModel {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String // "Standard Flat Rate", "Age-Banded Model 2025"
+  description String?
+  type        String // FLAT_RATE, AGE_BANDED, EXPERIENCE_RATED, CUSTOM
+  fileUrl     String? // Uploaded Excel/Python pricing model
+  parameters  Json // Structured pricing parameters
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  quotations Quotation[]
+}
+
+// ─── SUPPORTING ENTITIES ────────────────────────────────
+
+model Document {
+  id            String            @id @default(cuid())
+  fileName      String
+  fileUrl       String
+  fileSize      Int?
+  mimeType      String?
+  category      String // INVOICE, LAB_RESULT, DISCHARGE_SUMMARY, AGREEMENT, MEMBER_LIST, TARIFF_SCHEDULE, CLAIM_SUPPORT, ENDORSEMENT, QUOTATION
+  uploadedBy    String?
+  // Polymorphic relation via nullable FKs
+  groupId       String?
+  group         Group?            @relation(fields: [groupId], references: [id])
+  endorsementId String?
+  endorsement   Endorsement?      @relation(fields: [endorsementId], references: [id])
+  claimId       String?
+  claim         Claim?            @relation(fields: [claimId], references: [id])
+  preauthId     String?
+  preauth       PreAuthorization? @relation(fields: [preauthId], references: [id])
+  brokerId      String?
+  broker        Broker?           @relation(fields: [brokerId], references: [id])
+  quotationId   String?
+  quotation     Quotation?        @relation(fields: [quotationId], references: [id])
+  createdAt     DateTime          @default(now())
+}
+
+model Correspondence {
+  id       String   @id @default(cuid())
+  memberId String
+  member   Member   @relation(fields: [memberId], references: [id])
+  type     String // WELCOME, CARD_ISSUED, CLAIM_UPDATE, RENEWAL_REMINDER, SUSPENSION_NOTICE, PREAUTH_STATUS
+  channel  String // EMAIL, SMS, BOTH
+  subject  String?
+  body     String?
+  status   String   @default("SENT") // SENT, FAILED, PENDING
+  sentAt   DateTime @default(now())
+}
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  entityType  String // GROUP, MEMBER, CLAIM, PREAUTH, ENDORSEMENT
+  entityId    String
+  action      String // CREATED, UPDATED, STATUS_CHANGED, PAYMENT_RECEIVED, etc.
+  description String
+  userId      String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  // Polymorphic references
+  groupId       String?
+  group         Group?            @relation(fields: [groupId], references: [id])
+  memberId      String?
+  member        Member?           @relation(fields: [memberId], references: [id])
+  endorsementId String?
+  endorsement   Endorsement?      @relation(fields: [endorsementId], references: [id])
+  preauthId     String?
+  preauth       PreAuthorization? @relation(fields: [preauthId], references: [id])
+
+  @@index([entityType, entityId])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  action      String
+  module      String
+  description String
+  ipAddress   String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([module])
+  @@index([createdAt])
+}
+
+// ─── MEDICAL CODE REFERENCE ─────────────────────────────
+model ICD10Code {
+  code           String   @id // "E11.9"
+  description    String // "Type 2 diabetes mellitus, unspecified"
+  category       String // "Endocrine, nutritional and metabolic diseases"
+  chapterCode    String? // "IV"
+  standardCharge Decimal? // Standard consultation/admission charge in KES for this diagnosis
+}
+
+model CPTCode {
+  code            String   @id // "99213"
+  description     String // "Office or other outpatient visit, established patient"
+  category        String // "Evaluation and Management"
+  serviceCategory String   @default("CONSULTATION") // CONSULTATION, LABORATORY, PHARMACY, IMAGING, PROCEDURE, OTHER
+  averageCost     Decimal? // Reference cost in KES — used when no provider tariff exists
+}
+
+// ─── NOTIFICATION TEMPLATES ─────────────────────────────
+model NotificationTemplate {
+  id           String   @id @default(cuid())
+  tenantId     String
+  name         String // "Welcome Email"
+  type         String // WELCOME, CARD_ISSUED, CLAIM_APPROVED, CLAIM_DECLINED, RENEWAL_REMINDER_30, RENEWAL_REMINDER_7, PAYMENT_OVERDUE, SUSPENSION_NOTICE
+  channel      String // EMAIL, SMS, BOTH
+  subject      String? // For email
+  bodyTemplate String // Template with {{variables}}
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+// ─── EXCEPTION LOGS ─────────────────────────────────────
+
+enum ExceptionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model ExceptionLog {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  entityType String // CLAIM | PREAUTH | CLAIM_LINE | INVOICE
+  entityId   String // id of the affected record
+  entityRef  String? // Human-readable ref e.g. "CLM-2025-00001"
+
+  // Polymorphic claim link (optional — for quick JOIN)
+  claimId String?
+  claim   Claim?  @relation("ClaimExceptions", fields: [claimId], references: [id])
+
+  exceptionCode String // BENEFIT_EXCEEDED | MANUAL_OVERRIDE | LATE_SUBMISSION | PROVIDER_RATE_DISPUTE | FRAUD_INVESTIGATION | DUPLICATE_CHECK | OTHER
+  reason        String
+  notes         String?
+
+  raisedById String
+  raisedBy   User   @relation("ExceptionRaisedBy", fields: [raisedById], references: [id])
+
+  status         ExceptionStatus @default(PENDING)
+  resolvedById   String?
+  resolvedBy     User?           @relation("ExceptionResolvedBy", fields: [resolvedById], references: [id])
+  resolvedAt     DateTime?
+  resolutionNote String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([entityType, entityId])
+  @@index([claimId])
+}
+
+// ─── GENERAL LEDGER ──────────────────────────────────────
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  REVENUE
+  EXPENSE
+}
+
+enum NormalBalance {
+  DEBIT
+  CREDIT
+}
+
+enum JournalStatus {
+  POSTED
+  REVERSED
+}
+
+enum GLSourceType {
+  INVOICE_ISSUED
+  PREMIUM_RECEIVED
+  CLAIM_APPROVED
+  CLAIM_PAID
+  COMMISSION_EARNED
+  ENDORSEMENT_ADJUSTMENT
+  MANUAL
+}
+
+model ChartOfAccount {
+  id            String        @id @default(cuid())
+  tenantId      String
+  tenant        Tenant        @relation(fields: [tenantId], references: [id])
+  code          String // e.g. "1100"
+  name          String // e.g. "Premium Receivables"
+  type          AccountType
+  subtype       String? // e.g. "Current Assets"
+  normalBalance NormalBalance
+  description   String?
+  isActive      Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+
+  journalLines JournalLine[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, type])
+}
+
+model JournalEntry {
+  id           String        @id @default(cuid())
+  tenantId     String
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  entryNumber  String // "JE-2025-00001"
+  entryDate    DateTime
+  description  String
+  reference    String? // Invoice / claim / payment ref
+  sourceType   GLSourceType
+  sourceId     String? // ID of triggering record
+  status       JournalStatus @default(POSTED)
+  postedById   String?
+  isReversed   Boolean       @default(false)
+  reversalOfId String? // Set on the reversal entry; points back to original
+
+  lines     JournalLine[]
+  createdAt DateTime      @default(now())
+
+  @@unique([tenantId, entryNumber])
+  @@index([tenantId])
+  @@index([tenantId, sourceType, sourceId])
+  @@index([entryDate])
+  @@index([tenantId, status])
+}
+
+model JournalLine {
+  id             String         @id @default(cuid())
+  journalEntryId String
+  journalEntry   JournalEntry   @relation(fields: [journalEntryId], references: [id])
+  accountId      String
+  account        ChartOfAccount @relation(fields: [accountId], references: [id])
+  description    String?
+  debit          Decimal        @default(0)
+  credit         Decimal        @default(0)
+
+  @@index([journalEntryId])
+  @@index([accountId])
+}
+
+// ─── INTEGRATION CONFIG ─────────────────────────────────
+model IntegrationConfig {
+  id         String    @id @default(cuid())
+  tenantId   String
+  provider   String // SMART, SLADE360, HMS, SHA, ERP
+  isEnabled  Boolean   @default(false)
+  apiBaseUrl String?
+  apiKey     String? // Encrypted
+  apiSecret  String? // Encrypted
+  config     Json      @default("{}")
+  lastSyncAt DateTime?
+  status     String    @default("DISCONNECTED") // CONNECTED, DISCONNECTED, ERROR
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([tenantId, provider])
+}
+
+// ─── FRAUD ALERTS ────────────────────────────────────────
+
+enum FraudSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model ClaimFraudAlert {
+  id         String        @id @default(cuid())
+  tenantId   String
+  tenant     Tenant        @relation(fields: [tenantId], references: [id])
+  claimId    String
+  claim      Claim         @relation(fields: [claimId], references: [id])
+  rule       String        // e.g. "Velocity Check", "Unauth High Value"
+  score      Int           // Severity confidence (1-100)
+  severity   FraudSeverity @default(MEDIUM)
+  notes      String?
+  resolved   Boolean       @default(false)
+  resolvedBy String?
+  resolvedAt DateTime?
+  createdAt  DateTime      @default(now())
+
+  @@index([tenantId])
+  @@index([claimId])
+  @@index([resolved])
+}
+
+// ─── COMPLAINTS ──────────────────────────────────────────
+
+enum ComplaintStatus {
+  OPEN
+  INVESTIGATING
+  RESOLVED
+  DISMISSED
+}
+
+model Complaint {
+  id          String          @id @default(cuid())
+  tenantId    String
+  tenant      Tenant          @relation(fields: [tenantId], references: [id])
+  memberId    String?
+  member      Member?         @relation(fields: [memberId], references: [id])
+  subject     String
+  type        String          // e.g. "SERVICE", "FACILITY", "BILLING"
+  description String
+  status      ComplaintStatus @default(OPEN)
+  resolution  String?
+  resolvedAt  DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([tenantId])
+  @@index([memberId])
+  @@index([status])
+}
