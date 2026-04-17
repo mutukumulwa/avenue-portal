@@ -453,4 +453,104 @@ export class FraudService {
 
     return warnings;
   }
+
+  // ── CO-CONTRIBUTION FRAUD RULES (called post-adjudication) ────────────────
+
+  static async evaluateCoContribution(params: {
+    claimId: string;
+    tenantId: string;
+    memberId: string;
+    finalAmount: number;
+    collectionStatus: string;
+    waiverReason?: string | null;
+    waiverApprovedBy?: string | null;
+  }): Promise<string[]> {
+    const warnings: string[] = [];
+
+    // RULE-COC-001: Waiver without documented reason
+    if (
+      params.collectionStatus === "WAIVED" &&
+      (!params.waiverReason || params.waiverReason.trim().length < 10)
+    ) {
+      warnings.push(
+        "RULE-COC-001: Co-contribution waived without adequate documented reason — ensure a supervisor has reviewed and approved."
+      );
+    }
+
+    // RULE-COC-002: Repeated waivers for the same member
+    const recentWaivers = await prisma.coContributionTransaction.count({
+      where: {
+        memberId: params.memberId,
+        collectionStatus: "WAIVED",
+        NOT: { claimId: params.claimId },
+        createdAt: { gte: new Date(Date.now() - 90 * 24 * 60 * 60 * 1000) },
+      },
+    });
+    if (recentWaivers >= 2) {
+      warnings.push(
+        `RULE-COC-002: Member has had ${recentWaivers} co-contribution waivers in the last 90 days — review for systematic waiver abuse.`
+      );
+    }
+
+    // RULE-COC-003: Amount collected exceeds calculated final amount
+    const tx = await prisma.coContributionTransaction.findUnique({
+      where: { claimId: params.claimId },
+    });
+    if (tx) {
+      const collected = Number(tx.amountCollected ?? 0);
+      const final = Number(tx.finalAmount);
+      if (collected > final * 1.01) {
+        warnings.push(
+          `RULE-COC-003: Amount collected (${collected.toFixed(2)}) exceeds calculated co-contribution (${final.toFixed(2)}) — verify for overcharging.`
+        );
+      }
+    }
+
+    // RULE-COC-004: Zero co-contribution on a high-value claim without waiver
+    if (params.finalAmount === 0 && params.collectionStatus !== "WAIVED") {
+      const claim = await prisma.claim.findUnique({
+        where: { id: params.claimId },
+        select: { billedAmount: true },
+      });
+      if (claim && Number(claim.billedAmount) > 50_000) {
+        warnings.push(
+          "RULE-COC-004: Zero co-contribution applied on a claim exceeding KES 50,000 — confirm a NONE-type rule is intentional for this benefit category and network tier."
+        );
+      }
+    }
+
+    // RULE-COC-005: Annual cap reached suspiciously early (before Q3)
+    if (params.collectionStatus !== "WAIVED") {
+      const yearStart = new Date(new Date().getFullYear(), 0, 1);
+      const q3Start = new Date(new Date().getFullYear(), 6, 1);
+      const memberCap = await prisma.memberAnnualCoContribution.findFirst({
+        where: {
+          memberId: params.memberId,
+          capReached: true,
+          updatedAt: { gte: yearStart, lt: q3Start },
+        },
+      });
+      if (memberCap) {
+        warnings.push(
+          "RULE-COC-005: Member's annual co-contribution cap was reached before Q3 — review for potential benefit overuse or rule misconfiguration."
+        );
+      }
+    }
+
+    // RULE-COC-006: Waiver approved by same user who submitted the claim
+    // (uses memberId as a proxy since Claim has no createdBy field)
+    if (params.collectionStatus === "WAIVED" && params.waiverApprovedBy) {
+      const coTx = await prisma.coContributionTransaction.findUnique({
+        where: { claimId: params.claimId },
+        select: { waiverApprovedBy: true },
+      });
+      if (coTx?.waiverApprovedBy === params.memberId) {
+        warnings.push(
+          "RULE-COC-006: Co-contribution waiver approver matches the member ID on this claim — segregation of duties review recommended."
+        );
+      }
+    }
+
+    return warnings;
+  }
 }

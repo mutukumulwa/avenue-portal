@@ -4,6 +4,8 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { ClaimsService } from "@/server/services/claims.service";
+import { CoContributionService } from "@/server/services/coContribution/coContribution.service";
+import Decimal from "decimal.js";
 import { revalidatePath } from "next/cache";
 import { GLService } from "@/server/services/gl.service";
 import { writeAudit } from "@/lib/audit";
@@ -164,4 +166,62 @@ export async function resolveExceptionAction(formData: FormData) {
 
   revalidatePath(`/claims/${claimId}`);
   revalidatePath(`/settings/exceptions`);
+}
+
+// ── Co-contribution collection ─────────────────────────────────────────────
+
+export async function collectCoContributionAction(
+  formData: FormData,
+): Promise<{ error?: string }> {
+  const session = await requireRole(ROLES.OPS);
+
+  const transactionId    = formData.get("transactionId") as string;
+  const amountCollected  = Number(formData.get("amountCollected"));
+  const paymentMethod    = formData.get("paymentMethod") as string;
+  const mpesaRef         = (formData.get("mpesaRef") as string) || undefined;
+
+  if (!transactionId || isNaN(amountCollected) || amountCollected <= 0) {
+    return { error: "Invalid collection details." };
+  }
+
+  const tx = await prisma.coContributionTransaction.findUnique({
+    where: { id: transactionId },
+    select: { id: true, claimId: true, tenantId: true },
+  });
+  if (!tx || tx.tenantId !== session.user.tenantId) return { error: "Transaction not found." };
+
+  await CoContributionService.recordCollection(
+    transactionId,
+    new Decimal(amountCollected),
+    paymentMethod,
+    mpesaRef,
+  );
+
+  revalidatePath(`/claims/${tx.claimId}`);
+  return {};
+}
+
+export async function waiveCoContributionAction(
+  formData: FormData,
+): Promise<{ error?: string }> {
+  const session = await requireRole(ROLES.OPS);
+
+  const transactionId = formData.get("transactionId") as string;
+  const reason        = (formData.get("reason") as string)?.trim();
+  const approvedBy    = (formData.get("approvedBy") as string)?.trim();
+
+  if (!transactionId || !reason || reason.length < 10 || !approvedBy) {
+    return { error: "Provide a reason (min 10 chars) and the approver name." };
+  }
+
+  const tx = await prisma.coContributionTransaction.findUnique({
+    where: { id: transactionId },
+    select: { id: true, claimId: true, tenantId: true },
+  });
+  if (!tx || tx.tenantId !== session.user.tenantId) return { error: "Transaction not found." };
+
+  await CoContributionService.waiveCoContribution(transactionId, reason, approvedBy);
+
+  revalidatePath(`/claims/${tx.claimId}`);
+  return {};
 }

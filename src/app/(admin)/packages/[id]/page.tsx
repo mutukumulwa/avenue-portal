@@ -1,14 +1,22 @@
 import { requireRole, ROLES } from "@/lib/rbac";
-import { redirect, notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import { PackagesService } from "@/server/services/packages.service";
+import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle, Clock, Shield, Pencil } from "lucide-react";
+import { ArrowLeft, CheckCircle, Clock, Shield, Pencil, Percent } from "lucide-react";
 
 export default async function PackageDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requireRole(ROLES.UNDERWRITING);
 
   const { id } = await params;
-  const pkg = await PackagesService.getPackageById(session.user.tenantId, id);
+  const [pkg, coRules, annualCap] = await Promise.all([
+    PackagesService.getPackageById(session.user.tenantId, id),
+    prisma.coContributionRule.findMany({
+      where: { packageId: id },
+      orderBy: [{ benefitCategory: "asc" }, { networkTier: "asc" }],
+    }),
+    prisma.annualCoContributionCap.findUnique({ where: { packageId: id } }),
+  ]);
   if (!pkg) notFound();
 
   const currentBenefits = pkg.currentVersion?.benefits ?? [];
@@ -124,6 +132,66 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
             )}
           </div>
         </div>
+      </div>
+
+      {/* Co-Contribution Rules */}
+      <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-[#EEEEEE] flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Percent size={15} className="text-avenue-indigo" />
+            <h2 className="font-bold text-avenue-text-heading font-heading">Co-Contribution Rules</h2>
+          </div>
+          {annualCap && (
+            <span className="text-xs text-avenue-text-muted">
+              Annual caps — Individual: KES {Number(annualCap.individualCap).toLocaleString()} · Family: KES {Number(annualCap.familyCap).toLocaleString()}
+            </span>
+          )}
+        </div>
+        {coRules.length === 0 ? (
+          <p className="px-5 py-4 text-sm text-avenue-text-body">No co-contribution rules configured for this package.</p>
+        ) : (
+          <table className="w-full text-left text-sm">
+            <thead>
+              <tr className="bg-[#E6E7E8] text-[#6C757D] font-semibold border-b border-[#EEEEEE]">
+                <th className="px-5 py-3">Benefit Category</th>
+                <th className="px-5 py-3">Network Tier</th>
+                <th className="px-5 py-3">Type</th>
+                <th className="px-5 py-3">Amount / %</th>
+                <th className="px-5 py-3">Per-Visit Cap</th>
+                <th className="px-5 py-3">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#EEEEEE] text-avenue-text-body">
+              {coRules.map(r => (
+                <tr key={r.id} className="hover:bg-[#F8F9FA]">
+                  <td className="px-5 py-3 font-semibold text-avenue-text-heading">
+                    {r.benefitCategory ? r.benefitCategory.replace(/_/g, " ") : <span className="text-avenue-text-muted italic">All categories</span>}
+                  </td>
+                  <td className="px-5 py-3">{r.networkTier.replace("_", " ")}</td>
+                  <td className="px-5 py-3">{r.type.replace(/_/g, " ")}</td>
+                  <td className="px-5 py-3 font-mono">
+                    {r.type === "PERCENTAGE" || r.type === "HYBRID"
+                      ? `${r.percentage ?? 0}%`
+                      : r.type === "FIXED_AMOUNT"
+                      ? `KES ${Number(r.fixedAmount ?? 0).toLocaleString()}`
+                      : "—"}
+                    {r.type === "HYBRID" && r.fixedAmount
+                      ? ` / KES ${Number(r.fixedAmount).toLocaleString()} floor`
+                      : ""}
+                  </td>
+                  <td className="px-5 py-3 font-mono">
+                    {r.perVisitCap ? `KES ${Number(r.perVisitCap).toLocaleString()}` : "—"}
+                  </td>
+                  <td className="px-5 py-3">
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${r.isActive ? "bg-[#28A745]/10 text-[#28A745]" : "bg-[#6C757D]/10 text-[#6C757D]"}`}>
+                      {r.isActive ? "Active" : "Inactive"}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </div>
 
       {/* Version history */}

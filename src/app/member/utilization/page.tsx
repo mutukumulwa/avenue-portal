@@ -12,8 +12,12 @@ export default async function MemberUtilizationPage() {
         include: {
           claims: {
             orderBy: { createdAt: "desc" },
-            include: { provider: { select: { name: true, type: true } } },
+            include: {
+              provider: { select: { name: true, type: true } },
+              coContributionTransaction: { select: { finalAmount: true, amountCollected: true, collectionStatus: true } },
+            },
           },
+          annualCoContributions: { orderBy: { membershipYear: "desc" }, take: 1 },
         },
       },
     },
@@ -26,6 +30,13 @@ export default async function MemberUtilizationPage() {
   const totalBilled = claims.reduce((s, c) => s + Number(c.billedAmount), 0);
   const totalApproved = claims.reduce((s, c) => s + Number(c.approvedAmount), 0);
   const totalPaid = claims.reduce((s, c) => s + Number(c.paidAmount), 0);
+  const currentYear = new Date().getFullYear();
+  const ytdCoContrib = member.annualCoContributions[0]?.membershipYear === currentYear
+    ? Number(member.annualCoContributions[0].totalCoContribution)
+    : 0;
+  const capReached = member.annualCoContributions[0]?.membershipYear === currentYear
+    ? member.annualCoContributions[0].capReached
+    : false;
 
   const statusColor = (status: string) => {
     switch (status) {
@@ -44,15 +55,19 @@ export default async function MemberUtilizationPage() {
         <p className="text-avenue-text-muted mt-1">Your claims and utilization history.</p>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: "Total Billed (KES)", value: totalBilled.toLocaleString(), color: "text-avenue-indigo" },
           { label: "Approved (KES)", value: totalApproved.toLocaleString(), color: "text-[#28A745]" },
           { label: "Paid (KES)", value: totalPaid.toLocaleString(), color: "text-[#17A2B8]" },
+          { label: `My Share ${currentYear} (KES)`, value: ytdCoContrib.toLocaleString(), color: capReached ? "text-[#DC3545]" : "text-[#856404]" },
         ].map((s) => (
           <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-lg p-4 shadow-sm">
             <p className="text-xs text-avenue-text-muted font-bold uppercase">{s.label}</p>
             <p className={`text-xl font-bold mt-1 ${s.color}`}>{s.value}</p>
+            {s.label.startsWith("My Share") && capReached && (
+              <p className="text-[10px] text-[#DC3545] font-bold mt-1 uppercase">Annual cap reached</p>
+            )}
           </div>
         ))}
       </div>
@@ -73,6 +88,13 @@ export default async function MemberUtilizationPage() {
                   <p className="font-bold text-avenue-text-heading">KES {Number(c.billedAmount).toLocaleString()}</p>
                   {Number(c.approvedAmount) > 0 && (
                     <p className="text-xs text-[#28A745] mt-0.5">Approved: KES {Number(c.approvedAmount).toLocaleString()}</p>
+                  )}
+                  {c.coContributionTransaction && Number(c.coContributionTransaction.finalAmount) > 0 && (
+                    <p className="text-xs text-[#856404] mt-0.5">
+                      Your share: KES {Number(c.coContributionTransaction.finalAmount).toLocaleString()}
+                      {" · "}
+                      <span className="capitalize">{c.coContributionTransaction.collectionStatus.toLowerCase()}</span>
+                    </p>
                   )}
                   <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-full inline-block mt-1 ${statusColor(c.status)}`}>
                     {c.status.replace(/_/g, " ")}

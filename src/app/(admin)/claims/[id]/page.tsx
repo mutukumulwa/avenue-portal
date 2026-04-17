@@ -3,9 +3,11 @@ import { notFound } from "next/navigation";
 import { ClaimsService } from "@/server/services/claims.service";
 import { adjudicateClaimAction, resolveExceptionAction } from "./actions";
 import { ExceptionModal } from "./ExceptionModal";
-import { ArrowLeft, Clock, CheckCircle2, XCircle, AlertTriangle, Info, FlaskConical, Pill, ScanLine, Stethoscope, Scissors, HelpCircle, ShieldAlert, ShieldCheck, ShieldX } from "lucide-react";
+import { ArrowLeft, Clock, CheckCircle2, XCircle, AlertTriangle, Info, FlaskConical, Pill, ScanLine, Stethoscope, Scissors, HelpCircle, ShieldAlert, ShieldCheck, ShieldX, Percent } from "lucide-react";
 import Link from "next/link";
 import { ClaimDocuments } from "./ClaimDocuments";
+import { prisma } from "@/lib/prisma";
+import { CoContributionCollectionForm } from "./CoContributionCollectionForm";
 
 const LINE_CAT_META: Record<string, { label: string; color: string; Icon: React.ElementType }> = {
   CONSULTATION: { label: "Consultation", color: "bg-avenue-indigo/10 text-avenue-indigo",  Icon: Stethoscope },
@@ -21,9 +23,10 @@ export default async function ClaimDetailPage({ params }: { params: Promise<{ id
 
   const { id } = await params;
   const tenantId = session.user.tenantId;
-  const [claim, tariffVariances] = await Promise.all([
+  const [claim, tariffVariances, coContribTx] = await Promise.all([
     ClaimsService.getClaimById(tenantId, id),
     ClaimsService.getClaimTariffVariances(tenantId, id),
+    prisma.coContributionTransaction.findUnique({ where: { claimId: id } }),
   ]);
 
   if (!claim) notFound();
@@ -324,6 +327,16 @@ export default async function ClaimDetailPage({ params }: { params: Promise<{ id
           mimeType: d.mimeType ?? null,
         }))}
       />
+
+      {/* Co-contribution */}
+      {coContribTx && (
+        <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm">
+          <h3 className="text-sm font-bold text-avenue-text-heading uppercase tracking-wide mb-1 flex items-center gap-2">
+            <Percent size={15} className="text-avenue-indigo" /> Member Co-Contribution
+          </h3>
+          <CoContributionCollectionForm transaction={coContribTx} />
+        </div>
+      )}
 
       {/* Adjudication form */}
       {canAdjudicate && (

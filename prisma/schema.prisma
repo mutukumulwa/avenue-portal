@@ -38,6 +38,11 @@ model Tenant {
   journalEntries   JournalEntry[]
   fraudAlerts      ClaimFraudAlert[]
   complaints       Complaint[]
+  coContributionRules        CoContributionRule[]
+  annualCoContributionCaps   AnnualCoContributionCap[]
+  coContributionTransactions CoContributionTransaction[]
+  memberAnnualCoContributions MemberAnnualCoContribution[]
+  familyAnnualCoContributions FamilyAnnualCoContribution[]
 }
 
 // ─── USERS & AUTH ────────────────────────────────────────
@@ -279,8 +284,11 @@ model Member {
   preauths        PreAuthorization[]
   benefitUsages   BenefitUsage[]
   endorsements    Endorsement[]      @relation("EndorsementMember")
-  complaints      Complaint[]
-  user            User?
+  complaints                 Complaint[]
+  coContributionTransactions CoContributionTransaction[]
+  annualCoContributions      MemberAnnualCoContribution[]
+  familyCoContributions      FamilyAnnualCoContribution[] @relation("FamilyCoContributions")
+  user                       User?
   correspondences Correspondence[]
   activityLogs    ActivityLog[]
 
@@ -329,7 +337,9 @@ model Package {
   currentVersion   PackageVersion?    @relation("CurrentVersion", fields: [currentVersionId], references: [id])
   groups           Group[]
   members          Member[]
-  benefitTiers     GroupBenefitTier[]
+  benefitTiers            GroupBenefitTier[]
+  coContributionRules     CoContributionRule[]
+  annualCoContributionCap AnnualCoContributionCap?
 
   @@index([tenantId])
 }
@@ -583,7 +593,8 @@ model Claim {
   paymentVoucherId String?
   paymentVoucher   PaymentVoucher?   @relation(fields: [paymentVoucherId], references: [id])
 
-  fraudAlerts      ClaimFraudAlert[]
+  fraudAlerts               ClaimFraudAlert[]
+  coContributionTransaction CoContributionTransaction?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1287,4 +1298,174 @@ model Complaint {
   @@index([tenantId])
   @@index([memberId])
   @@index([status])
+}
+
+// ─── CO-CONTRIBUTION ────────────────────────────────────────────────────────
+
+enum CoContributionType {
+  FIXED_AMOUNT  // Flat KES amount per encounter
+  PERCENTAGE    // % of eligible cost
+  HYBRID        // Fixed minimum OR percentage, whichever is greater
+  NONE          // Exempt service — zero co-contribution
+}
+
+// Maps to Provider.tier: OWN → TIER_1, PARTNER/PANEL → TIER_2, unknown → TIER_3
+enum NetworkTier {
+  TIER_1  // Avenue own facilities
+  TIER_2  // Contracted partner / panel
+  TIER_3  // Out-of-network
+}
+
+enum CoContributionCollectionStatus {
+  PENDING
+  COLLECTED
+  PARTIAL
+  WAIVED
+  DEFERRED
+  REFUNDED
+  WRITTEN_OFF
+}
+
+enum CoContributionPaymentMethod {
+  CASH
+  MPESA
+  CARD
+  BANK_TRANSFER
+  OFFSET
+}
+
+// One rule per (package × benefit category × network tier × effective period)
+// benefitCategory == null means package-wide default for that tier
+model CoContributionRule {
+  id         String  @id @default(cuid())
+  tenantId   String
+  tenant     Tenant  @relation(fields: [tenantId], references: [id])
+  packageId  String
+  package    Package @relation(fields: [packageId], references: [id])
+
+  benefitCategory BenefitCategory? // null = package-wide default
+  networkTier     NetworkTier      @default(TIER_1)
+  type            CoContributionType
+
+  fixedAmount     Decimal? @db.Decimal(12, 2) // FIXED_AMOUNT or HYBRID minimum
+  percentage      Decimal? @db.Decimal(5, 2)  // PERCENTAGE or HYBRID (e.g. 20.00 = 20%)
+  perVisitCap     Decimal? @db.Decimal(12, 2) // Max co-contribution per encounter
+  perEncounterCap Decimal? @db.Decimal(12, 2) // Max per individual service line
+
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  isActive      Boolean   @default(true)
+  createdBy     String?
+  updatedBy     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  coContributionTransactions CoContributionTransaction[]
+
+  @@index([tenantId])
+  @@index([packageId])
+  @@index([packageId, benefitCategory, networkTier])
+}
+
+// Per-package annual out-of-pocket caps (individual + optional family)
+model AnnualCoContributionCap {
+  id        String  @id @default(cuid())
+  tenantId  String
+  tenant    Tenant  @relation(fields: [tenantId], references: [id])
+  packageId String  @unique
+  package   Package @relation(fields: [packageId], references: [id])
+
+  individualCap Decimal  @db.Decimal(12, 2)
+  familyCap     Decimal? @db.Decimal(12, 2) // null = no family cap
+
+  effectiveFrom DateTime  @default(now())
+  effectiveTo   DateTime?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([tenantId])
+}
+
+// One record per claim — the financial detail of a single co-contribution event
+model CoContributionTransaction {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  claimId              String              @unique
+  claim                Claim               @relation(fields: [claimId], references: [id])
+  memberId             String
+  member               Member              @relation(fields: [memberId], references: [id])
+  coContributionRuleId String?
+  coContributionRule   CoContributionRule? @relation(fields: [coContributionRuleId], references: [id])
+
+  serviceCost         Decimal @db.Decimal(12, 2) // Eligible service cost
+  calculatedAmount    Decimal @db.Decimal(12, 2) // Raw calculation before caps
+  cappedAmount        Decimal @db.Decimal(12, 2) // After per-visit / per-encounter cap
+  annualCapApplied    Boolean @default(false)
+  finalAmount         Decimal @db.Decimal(12, 2) // What member actually owes
+  planShare           Decimal @db.Decimal(12, 2) // What plan covers
+  amountCollected     Decimal @db.Decimal(12, 2) @default(0)
+  capsApplied         String[] // Which caps were binding
+
+  collectionStatus    CoContributionCollectionStatus  @default(PENDING)
+  paymentMethod       CoContributionPaymentMethod?
+  mpesaTransactionRef String?
+  mpesaPhoneNumber    String?
+  receiptNumber       String?
+
+  waiverReason     String?
+  waiverApprovedBy String?
+  waiverApprovedAt DateTime?
+
+  calculatedAt DateTime @default(now())
+  collectedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  createdBy    String?
+
+  @@index([tenantId])
+  @@index([memberId])
+  @@index([collectionStatus])
+}
+
+// Running annual total per member (updated on each co-contribution event)
+model MemberAnnualCoContribution {
+  id            String @id @default(cuid())
+  tenantId      String
+  tenant        Tenant @relation(fields: [tenantId], references: [id])
+  memberId      String
+  member        Member @relation(fields: [memberId], references: [id])
+  membershipYear Int   // e.g. 2026
+
+  totalCoContribution Decimal @db.Decimal(12, 2) @default(0)
+  capReached          Boolean  @default(false)
+  capReachedAt        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([memberId, membershipYear])
+  @@index([tenantId])
+}
+
+// Running annual total for the family unit (principal + dependents)
+model FamilyAnnualCoContribution {
+  id               String @id @default(cuid())
+  tenantId         String
+  tenant           Tenant @relation(fields: [tenantId], references: [id])
+  principalMemberId String
+  principal         Member @relation("FamilyCoContributions", fields: [principalMemberId], references: [id])
+  membershipYear    Int
+
+  totalCoContribution Decimal @db.Decimal(12, 2) @default(0)
+  capReached          Boolean  @default(false)
+  capReachedAt        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([principalMemberId, membershipYear])
+  @@index([tenantId])
 }
