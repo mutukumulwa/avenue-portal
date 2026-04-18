@@ -769,7 +769,7 @@ async function main() {
   // 8b. GL — seed chart of accounts BEFORE claims (GL posts need accounts)
   // ═══════════════════════════════════════════════════════════
   await GLService.seedChartOfAccounts(tenant.id)
-  console.log(`✅ Chart of Accounts: 23 standard accounts seeded`)
+  console.log(`✅ Chart of Accounts: 24 standard accounts seeded (incl. 1150 Co-Contribution Receivable)`)
 
   // ═══════════════════════════════════════════════════════════
   // 9. CLAIMS — structured lines by category

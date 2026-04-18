@@ -8,6 +8,7 @@ export const STANDARD_ACCOUNTS = [
   { code: "1010", name: "Cash at Bank",                  type: "ASSET",     subtype: "Current Assets",   normalBalance: "DEBIT",  description: "Main operating bank account" },
   { code: "1020", name: "M-Pesa / Mobile Money",         type: "ASSET",     subtype: "Current Assets",   normalBalance: "DEBIT",  description: "Mobile money collections account" },
   { code: "1100", name: "Premium Receivables",           type: "ASSET",     subtype: "Current Assets",   normalBalance: "DEBIT",  description: "Amounts billed to groups but not yet collected" },
+  { code: "1150", name: "Co-Contribution Receivable",   type: "ASSET",     subtype: "Current Assets",   normalBalance: "DEBIT",  description: "Member cost-sharing amounts owed but not yet collected" },
   { code: "1200", name: "Reinsurance Recoveries",        type: "ASSET",     subtype: "Current Assets",   normalBalance: "DEBIT",  description: "Claims recoverable from reinsurers" },
   { code: "1300", name: "Prepayments & Other Debtors",   type: "ASSET",     subtype: "Current Assets",   normalBalance: "DEBIT",  description: "Prepaid expenses and sundry debtors" },
   // LIABILITIES
@@ -147,20 +148,97 @@ export class GLService {
   }
 
   /**
-   * Claim approved → DR Net Claims Incurred / CR Claims Payable
+   * Claim approved — splits into plan share and member co-contribution:
+   *
+   *   DR 5010 Net Claims Incurred   (full approved amount)
+   *   CR 2010 Claims Payable        (plan share only — what the insurer pays the provider)
+   *   CR 1150 Co-Contrib Receivable (member share — asset until collected or waived)
+   *
+   * If coContributionAmount is zero or omitted the full amount goes to Claims Payable
+   * (backward compatible — existing call sites without co-contribution work unchanged).
+   */
+  /**
+   * Claim approved — correct double-entry with co-contribution split:
+   *
+   * Without co-contribution (coContributionAmount = 0):
+   *   DR 5010 Net Claims Incurred   approvedAmount
+   *   CR 2010 Claims Payable        approvedAmount
+   *
+   * With co-contribution:
+   *   DR 5010 Net Claims Incurred   planShare   (insurer's cost only)
+   *   DR 1150 Co-Contrib Receivable coContrib   (member owes this — balance sheet asset)
+   *   CR 2010 Claims Payable        approvedAmount (provider is owed the full amount)
    */
   static async postClaimApproved(tenantId: string, opts: {
-    sourceId: string; reference: string; amount: number; postedById?: string;
+    sourceId: string; reference: string; amount: number;
+    coContributionAmount?: number; postedById?: string;
   }) {
+    const coContrib = opts.coContributionAmount ?? 0;
+    const planShare = opts.amount - coContrib;
+
+    const lines: LineSpec[] = coContrib > 0
+      ? [
+          { accountCode: "5010", description: "Net claims incurred (plan share)",           debit:  planShare  },
+          { accountCode: "1150", description: `Co-contribution receivable — ${opts.reference}`, debit: coContrib  },
+          { accountCode: "2010", description: "Claims payable to provider",                 credit: opts.amount },
+        ]
+      : [
+          { accountCode: "5010", description: "Claims incurred",  debit:  opts.amount },
+          { accountCode: "2010", description: "Claims payable",   credit: opts.amount },
+        ];
+
     return postEntry(tenantId, {
-      description: `Claim approved — ${opts.reference}`,
+      description: coContrib > 0
+        ? `Claim approved — ${opts.reference} (plan KES ${planShare.toLocaleString()} + member KES ${coContrib.toLocaleString()})`
+        : `Claim approved — ${opts.reference}`,
+      reference:  opts.reference,
+      sourceType: "CLAIM_APPROVED",
+      sourceId:   opts.sourceId,
+      postedById: opts.postedById,
+      lines,
+    });
+  }
+
+  /**
+   * Co-contribution collected from member →
+   *   DR Cash / M-Pesa   (asset in)
+   *   CR 1150 Co-Contribution Receivable  (clears the receivable)
+   */
+  static async postCoContributionCollected(tenantId: string, opts: {
+    sourceId: string; reference: string; amount: number;
+    paymentMethod?: string; postedById?: string;
+  }) {
+    const cashCode = opts.paymentMethod === "MPESA" ? "1020" : "1010";
+    return postEntry(tenantId, {
+      description: `Co-contribution collected — ${opts.reference}`,
       reference:   opts.reference,
-      sourceType:  "CLAIM_APPROVED",
+      sourceType:  "CO_CONTRIBUTION_COLLECTED",
       sourceId:    opts.sourceId,
       postedById:  opts.postedById,
       lines: [
-        { accountCode: "5010", description: "Claims incurred",  debit:  opts.amount },
-        { accountCode: "2010", description: "Claims payable",   credit: opts.amount },
+        { accountCode: cashCode, description: "Cash / M-Pesa received from member", debit:  opts.amount },
+        { accountCode: "1150",   description: "Co-contribution receivable cleared",  credit: opts.amount },
+      ],
+    });
+  }
+
+  /**
+   * Co-contribution waived →
+   *   DR 5010 Net Claims Incurred  (insurer absorbs the waived member share)
+   *   CR 1150 Co-Contribution Receivable  (removes the asset)
+   */
+  static async postCoContributionWaived(tenantId: string, opts: {
+    sourceId: string; reference: string; amount: number; postedById?: string;
+  }) {
+    return postEntry(tenantId, {
+      description: `Co-contribution waived — ${opts.reference}`,
+      reference:   opts.reference,
+      sourceType:  "CO_CONTRIBUTION_WAIVED",
+      sourceId:    opts.sourceId,
+      postedById:  opts.postedById,
+      lines: [
+        { accountCode: "5010", description: "Claims incurred (waived co-contrib)", debit:  opts.amount },
+        { accountCode: "1150", description: "Co-contribution receivable written off", credit: opts.amount },
       ],
     });
   }

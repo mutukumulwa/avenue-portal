@@ -5,9 +5,9 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { ClaimsService } from "@/server/services/claims.service";
 import { CoContributionService } from "@/server/services/coContribution/coContribution.service";
+import { GLService } from "@/server/services/gl.service";
 import Decimal from "decimal.js";
 import { revalidatePath } from "next/cache";
-import { GLService } from "@/server/services/gl.service";
 import { writeAudit } from "@/lib/audit";
 
 export async function adjudicateClaimAction(formData: FormData) {
@@ -53,10 +53,18 @@ export async function adjudicateClaimAction(formData: FormData) {
   // Auto-post GL entry when claim is approved or partially approved
   if ((action === "APPROVED" || action === "PARTIALLY_APPROVED") && approvedAmount > 0) {
     try {
+      // Fetch co-contribution transaction so GL correctly splits plan share vs member share
+      const coTx = await prisma.coContributionTransaction.findUnique({
+        where: { claimId },
+        select: { finalAmount: true },
+      });
+      const coContribAmount = coTx ? Number(coTx.finalAmount) : 0;
+
       await GLService.postClaimApproved(tenantId, {
         sourceId:  claim.id,
         reference: claim.claimNumber,
         amount:    approvedAmount,
+        coContributionAmount: coContribAmount,
         postedById: session.user.id,
       });
     } catch {
@@ -197,6 +205,18 @@ export async function collectCoContributionAction(
     mpesaRef,
   );
 
+  // GL: DR Cash/M-Pesa  CR 1150 Co-Contribution Receivable
+  const claim = await prisma.claim.findUnique({ where: { id: tx.claimId }, select: { claimNumber: true } });
+  try {
+    await GLService.postCoContributionCollected(tx.tenantId, {
+      sourceId:      transactionId,
+      reference:     claim?.claimNumber ?? transactionId,
+      amount:        amountCollected,
+      paymentMethod,
+      postedById:    session.user.id,
+    });
+  } catch { /* GL accounts not yet set up — swallow */ }
+
   revalidatePath(`/claims/${tx.claimId}`);
   return {};
 }
@@ -216,11 +236,22 @@ export async function waiveCoContributionAction(
 
   const tx = await prisma.coContributionTransaction.findUnique({
     where: { id: transactionId },
-    select: { id: true, claimId: true, tenantId: true },
+    select: { id: true, claimId: true, tenantId: true, finalAmount: true },
   });
   if (!tx || tx.tenantId !== session.user.tenantId) return { error: "Transaction not found." };
 
   await CoContributionService.waiveCoContribution(transactionId, reason, approvedBy);
+
+  // GL: DR 5010 Net Claims Incurred  CR 1150 Co-Contribution Receivable
+  const claim = await prisma.claim.findUnique({ where: { id: tx.claimId }, select: { claimNumber: true } });
+  try {
+    await GLService.postCoContributionWaived(tx.tenantId, {
+      sourceId:   transactionId,
+      reference:  claim?.claimNumber ?? transactionId,
+      amount:     Number(tx.finalAmount),
+      postedById: session.user.id,
+    });
+  } catch { /* GL accounts not yet set up — swallow */ }
 
   revalidatePath(`/claims/${tx.claimId}`);
   return {};
