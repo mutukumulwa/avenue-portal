@@ -1597,7 +1597,193 @@ async function main() {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // 15. NOTIFICATION TEMPLATES
+  // 15. CO-CONTRIBUTION RULES & CAPS
+  // ═══════════════════════════════════════════════════════════
+  //
+  // Demonstrates the full rules hierarchy:
+  //   Essential  — outpatient 10% (all tiers) + Dental KES 500 fixed (Tier 2/3)
+  //                + annual individual cap KES 8,000 / family KES 20,000
+  //   Premier    — outpatient 5% Tier 2/3, free at own (NONE Tier 1)
+  //                + Dental KES 1,000 fixed Tier 3
+  //                + annual individual cap KES 15,000
+  //   Executive  — no co-contribution on any tier (NONE global)
+  //
+  // After rules, creates sample CoContributionTransactions on existing claims
+  // to show each collection status: PENDING, COLLECTED (M-Pesa), WAIVED.
+  {
+    const existingRule = await prisma.coContributionRule.findFirst({
+      where: { tenantId, packageId: packages[0]!.id },
+    })
+
+    if (!existingRule) {
+      const essentialPkg = packages.find(p => p.name === 'Avenue Essential')!
+      const premierPkg   = packages.find(p => p.name === 'Avenue Premier')!
+      const execPkg      = packages.find(p => p.name === 'Avenue Executive')!
+
+      // ── Essential: outpatient 10% applies to all network tiers ───────────
+      for (const tier of ['TIER_1', 'TIER_2', 'TIER_3'] as const) {
+        await prisma.coContributionRule.create({ data: {
+          tenantId, packageId: essentialPkg.id,
+          benefitCategory: 'OUTPATIENT', networkTier: tier,
+          type: 'PERCENTAGE', percentage: 10,
+          perVisitCap: null, effectiveFrom: new Date('2024-01-01'),
+        }})
+      }
+      // Essential: Dental — fixed KES 500 on partner/panel tiers, free at own
+      await prisma.coContributionRule.create({ data: {
+        tenantId, packageId: essentialPkg.id,
+        benefitCategory: 'DENTAL', networkTier: 'TIER_1',
+        type: 'NONE', effectiveFrom: new Date('2024-01-01'),
+      }})
+      await prisma.coContributionRule.create({ data: {
+        tenantId, packageId: essentialPkg.id,
+        benefitCategory: 'DENTAL', networkTier: 'TIER_2',
+        type: 'FIXED_AMOUNT', fixedAmount: 500, perVisitCap: 500,
+        effectiveFrom: new Date('2024-01-01'),
+      }})
+      await prisma.coContributionRule.create({ data: {
+        tenantId, packageId: essentialPkg.id,
+        benefitCategory: 'DENTAL', networkTier: 'TIER_3',
+        type: 'FIXED_AMOUNT', fixedAmount: 800, perVisitCap: 800,
+        effectiveFrom: new Date('2024-01-01'),
+      }})
+
+      // Essential: Annual cap
+      await prisma.annualCoContributionCap.upsert({
+        where: { packageId: essentialPkg.id },
+        update: {},
+        create: { tenantId, packageId: essentialPkg.id, individualCap: 8000, familyCap: 20000 },
+      })
+
+      // ── Premier: Outpatient — free at Tier 1, 5% at Tier 2, 10% at Tier 3 ─
+      await prisma.coContributionRule.create({ data: {
+        tenantId, packageId: premierPkg.id,
+        benefitCategory: 'OUTPATIENT', networkTier: 'TIER_1',
+        type: 'NONE', effectiveFrom: new Date('2024-01-01'),
+      }})
+      await prisma.coContributionRule.create({ data: {
+        tenantId, packageId: premierPkg.id,
+        benefitCategory: 'OUTPATIENT', networkTier: 'TIER_2',
+        type: 'PERCENTAGE', percentage: 5, perVisitCap: 2000,
+        effectiveFrom: new Date('2024-01-01'),
+      }})
+      await prisma.coContributionRule.create({ data: {
+        tenantId, packageId: premierPkg.id,
+        benefitCategory: 'OUTPATIENT', networkTier: 'TIER_3',
+        type: 'PERCENTAGE', percentage: 10, perVisitCap: 3000,
+        effectiveFrom: new Date('2024-01-01'),
+      }})
+      // Premier: Dental — fixed KES 1,000 for Tier 3 only
+      await prisma.coContributionRule.create({ data: {
+        tenantId, packageId: premierPkg.id,
+        benefitCategory: 'DENTAL', networkTier: 'TIER_3',
+        type: 'FIXED_AMOUNT', fixedAmount: 1000,
+        effectiveFrom: new Date('2024-01-01'),
+      }})
+
+      // Premier: Annual individual cap only
+      await prisma.annualCoContributionCap.upsert({
+        where: { packageId: premierPkg.id },
+        update: {},
+        create: { tenantId, packageId: premierPkg.id, individualCap: 15000, familyCap: null },
+      })
+
+      // ── Executive: No co-contribution on anything ─────────────────────────
+      for (const tier of ['TIER_1', 'TIER_2', 'TIER_3'] as const) {
+        await prisma.coContributionRule.create({ data: {
+          tenantId, packageId: execPkg.id,
+          benefitCategory: null, networkTier: tier,
+          type: 'NONE', effectiveFrom: new Date('2024-01-01'),
+        }})
+      }
+
+      console.log('✅ Co-contribution rules: Essential (10% OPD + Dental tiers) + Premier (tiered OPD) + Executive (none)')
+
+      // ── Sample transactions on existing claims ────────────────────────────
+      // CLM-001: PENDING (member owes KES 800 on a KES 8,000 outpatient visit)
+      const clm1 = await prisma.claim.findFirst({ where: { tenantId, claimNumber: 'CLM-001' } })
+      if (clm1) {
+        const existing = await prisma.coContributionTransaction.findUnique({ where: { claimId: clm1.id } })
+        if (!existing) {
+          const rule1 = await prisma.coContributionRule.findFirst({
+            where: { tenantId, packageId: essentialPkg.id, benefitCategory: 'OUTPATIENT', networkTier: 'TIER_1' },
+          })
+          await prisma.coContributionTransaction.create({ data: {
+            tenantId, claimId: clm1.id, memberId: clm1.memberId,
+            coContributionRuleId: rule1?.id,
+            serviceCost: clm1.billedAmount,
+            calculatedAmount: 800, cappedAmount: 800, finalAmount: 800,
+            planShare: Number(clm1.billedAmount) - 800,
+            annualCapApplied: false, capsApplied: [],
+            collectionStatus: 'PENDING',
+          }})
+          await prisma.memberAnnualCoContribution.upsert({
+            where: { memberId_membershipYear: { memberId: clm1.memberId, membershipYear: 2025 } },
+            update: {},
+            create: { tenantId, memberId: clm1.memberId, membershipYear: 2025, totalCoContribution: 800, capReached: false },
+          })
+        }
+      }
+
+      // CLM-002: COLLECTED via M-Pesa (KES 400 collected)
+      const clm2 = await prisma.claim.findFirst({ where: { tenantId, claimNumber: 'CLM-002' } })
+      if (clm2) {
+        const existing = await prisma.coContributionTransaction.findUnique({ where: { claimId: clm2.id } })
+        if (!existing) {
+          const rule2 = await prisma.coContributionRule.findFirst({
+            where: { tenantId, packageId: essentialPkg.id, benefitCategory: 'OUTPATIENT', networkTier: 'TIER_1' },
+          })
+          await prisma.coContributionTransaction.create({ data: {
+            tenantId, claimId: clm2.id, memberId: clm2.memberId,
+            coContributionRuleId: rule2?.id,
+            serviceCost: clm2.billedAmount,
+            calculatedAmount: 400, cappedAmount: 400, finalAmount: 400,
+            planShare: Number(clm2.billedAmount) - 400,
+            annualCapApplied: false, capsApplied: [],
+            collectionStatus: 'COLLECTED',
+            amountCollected: 400,
+            paymentMethod: 'MPESA',
+            mpesaTransactionRef: 'QHX9872KAB',
+            collectedAt: new Date('2025-03-10T09:15:00Z'),
+          }})
+          await prisma.memberAnnualCoContribution.upsert({
+            where: { memberId_membershipYear: { memberId: clm2.memberId, membershipYear: 2025 } },
+            update: { totalCoContribution: { increment: 400 } },
+            create: { tenantId, memberId: clm2.memberId, membershipYear: 2025, totalCoContribution: 400, capReached: false },
+          })
+        }
+      }
+
+      // CLM-003: WAIVED (senior member, financial hardship documented)
+      const clm3 = await prisma.claim.findFirst({ where: { tenantId, claimNumber: 'CLM-003' } })
+      if (clm3) {
+        const existing = await prisma.coContributionTransaction.findUnique({ where: { claimId: clm3.id } })
+        if (!existing) {
+          const rule3 = await prisma.coContributionRule.findFirst({
+            where: { tenantId, packageId: premierPkg.id, benefitCategory: 'OUTPATIENT', networkTier: 'TIER_1' },
+          })
+          await prisma.coContributionTransaction.create({ data: {
+            tenantId, claimId: clm3.id, memberId: clm3.memberId,
+            coContributionRuleId: rule3?.id,
+            serviceCost: clm3.billedAmount,
+            calculatedAmount: 0, cappedAmount: 0, finalAmount: 0,
+            planShare: clm3.billedAmount,
+            annualCapApplied: false, capsApplied: [],
+            collectionStatus: 'WAIVED',
+            waiverReason: 'Member is 68 years old with documented financial hardship — waiver approved per senior citizen policy.',
+            waiverApprovedBy: 'Dr. Sarah Achieng (Medical Officer)',
+          }})
+        }
+      }
+
+      console.log('✅ Co-contribution transactions: CLM-001 (PENDING KES 800), CLM-002 (COLLECTED M-Pesa), CLM-003 (WAIVED — hardship)')
+    } else {
+      console.log('✅ Co-contribution rules: already seeded')
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 17. NOTIFICATION TEMPLATES
   // ═══════════════════════════════════════════════════════════
   const notifTemplates = [
     { name: 'Welcome Email',          type: 'WELCOME',              channel: 'EMAIL', subject: 'Welcome to Avenue Healthcare',         bodyTemplate: 'Dear {{firstName}}, welcome to Avenue Healthcare. Your member number is {{memberNumber}}.' },
@@ -1630,6 +1816,10 @@ async function main() {
   console.log('           RULE-CLIN-001 (gender mismatch), RULE-BILL-003 (tariff breach),')
   console.log('           RULE-BILL-004 (round-number clustering), RULE-TEMP-004 (duplicate),')
   console.log('           RULE-FIN-004 (split billing) — each with a matching ClaimFraudAlert')
+  console.log('  • Co-contribution rules: Essential (10% OPD all tiers + Dental tiers, KES 8k/20k annual caps)')
+  console.log('                           Premier (tiered OPD: free Tier1/5% Tier2/10% Tier3, KES 15k cap)')
+  console.log('                           Executive (NONE on all tiers — plan covers 100%)')
+  console.log('  • Co-contribution transactions: CLM-001 PENDING, CLM-002 COLLECTED (M-Pesa QHX9872KAB), CLM-003 WAIVED')
 }
 
 main()
