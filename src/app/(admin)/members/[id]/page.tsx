@@ -2,8 +2,9 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { ArrowLeft, Pencil } from "lucide-react";
+import { ArrowLeft, Pencil, CreditCard } from "lucide-react";
 import { MemberProfileTabs } from "@/components/members/MemberProfileTabs";
+import { MemberTransferPanel } from "./transfer/MemberTransferPanel";
 import QRCode from "react-qr-code";
 
 export default async function MemberDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -83,6 +84,20 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
   });
 
   if (!member) notFound();
+
+  // Data for transfer panel
+  const [allGroups, groupTiers] = await Promise.all([
+    prisma.group.findMany({
+      where: { tenantId: session.user.tenantId, status: "ACTIVE" },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.groupBenefitTier.findMany({
+      where: { groupId: member.groupId },
+      select: { id: true, name: true, package: { select: { name: true } } },
+      orderBy: { name: "asc" },
+    }),
+  ]);
 
   // eslint-disable-next-line react-compiler/react-compiler
   const age = Math.floor(
@@ -217,6 +232,12 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
         </div>
         <div className="flex items-center gap-3">
           <Link
+            href={`/members/${id}/card`}
+            className="flex items-center gap-1.5 text-xs font-semibold text-[#17A2B8] border border-[#17A2B8]/30 hover:bg-[#17A2B8]/5 px-3 py-1.5 rounded-full transition-colors"
+          >
+            <CreditCard size={13} /> Card
+          </Link>
+          <Link
             href={`/members/${id}/edit`}
             className="flex items-center gap-1.5 text-xs font-semibold text-avenue-indigo border border-avenue-indigo/30 hover:bg-avenue-indigo/5 px-3 py-1.5 rounded-full transition-colors"
           >
@@ -241,6 +262,18 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
             <p className={`text-xl font-bold mt-1 ${s.color}`}>{s.value}</p>
           </div>
         ))}
+      </div>
+
+      {/* Transfer / tier-change panel */}
+      <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm">
+        <h3 className="text-sm font-bold text-avenue-text-heading mb-3">Transfers &amp; Tier Changes</h3>
+        <MemberTransferPanel
+          memberId={member.id}
+          currentGroupId={member.groupId}
+          currentTierId={member.benefitTierId ?? null}
+          groups={allGroups}
+          tiers={groupTiers.map(t => ({ id: t.id, name: t.name, packageName: t.package.name }))}
+        />
       </div>
 
       {/* Tabbed profile */}

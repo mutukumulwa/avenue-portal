@@ -11,7 +11,7 @@ import { prisma } from "@/lib/prisma";
 
 const REMINDER_THRESHOLDS = [60, 30, 14, 7];
 
-async function runRenewalReminderJob() {
+export async function runRenewalReminderJob() {
   console.info(`[renewal-reminder] Running renewal reminder job...`);
 
   try {

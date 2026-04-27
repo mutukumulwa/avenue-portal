@@ -25,11 +25,31 @@ export async function scheduleEscalationJob() {
     "preauth-escalation",
     {},
     {
-      repeat:  { every: 30 * 60 * 1000 }, // 30 minutes
-      jobId:   "preauth-escalation-recurring",
+      repeat:   { every: 30 * 60 * 1000 }, // 30 minutes
+      jobId:    "preauth-escalation-recurring",
       attempts: 2,
     },
   );
+}
+
+/**
+ * Schedule daily system jobs (renewal reminders + suspension checks).
+ * Runs at 06:00 EAT daily — BullMQ deduplicates by jobId.
+ */
+export async function scheduleDailyJobs() {
+  const SIX_AM_CRON = "0 6 * * *";
+  await Promise.all([
+    Queues.system.add(
+      "renewal-reminders",
+      {},
+      { repeat: { pattern: SIX_AM_CRON }, jobId: "renewal-reminders-daily", attempts: 2 },
+    ),
+    Queues.system.add(
+      "suspension-check",
+      {},
+      { repeat: { pattern: SIX_AM_CRON }, jobId: "suspension-check-daily", attempts: 2 },
+    ),
+  ]);
 }
 
 /**

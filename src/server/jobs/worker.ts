@@ -1,12 +1,15 @@
 import { Worker, Job } from "bullmq";
-import { connection, scheduleEscalationJob } from "../../lib/queue";
+import { connection, scheduleEscalationJob, scheduleDailyJobs } from "../../lib/queue";
 import { NotificationService } from "../services/notification.service";
 import { runPreauthEscalationJob } from "./preauth-escalation.job";
+import { runRenewalReminderJob } from "./renewal-reminder.job";
+import { runSuspensionCheckJob } from "./suspension-check.job";
 
 console.log("Starting background workers...");
 
 // Register recurring scheduled jobs (idempotent — BullMQ deduplicates by jobId)
 scheduleEscalationJob().catch(err => console.error("[Worker] Failed to schedule escalation job:", err));
+scheduleDailyJobs().catch(err => console.error("[Worker] Failed to schedule daily jobs:", err));
 
 /**
  * NOTIFICATIONS WORKER
@@ -40,6 +43,25 @@ billingWorker.on('failed', (job: Job | undefined, err: Error) => {
 });
 
 /**
+ * SYSTEM WORKER
+ * Daily jobs: renewal reminders + suspension checks
+ */
+const systemWorker = new Worker("system", async (job: Job) => {
+  if (job.name === "renewal-reminders") {
+    console.log("[Worker] Running renewal reminders...");
+    await runRenewalReminderJob();
+  }
+  if (job.name === "suspension-check") {
+    console.log("[Worker] Running suspension check...");
+    await runSuspensionCheckJob();
+  }
+}, { connection });
+
+systemWorker.on('failed', (job: Job | undefined, err: Error) => {
+  console.error(`[Worker] System job ${job?.id} failed:`, err);
+});
+
+/**
  * CLINICAL WORKER
  * Handles pre-auth escalation and other clinical operations
  */
@@ -59,5 +81,6 @@ process.on("SIGTERM", async () => {
   console.log("Gracefully closing workers...");
   await notificationWorker.close();
   await billingWorker.close();
+  await systemWorker.close();
   await clinicalWorker.close();
 });

@@ -69,13 +69,22 @@ export default async function GroupsPage({
           <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Corporate Groups</h1>
           <p className="text-avenue-text-muted mt-1 text-sm">Manage enrolled organizations and their packages.</p>
         </div>
-        <Link
-          href="/groups/new"
-          className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors flex items-center gap-2 shadow-sm"
-        >
-          <PlusCircle size={18} />
-          Enroll Group
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/groups/new/individual"
+            className="border border-avenue-indigo text-avenue-indigo hover:bg-avenue-indigo/5 px-5 py-2 rounded-full font-semibold transition-colors flex items-center gap-2 text-sm"
+          >
+            <PlusCircle size={16} />
+            Individual Client
+          </Link>
+          <Link
+            href="/groups/new"
+            className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors flex items-center gap-2 shadow-sm"
+          >
+            <PlusCircle size={18} />
+            Enroll Group
+          </Link>
+        </div>
       </div>
 
       <Suspense>

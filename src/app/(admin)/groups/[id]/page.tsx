@@ -1,9 +1,10 @@
 import { requireRole, ROLES } from "@/lib/rbac";
-import { redirect, notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { ArrowLeft, Users, Receipt, FileText, CreditCard, Pencil } from "lucide-react";
+import { ArrowLeft, Users, Receipt, FileText, CreditCard, Pencil, Wallet } from "lucide-react";
 import { BenefitTiersCard } from "@/components/groups/BenefitTiersCard";
+import { SelfFundedPanel } from "./self-funded/SelfFundedPanel";
 
 export default async function GroupDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requireRole(ROLES.OPS);
@@ -13,6 +14,7 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
   const group = await prisma.group.findUnique({
     where: { id, tenantId: session.user.tenantId },
     include: {
+      selfFundedAccount: { include: { transactions: { orderBy: { postedAt: "desc" }, take: 20 } } },
       package: true,
       broker: { select: { name: true } },
       benefitTiers: {
@@ -295,6 +297,23 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
           </tbody>
         </table>
       </div>
+
+      {/* Self-funded scheme panel — only shown for SELF_FUNDED groups */}
+      {group.fundingMode === "SELF_FUNDED" && (
+        <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#EEEEEE] flex items-center gap-2">
+            <Wallet size={15} className="text-avenue-indigo" />
+            <h2 className="font-bold text-avenue-text-heading font-heading">Self-Funded Account</h2>
+          </div>
+          <div className="p-5">
+            <SelfFundedPanel
+              groupId={group.id}
+              account={group.selfFundedAccount as never}
+              minimumBalance={Number(group.selfFundedAccount?.minimumBalance ?? 0)}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

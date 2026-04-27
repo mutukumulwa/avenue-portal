@@ -119,6 +119,11 @@ enum FundingMode {
   SELF_FUNDED  // Client deposits a fund; broker administers; admin fee charged
 }
 
+enum ClientType {
+  CORPORATE   // Employer / organization scheme
+  INDIVIDUAL  // Single person / family — no employer group
+}
+
 enum AdminFeeMethod {
   FLAT_PER_INSURED  // Fixed fee per member at policy start
   PCT_OF_CLAIMS     // Percentage of total claims paid, computed post-period
@@ -160,6 +165,7 @@ model Group {
   suspensionReason   String?
   terminatedAt       DateTime?
   notes              String?
+  clientType         ClientType       @default(CORPORATE)
   // Funding mode — INSURED (default) or SELF_FUNDED
   fundingMode        FundingMode      @default(INSURED)
   // Self-funded admin fee config (ignored when fundingMode = INSURED)
@@ -170,7 +176,8 @@ model Group {
 
   members            Member[]
   benefitTiers       GroupBenefitTier[]
-  endorsements       Endorsement[]
+  endorsements       Endorsement[]      @relation("EndorsementGroup")
+  inboundTransfers   Endorsement[]      @relation("EndorsementToGroup")
   invoices           Invoice[]
   payments           Payment[]
   documents          Document[]
@@ -248,7 +255,8 @@ model GroupBenefitTier {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  members Member[]
+  members              Member[]
+  inboundTierChanges   Endorsement[] @relation("EndorsementTier")
 
   @@unique([groupId, name])
   @@index([groupId])
@@ -558,8 +566,9 @@ enum EndorsementType {
   BENEFIT_MODIFICATION // Change in benefits (e.g., maternity rider added)
   SALARY_CHANGE // If contribution is salary-based
   GROUP_DATA_CHANGE // Contact info, payment terms change
-  TIER_CHANGE // Member moved between benefit tiers within the same group
-  CORRECTION // Error correction
+  TIER_CHANGE     // Member moved between benefit tiers within the same group
+  SCHEME_TRANSFER // Member moves to a different group entirely
+  CORRECTION      // Error correction
 }
 
 enum EndorsementStatus {
@@ -578,7 +587,7 @@ model Endorsement {
   tenant            Tenant            @relation(fields: [tenantId], references: [id])
   endorsementNumber String // e.g., END-2025-00001
   groupId           String
-  group             Group             @relation(fields: [groupId], references: [id])
+  group             Group             @relation("EndorsementGroup", fields: [groupId], references: [id])
   type              EndorsementType
   status            EndorsementStatus @default(DRAFT)
   effectiveDate     DateTime
@@ -588,6 +597,13 @@ model Endorsement {
   // The member(s) affected
   memberId String? // For member-level endorsements
   member   Member? @relation("EndorsementMember", fields: [memberId], references: [id])
+
+  // SCHEME_TRANSFER: destination group
+  toGroupId   String?
+  toGroup     Group?  @relation("EndorsementToGroup", fields: [toGroupId], references: [id])
+  // TIER_CHANGE: destination tier within same group
+  toBenefitTierId String?
+  toBenefitTier   GroupBenefitTier? @relation("EndorsementTier", fields: [toBenefitTierId], references: [id])
 
   // Change details stored as structured JSON
   // Examples:

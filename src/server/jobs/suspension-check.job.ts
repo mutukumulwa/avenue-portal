@@ -13,7 +13,7 @@ import { prisma } from "@/lib/prisma";
 
 const SUSPENSION_THRESHOLD_DAYS = 60;
 
-async function runSuspensionCheckJob() {
+export async function runSuspensionCheckJob() {
   console.info(`[suspension-check] Running suspension check...`);
 
   try {
