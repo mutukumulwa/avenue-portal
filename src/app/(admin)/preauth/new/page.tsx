@@ -4,9 +4,15 @@ import { MembersService } from "@/server/services/members.service";
 import { ProvidersService } from "@/server/services/providers.service";
 import { requireRole, ROLES } from "@/lib/rbac";
 import { PreAuthNewForm } from "./PreAuthNewForm";
+import { MemberClaimHistory } from "@/components/MemberClaimHistory";
 
-export default async function NewPreAuthPage() {
+export default async function NewPreAuthPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ memberId?: string }>;
+}) {
   const session = await requireRole(ROLES.CLINICAL);
+  const { memberId } = await searchParams;
 
   const tenantId = session.user.tenantId;
   const [members, providers] = await Promise.all([
@@ -25,6 +31,7 @@ export default async function NewPreAuthPage() {
           <p className="text-avenue-text-body font-body mt-1 text-sm">Request approval for a planned medical procedure.</p>
         </div>
       </div>
+      {memberId && <MemberClaimHistory memberId={memberId} />}
       <PreAuthNewForm members={members} providers={providers} />
     </div>
   );

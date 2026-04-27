@@ -41,7 +41,8 @@ export default async function ClaimDetailPage({ params }: { params: Promise<{ id
     return sum + contracted;
   }, 0);
 
-  const canAdjudicate = ["RECEIVED", "UNDER_REVIEW"].includes(claim.status);
+  const canCapture    = ["RECEIVED", "INCURRED"].includes(claim.status);
+  const canAdjudicate = ["CAPTURED", "UNDER_REVIEW"].includes(claim.status);
   const diagnoses = claim.diagnoses as { code?: string; icdCode?: string; description: string; isPrimary?: boolean }[];
 
   // Group structured claim lines by service category
@@ -338,6 +339,40 @@ export default async function ClaimDetailPage({ params }: { params: Promise<{ id
         </div>
       )}
 
+      {/* Reimbursement payment details banner */}
+      {(claim as { isReimbursement?: boolean }).isReimbursement && (
+        <div className="bg-[#EEF2FF] border border-avenue-indigo/20 rounded-lg p-4 text-sm space-y-1">
+          <p className="font-bold text-avenue-text-heading">Reimbursement Claim — pay member directly</p>
+          {(claim as { reimbursementMpesaPhone?: string }).reimbursementMpesaPhone && (
+            <p className="text-avenue-text-body">M-Pesa: <span className="font-mono font-semibold">{(claim as { reimbursementMpesaPhone?: string }).reimbursementMpesaPhone}</span></p>
+          )}
+          {(claim as { reimbursementBankName?: string; reimbursementAccountNo?: string }).reimbursementBankName && (
+            <p className="text-avenue-text-body">
+              Bank: <span className="font-semibold">{(claim as { reimbursementBankName?: string }).reimbursementBankName}</span>
+              {" · Acc: "}<span className="font-mono">{(claim as { reimbursementAccountNo?: string }).reimbursementAccountNo}</span>
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Mark as captured — data entry complete */}
+      {canCapture && (
+        <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm">
+          <p className="text-sm font-semibold text-avenue-text-heading mb-1">Data Entry Complete?</p>
+          <p className="text-xs text-avenue-text-muted mb-3">
+            Once all service lines and documents are captured, mark this claim as ready for adjudication.
+          </p>
+          <form action={adjudicateClaimAction}>
+            <input type="hidden" name="claimId" value={claim.id} />
+            <input type="hidden" name="action" value="CAPTURED" />
+            <button type="submit"
+              className="px-5 py-2 rounded-full text-sm font-bold bg-[#17A2B8] hover:bg-[#138496] text-white transition-colors">
+              Mark as Captured — Forward for Review
+            </button>
+          </form>
+        </div>
+      )}
+
       {/* Adjudication form */}
       {canAdjudicate && (
         <div className="bg-white border-2 border-avenue-indigo/20 rounded-lg p-6 shadow-sm">
@@ -347,7 +382,7 @@ export default async function ClaimDetailPage({ params }: { params: Promise<{ id
           </h3>
           <form action={adjudicateClaimAction} className="space-y-4">
             <input type="hidden" name="claimId" value={claim.id} />
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-avenue-text-heading">Decision</label>

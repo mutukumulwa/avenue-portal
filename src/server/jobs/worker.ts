@@ -1,8 +1,12 @@
 import { Worker, Job } from "bullmq";
-import { connection } from "../../lib/queue";
+import { connection, scheduleEscalationJob } from "../../lib/queue";
 import { NotificationService } from "../services/notification.service";
+import { runPreauthEscalationJob } from "./preauth-escalation.job";
 
 console.log("Starting background workers...");
+
+// Register recurring scheduled jobs (idempotent — BullMQ deduplicates by jobId)
+scheduleEscalationJob().catch(err => console.error("[Worker] Failed to schedule escalation job:", err));
 
 /**
  * NOTIFICATIONS WORKER
@@ -35,9 +39,25 @@ billingWorker.on('failed', (job: Job | undefined, err: Error) => {
   console.error(`[Worker] Billing job ${job?.id} failed:`, err);
 });
 
+/**
+ * CLINICAL WORKER
+ * Handles pre-auth escalation and other clinical operations
+ */
+const clinicalWorker = new Worker("clinical", async (job: Job) => {
+  if (job.name === "preauth-escalation") {
+    const count = await runPreauthEscalationJob();
+    console.log(`[Worker] Escalation complete — ${count} pre-auth(s) escalated`);
+  }
+}, { connection });
+
+clinicalWorker.on('failed', (job: Job | undefined, err: Error) => {
+  console.error(`[Worker] Clinical job ${job?.id} failed:`, err);
+});
+
 // Process exit handling loop
 process.on("SIGTERM", async () => {
   console.log("Gracefully closing workers...");
   await notificationWorker.close();
   await billingWorker.close();
+  await clinicalWorker.close();
 });

@@ -15,9 +15,54 @@ export async function adjudicateClaimAction(formData: FormData) {
 
   const tenantId = session.user.tenantId;
   const claimId = formData.get("claimId") as string;
-  const action = formData.get("action") as "APPROVED" | "PARTIALLY_APPROVED" | "DECLINED";
+  const action = formData.get("action") as "CAPTURED" | "APPROVED" | "PARTIALLY_APPROVED" | "DECLINED";
+
+  // CAPTURED is a state transition only — mark claim as data-entry complete
+  if (action === "CAPTURED") {
+    await prisma.claim.update({
+      where: { id: claimId, tenantId },
+      data: { status: "CAPTURED" },
+    });
+    await prisma.adjudicationLog.create({
+      data: { claimId, action: "CAPTURED", toStatus: "CAPTURED", notes: "Claim data entry complete — forwarded for review.", userId: session.user.id },
+    });
+    revalidatePath(`/claims/${claimId}`);
+    revalidatePath("/claims");
+    return;
+  }
 
   const approvedAmount = action !== "DECLINED" ? Number(formData.get("approvedAmount") || 0) : 0;
+
+  // ── Approval matrix check ─────────────────────────────────────────────────
+  if (action === "APPROVED" || action === "PARTIALLY_APPROVED") {
+    const claim = await prisma.claim.findUnique({
+      where: { id: claimId, tenantId },
+      select: { billedAmount: true, serviceType: true, benefitCategory: true },
+    });
+    if (claim) {
+      const matrix = await prisma.approvalMatrix.findFirst({
+        where: {
+          tenantId,
+          isActive: true,
+          OR: [{ serviceType: claim.serviceType }, { serviceType: null }],
+          AND: [
+            { OR: [{ benefitCategory: claim.benefitCategory }, { benefitCategory: null }] },
+            { OR: [{ claimValueMin: null }, { claimValueMin: { lte: approvedAmount } }] },
+            { OR: [{ claimValueMax: null }, { claimValueMax: { gte: approvedAmount } }] },
+          ],
+        },
+        orderBy: { claimValueMin: "desc" }, // most specific rule wins
+      });
+      if (matrix) {
+        const roleHierarchy = ["SUPER_ADMIN", "UNDERWRITER", "MEDICAL_OFFICER", "CLAIMS_OFFICER", "FINANCE_OFFICER", "CUSTOMER_SERVICE"];
+        const userIdx   = roleHierarchy.indexOf(session.user.role as string);
+        const reqIdx    = roleHierarchy.indexOf(matrix.requiredRole);
+        if (userIdx > reqIdx) {
+          throw new Error(`Approval matrix: this claim (KES ${approvedAmount.toLocaleString()}) requires a ${matrix.requiredRole.replace(/_/g, " ")} or above. Your role (${session.user.role}) is not authorised to approve it.`);
+        }
+      }
+    }
+  }
 
   // Tariff Validation Block
   if (action === "APPROVED" || action === "PARTIALLY_APPROVED") {

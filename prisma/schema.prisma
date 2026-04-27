@@ -640,12 +640,13 @@ enum ClaimStatus {
 }
 
 enum ClaimSource {
-  MANUAL // Entered by admin
-  PREAUTH // Converted from pre-authorization
-  SMART // Received via SMART integration
-  SLADE360 // Received via Slade360 EDI
-  HMS // Received from hospital HMS
-  BATCH // Batch upload from facility
+  MANUAL        // Entered by admin
+  REIMBURSEMENT // Member paid provider directly — insurer reimburses member
+  PREAUTH       // Converted from pre-authorization
+  SMART         // Received via SMART integration
+  SLADE360      // Received via Slade360 EDI
+  HMS           // Received from hospital HMS
+  BATCH         // Batch upload from facility
 }
 
 enum ServiceType {
@@ -712,6 +713,13 @@ model Claim {
   appealNotes     String?
   appealDecision  String?
   appealDecidedAt DateTime?
+
+  // Reimbursement — member paid provider directly; insurer pays member back
+  isReimbursement          Boolean @default(false)
+  reimbursementBankName    String?
+  reimbursementAccountNo   String?
+  reimbursementMpesaPhone  String?
+  reimbursedAt             DateTime?
 
   // Integration references
   smartClaimRef    String? // SMART claim reference

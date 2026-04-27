@@ -11,9 +11,26 @@ export const connection = new Redis(redisUrl, {
 // Define core system queues
 export const Queues = {
   notifications: new Queue("notifications", { connection }),
-  billing: new Queue("billing", { connection }),
-  system: new Queue("system", { connection }),
+  billing:       new Queue("billing",       { connection }),
+  clinical:      new Queue("clinical",      { connection }),
+  system:        new Queue("system",        { connection }),
 };
+
+/**
+ * Schedule the pre-auth escalation scan to run every 30 minutes.
+ * Call once at worker startup — BullMQ deduplicates by jobId.
+ */
+export async function scheduleEscalationJob() {
+  await Queues.clinical.add(
+    "preauth-escalation",
+    {},
+    {
+      repeat:  { every: 30 * 60 * 1000 }, // 30 minutes
+      jobId:   "preauth-escalation-recurring",
+      attempts: 2,
+    },
+  );
+}
 
 /**
  * Enqueue an email to be sent asynchronously.

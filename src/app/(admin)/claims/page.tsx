@@ -12,8 +12,9 @@ export default async function ClaimsPage() {
   const statusColor = (status: string) => {
     switch (status) {
       case "APPROVED": case "PAID": return "bg-[#28A745]/10 text-[#28A745]";
-      case "RECEIVED": case "UNDER_REVIEW": return "bg-[#17A2B8]/10 text-[#17A2B8]";
-      case "PARTIALLY_APPROVED": return "bg-[#FFC107]/10 text-[#FFC107]";
+      case "RECEIVED": case "UNDER_REVIEW": case "CAPTURED": return "bg-[#17A2B8]/10 text-[#17A2B8]";
+      case "INCURRED": return "bg-[#6C757D]/10 text-[#6C757D]";
+      case "PARTIALLY_APPROVED": return "bg-[#FFC107]/10 text-[#856404]";
       case "DECLINED": case "VOID": return "bg-[#DC3545]/10 text-[#DC3545]";
       default: return "bg-[#6C757D]/10 text-[#6C757D]";
     }
@@ -26,22 +27,31 @@ export default async function ClaimsPage() {
           <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Claims</h1>
           <p className="text-avenue-text-body font-body mt-1">Review and adjudicate medical insurance claims.</p>
         </div>
-        <Link 
-          href="/claims/new"
-          className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors flex items-center space-x-2 shadow-sm"
-        >
-          <PlusCircle size={18} />
-          <span>New Claim</span>
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/claims/new/reimbursement"
+            className="border border-avenue-indigo text-avenue-indigo hover:bg-avenue-indigo/5 px-5 py-2 rounded-full font-semibold transition-colors flex items-center gap-2 text-sm"
+          >
+            <PlusCircle size={16} />
+            Reimbursement
+          </Link>
+          <Link
+            href="/claims/new"
+            className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors flex items-center gap-2 shadow-sm"
+          >
+            <PlusCircle size={18} />
+            <span>New Claim</span>
+          </Link>
+        </div>
       </div>
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: "Total", count: claims.length, color: "bg-avenue-indigo" },
-          { label: "Pending Review", count: claims.filter(c => ["RECEIVED", "UNDER_REVIEW"].includes(c.status)).length, color: "bg-[#17A2B8]" },
+          { label: "Awaiting Capture", count: claims.filter(c => ["INCURRED", "RECEIVED"].includes(c.status)).length, color: "bg-[#6C757D]" },
+          { label: "In Review", count: claims.filter(c => ["CAPTURED", "UNDER_REVIEW"].includes(c.status)).length, color: "bg-[#17A2B8]" },
           { label: "Approved", count: claims.filter(c => ["APPROVED", "PARTIALLY_APPROVED"].includes(c.status)).length, color: "bg-[#28A745]" },
-          { label: "Declined", count: claims.filter(c => c.status === "DECLINED").length, color: "bg-[#DC3545]" },
         ].map((s) => (
           <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-lg p-4 shadow-sm">
             <p className="text-xs text-avenue-text-muted font-bold uppercase">{s.label}</p>
