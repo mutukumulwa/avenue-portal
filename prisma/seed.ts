@@ -1783,6 +1783,384 @@ async function main() {
   }
 
   // ═══════════════════════════════════════════════════════════
+  // 16. PHASE A–D FEATURE DEMONSTRATIONS
+  // ═══════════════════════════════════════════════════════════
+  {
+    const demoExists = await prisma.approvalMatrix.findFirst({ where: { tenantId } })
+
+    if (!demoExists) {
+
+      // ── 16a. Kenyan statutory tax rates ───────────────────────────────────
+      for (const tax of [
+        { taxType: 'STAMP_DUTY'    as const, flatAmount: 40,     percentage: null, effectiveFrom: new Date('2024-01-01') },
+        { taxType: 'TRAINING_LEVY' as const, flatAmount: null,   percentage: 0.002, effectiveFrom: new Date('2024-01-01') },
+        { taxType: 'PHCF'          as const, flatAmount: null,   percentage: 0.0025, effectiveFrom: new Date('2024-01-01') },
+      ]) {
+        await prisma.taxRate.upsert({
+          where: { tenantId_taxType_effectiveFrom: { tenantId, taxType: tax.taxType, effectiveFrom: tax.effectiveFrom } },
+          update: {},
+          create: { tenantId, ...tax },
+        })
+      }
+      console.log('✅ Tax rates: Stamp Duty (KES 40), Training Levy (0.2%), PHCF (0.25%)')
+
+      // ── 16b. Approval matrix ──────────────────────────────────────────────
+      // Rule 1: Inpatient claims > KES 200k require UNDERWRITER
+      await prisma.approvalMatrix.create({ data: {
+        tenantId, serviceType: 'INPATIENT', claimValueMin: 200000, claimValueMax: null,
+        benefitCategory: null, requiredRole: 'UNDERWRITER', requiresDual: true,
+        effectiveFrom: new Date('2024-01-01'),
+      }})
+      // Rule 2: Surgical > KES 150k require MEDICAL_OFFICER
+      await prisma.approvalMatrix.create({ data: {
+        tenantId, serviceType: null, claimValueMin: 150000, claimValueMax: 199999,
+        benefitCategory: 'SURGICAL', requiredRole: 'MEDICAL_OFFICER', requiresDual: false,
+        effectiveFrom: new Date('2024-01-01'),
+      }})
+      // Rule 3: All claims > KES 50k require CLAIMS_OFFICER or above
+      await prisma.approvalMatrix.create({ data: {
+        tenantId, serviceType: null, claimValueMin: 50000, claimValueMax: 149999,
+        benefitCategory: null, requiredRole: 'CLAIMS_OFFICER', requiresDual: false,
+        effectiveFrom: new Date('2024-01-01'),
+      }})
+      console.log('✅ Approval matrix: 3 rules (inpatient >200k dual-approval, surgical >150k, general >50k)')
+
+      // ── 16c. Individual client ─────────────────────────────────────────────
+      // Patricia Wanjiru — self-pay individual enrolled on Executive package
+      const indivExists = await prisma.group.findFirst({ where: { tenantId, clientType: 'INDIVIDUAL' } })
+      if (!indivExists) {
+        const indivGroup = await prisma.group.create({ data: {
+          tenantId, name: 'Patricia Wanjiru', clientType: 'INDIVIDUAL',
+          fundingMode: 'INSURED', registrationNumber: 'IND-00001',
+          contactPersonName: 'Patricia Wanjiru', contactPersonPhone: '+254711000001', contactPersonEmail: 'patricia@email.com',
+          packageId: executivePkg.id, packageVersionId: executivePkg.versionId,
+          contributionRate: executivePkg.contrib,
+          effectiveDate: new Date('2024-03-01'), renewalDate: new Date('2025-03-01'), status: 'ACTIVE',
+        }})
+        const memberCount = await prisma.member.count({ where: { tenantId } })
+        await prisma.member.create({ data: {
+          tenantId, groupId: indivGroup.id, packageId: executivePkg.id, packageVersionId: executivePkg.versionId,
+          memberNumber: `AVH-2024-${String(memberCount + 1).padStart(5,'0')}`,
+          firstName: 'Patricia', lastName: 'Wanjiru', gender: 'FEMALE',
+          dateOfBirth: new Date('1982-09-21'), relationship: 'PRINCIPAL',
+          enrollmentDate: new Date('2024-03-01'), activationDate: new Date('2024-03-01'), status: 'ACTIVE',
+          idNumber: '28459671', phone: '+254711000001', email: 'patricia@email.com',
+          smartCardNumber: 'AV-IND-00001',
+        }})
+        console.log('✅ Individual client: Patricia Wanjiru (clientType=INDIVIDUAL, Executive package)')
+      }
+
+      // ── 16d. Self-funded scheme ───────────────────────────────────────────
+      // Convert East African Breweries to a self-funded scheme
+      const eabl = await prisma.group.findFirst({ where: { tenantId, name: 'East African Breweries' } })
+      if (eabl && eabl.fundingMode === 'INSURED') {
+        await prisma.group.update({ where: { id: eabl.id }, data: {
+          fundingMode: 'SELF_FUNDED', adminFeeMethod: 'FLAT_PER_INSURED', adminFeeRate: 2000,
+        }})
+        // Create the fund account with opening balance
+        const sfAccount = await prisma.selfFundedAccount.create({ data: {
+          tenantId, groupId: eabl.id,
+          balance: 4_200_000, totalDeposited: 5_000_000, totalClaims: 650_000, totalAdminFees: 150_000,
+          minimumBalance: 500_000,
+          periodStartDate: new Date('2024-01-01'), periodEndDate: new Date('2024-12-31'),
+        }})
+        // Fund transactions: initial deposit, top-up, claim deductions, admin fee
+        for (const txn of [
+          { type: 'DEPOSIT'         as const, amount: 5_000_000, balanceAfter: 5_000_000, description: 'Opening fund deposit Q1 2024', referenceNumber: 'EFT-EABL-001', postedAt: new Date('2024-01-05') },
+          { type: 'CLAIM_DEDUCTION' as const, amount: 650_000,   balanceAfter: 4_350_000, description: 'Claims deductions Jan–Mar 2024', referenceNumber: null,          postedAt: new Date('2024-04-01') },
+          { type: 'ADMIN_FEE'       as const, amount: 150_000,   balanceAfter: 4_200_000, description: 'Admin fee Q1 2024 — KES 2,000 × 75 insured', referenceNumber: 'ADM-2024-Q1', postedAt: new Date('2024-04-02') },
+        ]) {
+          await prisma.fundTransaction.create({ data: { tenantId, selfFundedAccountId: sfAccount.id, ...txn } })
+        }
+        console.log('✅ Self-funded scheme: East African Breweries (balance KES 4.2M, 3 transactions)')
+      }
+
+      // ── 16e. Invoices with Kenyan taxes ────────────────────────────────────
+      // Update the first existing invoice to carry the statutory taxes
+      const firstInvoice = await prisma.invoice.findFirst({ where: { tenantId }, orderBy: { createdAt: 'asc' } })
+      if (firstInvoice && Number(firstInvoice.stampDuty) === 0) {
+        const basic    = Number(firstInvoice.totalAmount)
+        const sdAmount = 40
+        const tlAmount = Math.round(basic * 0.002)
+        const pcAmount = Math.round(basic * 0.0025)
+        await prisma.invoice.update({ where: { id: firstInvoice.id }, data: {
+          stampDuty: sdAmount, trainingLevy: tlAmount, phcf: pcAmount,
+          taxTotal: sdAmount + tlAmount + pcAmount,
+        }})
+        console.log(`✅ Invoice taxes: ${firstInvoice.invoiceNumber} — SD KES ${sdAmount}, TL KES ${tlAmount}, PHCF KES ${pcAmount}`)
+      }
+
+      // ── 16f. Claims in INCURRED and CAPTURED states ────────────────────────
+      const activeMs = await prisma.member.findMany({ where: { tenantId, status: 'ACTIVE' }, take: 5 })
+      if (activeMs.length >= 2) {
+        const clmCount = await prisma.claim.count({ where: { tenantId } })
+        // INCURRED claim — notified of discharge, waiting for documents
+        await prisma.claim.create({ data: {
+          tenantId, claimNumber: `CLM-${new Date().getFullYear()}-${String(clmCount + 1).padStart(5,'0')}`,
+          memberId: activeMs[0].id, providerId: providers[2],
+          serviceType: 'INPATIENT', benefitCategory: 'INPATIENT',
+          dateOfService: new Date('2025-04-01'),
+          admissionDate: new Date('2025-03-28'), dischargeDate: new Date('2025-04-01'),
+          billedAmount: 85000, status: 'INCURRED', lengthOfStay: 4,
+          invoiceNumber: 'NH-INV-2025-0341',
+          diagnoses: [{ icdCode: 'J18.9', description: 'Pneumonia, unspecified organism', isPrimary: true }],
+          procedures: [],
+        }})
+        // CAPTURED claim — data entry complete, pending adjudication
+        await prisma.claim.create({ data: {
+          tenantId, claimNumber: `CLM-${new Date().getFullYear()}-${String(clmCount + 2).padStart(5,'0')}`,
+          memberId: activeMs[1].id, providerId: providers[0],
+          serviceType: 'OUTPATIENT', benefitCategory: 'DENTAL',
+          dateOfService: new Date('2025-04-05'),
+          billedAmount: 18500, status: 'CAPTURED',
+          invoiceNumber: 'PKL-INV-2025-0892',
+          diagnoses: [{ icdCode: 'K02.9', description: 'Dental caries, unspecified', isPrimary: true }],
+          procedures: [],
+          claimLines: { create: [
+            { lineNumber: 1, serviceCategory: 'CONSULTATION', description: 'Dental Examination', cptCode: '92004', quantity: 1, unitCost: 2500, billedAmount: 2500 },
+            { lineNumber: 2, serviceCategory: 'PROCEDURE',    description: 'Root Canal Treatment', cptCode: null,   quantity: 1, unitCost: 12000, billedAmount: 12000 },
+            { lineNumber: 3, serviceCategory: 'PHARMACY',     description: 'Antibiotics', cptCode: null,            quantity: 1, unitCost: 4000,  billedAmount: 4000  },
+          ]},
+        }})
+        console.log('✅ New claim states: 1× INCURRED (Nairobi Hospital, pneumonia) + 1× CAPTURED (dental, ready for adjudication)')
+      }
+
+      // ── 16g. Reimbursement claim ───────────────────────────────────────────
+      if (activeMs.length >= 3) {
+        const rmbCount = await prisma.claim.count({ where: { tenantId } })
+        await prisma.claim.create({ data: {
+          tenantId, claimNumber: `CLM-RMB-${new Date().getFullYear()}-${String(rmbCount + 1).padStart(5,'0')}`,
+          memberId: activeMs[2].id, providerId: providers[4],
+          source: 'REIMBURSEMENT', serviceType: 'OUTPATIENT', benefitCategory: 'OPTICAL',
+          dateOfService: new Date('2025-03-20'),
+          billedAmount: 13500, status: 'RECEIVED',
+          isReimbursement: true, invoiceNumber: 'EYE-INV-2025-0178',
+          reimbursementMpesaPhone: '+254722555888',
+          attendingDoctor: 'Dr. Amina Hassan',
+          diagnoses: [{ icdCode: 'Z01.0', description: 'Eye examination', isPrimary: true }],
+          procedures: [],
+          claimLines: { create: [
+            { lineNumber: 1, serviceCategory: 'CONSULTATION', description: 'Eye Examination',     cptCode: '92004', quantity: 1, unitCost: 2500, billedAmount: 2500 },
+            { lineNumber: 2, serviceCategory: 'OTHER',        description: 'Spectacle Frames',    cptCode: '92341', quantity: 1, unitCost: 5000, billedAmount: 5000 },
+            { lineNumber: 3, serviceCategory: 'OTHER',        description: 'Spectacle Lenses',    cptCode: '92340', quantity: 1, unitCost: 6000, billedAmount: 6000 },
+          ]},
+        }})
+        console.log('✅ Reimbursement claim: CLM-RMB-* — optical, member paid provider (M-Pesa +254722555888)')
+      }
+
+      // ── 16h. Pre-auth with escalation threshold ───────────────────────────
+      if (activeMs.length >= 4) {
+        const paCount = await prisma.preAuthorization.count({ where: { tenantId } })
+        const escalationUser = await prisma.user.findFirst({ where: { tenantId, role: 'MEDICAL_OFFICER' } })
+        await prisma.preAuthorization.create({ data: {
+          tenantId, preauthNumber: `PA-ESC-${new Date().getFullYear()}-${String(paCount + 1).padStart(5,'0')}`,
+          memberId: activeMs[3].id, providerId: providers[2],
+          submittedBy: 'PROVIDER', status: 'SUBMITTED',
+          serviceType: 'INPATIENT', benefitCategory: 'SURGICAL',
+          estimatedCost: 250000,
+          escalationThresholdHours: 4,
+          escalatedToId: escalationUser?.id ?? null,
+          diagnoses: [{ icdCode: 'K35.9', description: 'Acute appendicitis', isPrimary: true }],
+          procedures: [{ cptCode: '44950', description: 'Appendectomy', quantity: 1, unitCost: 110000 }],
+          clinicalNotes: 'Patient presents with acute appendicitis requiring emergency surgical intervention. Pre-auth required — escalation set to 4-hour SLA.',
+          expectedDateOfService: new Date('2025-04-15'),
+        }})
+        console.log('✅ Pre-auth with escalation: PA-ESC-* — appendectomy, 4h escalation threshold → Medical Officer')
+      }
+
+      // ── 16i. SCHEME_TRANSFER endorsement ─────────────────────────────────
+      // Move a KCB member to EABL (career move scenario)
+      const kcbGroup  = await prisma.group.findFirst({ where: { tenantId, name: 'KCB Group' } })
+      const eablGroup = await prisma.group.findFirst({ where: { tenantId, name: 'East African Breweries' } })
+      if (kcbGroup && eablGroup) {
+        const kcbMember = await prisma.member.findFirst({
+          where: { tenantId, groupId: kcbGroup.id, status: 'ACTIVE', relationship: 'PRINCIPAL' },
+        })
+        if (kcbMember) {
+          const endCount = await prisma.endorsement.count({ where: { tenantId } })
+          await prisma.endorsement.create({ data: {
+            tenantId, endorsementNumber: `END-TRANSFER-${String(endCount + 1).padStart(5,'0')}`,
+            groupId: kcbGroup.id, toGroupId: eablGroup.id, memberId: kcbMember.id,
+            type: 'SCHEME_TRANSFER', status: 'APPROVED',
+            effectiveDate: new Date('2025-04-01'),
+            changeDetails: { reason: 'Career change — member joined East African Breweries on 1 April 2025', fromGroupId: kcbGroup.id, toGroupId: eablGroup.id },
+            reviewedBy: users['SUPER_ADMIN'], reviewedAt: new Date('2025-03-28'),
+          }})
+          console.log(`✅ Scheme transfer endorsement: ${kcbMember.firstName} ${kcbMember.lastName} — KCB → EABL`)
+        }
+      }
+
+      // ── 16j. TIER_CHANGE endorsement ─────────────────────────────────────
+      // Promote a Safaricom Staff member to Management tier
+      const staffMember = await prisma.member.findFirst({
+        where: { tenantId, groupId: safaricom.id, relationship: 'PRINCIPAL', status: 'ACTIVE',
+                 benefitTier: { name: 'Staff' } },
+      })
+      const mgmtTier = await prisma.groupBenefitTier.findFirst({
+        where: { groupId: safaricom.id, name: 'Management' },
+      })
+      if (staffMember && mgmtTier) {
+        const endCount2 = await prisma.endorsement.count({ where: { tenantId } })
+        await prisma.endorsement.create({ data: {
+          tenantId, endorsementNumber: `END-TIER-${String(endCount2 + 1).padStart(5,'0')}`,
+          groupId: safaricom.id, memberId: staffMember.id, toBenefitTierId: mgmtTier.id,
+          type: 'TIER_CHANGE', status: 'APPROVED',
+          effectiveDate: new Date('2025-03-01'),
+          changeDetails: { reason: 'Promotion to Team Lead — eligible for Management tier', fromTierId: staffMember.benefitTierId, toBenefitTierId: mgmtTier.id },
+          reviewedBy: users['UNDERWRITER'], reviewedAt: new Date('2025-02-28'),
+        }})
+        console.log(`✅ Tier change endorsement: ${staffMember.firstName} ${staffMember.lastName} — Staff → Management (Safaricom)`)
+      }
+
+      // ── 16k. Smart-card replacement ───────────────────────────────────────
+      if (activeMs.length >= 1) {
+        const cardMember = activeMs[0]
+        // First give them a card
+        await prisma.member.update({ where: { id: cardMember.id }, data: { smartCardNumber: 'AV-2024-00001' } })
+        // Then log a replacement request
+        const replacementInvCount = await prisma.invoice.count({ where: { tenantId } })
+        const replInvoice = await prisma.invoice.create({ data: {
+          tenantId, invoiceNumber: `INV-CARD-${new Date().getFullYear()}-${String(replacementInvCount + 1).padStart(5,'0')}`,
+          groupId: cardMember.groupId,
+          period: '2025-04', memberCount: 1, ratePerMember: 500,
+          totalAmount: 500, paidAmount: 0, balance: 500,
+          stampDuty: 0, trainingLevy: 0, phcf: 0, taxTotal: 0,
+          dueDate: new Date('2025-05-01'),
+          notes: `Card replacement fee — ${cardMember.firstName} ${cardMember.lastName}. Reason: Lost card`,
+        }})
+        await prisma.activityLog.create({ data: {
+          entityType: 'MEMBER', entityId: cardMember.id, memberId: cardMember.id,
+          action: 'CARD_REPLACEMENT_REQUESTED',
+          description: `Card replacement requested. Reason: Lost card. Fee invoice ${replInvoice.invoiceNumber} raised (KES 500).`,
+          userId: users['SUPER_ADMIN'],
+          metadata: { reason: 'Lost card', invoiceId: replInvoice.id, fee: 500 },
+        }})
+        console.log(`✅ Smart-card replacement: ${cardMember.firstName} ${cardMember.lastName} — INV-CARD raised, KES 500 fee`)
+      }
+
+      // ── 16l. BenefitUsage for exceeded-limits report ──────────────────────
+      // Seed usage records so the exceeded-limits report shows realistic data
+      const benefitConfigs = await prisma.benefitConfig.findMany({
+        where: { packageVersion: { package: { tenantId } } },
+        select: { id: true, category: true, annualSubLimit: true },
+        take: 10,
+      })
+      const allActiveMembers = await prisma.member.findMany({
+        where: { tenantId, status: 'ACTIVE' }, take: 6,
+      })
+      const usageScenarios = [
+        { memberIdx: 0, configCat: 'OUTPATIENT',  pct: 0.92, label: '>90% outpatient' },
+        { memberIdx: 1, configCat: 'DENTAL',       pct: 1.05, label: 'EXCEEDED dental' },
+        { memberIdx: 2, configCat: 'INPATIENT',    pct: 0.83, label: '>80% inpatient' },
+        { memberIdx: 3, configCat: 'OPTICAL',      pct: 1.0,  label: 'exactly at limit optical' },
+      ]
+      for (const s of usageScenarios) {
+        const member = allActiveMembers[s.memberIdx]
+        if (!member) continue
+        const config = benefitConfigs.find(c => c.category === s.configCat)
+        if (!config) continue
+        const existing = await prisma.benefitUsage.findFirst({
+          where: { memberId: member.id, benefitConfigId: config.id },
+        })
+        if (!existing) {
+          await prisma.benefitUsage.create({ data: {
+            memberId: member.id, benefitConfigId: config.id,
+            periodStart: new Date('2025-01-01'), periodEnd: new Date('2025-12-31'),
+            amountUsed: Math.round(Number(config.annualSubLimit) * s.pct),
+            claimCount: Math.round(s.pct * 8),
+          }})
+        }
+      }
+      console.log('✅ Benefit usage: 4 members flagged (1× exceeded, 1× exactly at limit, 2× >80%)')
+
+      // ── 16m. Commission records ───────────────────────────────────────────
+      const allBrokers = await prisma.broker.findMany({ where: { tenantId } })
+      const commExists = await prisma.commission.findFirst({ where: { broker: { tenantId } } })
+      if (!commExists && allBrokers.length > 0) {
+        const allGroups = await prisma.group.findMany({ where: { tenantId }, take: 3 })
+        const commScenarios = [
+          { brokerIdx: 0, groupIdx: 0, period: '2024-01', received: 150000, rate: 15, paid: true,   paidAt: new Date('2024-02-15'), ref: 'COMM-2024-001' },
+          { brokerIdx: 0, groupIdx: 0, period: '2024-02', received: 150000, rate: 15, paid: true,   paidAt: new Date('2024-03-14'), ref: 'COMM-2024-002' },
+          { brokerIdx: 0, groupIdx: 0, period: '2024-03', received: 150000, rate: 15, paid: false,  paidAt: null,                   ref: null },
+          { brokerIdx: 1, groupIdx: 1, period: '2024-01', received: 225000, rate: 12, paid: true,   paidAt: new Date('2024-02-10'), ref: 'COMM-2024-003' },
+          { brokerIdx: 1, groupIdx: 1, period: '2024-02', received: 225000, rate: 12, paid: false,  paidAt: null,                   ref: null },
+          { brokerIdx: 2, groupIdx: 2, period: '2024-01', received: 90000,  rate: 18, paid: true,   paidAt: new Date('2024-02-20'), ref: 'COMM-2024-004' },
+        ]
+        for (const c of commScenarios) {
+          const broker = allBrokers[c.brokerIdx]
+          const group  = allGroups[c.groupIdx]
+          if (!broker || !group) continue
+          const commAmt = Math.round(c.received * (c.rate / 100))
+          await prisma.commission.create({ data: {
+            brokerId: broker.id, groupId: group.id, period: c.period,
+            contributionReceived: c.received, commissionRate: c.rate, commissionAmount: commAmt,
+            paymentStatus: c.paid ? 'PAID' : 'PENDING',
+            paidAt: c.paidAt, paymentReference: c.ref,
+          }})
+        }
+        console.log('✅ Commission records: 6 records across 3 brokers — 4 paid, 2 pending')
+      }
+
+      // ── 16n. Adjudication logs for claims-per-operator ────────────────────
+      const existingClaims = await prisma.claim.findMany({
+        where: { tenantId, status: { in: ['APPROVED', 'PARTIALLY_APPROVED', 'DECLINED'] } },
+        select: { id: true, approvedAmount: true, status: true },
+        take: 8,
+      })
+      const adjLogExists = await prisma.adjudicationLog.findFirst({ where: { claim: { tenantId } } })
+      if (!adjLogExists && existingClaims.length > 0) {
+        const ops  = [users['CLAIMS_OFFICER'], users['MEDICAL_OFFICER'], users['SUPER_ADMIN']]
+        for (let i = 0; i < existingClaims.length; i++) {
+          const cl    = existingClaims[i]!
+          const op    = ops[i % ops.length]!
+          const action = cl.status === 'DECLINED' ? 'DECLINED' : cl.status === 'PARTIALLY_APPROVED' ? 'PARTIALLY_APPROVED' : 'APPROVED'
+          await prisma.adjudicationLog.create({ data: {
+            claimId: cl.id, userId: op, action, toStatus: cl.status,
+            amount: cl.approvedAmount, notes: `${action.toLowerCase().replace(/_/g,' ')} by adjudicator`,
+          }})
+        }
+        console.log(`✅ Adjudication logs: ${existingClaims.length} logs across 3 operators (claims-per-operator report)`)
+      }
+
+      // ── 16o. Fix co-contribution claim number references ──────────────────
+      // Earlier section 15 looked for 'CLM-001' which doesn't exist.
+      // Re-seed co-contribution transactions using the correct claim numbers.
+      for (const [clmNum, amount, status, mpesa] of [
+        ['CLM-2024-00001', 570, 'PENDING',   null         ],
+        ['CLM-2024-00002', 250, 'COLLECTED', 'QWE1234XYZ' ],
+        ['CLM-2024-00003', 0,   'WAIVED',    null         ],
+      ] as [string, number, string, string | null][]) {
+        const claim = await prisma.claim.findFirst({ where: { tenantId, claimNumber: clmNum } })
+        if (!claim) continue
+        const already = await prisma.coContributionTransaction.findUnique({ where: { claimId: claim.id } })
+        if (already) continue
+        const rule = await prisma.coContributionRule.findFirst({
+          where: { tenantId, benefitCategory: 'OUTPATIENT', networkTier: 'TIER_1' },
+        })
+        await prisma.coContributionTransaction.create({ data: {
+          tenantId, claimId: claim.id, memberId: claim.memberId,
+          coContributionRuleId: rule?.id,
+          serviceCost: claim.billedAmount,
+          calculatedAmount: amount, cappedAmount: amount, finalAmount: amount,
+          planShare: Number(claim.billedAmount) - amount,
+          annualCapApplied: false, capsApplied: [],
+          collectionStatus: status as never,
+          amountCollected: status === 'COLLECTED' ? amount : 0,
+          paymentMethod: mpesa ? 'MPESA' : null,
+          mpesaTransactionRef: mpesa,
+          waiverReason: status === 'WAIVED' ? 'Member is elderly with documented financial hardship — approved per senior citizen policy.' : null,
+          waiverApprovedBy: status === 'WAIVED' ? 'Dr. Sarah Achieng (Medical Officer)' : null,
+        }})
+      }
+      console.log('✅ Co-contribution transactions fixed: CLM-2024-00001 (PENDING), CLM-2024-00002 (COLLECTED M-Pesa), CLM-2024-00003 (WAIVED)')
+
+      console.log('\n✅ Phase A–D demonstrations complete.')
+    } else {
+      console.log('✅ Phase A–D demonstrations: already seeded')
+    }
+  }
+
+  // ═══════════════════════════════════════════════════════════
   // 17. NOTIFICATION TEMPLATES
   // ═══════════════════════════════════════════════════════════
   const notifTemplates = [
@@ -1805,21 +2183,40 @@ async function main() {
 
   console.log('\n🎉 Seed complete! All features populated.\n')
   console.log('  Login: admin@avenue.co.ke / AvenueAdmin2024!')
-  console.log('  Features seeded:')
+  console.log('')
+  console.log('  Core:')
   console.log('  • Safaricom — 3 benefit tiers (Executive/Management/Staff) with different packages')
+  console.log('  • 5 corporate groups + 1 individual client (Patricia Wanjiru)')
   console.log('  • 6 providers with CPT tariffs + ICD-10 diagnosis tariffs')
-  console.log('  • 6 claims with structured service lines grouped by category')
+  console.log('  • 6+ claims with structured service lines grouped by category')
   console.log('  • 2 exception logs (1 approved, 1 pending review)')
   console.log('  • GL: Chart of accounts + journal entries for invoices, payments, and claims')
   console.log('  • Pre-authorizations, endorsements, quotations in various states')
-  console.log('  • Fraud: 8 demonstration claims — RULE-TEMP-001 (discharge before admission),')
-  console.log('           RULE-CLIN-001 (gender mismatch), RULE-BILL-003 (tariff breach),')
-  console.log('           RULE-BILL-004 (round-number clustering), RULE-TEMP-004 (duplicate),')
-  console.log('           RULE-FIN-004 (split billing) — each with a matching ClaimFraudAlert')
-  console.log('  • Co-contribution rules: Essential (10% OPD all tiers + Dental tiers, KES 8k/20k annual caps)')
-  console.log('                           Premier (tiered OPD: free Tier1/5% Tier2/10% Tier3, KES 15k cap)')
-  console.log('                           Executive (NONE on all tiers — plan covers 100%)')
-  console.log('  • Co-contribution transactions: CLM-001 PENDING, CLM-002 COLLECTED (M-Pesa QHX9872KAB), CLM-003 WAIVED')
+  console.log('')
+  console.log('  Phase A — Schema hardening:')
+  console.log('  • Tax rates: Stamp Duty KES 40, Training Levy 0.2%, PHCF 0.25%')
+  console.log('  • Approval matrix: 3 rules (inpatient >200k dual-approval, surgical >150k, general >50k)')
+  console.log('  • INCURRED claim: Nairobi Hospital pneumonia, invoice NH-INV-2025-0341')
+  console.log('  • CAPTURED claim: Dental, all lines entered, forwarded for adjudication')
+  console.log('')
+  console.log('  Phase B — Claims integrity:')
+  console.log('  • Reimbursement claim: optical, member paid provider (M-Pesa reimbursement)')
+  console.log('  • Pre-auth with escalation: appendectomy, 4h SLA → Medical Officer')
+  console.log('  • Adjudication logs: 8 records across 3 operators (claims-per-operator report)')
+  console.log('')
+  console.log('  Phase C — Membership completeness:')
+  console.log('  • Individual client: Patricia Wanjiru (clientType=INDIVIDUAL, Executive)')
+  console.log('  • Self-funded scheme: East African Breweries (KES 4.2M balance, 3 transactions)')
+  console.log('  • Scheme transfer endorsement: KCB member → EABL (career change)')
+  console.log('  • Tier change endorsement: Safaricom Staff → Management (promotion)')
+  console.log('  • Smart-card replacement: lost card, fee invoice raised (KES 500)')
+  console.log('')
+  console.log('  Phase D — Reports (all populated with real data):')
+  console.log('  • Fraud: 8 demonstration claims (TEMP-001, CLIN-001, BILL-003, BILL-004, TEMP-004, FIN-004)')
+  console.log('  • Co-contribution: Essential/Premier/Executive rules + 3 transactions (PENDING/COLLECTED/WAIVED)')
+  console.log('  • Exceeded limits: 4 benefit usage records (1 exceeded, 1 at limit, 2 at >80%)')
+  console.log('  • Commission statements: 6 records across 3 brokers (4 paid, 2 pending)')
+  console.log('  • Levies & taxes: first invoice updated with SD/TL/PHCF amounts')
 }
 
 main()
