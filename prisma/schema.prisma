@@ -38,11 +38,15 @@ model Tenant {
   journalEntries   JournalEntry[]
   fraudAlerts      ClaimFraudAlert[]
   complaints       Complaint[]
-  coContributionRules        CoContributionRule[]
-  annualCoContributionCaps   AnnualCoContributionCap[]
-  coContributionTransactions CoContributionTransaction[]
+  coContributionRules         CoContributionRule[]
+  annualCoContributionCaps    AnnualCoContributionCap[]
+  coContributionTransactions  CoContributionTransaction[]
   memberAnnualCoContributions MemberAnnualCoContribution[]
   familyAnnualCoContributions FamilyAnnualCoContribution[]
+  selfFundedAccounts          SelfFundedAccount[]
+  fundTransactions            FundTransaction[]
+  taxRates                    TaxRate[]
+  approvalMatrices            ApprovalMatrix[]
 }
 
 // ─── USERS & AUTH ────────────────────────────────────────
@@ -82,11 +86,12 @@ model User {
   group    Group?  @relation("HRManagerGroup", fields: [groupId], references: [id])
 
   auditLogs                AuditLog[]
-  claimReviews             Claim[]          @relation("ClaimReviewer")
-  raisedExceptions         ExceptionLog[]   @relation("ExceptionRaisedBy")
-  resolvedExceptions       ExceptionLog[]   @relation("ExceptionResolvedBy")
-  submittedServiceRequests ServiceRequest[] @relation("SRSubmitter")
-  respondedServiceRequests ServiceRequest[] @relation("SRResponder")
+  claimReviews             Claim[]              @relation("ClaimReviewer")
+  raisedExceptions         ExceptionLog[]       @relation("ExceptionRaisedBy")
+  resolvedExceptions       ExceptionLog[]       @relation("ExceptionResolvedBy")
+  submittedServiceRequests ServiceRequest[]     @relation("SRSubmitter")
+  respondedServiceRequests ServiceRequest[]     @relation("SRResponder")
+  escalatedPreauths        PreAuthorization[]   @relation("PreauthEscalation")
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -107,6 +112,25 @@ enum PaymentFrequency {
   QUARTERLY
   SEMI_ANNUAL
   ANNUAL
+}
+
+enum FundingMode {
+  INSURED      // Traditional risk-bearing — premium underwriting
+  SELF_FUNDED  // Client deposits a fund; broker administers; admin fee charged
+}
+
+enum AdminFeeMethod {
+  FLAT_PER_INSURED  // Fixed fee per member at policy start
+  PCT_OF_CLAIMS     // Percentage of total claims paid, computed post-period
+}
+
+enum FundTransactionType {
+  DEPOSIT
+  TOP_UP
+  CLAIM_DEDUCTION
+  ADMIN_FEE
+  REFUND
+  ADJUSTMENT
 }
 
 model Group {
@@ -136,22 +160,29 @@ model Group {
   suspensionReason   String?
   terminatedAt       DateTime?
   notes              String?
+  // Funding mode — INSURED (default) or SELF_FUNDED
+  fundingMode        FundingMode      @default(INSURED)
+  // Self-funded admin fee config (ignored when fundingMode = INSURED)
+  adminFeeMethod     AdminFeeMethod?
+  adminFeeRate       Decimal?         // KES flat (FLAT_PER_INSURED) or % (PCT_OF_CLAIMS)
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
 
-  members         Member[]
-  benefitTiers    GroupBenefitTier[]
-  endorsements    Endorsement[]
-  invoices        Invoice[]
-  payments        Payment[]
-  documents       Document[]
-  activityLogs    ActivityLog[]
-  quotations      Quotation[]
-  hrManagers      User[]             @relation("HRManagerGroup")
-  serviceRequests ServiceRequest[]
+  members            Member[]
+  benefitTiers       GroupBenefitTier[]
+  endorsements       Endorsement[]
+  invoices           Invoice[]
+  payments           Payment[]
+  documents          Document[]
+  activityLogs       ActivityLog[]
+  quotations         Quotation[]
+  hrManagers         User[]             @relation("HRManagerGroup")
+  serviceRequests    ServiceRequest[]
+  selfFundedAccount  SelfFundedAccount?
 
   @@index([tenantId])
   @@index([tenantId, status])
+  @@index([tenantId, fundingMode])
   @@index([brokerId])
 }
 
@@ -298,6 +329,105 @@ model Member {
   @@index([groupId])
   @@index([principalId])
   @@index([idNumber])
+}
+
+// ─── SELF-FUNDED SCHEME ACCOUNTS ─────────────────────────
+
+// One account per self-funded group — tracks the fund balance
+model SelfFundedAccount {
+  id        String  @id @default(cuid())
+  tenantId  String
+  tenant    Tenant  @relation(fields: [tenantId], references: [id])
+  groupId   String  @unique
+  group     Group   @relation(fields: [groupId], references: [id])
+
+  balance          Decimal @default(0) @db.Decimal(14, 2) // Current fund balance (KES)
+  minimumBalance   Decimal @default(0) @db.Decimal(14, 2) // Alert threshold
+  totalDeposited   Decimal @default(0) @db.Decimal(14, 2) // Lifetime deposits
+  totalClaims      Decimal @default(0) @db.Decimal(14, 2) // Lifetime claims deducted
+  totalAdminFees   Decimal @default(0) @db.Decimal(14, 2) // Lifetime admin fees charged
+
+  periodStartDate  DateTime
+  periodEndDate    DateTime
+
+  transactions FundTransaction[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+}
+
+// Ledger of every fund movement for a self-funded scheme
+model FundTransaction {
+  id                  String              @id @default(cuid())
+  tenantId            String
+  tenant              Tenant              @relation(fields: [tenantId], references: [id])
+  selfFundedAccountId String
+  selfFundedAccount   SelfFundedAccount   @relation(fields: [selfFundedAccountId], references: [id])
+
+  type             FundTransactionType
+  amount           Decimal             @db.Decimal(14, 2)
+  balanceAfter     Decimal             @db.Decimal(14, 2)
+  description      String
+  referenceNumber  String?             // Cheque / EFT / M-Pesa ref
+  claimId          String?             // Set when type = CLAIM_DEDUCTION
+  invoiceId        String?             // Set when type = ADMIN_FEE
+  postedById       String?
+  postedAt         DateTime            @default(now())
+
+  @@index([tenantId])
+  @@index([selfFundedAccountId])
+}
+
+// ─── KENYAN STATUTORY TAXES ──────────────────────────────
+
+enum TaxType {
+  STAMP_DUTY      // KES 40 flat per policy — IRA requirement
+  TRAINING_LEVY   // 0.2% of basic premium — AKI training fund
+  PHCF            // 0.25% of basic premium — Post Hospital Care Fund
+}
+
+// Configurable tax rates per tenant (lets rates change without code changes)
+model TaxRate {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  taxType     TaxType
+  flatAmount  Decimal? @db.Decimal(10, 2) // For STAMP_DUTY
+  percentage  Decimal? @db.Decimal(6, 4)  // For percentage-based taxes (e.g. 0.2000 = 0.2%)
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  isActive    Boolean  @default(true)
+
+  @@unique([tenantId, taxType, effectiveFrom])
+  @@index([tenantId])
+}
+
+// ─── APPROVAL MATRIX ─────────────────────────────────────
+
+// Configures which role must approve a claim based on value and type
+model ApprovalMatrix {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+
+  claimValueMin  Decimal?        // null = no lower bound
+  claimValueMax  Decimal?        // null = no upper bound
+  serviceType    ServiceType?    // null = applies to all service types
+  benefitCategory BenefitCategory? // null = applies to all categories
+
+  requiredRole   String          // Maps to UserRole enum value
+  requiresDual   Boolean @default(false) // Maker-checker: needs two approvers
+
+  effectiveFrom  DateTime
+  effectiveTo    DateTime?
+  isActive       Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
 }
 
 // ─── PACKAGES & BENEFITS ────────────────────────────────
@@ -495,8 +625,10 @@ model Endorsement {
 
 // ─── CLAIMS ─────────────────────────────────────────────
 enum ClaimStatus {
-  RECEIVED
-  UNDER_REVIEW
+  INCURRED        // Liability known before paper arrives (e.g. discharge notification)
+  RECEIVED        // Claim documents received from provider
+  CAPTURED        // Data entry complete — awaiting adjudication
+  UNDER_REVIEW    // Medical officer / claims officer reviewing
   APPROVED
   PARTIALLY_APPROVED
   DECLINED
@@ -527,7 +659,8 @@ model Claim {
   id              String            @id @default(cuid())
   tenantId        String
   tenant          Tenant            @relation(fields: [tenantId], references: [id])
-  claimNumber     String // e.g., CLM-2025-00001
+  claimNumber     String  // e.g., CLM-2025-00001
+  invoiceNumber   String? // Provider's own invoice number — unique per provider
   memberId        String
   member          Member            @relation(fields: [memberId], references: [id])
   providerId      String
@@ -599,6 +732,10 @@ model Claim {
   updatedAt DateTime @updatedAt
 
   @@unique([tenantId, claimNumber])
+  // Provider-scoped invoice uniqueness — prevents same provider submitting same invoice twice
+  @@unique([providerId, invoiceNumber])
+  // Double-capture detection index — (provider, member, date, category) lookups at adjudication
+  @@index([tenantId, providerId, memberId, dateOfService, benefitCategory])
   @@index([tenantId])
   @@index([tenantId, status])
   @@index([memberId])
@@ -699,6 +836,12 @@ model PreAuthorization {
   declinedBy        String?
   declinedAt        DateTime?
 
+  // Escalation — if pending past threshold, auto-notify next approver
+  escalationThresholdHours Int?      // null = no escalation configured
+  escalatedAt              DateTime?
+  escalatedToId            String?
+  escalatedTo              User?     @relation("PreauthEscalation", fields: [escalatedToId], references: [id])
+
   // Conversion to claim
   claimId     String?
   claim       Claim?
@@ -771,13 +914,15 @@ model ProviderTariff {
   provider      Provider  @relation(fields: [providerId], references: [id])
   cptCode       String?
   serviceName   String
-  agreedRate    Decimal // KES — overrides standard CPT charge for this provider
+  agreedRate    Decimal  // KES — overrides standard CPT charge for this provider
   effectiveFrom DateTime
   effectiveTo   DateTime?
-  createdAt     DateTime  @default(now())
+  isActive      Boolean  @default(true) // Never delete — deactivate instead
+  createdAt     DateTime @default(now())
 
   @@index([providerId])
   @@index([providerId, cptCode])
+  @@index([providerId, isActive])
 }
 
 // Diagnosis-based bundled rates — e.g. malaria admission = KES 8,000/day flat
@@ -787,11 +932,12 @@ model ProviderDiagnosisTariff {
   provider       Provider  @relation(fields: [providerId], references: [id])
   icdCode        String // ICD-10 code this rate applies to
   diagnosisLabel String // Human-readable label (copied at time of creation)
-  bundledRate    Decimal? // Fixed package rate for the whole episode (KES)
-  perDayRate     Decimal? // Per diem rate (KES/day) — for inpatient
-  notes          String? // Any special conditions or inclusions
+  bundledRate    Decimal?  // Fixed package rate for the whole episode (KES)
+  perDayRate     Decimal?  // Per diem rate (KES/day) — for inpatient
+  notes          String?   // Any special conditions or inclusions
   effectiveFrom  DateTime
   effectiveTo    DateTime?
+  isActive       Boolean   @default(true) // Never delete — deactivate instead
   createdAt      DateTime  @default(now())
 
   @@index([providerId])
@@ -870,6 +1016,11 @@ model Invoice {
   totalAmount   Decimal
   paidAmount    Decimal       @default(0)
   balance       Decimal // totalAmount - paidAmount
+  // Kenyan statutory taxes — computed at invoice generation
+  stampDuty     Decimal       @default(40)    @db.Decimal(10, 2) // KES 40 flat
+  trainingLevy  Decimal       @default(0)     @db.Decimal(10, 2) // 0.2% of basic premium
+  phcf          Decimal       @default(0)     @db.Decimal(10, 2) // 0.25% of basic premium
+  taxTotal      Decimal       @default(0)     @db.Decimal(10, 2) // stampDuty + trainingLevy + phcf
   dueDate       DateTime
   status        InvoiceStatus @default(DRAFT)
   sentAt        DateTime?
