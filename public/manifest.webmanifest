@@ -1,0 +1,25 @@
+{
+  "name": "Avenue Health Member Portal",
+  "short_name": "Avenue Health",
+  "description": "Mobile member access for benefits, dependents, utilization, pre-authorizations, facilities, and support.",
+  "start_url": "/member/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#F8F9FA",
+  "theme_color": "#292A83",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icons/avenue-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/avenue-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Avenue Health">
+  <rect width="512" height="512" fill="#292A83"/>
+  <circle cx="256" cy="256" r="196" fill="#FFFFFF"/>
+  <path fill="#292A83" d="M270 143h-28l-94 226h47l18-48h84l19 48h48l-94-226Zm-43 141 28-74 29 74h-57Z"/>
+</svg>
