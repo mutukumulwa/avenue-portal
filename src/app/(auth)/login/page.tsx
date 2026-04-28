@@ -42,6 +42,8 @@ export default function LoginPage() {
       router.push("/member/dashboard");
     } else if (role === "HR_MANAGER") {
       router.push("/hr/dashboard");
+    } else if (role === "FUND_ADMINISTRATOR") {
+      router.push("/fund/dashboard");
     } else {
       router.push("/dashboard");
     }

@@ -29,7 +29,8 @@ export const ROLES = {
   OPS:          ["SUPER_ADMIN", "CLAIMS_OFFICER", "MEDICAL_OFFICER", "CUSTOMER_SERVICE", "UNDERWRITER"] as UserRole[],
   /** Anyone with a portal login (all internal staff) */
   ANY_STAFF:    ["SUPER_ADMIN", "CLAIMS_OFFICER", "FINANCE_OFFICER", "UNDERWRITER",
-                 "CUSTOMER_SERVICE", "MEDICAL_OFFICER", "REPORTS_VIEWER"] as UserRole[],
+                 "CUSTOMER_SERVICE", "MEDICAL_OFFICER", "REPORTS_VIEWER",
+                 "FUND_ADMINISTRATOR"] as UserRole[],
   /** Member self-service portal */
   MEMBER:       ["MEMBER_USER"] as UserRole[],
   /** Corporate group HR administrator */
