@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LayoutDashboard, Wallet, FileText, BarChart2, LogOut } from "lucide-react";
+import { PortalSwitcher } from "./PortalSwitcher";
 
 const STATIC_ITEMS = [
   { label: "Dashboard", href: "/fund/dashboard", icon: LayoutDashboard },
@@ -15,9 +16,9 @@ interface FundScheme {
   isLow: boolean;
 }
 
-interface Props { schemes: FundScheme[] }
+interface Props { schemes: FundScheme[]; userRole: string }
 
-export function FundSidebar({ schemes }: Props) {
+export function FundSidebar({ schemes, userRole }: Props) {
   const pathname = usePathname();
 
   return (
@@ -32,6 +33,9 @@ export function FundSidebar({ schemes }: Props) {
             Fund Admin
           </span>
         </Link>
+
+        {/* Portal switcher */}
+        <PortalSwitcher userRole={userRole} />
 
         {/* Static nav */}
         <ul className="space-y-1 font-medium mb-4">

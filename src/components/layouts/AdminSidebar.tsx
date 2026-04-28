@@ -9,6 +9,7 @@ import {
   Settings, LogOut, Calculator, UserCheck, MessageSquareText,
   ShieldAlert, MessageSquareWarning, Wallet,
 } from "lucide-react";
+import { PortalSwitcher } from "./PortalSwitcher";
 import { useState } from "react";
 import type { UserRole } from "@prisma/client";
 
@@ -197,6 +198,9 @@ export function AdminSidebar({ userRole }: { userRole: UserRole | null }) {
             <span className="text-xs font-semibold text-avenue-text-muted font-body tracking-normal">Avenue Healthcare</span>
           </span>
         </Link>
+
+        {/* Portal switcher */}
+        {userRole && <PortalSwitcher userRole={userRole} />}
 
         {/* Nav groups */}
         <nav className="flex-1 space-y-1">

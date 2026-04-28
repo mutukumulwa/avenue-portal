@@ -34,7 +34,7 @@ export default async function FundLayout({ children }: { children: React.ReactNo
 
   return (
     <div className="flex min-h-screen bg-[#F8F9FA]">
-      <FundSidebar schemes={schemes} />
+      <FundSidebar schemes={schemes} userRole={session.user.role as string} />
       <div className="flex-1 ml-64 p-8">
         {children}
       </div>

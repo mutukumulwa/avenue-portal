@@ -9,6 +9,7 @@ import {
   LogOut,
   Headset
 } from "lucide-react";
+import { PortalSwitcher } from "./PortalSwitcher";
 
 type NavItem  = { label: string; href: string; icon: React.ElementType };
 type NavGroup = { label: string; items: NavItem[] };
@@ -85,14 +86,14 @@ function NavGroupSection({ group, pathname }: { group: NavGroup; pathname: strin
   );
 }
 
-export function HRSidebar({ groupName }: { groupName: string }) {
+export function HRSidebar({ groupName, userRole }: { groupName: string; userRole: string }) {
   const pathname = usePathname();
 
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-60 border-r border-[#EEEEEE] bg-white">
       <div className="flex h-full flex-col overflow-y-auto px-3 py-4">
         {/* Logo */}
-        <Link href="/hr/dashboard" className="mb-5 flex items-center pl-1 space-x-2">
+        <Link href="/hr/dashboard" className="mb-4 flex items-center pl-1 space-x-2">
           <div className="h-8 w-8 bg-avenue-indigo rounded-full shrink-0" />
           <span className="text-lg font-bold font-heading text-avenue-indigo tracking-tight leading-tight">
             AiCare<br />
@@ -100,8 +101,11 @@ export function HRSidebar({ groupName }: { groupName: string }) {
           </span>
         </Link>
 
+        {/* Portal switcher */}
+        <PortalSwitcher userRole={userRole} />
+
         {/* Nav groups */}
-        <nav className="flex-1 mt-4">
+        <nav className="flex-1 mt-2">
           {NAV_GROUPS.map(group => (
             <NavGroupSection key={group.label} group={group} pathname={pathname} />
           ))}

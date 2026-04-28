@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import {
   LayoutDashboard,
@@ -9,6 +11,7 @@ import {
   HelpCircle,
   LogOut,
 } from "lucide-react";
+import { PortalSwitcher } from "./PortalSwitcher";
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/broker/dashboard", icon: LayoutDashboard },
@@ -20,16 +23,17 @@ const NAV_ITEMS = [
   { label: "Support", href: "/broker/support", icon: HelpCircle },
 ];
 
-export function BrokerSidebar() {
+export function BrokerSidebar({ userRole }: { userRole: string }) {
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-[#EEEEEE] bg-white transition-transform">
       <div className="flex h-full flex-col overflow-y-auto px-3 py-4">
-        <Link href="/broker/dashboard" className="mb-6 flex items-center pl-2.5 space-x-2">
+        <Link href="/broker/dashboard" className="mb-4 flex items-center pl-2.5 space-x-2">
           <div className="h-8 w-8 bg-avenue-indigo rounded-full" />
           <span className="self-center whitespace-nowrap text-xl font-bold font-heading text-avenue-indigo tracking-tight">
             AiCare | Broker
           </span>
         </Link>
+        <PortalSwitcher userRole={userRole} />
         <ul className="space-y-1.5 font-medium">
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;
