@@ -11,12 +11,15 @@ export default async function HRLayout({
   children: React.ReactNode;
 }) {
   const session = await auth();
-  if (!session?.user || session.user.role !== "HR_MANAGER") {
+  const role = session?.user?.role;
+  const allowed = ["HR_MANAGER", "SUPER_ADMIN"];
+  if (!session?.user || !allowed.includes(role as string)) {
     redirect("/login");
   }
 
+  // For SUPER_ADMIN visiting the HR portal, show a generic label
   const groupId = session.user.groupId;
-  let groupName = "Manage Group";
+  let groupName = role === "SUPER_ADMIN" ? "HR Portal (Admin view)" : "Manage Group";
   if (groupId) {
     const group = await prisma.group.findUnique({
       where: { id: groupId },
