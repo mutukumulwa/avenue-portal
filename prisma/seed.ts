@@ -26,12 +26,13 @@ async function main() {
   // ═══════════════════════════════════════════════════════════
   const pw = await bcrypt.hash('AvenueAdmin2024!', 10)
   const userDefs = [
-    { email: 'admin@avenue.co.ke',       firstName: 'James',    lastName: 'Kamau',    role: 'SUPER_ADMIN'      },
-    { email: 'claims@avenue.co.ke',      firstName: 'Grace',    lastName: 'Wanjiku',  role: 'CLAIMS_OFFICER'   },
-    { email: 'finance@avenue.co.ke',     firstName: 'Peter',    lastName: 'Ochieng',  role: 'FINANCE_OFFICER'  },
-    { email: 'underwriter@avenue.co.ke', firstName: 'Faith',    lastName: 'Muthoni',  role: 'UNDERWRITER'      },
-    { email: 'cs@avenue.co.ke',          firstName: 'David',    lastName: 'Kipchoge', role: 'CUSTOMER_SERVICE' },
-    { email: 'medical@avenue.co.ke',     firstName: 'Dr. Sarah',lastName: 'Achieng',  role: 'MEDICAL_OFFICER'  },
+    { email: 'admin@avenue.co.ke',       firstName: 'James',    lastName: 'Kamau',    role: 'SUPER_ADMIN'        },
+    { email: 'claims@avenue.co.ke',      firstName: 'Grace',    lastName: 'Wanjiku',  role: 'CLAIMS_OFFICER'     },
+    { email: 'finance@avenue.co.ke',     firstName: 'Peter',    lastName: 'Ochieng',  role: 'FINANCE_OFFICER'    },
+    { email: 'underwriter@avenue.co.ke', firstName: 'Faith',    lastName: 'Muthoni',  role: 'UNDERWRITER'        },
+    { email: 'cs@avenue.co.ke',          firstName: 'David',    lastName: 'Kipchoge', role: 'CUSTOMER_SERVICE'   },
+    { email: 'medical@avenue.co.ke',     firstName: 'Dr. Sarah',lastName: 'Achieng',  role: 'MEDICAL_OFFICER'    },
+    { email: 'fund@avenue.co.ke',        firstName: 'Caroline', lastName: 'Mwaura',   role: 'FUND_ADMINISTRATOR' },
   ] as const
   const users: Record<string, string> = {}
   for (const u of userDefs) {
@@ -42,7 +43,7 @@ async function main() {
     })
     users[u.role] = user.id
   }
-  console.log(`✅ Users: ${userDefs.length}`)
+  console.log(`✅ Users: ${userDefs.length} (incl. fund@avenue.co.ke / FUND_ADMINISTRATOR)`)
 
   // ═══════════════════════════════════════════════════════════
   // 3. PACKAGES (Essential, Premier, Executive)
@@ -1854,8 +1855,11 @@ async function main() {
       // Convert East African Breweries to a self-funded scheme
       const eabl = await prisma.group.findFirst({ where: { tenantId, name: 'East African Breweries' } })
       if (eabl && eabl.fundingMode === 'INSURED') {
+        const fundAdminUser = await prisma.user.findFirst({ where: { tenantId, email: 'fund@avenue.co.ke' } })
         await prisma.group.update({ where: { id: eabl.id }, data: {
           fundingMode: 'SELF_FUNDED', adminFeeMethod: 'FLAT_PER_INSURED', adminFeeRate: 2000,
+          // Link the fund admin user to this scheme
+          fundAdministrators: fundAdminUser ? { connect: { id: fundAdminUser.id } } : undefined,
         }})
         // Create the fund account with opening balance
         const sfAccount = await prisma.selfFundedAccount.create({ data: {

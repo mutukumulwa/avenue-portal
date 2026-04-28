@@ -61,6 +61,7 @@ enum UserRole {
   BROKER_USER
   MEMBER_USER
   HR_MANAGER
+  FUND_ADMINISTRATOR // Employer finance officer managing self-funded scheme(s)
 }
 
 model User {
@@ -85,6 +86,7 @@ model User {
   groupId  String?
   group    Group?  @relation("HRManagerGroup", fields: [groupId], references: [id])
 
+  managedFundGroups        Group[]              @relation("FundAdminGroups")
   auditLogs                AuditLog[]
   claimReviews             Claim[]              @relation("ClaimReviewer")
   raisedExceptions         ExceptionLog[]       @relation("ExceptionRaisedBy")
@@ -178,6 +180,7 @@ model Group {
   benefitTiers       GroupBenefitTier[]
   endorsements       Endorsement[]      @relation("EndorsementGroup")
   inboundTransfers   Endorsement[]      @relation("EndorsementToGroup")
+  fundAdministrators User[]             @relation("FundAdminGroups")
   invoices           Invoice[]
   payments           Payment[]
   documents          Document[]
@@ -349,11 +352,17 @@ model SelfFundedAccount {
   groupId   String  @unique
   group     Group   @relation(fields: [groupId], references: [id])
 
-  balance          Decimal @default(0) @db.Decimal(14, 2) // Current fund balance (KES)
-  minimumBalance   Decimal @default(0) @db.Decimal(14, 2) // Alert threshold
-  totalDeposited   Decimal @default(0) @db.Decimal(14, 2) // Lifetime deposits
-  totalClaims      Decimal @default(0) @db.Decimal(14, 2) // Lifetime claims deducted
-  totalAdminFees   Decimal @default(0) @db.Decimal(14, 2) // Lifetime admin fees charged
+  balance          Decimal           @default(0) @db.Decimal(14, 2)
+  minimumBalance   Decimal           @default(0) @db.Decimal(14, 2)
+  totalDeposited   Decimal           @default(0) @db.Decimal(14, 2)
+  totalClaims      Decimal           @default(0) @db.Decimal(14, 2)
+  totalAdminFees   Decimal           @default(0) @db.Decimal(14, 2)
+
+  // Categories currently on hold — no new claims approved against these
+  heldCategories   BenefitCategory[]
+
+  // Track whether the period-end admin fee has been invoiced
+  adminFeeInvoiceId String?
 
   periodStartDate  DateTime
   periodEndDate    DateTime
@@ -378,14 +387,16 @@ model FundTransaction {
   amount           Decimal             @db.Decimal(14, 2)
   balanceAfter     Decimal             @db.Decimal(14, 2)
   description      String
-  referenceNumber  String?             // Cheque / EFT / M-Pesa ref
-  claimId          String?             // Set when type = CLAIM_DEDUCTION
-  invoiceId        String?             // Set when type = ADMIN_FEE
+  referenceNumber  String?
+  claimId          String?
+  claim            Claim?              @relation(fields: [claimId], references: [id])
+  invoiceId        String?
   postedById       String?
   postedAt         DateTime            @default(now())
 
   @@index([tenantId])
   @@index([selfFundedAccountId])
+  @@index([claimId])
 }
 
 // ─── KENYAN STATUTORY TAXES ──────────────────────────────
@@ -752,6 +763,7 @@ model Claim {
 
   fraudAlerts               ClaimFraudAlert[]
   coContributionTransaction CoContributionTransaction?
+  fundTransactions          FundTransaction[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

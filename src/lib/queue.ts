@@ -49,6 +49,11 @@ export async function scheduleDailyJobs() {
       {},
       { repeat: { pattern: SIX_AM_CRON }, jobId: "suspension-check-daily", attempts: 2 },
     ),
+    Queues.system.add(
+      "fund-balance-alert",
+      {},
+      { repeat: { pattern: SIX_AM_CRON }, jobId: "fund-balance-alert-daily", attempts: 2 },
+    ),
   ]);
 }
 

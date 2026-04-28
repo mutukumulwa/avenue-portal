@@ -117,6 +117,43 @@ export async function adjudicateClaimAction(formData: FormData) {
     }
   }
 
+  // ── Self-funded deduction ──────────────────────────────────────────────────
+  // If the member's group is SELF_FUNDED, deduct the approved amount from the
+  // fund and record a CLAIM_DEDUCTION transaction. Soft warning only — never
+  // blocks adjudication.
+  if ((action === "APPROVED" || action === "PARTIALLY_APPROVED") && approvedAmount > 0) {
+    try {
+      const memberGroup = await prisma.member.findUnique({
+        where: { id: claim.memberId },
+        select: { group: { select: { fundingMode: true, selfFundedAccount: { select: { id: true, balance: true } } } } },
+      });
+      const account = memberGroup?.group?.selfFundedAccount;
+      if (memberGroup?.group?.fundingMode === "SELF_FUNDED" && account) {
+        const newBalance = Number(account.balance) - approvedAmount;
+        await prisma.$transaction([
+          prisma.selfFundedAccount.update({
+            where: { id: account.id },
+            data: { balance: newBalance, totalClaims: { increment: approvedAmount } },
+          }),
+          prisma.fundTransaction.create({
+            data: {
+              tenantId,
+              selfFundedAccountId: account.id,
+              claimId: claim.id,
+              type: "CLAIM_DEDUCTION",
+              amount: approvedAmount,
+              balanceAfter: newBalance,
+              description: `Claim ${claim.claimNumber} — ${action.replace(/_/g, " ").toLowerCase()}`,
+              postedById: session.user.id,
+            },
+          }),
+        ]);
+      }
+    } catch {
+      // Fund deduction failed — log silently, adjudication already committed
+    }
+  }
+
   await writeAudit({
     userId: session.user.id,
     action: `CLAIM_${action}`,

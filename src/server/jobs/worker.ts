@@ -2,8 +2,9 @@ import { Worker, Job } from "bullmq";
 import { connection, scheduleEscalationJob, scheduleDailyJobs } from "../../lib/queue";
 import { NotificationService } from "../services/notification.service";
 import { runPreauthEscalationJob } from "./preauth-escalation.job";
-import { runRenewalReminderJob } from "./renewal-reminder.job";
-import { runSuspensionCheckJob } from "./suspension-check.job";
+import { runRenewalReminderJob }    from "./renewal-reminder.job";
+import { runSuspensionCheckJob }    from "./suspension-check.job";
+import { runFundBalanceAlertJob }   from "./fund-balance-alert.job";
 
 console.log("Starting background workers...");
 
@@ -54,6 +55,10 @@ const systemWorker = new Worker("system", async (job: Job) => {
   if (job.name === "suspension-check") {
     console.log("[Worker] Running suspension check...");
     await runSuspensionCheckJob();
+  }
+  if (job.name === "fund-balance-alert") {
+    console.log("[Worker] Running fund balance alerts...");
+    await runFundBalanceAlertJob();
   }
 }, { connection });
 

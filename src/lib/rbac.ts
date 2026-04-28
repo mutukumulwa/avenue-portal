@@ -11,7 +11,8 @@ export type UserRole =
   | "REPORTS_VIEWER"
   | "BROKER_USER"
   | "MEMBER_USER"
-  | "HR_MANAGER";
+  | "HR_MANAGER"
+  | "FUND_ADMINISTRATOR";
 
 // ── Role sets used across pages / actions ────────────────────────────────────
 
@@ -33,6 +34,8 @@ export const ROLES = {
   MEMBER:       ["MEMBER_USER"] as UserRole[],
   /** Corporate group HR administrator */
   HR:           ["HR_MANAGER"] as UserRole[],
+  /** Self-funded scheme fund administrator (employer finance officer) */
+  FUND:         ["FUND_ADMINISTRATOR", "SUPER_ADMIN"] as UserRole[],
 };
 
 /**
