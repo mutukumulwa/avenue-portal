@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Users, Building2, FileText, BriefcaseMedical,
   Stethoscope, Receipt, CreditCard, Building, PieChart,
   Settings, LogOut, Calculator, UserCheck, MessageSquareText,
-  ShieldAlert, MessageSquareWarning,
+  ShieldAlert, MessageSquareWarning, Wallet,
 } from "lucide-react";
 import { useState } from "react";
 import type { UserRole } from "@prisma/client";
@@ -58,8 +58,9 @@ const NAV_GROUPS: NavGroup[] = [
           { label: "Account Ledger",      href: "/billing/gl/ledger" },
         ],
       },
-      { label: "Brokers",    href: "/brokers",    icon: UserCheck,  roles: ADMIN_ONLY   },
-      { label: "Quotations", href: "/quotations", icon: Calculator, roles: UNDERWRITING },
+      { label: "Self-Funded Schemes", href: "/fund/dashboard", icon: Wallet,     roles: FINANCE      },
+      { label: "Brokers",             href: "/brokers",        icon: UserCheck,  roles: ADMIN_ONLY   },
+      { label: "Quotations",          href: "/quotations",     icon: Calculator, roles: UNDERWRITING },
     ],
   },
   {
