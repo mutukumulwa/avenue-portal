@@ -34,7 +34,7 @@ export const ROLES = {
   /** Member self-service portal */
   MEMBER:       ["MEMBER_USER"] as UserRole[],
   /** Corporate group HR administrator */
-  HR:           ["HR_MANAGER"] as UserRole[],
+  HR:           ["HR_MANAGER", "SUPER_ADMIN"] as UserRole[],
   /** Self-funded scheme fund administrator (employer finance officer) */
   FUND:         ["FUND_ADMINISTRATOR", "SUPER_ADMIN"] as UserRole[],
 };
