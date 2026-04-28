@@ -4,81 +4,79 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 interface Portal {
-  label:  string;
-  href:   string;
-  color:  string; // active bg
-  dot:    string; // indicator colour
+  label:    string;
+  href:     string;
+  basePath: string;   // pathname prefix that means "I'm in this portal"
+  activeClass: string;
+  dotClass:    string;
 }
 
 const ALL_PORTALS: Portal[] = [
-  { label: "Admin",  href: "/dashboard",      color: "bg-avenue-indigo",  dot: "bg-avenue-indigo"  },
-  { label: "Fund",   href: "/fund/dashboard",  color: "bg-[#28A745]",      dot: "bg-[#28A745]"      },
-  { label: "Broker", href: "/broker/dashboard",color: "bg-[#17A2B8]",      dot: "bg-[#17A2B8]"      },
-  { label: "HR",     href: "/hr/dashboard",    color: "bg-[#856404]",      dot: "bg-[#856404]"      },
+  { label: "Admin",  href: "/dashboard",      basePath: "/__admin__", activeClass: "bg-avenue-indigo text-white",  dotClass: "bg-avenue-indigo"  },
+  { label: "Fund",   href: "/fund/dashboard",  basePath: "/fund",      activeClass: "bg-[#28A745] text-white",     dotClass: "bg-[#28A745]"      },
+  { label: "Broker", href: "/broker/dashboard",basePath: "/broker",    activeClass: "bg-[#17A2B8] text-white",     dotClass: "bg-[#17A2B8]"      },
+  { label: "HR",     href: "/hr/dashboard",    basePath: "/hr",        activeClass: "bg-[#856404] text-white",     dotClass: "bg-[#856404]"      },
 ];
 
-const ROLE_PORTALS: Record<string, string[]> = {
-  SUPER_ADMIN:       ["Admin", "Fund", "Broker", "HR"],
-  FINANCE_OFFICER:   ["Admin", "Fund"],
-  CLAIMS_OFFICER:    ["Admin"],
-  MEDICAL_OFFICER:   ["Admin"],
-  UNDERWRITER:       ["Admin"],
-  CUSTOMER_SERVICE:  ["Admin"],
-  REPORTS_VIEWER:    ["Admin"],
-  FUND_ADMINISTRATOR:["Fund"],
-  BROKER_USER:       ["Broker"],
-  HR_MANAGER:        ["HR"],
-};
+// Admin portal is "active" on any path that isn't another dedicated portal
+const OTHER_PORTAL_BASES = ["/fund", "/broker", "/hr", "/member"];
 
-interface Props {
-  userRole: string;
+function isActive(portal: Portal, pathname: string): boolean {
+  if (portal.label === "Admin") {
+    return !OTHER_PORTAL_BASES.some(base => pathname.startsWith(base));
+  }
+  return pathname === portal.href || pathname.startsWith(portal.basePath + "/") || pathname === portal.basePath;
 }
 
-export function PortalSwitcher({ userRole }: Props) {
+const ROLE_PORTALS: Record<string, string[]> = {
+  SUPER_ADMIN:        ["Admin", "Fund", "Broker", "HR"],
+  FINANCE_OFFICER:    ["Admin", "Fund"],
+  CLAIMS_OFFICER:     ["Admin"],
+  MEDICAL_OFFICER:    ["Admin"],
+  UNDERWRITER:        ["Admin"],
+  CUSTOMER_SERVICE:   ["Admin"],
+  REPORTS_VIEWER:     ["Admin"],
+  FUND_ADMINISTRATOR: ["Fund"],
+  BROKER_USER:        ["Broker"],
+  HR_MANAGER:         ["HR"],
+};
+
+export function PortalSwitcher({ userRole }: { userRole: string }) {
   const pathname = usePathname();
   const allowed  = ROLE_PORTALS[userRole] ?? [];
   const visible  = ALL_PORTALS.filter(p => allowed.includes(p.label));
 
-  // Only show the switcher when the user can reach more than one portal,
-  // or always show it so they can see where they are.
-  if (visible.length === 0) return null;
-
-  const current = visible.find(p =>
-    pathname === p.href || pathname.startsWith(p.href.replace("/dashboard", ""))
-  );
+  // Only show when the user has access to more than one portal
+  if (visible.length <= 1) return null;
 
   return (
-    <div className="px-3 pb-3 pt-1">
-      <p className="text-[9px] font-bold uppercase tracking-widest text-avenue-text-muted/60 mb-1.5 pl-1">
-        Portal
+    <div className="mb-3">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-avenue-text-muted mb-1.5 px-1">
+        Switch Portal
       </p>
       <div className="flex flex-col gap-1">
         {visible.map(p => {
-          const isActive = current?.label === p.label;
+          const active = isActive(p, pathname);
           return (
             <Link
               key={p.label}
               href={p.href}
-              className={`flex items-center gap-2 rounded-[6px] px-2.5 py-1.5 text-xs font-semibold transition-colors ${
-                isActive
-                  ? `${p.color} text-white`
-                  : "text-avenue-text-muted hover:bg-[#F0F0F0] hover:text-avenue-text-heading"
+              className={`flex items-center gap-2 rounded-[6px] px-2.5 py-2 text-sm font-semibold transition-all ${
+                active
+                  ? p.activeClass + " shadow-sm"
+                  : "text-avenue-text-body bg-[#F4F4F4] hover:bg-[#E8E8E8]"
               }`}
             >
-              <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${isActive ? "bg-white/70" : p.dot}`} />
+              <span className={`h-2 w-2 rounded-full shrink-0 ${active ? "bg-white/70" : p.dotClass}`} />
               {p.label}
-              {isActive && (
-                <span className="ml-auto text-[9px] font-bold uppercase tracking-wide opacity-70">
-                  current
-                </span>
+              {active && (
+                <span className="ml-auto text-[10px] opacity-75">current</span>
               )}
             </Link>
           );
         })}
       </div>
-      {visible.length > 1 && (
-        <div className="mt-2 border-t border-[#EEEEEE]" />
-      )}
+      <div className="mt-3 border-b border-[#EEEEEE]" />
     </div>
   );
 }
