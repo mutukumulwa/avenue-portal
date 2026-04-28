@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { PlusCircle, Trash2, AlertTriangle } from "lucide-react";
 import { submitReimbursementClaimAction } from "../actions";
 
@@ -251,9 +252,9 @@ export function ReimbursementClaimForm({ members, providers }: { members: Member
       </div>
 
       <div className="flex justify-end gap-3">
-        <a href="/claims" className="px-6 py-2.5 rounded-full border border-[#EEEEEE] text-sm text-avenue-text-body hover:bg-[#F8F9FA] transition-colors">
+        <Link href="/claims" className="px-6 py-2.5 rounded-full border border-[#EEEEEE] text-sm text-avenue-text-body hover:bg-[#F8F9FA] transition-colors">
           Cancel
-        </a>
+        </Link>
         <button type="submit" disabled={isPending || total === 0}
           className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-8 py-2.5 rounded-full font-semibold text-sm transition-colors shadow-sm disabled:opacity-50">
           {isPending ? "Submitting…" : "Submit Reimbursement Claim"}

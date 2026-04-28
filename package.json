@@ -13,6 +13,7 @@
     "db:push": "npx prisma db push",
     "db:generate": "npx prisma generate",
     "worker": "tsx src/server/jobs/worker.ts",
+    "audit:smoke": "node scripts/audit-menu-smoke.mjs",
     "postinstall": "prisma generate"
   },
   "dependencies": {

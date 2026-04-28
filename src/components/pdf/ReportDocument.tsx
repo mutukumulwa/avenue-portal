@@ -1,5 +1,10 @@
 import { Document, Page, Text, View, StyleSheet } from "@react-pdf/renderer";
 
+export type ReportPdfData = {
+  total?: number;
+  totalBilled?: number;
+};
+
 const styles = StyleSheet.create({
   page: { padding: 40, fontFamily: "Helvetica", backgroundColor: "#FFFFFF" },
   header: {
@@ -35,7 +40,7 @@ const styles = StyleSheet.create({
   }
 });
 
-export const ReportDocument = ({ title, data }: { title: string, data: any }) => (
+export const ReportDocument = ({ title, data }: { title: string, data: ReportPdfData }) => (
   <Document>
     <Page size="A4" style={styles.page}>
       <View style={styles.header}>

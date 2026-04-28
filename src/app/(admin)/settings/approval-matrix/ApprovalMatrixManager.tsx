@@ -2,7 +2,6 @@
 
 import { useState, useTransition } from "react";
 import { Plus, Trash2, ToggleLeft, ToggleRight, ShieldCheck } from "lucide-react";
-import type { ApprovalMatrix } from "@prisma/client";
 import {
   createApprovalMatrixRuleAction,
   toggleApprovalMatrixRuleAction,
@@ -25,7 +24,23 @@ const BENEFIT_CATEGORIES = [
   "LAST_EXPENSE","WELLNESS_PREVENTIVE","REHABILITATION","CUSTOM",
 ];
 
-interface Props { rules: ApprovalMatrix[] }
+export interface ApprovalMatrixRuleDTO {
+  id: string;
+  tenantId: string;
+  claimValueMin: number | null;
+  claimValueMax: number | null;
+  serviceType: string | null;
+  benefitCategory: string | null;
+  requiredRole: string;
+  requiresDual: boolean;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface Props { rules: ApprovalMatrixRuleDTO[] }
 
 export function ApprovalMatrixManager({ rules }: Props) {
   const [showForm, setShowForm] = useState(false);

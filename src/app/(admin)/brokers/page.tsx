@@ -2,6 +2,7 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { PlusCircle } from "lucide-react";
 import { BrokersTable } from "./BrokersTable";
+import Link from "next/link";
 
 export default async function BrokersPage() {
   const session = await requireRole(ROLES.ADMIN_ONLY);
@@ -19,10 +20,10 @@ export default async function BrokersPage() {
           <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Brokers</h1>
           <p className="text-avenue-text-body font-body mt-1">Manage broker partners and their commission structures.</p>
         </div>
-        <button className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors flex items-center space-x-2 shadow-sm">
+        <Link href="/brokers/new" className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors flex items-center space-x-2 shadow-sm">
           <PlusCircle size={18} />
           <span>Add Broker</span>
-        </button>
+        </Link>
       </div>
 
       <BrokersTable

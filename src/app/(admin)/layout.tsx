@@ -13,7 +13,7 @@ export default async function AdminLayout({
   const userRole = (session?.user?.role ?? null) as UserRole | null;
 
   // Global Route Guard for Admin paths
-  if (!session || userRole === "HR_MANAGER") {
+  if (!session || userRole === "HR_MANAGER" || userRole === "BROKER_USER" || userRole === "MEMBER_USER") {
     const { requireRole, ROLES } = await import("@/lib/rbac");
     await requireRole(ROLES.ANY_STAFF); // will automatically redirect to auth or forbidden
   }

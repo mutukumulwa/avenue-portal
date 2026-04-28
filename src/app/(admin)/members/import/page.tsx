@@ -80,7 +80,7 @@ export default async function MemberImportPage() {
 
           <div className="space-y-3">
             <div>
-              <p className="font-bold text-avenue-text-heading text-xs uppercase tracking-wide mb-1">What is "relationship"?</p>
+              <p className="font-bold text-avenue-text-heading text-xs uppercase tracking-wide mb-1">What is &quot;relationship&quot;?</p>
               <p className="text-xs text-avenue-text-body mb-2">
                 Every member must have a relationship to the main insured person on the policy (the <strong>PRINCIPAL</strong>).
               </p>
@@ -103,7 +103,7 @@ export default async function MemberImportPage() {
 
             <div className="bg-[#FFF3CD] border border-[#FFC107]/40 rounded-lg p-3 text-xs text-[#856404] space-y-1">
               <p className="font-bold">Linking dependants to their principal</p>
-              <p>Put the principal's <strong>National ID</strong> in the <code className="bg-[#FFC107]/20 px-1 rounded">principalIdNumber</code> column of every dependant row. The principal must appear <strong>before</strong> their dependants in the file, or already exist in the system.</p>
+              <p>Put the principal&apos;s <strong>National ID</strong> in the <code className="bg-[#FFC107]/20 px-1 rounded">principalIdNumber</code> column of every dependant row. The principal must appear <strong>before</strong> their dependants in the file, or already exist in the system.</p>
               <p className="mt-1">If a principal has no National ID, add them first using the single-member form, then import their dependants separately with the assigned member number — or contact support.</p>
             </div>
 

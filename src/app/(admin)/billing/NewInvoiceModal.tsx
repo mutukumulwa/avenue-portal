@@ -11,8 +11,15 @@ export function NewInvoiceModal({ groups }: { groups: Group[] }) {
   const [state, action, pending] = useActionState(createInvoiceAction, null);
 
   // Default period to current month
-  const defaultPeriod = new Date().toISOString().slice(0, 7);
-  const defaultDue = new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10);
+  const [defaults] = useState(() => {
+    const now = new Date();
+    const due = new Date(now);
+    due.setDate(due.getDate() + 30);
+    return {
+      period: now.toISOString().slice(0, 7),
+      dueDate: due.toISOString().slice(0, 10),
+    };
+  });
 
   return (
     <>
@@ -54,11 +61,11 @@ export function NewInvoiceModal({ groups }: { groups: Group[] }) {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-avenue-text-muted uppercase mb-1">Period (YYYY-MM)</label>
-                  <input name="period" type="month" defaultValue={defaultPeriod} required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo" />
+                  <input name="period" type="month" defaultValue={defaults.period} required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo" />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-avenue-text-muted uppercase mb-1">Due Date</label>
-                  <input name="dueDate" type="date" defaultValue={defaultDue} required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo" />
+                  <input name="dueDate" type="date" defaultValue={defaults.dueDate} required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">

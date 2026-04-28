@@ -21,6 +21,7 @@ const ANY_STAFF: UserRole[] = ["SUPER_ADMIN","CLAIMS_OFFICER","FINANCE_OFFICER",
 const OPS:       UserRole[] = ["SUPER_ADMIN","CLAIMS_OFFICER","MEDICAL_OFFICER","CUSTOMER_SERVICE","UNDERWRITER"];
 const CLINICAL:  UserRole[] = ["SUPER_ADMIN","CLAIMS_OFFICER","MEDICAL_OFFICER"];
 const FINANCE:   UserRole[] = ["SUPER_ADMIN","FINANCE_OFFICER"];
+const FUND_PORTAL: UserRole[] = ["SUPER_ADMIN"];
 const UNDERWRITING: UserRole[] = ["SUPER_ADMIN","UNDERWRITER"];
 const ADMIN_ONLY:   UserRole[] = ["SUPER_ADMIN"];
 
@@ -59,7 +60,7 @@ const NAV_GROUPS: NavGroup[] = [
           { label: "Account Ledger",      href: "/billing/gl/ledger" },
         ],
       },
-      { label: "Self-Funded Schemes", href: "/fund/dashboard", icon: Wallet,     roles: FINANCE      },
+      { label: "Self-Funded Schemes", href: "/fund/dashboard", icon: Wallet,     roles: FUND_PORTAL  },
       { label: "Brokers",             href: "/brokers",        icon: UserCheck,  roles: ADMIN_ONLY   },
       { label: "Quotations",          href: "/quotations",     icon: Calculator, roles: UNDERWRITING },
     ],

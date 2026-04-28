@@ -1,8 +1,8 @@
 import { requireRole, ROLES } from "@/lib/rbac";
-import { redirect, notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Pencil } from "lucide-react";
 
 export default async function BrokerDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requireRole(ROLES.ADMIN_ONLY);
@@ -37,14 +37,21 @@ export default async function BrokerDetailPage({ params }: { params: Promise<{ i
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
-      <div className="flex items-center gap-3">
-        <Link href="/brokers" className="text-avenue-text-muted hover:text-avenue-indigo transition-colors">
-          <ArrowLeft size={20} />
-        </Link>
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">{broker.name}</h1>
-          <p className="text-avenue-text-body text-sm mt-0.5">IRA: {broker.licenseNumber ?? "N/A"} · {broker.contactPerson}</p>
+          <div className="flex items-center gap-3">
+            <Link href="/brokers" className="text-avenue-text-muted hover:text-avenue-indigo transition-colors">
+              <ArrowLeft size={20} />
+            </Link>
+            <div>
+              <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">{broker.name}</h1>
+              <p className="text-avenue-text-body text-sm mt-0.5">IRA: {broker.licenseNumber ?? "N/A"} · {broker.contactPerson}</p>
+            </div>
+          </div>
         </div>
+        <Link href={`/brokers/${broker.id}/edit`} className="inline-flex items-center gap-1.5 text-xs font-semibold text-avenue-indigo border border-avenue-indigo/30 hover:bg-avenue-indigo/5 px-3 py-1.5 rounded-full transition-colors">
+          <Pencil size={13} /> Edit
+        </Link>
       </div>
 
       <div className="grid md:grid-cols-3 gap-4">

@@ -67,3 +67,56 @@ export async function recordFundDepositAction(
   revalidatePath(`/groups/${groupId}`);
   return {};
 }
+
+export async function configureSelfFundedSchemeAction(formData: FormData): Promise<{ error?: string }> {
+  const session = await requireRole(ROLES.ADMIN_ONLY);
+  const groupId = formData.get("groupId") as string;
+  const minimumBalance = Number(formData.get("minimumBalance") || 0);
+  const adminFeeMethod = (formData.get("adminFeeMethod") as "FLAT_PER_INSURED" | "PCT_OF_CLAIMS") || "FLAT_PER_INSURED";
+  const adminFeeRate = Number(formData.get("adminFeeRate") || 0);
+  const adminIds = formData.getAll("fundAdminIds").map(String).filter(Boolean);
+
+  if (!groupId) return { error: "Group is required." };
+
+  const group = await prisma.group.findUnique({
+    where: { id: groupId, tenantId: session.user.tenantId },
+    select: { id: true, selfFundedAccount: true },
+  });
+  if (!group) return { error: "Group not found." };
+
+  await prisma.$transaction(async tx => {
+    await tx.group.update({
+      where: { id: groupId },
+      data: {
+        fundingMode: "SELF_FUNDED",
+        adminFeeMethod,
+        adminFeeRate,
+        fundAdministrators: { set: adminIds.map(id => ({ id })) },
+      },
+    });
+
+    if (!group.selfFundedAccount) {
+      const now = new Date();
+      const end = new Date(now);
+      end.setFullYear(end.getFullYear() + 1);
+      await tx.selfFundedAccount.create({
+        data: {
+          tenantId: session.user.tenantId,
+          groupId,
+          minimumBalance,
+          periodStartDate: now,
+          periodEndDate: end,
+        },
+      });
+    } else {
+      await tx.selfFundedAccount.update({
+        where: { id: group.selfFundedAccount.id },
+        data: { minimumBalance },
+      });
+    }
+  });
+
+  revalidatePath(`/groups/${groupId}`);
+  revalidatePath("/fund/dashboard");
+  return {};
+}

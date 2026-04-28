@@ -29,8 +29,8 @@ function isActive(portal: Portal, pathname: string): boolean {
 }
 
 const ROLE_PORTALS: Record<string, string[]> = {
-  SUPER_ADMIN:        ["Admin", "Fund", "Broker", "HR"],
-  FINANCE_OFFICER:    ["Admin", "Fund"],
+  SUPER_ADMIN:        ["Admin", "Fund"],
+  FINANCE_OFFICER:    ["Admin"],
   CLAIMS_OFFICER:     ["Admin"],
   MEDICAL_OFFICER:    ["Admin"],
   UNDERWRITER:        ["Admin"],

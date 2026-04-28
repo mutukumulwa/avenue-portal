@@ -352,7 +352,7 @@ function DependantsTab({ member }: { member: Member }) {
           </thead>
           <tbody className="divide-y divide-[#EEEEEE] text-avenue-text-body">
             {member.dependents.map(d => {
-              const dAge = Math.floor((Date.now() - new Date(d.dateOfBirth).getTime()) / (1000 * 3600 * 24 * 365.25));
+              const dAge = Math.floor((new Date().getTime() - new Date(d.dateOfBirth).getTime()) / (1000 * 3600 * 24 * 365.25));
               return (
                 <tr key={d.id} className="hover:bg-[#F8F9FA]">
                   <td className="px-5 py-3 font-semibold text-avenue-text-heading">

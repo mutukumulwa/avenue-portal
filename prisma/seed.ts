@@ -260,6 +260,24 @@ async function main() {
   }
   console.log(`✅ Brokers: ${brokers.length}`)
 
+  // Broker portal user — linked to KAIB (brokers[0])
+  const brokerUserExists = await prisma.user.findFirst({ where: { tenantId: tenant.id, email: 'broker@kaib.co.ke' } })
+  if (!brokerUserExists) {
+    await prisma.user.create({
+      data: {
+        tenantId: tenant.id,
+        email: 'broker@kaib.co.ke',
+        firstName: 'John',
+        lastName: 'Mutua',
+        role: 'BROKER_USER',
+        passwordHash: pw,
+        isActive: true,
+        brokerId: brokers[0],
+      },
+    })
+    console.log('✅ Broker portal user: broker@kaib.co.ke')
+  }
+
   // ═══════════════════════════════════════════════════════════
   // 6. GROUPS — Safaricom has 3 benefit tiers
   // ═══════════════════════════════════════════════════════════
@@ -2343,6 +2361,47 @@ async function main() {
   }
   console.log(`✅ Notification templates: ${notifTemplates.length}`)
 
+  const firstActiveMember = await prisma.member.findFirst({
+    where: { tenantId, status: 'ACTIVE' },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true, firstName: true, lastName: true },
+  })
+  if (firstActiveMember) {
+    await prisma.user.upsert({
+      where: { tenantId_email: { tenantId, email: 'member@avenue.co.ke' } },
+      update: {
+        passwordHash: pw,
+        isActive: true,
+        role: 'MEMBER_USER',
+        memberId: firstActiveMember.id,
+      },
+      create: {
+        tenantId,
+        email: 'member@avenue.co.ke',
+        firstName: firstActiveMember.firstName,
+        lastName: firstActiveMember.lastName,
+        role: 'MEMBER_USER',
+        passwordHash: pw,
+        isActive: true,
+        memberId: firstActiveMember.id,
+      },
+    })
+  }
+
+  const fundAdminUser = await prisma.user.findFirst({ where: { tenantId, email: 'fund@avenue.co.ke' } })
+  if (fundAdminUser) {
+    const selfFundedGroups = await prisma.group.findMany({
+      where: { tenantId, fundingMode: 'SELF_FUNDED' },
+      select: { id: true },
+    })
+    if (selfFundedGroups.length > 0) {
+      await prisma.user.update({
+        where: { id: fundAdminUser.id },
+        data: { managedFundGroups: { connect: selfFundedGroups.map(g => ({ id: g.id })) } },
+      })
+    }
+  }
+
   console.log('\n🎉 Seed complete! All features populated.\n')
   console.log('  Login: admin@avenue.co.ke / AvenueAdmin2024!')
   console.log('')
@@ -2370,7 +2429,8 @@ async function main() {
   console.log('  • Individual client: Patricia Wanjiru (clientType=INDIVIDUAL, Executive)')
   console.log('  • Self-funded scheme 1: EABL — KES 5M deposit, 4 claims deducted by claimId, admin fee')
   console.log('  • Self-funded scheme 2: Bamburi Cement — KES 380k balance (below min → low-balance demo)')
-  console.log('  • Fund admin: fund@avenue.co.ke / AvenueAdmin2024! — linked to both schemes')
+  console.log('  • Fund admin: fund@avenue.co.ke / AvenueAdmin2024! — linked to all self-funded schemes')
+  console.log('  • Member: member@avenue.co.ke / AvenueAdmin2024! — linked to an active member')
   console.log('  • Admin sidebar: Self-Funded Schemes link under Finance → /fund/dashboard')
   console.log('  • Scheme transfer endorsement: KCB member → EABL (career change)')
   console.log('  • Tier change endorsement: Safaricom Staff → Management (promotion)')

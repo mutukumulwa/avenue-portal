@@ -58,7 +58,7 @@ export default async function BrokerGroupsPage() {
                   }`}>{g.status}</span>
                 </td>
                 <td className="px-6 py-4">
-                  <Link href={`/groups/${g.id}`} className="text-avenue-indigo hover:text-avenue-secondary font-semibold inline-flex items-center gap-1">
+                  <Link href={`/broker/groups/${g.id}`} className="text-avenue-indigo hover:text-avenue-secondary font-semibold inline-flex items-center gap-1">
                     View <ArrowRight size={14} />
                   </Link>
                 </td>

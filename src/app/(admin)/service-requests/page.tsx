@@ -65,8 +65,7 @@ export default async function AdminServiceRequestsPage() {
           </thead>
           <tbody className="divide-y divide-[#EEEEEE] text-sm">
             {requests.map(req => {
-               // eslint-disable-next-line react-compiler/react-compiler
-               const daysOld = Math.floor((Date.now() - new Date(req.createdAt).getTime()) / (1000 * 3600 * 24));
+               const daysOld = Math.floor((new Date().getTime() - new Date(req.createdAt).getTime()) / (1000 * 3600 * 24));
                return (
                 <tr key={req.id} className="hover:bg-[#F8F9FA] transition-colors group cursor-pointer relative">
                   <td className="px-6 py-4">

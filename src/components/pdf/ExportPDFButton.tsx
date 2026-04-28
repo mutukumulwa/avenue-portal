@@ -2,11 +2,10 @@
 
 import { Download } from "lucide-react";
 import { useState } from "react";
-// @ts-ignore - The user will install @react-pdf/renderer shortly
 import { pdf } from "@react-pdf/renderer";
-import { ReportDocument } from "./ReportDocument";
+import { ReportDocument, type ReportPdfData } from "./ReportDocument";
 
-export function ExportPDFButton({ title, data, filename }: { title: string, data: any, filename: string }) {
+export function ExportPDFButton({ title, data, filename }: { title: string, data: ReportPdfData, filename: string }) {
   const [loading, setLoading] = useState(false);
 
   const handleExport = async () => {

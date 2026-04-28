@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LayoutDashboard, Wallet, FileText, BarChart2, LogOut } from "lucide-react";
+import { signOut } from "next-auth/react";
 import { PortalSwitcher } from "./PortalSwitcher";
 
 const STATIC_ITEMS = [
@@ -101,12 +102,13 @@ export function FundSidebar({ schemes, userRole }: Props) {
         )}
 
         <div className="mt-auto pt-4 border-t border-[#EEEEEE]">
-          <form action="/api/auth/signout" method="POST">
-            <button className="w-full group flex items-center rounded-[8px] p-2 text-avenue-error hover:bg-red-50 transition-colors">
-              <LogOut className="h-5 w-5 flex-shrink-0" />
-              <span className="ml-3 font-semibold">Log out</span>
-            </button>
-          </form>
+          <button
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            className="w-full group flex items-center rounded-[8px] p-2 text-avenue-error hover:bg-red-50 transition-colors"
+          >
+            <LogOut className="h-5 w-5 shrink-0" />
+            <span className="ml-3 font-semibold">Log out</span>
+          </button>
         </div>
       </div>
     </aside>

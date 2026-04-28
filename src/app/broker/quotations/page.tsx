@@ -39,7 +39,7 @@ export default async function BrokerQuotationsPage() {
           <p className="text-avenue-text-muted mt-1">Quotations you have generated for prospects.</p>
         </div>
         <Link
-          href="/quotations/calculator"
+          href="/broker/quotations/new"
           className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors flex items-center space-x-2 shadow-sm"
         >
           <Calculator size={18} />

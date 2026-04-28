@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { PlusCircle, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 export default async function BrokerSubmissionsPage() {
   const session = await auth();
@@ -35,18 +35,11 @@ export default async function BrokerSubmissionsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div>
         <div>
           <h1 className="text-2xl font-bold font-heading text-avenue-text-heading">Endorsement Submissions</h1>
           <p className="text-avenue-text-muted mt-1">Endorsements submitted for your groups.</p>
         </div>
-        <Link
-          href="/endorsements/new"
-          className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors flex items-center space-x-2 shadow-sm"
-        >
-          <PlusCircle size={18} />
-          <span>New Endorsement</span>
-        </Link>
       </div>
 
       <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
@@ -82,7 +75,7 @@ export default async function BrokerSubmissionsPage() {
                   </span>
                 </td>
                 <td className="px-6 py-4">
-                  <Link href={`/endorsements/${e.id}`} className="text-avenue-indigo hover:text-avenue-secondary font-semibold inline-flex items-center gap-1">
+                  <Link href={`/broker/submissions/${e.id}`} className="text-avenue-indigo hover:text-avenue-secondary font-semibold inline-flex items-center gap-1">
                     View <ArrowRight size={14} />
                   </Link>
                 </td>

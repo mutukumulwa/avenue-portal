@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Users, Receipt, FileText, CreditCard, Pencil, Wallet } from "lucide-react";
 import { BenefitTiersCard } from "@/components/groups/BenefitTiersCard";
 import { SelfFundedPanel } from "./self-funded/SelfFundedPanel";
+import { SelfFundedSetupPanel } from "./self-funded/SelfFundedSetupPanel";
 
 export default async function GroupDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requireRole(ROLES.OPS);
@@ -39,15 +40,23 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
         orderBy: { createdAt: "desc" }, take: 5,
         select: { id: true, endorsementNumber: true, type: true, status: true, effectiveDate: true },
       },
+      fundAdministrators: { select: { id: true } },
       _count: { select: { members: true, endorsements: true } },
     },
   });
 
-  const packages = await prisma.package.findMany({
-    where: { tenantId: session.user.tenantId, status: "ACTIVE" },
-    select: { id: true, name: true, annualLimit: true },
-    orderBy: { name: "asc" },
-  });
+  const [packages, fundAdmins] = await Promise.all([
+    prisma.package.findMany({
+      where: { tenantId: session.user.tenantId, status: "ACTIVE" },
+      select: { id: true, name: true, annualLimit: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.user.findMany({
+      where: { tenantId: session.user.tenantId, role: "FUND_ADMINISTRATOR", isActive: true },
+      select: { id: true, firstName: true, lastName: true, email: true },
+      orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
+    }),
+  ]);
 
   if (!group) notFound();
 
@@ -197,6 +206,16 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
 
       {/* Benefit Tiers */}
       <BenefitTiersCard groupId={id} tiers={serializedTiers} packages={serializedPackages} />
+
+      <SelfFundedSetupPanel
+        groupId={group.id}
+        fundingMode={group.fundingMode}
+        minimumBalance={Number(group.selfFundedAccount?.minimumBalance ?? 0)}
+        adminFeeMethod={group.adminFeeMethod}
+        adminFeeRate={group.adminFeeRate === null ? null : Number(group.adminFeeRate)}
+        selectedAdminIds={group.fundAdministrators.map(a => a.id)}
+        fundAdmins={fundAdmins.map(a => ({ id: a.id, name: `${a.firstName} ${a.lastName}`, email: a.email }))}
+      />
 
       {/* Members table */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">

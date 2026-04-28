@@ -11,6 +11,7 @@ import {
   HelpCircle,
   LogOut,
 } from "lucide-react";
+import { signOut } from "next-auth/react";
 import { PortalSwitcher } from "./PortalSwitcher";
 
 const NAV_ITEMS = [
@@ -51,8 +52,11 @@ export function BrokerSidebar({ userRole }: { userRole: string }) {
           })}
         </ul>
         <div className="mt-auto pt-4 border-t border-[#EEEEEE]">
-          <button className="w-full group flex items-center rounded-[8px] p-2 text-avenue-error hover:bg-red-50 transition-colors">
-            <LogOut className="h-5 w-5 flex-shrink-0" />
+          <button
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            className="w-full group flex items-center rounded-[8px] p-2 text-avenue-error hover:bg-red-50 transition-colors"
+          >
+            <LogOut className="h-5 w-5 shrink-0" />
             <span className="ml-3 font-semibold">Log out</span>
           </button>
         </div>

@@ -13,9 +13,19 @@ const ROLES = [
   { value: "REPORTS_VIEWER",  label: "Reports Viewer"   },
   { value: "SUPER_ADMIN",     label: "Super Admin"      },
   { value: "HR_MANAGER",      label: "HR Manager"       },
+  { value: "BROKER_USER",     label: "Broker User"      },
+  { value: "MEMBER_USER",     label: "Member User"      },
+  { value: "FUND_ADMINISTRATOR", label: "Fund Administrator" },
 ];
 
-export function InviteUserModal({ groups = [] }: { groups?: { id: string; name: string }[] }) {
+interface InviteUserModalProps {
+  groups?: { id: string; name: string }[];
+  brokers?: { id: string; name: string }[];
+  members?: { id: string; name: string; memberNumber: string; groupName: string }[];
+  fundGroups?: { id: string; name: string }[];
+}
+
+export function InviteUserModal({ groups = [], brokers = [], members = [], fundGroups = [] }: InviteUserModalProps) {
   const [open, setOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState("");
   const [state, action, pending] = useActionState(inviteUserAction, null);
@@ -31,7 +41,7 @@ export function InviteUserModal({ groups = [] }: { groups?: { id: string; name: 
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 relative">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 relative max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setOpen(false)}
               className="absolute top-4 right-4 text-avenue-text-muted hover:text-avenue-text-heading"
@@ -91,6 +101,35 @@ export function InviteUserModal({ groups = [] }: { groups?: { id: string; name: 
                       <option key={g.id} value={g.id}>{g.name}</option>
                     ))}
                   </select>
+                </div>
+              )}
+              {selectedRole === "BROKER_USER" && (
+                <div>
+                  <label className="block text-xs font-bold text-avenue-text-muted uppercase mb-1">Broker Profile</label>
+                  <select name="brokerId" required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo bg-white">
+                    <option value="">Select broker…</option>
+                    {brokers.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                  </select>
+                </div>
+              )}
+              {selectedRole === "MEMBER_USER" && (
+                <div>
+                  <label className="block text-xs font-bold text-avenue-text-muted uppercase mb-1">Member Profile</label>
+                  <select name="memberId" required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo bg-white">
+                    <option value="">Select member…</option>
+                    {members.map(m => (
+                      <option key={m.id} value={m.id}>{m.name} · {m.memberNumber} · {m.groupName}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              {selectedRole === "FUND_ADMINISTRATOR" && (
+                <div>
+                  <label className="block text-xs font-bold text-avenue-text-muted uppercase mb-1">Self-Funded Schemes</label>
+                  <select name="fundGroupIds" multiple required className="w-full min-h-28 border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo bg-white">
+                    {fundGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                  </select>
+                  <p className="text-[10px] text-avenue-text-muted mt-1">Hold Command/Ctrl to select multiple schemes.</p>
                 </div>
               )}
               <div>

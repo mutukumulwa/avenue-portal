@@ -18,7 +18,17 @@ export default async function ApprovalMatrixPage() {
           Rules are evaluated from most specific to least specific — the first match applies.
         </p>
       </div>
-      <ApprovalMatrixManager rules={rules} />
+      <ApprovalMatrixManager
+        rules={rules.map(rule => ({
+          ...rule,
+          claimValueMin: rule.claimValueMin === null ? null : Number(rule.claimValueMin),
+          claimValueMax: rule.claimValueMax === null ? null : Number(rule.claimValueMax),
+          effectiveFrom: rule.effectiveFrom.toISOString(),
+          effectiveTo: rule.effectiveTo?.toISOString() ?? null,
+          createdAt: rule.createdAt.toISOString(),
+          updatedAt: rule.updatedAt.toISOString(),
+        }))}
+      />
     </div>
   );
 }

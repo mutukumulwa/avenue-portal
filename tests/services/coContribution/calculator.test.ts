@@ -4,16 +4,31 @@ import { calculateCoContribution } from '@/server/services/coContribution/calcul
 import type { CoContributionRule } from '@prisma/client'
 
 // Minimal rule factory — only fields calculator uses
-function rule(overrides: Partial<CoContributionRule>): CoContributionRule {
+type RuleOverrides = Partial<Omit<CoContributionRule, 'fixedAmount' | 'percentage' | 'perVisitCap' | 'perEncounterCap'>> & {
+  fixedAmount?: Decimal | number | null
+  percentage?: Decimal | number | null
+  perVisitCap?: Decimal | number | null
+  perEncounterCap?: Decimal | number | null
+}
+
+function decimalOrNull(value: Decimal | number | null | undefined): Decimal | null {
+  if (value === undefined || value === null) return null
+  return new Decimal(value)
+}
+
+function rule(overrides: RuleOverrides): CoContributionRule {
   return {
     id: 'rule-1', tenantId: 't1', packageId: 'pkg-1',
     benefitCategory: null, networkTier: 'TIER_1',
-    type: 'PERCENTAGE', fixedAmount: null, percentage: null,
-    perVisitCap: null, perEncounterCap: null,
+    type: 'PERCENTAGE',
     effectiveFrom: new Date(), effectiveTo: null, isActive: true,
     createdBy: null, updatedBy: null,
     createdAt: new Date(), updatedAt: new Date(),
     ...overrides,
+    fixedAmount: decimalOrNull(overrides.fixedAmount),
+    percentage: decimalOrNull(overrides.percentage),
+    perVisitCap: decimalOrNull(overrides.perVisitCap),
+    perEncounterCap: decimalOrNull(overrides.perEncounterCap),
   } as CoContributionRule
 }
 

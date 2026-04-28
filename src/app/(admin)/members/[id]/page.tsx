@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Pencil, CreditCard } from "lucide-react";
 import { MemberProfileTabs } from "@/components/members/MemberProfileTabs";
 import { MemberTransferPanel } from "./transfer/MemberTransferPanel";
+import { PortalLoginPanel } from "./PortalLoginPanel";
 import QRCode from "react-qr-code";
 
 export default async function MemberDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -80,6 +81,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
         orderBy: { sentAt: "desc" },
         take: 30,
       },
+      user: { select: { email: true, isActive: true } },
     },
   });
 
@@ -99,9 +101,8 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
     }),
   ]);
 
-  // eslint-disable-next-line react-compiler/react-compiler
   const age = Math.floor(
-    (Date.now() - new Date(member.dateOfBirth).getTime()) / (1000 * 3600 * 24 * 365.25)
+    (new Date().getTime() - new Date(member.dateOfBirth).getTime()) / (1000 * 3600 * 24 * 365.25)
   );
 
   // Limit comes from the package benefit schedule (source of truth), not from usage records
@@ -275,6 +276,12 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
           tiers={groupTiers.map(t => ({ id: t.id, name: t.name, packageName: t.package.name }))}
         />
       </div>
+
+      <PortalLoginPanel
+        memberId={member.id}
+        defaultEmail={member.email}
+        portalUser={member.user}
+      />
 
       {/* Tabbed profile */}
       <MemberProfileTabs member={safeMember} age={age} />

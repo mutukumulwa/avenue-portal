@@ -42,5 +42,5 @@ export async function createPackageAction(formData: FormData) {
     benefits: benefits.length > 0 ? benefits : [{ category: "INPATIENT", annualSubLimit: annualLimit }],
   });
 
-  redirect("/admin/packages");
+  redirect("/packages");
 }
