@@ -350,6 +350,27 @@ async function main() {
     },
   })
 
+  await prisma.user.upsert({
+    where: { tenantId_email: { tenantId, email: 'emily.wambui@safaricom.co.ke' } },
+    update: {
+      passwordHash: pw,
+      isActive: true,
+      role: 'HR_MANAGER',
+      groupId: safaricom.id,
+    },
+    create: {
+      tenantId,
+      email: 'emily.wambui@safaricom.co.ke',
+      firstName: 'Emily',
+      lastName: 'Wambui',
+      role: 'HR_MANAGER',
+      passwordHash: pw,
+      isActive: true,
+      groupId: safaricom.id,
+    },
+  })
+  console.log('✅ HR portal user: emily.wambui@safaricom.co.ke')
+
   // Create benefit tiers for Safaricom
   const tierExisting = await prisma.groupBenefitTier.findFirst({ where: { groupId: safaricom.id } })
   let executiveTier: { id: string } | null = null
