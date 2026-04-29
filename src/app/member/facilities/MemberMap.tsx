@@ -4,10 +4,10 @@ import { useEffect } from "react";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
-import { Navigation } from "lucide-react";
 
 // Fix Leaflet icons
-delete (L.Icon.Default.prototype as any)._getIconUrl;
+// @ts-expect-error - modifying prototype for leaflet workaround
+delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
   iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
@@ -20,7 +20,18 @@ const UserLocationIcon = L.divIcon({
   iconSize: [20, 20],
 });
 
-function MapBounds({ providers, userPos }: { providers: any[]; userPos: { lat: number; lng: number } }) {
+export type ProviderLocation = {
+  id: string;
+  name: string;
+  type: string;
+  distance: number;
+  geoLatitude: number;
+  geoLongitude: number;
+  address?: string | null;
+  phone?: string | null;
+};
+
+function MapBounds({ providers, userPos }: { providers: ProviderLocation[]; userPos: { lat: number; lng: number } }) {
   const map = useMap();
 
   useEffect(() => {
@@ -42,7 +53,7 @@ function MapBounds({ providers, userPos }: { providers: any[]; userPos: { lat: n
   return null;
 }
 
-export default function MemberMap({ position, providers }: { position: { lat: number; lng: number }; providers: any[] }) {
+export default function MemberMap({ position, providers }: { position: { lat: number; lng: number }; providers: ProviderLocation[] }) {
   return (
     <MapContainer
       center={[position.lat, position.lng]}

@@ -14,6 +14,8 @@ type AppendCheckInEventInput = {
   credentialId?: string | null;
   photoEvidenceUrl?: string | null;
   knowledgeQuestionKeys?: string[];
+  geoLatitude?: Prisma.Decimal | null;
+  geoLongitude?: Prisma.Decimal | null;
   reviewRequired?: boolean;
   reasonCode?: string | null;
   notes?: string | null;
@@ -55,6 +57,8 @@ export async function appendCheckInEvent(input: AppendCheckInEventInput) {
       credentialId: input.credentialId ?? null,
       photoEvidenceUrl: input.photoEvidenceUrl ?? null,
       knowledgeQuestionKeys: input.knowledgeQuestionKeys ?? [],
+      geoLatitude: input.geoLatitude ? input.geoLatitude.toString() : null,
+      geoLongitude: input.geoLongitude ? input.geoLongitude.toString() : null,
       reviewRequired: input.reviewRequired ?? false,
       reasonCode: input.reasonCode ?? null,
       notesHash,
@@ -77,6 +81,8 @@ export async function appendCheckInEvent(input: AppendCheckInEventInput) {
       credentialId: input.credentialId ?? undefined,
       photoEvidenceUrl: input.photoEvidenceUrl ?? undefined,
       knowledgeQuestionKeys: input.knowledgeQuestionKeys ?? [],
+      geoLatitude: input.geoLatitude ?? undefined,
+      geoLongitude: input.geoLongitude ?? undefined,
       reviewRequired: input.reviewRequired ?? false,
       reasonCode: input.reasonCode ?? undefined,
       notesHash: notesHash ?? undefined,

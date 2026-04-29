@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { Skeleton } from "@/components/ui/Skeleton";
 import { MapPin, Phone, Navigation } from "lucide-react";
 import { getNearbyProvidersAction } from "./actions";
+import type { ProviderLocation } from "./MemberMap";
 
 const MemberMap = dynamic(() => import("./MemberMap"), {
   ssr: false,
@@ -13,35 +13,44 @@ const MemberMap = dynamic(() => import("./MemberMap"), {
 
 export function FacilitiesMap() {
   const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null);
-  const [providers, setProviders] = useState<any[]>([]);
+  const [providers, setProviders] = useState<ProviderLocation[]>([]);
   const [loading, setLoading] = useState(false);
   const [radius, setRadius] = useState(20);
 
   useEffect(() => {
+    let mounted = true;
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          setPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          if(mounted) setPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         },
         (err) => {
           console.error("Geolocation error:", err);
-          // Default to Nairobi if user denies permission
-          setPosition({ lat: -1.2921, lng: 36.8219 });
+          if(mounted) setPosition({ lat: -1.2921, lng: 36.8219 });
         }
       );
     } else {
-      setPosition({ lat: -1.2921, lng: 36.8219 });
+      setTimeout(() => {
+        if(mounted) setPosition({ lat: -1.2921, lng: 36.8219 });
+      }, 0);
     }
+    return () => { mounted = false; };
   }, []);
 
   useEffect(() => {
+    let mounted = true;
     if (position) {
-      setLoading(true);
-      getNearbyProvidersAction(position.lat, position.lng, radius).then((data) => {
-        setProviders(data);
-        setLoading(false);
-      });
+      const fetchProviders = async () => {
+        setLoading(true);
+        const data = await getNearbyProvidersAction(position.lat, position.lng, radius);
+        if (mounted) {
+          setProviders(data);
+          setLoading(false);
+        }
+      };
+      fetchProviders();
     }
+    return () => { mounted = false; };
   }, [position, radius]);
 
   if (!position) return <div className="h-96 bg-slate-100 animate-pulse rounded-lg flex items-center justify-center">Locating you...</div>;
@@ -86,13 +95,13 @@ export function FacilitiesMap() {
                 </div>
                 {p.address && (
                   <div className="flex items-start gap-1.5 text-xs text-avenue-text-muted mt-2">
-                    <MapPin size={12} className="mt-0.5 flex-shrink-0" />
+                    <MapPin size={12} className="mt-0.5 shrink-0" />
                     <span>{p.address}</span>
                   </div>
                 )}
                 {p.phone && (
                   <div className="flex items-center gap-1.5 text-xs text-avenue-text-muted mt-1">
-                    <Phone size={12} className="flex-shrink-0" />
+                    <Phone size={12} className="shrink-0" />
                     <a href={`tel:${p.phone}`} className="hover:text-avenue-indigo">{p.phone}</a>
                   </div>
                 )}
