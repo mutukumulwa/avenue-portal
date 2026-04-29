@@ -29,6 +29,8 @@ export async function addProviderAction(
       contractStartDate: formData.get("contractStartDate") as string,
       contractEndDate:   formData.get("contractEndDate")   as string,
       contractNotes:     formData.get("contractNotes")     as string,
+      geoLatitude:       formData.get("geoLatitude") ? Number(formData.get("geoLatitude")) : undefined,
+      geoLongitude:      formData.get("geoLongitude") ? Number(formData.get("geoLongitude")) : undefined,
     });
     redirect(`/providers/${provider.id}`);
   } catch (err) {

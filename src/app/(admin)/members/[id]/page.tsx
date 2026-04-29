@@ -6,6 +6,7 @@ import { ArrowLeft, Pencil, CreditCard } from "lucide-react";
 import { MemberProfileTabs } from "@/components/members/MemberProfileTabs";
 import { MemberTransferPanel } from "./transfer/MemberTransferPanel";
 import { PortalLoginPanel } from "./PortalLoginPanel";
+import { BranchEnrollmentPanel } from "./webauthn/BranchEnrollmentPanel";
 import QRCode from "react-qr-code";
 
 export default async function MemberDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -282,6 +283,8 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
         defaultEmail={member.email}
         portalUser={member.user}
       />
+
+      <BranchEnrollmentPanel memberId={member.id} />
 
       {/* Tabbed profile */}
       <MemberProfileTabs member={safeMember} age={age} />

@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Users, Building2, FileText, BriefcaseMedical,
   Stethoscope, Receipt, CreditCard, Building, PieChart,
   Settings, LogOut, Calculator, UserCheck, MessageSquareText,
-  ShieldAlert, MessageSquareWarning, Wallet,
+  ShieldAlert, MessageSquareWarning, Wallet, Fingerprint,
 } from "lucide-react";
 import { PortalSwitcher } from "./PortalSwitcher";
 import { useState } from "react";
@@ -44,22 +44,18 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Clinical",
     items: [
-      { label: "Claims",             href: "/claims",    icon: Receipt,     roles: CLINICAL   },
-      { label: "Pre-Authorizations", href: "/preauth",   icon: Stethoscope, roles: CLINICAL   },
+      { label: "Claims",             href: "/claims",    icon: Receipt,     roles: OPS        },
+      { label: "Pre-Authorizations", href: "/preauth",   icon: Stethoscope, roles: OPS        },
+      { label: "Secure Check-Ins",   href: "/check-ins", icon: Fingerprint, roles: OPS        },
       { label: "Providers",          href: "/providers", icon: Building,    roles: ADMIN_ONLY },
     ],
   },
   {
     label: "Finance",
     items: [
-      {
-        label: "Billing", href: "/billing", icon: CreditCard, roles: FINANCE,
-        children: [
-          { label: "Invoices & Payments", href: "/billing"           },
-          { label: "General Ledger",      href: "/billing/gl"        },
-          { label: "Account Ledger",      href: "/billing/gl/ledger" },
-        ],
-      },
+      { label: "Billing & Invoices",  href: "/billing",           icon: CreditCard, roles: FINANCE },
+      { label: "General Ledger",      href: "/billing/gl",        icon: FileText,   roles: FINANCE },
+      { label: "Account Ledger",      href: "/billing/gl/ledger", icon: FileText,   roles: FINANCE },
       { label: "Self-Funded Schemes", href: "/fund/dashboard", icon: Wallet,     roles: FUND_PORTAL  },
       { label: "Brokers",             href: "/brokers",        icon: UserCheck,  roles: ADMIN_ONLY   },
       { label: "Quotations",          href: "/quotations",     icon: Calculator, roles: UNDERWRITING },
@@ -76,7 +72,13 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Service Requests", href: "/service-requests", icon: MessageSquareText,    roles: OPS },
       { label: "Complaints",       href: "/complaints",        icon: MessageSquareWarning, roles: OPS },
-      { label: "Fraud Alerts",     href: "/fraud",             icon: ShieldAlert,          roles: OPS },
+      {
+        label: "Fraud Alerts", href: "/fraud", icon: ShieldAlert, roles: OPS,
+        children: [
+          { label: "Claim Alerts",    href: "/fraud"           },
+          { label: "Check-In Audit", href: "/fraud/check-ins" },
+        ],
+      },
     ],
   },
   {

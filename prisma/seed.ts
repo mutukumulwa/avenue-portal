@@ -20,6 +20,59 @@ async function main() {
   })
   console.log(`✅ Tenant: ${tenant.name}`)
   const tenantId = tenant.id
+  // ═══════════════════════════════════════════════════════════
+  // 1b. BENEFIT RIDERS & TAXES
+  // ═══════════════════════════════════════════════════════════
+  const riders = [
+    { code: 'IP-HIV', description: 'Inpatient HIV/AIDS', type: 'INPATIENT' },
+    { code: 'IP-DIALY', description: 'Inpatient Dialysis', type: 'INPATIENT' },
+    { code: 'IP-EVAC', description: 'Inpatient Evacuation', type: 'INPATIENT' },
+    { code: 'IP-CONG', description: 'Inpatient Congenital', type: 'INPATIENT' },
+    { code: 'IP-PC', description: 'Inpatient Palliative Care', type: 'INPATIENT' },
+    { code: 'IP-GYNA', description: 'Inpatient Gynaecology', type: 'INPATIENT' },
+    { code: 'IP-MAT', description: 'Inpatient Maternity', type: 'INPATIENT' },
+    { code: 'IP-OPTH', description: 'Inpatient Ophthalmology', type: 'INPATIENT' },
+    { code: 'IP-PERNATL', description: 'Inpatient Perinatal', type: 'INPATIENT' },
+    { code: 'IP-PHSP', description: 'Inpatient Physiotherapy', type: 'INPATIENT' },
+    { code: 'IP-CA', description: 'Inpatient Cancer', type: 'INPATIENT' },
+    { code: 'IP-PSYC', description: 'Inpatient Psychiatry', type: 'INPATIENT' },
+    { code: 'IP-CS', description: 'Inpatient Caesarean Section', type: 'INPATIENT' },
+    { code: 'OP-DNTL', description: 'Outpatient Dental', type: 'OUTPATIENT' },
+    { code: 'OP-OPTC', description: 'Outpatient Optical', type: 'OUTPATIENT' },
+    { code: 'OP-GYNA', description: 'Outpatient Gynaecology', type: 'OUTPATIENT' },
+    { code: 'OP-HIV', description: 'Outpatient HIV/AIDS', type: 'OUTPATIENT' },
+    { code: 'OP-CA', description: 'Outpatient Cancer', type: 'OUTPATIENT' },
+    { code: 'OP-CONG', description: 'Outpatient Congenital', type: 'OUTPATIENT' },
+    { code: 'OP-EVAC', description: 'Outpatient Evacuation', type: 'OUTPATIENT' },
+    { code: 'OP-MAT', description: 'Outpatient Maternity', type: 'OUTPATIENT' },
+    { code: 'OP-MER', description: 'Outpatient Medical Exam', type: 'OUTPATIENT' },
+    { code: 'OP-PC', description: 'Outpatient Palliative Care', type: 'OUTPATIENT' },
+    { code: 'OP-PSYC', description: 'Outpatient Psychiatry', type: 'OUTPATIENT' },
+    { code: 'OP-VACC', description: 'Outpatient Vaccination', type: 'OUTPATIENT' },
+    { code: 'OP-FUNERAL', description: 'Outpatient Funeral', type: 'OUTPATIENT' },
+  ];
+  for (const r of riders) {
+    await prisma.benefitRider.upsert({
+      where: { code: r.code },
+      update: {},
+      create: { ...r, isActive: true },
+    });
+  }
+  console.log(`✅ Benefit Riders: ${riders.length}`);
+
+  const taxes = [
+    { taxType: 'STAMP_DUTY' as const, flatAmount: 40, percentage: null },
+    { taxType: 'TRAINING_LEVY' as const, flatAmount: null, percentage: 0.002 },
+    { taxType: 'PHCF' as const, flatAmount: null, percentage: 0.0025 },
+  ];
+  for (const t of taxes) {
+    await prisma.taxRate.upsert({
+      where: { tenantId_taxType_effectiveFrom: { tenantId, taxType: t.taxType, effectiveFrom: new Date('2024-01-01') } },
+      update: {},
+      create: { tenantId, taxType: t.taxType, flatAmount: t.flatAmount, percentage: t.percentage, effectiveFrom: new Date('2024-01-01') },
+    });
+  }
+  console.log(`✅ Tax Rates: ${taxes.length}`);
 
   // ═══════════════════════════════════════════════════════════
   // 2. USERS

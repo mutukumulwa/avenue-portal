@@ -2,16 +2,22 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Lock, Mail, AlertCircle } from "lucide-react";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
-export default function LoginPage() {
+function safeCallbackUrl(value: string | null) {
+  if (!value || !value.startsWith("/") || value.startsWith("//")) return null;
+  return value;
+}
+
+function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,6 +41,12 @@ export default function LoginPage() {
     const res = await fetch("/api/auth/session");
     const session = await res.json();
     const role = session?.user?.role;
+    const callbackUrl = safeCallbackUrl(searchParams.get("callbackUrl"));
+
+    if (callbackUrl) {
+      router.push(callbackUrl);
+      return;
+    }
 
     if (role === "BROKER_USER") {
       router.push("/broker/dashboard");
@@ -129,5 +141,13 @@ export default function LoginPage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-avenue-bg-alt/50" />}>
+      <LoginForm />
+    </Suspense>
   );
 }

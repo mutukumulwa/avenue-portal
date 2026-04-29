@@ -13,6 +13,8 @@ import {
   HelpCircle,
   UserCircle,
   LogOut,
+  Fingerprint,
+  Smartphone,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -21,8 +23,10 @@ const NAV_ITEMS = [
   { label: "Dependents",  href: "/member/dependents",  icon: Users           },
   { label: "Utilization", href: "/member/utilization", icon: TrendingUp      },
   { label: "Pre-Auth",    href: "/member/preauth",     icon: Stethoscope     },
+  { label: "Check-In",    href: "/member/check-in",    icon: Fingerprint     },
   { label: "Facilities",  href: "/member/facilities",  icon: Building        },
   { label: "Support",     href: "/member/support",     icon: HelpCircle      },
+  { label: "Security",    href: "/member/security",    icon: Smartphone      },
   { label: "Profile",     href: "/member/profile",     icon: UserCircle      },
 ];
 

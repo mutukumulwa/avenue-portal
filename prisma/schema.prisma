@@ -22,31 +22,38 @@ model Tenant {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  users           User[]
-  groups          Group[]
-  members         Member[]
-  packages        Package[]
-  claims          Claim[]
-  preauths        PreAuthorization[]
-  providers       Provider[]
-  brokers         Broker[]
-  endorsements    Endorsement[]
-  invoices        Invoice[]
-  quotations      Quotation[]
-  exceptionLogs    ExceptionLog[]
-  chartOfAccounts  ChartOfAccount[]
-  journalEntries   JournalEntry[]
-  fraudAlerts      ClaimFraudAlert[]
-  complaints       Complaint[]
-  coContributionRules         CoContributionRule[]
-  annualCoContributionCaps    AnnualCoContributionCap[]
-  coContributionTransactions  CoContributionTransaction[]
-  memberAnnualCoContributions MemberAnnualCoContribution[]
-  familyAnnualCoContributions FamilyAnnualCoContribution[]
-  selfFundedAccounts          SelfFundedAccount[]
-  fundTransactions            FundTransaction[]
-  taxRates                    TaxRate[]
-  approvalMatrices            ApprovalMatrix[]
+  users                          User[]
+  groups                         Group[]
+  members                        Member[]
+  packages                       Package[]
+  claims                         Claim[]
+  preauths                       PreAuthorization[]
+  providers                      Provider[]
+  brokers                        Broker[]
+  endorsements                   Endorsement[]
+  invoices                       Invoice[]
+  quotations                     Quotation[]
+  exceptionLogs                  ExceptionLog[]
+  chartOfAccounts                ChartOfAccount[]
+  journalEntries                 JournalEntry[]
+  fraudAlerts                    ClaimFraudAlert[]
+  complaints                     Complaint[]
+  coContributionRules            CoContributionRule[]
+  annualCoContributionCaps       AnnualCoContributionCap[]
+  coContributionTransactions     CoContributionTransaction[]
+  memberAnnualCoContributions    MemberAnnualCoContribution[]
+  familyAnnualCoContributions    FamilyAnnualCoContribution[]
+  selfFundedAccounts             SelfFundedAccount[]
+  fundTransactions               FundTransaction[]
+  taxRates                       TaxRate[]
+  approvalMatrices               ApprovalMatrix[]
+  memberWebAuthnCredentials      MemberWebAuthnCredential[]
+  webAuthnRegistrationChallenges WebAuthnRegistrationChallenge[]
+  webAuthnEnrollmentApprovals    WebAuthnEnrollmentApproval[]
+  checkInChallenges              CheckInChallenge[]
+  checkInEvents                  CheckInEvent[]
+  memberCheckInNotifications     MemberCheckInNotification[]
+  visitVerifications             VisitVerification[]
 }
 
 // ─── USERS & AUTH ────────────────────────────────────────
@@ -86,14 +93,19 @@ model User {
   groupId  String?
   group    Group?  @relation("HRManagerGroup", fields: [groupId], references: [id])
 
-  managedFundGroups        Group[]              @relation("FundAdminGroups")
-  auditLogs                AuditLog[]
-  claimReviews             Claim[]              @relation("ClaimReviewer")
-  raisedExceptions         ExceptionLog[]       @relation("ExceptionRaisedBy")
-  resolvedExceptions       ExceptionLog[]       @relation("ExceptionResolvedBy")
-  submittedServiceRequests ServiceRequest[]     @relation("SRSubmitter")
-  respondedServiceRequests ServiceRequest[]     @relation("SRResponder")
-  escalatedPreauths        PreAuthorization[]   @relation("PreauthEscalation")
+  managedFundGroups           Group[]                      @relation("FundAdminGroups")
+  auditLogs                   AuditLog[]
+  claimReviews                Claim[]                      @relation("ClaimReviewer")
+  raisedExceptions            ExceptionLog[]               @relation("ExceptionRaisedBy")
+  resolvedExceptions          ExceptionLog[]               @relation("ExceptionResolvedBy")
+  submittedServiceRequests    ServiceRequest[]             @relation("SRSubmitter")
+  respondedServiceRequests    ServiceRequest[]             @relation("SRResponder")
+  escalatedPreauths           PreAuthorization[]           @relation("PreauthEscalation")
+  initiatedCheckIns           CheckInChallenge[]           @relation("CheckInInitiatedBy")
+  initiatedCheckInEvents      CheckInEvent[]               @relation("CheckInEventInitiatedBy")
+  overrideCheckInEvents       CheckInEvent[]               @relation("CheckInEventOverrideBy")
+  confirmedVisits             VisitVerification[]          @relation("VisitConfirmedBy")
+  webAuthnEnrollmentApprovals WebAuthnEnrollmentApproval[] @relation("WebAuthnEnrollmentApprovedBy")
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -117,18 +129,30 @@ enum PaymentFrequency {
 }
 
 enum FundingMode {
-  INSURED      // Traditional risk-bearing — premium underwriting
-  SELF_FUNDED  // Client deposits a fund; broker administers; admin fee charged
+  INSURED // Traditional risk-bearing — premium underwriting
+  SELF_FUNDED // Client deposits a fund; broker administers; admin fee charged
 }
 
 enum ClientType {
-  CORPORATE   // Employer / organization scheme
-  INDIVIDUAL  // Single person / family — no employer group
+  CORPORATE // Employer / organization scheme
+  INDIVIDUAL // Single person / family — no employer group
+}
+
+enum FamilySize {
+  M
+  M_1
+  M_2
+  M_3
+  M_4
+  M_5
+  M_6
+  M_7
+  M_7_PLUS
 }
 
 enum AdminFeeMethod {
-  FLAT_PER_INSURED  // Fixed fee per member at policy start
-  PCT_OF_CLAIMS     // Percentage of total claims paid, computed post-period
+  FLAT_PER_INSURED // Fixed fee per member at policy start
+  PCT_OF_CLAIMS // Percentage of total claims paid, computed post-period
 }
 
 enum FundTransactionType {
@@ -172,7 +196,7 @@ model Group {
   fundingMode        FundingMode      @default(INSURED)
   // Self-funded admin fee config (ignored when fundingMode = INSURED)
   adminFeeMethod     AdminFeeMethod?
-  adminFeeRate       Decimal?         // KES flat (FLAT_PER_INSURED) or % (PCT_OF_CLAIMS)
+  adminFeeRate       Decimal? // KES flat (FLAT_PER_INSURED) or % (PCT_OF_CLAIMS)
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt
 
@@ -258,8 +282,8 @@ model GroupBenefitTier {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
-  members              Member[]
-  inboundTierChanges   Endorsement[] @relation("EndorsementTier")
+  members            Member[]
+  inboundTierChanges Endorsement[] @relation("EndorsementTier")
 
   @@unique([groupId, name])
   @@index([groupId])
@@ -322,17 +346,24 @@ model Member {
   createdAt        DateTime           @default(now())
   updatedAt        DateTime           @updatedAt
 
-  claims          Claim[]
-  preauths        PreAuthorization[]
-  benefitUsages   BenefitUsage[]
-  endorsements    Endorsement[]      @relation("EndorsementMember")
-  complaints                 Complaint[]
-  coContributionTransactions CoContributionTransaction[]
-  annualCoContributions      MemberAnnualCoContribution[]
-  familyCoContributions      FamilyAnnualCoContribution[] @relation("FamilyCoContributions")
-  user                       User?
-  correspondences Correspondence[]
-  activityLogs    ActivityLog[]
+  claims                         Claim[]
+  preauths                       PreAuthorization[]
+  benefitUsages                  BenefitUsage[]
+  endorsements                   Endorsement[]                   @relation("EndorsementMember")
+  complaints                     Complaint[]
+  coContributionTransactions     CoContributionTransaction[]
+  annualCoContributions          MemberAnnualCoContribution[]
+  familyCoContributions          FamilyAnnualCoContribution[]    @relation("FamilyCoContributions")
+  user                           User?
+  correspondences                Correspondence[]
+  activityLogs                   ActivityLog[]
+  webAuthnCredentials            MemberWebAuthnCredential[]
+  webAuthnRegistrationChallenges WebAuthnRegistrationChallenge[]
+  webAuthnEnrollmentApprovals    WebAuthnEnrollmentApproval[]
+  checkInChallenges              CheckInChallenge[]
+  checkInEvents                  CheckInEvent[]
+  checkInNotifications           MemberCheckInNotification[]
+  visitVerifications             VisitVerification[]
 
   @@unique([tenantId, memberNumber])
   @@index([tenantId])
@@ -342,30 +373,307 @@ model Member {
   @@index([idNumber])
 }
 
+// ─── SECURE MEMBER CHECK-IN ─────────────────────────────
+
+enum CredentialStatus {
+  ACTIVE
+  REVOKED
+  LOCKED
+}
+
+enum AuthenticatorAttachment {
+  PLATFORM
+  CROSS_PLATFORM
+  UNKNOWN
+}
+
+enum WebAuthnRegistrationStatus {
+  PENDING
+  VERIFIED
+  EXPIRED
+  FAILED
+}
+
+enum WebAuthnEnrollmentApprovalStatus {
+  PENDING
+  USED
+  EXPIRED
+  CANCELLED
+}
+
+enum CheckInChallengeStatus {
+  PENDING
+  SIGNED
+  CODE_CONFIRMED
+  EXPIRED
+  FAILED
+  CANCELLED
+  FALLBACK_STARTED
+}
+
+enum CheckInFlow {
+  BIOMETRIC
+  IN_APP_CONFIRMATION
+  SMS_OTP
+  PHOTO_KNOWLEDGE
+  EMERGENCY_OVERRIDE
+}
+
+enum CheckInOutcome {
+  INITIATED
+  SUCCESS
+  FAILED
+  EXPIRED
+  OVERRIDDEN
+  FLAGGED_FOR_REVIEW
+}
+
+enum CheckInNotificationStatus {
+  PENDING
+  SEEN
+  ACTIONED
+  EXPIRED
+  CANCELLED
+}
+
+model MemberWebAuthnCredential {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id])
+
+  credentialId String   @unique
+  publicKey    String
+  counter      Int      @default(0)
+  transports   String[]
+
+  deviceName       String?
+  deviceModel      String?
+  osName           String?
+  osVersion        String?
+  attachment       AuthenticatorAttachment @default(UNKNOWN)
+  status           CredentialStatus        @default(ACTIVE)
+  isSoftCredential Boolean                 @default(false)
+  lockedUntil      DateTime?
+  lastUsedAt       DateTime?
+  revokedAt        DateTime?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+
+  challenges    CheckInChallenge[]
+  events        CheckInEvent[]
+  notifications MemberCheckInNotification[]
+
+  @@index([tenantId])
+  @@index([memberId])
+  @@index([tenantId, status])
+}
+
+model WebAuthnRegistrationChallenge {
+  id            String                     @id @default(cuid())
+  tenantId      String
+  tenant        Tenant                     @relation(fields: [tenantId], references: [id])
+  memberId      String
+  member        Member                     @relation(fields: [memberId], references: [id])
+  challenge     String
+  challengeHash String
+  status        WebAuthnRegistrationStatus @default(PENDING)
+  expiresAt     DateTime
+  consumedAt    DateTime?
+  createdAt     DateTime                   @default(now())
+  updatedAt     DateTime                   @updatedAt
+
+  @@index([tenantId])
+  @@index([memberId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model WebAuthnEnrollmentApproval {
+  id           String                           @id @default(cuid())
+  tenantId     String
+  tenant       Tenant                           @relation(fields: [tenantId], references: [id])
+  memberId     String
+  member       Member                           @relation(fields: [memberId], references: [id])
+  approvedById String
+  approvedBy   User                             @relation("WebAuthnEnrollmentApprovedBy", fields: [approvedById], references: [id])
+  tokenHash    String                           @unique
+  status       WebAuthnEnrollmentApprovalStatus @default(PENDING)
+  reason       String?
+  expiresAt    DateTime
+  usedAt       DateTime?
+  createdAt    DateTime                         @default(now())
+  updatedAt    DateTime                         @updatedAt
+
+  @@index([tenantId])
+  @@index([memberId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model CheckInChallenge {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  memberId   String
+  member     Member   @relation(fields: [memberId], references: [id])
+  providerId String
+  provider   Provider @relation(fields: [providerId], references: [id])
+
+  workstationId String?
+  initiatedById String
+  initiatedBy   User    @relation("CheckInInitiatedBy", fields: [initiatedById], references: [id])
+
+  challenge     String
+  challengeHash String
+  expiresAt     DateTime
+  status        CheckInChallengeStatus @default(PENDING)
+  attemptCount  Int                    @default(0)
+  consumedAt    DateTime?
+
+  signedCredentialId String?
+  signedCredential   MemberWebAuthnCredential? @relation(fields: [signedCredentialId], references: [id])
+  visitCodeHash      String?
+  visitCodeExpiresAt DateTime?
+
+  events            CheckInEvent[]
+  notifications     MemberCheckInNotification[]
+  visitVerification VisitVerification?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([memberId])
+  @@index([providerId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model CheckInEvent {
+  id          String            @id @default(cuid())
+  tenantId    String
+  tenant      Tenant            @relation(fields: [tenantId], references: [id])
+  memberId    String
+  member      Member            @relation(fields: [memberId], references: [id])
+  providerId  String?
+  provider    Provider?         @relation(fields: [providerId], references: [id])
+  challengeId String?
+  challenge   CheckInChallenge? @relation(fields: [challengeId], references: [id])
+
+  flow    CheckInFlow
+  outcome CheckInOutcome
+
+  initiatedById String?
+  initiatedBy   User?                     @relation("CheckInEventInitiatedBy", fields: [initiatedById], references: [id])
+  overrideById  String?
+  overrideBy    User?                     @relation("CheckInEventOverrideBy", fields: [overrideById], references: [id])
+  credentialId  String?
+  credential    MemberWebAuthnCredential? @relation(fields: [credentialId], references: [id])
+
+  photoEvidenceUrl      String?
+  faceMatchScore        Decimal? @db.Decimal(5, 2)
+  knowledgeQuestionKeys String[]
+  geoLatitude           Decimal? @db.Decimal(9, 6)
+  geoLongitude          Decimal? @db.Decimal(9, 6)
+  ipAddressHash         String?
+  userAgentHash         String?
+  reviewRequired        Boolean  @default(false)
+  reasonCode            String?
+  notesHash             String?
+  previousEventHash     String?
+  eventHash             String
+  metadata              Json?
+  createdAt             DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([memberId])
+  @@index([providerId])
+  @@index([challengeId])
+  @@index([flow])
+  @@index([outcome])
+  @@index([reviewRequired])
+  @@index([createdAt])
+}
+
+model MemberCheckInNotification {
+  id           String                    @id @default(cuid())
+  tenantId     String
+  tenant       Tenant                    @relation(fields: [tenantId], references: [id])
+  memberId     String
+  member       Member                    @relation(fields: [memberId], references: [id])
+  challengeId  String
+  challenge    CheckInChallenge          @relation(fields: [challengeId], references: [id])
+  credentialId String?
+  credential   MemberWebAuthnCredential? @relation(fields: [credentialId], references: [id])
+
+  title      String
+  body       String
+  status     CheckInNotificationStatus @default(PENDING)
+  seenAt     DateTime?
+  actionedAt DateTime?
+  expiresAt  DateTime
+  createdAt  DateTime                  @default(now())
+  updatedAt  DateTime                  @updatedAt
+
+  @@index([tenantId])
+  @@index([memberId])
+  @@index([challengeId])
+  @@index([status])
+  @@index([expiresAt])
+}
+
+model VisitVerification {
+  id          String            @id @default(cuid())
+  tenantId    String
+  tenant      Tenant            @relation(fields: [tenantId], references: [id])
+  memberId    String
+  member      Member            @relation(fields: [memberId], references: [id])
+  providerId  String
+  provider    Provider          @relation(fields: [providerId], references: [id])
+  challengeId String?           @unique
+  challenge   CheckInChallenge? @relation(fields: [challengeId], references: [id])
+
+  flow           CheckInFlow
+  openedAt       DateTime    @default(now())
+  confirmedById  String?
+  confirmedBy    User?       @relation("VisitConfirmedBy", fields: [confirmedById], references: [id])
+  overrideReason String?
+  reviewRequired Boolean     @default(false)
+  notes          String?
+
+  @@index([tenantId])
+  @@index([memberId])
+  @@index([providerId])
+  @@index([openedAt])
+  @@index([reviewRequired])
+}
+
 // ─── SELF-FUNDED SCHEME ACCOUNTS ─────────────────────────
 
 // One account per self-funded group — tracks the fund balance
 model SelfFundedAccount {
-  id        String  @id @default(cuid())
-  tenantId  String
-  tenant    Tenant  @relation(fields: [tenantId], references: [id])
-  groupId   String  @unique
-  group     Group   @relation(fields: [groupId], references: [id])
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  groupId  String @unique
+  group    Group  @relation(fields: [groupId], references: [id])
 
-  balance          Decimal           @default(0) @db.Decimal(14, 2)
-  minimumBalance   Decimal           @default(0) @db.Decimal(14, 2)
-  totalDeposited   Decimal           @default(0) @db.Decimal(14, 2)
-  totalClaims      Decimal           @default(0) @db.Decimal(14, 2)
-  totalAdminFees   Decimal           @default(0) @db.Decimal(14, 2)
+  balance        Decimal @default(0) @db.Decimal(14, 2)
+  minimumBalance Decimal @default(0) @db.Decimal(14, 2)
+  totalDeposited Decimal @default(0) @db.Decimal(14, 2)
+  totalClaims    Decimal @default(0) @db.Decimal(14, 2)
+  totalAdminFees Decimal @default(0) @db.Decimal(14, 2)
 
   // Categories currently on hold — no new claims approved against these
-  heldCategories   BenefitCategory[]
+  heldCategories BenefitCategory[]
 
   // Track whether the period-end admin fee has been invoiced
   adminFeeInvoiceId String?
 
-  periodStartDate  DateTime
-  periodEndDate    DateTime
+  periodStartDate DateTime
+  periodEndDate   DateTime
 
   transactions FundTransaction[]
 
@@ -377,22 +685,22 @@ model SelfFundedAccount {
 
 // Ledger of every fund movement for a self-funded scheme
 model FundTransaction {
-  id                  String              @id @default(cuid())
+  id                  String            @id @default(cuid())
   tenantId            String
-  tenant              Tenant              @relation(fields: [tenantId], references: [id])
+  tenant              Tenant            @relation(fields: [tenantId], references: [id])
   selfFundedAccountId String
-  selfFundedAccount   SelfFundedAccount   @relation(fields: [selfFundedAccountId], references: [id])
+  selfFundedAccount   SelfFundedAccount @relation(fields: [selfFundedAccountId], references: [id])
 
-  type             FundTransactionType
-  amount           Decimal             @db.Decimal(14, 2)
-  balanceAfter     Decimal             @db.Decimal(14, 2)
-  description      String
-  referenceNumber  String?
-  claimId          String?
-  claim            Claim?              @relation(fields: [claimId], references: [id])
-  invoiceId        String?
-  postedById       String?
-  postedAt         DateTime            @default(now())
+  type            FundTransactionType
+  amount          Decimal             @db.Decimal(14, 2)
+  balanceAfter    Decimal             @db.Decimal(14, 2)
+  description     String
+  referenceNumber String?
+  claimId         String?
+  claim           Claim?              @relation(fields: [claimId], references: [id])
+  invoiceId       String?
+  postedById      String?
+  postedAt        DateTime            @default(now())
 
   @@index([tenantId])
   @@index([selfFundedAccountId])
@@ -402,22 +710,22 @@ model FundTransaction {
 // ─── KENYAN STATUTORY TAXES ──────────────────────────────
 
 enum TaxType {
-  STAMP_DUTY      // KES 40 flat per policy — IRA requirement
-  TRAINING_LEVY   // 0.2% of basic premium — AKI training fund
-  PHCF            // 0.25% of basic premium — Post Hospital Care Fund
+  STAMP_DUTY // KES 40 flat per policy — IRA requirement
+  TRAINING_LEVY // 0.2% of basic premium — AKI training fund
+  PHCF // 0.25% of basic premium — Post Hospital Care Fund
 }
 
 // Configurable tax rates per tenant (lets rates change without code changes)
 model TaxRate {
-  id          String   @id @default(cuid())
-  tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id])
-  taxType     TaxType
-  flatAmount  Decimal? @db.Decimal(10, 2) // For STAMP_DUTY
-  percentage  Decimal? @db.Decimal(6, 4)  // For percentage-based taxes (e.g. 0.2000 = 0.2%)
+  id            String    @id @default(cuid())
+  tenantId      String
+  tenant        Tenant    @relation(fields: [tenantId], references: [id])
+  taxType       TaxType
+  flatAmount    Decimal?  @db.Decimal(10, 2) // For STAMP_DUTY
+  percentage    Decimal?  @db.Decimal(6, 4) // For percentage-based taxes (e.g. 0.2000 = 0.2%)
   effectiveFrom DateTime
   effectiveTo   DateTime?
-  isActive    Boolean  @default(true)
+  isActive      Boolean   @default(true)
 
   @@unique([tenantId, taxType, effectiveFrom])
   @@index([tenantId])
@@ -427,21 +735,21 @@ model TaxRate {
 
 // Configures which role must approve a claim based on value and type
 model ApprovalMatrix {
-  id          String   @id @default(cuid())
-  tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
 
-  claimValueMin  Decimal?        // null = no lower bound
-  claimValueMax  Decimal?        // null = no upper bound
-  serviceType    ServiceType?    // null = applies to all service types
+  claimValueMin   Decimal? // null = no lower bound
+  claimValueMax   Decimal? // null = no upper bound
+  serviceType     ServiceType? // null = applies to all service types
   benefitCategory BenefitCategory? // null = applies to all categories
 
-  requiredRole   String          // Maps to UserRole enum value
-  requiresDual   Boolean @default(false) // Maker-checker: needs two approvers
+  requiredRole String // Maps to UserRole enum value
+  requiresDual Boolean @default(false) // Maker-checker: needs two approvers
 
-  effectiveFrom  DateTime
-  effectiveTo    DateTime?
-  isActive       Boolean @default(true)
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  isActive      Boolean   @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -481,11 +789,11 @@ model Package {
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 
-  versions         PackageVersion[]
-  currentVersionId String?            @unique
-  currentVersion   PackageVersion?    @relation("CurrentVersion", fields: [currentVersionId], references: [id])
-  groups           Group[]
-  members          Member[]
+  versions                PackageVersion[]
+  currentVersionId        String?                  @unique
+  currentVersion          PackageVersion?          @relation("CurrentVersion", fields: [currentVersionId], references: [id])
+  groups                  Group[]
+  members                 Member[]
   benefitTiers            GroupBenefitTier[]
   coContributionRules     CoContributionRule[]
   annualCoContributionCap AnnualCoContributionCap?
@@ -527,6 +835,14 @@ enum BenefitCategory {
   WELLNESS_PREVENTIVE
   REHABILITATION
   CUSTOM
+}
+
+model BenefitRider {
+  code        String   @id // e.g., IP-HIV, OP-DNTL
+  description String
+  type        String // INPATIENT | OUTPATIENT
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
 }
 
 model BenefitConfig {
@@ -577,9 +893,9 @@ enum EndorsementType {
   BENEFIT_MODIFICATION // Change in benefits (e.g., maternity rider added)
   SALARY_CHANGE // If contribution is salary-based
   GROUP_DATA_CHANGE // Contact info, payment terms change
-  TIER_CHANGE     // Member moved between benefit tiers within the same group
+  TIER_CHANGE // Member moved between benefit tiers within the same group
   SCHEME_TRANSFER // Member moves to a different group entirely
-  CORRECTION      // Error correction
+  CORRECTION // Error correction
 }
 
 enum EndorsementStatus {
@@ -610,8 +926,8 @@ model Endorsement {
   member   Member? @relation("EndorsementMember", fields: [memberId], references: [id])
 
   // SCHEME_TRANSFER: destination group
-  toGroupId   String?
-  toGroup     Group?  @relation("EndorsementToGroup", fields: [toGroupId], references: [id])
+  toGroupId       String?
+  toGroup         Group?            @relation("EndorsementToGroup", fields: [toGroupId], references: [id])
   // TIER_CHANGE: destination tier within same group
   toBenefitTierId String?
   toBenefitTier   GroupBenefitTier? @relation("EndorsementTier", fields: [toBenefitTierId], references: [id])
@@ -652,10 +968,10 @@ model Endorsement {
 
 // ─── CLAIMS ─────────────────────────────────────────────
 enum ClaimStatus {
-  INCURRED        // Liability known before paper arrives (e.g. discharge notification)
-  RECEIVED        // Claim documents received from provider
-  CAPTURED        // Data entry complete — awaiting adjudication
-  UNDER_REVIEW    // Medical officer / claims officer reviewing
+  INCURRED // Liability known before paper arrives (e.g. discharge notification)
+  RECEIVED // Claim documents received from provider
+  CAPTURED // Data entry complete — awaiting adjudication
+  UNDER_REVIEW // Medical officer / claims officer reviewing
   APPROVED
   PARTIALLY_APPROVED
   DECLINED
@@ -667,13 +983,13 @@ enum ClaimStatus {
 }
 
 enum ClaimSource {
-  MANUAL        // Entered by admin
+  MANUAL // Entered by admin
   REIMBURSEMENT // Member paid provider directly — insurer reimburses member
-  PREAUTH       // Converted from pre-authorization
-  SMART         // Received via SMART integration
-  SLADE360      // Received via Slade360 EDI
-  HMS           // Received from hospital HMS
-  BATCH         // Batch upload from facility
+  PREAUTH // Converted from pre-authorization
+  SMART // Received via SMART integration
+  SLADE360 // Received via Slade360 EDI
+  HMS // Received from hospital HMS
+  BATCH // Batch upload from facility
 }
 
 enum ServiceType {
@@ -687,7 +1003,7 @@ model Claim {
   id              String            @id @default(cuid())
   tenantId        String
   tenant          Tenant            @relation(fields: [tenantId], references: [id])
-  claimNumber     String  // e.g., CLM-2025-00001
+  claimNumber     String // e.g., CLM-2025-00001
   invoiceNumber   String? // Provider's own invoice number — unique per provider
   memberId        String
   member          Member            @relation(fields: [memberId], references: [id])
@@ -742,11 +1058,11 @@ model Claim {
   appealDecidedAt DateTime?
 
   // Reimbursement — member paid provider directly; insurer pays member back
-  isReimbursement          Boolean @default(false)
-  reimbursementBankName    String?
-  reimbursementAccountNo   String?
-  reimbursementMpesaPhone  String?
-  reimbursedAt             DateTime?
+  isReimbursement         Boolean   @default(false)
+  reimbursementBankName   String?
+  reimbursementAccountNo  String?
+  reimbursementMpesaPhone String?
+  reimbursedAt            DateTime?
 
   // Integration references
   smartClaimRef    String? // SMART claim reference
@@ -764,8 +1080,8 @@ model Claim {
   fraudAlerts               ClaimFraudAlert[]
   coContributionTransaction CoContributionTransaction?
   fundTransactions          FundTransaction[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
 
   @@unique([tenantId, claimNumber])
   // Provider-scoped invoice uniqueness — prevents same provider submitting same invoice twice
@@ -873,7 +1189,7 @@ model PreAuthorization {
   declinedAt        DateTime?
 
   // Escalation — if pending past threshold, auto-notify next approver
-  escalationThresholdHours Int?      // null = no escalation configured
+  escalationThresholdHours Int? // null = no escalation configured
   escalatedAt              DateTime?
   escalatedToId            String?
   escalatedTo              User?     @relation("PreauthEscalation", fields: [escalatedToId], references: [id])
@@ -912,33 +1228,43 @@ enum ProviderTier {
 }
 
 model Provider {
-  id                 String       @id @default(cuid())
-  tenantId           String
-  tenant             Tenant       @relation(fields: [tenantId], references: [id])
-  name               String
-  type               ProviderType
-  tier               ProviderTier @default(PARTNER)
-  address            String?
-  county             String?
-  phone              String?
-  email              String?
-  contactPerson      String?
+  id            String       @id @default(cuid())
+  tenantId      String
+  tenant        Tenant       @relation(fields: [tenantId], references: [id])
+  name          String
+  type          ProviderType
+  tier          ProviderTier @default(PARTNER)
+  address       String?
+  county        String?
+  phone         String?
+  email         String?
+  contactPerson String?
+
+  // NEW: Geospatial and operational data
+  geoLatitude    Decimal? @db.Decimal(9, 6)
+  geoLongitude   Decimal? @db.Decimal(9, 6)
+  isOpen24Hours  Boolean  @default(false)
+  operatingHours Json? // e.g., { "Mon": "08:00-17:00" }
+
   servicesOffered    String[] // ["Inpatient", "Outpatient", "Maternity", "Surgery", "Pharmacy", "ICU"]
-  contractStatus     String       @default("ACTIVE") // ACTIVE, PENDING, EXPIRED
+  contractStatus     String    @default("ACTIVE") // ACTIVE, PENDING, EXPIRED
   contractStartDate  DateTime?
   contractEndDate    DateTime?
-  paymentTermDays    Int          @default(30) // e.g. Net 30, Net 14
+  paymentTermDays    Int       @default(30) // e.g. Net 30, Net 14
   creditLimit        Decimal? // Maximum outstanding payable (KES)
   contractNotes      String? // Free-text contract summary / special terms
   smartProviderId    String? // SMART provider code
   slade360ProviderId String? // Slade360 provider code
-  createdAt          DateTime     @default(now())
-  updatedAt          DateTime     @updatedAt
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  tariffs          ProviderTariff[]
-  diagnosisTariffs ProviderDiagnosisTariff[]
-  claims           Claim[]
-  preauths         PreAuthorization[]
+  tariffs            ProviderTariff[]
+  diagnosisTariffs   ProviderDiagnosisTariff[]
+  claims             Claim[]
+  preauths           PreAuthorization[]
+  checkInChallenges  CheckInChallenge[]
+  checkInEvents      CheckInEvent[]
+  visitVerifications VisitVerification[]
 
   @@index([tenantId])
   @@index([tenantId, tier])
@@ -950,11 +1276,11 @@ model ProviderTariff {
   provider      Provider  @relation(fields: [providerId], references: [id])
   cptCode       String?
   serviceName   String
-  agreedRate    Decimal  // KES — overrides standard CPT charge for this provider
+  agreedRate    Decimal // KES — overrides standard CPT charge for this provider
   effectiveFrom DateTime
   effectiveTo   DateTime?
-  isActive      Boolean  @default(true) // Never delete — deactivate instead
-  createdAt     DateTime @default(now())
+  isActive      Boolean   @default(true) // Never delete — deactivate instead
+  createdAt     DateTime  @default(now())
 
   @@index([providerId])
   @@index([providerId, cptCode])
@@ -968,9 +1294,9 @@ model ProviderDiagnosisTariff {
   provider       Provider  @relation(fields: [providerId], references: [id])
   icdCode        String // ICD-10 code this rate applies to
   diagnosisLabel String // Human-readable label (copied at time of creation)
-  bundledRate    Decimal?  // Fixed package rate for the whole episode (KES)
-  perDayRate     Decimal?  // Per diem rate (KES/day) — for inpatient
-  notes          String?   // Any special conditions or inclusions
+  bundledRate    Decimal? // Fixed package rate for the whole episode (KES)
+  perDayRate     Decimal? // Per diem rate (KES/day) — for inpatient
+  notes          String? // Any special conditions or inclusions
   effectiveFrom  DateTime
   effectiveTo    DateTime?
   isActive       Boolean   @default(true) // Never delete — deactivate instead
@@ -1053,10 +1379,10 @@ model Invoice {
   paidAmount    Decimal       @default(0)
   balance       Decimal // totalAmount - paidAmount
   // Kenyan statutory taxes — computed at invoice generation
-  stampDuty     Decimal       @default(40)    @db.Decimal(10, 2) // KES 40 flat
-  trainingLevy  Decimal       @default(0)     @db.Decimal(10, 2) // 0.2% of basic premium
-  phcf          Decimal       @default(0)     @db.Decimal(10, 2) // 0.25% of basic premium
-  taxTotal      Decimal       @default(0)     @db.Decimal(10, 2) // stampDuty + trainingLevy + phcf
+  stampDuty     Decimal       @default(40) @db.Decimal(10, 2) // KES 40 flat
+  trainingLevy  Decimal       @default(0) @db.Decimal(10, 2) // 0.2% of basic premium
+  phcf          Decimal       @default(0) @db.Decimal(10, 2) // 0.25% of basic premium
+  taxTotal      Decimal       @default(0) @db.Decimal(10, 2) // stampDuty + trainingLevy + phcf
   dueDate       DateTime
   status        InvoiceStatus @default(DRAFT)
   sentAt        DateTime?
@@ -1446,8 +1772,8 @@ model ClaimFraudAlert {
   tenant     Tenant        @relation(fields: [tenantId], references: [id])
   claimId    String
   claim      Claim         @relation(fields: [claimId], references: [id])
-  rule       String        // e.g. "Velocity Check", "Unauth High Value"
-  score      Int           // Severity confidence (1-100)
+  rule       String // e.g. "Velocity Check", "Unauth High Value"
+  score      Int // Severity confidence (1-100)
   severity   FraudSeverity @default(MEDIUM)
   notes      String?
   resolved   Boolean       @default(false)
@@ -1476,7 +1802,7 @@ model Complaint {
   memberId    String?
   member      Member?         @relation(fields: [memberId], references: [id])
   subject     String
-  type        String          // e.g. "SERVICE", "FACILITY", "BILLING"
+  type        String // e.g. "SERVICE", "FACILITY", "BILLING"
   description String
   status      ComplaintStatus @default(OPEN)
   resolution  String?
@@ -1492,17 +1818,17 @@ model Complaint {
 // ─── CO-CONTRIBUTION ────────────────────────────────────────────────────────
 
 enum CoContributionType {
-  FIXED_AMOUNT  // Flat KES amount per encounter
-  PERCENTAGE    // % of eligible cost
-  HYBRID        // Fixed minimum OR percentage, whichever is greater
-  NONE          // Exempt service — zero co-contribution
+  FIXED_AMOUNT // Flat KES amount per encounter
+  PERCENTAGE // % of eligible cost
+  HYBRID // Fixed minimum OR percentage, whichever is greater
+  NONE // Exempt service — zero co-contribution
 }
 
 // Maps to Provider.tier: OWN → TIER_1, PARTNER/PANEL → TIER_2, unknown → TIER_3
 enum NetworkTier {
-  TIER_1  // Avenue own facilities
-  TIER_2  // Contracted partner / panel
-  TIER_3  // Out-of-network
+  TIER_1 // Avenue own facilities
+  TIER_2 // Contracted partner / panel
+  TIER_3 // Out-of-network
 }
 
 enum CoContributionCollectionStatus {
@@ -1526,18 +1852,18 @@ enum CoContributionPaymentMethod {
 // One rule per (package × benefit category × network tier × effective period)
 // benefitCategory == null means package-wide default for that tier
 model CoContributionRule {
-  id         String  @id @default(cuid())
-  tenantId   String
-  tenant     Tenant  @relation(fields: [tenantId], references: [id])
-  packageId  String
-  package    Package @relation(fields: [packageId], references: [id])
+  id        String  @id @default(cuid())
+  tenantId  String
+  tenant    Tenant  @relation(fields: [tenantId], references: [id])
+  packageId String
+  package   Package @relation(fields: [packageId], references: [id])
 
   benefitCategory BenefitCategory? // null = package-wide default
-  networkTier     NetworkTier      @default(TIER_1)
+  networkTier     NetworkTier        @default(TIER_1)
   type            CoContributionType
 
   fixedAmount     Decimal? @db.Decimal(12, 2) // FIXED_AMOUNT or HYBRID minimum
-  percentage      Decimal? @db.Decimal(5, 2)  // PERCENTAGE or HYBRID (e.g. 20.00 = 20%)
+  percentage      Decimal? @db.Decimal(5, 2) // PERCENTAGE or HYBRID (e.g. 20.00 = 20%)
   perVisitCap     Decimal? @db.Decimal(12, 2) // Max co-contribution per encounter
   perEncounterCap Decimal? @db.Decimal(12, 2) // Max per individual service line
 
@@ -1589,16 +1915,16 @@ model CoContributionTransaction {
   coContributionRuleId String?
   coContributionRule   CoContributionRule? @relation(fields: [coContributionRuleId], references: [id])
 
-  serviceCost         Decimal @db.Decimal(12, 2) // Eligible service cost
-  calculatedAmount    Decimal @db.Decimal(12, 2) // Raw calculation before caps
-  cappedAmount        Decimal @db.Decimal(12, 2) // After per-visit / per-encounter cap
-  annualCapApplied    Boolean @default(false)
-  finalAmount         Decimal @db.Decimal(12, 2) // What member actually owes
-  planShare           Decimal @db.Decimal(12, 2) // What plan covers
-  amountCollected     Decimal @db.Decimal(12, 2) @default(0)
-  capsApplied         String[] // Which caps were binding
+  serviceCost      Decimal  @db.Decimal(12, 2) // Eligible service cost
+  calculatedAmount Decimal  @db.Decimal(12, 2) // Raw calculation before caps
+  cappedAmount     Decimal  @db.Decimal(12, 2) // After per-visit / per-encounter cap
+  annualCapApplied Boolean  @default(false)
+  finalAmount      Decimal  @db.Decimal(12, 2) // What member actually owes
+  planShare        Decimal  @db.Decimal(12, 2) // What plan covers
+  amountCollected  Decimal  @default(0) @db.Decimal(12, 2)
+  capsApplied      String[] // Which caps were binding
 
-  collectionStatus    CoContributionCollectionStatus  @default(PENDING)
+  collectionStatus    CoContributionCollectionStatus @default(PENDING)
   paymentMethod       CoContributionPaymentMethod?
   mpesaTransactionRef String?
   mpesaPhoneNumber    String?
@@ -1608,7 +1934,7 @@ model CoContributionTransaction {
   waiverApprovedBy String?
   waiverApprovedAt DateTime?
 
-  calculatedAt DateTime @default(now())
+  calculatedAt DateTime  @default(now())
   collectedAt  DateTime?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
@@ -1621,15 +1947,15 @@ model CoContributionTransaction {
 
 // Running annual total per member (updated on each co-contribution event)
 model MemberAnnualCoContribution {
-  id            String @id @default(cuid())
-  tenantId      String
-  tenant        Tenant @relation(fields: [tenantId], references: [id])
-  memberId      String
-  member        Member @relation(fields: [memberId], references: [id])
-  membershipYear Int   // e.g. 2026
+  id             String @id @default(cuid())
+  tenantId       String
+  tenant         Tenant @relation(fields: [tenantId], references: [id])
+  memberId       String
+  member         Member @relation(fields: [memberId], references: [id])
+  membershipYear Int // e.g. 2026
 
-  totalCoContribution Decimal @db.Decimal(12, 2) @default(0)
-  capReached          Boolean  @default(false)
+  totalCoContribution Decimal   @default(0) @db.Decimal(12, 2)
+  capReached          Boolean   @default(false)
   capReachedAt        DateTime?
 
   createdAt DateTime @default(now())
@@ -1641,15 +1967,15 @@ model MemberAnnualCoContribution {
 
 // Running annual total for the family unit (principal + dependents)
 model FamilyAnnualCoContribution {
-  id               String @id @default(cuid())
-  tenantId         String
-  tenant           Tenant @relation(fields: [tenantId], references: [id])
+  id                String @id @default(cuid())
+  tenantId          String
+  tenant            Tenant @relation(fields: [tenantId], references: [id])
   principalMemberId String
   principal         Member @relation("FamilyCoContributions", fields: [principalMemberId], references: [id])
   membershipYear    Int
 
-  totalCoContribution Decimal @db.Decimal(12, 2) @default(0)
-  capReached          Boolean  @default(false)
+  totalCoContribution Decimal   @default(0) @db.Decimal(12, 2)
+  capReached          Boolean   @default(false)
   capReachedAt        DateTime?
 
   createdAt DateTime @default(now())

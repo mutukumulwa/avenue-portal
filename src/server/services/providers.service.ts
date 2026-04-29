@@ -42,6 +42,10 @@ export class ProvidersService {
     contractStartDate?: string;
     contractEndDate?: string;
     contractNotes?: string;
+    geoLatitude?: number;
+    geoLongitude?: number;
+    isOpen24Hours?: boolean;
+    operatingHours?: any;
   }) {
     // Prevent exact duplicate names within the same tenant
     const existing = await prisma.provider.findFirst({
@@ -66,7 +70,54 @@ export class ProvidersService {
         contractStartDate: data.contractStartDate ? new Date(data.contractStartDate) : null,
         contractEndDate: data.contractEndDate ? new Date(data.contractEndDate) : null,
         contractNotes: data.contractNotes || null,
+        geoLatitude: data.geoLatitude || null,
+        geoLongitude: data.geoLongitude || null,
+        isOpen24Hours: data.isOpen24Hours ?? false,
+        operatingHours: data.operatingHours || null,
       },
     });
+  }
+
+  /**
+   * Update an existing provider
+   */
+  static async updateProvider(tenantId: string, id: string, data: Partial<Parameters<typeof ProvidersService.createProvider>[1]>) {
+    return prisma.provider.update({
+      where: { id, tenantId },
+      data: {
+        ...data,
+        contractStartDate: data.contractStartDate ? new Date(data.contractStartDate) : undefined,
+        contractEndDate: data.contractEndDate ? new Date(data.contractEndDate) : undefined,
+      },
+    });
+  }
+
+  /**
+   * Get providers within a specific radius (in km) using Haversine formula.
+   */
+  static async getNearbyProviders(tenantId: string, params: {
+    latitude: number;
+    longitude: number;
+    radiusKm: number;
+    packageVersionId?: string; // Future: filter by package access
+    serviceType?: string;      // Future: filter by required service
+  }) {
+    // Raw SQL to calculate distance using Haversine formula
+    const providers = await prisma.$queryRaw<any[]>`
+      WITH distances AS (
+        SELECT id, name, type, tier, address, county, phone, email, "isOpen24Hours", "operatingHours", "servicesOffered", "geoLatitude", "geoLongitude",
+          ( 6371 * acos( cos( radians(${params.latitude}) ) * cos( radians( "geoLatitude" ) ) * cos( radians( "geoLongitude" ) - radians(${params.longitude}) ) + sin( radians(${params.latitude}) ) * sin( radians( "geoLatitude" ) ) ) ) AS distance
+        FROM "Provider"
+        WHERE "tenantId" = ${tenantId}
+          AND "contractStatus" = 'ACTIVE'
+          AND "geoLatitude" IS NOT NULL
+          AND "geoLongitude" IS NOT NULL
+      )
+      SELECT * FROM distances
+      WHERE distance <= ${params.radiusKm}
+      ORDER BY distance ASC
+    `;
+    
+    return providers;
   }
 }

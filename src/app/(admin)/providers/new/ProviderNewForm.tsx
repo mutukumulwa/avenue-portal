@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { Save, AlertCircle } from "lucide-react";
 import { addProviderAction } from "./actions";
+import { LocationPicker } from "@/components/ui/LocationPicker";
 
 const inputCls = "w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo transition-colors";
 const labelCls = "text-xs font-bold text-avenue-text-muted uppercase block mb-1";
@@ -14,6 +15,7 @@ const SERVICES = [
 
 export function ProviderNewForm() {
   const [state, action, pending] = useActionState(addProviderAction, null);
+  const [geoPosition, setGeoPosition] = useState<{ lat: number; lng: number } | null>(null);
 
   return (
     <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-6">
@@ -60,6 +62,12 @@ export function ProviderNewForm() {
             <div>
               <label className={labelCls}>County</label>
               <input name="county" type="text" placeholder="e.g. Nairobi" className={inputCls} />
+            </div>
+            <div className="col-span-2">
+              <label className={labelCls}>Location (Drop Pin)</label>
+              <input type="hidden" name="geoLatitude" value={geoPosition?.lat || ""} />
+              <input type="hidden" name="geoLongitude" value={geoPosition?.lng || ""} />
+              <LocationPicker onPositionChange={setGeoPosition} />
             </div>
           </div>
         </div>
