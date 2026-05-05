@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/prisma";
+import { measureAsync } from "@/lib/perf";
+import { unstable_cache } from "next/cache";
 
 /**
  * Server component — injects tenant branding as CSS custom property overrides.
@@ -7,17 +9,26 @@ import { prisma } from "@/lib/prisma";
  * Tailwind v4 @theme variables are build-time defaults; injecting a :root
  * override here takes runtime precedence over those defaults.
  */
+const getCachedTenantTheme = unstable_cache(
+  async (tenantId: string) =>
+    measureAsync("tenant.theme_lookup", () =>
+      prisma.tenant.findUnique({
+        where: { id: tenantId },
+        select: {
+          primaryColor: true,
+          accentColor: true,
+          warmColor: true,
+          fontHeading: true,
+          fontBody: true,
+        },
+      })
+    ),
+  ["tenant-theme"],
+  { revalidate: 300 }
+);
+
 export async function TenantThemeInjector({ tenantId }: { tenantId: string }) {
-  const tenant = await prisma.tenant.findUnique({
-    where: { id: tenantId },
-    select: {
-      primaryColor: true,
-      accentColor: true,
-      warmColor: true,
-      fontHeading: true,
-      fontBody: true,
-    },
-  });
+  const tenant = await getCachedTenantTheme(tenantId);
 
   if (!tenant) return null;
 
@@ -51,7 +62,6 @@ export async function TenantThemeInjector({ tenantId }: { tenantId: string }) {
   return (
     <style
       id="tenant-theme"
-      // eslint-disable-next-line react/no-danger
       dangerouslySetInnerHTML={{ __html: css }}
     />
   );

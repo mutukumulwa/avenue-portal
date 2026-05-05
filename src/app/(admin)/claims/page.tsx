@@ -2,12 +2,13 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { ClaimsService } from "@/server/services/claims.service";
 import { PlusCircle, ArrowRight, FileSearch, ShieldAlert } from "lucide-react";
 import Link from "next/link";
+import { measureAsync } from "@/lib/perf";
 
 export default async function ClaimsPage() {
   const session = await requireRole(ROLES.OPS);
 
   const tenantId = session.user.tenantId;
-  const claims = await ClaimsService.getClaims(tenantId);
+  const claims = await measureAsync("claims.list.data", () => ClaimsService.getClaims(tenantId));
 
   const statusColor = (status: string) => {
     switch (status) {

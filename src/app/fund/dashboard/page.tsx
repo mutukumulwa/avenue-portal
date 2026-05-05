@@ -2,6 +2,7 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { Wallet, TrendingDown, AlertTriangle, CheckCircle, ArrowRight, Clock } from "lucide-react";
+import { measureAsync } from "@/lib/perf";
 
 function burnRate(transactions: { type: string; amount: number; postedAt: Date }[]): number {
   // Average monthly CLAIM_DEDUCTION over the last 3 months
@@ -21,45 +22,47 @@ export default async function FundDashboardPage() {
   const session = await requireRole(ROLES.FUND);
   const tenantId = session.user.tenantId;
 
-  const groups = await prisma.group.findMany({
-    where: {
-      tenantId,
-      fundingMode: "SELF_FUNDED",
-      ...(session.user.role === "SUPER_ADMIN"
-        ? {}
-        : { fundAdministrators: { some: { id: session.user.id } } }),
-    },
-    include: {
-      selfFundedAccount: {
-        include: {
-          transactions: {
-            orderBy: { postedAt: "desc" },
-            take: 100,
-            select: { type: true, amount: true, postedAt: true, description: true, claimId: true },
-          },
+  const [groups, recentClaims] = await measureAsync("dashboard.fund.data", () =>
+    Promise.all([
+      prisma.group.findMany({
+        where: {
+          tenantId,
+          fundingMode: "SELF_FUNDED",
+          ...(session.user.role === "SUPER_ADMIN"
+            ? {}
+            : { fundAdministrators: { some: { id: session.user.id } } }),
         },
-      },
-      members: { where: { status: "ACTIVE" }, select: { id: true } },
-    },
-    orderBy: { name: "asc" },
-  });
-
-  // Recent large claims across all funds (>50k)
-  const recentClaims = await prisma.claim.findMany({
-    where: {
-      tenantId,
-      status: { in: ["APPROVED", "PARTIALLY_APPROVED"] },
-      member: { group: { fundingMode: "SELF_FUNDED" } },
-      approvedAmount: { gte: 50000 },
-    },
-    select: {
-      id: true, claimNumber: true, approvedAmount: true, dateOfService: true,
-      benefitCategory: true,
-      member: { select: { firstName: true, lastName: true, group: { select: { id: true, name: true } } } },
-    },
-    orderBy: { decidedAt: "desc" },
-    take: 8,
-  });
+        include: {
+          selfFundedAccount: {
+            include: {
+              transactions: {
+                orderBy: { postedAt: "desc" },
+                take: 100,
+                select: { type: true, amount: true, postedAt: true, description: true, claimId: true },
+              },
+            },
+          },
+          members: { where: { status: "ACTIVE" }, select: { id: true } },
+        },
+        orderBy: { name: "asc" },
+      }),
+      prisma.claim.findMany({
+        where: {
+          tenantId,
+          status: { in: ["APPROVED", "PARTIALLY_APPROVED"] },
+          member: { group: { fundingMode: "SELF_FUNDED" } },
+          approvedAmount: { gte: 50000 },
+        },
+        select: {
+          id: true, claimNumber: true, approvedAmount: true, dateOfService: true,
+          benefitCategory: true,
+          member: { select: { firstName: true, lastName: true, group: { select: { id: true, name: true } } } },
+        },
+        orderBy: { decidedAt: "desc" },
+        take: 8,
+      }),
+    ])
+  );
 
   const totalBalance = groups.reduce((s, g) => s + Number(g.selfFundedAccount?.balance ?? 0), 0);
   const totalDeposited = groups.reduce((s, g) => s + Number(g.selfFundedAccount?.totalDeposited ?? 0), 0);
@@ -88,12 +91,12 @@ export default async function FundDashboardPage() {
         ].map(k => {
           const Icon = k.icon;
           return (
-            <div key={k.label} className="bg-white border border-[#EEEEEE] rounded-[8px] p-4 shadow-sm">
+            <div key={k.label} className="bg-white border border-[#EEEEEE] rounded-[8px] p-4 shadow-sm font-ui">
               <div className="flex items-center gap-2 mb-2">
                 <Icon size={15} className={k.color} />
-                <p className="text-xs font-bold uppercase text-avenue-text-muted">{k.label}</p>
+                <p className="text-xs font-bold uppercase tracking-wide text-avenue-text-muted">{k.label}</p>
               </div>
-              <p className={`text-xl font-bold ${k.color}`}>{k.value}</p>
+              <p className={`text-xl font-bold tabular-nums ${k.color}`}>{k.value}</p>
             </div>
           );
         })}
@@ -138,10 +141,10 @@ export default async function FundDashboardPage() {
                 </Link>
               </div>
 
-              <div className="px-5 py-4 grid md:grid-cols-4 gap-6">
+              <div className="px-5 py-4 grid md:grid-cols-4 gap-6 font-ui">
                 {/* Balance */}
                 <div>
-                  <p className="text-xs font-bold uppercase text-avenue-text-muted mb-1">Current Balance</p>
+                  <p className="text-xs font-bold uppercase tracking-wide text-avenue-text-muted mb-1">Current Balance</p>
                   <p className={`text-2xl font-bold font-mono ${isLow ? "text-[#DC3545]" : "text-[#28A745]"}`}>
                     KES {balance.toLocaleString("en-KE")}
                   </p>
@@ -154,7 +157,7 @@ export default async function FundDashboardPage() {
 
                 {/* Burn rate & days */}
                 <div>
-                  <p className="text-xs font-bold uppercase text-avenue-text-muted mb-1">Monthly Burn Rate</p>
+                  <p className="text-xs font-bold uppercase tracking-wide text-avenue-text-muted mb-1">Monthly Burn Rate</p>
                   <p className="text-lg font-bold text-avenue-text-heading font-mono">
                     KES {Math.round(monthly).toLocaleString("en-KE")}
                   </p>

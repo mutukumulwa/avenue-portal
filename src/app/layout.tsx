@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Quicksand, Lato } from "next/font/google";
+import { Quicksand, Lato, Roboto } from "next/font/google";
 import { PWARegister } from "@/components/PWARegister";
 import "./globals.css";
 
@@ -13,6 +13,12 @@ const lato = Lato({
   subsets: ["latin"],
   variable: "--font-body",
   weight: ["400", "700"],
+});
+
+const roboto = Roboto({
+  subsets: ["latin"],
+  variable: "--font-ui",
+  weight: ["400", "500", "700"],
 });
 
 export const metadata: Metadata = {
@@ -52,7 +58,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${quicksand.variable} ${lato.variable}`}
+      className={`${quicksand.variable} ${lato.variable} ${roboto.variable}`}
     >
       <body className="antialiased min-h-screen bg-avenue-bg text-avenue-text-body font-body">
         {children}

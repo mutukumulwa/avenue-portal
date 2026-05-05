@@ -3,6 +3,10 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { Users, Building2, Receipt, FileText, TrendingUp, Clock } from "lucide-react";
 import { ClaimsTrendChart, PremiumVsClaimsChart, LossRatioGauge } from "@/components/dashboard/DashboardCharts";
+import { measureAsync } from "@/lib/perf";
+
+type MonthlyRow = { month: string; claims: bigint; billed: number; approved: number };
+type LRRow = { billed: number; approved: number };
 
 export default async function DashboardPage() {
   const session = await requireRole(ROLES.ANY_STAFF);
@@ -10,45 +14,72 @@ export default async function DashboardPage() {
   const tenantId = session.user.tenantId;
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 3600 * 1000);
 
-  type CountRow = { count: bigint };
-
   const [
-    membersRow,
-    groupsRow,
-    pendingClaimsRow,
-    recentClaimsRow,
-    overdueInvoicesRow,
-    pendingPreauthsRow,
-  ] = await Promise.all([
-    prisma.$queryRaw<CountRow[]>`SELECT COUNT(*)::int AS count FROM "Member" WHERE "tenantId" = ${tenantId} AND status = 'ACTIVE'`,
-    prisma.$queryRaw<CountRow[]>`SELECT COUNT(*)::int AS count FROM "Group" WHERE "tenantId" = ${tenantId} AND status = 'ACTIVE'`,
-    prisma.$queryRaw<CountRow[]>`SELECT COUNT(*)::int AS count FROM "Claim" WHERE "tenantId" = ${tenantId} AND status IN ('RECEIVED','UNDER_REVIEW')`,
-    prisma.$queryRaw<CountRow[]>`SELECT COUNT(*)::int AS count FROM "Claim" WHERE "tenantId" = ${tenantId} AND "createdAt" >= ${thirtyDaysAgo}`,
-    prisma.$queryRaw<CountRow[]>`SELECT COUNT(*)::int AS count FROM "Invoice" WHERE "tenantId" = ${tenantId} AND status = 'OVERDUE'`,
-    prisma.$queryRaw<CountRow[]>`SELECT COUNT(*)::int AS count FROM "PreAuthorization" WHERE "tenantId" = ${tenantId} AND status IN ('SUBMITTED','UNDER_REVIEW')`,
-  ]);
+    countsRaw,
+    monthlyRaw,
+    lrRaw,
+    recentActivity,
+  ] = await measureAsync("dashboard.admin.data", () =>
+    Promise.all([
+      prisma.$queryRaw<{
+        activeMembers: number;
+        activeGroups: number;
+        pendingClaims: number;
+        recentClaims: number;
+        overdueInvoices: number;
+        pendingPreauths: number;
+      }[]>`
+        SELECT
+          (SELECT COUNT(*)::int FROM "Member" WHERE "tenantId" = ${tenantId} AND status = 'ACTIVE') AS "activeMembers",
+          (SELECT COUNT(*)::int FROM "Group" WHERE "tenantId" = ${tenantId} AND status = 'ACTIVE') AS "activeGroups",
+          (SELECT COUNT(*)::int FROM "Claim" WHERE "tenantId" = ${tenantId} AND status IN ('RECEIVED','UNDER_REVIEW')) AS "pendingClaims",
+          (SELECT COUNT(*)::int FROM "Claim" WHERE "tenantId" = ${tenantId} AND "createdAt" >= ${thirtyDaysAgo}) AS "recentClaims",
+          (SELECT COUNT(*)::int FROM "Invoice" WHERE "tenantId" = ${tenantId} AND status = 'OVERDUE') AS "overdueInvoices",
+          (SELECT COUNT(*)::int FROM "PreAuthorization" WHERE "tenantId" = ${tenantId} AND status IN ('SUBMITTED','UNDER_REVIEW')) AS "pendingPreauths"
+      `,
+      prisma.$queryRaw<MonthlyRow[]>`
+        SELECT
+          TO_CHAR(DATE_TRUNC('month', c."createdAt"), 'Mon YY') AS month,
+          COUNT(*)::int                                          AS claims,
+          COALESCE(SUM(c."billedAmount")::float, 0)             AS billed,
+          COALESCE(SUM(c."approvedAmount")::float, 0)           AS approved
+        FROM "Claim" c
+        WHERE c."tenantId" = ${tenantId}
+          AND c."createdAt" >= NOW() - INTERVAL '12 months'
+        GROUP BY DATE_TRUNC('month', c."createdAt")
+        ORDER BY DATE_TRUNC('month', c."createdAt")
+      `,
+      prisma.$queryRaw<LRRow[]>`
+        SELECT
+          COALESCE(SUM("billedAmount")::float,   0) AS billed,
+          COALESCE(SUM("approvedAmount")::float, 0) AS approved
+        FROM "Claim"
+        WHERE "tenantId" = ${tenantId}
+      `,
+      prisma.$queryRaw<{
+        id: string; claimNumber: string; firstName: string; lastName: string;
+        providerName: string; billedAmount: number; status: string;
+      }[]>`
+        SELECT c.id, c."claimNumber", m."firstName", m."lastName",
+               p.name AS "providerName", c."billedAmount"::float AS "billedAmount", c.status
+        FROM "Claim" c
+        JOIN "Member" m ON c."memberId" = m.id
+        JOIN "Provider" p ON c."providerId" = p.id
+        WHERE c."tenantId" = ${tenantId}
+        ORDER BY c."createdAt" DESC
+        LIMIT 6
+      `,
+    ])
+  );
 
-  const activeMembers = Number(membersRow[0]?.count ?? 0);
-  const activeGroups = Number(groupsRow[0]?.count ?? 0);
-  const pendingClaims = Number(pendingClaimsRow[0]?.count ?? 0);
-  const recentClaims = Number(recentClaimsRow[0]?.count ?? 0);
-  const overdueInvoices = Number(overdueInvoicesRow[0]?.count ?? 0);
-  const pendingPreauths = Number(pendingPreauthsRow[0]?.count ?? 0);
+  const counts = countsRaw[0];
+  const activeMembers = Number(counts?.activeMembers ?? 0);
+  const activeGroups = Number(counts?.activeGroups ?? 0);
+  const pendingClaims = Number(counts?.pendingClaims ?? 0);
+  const recentClaims = Number(counts?.recentClaims ?? 0);
+  const overdueInvoices = Number(counts?.overdueInvoices ?? 0);
+  const pendingPreauths = Number(counts?.pendingPreauths ?? 0);
 
-  // 12-month claims trend + premium vs claims
-  type MonthlyRow = { month: string; claims: bigint; billed: number; approved: number };
-  const monthlyRaw = await prisma.$queryRaw<MonthlyRow[]>`
-    SELECT
-      TO_CHAR(DATE_TRUNC('month', c."createdAt"), 'Mon YY') AS month,
-      COUNT(*)::int                                          AS claims,
-      COALESCE(SUM(c."billedAmount")::float, 0)             AS billed,
-      COALESCE(SUM(c."approvedAmount")::float, 0)           AS approved
-    FROM "Claim" c
-    WHERE c."tenantId" = ${tenantId}
-      AND c."createdAt" >= NOW() - INTERVAL '12 months'
-    GROUP BY DATE_TRUNC('month', c."createdAt")
-    ORDER BY DATE_TRUNC('month', c."createdAt")
-  `;
   const monthlyData = monthlyRaw.map(r => ({
     month:    r.month,
     claims:   Number(r.claims),
@@ -56,32 +87,9 @@ export default async function DashboardPage() {
     approved: Number(r.approved),
   }));
 
-  // All-time loss ratio
-  type LRRow = { billed: number; approved: number };
-  const lrRaw = await prisma.$queryRaw<LRRow[]>`
-    SELECT
-      COALESCE(SUM("billedAmount")::float,   0) AS billed,
-      COALESCE(SUM("approvedAmount")::float, 0) AS approved
-    FROM "Claim"
-    WHERE "tenantId" = ${tenantId}
-  `;
   const totalBilled   = Number(lrRaw[0]?.billed   ?? 0);
   const totalApproved = Number(lrRaw[0]?.approved ?? 0);
   const lossRatio     = totalBilled > 0 ? totalApproved / totalBilled : 0;
-
-  const recentActivity = await prisma.$queryRaw<{
-    id: string; claimNumber: string; firstName: string; lastName: string;
-    providerName: string; billedAmount: number; status: string;
-  }[]>`
-    SELECT c.id, c."claimNumber", m."firstName", m."lastName",
-           p.name AS "providerName", c."billedAmount"::float AS "billedAmount", c.status
-    FROM "Claim" c
-    JOIN "Member" m ON c."memberId" = m.id
-    JOIN "Provider" p ON c."providerId" = p.id
-    WHERE c."tenantId" = ${tenantId}
-    ORDER BY c."createdAt" DESC
-    LIMIT 6
-  `;
 
   const cards = [
     { label: "Total Active Members", value: activeMembers.toLocaleString(), sub: "Enrolled & active", icon: Users, color: "text-avenue-indigo", href: "/members" },
@@ -104,12 +112,12 @@ export default async function DashboardPage() {
           const Icon = card.icon;
           return (
             <Link key={card.label} href={card.href} className="block">
-              <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm hover:shadow-md hover:border-avenue-indigo/30 transition-all">
+              <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm hover:shadow-md hover:border-avenue-indigo/30 transition-all font-ui">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-bold uppercase text-avenue-text-muted">{card.label}</p>
+                  <p className="text-xs font-bold uppercase tracking-wide text-avenue-text-muted">{card.label}</p>
                   <Icon size={16} className={card.color} />
                 </div>
-                <p className={`text-2xl font-bold ${card.color}`}>{card.value}</p>
+                <p className={`text-2xl font-bold tabular-nums ${card.color}`}>{card.value}</p>
                 <p className="text-xs text-avenue-text-muted mt-1">{card.sub}</p>
               </div>
             </Link>

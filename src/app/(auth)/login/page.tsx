@@ -7,7 +7,14 @@ import { signIn } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 function safeCallbackUrl(value: string | null) {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) return null;
+  if (
+    !value ||
+    !value.startsWith("/") ||
+    value.startsWith("//") ||
+    value.startsWith("/login")
+  ) {
+    return null;
+  }
   return value;
 }
 
@@ -23,6 +30,7 @@ function LoginForm() {
     e.preventDefault();
     setError("");
     setLoading(true);
+    const startedAt = performance.now();
 
     const result = await signIn("credentials", {
       email,
@@ -31,34 +39,16 @@ function LoginForm() {
     });
 
     setLoading(false);
+    console.info(`[perf] login.signIn: ${(performance.now() - startedAt).toFixed(1)}ms`);
 
     if (result?.error) {
       setError("Invalid email or password. Please try again.");
       return;
     }
 
-    // Route to the right portal based on role — fetch session to check
-    const res = await fetch("/api/auth/session");
-    const session = await res.json();
-    const role = session?.user?.role;
     const callbackUrl = safeCallbackUrl(searchParams.get("callbackUrl"));
 
-    if (callbackUrl) {
-      router.push(callbackUrl);
-      return;
-    }
-
-    if (role === "BROKER_USER") {
-      router.push("/broker/dashboard");
-    } else if (role === "MEMBER_USER") {
-      router.push("/member/dashboard");
-    } else if (role === "HR_MANAGER") {
-      router.push("/hr/dashboard");
-    } else if (role === "FUND_ADMINISTRATOR") {
-      router.push("/fund/dashboard");
-    } else {
-      router.push("/dashboard");
-    }
+    router.replace(callbackUrl ?? "/post-login");
   };
 
   return (

@@ -29,3 +29,25 @@ This file tracks decisions that are intentionally deferred during build but must
 5. **IPRS integration**
    - Status: Explicitly out of scope for first biometric check-in build.
    - First build: do not call IPRS and do not treat `Member.photoUrl` as an IPRS-verified image.
+
+## Performance Deployment
+
+1. **Vercel and database region alignment**
+   - Status: Required before production launch.
+   - Decision needed: choose the Vercel serverless region closest to the production Postgres primary region.
+   - Reason: every server-rendered protected route performs auth and data reads; cross-region database latency is visible in login and navigation.
+
+2. **Runtime pooled database URL**
+   - Status: Required before production launch.
+   - Expected setup: `DATABASE_URL` should point at the provider's pooled/serverless-safe connection string when available.
+   - Migration setup: `DIRECT_URL` should point at the direct database connection and remain the URL used by Prisma migrations through `prisma.config.ts`.
+
+3. **Auth and database environment consistency**
+   - Status: Required before production launch.
+   - Required checks: production and preview environments must have stable `AUTH_SECRET`/`NEXTAUTH_SECRET` values and must point to the intended database target.
+   - Reason: changing auth secrets invalidates sessions and mis-targeted database URLs make production latency/debugging misleading.
+
+4. **Performance timing logs**
+   - Status: Optional for production debugging.
+   - Development: timing logs are enabled automatically.
+   - Production: set `AICARE_PERF_LOGS=1` temporarily to log server timings for auth, layouts, and dashboard loaders.

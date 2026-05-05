@@ -368,7 +368,9 @@ model Member {
   @@unique([tenantId, memberNumber])
   @@index([tenantId])
   @@index([tenantId, status])
+  @@index([tenantId, status, enrollmentDate])
   @@index([groupId])
+  @@index([groupId, status, enrollmentDate])
   @@index([principalId])
   @@index([idNumber])
 }
@@ -704,6 +706,8 @@ model FundTransaction {
 
   @@index([tenantId])
   @@index([selfFundedAccountId])
+  @@index([selfFundedAccountId, postedAt])
+  @@index([selfFundedAccountId, type, postedAt])
   @@index([claimId])
 }
 
@@ -963,6 +967,7 @@ model Endorsement {
   @@unique([tenantId, endorsementNumber])
   @@index([tenantId])
   @@index([groupId])
+  @@index([groupId, status])
   @@index([tenantId, status])
 }
 
@@ -1090,6 +1095,8 @@ model Claim {
   @@index([tenantId, providerId, memberId, dateOfService, benefitCategory])
   @@index([tenantId])
   @@index([tenantId, status])
+  @@index([tenantId, createdAt])
+  @@index([tenantId, status, createdAt])
   @@index([memberId])
   @@index([providerId])
   @@index([preauthId])
@@ -1207,6 +1214,7 @@ model PreAuthorization {
   @@unique([tenantId, preauthNumber])
   @@index([tenantId])
   @@index([tenantId, status])
+  @@index([tenantId, status, createdAt])
   @@index([memberId])
 }
 
@@ -1394,7 +1402,9 @@ model Invoice {
 
   @@unique([tenantId, invoiceNumber])
   @@index([tenantId])
+  @@index([tenantId, status])
   @@index([groupId])
+  @@index([groupId, status])
 }
 
 model Payment {
@@ -1556,6 +1566,7 @@ model ActivityLog {
   preauth       PreAuthorization? @relation(fields: [preauthId], references: [id])
 
   @@index([entityType, entityId])
+  @@index([groupId, createdAt])
 }
 
 model AuditLog {

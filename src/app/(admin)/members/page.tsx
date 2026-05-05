@@ -4,6 +4,7 @@ import { PlusCircle, UserCircle2, Activity } from "lucide-react";
 import Link from "next/link";
 import { SearchFilterBar } from "@/components/ui/SearchFilterBar";
 import { Suspense } from "react";
+import { measureAsync } from "@/lib/perf";
 
 const STATUS_OPTIONS = [
   { value: "ACTIVE",             label: "Active"              },
@@ -48,20 +49,22 @@ export default async function MembersPage({
     } : {}),
   };
 
-  const [members, total] = await Promise.all([
-    prisma.member.findMany({
-      where,
-      select: {
-        id: true, firstName: true, lastName: true,
-        memberNumber: true, email: true, phone: true,
-        status: true, relationship: true,
-        group: { select: { id: true, name: true } },
-      },
-      orderBy: { createdAt: "desc" },
-      take: 200,
-    }),
-    prisma.member.count({ where: { tenantId } }),
-  ]);
+  const [members, total] = await measureAsync("members.list.data", () =>
+    Promise.all([
+      prisma.member.findMany({
+        where,
+        select: {
+          id: true, firstName: true, lastName: true,
+          memberNumber: true, email: true, phone: true,
+          status: true, relationship: true,
+          group: { select: { id: true, name: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 200,
+      }),
+      prisma.member.count({ where: { tenantId } }),
+    ])
+  );
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-4">

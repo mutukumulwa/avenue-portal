@@ -1,6 +1,6 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
-import { Shield, QrCode, Phone } from "lucide-react";
+import { QrCode, Phone } from "lucide-react";
 
 export default async function MemberDashboardPage() {
   const session = await requireRole(ROLES.MEMBER);
@@ -97,9 +97,9 @@ export default async function MemberDashboardPage() {
           { label: "Used (KES)", value: totalUsed.toLocaleString(), color: "text-[#FFC107]" },
           { label: "Remaining (KES)", value: totalRemaining.toLocaleString(), color: "text-[#28A745]" },
         ].map((s) => (
-          <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-lg p-4 shadow-sm">
-            <p className="text-xs text-avenue-text-muted font-bold uppercase">{s.label}</p>
-            <p className={`text-xl font-bold mt-1 ${s.color}`}>{s.value}</p>
+          <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-lg p-4 shadow-sm font-ui">
+            <p className="text-xs text-avenue-text-muted font-bold uppercase tracking-wide">{s.label}</p>
+            <p className={`text-xl font-bold tabular-nums mt-1 ${s.color}`}>{s.value}</p>
           </div>
         ))}
       </div>

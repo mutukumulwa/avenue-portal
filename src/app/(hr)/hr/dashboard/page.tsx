@@ -3,6 +3,19 @@ import { prisma } from "@/lib/prisma";
 import { DashboardCharts } from "./DashboardCharts";
 import { Users, FileText, CheckCircle, Receipt } from "lucide-react";
 import { subMonths, startOfMonth, format } from "date-fns";
+import { measureAsync } from "@/lib/perf";
+
+type HRCountsRow = {
+  totalActiveMembers: number;
+  membersAddedThisMonth: number;
+  pendingEndorsements: number;
+  outstandingBalance: number;
+};
+
+type MemberTrendRow = {
+  month: string;
+  count: number;
+};
 
 export default async function HRDashboard() {
   const session = await requireRole(ROLES.HR);
@@ -18,80 +31,71 @@ export default async function HRDashboard() {
 
   const currentDate = new Date();
   const startOfCurrentMonth = startOfMonth(currentDate);
+  const trendStart = startOfMonth(subMonths(currentDate, 11));
 
   const [
-    totalActiveMembers,
-    membersAddedThisMonth,
-    pendingEndorsements,
-    invoices,
-    activities
-  ] = await Promise.all([
-    prisma.member.count({
-      where: { groupId, status: "ACTIVE" }
-    }),
-    prisma.member.count({
-      where: { 
-        groupId, 
-        enrollmentDate: { gte: startOfCurrentMonth } 
-      }
-    }),
-    prisma.endorsement.count({
-      where: { 
-        groupId, 
-        status: { in: ["SUBMITTED", "UNDER_REVIEW"] } 
-      }
-    }),
-    prisma.invoice.findMany({
-      where: { 
-        groupId, 
-        status: { in: ["SENT", "PARTIALLY_PAID", "OVERDUE"] } 
-      },
-      select: { totalAmount: true, paidAmount: true }
-    }),
-    prisma.activityLog.findMany({
-      where: { groupId },
-      orderBy: { createdAt: "desc" },
-      take: 10
-    })
-  ]);
-
-  const outstandingBalance = invoices.reduce(
-    (acc, inv) => acc + (Number(inv.totalAmount) - Number(inv.paidAmount)), 
-    0
+    countsRaw,
+    relationshipCounts,
+    memberTrendRaw,
+    activities,
+  ] = await measureAsync("dashboard.hr.data", () =>
+    Promise.all([
+      prisma.$queryRaw<HRCountsRow[]>`
+        SELECT
+          (SELECT COUNT(*)::int FROM "Member" WHERE "groupId" = ${groupId} AND status = 'ACTIVE') AS "totalActiveMembers",
+          (SELECT COUNT(*)::int FROM "Member" WHERE "groupId" = ${groupId} AND "enrollmentDate" >= ${startOfCurrentMonth}) AS "membersAddedThisMonth",
+          (SELECT COUNT(*)::int FROM "Endorsement" WHERE "groupId" = ${groupId} AND status IN ('SUBMITTED','UNDER_REVIEW')) AS "pendingEndorsements",
+          (
+            SELECT COALESCE(SUM(("totalAmount" - "paidAmount")::float), 0)
+            FROM "Invoice"
+            WHERE "groupId" = ${groupId}
+              AND status IN ('SENT','PARTIALLY_PAID','OVERDUE')
+          ) AS "outstandingBalance"
+      `,
+      prisma.member.groupBy({
+        by: ["relationship"],
+        where: { groupId, status: "ACTIVE" },
+        _count: { relationship: true },
+      }),
+      prisma.$queryRaw<MemberTrendRow[]>`
+        WITH months AS (
+          SELECT generate_series(${trendStart}::timestamp, ${startOfCurrentMonth}::timestamp, interval '1 month') AS month_start
+        )
+        SELECT
+          TO_CHAR(month_start, 'Mon YYYY') AS month,
+          (
+            SELECT COUNT(*)::int
+            FROM "Member" m
+            WHERE m."groupId" = ${groupId}
+              AND m.status = 'ACTIVE'
+              AND m."enrollmentDate" < LEAST(month_start + interval '1 month', ${currentDate}::timestamp)
+          ) AS count
+        FROM months
+        ORDER BY month_start
+      `,
+      prisma.activityLog.findMany({
+        where: { groupId },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+      }),
+    ])
   );
 
-  // Group membership by relationship
-  const relationshipCounts = await prisma.member.groupBy({
-    by: ['relationship'],
-    where: { groupId, status: "ACTIVE" },
-    _count: { relationship: true }
-  });
+  const counts = countsRaw[0];
+  const totalActiveMembers = Number(counts?.totalActiveMembers ?? 0);
+  const membersAddedThisMonth = Number(counts?.membersAddedThisMonth ?? 0);
+  const pendingEndorsements = Number(counts?.pendingEndorsements ?? 0);
+  const outstandingBalance = Number(counts?.outstandingBalance ?? 0);
 
   const relationshipData = relationshipCounts.map(item => ({
     name: item.relationship.charAt(0) + item.relationship.slice(1).toLowerCase(),
     value: item._count.relationship
   }));
 
-  // Build 12-month trend array
-  const memberTrendData = [];
-  for (let i = 11; i >= 0; i--) {
-    const d = subMonths(currentDate, i);
-    const mthEnd = startOfMonth(subMonths(currentDate, i - 1));
-
-    // Notice: Approximating active counts based on enrollment date for demo
-    const count = await prisma.member.count({
-      where: {
-        groupId,
-        status: "ACTIVE",
-        enrollmentDate: { lt: (i === 0 ? currentDate : mthEnd) }
-      }
-    });
-
-    memberTrendData.push({
-      month: format(d, "MMM yyyy"),
-      count
-    });
-  }
+  const memberTrendData = memberTrendRaw.map(row => ({
+    month: row.month,
+    count: Number(row.count),
+  }));
 
   const kpis = [
     { label: "Total Active Members", value: totalActiveMembers, icon: Users },
@@ -111,10 +115,10 @@ export default async function HRDashboard() {
         {kpis.map((kpi) => {
           const Icon = kpi.icon;
           return (
-            <div key={kpi.label} className="bg-white p-5 rounded-xl border border-[#EEEEEE] shadow-sm flex items-start justify-between">
+            <div key={kpi.label} className="bg-white p-5 rounded-xl border border-[#EEEEEE] shadow-sm flex items-start justify-between font-ui">
               <div>
-                <p className="text-[11px] font-bold text-avenue-text-muted uppercase tracking-wider mb-2">{kpi.label}</p>
-                <p className="text-2xl font-bold text-avenue-text-heading">{kpi.value}</p>
+                <p className="text-[11px] font-bold text-avenue-text-muted uppercase tracking-wide mb-2">{kpi.label}</p>
+                <p className="text-2xl font-bold text-avenue-text-heading tabular-nums">{kpi.value}</p>
               </div>
               <div className="bg-avenue-indigo/5 p-3 rounded-xl">
                 <Icon className="w-5 h-5 text-avenue-indigo" />

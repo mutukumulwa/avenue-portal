@@ -1,4 +1,4 @@
-import { auth } from "@/lib/auth";
+import { getCachedSession } from "@/lib/auth";
 import { redirect } from "next/navigation";
 
 export type UserRole =
@@ -45,7 +45,7 @@ export const ROLES = {
  * not in the allowed list.  Returns the session on success.
  */
 export async function requireRole(allowed: UserRole[]) {
-  const session = await auth();
+  const session = await getCachedSession();
   if (!session?.user) redirect("/login");
 
   const role = session.user.role as UserRole | undefined;

@@ -58,12 +58,12 @@ export default async function BrokerDashboardPage() {
         ].map((s) => {
           const Icon = s.icon;
           return (
-            <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm">
+            <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm font-ui">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-xs text-avenue-text-muted font-bold uppercase">{s.label}</p>
+                <p className="text-xs text-avenue-text-muted font-bold uppercase tracking-wide">{s.label}</p>
                 <Icon className={`h-4 w-4 ${s.color}`} />
               </div>
-              <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+              <p className={`text-2xl font-bold tabular-nums ${s.color}`}>{s.value}</p>
             </div>
           );
         })}
