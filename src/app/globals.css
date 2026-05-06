@@ -22,9 +22,9 @@
   --color-avenue-whatsapp: #25d366;
 
   /* Typography */
-  --font-heading: "Quicksand", "Nunito", "Poppins", sans-serif;
-  --font-body: "Lato", "Open Sans", "Helvetica Neue", sans-serif;
-  --font-ui: "Roboto", "Lato", sans-serif;
+  --font-heading: var(--font-quicksand), "Nunito", "Poppins", sans-serif;
+  --font-body: var(--font-lato), "Open Sans", "Helvetica Neue", sans-serif;
+  --font-ui: var(--font-roboto), var(--font-lato), sans-serif;
 
   /* Radii */
   --radius-pill: 50px;
@@ -46,6 +46,8 @@ body {
   color: var(--color-avenue-text-body);
   background: var(--background);
   font-family: var(--font-body);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
 }
 
 h1, h2, h3, h4, h5, h6 {

@@ -5,19 +5,19 @@ import "./globals.css";
 
 const quicksand = Quicksand({
   subsets: ["latin"],
-  variable: "--font-heading",
+  variable: "--font-quicksand",
   weight: ["700"],
 });
 
 const lato = Lato({
   subsets: ["latin"],
-  variable: "--font-body",
+  variable: "--font-lato",
   weight: ["400", "700"],
 });
 
 const roboto = Roboto({
   subsets: ["latin"],
-  variable: "--font-ui",
+  variable: "--font-roboto",
   weight: ["400", "500", "700"],
 });
 
