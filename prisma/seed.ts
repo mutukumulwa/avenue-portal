@@ -2355,6 +2355,274 @@ async function main() {
         console.log('✅ Commission records: 6 records across 3 brokers — 4 paid, 2 pending')
       }
 
+      // ── 16m-2. Broker Command Center demo data ───────────────────────────
+      const brokerCommandCenterExists = await prisma.brokerCommissionSchedule.findFirst({
+        where: { broker: { tenantId }, scheduleName: 'KAIB Corporate Standard 2026' },
+      })
+      if (!brokerCommandCenterExists) {
+        const [kaib, minet] = await Promise.all([
+          prisma.broker.findFirst({ where: { tenantId, name: 'Kenyan Alliance Insurance Brokers' } }),
+          prisma.broker.findFirst({ where: { tenantId, name: 'Minet Kenya' } }),
+        ])
+        const safaricomGroup = await prisma.group.findFirst({ where: { tenantId, name: 'Safaricom PLC' } })
+        const adminUserId = users['SUPER_ADMIN']
+
+        if (kaib && safaricomGroup && adminUserId) {
+          await prisma.broker.update({
+            where: { id: kaib.id },
+            data: {
+              brokerCode: kaib.brokerCode ?? 'BRK-KAIB',
+              legalName: 'Kenyan Alliance Insurance Brokers Limited',
+              tradingName: 'KAIB',
+              brokerType: 'MASTER_BROKER',
+              intermediaryCategory: 'REGULATED_BROKER',
+              requiresIraRegistration: true,
+              canReceiveCommission: true,
+              commissionBasis: 'COMMISSION',
+              sourceDescription: 'Regulated master broker used for Avenue corporate business demos.',
+              iraExpiryDate: new Date('2026-12-31'),
+              kraPin: 'P051234567A',
+              vatRegistered: true,
+              vatNumber: 'VAT-KAIB-001',
+              bankAccountReference: 'KCB-010012345678',
+              mpesaPaybillNumber: '522522',
+              approvedById: adminUserId,
+              approvedAt: new Date('2024-01-05'),
+            },
+          })
+
+          if (minet) {
+            await prisma.broker.update({
+              where: { id: minet.id },
+              data: {
+                brokerCode: minet.brokerCode ?? 'BRK-MINET',
+                legalName: 'Minet Kenya Insurance Brokers Limited',
+                brokerType: 'SUB_AGENT',
+                intermediaryCategory: 'REGULATED_BROKER',
+                requiresIraRegistration: true,
+                canReceiveCommission: true,
+                commissionBasis: 'COMMISSION',
+                parentBrokerId: kaib.id,
+                iraExpiryDate: new Date('2025-07-15'),
+                kraPin: 'P052345678B',
+              },
+            })
+          }
+
+          const independentIntroducer = await prisma.broker.create({
+            data: {
+              tenantId,
+              name: 'Nia Health Introducers',
+              brokerCode: 'SRC-NIA-INTRO',
+              legalName: 'Nia Health Introducers',
+              tradingName: 'Nia Introducers',
+              brokerType: 'INDIVIDUAL_PRODUCER',
+              intermediaryCategory: 'INTRODUCER',
+              requiresIraRegistration: false,
+              canReceiveCommission: true,
+              commissionBasis: 'REFERRAL_FEE',
+              referralFeeAmount: 15000,
+              sourceDescription: 'Independent non-IRA introducer that brings employer leads and is paid by approved referral fee.',
+              contactPerson: 'Nia Kamau',
+              phone: '+254722901100',
+              email: 'nia.introducer@example.com',
+              kraPin: 'A012345678N',
+              bankAccountReference: 'EQUITY-010099887766',
+              effectiveFrom: new Date('2024-01-01'),
+              approvedById: adminUserId,
+              approvedAt: new Date('2024-01-10'),
+              status: 'ACTIVE',
+            },
+          })
+
+          const internalSalesSource = await prisma.broker.create({
+            data: {
+              tenantId,
+              name: 'Avenue Corporate Sales Desk',
+              brokerCode: 'SRC-AVENUE-SALES',
+              legalName: 'Avenue Healthcare Corporate Sales Desk',
+              brokerType: 'INDIVIDUAL_PRODUCER',
+              intermediaryCategory: 'INTERNAL_SALES',
+              requiresIraRegistration: false,
+              canReceiveCommission: false,
+              commissionBasis: 'ATTRIBUTION_ONLY',
+              sourceDescription: 'Internal sales attribution source. No external commission or referral payout is generated.',
+              contactPerson: 'Corporate Sales Lead',
+              phone: '+254700300300',
+              email: 'corporate.sales@avenuehealthcare.com',
+              effectiveFrom: new Date('2024-01-01'),
+              approvedById: adminUserId,
+              approvedAt: new Date('2024-01-10'),
+              status: 'ACTIVE',
+            },
+          })
+
+          await prisma.brokerKycDocument.createMany({
+            data: [
+              {
+                brokerId: kaib.id,
+                documentType: 'IRA_LICENSE',
+                fileUri: '/seed-docs/brokers/kaib-ira-license-2026.pdf',
+                fileName: 'KAIB IRA License 2026.pdf',
+                uploadedById: adminUserId,
+                verifiedAt: new Date('2024-01-05'),
+                verifiedById: adminUserId,
+                expiresAt: new Date('2026-12-31'),
+                status: 'VERIFIED',
+              },
+              {
+                brokerId: kaib.id,
+                documentType: 'KRA_PIN_CERTIFICATE',
+                fileUri: '/seed-docs/brokers/kaib-kra-pin.pdf',
+                fileName: 'KAIB KRA PIN Certificate.pdf',
+                uploadedById: adminUserId,
+                verifiedAt: new Date('2024-01-05'),
+                verifiedById: adminUserId,
+                status: 'VERIFIED',
+              },
+              {
+                brokerId: kaib.id,
+                documentType: 'BANK_CONFIRMATION',
+                fileUri: '/seed-docs/brokers/kaib-bank-confirmation.pdf',
+                fileName: 'KAIB Bank Confirmation.pdf',
+                uploadedById: adminUserId,
+                status: 'PENDING_REVIEW',
+                notes: 'Seeded pending review to demonstrate KYC workflow.',
+              },
+              {
+                brokerId: independentIntroducer.id,
+                documentType: 'KRA_PIN_CERTIFICATE',
+                fileUri: '/seed-docs/intermediaries/nia-kra-pin.pdf',
+                fileName: 'Nia Introducers KRA PIN Certificate.pdf',
+                uploadedById: adminUserId,
+                verifiedAt: new Date('2024-01-10'),
+                verifiedById: adminUserId,
+                status: 'VERIFIED',
+              },
+              {
+                brokerId: independentIntroducer.id,
+                documentType: 'REFERRAL_AGREEMENT',
+                fileUri: '/seed-docs/intermediaries/nia-referral-agreement.pdf',
+                fileName: 'Nia Referral Agreement.pdf',
+                uploadedById: adminUserId,
+                verifiedAt: new Date('2024-01-10'),
+                verifiedById: adminUserId,
+                expiresAt: new Date('2026-01-09'),
+                status: 'VERIFIED',
+              },
+              {
+                brokerId: independentIntroducer.id,
+                documentType: 'BANK_CONFIRMATION',
+                fileUri: '/seed-docs/intermediaries/nia-bank-confirmation.pdf',
+                fileName: 'Nia Bank Confirmation.pdf',
+                uploadedById: adminUserId,
+                verifiedAt: new Date('2024-01-10'),
+                verifiedById: adminUserId,
+                status: 'VERIFIED',
+              },
+            ],
+          })
+
+          const producer = await prisma.brokerProducer.create({
+            data: {
+              brokerId: kaib.id,
+              producerName: 'Grace Wanjiku',
+              producerCode: 'PROD-KAIB-001',
+              iraIndividualNumber: 'IRA-AGT-77881',
+              email: 'grace.wanjiku@kaib.co.ke',
+              phone: '+254722555001',
+              effectiveFrom: new Date('2024-01-01'),
+              status: 'ACTIVE',
+              groups: { connect: [{ id: safaricomGroup.id }] },
+            },
+          })
+
+          const schedule = await prisma.brokerCommissionSchedule.create({
+            data: {
+              brokerId: kaib.id,
+              scheduleName: 'KAIB Corporate Standard 2026',
+              scheduleType: 'TIERED_VOLUME',
+              groupId: safaricomGroup.id,
+              clientType: 'CORPORATE',
+              newBusinessRate: 0.12,
+              renewalRate: 0.08,
+              overrideRate: minet ? 0.02 : null,
+              grossCommissionCeiling: 0.15,
+              payoutCycleDays: 30,
+              effectiveFrom: new Date('2024-01-01'),
+              status: 'ACTIVE',
+              createdById: adminUserId,
+              approvedById: adminUserId,
+              approvedAt: new Date('2024-01-06'),
+              tiers: {
+                create: [
+                  { tierOrder: 1, thresholdMetric: 'GROSS_CONTRIBUTION_BAND', thresholdMin: 0, thresholdMax: 250000, rate: 0.08 },
+                  { tierOrder: 2, thresholdMetric: 'GROSS_CONTRIBUTION_BAND', thresholdMin: 250001, thresholdMax: 750000, rate: 0.10 },
+                  { tierOrder: 3, thresholdMetric: 'GROSS_CONTRIBUTION_BAND', thresholdMin: 750001, thresholdMax: null, rate: 0.12 },
+                ],
+              },
+            },
+          })
+
+          const ledgerRows = [
+            { receipt: 'SEED-RCPT-2024-001', start: new Date('2024-01-01'), end: new Date('2024-01-31'), gross: 18000, wht: 1800, vat: 2880, levy: 36, net: 19044, state: 'PAID', paidAt: new Date('2024-02-10'), ref: 'PAY-KAIB-001' },
+            { receipt: 'SEED-RCPT-2024-002', start: new Date('2024-02-01'), end: new Date('2024-02-29'), gross: 18000, wht: 1800, vat: 2880, levy: 36, net: 19044, state: 'PAYABLE', paidAt: null, ref: null },
+            { receipt: 'SEED-RCPT-2024-003', start: new Date('2024-03-01'), end: new Date('2024-03-31'), gross: 0, wht: 0, vat: 0, levy: 0, net: 0, state: 'PENDING_RECONCILIATION', paidAt: null, ref: null },
+          ] as const
+
+          for (const row of ledgerRows) {
+            await prisma.commissionLedgerEntry.create({
+              data: {
+                brokerId: kaib.id,
+                scheduleId: row.state === 'PENDING_RECONCILIATION' ? null : schedule.id,
+                groupId: safaricomGroup.id,
+                contributionReceiptId: row.receipt,
+                state: row.state,
+                grossCommission: row.gross,
+                withholdingTax: row.wht,
+                vatAmount: row.vat,
+                iraAgentLevy: row.levy,
+                netPayable: row.net,
+                earnedPeriodStart: row.start,
+                earnedPeriodEnd: row.end,
+                paidAt: row.paidAt,
+                paymentReference: row.ref,
+                notes: row.state === 'PENDING_RECONCILIATION' ? 'Seeded pending item for broker compliance demo.' : null,
+              },
+            })
+          }
+
+          const paidEntry = await prisma.commissionLedgerEntry.findFirst({
+            where: { brokerId: kaib.id, contributionReceiptId: 'SEED-RCPT-2024-001' },
+            select: { id: true },
+          })
+          if (paidEntry) {
+            const batch = await prisma.commissionPayoutBatch.create({
+              data: {
+                batchReference: 'CPB-SEED-KAIB-001',
+                batchDate: new Date('2024-02-10'),
+                totalGross: 18000,
+                totalWHT: 1800,
+                totalVAT: 2880,
+                totalLevy: 36,
+                totalNet: 19044,
+                status: 'COMPLETED',
+                generatedById: adminUserId,
+                approvedById: adminUserId,
+                approvedAt: new Date('2024-02-09'),
+                disbursedAt: new Date('2024-02-10'),
+              },
+            })
+            await prisma.commissionLedgerEntry.update({
+              where: { id: paidEntry.id },
+              data: { payoutBatchId: batch.id },
+            })
+          }
+
+          console.log(`✅ Broker/Intermediary demo: schedule, KYC, producer ${producer.producerCode}, introducer ${independentIntroducer.brokerCode}, internal source ${internalSalesSource.brokerCode}, ledger, payout batch`)
+        }
+      }
+
       // ── 16n. Adjudication logs for claims-per-operator ────────────────────
       const existingClaims = await prisma.claim.findMany({
         where: { tenantId, status: { in: ['APPROVED', 'PARTIALLY_APPROVED', 'DECLINED'] } },

@@ -58,6 +58,22 @@ export async function scheduleDailyJobs() {
 }
 
 /**
+ * Schedule broker commission reconciliation after the normal billing window.
+ * Runs at 02:00 EAT daily — BullMQ deduplicates by jobId.
+ */
+export async function scheduleCommissionReconciliationJob() {
+  await Queues.billing.add(
+    "reconcile-commissions",
+    {},
+    {
+      repeat: { pattern: "0 2 * * *" },
+      jobId: "commission-reconciliation-daily",
+      attempts: 2,
+    },
+  );
+}
+
+/**
  * Enqueue an email to be sent asynchronously.
  */
 export async function enqueueEmail(payload: { to: string; subject: string; body: string; html?: string; correspondenceId?: string }) {
@@ -73,5 +89,11 @@ export async function enqueueEmail(payload: { to: string; subject: string; body:
 export async function enqueueBillingRun(groupId: string) {
   await Queues.billing.add("reconcile-billing", { groupId }, {
     attempts: 1, // Let ops see failure
+  });
+}
+
+export async function enqueueCommissionReconciliation(period?: string) {
+  await Queues.billing.add("reconcile-commissions", { period }, {
+    attempts: 1,
   });
 }

@@ -1,16 +1,18 @@
 import { Worker, Job } from "bullmq";
-import { connection, scheduleEscalationJob, scheduleDailyJobs } from "../../lib/queue";
+import { connection, scheduleEscalationJob, scheduleDailyJobs, scheduleCommissionReconciliationJob } from "../../lib/queue";
 import { NotificationService } from "../services/notification.service";
 import { runPreauthEscalationJob } from "./preauth-escalation.job";
 import { runRenewalReminderJob }    from "./renewal-reminder.job";
 import { runSuspensionCheckJob }    from "./suspension-check.job";
 import { runFundBalanceAlertJob }   from "./fund-balance-alert.job";
+import { runCommissionReconciliationJob } from "./commission-reconciliation.job";
 
 console.log("Starting background workers...");
 
 // Register recurring scheduled jobs (idempotent — BullMQ deduplicates by jobId)
 scheduleEscalationJob().catch(err => console.error("[Worker] Failed to schedule escalation job:", err));
 scheduleDailyJobs().catch(err => console.error("[Worker] Failed to schedule daily jobs:", err));
+scheduleCommissionReconciliationJob().catch(err => console.error("[Worker] Failed to schedule commission reconciliation job:", err));
 
 /**
  * NOTIFICATIONS WORKER
@@ -36,6 +38,10 @@ const billingWorker = new Worker("billing", async (job: Job) => {
   if (job.name === "reconcile-billing") {
     console.log(`[Worker] Reconciling billing for group ${job.data.groupId}`);
     // Await BillingService.recalculateGroup...
+  }
+  if (job.name === "reconcile-commissions") {
+    const result = await runCommissionReconciliationJob(job.data.period);
+    console.log(`[Worker] Commission reconciliation complete for ${result.period}`);
   }
 }, { connection });
 

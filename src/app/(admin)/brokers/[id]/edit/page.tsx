@@ -10,6 +10,11 @@ export default async function EditBrokerPage({ params }: { params: Promise<{ id:
   const { id } = await params;
   const broker = await prisma.broker.findUnique({ where: { id, tenantId: session.user.tenantId } });
   if (!broker) notFound();
+  const parentBrokers = await prisma.broker.findMany({
+    where: { tenantId: session.user.tenantId, status: "ACTIVE", id: { not: broker.id } },
+    select: { id: true, name: true, brokerCode: true },
+    orderBy: { name: "asc" },
+  });
 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
@@ -26,16 +31,36 @@ export default async function EditBrokerPage({ params }: { params: Promise<{ id:
         broker={{
           id: broker.id,
           name: broker.name,
+          brokerCode: broker.brokerCode,
+          legalName: broker.legalName,
+          tradingName: broker.tradingName,
+          brokerType: broker.brokerType,
+          intermediaryCategory: broker.intermediaryCategory,
+          requiresIraRegistration: broker.requiresIraRegistration,
+          canReceiveCommission: broker.canReceiveCommission,
+          commissionBasis: broker.commissionBasis,
+          referralFeeAmount: broker.referralFeeAmount === null ? null : Number(broker.referralFeeAmount),
+          sourceDescription: broker.sourceDescription,
+          parentBrokerId: broker.parentBrokerId,
           contactPerson: broker.contactPerson,
           phone: broker.phone,
           email: broker.email,
           address: broker.address,
           licenseNumber: broker.licenseNumber,
+          iraExpiryDate: broker.iraExpiryDate,
+          kraPin: broker.kraPin,
+          vatRegistered: broker.vatRegistered,
+          vatNumber: broker.vatNumber,
+          bankAccountReference: broker.bankAccountReference,
+          mpesaPaybillNumber: broker.mpesaPaybillNumber,
+          effectiveFrom: broker.effectiveFrom,
+          effectiveTo: broker.effectiveTo,
           status: broker.status,
           firstYearCommissionPct: Number(broker.firstYearCommissionPct),
           renewalCommissionPct: Number(broker.renewalCommissionPct),
           flatFeePerMember: broker.flatFeePerMember === null ? null : Number(broker.flatFeePerMember),
         }}
+        parentBrokers={parentBrokers}
       />
     </div>
   );

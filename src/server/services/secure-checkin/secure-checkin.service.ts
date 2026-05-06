@@ -181,8 +181,8 @@ export class SecureCheckInService {
     let isFlagged = false;
     let distanceKm: number | undefined;
 
-    if (input.latitude && input.longitude && challenge.provider.geoLatitude && challenge.provider.geoLongitude) {
-      distanceKm = calculateDistanceKm(
+    if (input.latitude != null && input.longitude != null && challenge.provider.geoLatitude != null && challenge.provider.geoLongitude != null) {
+      distanceKm = this.calculateDistanceKm(
         input.latitude,
         input.longitude,
         Number(challenge.provider.geoLatitude),

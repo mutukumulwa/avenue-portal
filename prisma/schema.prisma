@@ -182,6 +182,7 @@ model Group {
   packageVersion     PackageVersion?  @relation(fields: [packageVersionId], references: [id])
   brokerId           String?
   broker             Broker?          @relation(fields: [brokerId], references: [id])
+  producers          BrokerProducer[] @relation("ProducerSchemes")
   paymentFrequency   PaymentFrequency @default(ANNUAL)
   contributionRate   Decimal // Per-member contribution amount
   effectiveDate      DateTime
@@ -1315,16 +1316,127 @@ model ProviderDiagnosisTariff {
 }
 
 // ─── BROKERS ─────────────────────────────────────────────
+enum BrokerType {
+  MASTER_BROKER
+  SUB_AGENT
+  TIED_AGENT
+  INDIVIDUAL_PRODUCER
+  BANCASSURANCE
+}
+
+enum IntermediaryCategory {
+  REGULATED_BROKER
+  REGULATED_AGENT
+  INTRODUCER
+  REFERRAL_PARTNER
+  INTERNAL_SALES
+  CORPORATE_AFFINITY
+  BANCASSURANCE
+  OTHER
+}
+
+enum CommissionBasis {
+  COMMISSION
+  REFERRAL_FEE
+  ATTRIBUTION_ONLY
+  NONE
+}
+
+enum KycDocumentType {
+  IRA_LICENSE
+  KRA_PIN_CERTIFICATE
+  CR12
+  PROFESSIONAL_INDEMNITY
+  BANK_CONFIRMATION
+  DIRECTORS_ID
+  TAX_COMPLIANCE_CERTIFICATE
+  ENGAGEMENT_LETTER
+  REFERRAL_AGREEMENT
+  OTHER
+}
+
+enum KycDocumentStatus {
+  PENDING_REVIEW
+  VERIFIED
+  REJECTED
+  EXPIRED
+}
+
+enum CommissionScheduleType {
+  FLAT_PERCENTAGE
+  TIERED_VOLUME
+  TIERED_LOSS_RATIO
+  HYBRID_FLAT_PLUS_OVERRIDE
+  PERFORMANCE_LINKED
+}
+
+enum ScheduleStatus {
+  DRAFT
+  PENDING_APPROVAL
+  ACTIVE
+  SUPERSEDED
+  REJECTED
+}
+
+enum TierMetric {
+  GROSS_CONTRIBUTION_BAND
+  MEMBER_COUNT_BAND
+  LOSS_RATIO_BAND
+  RENEWAL_RETENTION_BAND
+}
+
+enum CommissionState {
+  PENDING_RECONCILIATION
+  EARNED
+  ACCRUED
+  PAYABLE
+  PAID
+  CLAWED_BACK
+  ON_HOLD
+}
+
+enum PayoutBatchStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  IN_TRANSIT
+  COMPLETED
+  PARTIAL_FAILURE
+}
+
 model Broker {
   id            String   @id @default(cuid())
   tenantId      String
   tenant        Tenant   @relation(fields: [tenantId], references: [id])
   name          String // Company name
+  brokerCode    String?  @unique
+  legalName     String?
+  tradingName   String?
+  brokerType    BrokerType @default(MASTER_BROKER)
+  intermediaryCategory IntermediaryCategory @default(REGULATED_BROKER)
+  requiresIraRegistration Boolean @default(true)
+  canReceiveCommission Boolean @default(true)
+  commissionBasis CommissionBasis @default(COMMISSION)
+  referralFeeAmount Decimal? @db.Decimal(18, 2)
+  sourceDescription String?
+  parentBrokerId String?
+  parent        Broker?  @relation("BrokerHierarchy", fields: [parentBrokerId], references: [id])
+  children      Broker[] @relation("BrokerHierarchy")
   contactPerson String
   phone         String
   email         String
   address       String?
   licenseNumber String? // IRA license
+  iraExpiryDate DateTime?
+  kraPin        String?
+  vatRegistered Boolean  @default(false)
+  vatNumber     String?
+  bankAccountReference String?
+  mpesaPaybillNumber String?
+  effectiveFrom DateTime @default(now())
+  effectiveTo   DateTime?
+  approvedById  String?
+  approvedAt    DateTime?
   status        String   @default("ACTIVE")
   dateOnboarded DateTime @default(now())
 
@@ -1336,6 +1448,10 @@ model Broker {
 
   groups      Group[]
   commissions Commission[]
+  producers   BrokerProducer[]
+  commissionSchedules BrokerCommissionSchedule[]
+  commissionLedger CommissionLedgerEntry[]
+  kycDocuments BrokerKycDocument[]
   documents   Document[]
   user        User?
   quotations  Quotation[]
@@ -1343,6 +1459,151 @@ model Broker {
   updatedAt   DateTime     @updatedAt
 
   @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, intermediaryCategory])
+  @@index([tenantId, canReceiveCommission])
+  @@index([status, effectiveFrom, effectiveTo])
+  @@index([parentBrokerId])
+}
+
+model BrokerKycDocument {
+  id            String            @id @default(cuid())
+  brokerId      String
+  broker        Broker            @relation(fields: [brokerId], references: [id])
+  documentType  KycDocumentType
+  fileUri       String
+  fileName      String
+  uploadedAt    DateTime          @default(now())
+  uploadedById  String
+  verifiedAt    DateTime?
+  verifiedById  String?
+  expiresAt     DateTime?
+  status        KycDocumentStatus @default(PENDING_REVIEW)
+  notes         String?
+
+  @@index([brokerId, documentType])
+  @@index([status, expiresAt])
+}
+
+model BrokerProducer {
+  id                  String   @id @default(cuid())
+  brokerId            String
+  broker              Broker   @relation(fields: [brokerId], references: [id])
+  producerName        String
+  producerCode        String   @unique
+  iraIndividualNumber String?
+  email               String
+  phone               String
+  effectiveFrom       DateTime
+  effectiveTo         DateTime?
+  status              String   @default("ACTIVE")
+  groups              Group[]  @relation("ProducerSchemes")
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([brokerId, status])
+}
+
+model BrokerCommissionSchedule {
+  id              String                 @id @default(cuid())
+  brokerId        String
+  broker          Broker                 @relation(fields: [brokerId], references: [id])
+  scheduleName    String
+  scheduleType    CommissionScheduleType
+  packageId       String?
+  groupId         String?
+  clientType      ClientType?
+  newBusinessRate Decimal                @db.Decimal(8, 5)
+  renewalRate     Decimal                @db.Decimal(8, 5)
+  overrideRate    Decimal?               @db.Decimal(8, 5)
+  grossCommissionCeiling Decimal?        @db.Decimal(8, 5)
+  payoutCycleDays Int                    @default(30)
+  tiers           CommissionTier[]
+  effectiveFrom   DateTime
+  effectiveTo     DateTime?
+  status          ScheduleStatus         @default(DRAFT)
+  createdById     String
+  approvedById    String?
+  approvedAt      DateTime?
+  ledgerEntries   CommissionLedgerEntry[]
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  @@index([brokerId, effectiveFrom, effectiveTo])
+  @@index([brokerId, status])
+  @@index([groupId])
+  @@index([packageId])
+}
+
+model CommissionTier {
+  id              String                    @id @default(cuid())
+  scheduleId      String
+  schedule        BrokerCommissionSchedule  @relation(fields: [scheduleId], references: [id])
+  tierOrder       Int
+  thresholdMetric TierMetric
+  thresholdMin    Decimal                   @db.Decimal(18, 2)
+  thresholdMax    Decimal?                  @db.Decimal(18, 2)
+  rate            Decimal                   @db.Decimal(8, 5)
+
+  @@index([scheduleId, tierOrder])
+}
+
+model CommissionLedgerEntry {
+  id                    String                    @id @default(cuid())
+  brokerId              String
+  broker                Broker                    @relation(fields: [brokerId], references: [id])
+  scheduleId            String?
+  schedule              BrokerCommissionSchedule? @relation(fields: [scheduleId], references: [id])
+  groupId               String
+  contributionReceiptId String?
+  membershipId          String?
+  state                 CommissionState
+  stateAsOf             DateTime                  @default(now())
+  grossCommission       Decimal                   @db.Decimal(18, 2)
+  withholdingTax        Decimal                   @db.Decimal(18, 2)
+  vatAmount             Decimal                   @db.Decimal(18, 2)
+  iraAgentLevy          Decimal                   @db.Decimal(18, 2)
+  netPayable            Decimal                   @db.Decimal(18, 2)
+  currency              String                    @default("KES")
+  earnedPeriodStart     DateTime
+  earnedPeriodEnd       DateTime
+  paidAt                DateTime?
+  paymentReference      String?
+  payoutBatchId         String?
+  payoutBatch           CommissionPayoutBatch?    @relation(fields: [payoutBatchId], references: [id])
+  clawbackParentId      String?
+  clawbackParent        CommissionLedgerEntry?    @relation("ClawbackChain", fields: [clawbackParentId], references: [id])
+  clawbackChildren      CommissionLedgerEntry[]   @relation("ClawbackChain")
+  clawbackReason        String?
+  notes                 String?
+  createdAt             DateTime                  @default(now())
+
+  @@index([brokerId, state, earnedPeriodStart])
+  @@index([groupId, earnedPeriodStart])
+  @@index([payoutBatchId])
+  @@index([contributionReceiptId])
+}
+
+model CommissionPayoutBatch {
+  id              String                  @id @default(cuid())
+  batchReference  String                  @unique
+  batchDate       DateTime
+  totalGross      Decimal                 @db.Decimal(18, 2)
+  totalWHT        Decimal                 @db.Decimal(18, 2)
+  totalVAT        Decimal                 @db.Decimal(18, 2)
+  totalLevy       Decimal                 @db.Decimal(18, 2)
+  totalNet        Decimal                 @db.Decimal(18, 2)
+  currency        String                  @default("KES")
+  status          PayoutBatchStatus
+  generatedById   String
+  approvedById    String?
+  approvedAt      DateTime?
+  disbursedAt     DateTime?
+  entries         CommissionLedgerEntry[]
+  createdAt       DateTime                @default(now())
+
+  @@index([status, batchDate])
 }
 
 model Commission {

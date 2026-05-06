@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { formatCurrency } from "@/lib/utils";
 import { Building2, Users, DollarSign, RefreshCw } from "lucide-react";
 
 export default async function BrokerDashboardPage() {
@@ -17,8 +18,10 @@ export default async function BrokerDashboardPage() {
             include: { _count: { select: { members: true } } },
             orderBy: { renewalDate: "asc" },
           },
-          commissions: {
-            where: { paymentStatus: "PENDING" },
+          commissionLedger: {
+            include: { schedule: { select: { scheduleName: true } } },
+            orderBy: { earnedPeriodStart: "desc" },
+            take: 8,
           },
         },
       },
@@ -36,7 +39,12 @@ export default async function BrokerDashboardPage() {
   }
 
   const totalMembers = broker.groups.reduce((s, g) => s + g._count.members, 0);
-  const pendingCommissions = broker.commissions.reduce((s, c) => s + Number(c.commissionAmount), 0);
+  const payableCommissions = broker.commissionLedger
+    .filter(entry => ["EARNED", "ACCRUED", "PAYABLE"].includes(entry.state))
+    .reduce((s, entry) => s + Number(entry.netPayable), 0);
+  const paidCommissions = broker.commissionLedger
+    .filter(entry => entry.state === "PAID")
+    .reduce((s, entry) => s + Number(entry.netPayable), 0);
   const renewalSoon = broker.groups.filter((g) => {
     const days = Math.ceil((g.renewalDate.getTime() - new Date().getTime()) / (1000 * 3600 * 24));
     return days >= 0 && days <= 60;
@@ -53,7 +61,7 @@ export default async function BrokerDashboardPage() {
         {[
           { label: "Active Groups", value: broker.groups.length, icon: Building2, color: "text-avenue-indigo" },
           { label: "Total Members", value: totalMembers, icon: Users, color: "text-[#28A745]" },
-          { label: "Pending Commissions (KES)", value: pendingCommissions.toLocaleString(), icon: DollarSign, color: "text-[#FFC107]" },
+          { label: "Payable Commissions", value: formatCurrency(payableCommissions), icon: DollarSign, color: "text-[#FFC107]" },
           { label: "Renewals Due (60 days)", value: renewalSoon.length, icon: RefreshCw, color: "text-[#DC3545]" },
         ].map((s) => {
           const Icon = s.icon;
@@ -89,6 +97,28 @@ export default async function BrokerDashboardPage() {
             ))}
             {broker.groups.length === 0 && (
               <div className="px-5 py-8 text-center text-avenue-text-body text-sm">No groups assigned.</div>
+            )}
+          </div>
+        </div>
+
+        {/* Commission snapshot */}
+        <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#EEEEEE] flex items-center justify-between">
+            <h2 className="font-bold text-avenue-text-heading font-heading">Commission Snapshot</h2>
+            <p className="text-xs text-avenue-text-muted">Paid {formatCurrency(paidCommissions)}</p>
+          </div>
+          <div className="divide-y divide-[#EEEEEE]">
+            {broker.commissionLedger.slice(0, 5).map((entry) => (
+              <div key={entry.id} className="px-5 py-3 flex items-center justify-between text-sm">
+                <div>
+                  <p className="font-semibold text-avenue-text-heading">{entry.schedule?.scheduleName ?? "Pending schedule"}</p>
+                  <p className="text-xs text-avenue-text-muted">{new Date(entry.earnedPeriodStart).toLocaleDateString("en-KE")} · {entry.state.replaceAll("_", " ")}</p>
+                </div>
+                <span className="font-bold text-[#28A745]">{formatCurrency(entry.netPayable)}</span>
+              </div>
+            ))}
+            {broker.commissionLedger.length === 0 && (
+              <div className="px-5 py-8 text-center text-avenue-text-body text-sm">No commission ledger entries yet.</div>
             )}
           </div>
         </div>
