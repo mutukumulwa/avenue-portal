@@ -127,14 +127,14 @@ async function main() {
   // 3. PACKAGES (Essential, Premier, Executive)
   // ═══════════════════════════════════════════════════════════
   const pkgDefs = [
-    { name: 'Avenue Essential', annual: 500000, contrib: 30000, benefits: [
+    { name: 'Avenue Essential', annual: 500000, contrib: 95000, benefits: [
       { cat: 'INPATIENT' as const,           limit: 500000,  copay: 0,  wait: 30  },
       { cat: 'OUTPATIENT' as const,          limit: 100000,  copay: 10, wait: 0   },
       { cat: 'MATERNITY' as const,           limit: 80000,   copay: 0,  wait: 365 },
       { cat: 'DENTAL' as const,              limit: 20000,   copay: 20, wait: 90  },
       { cat: 'OPTICAL' as const,             limit: 15000,   copay: 20, wait: 90  },
     ]},
-    { name: 'Avenue Premier', annual: 2000000, contrib: 75000, benefits: [
+    { name: 'Avenue Premier', annual: 2000000, contrib: 210000, benefits: [
       { cat: 'INPATIENT' as const,           limit: 2000000, copay: 0,  wait: 0   },
       { cat: 'OUTPATIENT' as const,          limit: 300000,  copay: 5,  wait: 0   },
       { cat: 'MATERNITY' as const,           limit: 200000,  copay: 0,  wait: 270 },
@@ -143,7 +143,7 @@ async function main() {
       { cat: 'MENTAL_HEALTH' as const,       limit: 100000,  copay: 10, wait: 90  },
       { cat: 'CHRONIC_DISEASE' as const,     limit: 300000,  copay: 0,  wait: 0   },
     ]},
-    { name: 'Avenue Executive', annual: 5000000, contrib: 150000, benefits: [
+    { name: 'Avenue Executive', annual: 5000000, contrib: 480000, benefits: [
       { cat: 'INPATIENT' as const,           limit: 5000000, copay: 0,  wait: 0   },
       { cat: 'OUTPATIENT' as const,          limit: 500000,  copay: 0,  wait: 0   },
       { cat: 'MATERNITY' as const,           limit: 500000,  copay: 0,  wait: 180 },
@@ -159,7 +159,14 @@ async function main() {
   const packages: { id: string; versionId: string; name: string; contrib: number }[] = []
   for (const p of pkgDefs) {
     const existing = await prisma.package.findFirst({ where: { tenantId: tenant.id, name: p.name }, include: { versions: true } })
-    if (existing) { packages.push({ id: existing.id, versionId: existing.versions[0]?.id ?? '', name: p.name, contrib: p.contrib }); continue }
+    if (existing) {
+      await prisma.package.update({
+        where: { id: existing.id },
+        data: { annualLimit: p.annual, contributionAmount: p.contrib, status: 'ACTIVE' },
+      })
+      packages.push({ id: existing.id, versionId: existing.versions[0]?.id ?? '', name: p.name, contrib: p.contrib });
+      continue
+    }
     const pkg = await prisma.package.create({
       data: {
         tenantId: tenant.id, name: p.name, type: 'CORPORATE',
@@ -374,6 +381,13 @@ async function main() {
       effectiveDate: new Date('2024-01-01'), renewalDate: new Date('2025-01-01'), status: 'ACTIVE',
     },
   })
+  await prisma.group.update({
+    where: { id: safaricom.id },
+    data: {
+      contributionRate: 165000, // annual blended rate per covered life across Executive/Management/Staff tiers
+      paymentFrequency: 'ANNUAL',
+    },
+  })
 
   await prisma.user.upsert({
     where: { tenantId_email: { tenantId, email: 'emily.wambui@safaricom.co.ke' } },
@@ -406,21 +420,21 @@ async function main() {
     executiveTier = await prisma.groupBenefitTier.create({
       data: {
         groupId: safaricom.id, name: 'Executive', packageId: executivePkg.id,
-        contributionRate: 150000, description: 'C-suite and Senior VP — unlimited consultations, global cover rider',
+        contributionRate: 480000, description: 'C-suite and Senior VP — high-limit inpatient, executive outpatient, mental health, and surgical cover',
         isDefault: false,
       },
     })
     managementTier = await prisma.groupBenefitTier.create({
       data: {
         groupId: safaricom.id, name: 'Management', packageId: premierPkg.id,
-        contributionRate: 75000, description: 'Managers and team leads — comprehensive cover including mental health',
+        contributionRate: 210000, description: 'Managers and team leads — comprehensive cover including chronic and mental health benefits',
         isDefault: true,
       },
     })
     staffTier = await prisma.groupBenefitTier.create({
       data: {
         groupId: safaricom.id, name: 'Staff', packageId: essentialPkg.id,
-        contributionRate: 30000, description: 'All permanent staff — essential inpatient and outpatient cover',
+        contributionRate: 95000, description: 'All permanent staff — essential inpatient, outpatient, dental, and optical cover',
         isDefault: false,
       },
     })
@@ -431,19 +445,34 @@ async function main() {
     managementTier = tiers[1] ?? null
     staffTier      = tiers[2] ?? null
   }
+  await prisma.groupBenefitTier.updateMany({ where: { groupId: safaricom.id, name: 'Executive' }, data: { packageId: executivePkg.id, contributionRate: 480000 } })
+  await prisma.groupBenefitTier.updateMany({ where: { groupId: safaricom.id, name: 'Management' }, data: { packageId: premierPkg.id, contributionRate: 210000 } })
+  await prisma.groupBenefitTier.updateMany({ where: { groupId: safaricom.id, name: 'Staff' }, data: { packageId: essentialPkg.id, contributionRate: 95000 } })
 
   // Other groups — flat package
   const otherGroupDefs = [
-    { name: 'KCB Group',              industry: 'Banking & Finance',      contact: 'Moses Kiptoo',  phone: '+254700200200', email: 'hr@kcb.co.ke',     pkgIdx: 1, county: 'Nairobi',  brokerIdx: 1 },
-    { name: 'East African Breweries', industry: 'Manufacturing',           contact: 'Anne Chebet',   phone: '+254700300300', email: 'hr@eabl.co.ke',    pkgIdx: 1, county: 'Nairobi',  brokerIdx: null },
-    { name: 'Bamburi Cement',         industry: 'Construction',            contact: 'Samuel Njoroge',phone: '+254700400400', email: 'hr@bamburi.co.ke', pkgIdx: 0, county: 'Mombasa',  brokerIdx: 2 },
-    { name: 'Twiga Foods',            industry: 'Agriculture & Logistics', contact: 'Lucy Akinyi',   phone: '+254700500500', email: 'hr@twiga.com',     pkgIdx: 0, county: 'Nairobi',  brokerIdx: null },
+    { name: 'KCB Group',              industry: 'Banking & Finance',      contact: 'Moses Kiptoo',  phone: '+254700200200', email: 'hr@kcb.co.ke',     pkgIdx: 1, county: 'Nairobi',  brokerIdx: 1,    contributionRate: 225000 },
+    { name: 'East African Breweries', industry: 'Manufacturing',           contact: 'Anne Chebet',   phone: '+254700300300', email: 'hr@eabl.co.ke',    pkgIdx: 1, county: 'Nairobi',  brokerIdx: null, contributionRate: 255000 },
+    { name: 'Bamburi Cement',         industry: 'Construction',            contact: 'Samuel Njoroge',phone: '+254700400400', email: 'hr@bamburi.co.ke', pkgIdx: 0, county: 'Mombasa',  brokerIdx: 2,    contributionRate: 135000 },
+    { name: 'Twiga Foods',            industry: 'Agriculture & Logistics', contact: 'Lucy Akinyi',   phone: '+254700500500', email: 'hr@twiga.com',     pkgIdx: 0, county: 'Nairobi',  brokerIdx: null, contributionRate: 115000 },
   ]
   const otherGroups: string[] = []
   for (const g of otherGroupDefs) {
     const pkg = packages[g.pkgIdx]
     const existing = await prisma.group.findFirst({ where: { tenantId: tenant.id, name: g.name } })
-    if (existing) { otherGroups.push(existing.id); continue }
+    if (existing) {
+      await prisma.group.update({
+        where: { id: existing.id },
+        data: {
+          packageId: pkg.id,
+          packageVersionId: pkg.versionId,
+          contributionRate: g.contributionRate,
+          paymentFrequency: 'ANNUAL',
+        },
+      })
+      otherGroups.push(existing.id);
+      continue
+    }
     const grp = await prisma.group.create({
       data: {
         tenantId: tenant.id, name: g.name, industry: g.industry,
@@ -451,7 +480,7 @@ async function main() {
         contactPersonName: g.contact, contactPersonPhone: g.phone, contactPersonEmail: g.email,
         county: g.county, packageId: pkg.id, packageVersionId: pkg.versionId,
         brokerId: g.brokerIdx !== null ? brokers[g.brokerIdx] : null,
-        paymentFrequency: 'ANNUAL', contributionRate: pkg.contrib,
+        paymentFrequency: 'ANNUAL', contributionRate: g.contributionRate,
         effectiveDate: new Date('2024-01-01'), renewalDate: new Date('2025-01-01'), status: 'ACTIVE',
       },
     })
@@ -2229,19 +2258,21 @@ async function main() {
           eablClaims.push(clm4 as unknown as ClaimSeed)
         }
 
-        // Build fund account: running balance from real claim amounts
-        let runningBalance = 5_000_000
+        // Build fund account: corporate-sized opening deposit and running balance from real claim amounts
+        const eablOpeningDeposit = 32_000_000
+        const eablAdminFee = 450_000
+        let runningBalance = eablOpeningDeposit
         const claimTotal = eablClaims.reduce((s, c) => s + (c as unknown as { approvedAmount: number }).approvedAmount, 0)
         runningBalance -= claimTotal
-        runningBalance -= 150_000 // admin fee
+        runningBalance -= eablAdminFee
 
         const sfAccount = await prisma.selfFundedAccount.create({ data: {
           tenantId, groupId: eabl.id,
           balance: runningBalance,
-          totalDeposited: 5_000_000,
+          totalDeposited: eablOpeningDeposit,
           totalClaims: claimTotal,
-          totalAdminFees: 150_000,
-          minimumBalance: 500_000,
+          totalAdminFees: eablAdminFee,
+          minimumBalance: 6_000_000,
           periodStartDate: new Date('2025-01-01'), periodEndDate: new Date('2025-12-31'),
         }})
 
@@ -2250,10 +2281,10 @@ async function main() {
         const claimDeductions: { amount: number; balance: number; claimId: string; description: string; postedAt: Date }[] = []
 
         // Opening deposit
-        ledgerBalance = 5_000_000
+        ledgerBalance = eablOpeningDeposit
         await prisma.fundTransaction.create({ data: {
           tenantId, selfFundedAccountId: sfAccount.id,
-          type: 'DEPOSIT', amount: 5_000_000, balanceAfter: ledgerBalance,
+          type: 'DEPOSIT', amount: eablOpeningDeposit, balanceAfter: ledgerBalance,
           description: 'Opening fund deposit — 2025 policy year', referenceNumber: 'EFT-EABL-2025-001',
           postedAt: new Date('2025-01-02'),
         }})
@@ -2279,11 +2310,11 @@ async function main() {
         }
 
         // Admin fee
-        ledgerBalance -= 150_000
+        ledgerBalance -= eablAdminFee
         await prisma.fundTransaction.create({ data: {
           tenantId, selfFundedAccountId: sfAccount.id,
-          type: 'ADMIN_FEE', amount: 150_000, balanceAfter: ledgerBalance,
-          description: 'Admin fee Q1 2025 — KES 2,000 × 75 insured', referenceNumber: 'ADM-EABL-2025-Q1',
+          type: 'ADMIN_FEE', amount: eablAdminFee, balanceAfter: ledgerBalance,
+          description: 'Admin fee Q1 2025 — corporate self-funded administration retainer', referenceNumber: 'ADM-EABL-2025-Q1',
           postedAt: new Date('2025-04-01'),
         }})
 
@@ -2300,28 +2331,28 @@ async function main() {
           fundAdministrators: fundAdminUser ? { connect: { id: fundAdminUser.id } } : undefined,
         }})
         // Deliberately seeded with balance BELOW minimum to demo the low-balance alert
-        let bal = 2_000_000
+        let bal = 12_000_000
         const sfAccount2 = await prisma.selfFundedAccount.create({ data: {
           tenantId, groupId: bamburi.id,
-          balance: 380_000,           // ← below minimumBalance of 500k → triggers alert
-          totalDeposited: 2_000_000,
-          totalClaims: 1_470_000,
-          totalAdminFees: 150_000,
-          minimumBalance: 500_000,
+          balance: 3_800_000,           // below minimumBalance of 5M → triggers alert without looking toy-sized
+          totalDeposited: 12_000_000,
+          totalClaims: 7_600_000,
+          totalAdminFees: 600_000,
+          minimumBalance: 5_000_000,
           periodStartDate: new Date('2025-01-01'), periodEndDate: new Date('2025-12-31'),
         }})
         for (const txn of [
-          { type: 'DEPOSIT' as const,          amount: 2_000_000, balanceAfter: (bal = 2_000_000),            description: 'Opening deposit 2025',              referenceNumber: 'EFT-BAM-2025-001', postedAt: new Date('2025-01-03') },
-          { type: 'CLAIM_DEDUCTION' as const,  amount:   450_000, balanceAfter: (bal -= 450_000,   bal),      description: 'Claims deductions Jan 2025',         referenceNumber: null,                postedAt: new Date('2025-02-01') },
-          { type: 'CLAIM_DEDUCTION' as const,  amount:   520_000, balanceAfter: (bal -= 520_000,   bal),      description: 'Claims deductions Feb 2025',         referenceNumber: null,                postedAt: new Date('2025-03-01') },
-          { type: 'ADMIN_FEE' as const,        amount:    75_000, balanceAfter: (bal -= 75_000,    bal),      description: 'Admin fee Q1 — 5% of KES 1.5M',     referenceNumber: 'ADM-BAM-Q1',        postedAt: new Date('2025-04-01') },
-          { type: 'CLAIM_DEDUCTION' as const,  amount:   500_000, balanceAfter: (bal -= 500_000,   bal),      description: 'Claims deductions Mar 2025',         referenceNumber: null,                postedAt: new Date('2025-04-05') },
-          { type: 'CLAIM_DEDUCTION' as const,  amount:    75_000, balanceAfter: (bal -= 75_000,    bal),      description: 'Claims deductions Apr 2025 (partial)',referenceNumber: null,                postedAt: new Date('2025-04-20') },
-          { type: 'ADMIN_FEE' as const,        amount:    75_000, balanceAfter: (bal -= 75_000,    bal),      description: 'Admin fee Q2 — 5% of KES 1.5M',     referenceNumber: 'ADM-BAM-Q2',        postedAt: new Date('2025-04-25') },
+          { type: 'DEPOSIT' as const,          amount: 12_000_000, balanceAfter: (bal = 12_000_000),          description: 'Opening deposit 2025',              referenceNumber: 'EFT-BAM-2025-001', postedAt: new Date('2025-01-03') },
+          { type: 'CLAIM_DEDUCTION' as const,  amount:  1_850_000, balanceAfter: (bal -= 1_850_000, bal),      description: 'Claims deductions Jan 2025',         referenceNumber: null,                postedAt: new Date('2025-02-01') },
+          { type: 'CLAIM_DEDUCTION' as const,  amount:  2_120_000, balanceAfter: (bal -= 2_120_000, bal),      description: 'Claims deductions Feb 2025',         referenceNumber: null,                postedAt: new Date('2025-03-01') },
+          { type: 'ADMIN_FEE' as const,        amount:    200_000, balanceAfter: (bal -= 200_000,   bal),      description: 'Admin fee Q1 — 5% claims administration retainer', referenceNumber: 'ADM-BAM-Q1', postedAt: new Date('2025-04-01') },
+          { type: 'CLAIM_DEDUCTION' as const,  amount:  2_450_000, balanceAfter: (bal -= 2_450_000, bal),      description: 'Claims deductions Mar 2025',         referenceNumber: null,                postedAt: new Date('2025-04-05') },
+          { type: 'CLAIM_DEDUCTION' as const,  amount:  1_180_000, balanceAfter: (bal -= 1_180_000, bal),      description: 'Claims deductions Apr 2025 (partial)',referenceNumber: null,                postedAt: new Date('2025-04-20') },
+          { type: 'ADMIN_FEE' as const,        amount:    400_000, balanceAfter: (bal -= 400_000,   bal),      description: 'Admin fee Q2 — 5% claims administration retainer', referenceNumber: 'ADM-BAM-Q2', postedAt: new Date('2025-04-25') },
         ]) {
           await prisma.fundTransaction.create({ data: { tenantId, selfFundedAccountId: sfAccount2.id, ...txn } })
         }
-        console.log(`✅ Self-funded scheme 2: Bamburi Cement — KES 380k balance (BELOW minimum KES 500k → low-balance demo)`)
+        console.log(`✅ Self-funded scheme 2: Bamburi Cement — KES 3.8M balance (BELOW minimum KES 5M → low-balance demo)`)
       }
 
       // ── 16e. Invoices with Kenyan taxes ────────────────────────────────────
@@ -3033,8 +3064,9 @@ async function main() {
       })
 
       const memberCount = group.members.length
-      const ratePerMember = Number(group.contributionRate)
-      const monthlyContribution = memberCount * ratePerMember
+      const annualRatePerMember = Number(group.contributionRate)
+      const monthlyRatePerMember = Math.round(annualRatePerMember / 12)
+      const monthlyContribution = memberCount * monthlyRatePerMember
 
       for (let i = 0; i < closedMonths.length; i++) {
         const period = closedMonths[i]
@@ -3057,7 +3089,7 @@ async function main() {
             groupId: group.id,
             period,
             memberCount,
-            ratePerMember,
+            ratePerMember: monthlyRatePerMember,
             totalAmount,
             paidAmount,
             balance,
@@ -3318,8 +3350,8 @@ async function main() {
   console.log('')
   console.log('  Phase C — Membership completeness:')
   console.log('  • Individual client: Patricia Wanjiru (clientType=INDIVIDUAL, Executive)')
-  console.log('  • Self-funded scheme 1: EABL — KES 5M deposit, 4 claims deducted by claimId, admin fee')
-  console.log('  • Self-funded scheme 2: Bamburi Cement — KES 380k balance (below min → low-balance demo)')
+  console.log('  • Self-funded scheme 1: EABL — KES 32M deposit, real claim deductions by claimId, admin fee')
+  console.log('  • Self-funded scheme 2: Bamburi Cement — KES 3.8M balance below KES 5M minimum (low-balance demo)')
   console.log('  • Fund admin: fund@avenue.co.ke / AvenueAdmin2024! — linked to all self-funded schemes')
   console.log('  • Member: member@avenue.co.ke / AvenueAdmin2024! — linked to an active member')
   console.log('  • Admin sidebar: Self-Funded Schemes link under Finance → /fund/dashboard')

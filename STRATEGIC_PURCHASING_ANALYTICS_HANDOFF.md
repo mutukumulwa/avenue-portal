@@ -119,6 +119,11 @@ This document is the source of truth for handoff. Update checkboxes and notes as
   - Spread across Safaricom PLC, KCB Group, East African Breweries, Bamburi Cement, and Twiga Foods.
   - Preserves Safaricom tiering and includes self-funded EABL/Bamburi schemes.
   - Monthly analytics claim generation now scales by group membership size, producing hundreds of dated encounters across the trailing period.
+- [x] Demo seed economics made more realistic for corporate medical schemes.
+  - Package contribution amounts now represent annual per-life rates: Essential KES 95k, Premier KES 210k, Executive KES 480k.
+  - Group contribution rates use plausible blended annual pricing by scheme.
+  - Analytics invoices derive monthly amounts from annual rates instead of treating annual rates as monthly rates.
+  - Self-funded EABL/Bamburi deposits and minimum balances are corporate-sized, not toy demo values.
 - [x] Ran `npx tsc --noEmit`.
 - [x] Ran `npm run build`.
 - [ ] Run `npm run db:seed` locally after migrations to verify row counts and visual analytics output.
