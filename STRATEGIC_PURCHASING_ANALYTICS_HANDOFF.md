@@ -17,7 +17,8 @@ This document is the source of truth for handoff. Update checkboxes and notes as
 - [x] Implement first analytics services and API.
 - [x] Implement first Strategic Purchasing Console UI.
 - [x] Add seed data for case-mix weights.
-- [ ] Add broader analytics seed data and verification coverage.
+- [x] Add targeted analytics demo seed data and verification coverage.
+- [ ] Add broader stress-scale analytics seed data later.
 
 ## Implementation Log
 
@@ -97,6 +98,25 @@ This document is the source of truth for handoff. Update checkboxes and notes as
 - [x] Ran `npx tsc --noEmit`.
 - [x] Ran `npm run build`.
 - [ ] Product/actuarial review is still needed before treating recommendation percentages as binding pricing guidance.
+
+### 2026-05-07 Analytics Demo Seed Slice
+
+- [x] Added targeted strategic purchasing analytics demo data in `prisma/seed.ts`.
+- [x] Demo seed updates existing corporate schemes with future renewal dates.
+- [x] Demo seed creates 16 closed months of internally consistent invoices and payments for the existing groups.
+- [x] Demo seed creates matching claims tied to real members, providers, ICD families, benefit categories, claim lines, and claim statuses.
+- [x] Demo seed creates differentiated analytics stories:
+  - Safaricom: healthy/stable MLR.
+  - KCB: watchlist chronic disease pressure.
+  - East African Breweries: high renewal risk with inpatient/surgical drivers.
+  - Bamburi Cement: critical MLR drift.
+  - Twiga Foods: moderate utilization story.
+- [x] Demo seed creates member risk profiles so Risk Composition is populated.
+- [x] Demo seed creates analytics alerts for MLR drift, provider anomaly, renewal risk, utilization spike, and contribution shortfall.
+- [x] Demo seed calls `AnalyticsRefreshService.refreshFoundation({ tenantId })` at the end so facts, snapshots, provider scorecards, and renewal analyses are populated immediately after `npm run db:seed`.
+- [x] Ran `npx tsc --noEmit`.
+- [x] Ran `npm run build`.
+- [ ] Run `npm run db:seed` locally after migrations to verify row counts and visual analytics output.
 
 ## Already Implemented Repo Capabilities To Reuse
 
@@ -360,15 +380,15 @@ Create a read service, likely `src/server/services/analytics.service.ts`.
 
 ### Phase 10: Seed Data
 
-- [ ] Extend `prisma/seed.ts` or add a dedicated analytics seed helper.
+- [x] Extend `prisma/seed.ts` or add a dedicated analytics seed helper.
 - [x] Seed case-mix weights.
-- [ ] Generate enough synthetic data to demonstrate trends:
-  - 18 months encounters.
-  - 12 months contribution/invoice/payment data.
+- [x] Generate enough synthetic data to demonstrate trends:
+  - 16 months encounters.
+  - 16 months contribution/invoice/payment data.
   - Multiple schemes with varied MLR.
   - Internal and external providers/facilities.
   - Precomputed renewal analyses.
-  - Around 20 alerts.
+  - 5 demo alerts.
 - [ ] For local practicality, start with a smaller default seed and optionally gate the 50,000+ encounter stress seed behind an env flag or separate command.
 
 ## Algorithm Notes

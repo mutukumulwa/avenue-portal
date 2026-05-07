@@ -2,6 +2,7 @@ import 'dotenv/config'
 import { prisma } from '../src/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { GLService } from '../src/server/services/gl.service'
+import { AnalyticsRefreshService } from '../src/server/services/analytics-refresh.service'
 
 async function main() {
   console.log('🌱 Starting comprehensive seed...')
@@ -2766,6 +2767,354 @@ async function main() {
         data: { managedFundGroups: { connect: selfFundedGroups.map(g => ({ id: g.id })) } },
       })
     }
+  }
+
+  // ═══════════════════════════════════════════════════════════
+  // 18. STRATEGIC PURCHASING ANALYTICS DEMO DATA
+  // ═══════════════════════════════════════════════════════════
+  {
+    const demoAnchor = new Date()
+    const monthKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+    const monthStart = (date: Date) => new Date(date.getFullYear(), date.getMonth(), 1)
+    const addDays = (date: Date, days: number) => {
+      const copy = new Date(date)
+      copy.setDate(copy.getDate() + days)
+      return copy
+    }
+    const addMonths = (date: Date, months: number) => {
+      const copy = new Date(date)
+      copy.setMonth(copy.getMonth() + months)
+      return copy
+    }
+    const closedMonths = Array.from({ length: 16 }, (_, i) => {
+      const date = monthStart(addMonths(demoAnchor, -15 + i))
+      return monthKey(date)
+    })
+
+    const demoGroups = await prisma.group.findMany({
+      where: {
+        tenantId,
+        name: { in: ['Safaricom PLC', 'KCB Group', 'East African Breweries', 'Bamburi Cement', 'Twiga Foods'] },
+      },
+      include: {
+        members: { where: { status: 'ACTIVE' }, select: { id: true, packageId: true, packageVersionId: true, benefitTierId: true } },
+        broker: { select: { name: true } },
+      },
+      orderBy: { name: 'asc' },
+    })
+
+    const scenarioByName: Record<string, {
+      code: string
+      renewalOffset: number
+      mlr: number
+      status: 'healthy' | 'watch' | 'critical'
+      providerPattern: number[]
+      diseasePattern: { icd: string; label: string; benefitCategory: 'OUTPATIENT' | 'INPATIENT' | 'CHRONIC_DISEASE' | 'SURGICAL' | 'MATERNITY' | 'DENTAL' | 'OPTICAL'; serviceType: 'OUTPATIENT' | 'INPATIENT' | 'DAY_CASE' }[]
+    }> = {
+      'Safaricom PLC': {
+        code: 'SAF', renewalOffset: 22, mlr: 0.58, status: 'healthy', providerPattern: [0, 1, 4],
+        diseasePattern: [
+          { icd: 'B54', label: 'Malaria, unspecified', benefitCategory: 'OUTPATIENT', serviceType: 'OUTPATIENT' },
+          { icd: 'J06.9', label: 'Acute upper respiratory infection', benefitCategory: 'OUTPATIENT', serviceType: 'OUTPATIENT' },
+          { icd: 'E11.9', label: 'Type 2 diabetes mellitus', benefitCategory: 'CHRONIC_DISEASE', serviceType: 'OUTPATIENT' },
+        ],
+      },
+      'KCB Group': {
+        code: 'KCB', renewalOffset: 37, mlr: 0.78, status: 'watch', providerPattern: [0, 2, 4],
+        diseasePattern: [
+          { icd: 'I10', label: 'Essential hypertension', benefitCategory: 'CHRONIC_DISEASE', serviceType: 'OUTPATIENT' },
+          { icd: 'E11.9', label: 'Type 2 diabetes mellitus', benefitCategory: 'CHRONIC_DISEASE', serviceType: 'OUTPATIENT' },
+          { icd: 'J18.9', label: 'Pneumonia, unspecified organism', benefitCategory: 'INPATIENT', serviceType: 'INPATIENT' },
+        ],
+      },
+      'East African Breweries': {
+        code: 'EABL', renewalOffset: 61, mlr: 0.94, status: 'critical', providerPattern: [2, 3, 0],
+        diseasePattern: [
+          { icd: 'J18.9', label: 'Pneumonia, unspecified organism', benefitCategory: 'INPATIENT', serviceType: 'INPATIENT' },
+          { icd: 'K35.9', label: 'Acute appendicitis', benefitCategory: 'SURGICAL', serviceType: 'INPATIENT' },
+          { icd: 'E11.9', label: 'Type 2 diabetes mellitus', benefitCategory: 'CHRONIC_DISEASE', serviceType: 'OUTPATIENT' },
+        ],
+      },
+      'Bamburi Cement': {
+        code: 'BAM', renewalOffset: 83, mlr: 1.08, status: 'critical', providerPattern: [3, 2, 5],
+        diseasePattern: [
+          { icd: 'K35.9', label: 'Acute appendicitis', benefitCategory: 'SURGICAL', serviceType: 'INPATIENT' },
+          { icd: 'S09.9', label: 'Head injury', benefitCategory: 'INPATIENT', serviceType: 'INPATIENT' },
+          { icd: 'M54.5', label: 'Low back pain', benefitCategory: 'OUTPATIENT', serviceType: 'OUTPATIENT' },
+        ],
+      },
+      'Twiga Foods': {
+        code: 'TWI', renewalOffset: 112, mlr: 0.69, status: 'watch', providerPattern: [1, 0, 4],
+        diseasePattern: [
+          { icd: 'A09', label: 'Gastroenteritis and diarrhoeal disease', benefitCategory: 'OUTPATIENT', serviceType: 'OUTPATIENT' },
+          { icd: 'N39.0', label: 'Urinary tract infection', benefitCategory: 'OUTPATIENT', serviceType: 'OUTPATIENT' },
+          { icd: 'O80', label: 'Single spontaneous delivery', benefitCategory: 'MATERNITY', serviceType: 'INPATIENT' },
+        ],
+      },
+    }
+
+    for (const group of demoGroups) {
+      const scenario = scenarioByName[group.name]
+      if (!scenario || group.members.length === 0) continue
+
+      await prisma.group.update({
+        where: { id: group.id },
+        data: { renewalDate: addDays(demoAnchor, scenario.renewalOffset) },
+      })
+
+      const memberCount = group.members.length
+      const ratePerMember = Number(group.contributionRate)
+      const monthlyContribution = memberCount * ratePerMember
+
+      for (let i = 0; i < closedMonths.length; i++) {
+        const period = closedMonths[i]
+        const [year, month] = period.split('-').map(Number)
+        const dueDate = new Date(year, month, 15)
+        const invoiceNumber = `AN-${scenario.code}-${period.replace('-', '')}`
+        const paidPct = i >= closedMonths.length - 1 && scenario.status === 'critical' ? 0.65 : scenario.status === 'watch' && i % 5 === 0 ? 0.82 : 1
+        const totalAmount = Math.round(monthlyContribution)
+        const paidAmount = Math.round(totalAmount * paidPct)
+        const balance = totalAmount - paidAmount
+        const invoiceStatus = balance === 0 ? 'PAID' : paidAmount > 0 ? 'PARTIALLY_PAID' : 'SENT'
+
+        let invoice = await prisma.invoice.findUnique({
+          where: { tenantId_invoiceNumber: { tenantId, invoiceNumber } },
+        })
+        if (!invoice) {
+          invoice = await prisma.invoice.create({ data: {
+            tenantId,
+            invoiceNumber,
+            groupId: group.id,
+            period,
+            memberCount,
+            ratePerMember,
+            totalAmount,
+            paidAmount,
+            balance,
+            dueDate,
+            sentAt: new Date(year, month - 1, 5),
+            status: invoiceStatus,
+            notes: `Analytics demo invoice — ${group.name} ${period}`,
+          }})
+        }
+
+        if (paidAmount > 0) {
+          const paymentExists = await prisma.payment.findFirst({
+            where: { invoiceId: invoice.id, referenceNumber: `PAY-${invoiceNumber}` },
+          })
+          if (!paymentExists) {
+            await prisma.payment.create({ data: {
+              groupId: group.id,
+              invoiceId: invoice.id,
+              amount: paidAmount,
+              paymentDate: new Date(year, month - 1, Math.min(24, 12 + (i % 10))),
+              paymentMethod: i % 4 === 0 ? 'MPESA' : 'BANK_TRANSFER',
+              referenceNumber: `PAY-${invoiceNumber}`,
+              notes: `Analytics demo payment — ${group.name} ${period}`,
+            }})
+          }
+        }
+
+        const seasonal = 0.86 + ((i % 6) * 0.055)
+        const claimBudget = Math.round(monthlyContribution * scenario.mlr * seasonal)
+        const claimCount = scenario.status === 'healthy' ? 2 : scenario.status === 'watch' ? 3 : 4
+        for (let j = 0; j < claimCount; j++) {
+          const member = group.members[(i + j) % group.members.length]
+          const disease = scenario.diseasePattern[(i + j) % scenario.diseasePattern.length]
+          const providerId = providers[scenario.providerPattern[(i + j) % scenario.providerPattern.length]] ?? providers[0]
+          const claimNumber = `CLM-AN-${scenario.code}-${period.replace('-', '')}-${String(j + 1).padStart(2, '0')}`
+          const exists = await prisma.claim.findUnique({
+            where: { tenantId_claimNumber: { tenantId, claimNumber } },
+          })
+          if (exists) continue
+
+          const dateOfService = new Date(year, month - 1, Math.min(26, 4 + j * 6))
+          const approvedAmount = Math.max(2500, Math.round((claimBudget / claimCount) * (0.84 + j * 0.08)))
+          const billedAmount = Math.round(approvedAmount * (1.05 + (j % 3) * 0.04))
+          const memberLiability = Math.max(0, billedAmount - approvedAmount)
+          await prisma.claim.create({ data: {
+            tenantId,
+            claimNumber,
+            invoiceNumber: `PROV-${scenario.code}-${period.replace('-', '')}-${j + 1}`,
+            memberId: member.id,
+            providerId,
+            serviceType: disease.serviceType,
+            benefitCategory: disease.benefitCategory,
+            dateOfService,
+            receivedAt: dateOfService,
+            decidedAt: addDays(dateOfService, 3),
+            paidAt: j % 3 === 0 ? addDays(dateOfService, 12) : null,
+            diagnoses: [{ icdCode: disease.icd, description: disease.label, isPrimary: true }],
+            procedures: [],
+            billedAmount,
+            approvedAmount,
+            paidAmount: j % 3 === 0 ? approvedAmount : 0,
+            memberLiability,
+            status: j % 3 === 0 ? 'PAID' : 'APPROVED',
+            claimLines: { create: [
+              {
+                lineNumber: 1,
+                serviceCategory: disease.serviceType === 'INPATIENT' ? 'PROCEDURE' : 'CONSULTATION',
+                description: `${disease.label} care bundle`,
+                icdCode: disease.icd,
+                quantity: 1,
+                unitCost: Math.round(billedAmount * 0.62),
+                billedAmount: Math.round(billedAmount * 0.62),
+                approvedAmount: Math.round(approvedAmount * 0.62),
+              },
+              {
+                lineNumber: 2,
+                serviceCategory: disease.benefitCategory === 'CHRONIC_DISEASE' ? 'PHARMACY' : 'LABORATORY',
+                description: disease.benefitCategory === 'CHRONIC_DISEASE' ? 'Chronic medication and consumables' : 'Diagnostics and consumables',
+                icdCode: disease.icd,
+                quantity: 1,
+                unitCost: billedAmount - Math.round(billedAmount * 0.62),
+                billedAmount: billedAmount - Math.round(billedAmount * 0.62),
+                approvedAmount: approvedAmount - Math.round(approvedAmount * 0.62),
+              },
+            ]},
+          }})
+        }
+      }
+    }
+
+    const riskCandidates = await prisma.member.findMany({
+      where: { tenantId, status: 'ACTIVE' },
+      include: { package: { select: { annualLimit: true } } },
+      take: 12,
+    })
+    const riskTiers = [
+      { tier: 'LOW' as const, score: 0.18, tags: ['preventive'], pct: 0.22, claims: 2, projected: null },
+      { tier: 'LOW' as const, score: 0.26, tags: ['low-acute'], pct: 0.31, claims: 3, projected: null },
+      { tier: 'MODERATE' as const, score: 0.46, tags: ['hypertension'], pct: 0.54, claims: 5, projected: addDays(demoAnchor, 210) },
+      { tier: 'MODERATE' as const, score: 0.58, tags: ['diabetes'], pct: 0.68, claims: 7, projected: addDays(demoAnchor, 160) },
+      { tier: 'HIGH' as const, score: 0.78, tags: ['diabetes', 'inpatient-risk'], pct: 0.84, claims: 9, projected: addDays(demoAnchor, 90) },
+      { tier: 'HIGH' as const, score: 0.86, tags: ['maternity', 'surgical-risk'], pct: 0.93, claims: 10, projected: addDays(demoAnchor, 60) },
+      { tier: 'CRITICAL' as const, score: 0.94, tags: ['pneumonia', 'repeat-admission'], pct: 1.08, claims: 12, projected: addDays(demoAnchor, 28) },
+      { tier: 'CRITICAL' as const, score: 0.98, tags: ['orthopaedic', 'cap-exceeded'], pct: 1.18, claims: 14, projected: addDays(demoAnchor, 14) },
+    ]
+    for (let i = 0; i < Math.min(riskCandidates.length, riskTiers.length); i++) {
+      const member = riskCandidates[i]
+      const risk = riskTiers[i]
+      const cap = Number(member.package.annualLimit)
+      await prisma.memberRiskProfile.upsert({
+        where: { memberId: member.id },
+        update: {
+          tenantId,
+          groupId: member.groupId,
+          riskTier: risk.tier,
+          riskScore: risk.score,
+          chronicTags: risk.tags,
+          utilizationToCap: risk.pct,
+          projectedExceedDate: risk.projected,
+          trailing12ClaimCost: Math.round(cap * Math.min(risk.pct, 1.25)),
+          trailing12ClaimCount: risk.claims,
+          lastCalculatedAt: demoAnchor,
+        },
+        create: {
+          tenantId,
+          groupId: member.groupId,
+          memberId: member.id,
+          riskTier: risk.tier,
+          riskScore: risk.score,
+          chronicTags: risk.tags,
+          utilizationToCap: risk.pct,
+          projectedExceedDate: risk.projected,
+          trailing12ClaimCost: Math.round(cap * Math.min(risk.pct, 1.25)),
+          trailing12ClaimCount: risk.claims,
+          lastCalculatedAt: demoAnchor,
+        },
+      })
+    }
+
+    await prisma.analyticsAlert.deleteMany({
+      where: { tenantId, context: { path: ['source'], equals: 'analytics-demo' } },
+    })
+    const alertGroups = await prisma.group.findMany({
+      where: { tenantId, name: { in: ['East African Breweries', 'Bamburi Cement', 'KCB Group', 'Safaricom PLC'] } },
+      select: { id: true, name: true, brokerId: true },
+    })
+    const groupByName = new Map(alertGroups.map(g => [g.name, g]))
+    const providerForAlert = await prisma.provider.findFirst({ where: { tenantId, name: 'Aga Khan University Hospital' }, select: { id: true } })
+    await prisma.analyticsAlert.createMany({ data: [
+      {
+        tenantId,
+        groupId: groupByName.get('Bamburi Cement')?.id,
+        intermediaryId: groupByName.get('Bamburi Cement')?.brokerId,
+        type: 'MLR_DRIFT',
+        severity: 'CRITICAL',
+        status: 'OPEN',
+        title: 'Bamburi Cement MLR above pricing target',
+        message: 'Trailing claims have exceeded contributions, driven by surgical and injury episodes.',
+        metricKey: 'trailing12Mlr',
+        metricValue: 1.08,
+        thresholdValue: 0.75,
+        context: { source: 'analytics-demo', driver: 'surgical spike' },
+      },
+      {
+        tenantId,
+        providerId: providerForAlert?.id,
+        type: 'PROVIDER_ANOMALY',
+        severity: 'WARNING',
+        status: 'OPEN',
+        title: 'Aga Khan adjusted cost above peer benchmark',
+        message: 'Case-mix-adjusted inpatient cost is materially above Avenue-owned facilities.',
+        metricKey: 'adjustedCostIndex',
+        metricValue: 1.34,
+        thresholdValue: 1.15,
+        context: { source: 'analytics-demo', peerGroup: 'tertiary inpatient' },
+      },
+      {
+        tenantId,
+        groupId: groupByName.get('East African Breweries')?.id,
+        type: 'RENEWAL_RISK',
+        severity: 'CRITICAL',
+        status: 'ACKNOWLEDGED',
+        title: 'EABL renewal requires contribution action',
+        message: 'Renewal analysis recommends an increase because trailing MLR is above target.',
+        metricKey: 'recommendedAdjustmentPct',
+        metricValue: 0.18,
+        thresholdValue: 0.1,
+        context: { source: 'analytics-demo', dueInDays: 61 },
+      },
+      {
+        tenantId,
+        groupId: groupByName.get('KCB Group')?.id,
+        type: 'UTILIZATION_SPIKE',
+        severity: 'WARNING',
+        status: 'OPEN',
+        title: 'KCB chronic disease utilization rising',
+        message: 'Diabetes and hypertension claims are trending upward across the last two quarters.',
+        metricKey: 'chronicClaimShare',
+        metricValue: 0.42,
+        thresholdValue: 0.3,
+        context: { source: 'analytics-demo', driver: 'E11/I10' },
+      },
+      {
+        tenantId,
+        groupId: groupByName.get('Safaricom PLC')?.id,
+        type: 'CONTRIBUTION_SHORTFALL',
+        severity: 'INFO',
+        status: 'RESOLVED',
+        title: 'Safaricom contribution collection restored',
+        message: 'Premium collection is current after a temporary delay in the last cycle.',
+        metricKey: 'collectionRate',
+        metricValue: 1,
+        thresholdValue: 0.95,
+        context: { source: 'analytics-demo', resolvedBySeed: true },
+        resolvedAt: demoAnchor,
+      },
+    ]})
+
+    const analyticsResult = await AnalyticsRefreshService.refreshFoundation({ tenantId })
+    console.log(
+      `✅ Strategic purchasing analytics demo: ${closedMonths.length} months, ` +
+      `${analyticsResult.encounterFacts.facts} encounter facts, ` +
+      `${analyticsResult.contributionFacts.facts} contribution facts, ` +
+      `${analyticsResult.mlrSnapshots.snapshots} MLR snapshots, ` +
+      `${analyticsResult.providerScorecards.scorecards} provider scorecards, ` +
+      `${analyticsResult.renewalAnalyses.renewalAnalyses} renewal analyses`
+    )
   }
 
   console.log('\n🎉 Seed complete! All features populated.\n')
