@@ -59,17 +59,17 @@ function MetricStrip({
       {metrics.map((metric) => {
         const Icon = metric.icon;
         return (
-          <div key={metric.label} className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
+          <div key={metric.label} className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm font-ui">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-xs font-bold uppercase tracking-wide text-avenue-text-muted">{metric.label}</p>
+                <p className="text-[13px] font-bold uppercase tracking-normal text-avenue-text-muted">{metric.label}</p>
                 <p className="mt-2 text-2xl font-bold tabular-nums text-avenue-text-heading">{metric.value}</p>
               </div>
               <div className={`rounded-[8px] p-2 ${metric.tone}`}>
                 <Icon className="h-5 w-5" />
               </div>
             </div>
-            <p className="mt-2 text-xs text-avenue-text-muted">{metric.detail}</p>
+            <p className="mt-2 text-[13px] leading-snug text-avenue-text-muted">{metric.detail}</p>
           </div>
         );
       })}
@@ -107,8 +107,8 @@ function SchemeGrid({
         <Building2 className="h-5 w-5 text-avenue-indigo" />
       </div>
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[860px] text-left text-sm">
-          <thead className="border-b border-[#EEEEEE] bg-[#F8F9FA] text-xs uppercase tracking-wide text-avenue-text-muted">
+        <table className="w-full min-w-[860px] text-left text-sm font-ui">
+          <thead className="border-b border-[#EEEEEE] bg-[#F8F9FA] text-[13px] uppercase tracking-normal text-avenue-text-muted">
             <tr>
               <th className="px-5 py-3 font-bold">Scheme</th>
               <th className="px-5 py-3 font-bold">Members</th>
@@ -131,13 +131,13 @@ function SchemeGrid({
               <tr key={scheme.groupId} className="hover:bg-[#F8F9FA]">
                 <td className="px-5 py-4">
                   <p className="font-semibold text-avenue-text-heading">{scheme.name}</p>
-                  <p className="text-xs text-avenue-text-muted">{scheme.intermediaryName ?? "Direct"} · {scheme.period ?? "No period"}</p>
+                  <p className="text-[13px] leading-snug text-avenue-text-muted">{scheme.intermediaryName ?? "Direct"} · {scheme.period ?? "No period"}</p>
                 </td>
                 <td className="px-5 py-4 tabular-nums">{scheme.memberCount.toLocaleString()}</td>
                 <td className="px-5 py-4 tabular-nums">{formatMoney(scheme.contribution)}</td>
                 <td className="px-5 py-4 tabular-nums">{formatMoney(scheme.claims)}</td>
                 <td className="px-5 py-4">
-                  <span className={`rounded-full px-2 py-1 text-xs font-bold tabular-nums ${statusTone(scheme.mlr)}`}>
+                  <span className={`rounded-full px-2 py-1 text-[13px] font-bold tabular-nums tracking-normal ${statusTone(scheme.mlr)}`}>
                     {formatPercent(scheme.mlr)}
                   </span>
                 </td>
@@ -145,7 +145,7 @@ function SchemeGrid({
                   <MiniSparkline values={scheme.sparkline} />
                 </td>
                 <td className="px-5 py-4">
-                  <span className="rounded-full bg-avenue-bg-alt px-2 py-1 text-xs font-bold text-avenue-text-heading">
+                  <span className="rounded-full bg-avenue-bg-alt px-2 py-1 text-[13px] font-bold text-avenue-text-heading">
                     {scheme.alertCount}
                   </span>
                 </td>
@@ -164,7 +164,7 @@ function ProviderGrid({
   providers: Awaited<ReturnType<typeof AnalyticsService.getProviderScorecard>>;
 }) {
   return (
-    <div className="rounded-[8px] border border-[#EEEEEE] bg-white shadow-sm">
+    <div className="rounded-[8px] border border-[#EEEEEE] bg-white shadow-sm font-ui">
       <div className="flex items-center justify-between border-b border-[#EEEEEE] px-5 py-4">
         <div>
           <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Provider Scorecard</h2>
@@ -178,18 +178,18 @@ function ProviderGrid({
         )}
         {providers.slice(0, 8).map((provider, index) => (
           <div key={provider.id} className="grid grid-cols-[auto_1fr_auto] items-center gap-4 px-5 py-4">
-            <span className="flex h-8 w-8 items-center justify-center rounded-[8px] bg-avenue-indigo/10 text-xs font-bold text-avenue-indigo">
+            <span className="flex h-8 w-8 items-center justify-center rounded-[8px] bg-avenue-indigo/10 text-[13px] font-bold text-avenue-indigo">
               {index + 1}
             </span>
             <div className="min-w-0">
               <p className="truncate font-semibold text-avenue-text-heading">{provider.providerName}</p>
-              <p className="text-xs text-avenue-text-muted">
+              <p className="text-[13px] leading-snug text-avenue-text-muted">
                 {provider.providerTier ?? "UNKNOWN"} · {provider.claimCount.toLocaleString()} claims · CMI {Number(provider.caseMixIndex).toFixed(2)}
               </p>
             </div>
             <div className="text-right">
               <p className="font-bold tabular-nums text-avenue-text-heading">{formatMoney(Number(provider.adjustedCost))}</p>
-              <p className="text-xs text-avenue-text-muted">{formatPercent(Number(provider.rejectionRate))} rejected</p>
+              <p className="text-[13px] leading-snug text-avenue-text-muted">{formatPercent(Number(provider.rejectionRate))} rejected</p>
             </div>
           </div>
         ))}
@@ -211,7 +211,7 @@ function RiskComposition({
   };
 
   return (
-    <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
+    <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm font-ui">
       <div className="mb-5 flex items-center justify-between">
         <div>
           <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Risk Composition</h2>
@@ -251,7 +251,7 @@ function RenewalPipeline({
   };
 
   return (
-    <div className="rounded-[8px] border border-[#EEEEEE] bg-white shadow-sm">
+    <div className="rounded-[8px] border border-[#EEEEEE] bg-white shadow-sm font-ui">
       <div className="flex items-center justify-between border-b border-[#EEEEEE] px-5 py-4">
         <div>
           <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Renewal Watch</h2>
@@ -268,15 +268,15 @@ function RenewalPipeline({
             <div className="mb-3 flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="truncate font-semibold text-avenue-text-heading">{renewal.groupName}</p>
-                <p className="text-xs text-avenue-text-muted">
+                <p className="text-[13px] leading-snug text-avenue-text-muted">
                   {renewal.intermediaryName ?? "Direct"} · {renewal.activeMembers.toLocaleString()} members
                 </p>
               </div>
-              <span className={`shrink-0 rounded-full px-2 py-1 text-xs font-bold ${urgencyTone(renewal.daysToRenewal)}`}>
+              <span className={`shrink-0 rounded-full px-2 py-1 text-[13px] font-bold tracking-normal ${urgencyTone(renewal.daysToRenewal)}`}>
                 {renewal.daysToRenewal}d
               </span>
             </div>
-            <div className="grid grid-cols-3 gap-2 text-xs">
+            <div className="grid grid-cols-3 gap-2 text-[13px]">
               <div>
                 <p className="text-avenue-text-muted">MLR</p>
                 <p className={`font-bold tabular-nums ${renewal.trailing12Mlr > renewal.targetMlr ? "text-[#DC3545]" : "text-[#28A745]"}`}>
@@ -294,7 +294,7 @@ function RenewalPipeline({
                 </p>
               </div>
             </div>
-            <p className="mt-3 text-xs text-avenue-text-muted">
+            <p className="mt-3 text-[13px] leading-snug text-avenue-text-muted">
               Recommended contribution {formatMoney(renewal.recommendedContribution)}
             </p>
           </div>
@@ -317,7 +317,7 @@ export default async function StrategicPurchasingAnalyticsPage() {
   ]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-ui">
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2 text-sm font-semibold text-avenue-indigo">
           <BarChart3 className="h-4 w-4" />
