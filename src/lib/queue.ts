@@ -14,6 +14,7 @@ export const Queues = {
   billing:       new Queue("billing",       { connection }),
   clinical:      new Queue("clinical",      { connection }),
   system:        new Queue("system",        { connection }),
+  analytics:     new Queue("analytics",     { connection }),
 };
 
 /**
@@ -74,6 +75,22 @@ export async function scheduleCommissionReconciliationJob() {
 }
 
 /**
+ * Refresh strategic purchasing analytics facts and lightweight derived data.
+ * Runs every 15 minutes so dashboards can read from analytics tables.
+ */
+export async function scheduleAnalyticsRefreshJob() {
+  await Queues.analytics.add(
+    "refresh-foundation",
+    {},
+    {
+      repeat: { every: 15 * 60 * 1000 },
+      jobId: "analytics-refresh-foundation-recurring",
+      attempts: 2,
+    },
+  );
+}
+
+/**
  * Enqueue an email to be sent asynchronously.
  */
 export async function enqueueEmail(payload: { to: string; subject: string; body: string; html?: string; correspondenceId?: string }) {
@@ -94,6 +111,12 @@ export async function enqueueBillingRun(groupId: string) {
 
 export async function enqueueCommissionReconciliation(period?: string) {
   await Queues.billing.add("reconcile-commissions", { period }, {
+    attempts: 1,
+  });
+}
+
+export async function enqueueAnalyticsRefresh(payload: { tenantId?: string } = {}) {
+  await Queues.analytics.add("refresh-foundation", payload, {
     attempts: 1,
   });
 }

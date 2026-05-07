@@ -60,6 +60,30 @@ async function main() {
   }
   console.log(`✅ Benefit Riders: ${riders.length}`);
 
+  const caseMixWeights = [
+    { icdFamily: 'A09', label: 'Gastroenteritis and diarrhoeal disease', weight: 0.85 },
+    { icdFamily: 'B54', label: 'Malaria, unspecified', weight: 0.9 },
+    { icdFamily: 'E11', label: 'Type 2 diabetes mellitus', weight: 1.35 },
+    { icdFamily: 'I10', label: 'Essential hypertension', weight: 1.2 },
+    { icdFamily: 'J06', label: 'Acute upper respiratory infections', weight: 0.75 },
+    { icdFamily: 'J18', label: 'Pneumonia', weight: 1.6 },
+    { icdFamily: 'K35', label: 'Acute appendicitis', weight: 1.75 },
+    { icdFamily: 'M54', label: 'Back pain', weight: 0.95 },
+    { icdFamily: 'N39', label: 'Urinary tract disorders', weight: 0.9 },
+    { icdFamily: 'O80', label: 'Single spontaneous delivery', weight: 1.45 },
+    { icdFamily: 'R50', label: 'Fever of other and unknown origin', weight: 0.8 },
+    { icdFamily: 'S09', label: 'Head injury', weight: 1.25 },
+    { icdFamily: 'Z00', label: 'General examination', weight: 0.7 },
+  ];
+  for (const weight of caseMixWeights) {
+    await prisma.caseMixWeight.upsert({
+      where: { icdFamily: weight.icdFamily },
+      update: { label: weight.label, weight: weight.weight, isActive: true },
+      create: weight,
+    });
+  }
+  console.log(`✅ Case Mix Weights: ${caseMixWeights.length}`);
+
   const taxes = [
     { taxType: 'STAMP_DUTY' as const, flatAmount: 40, percentage: null },
     { taxType: 'TRAINING_LEVY' as const, flatAmount: null, percentage: 0.002 },

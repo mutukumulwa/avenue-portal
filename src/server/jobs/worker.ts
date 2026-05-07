@@ -1,11 +1,12 @@
 import { Worker, Job } from "bullmq";
-import { connection, scheduleEscalationJob, scheduleDailyJobs, scheduleCommissionReconciliationJob } from "../../lib/queue";
+import { connection, scheduleEscalationJob, scheduleDailyJobs, scheduleCommissionReconciliationJob, scheduleAnalyticsRefreshJob } from "../../lib/queue";
 import { NotificationService } from "../services/notification.service";
 import { runPreauthEscalationJob } from "./preauth-escalation.job";
 import { runRenewalReminderJob }    from "./renewal-reminder.job";
 import { runSuspensionCheckJob }    from "./suspension-check.job";
 import { runFundBalanceAlertJob }   from "./fund-balance-alert.job";
 import { runCommissionReconciliationJob } from "./commission-reconciliation.job";
+import { runAnalyticsRefreshJob } from "./analytics-refresh.job";
 
 console.log("Starting background workers...");
 
@@ -13,6 +14,7 @@ console.log("Starting background workers...");
 scheduleEscalationJob().catch(err => console.error("[Worker] Failed to schedule escalation job:", err));
 scheduleDailyJobs().catch(err => console.error("[Worker] Failed to schedule daily jobs:", err));
 scheduleCommissionReconciliationJob().catch(err => console.error("[Worker] Failed to schedule commission reconciliation job:", err));
+scheduleAnalyticsRefreshJob().catch(err => console.error("[Worker] Failed to schedule analytics refresh job:", err));
 
 /**
  * NOTIFICATIONS WORKER
@@ -87,6 +89,20 @@ clinicalWorker.on('failed', (job: Job | undefined, err: Error) => {
   console.error(`[Worker] Clinical job ${job?.id} failed:`, err);
 });
 
+/**
+ * ANALYTICS WORKER
+ * Keeps read-optimized strategic purchasing facts fresh for dashboards.
+ */
+const analyticsWorker = new Worker("analytics", async (job: Job) => {
+  if (job.name === "refresh-foundation") {
+    await runAnalyticsRefreshJob(job.data as { tenantId?: string });
+  }
+}, { connection });
+
+analyticsWorker.on('failed', (job: Job | undefined, err: Error) => {
+  console.error(`[Worker] Analytics job ${job?.id} failed:`, err);
+});
+
 // Process exit handling loop
 process.on("SIGTERM", async () => {
   console.log("Gracefully closing workers...");
@@ -94,4 +110,5 @@ process.on("SIGTERM", async () => {
   await billingWorker.close();
   await systemWorker.close();
   await clinicalWorker.close();
+  await analyticsWorker.close();
 });

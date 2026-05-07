@@ -2256,3 +2256,254 @@ model FamilyAnnualCoContribution {
   @@unique([principalMemberId, membershipYear])
   @@index([tenantId])
 }
+
+// ─── STRATEGIC PURCHASING ANALYTICS ─────────────────────
+enum AnalyticsEncounterType {
+  OUTPATIENT
+  INPATIENT
+  DAY_CASE
+  EMERGENCY
+}
+
+enum RiskTier {
+  LOW
+  MODERATE
+  HIGH
+  CRITICAL
+}
+
+enum AnalyticsAlertType {
+  MLR_DRIFT
+  UTILIZATION_SPIKE
+  PROVIDER_ANOMALY
+  RENEWAL_RISK
+  MEMBER_RISK
+  CONTRIBUTION_SHORTFALL
+}
+
+enum AnalyticsAlertSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum AnalyticsAlertStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+model AnalyticsEncounterFact {
+  id                    String                 @id @default(cuid())
+  sourceKey             String                 @unique
+  sourceClaimId         String
+  sourceClaimLineId     String?
+  tenantId              String
+  groupId               String
+  packageId             String?
+  benefitTierId         String?
+  intermediaryId        String?
+  memberId              String
+  providerId            String
+  providerTier          ProviderTier?
+  providerType          ProviderType?
+  isInternalProvider    Boolean                @default(false)
+  encounterDate         DateTime
+  encounterMonth        DateTime
+  encounterType         AnalyticsEncounterType
+  benefitCategory       BenefitCategory?
+  icdCode               String?
+  icdFamily             String?
+  memberAge             Int?
+  memberAgeBand         String?
+  memberGender          Gender?
+  memberRelationship    MemberRelationship?
+  familySizeBand        String?
+  memberCounty          String?
+  groupCounty           String?
+  providerCounty        String?
+  grossCost             Decimal                @db.Decimal(18, 2)
+  benefitPaid           Decimal                @db.Decimal(18, 2)
+  memberCoContribution  Decimal                @default(0) @db.Decimal(18, 2)
+  rejectedAmount        Decimal                @default(0) @db.Decimal(18, 2)
+  caseMixWeight         Decimal                @default(1) @db.Decimal(10, 4)
+  usedDefaultCaseMix    Boolean                @default(true)
+  status                ClaimStatus
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  @@index([tenantId, encounterDate])
+  @@index([tenantId, encounterMonth])
+  @@index([groupId, encounterDate])
+  @@index([providerId, encounterDate])
+  @@index([intermediaryId, encounterDate])
+  @@index([memberId, encounterDate])
+  @@index([tenantId, status, encounterDate])
+  @@index([tenantId, icdFamily, encounterDate])
+}
+
+model AnalyticsContributionFact {
+  id                    String   @id @default(cuid())
+  sourceKey             String   @unique
+  sourceInvoiceId       String?
+  sourcePaymentId       String?
+  tenantId              String
+  groupId               String
+  packageId             String?
+  benefitTierId         String?
+  intermediaryId        String?
+  period                String
+  periodStart           DateTime
+  periodEnd             DateTime
+  memberCount           Int
+  grossContribution     Decimal  @db.Decimal(18, 2)
+  paidContribution      Decimal  @default(0) @db.Decimal(18, 2)
+  outstandingAmount     Decimal  @default(0) @db.Decimal(18, 2)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([tenantId, periodStart])
+  @@index([groupId, periodStart])
+  @@index([intermediaryId, periodStart])
+  @@index([tenantId, period])
+}
+
+model CaseMixWeight {
+  id              String   @id @default(cuid())
+  icdFamily       String   @unique
+  label           String
+  weight          Decimal  @default(1) @db.Decimal(10, 4)
+  effectiveFrom   DateTime @default(now())
+  effectiveTo     DateTime?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([isActive])
+}
+
+model AnalyticsMlrSnapshot {
+  id                    String   @id @default(cuid())
+  tenantId              String
+  groupId               String?
+  packageId             String?
+  benefitTierId         String?
+  intermediaryId        String?
+  grain                 String
+  period                String
+  periodStart           DateTime
+  grossContribution     Decimal  @db.Decimal(18, 2)
+  paidContribution      Decimal  @default(0) @db.Decimal(18, 2)
+  grossCost             Decimal  @default(0) @db.Decimal(18, 2)
+  benefitPaid           Decimal  @default(0) @db.Decimal(18, 2)
+  memberCoContribution  Decimal  @default(0) @db.Decimal(18, 2)
+  mlr                   Decimal  @default(0) @db.Decimal(10, 4)
+  trailing12Mlr         Decimal  @default(0) @db.Decimal(10, 4)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([tenantId, grain, period, groupId, packageId, benefitTierId, intermediaryId])
+  @@index([tenantId, periodStart])
+  @@index([groupId, periodStart])
+  @@index([intermediaryId, periodStart])
+}
+
+model ProviderScorecard {
+  id                    String   @id @default(cuid())
+  tenantId              String
+  providerId            String
+  period                String
+  periodStart           DateTime
+  providerName          String
+  providerTier          ProviderTier?
+  providerType          ProviderType?
+  claimCount            Int
+  memberCount           Int
+  grossCost             Decimal  @db.Decimal(18, 2)
+  adjustedCost          Decimal  @db.Decimal(18, 2)
+  averageCost           Decimal  @default(0) @db.Decimal(18, 2)
+  caseMixIndex          Decimal  @default(1) @db.Decimal(10, 4)
+  rejectionRate         Decimal  @default(0) @db.Decimal(10, 4)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([tenantId, providerId, period])
+  @@index([tenantId, periodStart])
+  @@index([providerId, periodStart])
+}
+
+model MemberRiskProfile {
+  id                    String   @id @default(cuid())
+  tenantId              String
+  groupId               String
+  memberId              String
+  riskTier              RiskTier @default(LOW)
+  riskScore             Decimal  @default(0) @db.Decimal(10, 4)
+  chronicTags           String[]
+  utilizationToCap      Decimal  @default(0) @db.Decimal(10, 4)
+  projectedExceedDate   DateTime?
+  trailing12ClaimCost   Decimal  @default(0) @db.Decimal(18, 2)
+  trailing12ClaimCount  Int      @default(0)
+  lastCalculatedAt      DateTime @default(now())
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([memberId])
+  @@index([tenantId, riskTier])
+  @@index([groupId, riskTier])
+  @@index([projectedExceedDate])
+}
+
+model RenewalAnalysis {
+  id                         String   @id @default(cuid())
+  tenantId                   String
+  groupId                    String
+  renewalDate                DateTime
+  trailing12Mlr              Decimal  @default(0) @db.Decimal(10, 4)
+  currentYearMlr             Decimal  @default(0) @db.Decimal(10, 4)
+  targetMlr                  Decimal  @default(0.75) @db.Decimal(10, 4)
+  currentContribution        Decimal  @default(0) @db.Decimal(18, 2)
+  projectedClaims            Decimal  @default(0) @db.Decimal(18, 2)
+  recommendedContribution    Decimal  @default(0) @db.Decimal(18, 2)
+  recommendedAdjustmentPct   Decimal  @default(0) @db.Decimal(10, 4)
+  topIcdDrivers              Json     @default("[]")
+  anonymizedTopUtilizers     Json     @default("[]")
+  simulatorDefaults          Json     @default("{}")
+  lastCalculatedAt           DateTime @default(now())
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+
+  @@unique([groupId, renewalDate])
+  @@index([tenantId, renewalDate])
+}
+
+model AnalyticsAlert {
+  id                 String                 @id @default(cuid())
+  tenantId           String
+  groupId            String?
+  providerId         String?
+  memberId           String?
+  intermediaryId     String?
+  type               AnalyticsAlertType
+  severity           AnalyticsAlertSeverity @default(INFO)
+  status             AnalyticsAlertStatus   @default(OPEN)
+  title              String
+  message            String
+  metricKey          String?
+  metricValue        Decimal?               @db.Decimal(18, 4)
+  thresholdValue     Decimal?               @db.Decimal(18, 4)
+  context            Json                   @default("{}")
+  acknowledgedById   String?
+  acknowledgedAt     DateTime?
+  resolvedById       String?
+  resolvedAt         DateTime?
+  resolutionNote     String?
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  @@index([tenantId, status, severity, createdAt])
+  @@index([groupId, status])
+  @@index([providerId, status])
+  @@index([memberId, status])
+  @@index([intermediaryId, status])
+}
