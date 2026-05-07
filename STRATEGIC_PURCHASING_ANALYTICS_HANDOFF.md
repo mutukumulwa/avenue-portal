@@ -904,6 +904,49 @@ Manual/browser QA still required after server/database refresh:
 - [ ] Login as HR and broker seeded users; verify admin analytics routes are still blocked by layout and future service/API scopes are ready.
 - [ ] Decide whether old non-analytics transactional reports should be fund-admin scoped or hidden from fund admins.
 
+### 2026-05-08 Fund Portal Stabilization Pass
+
+Goal: address fund portal gaps found while testing EABL/Bamburi self-funded schemes.
+
+Completed:
+
+- [x] Made EABL and Bamburi self-funded demo seed idempotent.
+  - The seed now converts/updates the groups even if they are already `SELF_FUNDED`.
+  - The seed now upserts `SelfFundedAccount` by `groupId` and rebuilds the demo fund ledger rows.
+  - EABL fund claims now use deterministic claim numbers instead of count-based numbers that can drift across reruns.
+- [x] Fixed fund detail KPI display where active lives were shown with a `KES` prefix.
+- [x] Added fund-admin assignment checks to `/fund/[groupId]/claims`.
+- [x] Added fund-admin assignment checks to `/fund/[groupId]/statement`.
+- [x] Added role and assigned-scheme checks to `/api/fund/[groupId]/statement/export`.
+- [x] Scoped fund dashboard large-claims list to the signed-in fund administrator's assigned schemes.
+- [x] Ran `npm run build`.
+
+Verification caveat:
+
+- [ ] `npx tsc --noEmit` is blocked by untracked root `scratch-*.ts` files, not by the fund portal code. Current blockers include `scratch-bamburi-claims.ts`, `scratch-bamburi-invoices.ts`, `scratch-bamburi-rate.ts`, and `scratch-check-api.ts`.
+- [ ] Run `npm run db:seed` against a dev database, then verify `fund@avenue.co.ke` can open `/fund/dashboard`, EABL detail, EABL claims, EABL statement, and statement CSV export.
+
+### 2026-05-08 Strategic Analytics Run-Rate Labeling And Global Rendering Pass
+
+Goal: remove ambiguity in the Strategic Purchasing Console metrics and address the remaining Windows font rendering issues globally instead of patching one card/page at a time.
+
+Completed:
+
+- [x] Clarified `/analytics` portfolio MLR detail as the latest monthly run-rate period.
+- [x] Clarified `/analytics` Contribution YTD detail as collected YTD.
+- [x] Clarified the scheme performance panel as latest monthly run-rate analytics.
+- [x] Renamed scheme grid headers to `Monthly Contribution`, `Monthly Claims`, and `Monthly MLR`.
+- [x] Added monthly collected contribution under each scheme's monthly billed contribution.
+- [x] Changed scheme row period copy to `Run-rate period ...` so it is obvious the row is period-based.
+- [x] Added global font smoothing/kerning rules in `src/app/globals.css`.
+- [x] Added a global override for Tailwind `tracking-tight`, `tracking-wide`, `tracking-wider`, and `tracking-widest` utilities so letter spacing is normalized to `0` across Windows and macOS.
+
+Notes:
+
+- The top contribution card is still a year-to-date portfolio KPI.
+- The scheme performance table is the monthly run-rate surface and now labels both billed and collected amounts accordingly.
+- The global tracking override is intentionally broad because the Windows rendering issue appeared across multiple pages and the design standard for this project is zero letter spacing.
+
 ### 2026-05-08 Recommended next slice (as of 2026-05-08):
 
 All four analytics drilldown areas are now complete (Scheme, Alert, Renewal, Provider). Reports integration is done. Remaining work in priority order:

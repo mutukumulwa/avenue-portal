@@ -2170,7 +2170,7 @@ async function main() {
       // ── 16d. Self-funded schemes ──────────────────────────────────────────
       // Scheme 1: East African Breweries — healthy fund, multi-category claims
       const eabl = await prisma.group.findFirst({ where: { tenantId, name: 'East African Breweries' } })
-      if (eabl && eabl.fundingMode === 'INSURED') {
+      if (eabl) {
         const fundAdminUser = await prisma.user.findFirst({ where: { tenantId, email: 'fund@avenue.co.ke' } })
         await prisma.group.update({ where: { id: eabl.id }, data: {
           fundingMode: 'SELF_FUNDED', adminFeeMethod: 'FLAT_PER_INSURED', adminFeeRate: 2000,
@@ -2186,18 +2186,23 @@ async function main() {
         const eablMember2 = eablMembers[1] ?? eablMembers[0]
 
         // Create real EABL claims so the dashboard has fund deductions with claimIds
-        type ClaimSeed = {
-          claimNumber: string; memberId: string; providerId: string
-          serviceType: string; benefitCategory: string; dateOfService: Date
-          billedAmount: number; approvedAmount: number; status: string
-          diagnoses: object; procedures: object
-        }
-        const eablClaims: ClaimSeed[] = []
+        const eablClaims: { id: string; approvedAmount: unknown; benefitCategory: string; dateOfService: Date }[] = []
         if (eablMember1) {
-          const clmBase = await prisma.claim.count({ where: { tenantId } })
           // Inpatient — large claim to show in large-claims table
-          const clm1 = await prisma.claim.create({ data: {
-            tenantId, claimNumber: `CLM-EABL-${String(clmBase + 1).padStart(5,'0')}`,
+          const clm1 = await prisma.claim.upsert({
+            where: { tenantId_claimNumber: { tenantId, claimNumber: 'CLM-EABL-FUND-001' } },
+            update: {
+              memberId: eablMember1.id, providerId: providers[2],
+              serviceType: 'INPATIENT', benefitCategory: 'INPATIENT',
+              dateOfService: new Date('2025-02-10'),
+              admissionDate: new Date('2025-02-10'), dischargeDate: new Date('2025-02-14'), lengthOfStay: 4,
+              billedAmount: 220000, approvedAmount: 210000, status: 'APPROVED',
+              decidedAt: new Date('2025-02-15'), receivedAt: new Date('2025-02-15'),
+              diagnoses: [{ icdCode: 'J18.9', description: 'Pneumonia', isPrimary: true }],
+              procedures: [],
+            },
+            create: {
+            tenantId, claimNumber: 'CLM-EABL-FUND-001',
             memberId: eablMember1.id, providerId: providers[2],
             serviceType: 'INPATIENT', benefitCategory: 'INPATIENT',
             dateOfService: new Date('2025-02-10'),
@@ -2207,11 +2212,22 @@ async function main() {
             diagnoses: [{ icdCode: 'J18.9', description: 'Pneumonia', isPrimary: true }],
             procedures: [],
           }})
-          eablClaims.push(clm1 as unknown as ClaimSeed)
+          eablClaims.push(clm1)
 
           // Outpatient — medium claim
-          const clm2 = await prisma.claim.create({ data: {
-            tenantId, claimNumber: `CLM-EABL-${String(clmBase + 2).padStart(5,'0')}`,
+          const clm2 = await prisma.claim.upsert({
+            where: { tenantId_claimNumber: { tenantId, claimNumber: 'CLM-EABL-FUND-002' } },
+            update: {
+              memberId: eablMember1.id, providerId: providers[0],
+              serviceType: 'OUTPATIENT', benefitCategory: 'OUTPATIENT',
+              dateOfService: new Date('2025-03-05'),
+              billedAmount: 18500, approvedAmount: 17000, status: 'APPROVED',
+              decidedAt: new Date('2025-03-05'), receivedAt: new Date('2025-03-05'),
+              diagnoses: [{ icdCode: 'E11.9', description: 'Type 2 diabetes', isPrimary: true }],
+              procedures: [],
+            },
+            create: {
+            tenantId, claimNumber: 'CLM-EABL-FUND-002',
             memberId: eablMember1.id, providerId: providers[0],
             serviceType: 'OUTPATIENT', benefitCategory: 'OUTPATIENT',
             dateOfService: new Date('2025-03-05'),
@@ -2225,13 +2241,24 @@ async function main() {
               { lineNumber: 3, serviceCategory: 'PHARMACY',     description: 'Metformin + supplements', cptCode: null,    quantity: 1, unitCost: 12000, billedAmount: 12000, approvedAmount: 10500 },
             ]},
           }})
-          eablClaims.push(clm2 as unknown as ClaimSeed)
+          eablClaims.push(clm2)
         }
         if (eablMember2 && eablMember2.id !== eablMember1?.id) {
-          const clmBase2 = await prisma.claim.count({ where: { tenantId } })
           // Surgical — large, triggers large-claims table
-          const clm3 = await prisma.claim.create({ data: {
-            tenantId, claimNumber: `CLM-EABL-${String(clmBase2 + 1).padStart(5,'0')}`,
+          const clm3 = await prisma.claim.upsert({
+            where: { tenantId_claimNumber: { tenantId, claimNumber: 'CLM-EABL-FUND-003' } },
+            update: {
+              memberId: eablMember2.id, providerId: providers[2],
+              serviceType: 'INPATIENT', benefitCategory: 'SURGICAL',
+              dateOfService: new Date('2025-01-20'),
+              billedAmount: 185000, approvedAmount: 175000, status: 'PAID',
+              decidedAt: new Date('2025-01-22'), receivedAt: new Date('2025-01-22'),
+              paidAt: new Date('2025-02-01'),
+              diagnoses: [{ icdCode: 'K35.9', description: 'Acute appendicitis', isPrimary: true }],
+              procedures: [{ cptCode: '44950', description: 'Appendectomy', quantity: 1, unitCost: 110000 }],
+            },
+            create: {
+            tenantId, claimNumber: 'CLM-EABL-FUND-003',
             memberId: eablMember2.id, providerId: providers[2],
             serviceType: 'INPATIENT', benefitCategory: 'SURGICAL',
             dateOfService: new Date('2025-01-20'),
@@ -2241,12 +2268,22 @@ async function main() {
             diagnoses: [{ icdCode: 'K35.9', description: 'Acute appendicitis', isPrimary: true }],
             procedures: [{ cptCode: '44950', description: 'Appendectomy', quantity: 1, unitCost: 110000 }],
           }})
-          eablClaims.push(clm3 as unknown as ClaimSeed)
+          eablClaims.push(clm3)
 
           // Dental
-          const clmBase3 = await prisma.claim.count({ where: { tenantId } })
-          const clm4 = await prisma.claim.create({ data: {
-            tenantId, claimNumber: `CLM-EABL-${String(clmBase3 + 1).padStart(5,'0')}`,
+          const clm4 = await prisma.claim.upsert({
+            where: { tenantId_claimNumber: { tenantId, claimNumber: 'CLM-EABL-FUND-004' } },
+            update: {
+              memberId: eablMember2.id, providerId: providers[0],
+              serviceType: 'OUTPATIENT', benefitCategory: 'DENTAL',
+              dateOfService: new Date('2025-03-18'),
+              billedAmount: 22000, approvedAmount: 20000, status: 'APPROVED',
+              decidedAt: new Date('2025-03-18'), receivedAt: new Date('2025-03-18'),
+              diagnoses: [{ icdCode: 'K02.9', description: 'Dental caries', isPrimary: true }],
+              procedures: [],
+            },
+            create: {
+            tenantId, claimNumber: 'CLM-EABL-FUND-004',
             memberId: eablMember2.id, providerId: providers[0],
             serviceType: 'OUTPATIENT', benefitCategory: 'DENTAL',
             dateOfService: new Date('2025-03-18'),
@@ -2255,26 +2292,41 @@ async function main() {
             diagnoses: [{ icdCode: 'K02.9', description: 'Dental caries', isPrimary: true }],
             procedures: [],
           }})
-          eablClaims.push(clm4 as unknown as ClaimSeed)
+          eablClaims.push(clm4)
         }
 
         // Build fund account: corporate-sized opening deposit and running balance from real claim amounts
         const eablOpeningDeposit = 32_000_000
         const eablAdminFee = 450_000
         let runningBalance = eablOpeningDeposit
-        const claimTotal = eablClaims.reduce((s, c) => s + (c as unknown as { approvedAmount: number }).approvedAmount, 0)
+        const claimTotal = eablClaims.reduce((s, c) => s + Number(c.approvedAmount), 0)
         runningBalance -= claimTotal
         runningBalance -= eablAdminFee
 
-        const sfAccount = await prisma.selfFundedAccount.create({ data: {
-          tenantId, groupId: eabl.id,
-          balance: runningBalance,
-          totalDeposited: eablOpeningDeposit,
-          totalClaims: claimTotal,
-          totalAdminFees: eablAdminFee,
-          minimumBalance: 6_000_000,
-          periodStartDate: new Date('2025-01-01'), periodEndDate: new Date('2025-12-31'),
-        }})
+        const sfAccount = await prisma.selfFundedAccount.upsert({
+          where: { groupId: eabl.id },
+          update: {
+            tenantId,
+            balance: runningBalance,
+            totalDeposited: eablOpeningDeposit,
+            totalClaims: claimTotal,
+            totalAdminFees: eablAdminFee,
+            minimumBalance: 6_000_000,
+            heldCategories: [],
+            periodStartDate: new Date('2025-01-01'), periodEndDate: new Date('2025-12-31'),
+          },
+          create: {
+            tenantId, groupId: eabl.id,
+            balance: runningBalance,
+            totalDeposited: eablOpeningDeposit,
+            totalClaims: claimTotal,
+            totalAdminFees: eablAdminFee,
+            minimumBalance: 6_000_000,
+            heldCategories: [],
+            periodStartDate: new Date('2025-01-01'), periodEndDate: new Date('2025-12-31'),
+          },
+        })
+        await prisma.fundTransaction.deleteMany({ where: { selfFundedAccountId: sfAccount.id } })
 
         // Fund ledger: deposit → each individual claim deduction → admin fee
         let ledgerBalance = 0
@@ -2323,8 +2375,7 @@ async function main() {
 
       // Scheme 2: Bamburi Cement — LOW balance, triggers alert demonstration
       const bamburi = await prisma.group.findFirst({ where: { tenantId, name: 'Bamburi Cement' } })
-      const bamburiSfExists = await prisma.selfFundedAccount.findFirst({ where: { group: { name: 'Bamburi Cement' } } })
-      if (bamburi && !bamburiSfExists) {
+      if (bamburi) {
         const fundAdminUser = await prisma.user.findFirst({ where: { tenantId, email: 'fund@avenue.co.ke' } })
         await prisma.group.update({ where: { id: bamburi.id }, data: {
           fundingMode: 'SELF_FUNDED', adminFeeMethod: 'PCT_OF_CLAIMS', adminFeeRate: 5,
@@ -2332,15 +2383,30 @@ async function main() {
         }})
         // Deliberately seeded with balance BELOW minimum to demo the low-balance alert
         let bal = 12_000_000
-        const sfAccount2 = await prisma.selfFundedAccount.create({ data: {
-          tenantId, groupId: bamburi.id,
-          balance: 3_800_000,           // below minimumBalance of 5M → triggers alert without looking toy-sized
-          totalDeposited: 12_000_000,
-          totalClaims: 7_600_000,
-          totalAdminFees: 600_000,
-          minimumBalance: 5_000_000,
-          periodStartDate: new Date('2025-01-01'), periodEndDate: new Date('2025-12-31'),
-        }})
+        const sfAccount2 = await prisma.selfFundedAccount.upsert({
+          where: { groupId: bamburi.id },
+          update: {
+            tenantId,
+            balance: 3_800_000,           // below minimumBalance of 5M → triggers alert without looking toy-sized
+            totalDeposited: 12_000_000,
+            totalClaims: 7_600_000,
+            totalAdminFees: 600_000,
+            minimumBalance: 5_000_000,
+            heldCategories: [],
+            periodStartDate: new Date('2025-01-01'), periodEndDate: new Date('2025-12-31'),
+          },
+          create: {
+            tenantId, groupId: bamburi.id,
+            balance: 3_800_000,
+            totalDeposited: 12_000_000,
+            totalClaims: 7_600_000,
+            totalAdminFees: 600_000,
+            minimumBalance: 5_000_000,
+            heldCategories: [],
+            periodStartDate: new Date('2025-01-01'), periodEndDate: new Date('2025-12-31'),
+          },
+        })
+        await prisma.fundTransaction.deleteMany({ where: { selfFundedAccountId: sfAccount2.id } })
         for (const txn of [
           { type: 'DEPOSIT' as const,          amount: 12_000_000, balanceAfter: (bal = 12_000_000),          description: 'Opening deposit 2025',              referenceNumber: 'EFT-BAM-2025-001', postedAt: new Date('2025-01-03') },
           { type: 'CLAIM_DEDUCTION' as const,  amount:  1_850_000, balanceAfter: (bal -= 1_850_000, bal),      description: 'Claims deductions Jan 2025',         referenceNumber: null,                postedAt: new Date('2025-02-01') },

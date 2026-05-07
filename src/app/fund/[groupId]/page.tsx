@@ -21,7 +21,7 @@ export default async function FundSchemePage({ params }: { params: Promise<{ gro
   const { groupId } = await params;
   const tenantId = session.user.tenantId;
 
-  const group = await prisma.group.findUnique({
+  const group = await prisma.group.findFirst({
     where: { id: groupId, tenantId, fundingMode: "SELF_FUNDED" },
     include: {
       selfFundedAccount: {
@@ -118,10 +118,10 @@ export default async function FundSchemePage({ params }: { params: Promise<{ gro
       {/* KPI row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Total Deposited",  value: deposited.toLocaleString("en-KE"), icon: Wallet,       color: "text-avenue-indigo" },
-          { label: "Claims Deducted",  value: claimed.toLocaleString("en-KE"),   icon: TrendingDown, color: "text-[#DC3545]"    },
-          { label: "Admin Fees",       value: fees.toLocaleString("en-KE"),      icon: FileText,     color: "text-[#856404]"    },
-          { label: "Active Members",   value: group.members.length.toString(),   icon: Users,        color: "text-[#17A2B8]"    },
+          { label: "Total Deposited",  value: `KES ${deposited.toLocaleString("en-KE")}`, icon: Wallet,       color: "text-avenue-indigo" },
+          { label: "Claims Deducted",  value: `KES ${claimed.toLocaleString("en-KE")}`,   icon: TrendingDown, color: "text-[#DC3545]"    },
+          { label: "Admin Fees",       value: `KES ${fees.toLocaleString("en-KE")}`,      icon: FileText,     color: "text-[#856404]"    },
+          { label: "Active Lives",     value: group.members.length.toString(),             icon: Users,        color: "text-[#17A2B8]"    },
         ].map(k => {
           const Icon = k.icon;
           return (
@@ -130,7 +130,7 @@ export default async function FundSchemePage({ params }: { params: Promise<{ gro
                 <Icon size={14} className={k.color} />
                 <p className="text-xs font-bold uppercase text-avenue-text-muted">{k.label}</p>
               </div>
-              <p className={`text-xl font-bold font-mono ${k.color}`}>KES {k.value}</p>
+              <p className={`text-xl font-bold font-mono ${k.color}`}>{k.value}</p>
             </div>
           );
         })}

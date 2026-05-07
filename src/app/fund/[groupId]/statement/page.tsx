@@ -18,7 +18,7 @@ export default async function FundStatementPage({ params }: { params: Promise<{ 
   const { groupId } = await params;
   const tenantId = session.user.tenantId;
 
-  const group = await prisma.group.findUnique({
+  const group = await prisma.group.findFirst({
     where: { id: groupId, tenantId, fundingMode: "SELF_FUNDED" },
     include: {
       selfFundedAccount: {
@@ -26,10 +26,14 @@ export default async function FundStatementPage({ params }: { params: Promise<{ 
           transactions: { orderBy: { postedAt: "asc" } },
         },
       },
+      fundAdministrators: { select: { id: true } },
       members: { where: { status: "ACTIVE" }, select: { id: true } },
     },
   });
   if (!group) notFound();
+  if (session.user.role !== "SUPER_ADMIN" && !group.fundAdministrators.some((admin) => admin.id === session.user.id)) {
+    notFound();
+  }
 
   const acc = group.selfFundedAccount;
   if (!acc) notFound();
@@ -39,7 +43,6 @@ export default async function FundStatementPage({ params }: { params: Promise<{ 
   const debits   = txns.filter(t => ["CLAIM_DEDUCTION","ADMIN_FEE","ADJUSTMENT"].includes(t.type));
 
   const totalIn    = deposits.reduce((s, t) => s + Number(t.amount), 0);
-  const totalOut   = debits.reduce((s, t) => s + Number(t.amount), 0);
   const openingBal = txns.length > 0 ? Number(txns[0].balanceAfter) - (deposits[0] ? Number(deposits[0].amount) : 0) : 0;
   const closingBal = Number(acc.balance);
 

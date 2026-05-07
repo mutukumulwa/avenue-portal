@@ -50,7 +50,14 @@ export default async function FundDashboardPage() {
         where: {
           tenantId,
           status: { in: ["APPROVED", "PARTIALLY_APPROVED"] },
-          member: { group: { fundingMode: "SELF_FUNDED" } },
+          member: {
+            group: {
+              fundingMode: "SELF_FUNDED",
+              ...(session.user.role === "SUPER_ADMIN"
+                ? {}
+                : { fundAdministrators: { some: { id: session.user.id } } }),
+            },
+          },
           approvedAmount: { gte: 50000 },
         },
         select: {

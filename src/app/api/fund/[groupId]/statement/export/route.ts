@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { ROLES, type UserRole } from "@/lib/rbac";
 
 export async function GET(
   _req: Request,
@@ -8,19 +9,26 @@ export async function GET(
 ) {
   const session = await auth();
   if (!session?.user?.tenantId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!session.user.role || !ROLES.FUND.includes(session.user.role as UserRole)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   const { groupId } = await params;
   const tenantId = session.user.tenantId;
 
-  const group = await prisma.group.findUnique({
+  const group = await prisma.group.findFirst({
     where: { id: groupId, tenantId, fundingMode: "SELF_FUNDED" },
     include: {
       selfFundedAccount: {
         include: { transactions: { orderBy: { postedAt: "asc" } } },
       },
+      fundAdministrators: { select: { id: true } },
     },
   });
   if (!group?.selfFundedAccount) return NextResponse.json({ error: "Not found" }, { status: 404 });
+  if (session.user.role !== "SUPER_ADMIN" && !group.fundAdministrators.some((admin) => admin.id === session.user.id)) {
+    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  }
 
   const acc  = group.selfFundedAccount;
   const txns = acc.transactions;

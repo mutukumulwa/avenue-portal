@@ -29,7 +29,7 @@ function MetricStrip({
     {
       label: "Portfolio MLR",
       value: formatPercent(summary.portfolioMlr),
-      detail: summary.period ? `Latest period ${summary.period}` : "Awaiting analytics refresh",
+      detail: summary.period ? `Latest monthly run-rate period ${summary.period}` : "Awaiting analytics refresh",
       icon: Gauge,
       tone: statusTone(summary.portfolioMlr),
     },
@@ -43,7 +43,7 @@ function MetricStrip({
     {
       label: "Contribution YTD",
       value: formatMoney(summary.contributionYtd),
-      detail: `${formatMoney(summary.paidContributionYtd)} collected`,
+      detail: `${formatMoney(summary.paidContributionYtd)} collected YTD`,
       icon: TrendingUp,
       tone: "text-[#17A2B8] bg-[#17A2B8]/10",
     },
@@ -111,7 +111,7 @@ function SchemeGrid({
       <div className="flex items-center justify-between border-b border-[#EEEEEE] px-5 py-4">
         <div>
           <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Scheme Performance</h2>
-          <p className="text-sm text-avenue-text-muted">Current contribution, claims pressure, and alert signals by scheme.</p>
+          <p className="text-sm text-avenue-text-muted">Latest monthly run-rate contribution, collected amounts, claims pressure, and alert signals by scheme.</p>
         </div>
         <Building2 className="h-5 w-5 text-avenue-indigo" />
       </div>
@@ -121,9 +121,9 @@ function SchemeGrid({
             <tr>
               <th className="px-5 py-3 font-bold">Scheme</th>
               <th className="px-5 py-3 font-bold">Members</th>
-              <th className="px-5 py-3 font-bold">Contribution</th>
-              <th className="px-5 py-3 font-bold">Claims</th>
-              <th className="px-5 py-3 font-bold">MLR</th>
+              <th className="px-5 py-3 font-bold">Monthly Contribution</th>
+              <th className="px-5 py-3 font-bold">Monthly Claims</th>
+              <th className="px-5 py-3 font-bold">Monthly MLR</th>
               <th className="px-5 py-3 font-bold">Trend</th>
               <th className="px-5 py-3 font-bold">Alerts</th>
             </tr>
@@ -142,10 +142,13 @@ function SchemeGrid({
                   <Link href={`/analytics/schemes/${scheme.groupId}`} className="font-semibold text-avenue-text-heading hover:text-avenue-indigo hover:underline">
                     {scheme.name}
                   </Link>
-                  <p className="text-[13px] leading-snug text-avenue-text-muted">{scheme.intermediaryName ?? "Direct"} · {scheme.period ?? "No period"}</p>
+                  <p className="text-[13px] leading-snug text-avenue-text-muted">{scheme.intermediaryName ?? "Direct"} · Run-rate period {scheme.period ?? "not refreshed"}</p>
                 </td>
                 <td className="px-5 py-4 tabular-nums">{scheme.memberCount.toLocaleString()}</td>
-                <td className="px-5 py-4 tabular-nums">{formatMoney(scheme.contribution)}</td>
+                <td className="px-5 py-4 tabular-nums">
+                  <p>{formatMoney(scheme.contribution)}</p>
+                  <p className="text-[13px] leading-snug text-avenue-text-muted">{formatMoney(scheme.paidContribution)} collected</p>
+                </td>
                 <td className="px-5 py-4 tabular-nums">{formatMoney(scheme.claims)}</td>
                 <td className="px-5 py-4">
                   <span className={`rounded-full px-2 py-1 text-[13px] font-bold tabular-nums tracking-normal ${statusTone(scheme.mlr)}`}>
@@ -338,7 +341,7 @@ export default async function StrategicPurchasingAnalyticsPage() {
         </div>
         <div>
           <h1 className="font-heading text-3xl font-bold text-avenue-text-heading">Strategic Purchasing Console</h1>
-          <p className="text-avenue-text-muted">Portfolio MLR, scheme performance, provider efficiency, and risk signals.</p>
+          <p className="text-avenue-text-muted">Portfolio MLR, monthly scheme run-rate performance, provider efficiency, and risk signals.</p>
         </div>
       </div>
 

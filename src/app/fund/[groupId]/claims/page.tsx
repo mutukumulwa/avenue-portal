@@ -20,11 +20,18 @@ export default async function FundClaimsPage({ params }: { params: Promise<{ gro
   const { groupId } = await params;
   const tenantId = session.user.tenantId;
 
-  const group = await prisma.group.findUnique({
+  const group = await prisma.group.findFirst({
     where: { id: groupId, tenantId, fundingMode: "SELF_FUNDED" },
-    select: { name: true, selfFundedAccount: { select: { balance: true, totalClaims: true } } },
+    select: {
+      name: true,
+      fundAdministrators: { select: { id: true } },
+      selfFundedAccount: { select: { balance: true, totalClaims: true, heldCategories: true } },
+    },
   });
   if (!group) notFound();
+  if (session.user.role !== "SUPER_ADMIN" && !group.fundAdministrators.some((admin) => admin.id === session.user.id)) {
+    notFound();
+  }
 
   const claims = await prisma.claim.findMany({
     where: { tenantId, member: { groupId } },
@@ -46,8 +53,7 @@ export default async function FundClaimsPage({ params }: { params: Promise<{ gro
   const declined      = claims.filter(c => c.status === "DECLINED").length;
 
   // Identify categories on hold
-  const heldCats = (group.selfFundedAccount as { balance: unknown } & { heldCategories?: string[] } | null)
-    ?.heldCategories ?? [] as string[];
+  const heldCats = group.selfFundedAccount?.heldCategories ?? [];
 
   return (
     <div className="space-y-6 max-w-6xl">
