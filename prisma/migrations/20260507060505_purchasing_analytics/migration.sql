@@ -1,2 +1,0 @@
--- RenameIndex
-ALTER INDEX "AnalyticsMlrSnapshot_tenantId_grain_period_groupId_packageId_be" RENAME TO "AnalyticsMlrSnapshot_tenantId_grain_period_groupId_packageI_key";

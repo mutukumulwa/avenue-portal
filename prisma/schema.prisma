@@ -2402,7 +2402,7 @@ model AnalyticsMlrSnapshot {
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
 
-  @@unique([tenantId, grain, period, groupId, packageId, benefitTierId, intermediaryId])
+  @@unique([tenantId, grain, period, groupId, packageId, benefitTierId, intermediaryId], map: "AnalyticsMlrSnapshot_scope_key")
   @@index([tenantId, periodStart])
   @@index([groupId, periodStart])
   @@index([intermediaryId, periodStart])

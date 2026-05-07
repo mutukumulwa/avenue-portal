@@ -246,7 +246,7 @@ CREATE INDEX "AnalyticsContributionFact_tenantId_period_idx" ON "AnalyticsContri
 CREATE UNIQUE INDEX "CaseMixWeight_icdFamily_key" ON "CaseMixWeight"("icdFamily");
 CREATE INDEX "CaseMixWeight_isActive_idx" ON "CaseMixWeight"("isActive");
 
-CREATE UNIQUE INDEX "AnalyticsMlrSnapshot_tenantId_grain_period_groupId_packageId_benefitTierId_intermediaryId_key" ON "AnalyticsMlrSnapshot"("tenantId", "grain", "period", "groupId", "packageId", "benefitTierId", "intermediaryId");
+CREATE UNIQUE INDEX "AnalyticsMlrSnapshot_scope_key" ON "AnalyticsMlrSnapshot"("tenantId", "grain", "period", "groupId", "packageId", "benefitTierId", "intermediaryId");
 CREATE INDEX "AnalyticsMlrSnapshot_tenantId_periodStart_idx" ON "AnalyticsMlrSnapshot"("tenantId", "periodStart");
 CREATE INDEX "AnalyticsMlrSnapshot_groupId_periodStart_idx" ON "AnalyticsMlrSnapshot"("groupId", "periodStart");
 CREATE INDEX "AnalyticsMlrSnapshot_intermediaryId_periodStart_idx" ON "AnalyticsMlrSnapshot"("intermediaryId", "periodStart");
