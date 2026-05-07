@@ -8,6 +8,7 @@ import {
   Stethoscope, Receipt, CreditCard, Building, PieChart,
   Settings, LogOut, Calculator, UserCheck, MessageSquareText,
   ShieldAlert, MessageSquareWarning, Wallet, Fingerprint,
+  BarChart3,
 } from "lucide-react";
 import { PortalSwitcher } from "./PortalSwitcher";
 import { useState } from "react";
@@ -63,6 +64,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Insights",
     items: [
+      { label: "Strategic Purchasing", href: "/analytics", icon: BarChart3, roles: ANY_STAFF },
       { label: "Reports", href: "/reports", icon: PieChart, roles: ANY_STAFF },
     ],
   },

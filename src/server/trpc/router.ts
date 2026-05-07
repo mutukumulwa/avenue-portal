@@ -12,6 +12,7 @@ import { quotationsRouter } from "./routers/quotations";
 import { reportsRouter } from "./routers/reports";
 import { settingsRouter } from "./routers/settings";
 import { coContributionRouter } from "./routers/coContribution";
+import { analyticsRouter } from "./routers/analytics";
 
 export const appRouter = createTRPCRouter({
   healthcheck: publicProcedure.query(() => {
@@ -28,6 +29,7 @@ export const appRouter = createTRPCRouter({
   brokers: brokersRouter,
   quotations: quotationsRouter,
   reports: reportsRouter,
+  analytics: analyticsRouter,
   settings: settingsRouter,
   coContribution: coContributionRouter,
 });

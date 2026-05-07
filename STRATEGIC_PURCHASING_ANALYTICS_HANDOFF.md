@@ -14,8 +14,8 @@ This document is the source of truth for handoff. Update checkboxes and notes as
 - [x] Confirmed this is not a terminology-engine task; broker/intermediary generalization has already been implemented and should be reused.
 - [x] Implement schema additions.
 - [x] Implement first ETL/backfill foundation for encounter and contribution facts.
-- [ ] Implement analytics services and API.
-- [ ] Implement UI workspaces.
+- [x] Implement first analytics services and API.
+- [x] Implement first Strategic Purchasing Console UI.
 - [x] Add seed data for case-mix weights.
 - [ ] Add broader analytics seed data and verification coverage.
 
@@ -39,6 +39,64 @@ This document is the source of truth for handoff. Update checkboxes and notes as
 - [x] Ran `npx tsc --noEmit`.
 - [x] Run `npm run build`.
 - [ ] Run `npm run lint` after deciding whether to address unrelated baseline lint failures.
+
+### 2026-05-07 Derived Snapshot And API Slice
+
+- [x] Extended `src/server/services/analytics-refresh.service.ts`.
+  - Added `refreshMlrSnapshots()`.
+  - Added `refreshProviderScorecards()`.
+  - Included both methods in `refreshFoundation()`.
+- [x] Updated `src/server/jobs/analytics-refresh.job.ts` logging to include MLR snapshots and provider scorecard rows.
+- [x] Added `src/server/services/analytics.service.ts`.
+  - Added portfolio summary read method.
+  - Added scheme grid read method.
+  - Added provider scorecard read method.
+  - Added risk composition read method.
+- [x] Added `src/server/trpc/routers/analytics.ts`.
+  - Added `analytics.portfolioSummary`.
+  - Added `analytics.schemeGrid`.
+  - Added `analytics.providerScorecard`.
+  - Added `analytics.riskComposition`.
+  - Added `analytics.refreshFoundation` mutation for dev/manual refresh.
+- [x] Registered analytics router in `src/server/trpc/router.ts`.
+- [x] Ran `npx tsc --noEmit`.
+- [x] Ran `npm run build`.
+- [ ] Add stricter role scoping for HR and intermediary users before exposing UI broadly.
+- [ ] Replace placeholder trailing-12 MLR calculation with true 12-period rolling calculation.
+
+### 2026-05-07 First Console UI Slice
+
+- [x] Added first Strategic Purchasing Console page at `src/app/(admin)/analytics/page.tsx`.
+  - Portfolio metric strip.
+  - Scheme performance grid with MLR, contribution, claims, sparkline, and alert count.
+  - Provider scorecard panel.
+  - Risk composition panel.
+  - Renewal Watch placeholder panel for the next workspace slice.
+- [x] Added route-level loading skeleton at `src/app/(admin)/analytics/loading.tsx`.
+- [x] Added "Strategic Purchasing" sidebar item under Insights in `src/components/layouts/AdminSidebar.tsx`.
+- [x] Ran `npx tsc --noEmit`.
+- [x] Ran `npm run build`.
+- [ ] Data will remain empty until the analytics migration is applied and `analytics.refreshFoundation` or the analytics worker has populated the fact/snapshot tables.
+- [ ] The page currently uses `ROLES.ANY_STAFF`; tighten this before production exposure if only underwriting/finance/admin roles should access portfolio purchasing analytics.
+
+### 2026-05-07 Renewal Pipeline Slice
+
+- [x] Added `refreshRenewalAnalyses()` in `src/server/services/analytics-refresh.service.ts`.
+  - Finds active schemes renewing in the next 90 days.
+  - Computes trailing 12-month MLR and current-year MLR from analytics facts.
+  - Uses a default target MLR of `75%`.
+  - Uses a default inflation assumption of `8%`.
+  - Stores top five ICD cost drivers.
+  - Stores top ten utilizers as anonymized summary rows.
+  - Stores simulator defaults in `RenewalAnalysis.simulatorDefaults`.
+- [x] Included renewal analysis generation in `refreshFoundation()`.
+- [x] Updated analytics job logging to include renewal analysis rows.
+- [x] Added `AnalyticsService.getRenewalPipeline()`.
+- [x] Added `analytics.renewalPipeline` tRPC query.
+- [x] Replaced the `/analytics` Renewal Watch placeholder with real 90-day renewal pipeline data.
+- [x] Ran `npx tsc --noEmit`.
+- [x] Ran `npm run build`.
+- [ ] Product/actuarial review is still needed before treating recommendation percentages as binding pricing guidance.
 
 ## Already Implemented Repo Capabilities To Reuse
 
@@ -161,30 +219,30 @@ Proposed enums:
   - [x] `refreshEncounterFacts({ tenantId?, from?, to? })`
   - [x] `refreshContributionFacts({ tenantId?, from?, to? })`
   - [x] `refreshCaseMixWeights()`
-  - [ ] `refreshMlrSnapshots({ tenantId?, from?, to? })`
-  - [ ] `refreshProviderScorecards({ tenantId?, from?, to? })`
+  - [x] `refreshMlrSnapshots({ tenantId?, from?, to? })`
+  - [x] `refreshProviderScorecards({ tenantId?, from?, to? })`
   - [ ] `refreshMemberRiskProfiles({ tenantId?, groupId? })`
-  - [ ] `refreshRenewalAnalyses({ tenantId?, daysAhead: 90 })`
+  - [x] `refreshRenewalAnalyses({ tenantId?, daysAhead: 90 })`
   - [ ] `refreshAnalyticsAlerts({ tenantId? })`
 - [x] Use upsert/delete-and-recreate by deterministic source keys so reruns are safe.
 - [x] Add queue job integration if the existing queue worker supports periodic jobs.
-- [ ] Add a manual admin-only refresh action or script for local/dev use.
+- [x] Add a manual admin-only refresh action or script for local/dev use.
 - [ ] Do not run destructive analytics rebuilds against production unless explicitly requested.
 
 ### Phase 3: Analytics Query Service
 
 Create a read service, likely `src/server/services/analytics.service.ts`.
 
-- [ ] Portfolio summary:
+- [x] Portfolio summary:
   - Portfolio MLR, covered members, contribution YTD, claims YTD, open alerts.
-- [ ] Scheme grid:
+- [x] Scheme grid:
   - Group, member count, contribution, claims, MLR, trailing MLR sparkline data, alert badge.
 - [ ] MLR breakdowns:
   - By scheme, benefit tier/category, family-size band, intermediary book, geography, disease family.
-- [ ] Provider scorecard:
+- [x] Provider scorecard:
   - Rank providers by case-mix-adjusted cost.
   - Include claim count, total cost, adjusted cost, average cost, denial/rejection rate where available.
-- [ ] Risk composition:
+- [x] Risk composition:
   - Count and percentage by risk tier.
 - [ ] Member risk list:
   - Filter by risk tier, group, chronic tag, projected cap exceed date.
@@ -198,17 +256,17 @@ Create a read service, likely `src/server/services/analytics.service.ts`.
 
 ### Phase 4: API/TRPC Layer
 
-- [ ] Add `src/server/trpc/routers/analytics.ts`.
-- [ ] Register router in `src/server/trpc/router.ts`.
-- [ ] Use existing auth/RBAC helpers and cached auth helper from previous optimization work.
+- [x] Add `src/server/trpc/routers/analytics.ts`.
+- [x] Register router in `src/server/trpc/router.ts`.
+- [x] Use existing auth/RBAC helpers and cached auth helper from previous optimization work.
 - [ ] Proposed procedures:
-  - [ ] `analytics.portfolioSummary`
-  - [ ] `analytics.schemeGrid`
+  - [x] `analytics.portfolioSummary`
+  - [x] `analytics.schemeGrid`
   - [ ] `analytics.schemeDetail`
-  - [ ] `analytics.providerScorecard`
-  - [ ] `analytics.riskComposition`
+  - [x] `analytics.providerScorecard`
+  - [x] `analytics.riskComposition`
   - [ ] `analytics.memberRiskProfiles`
-  - [ ] `analytics.renewalPipeline`
+  - [x] `analytics.renewalPipeline`
   - [ ] `analytics.renewalWorkspace`
   - [ ] `analytics.simulateRenewal`
   - [ ] `analytics.alerts`
@@ -223,27 +281,26 @@ Create a read service, likely `src/server/services/analytics.service.ts`.
 ### Phase 5: Strategic Purchasing Console UI
 
 - [ ] Build reusable analytics components in `src/components/analytics/`.
-- [ ] Add route-level `loading.tsx` skeletons for new analytics pages.
-- [ ] Console header strip:
+- [x] Add route-level `loading.tsx` skeletons for new analytics pages.
+- [x] Console header strip:
   - Portfolio MLR.
   - Members covered.
   - Contribution YTD.
   - Open alert count.
-- [ ] Scheme grid:
+- [x] Scheme grid:
   - Scheme/group name.
   - Member count.
   - Contribution.
   - Current and trailing MLR.
   - Sparkline.
   - Alert badge.
-- [ ] Provider performance grid:
+- [x] Provider performance grid:
   - Case-mix-adjusted ranking.
   - Internal/external indicator where available.
   - Claim volume and adjusted cost.
-- [ ] Risk composition visualization:
-  - Donut or compact segmented bar.
-  - Keep it readable and not card-heavy.
-- [ ] Renewal pipeline:
+- [x] Risk composition visualization:
+  - Compact bars by tier.
+- [x] Renewal pipeline:
   - Next 90 days, recommendation and risk state.
 - [ ] Geographic/disease pattern section:
   - Start with table/choropleth-ready layout if map asset/data is not yet ready.
@@ -251,10 +308,10 @@ Create a read service, likely `src/server/services/analytics.service.ts`.
 ### Phase 6: Renewal Intelligence Workspace
 
 - [ ] Build scheme renewal detail page.
-- [ ] Show trailing 12-month MLR and current year MLR.
-- [ ] Show top five ICD/disease cost drivers.
-- [ ] Show anonymized top ten utilizing members.
-- [ ] Add contribution adjustment recommendation.
+- [x] Show trailing 12-month MLR and current year MLR.
+- [x] Show top five ICD/disease cost drivers.
+- [x] Show anonymized top ten utilizing members.
+- [x] Add contribution adjustment recommendation.
 - [ ] Add simulator controls:
   - Target MLR.
   - Inflation assumption.
@@ -326,9 +383,9 @@ MLR = SUM(benefitPaid + memberCoContribution) / SUM(grossContribution)
 
 Implementation notes:
 
-- [ ] Use paid contribution for cash-realized views and gross contribution for pricing views. Label both clearly if both appear.
+- [x] Use paid contribution for cash-realized views and gross contribution for pricing views. Label both clearly if both appear.
 - [ ] Use trailing 12-month MLR for renewal and portfolio trend.
-- [ ] Store numerator/denominator values alongside ratios for auditability.
+- [x] Store numerator/denominator values alongside ratios for auditability.
 
 ### Case-Mix Adjustment
 
@@ -355,10 +412,10 @@ recommendedAdjustmentPct = (requiredContribution - currentContribution) / curren
 
 Inputs:
 
-- [ ] Trailing 12-month claims.
-- [ ] Current contribution.
-- [ ] Target MLR.
-- [ ] Inflation assumption.
+- [x] Trailing 12-month claims.
+- [x] Current contribution.
+- [x] Target MLR.
+- [x] Inflation assumption.
 - [ ] Membership change assumption when available.
 
 ### Risk Stratification
@@ -420,9 +477,24 @@ Completed first build slice:
 - [x] Add encounter and contribution fact backfill service.
 - [x] Verify with `npx prisma validate`, `npx prisma generate`, and `npx tsc --noEmit`.
 
+Completed second build slice:
+
+- [x] Add `refreshMlrSnapshots()`.
+- [x] Add `refreshProviderScorecards()`.
+- [x] Add first read service methods for portfolio summary, scheme grid, and provider ranking.
+- [x] Add tRPC router shell for analytics reads.
+
 Recommended next slice:
 
-- [ ] Add `refreshMlrSnapshots()`.
-- [ ] Add `refreshProviderScorecards()`.
-- [ ] Add first read service methods for portfolio summary, scheme grid, and provider ranking.
-- [ ] Add tRPC router shell for analytics reads.
+- [x] Build the first Strategic Purchasing Console UI using the new analytics reads.
+- [x] Add route-level loading skeleton for the console.
+- [x] Add sidebar navigation entry.
+- [ ] Tighten role scoping before broad UI exposure, especially HR and intermediary-specific access.
+- [x] Build renewal pipeline data and replace the placeholder panel.
+
+Recommended next slice:
+
+- [ ] Add member risk profile generation.
+- [ ] Add member risk list/read API.
+- [ ] Replace empty risk composition dependency with generated profiles.
+- [ ] Start the Member Risk Workbench route after profiles exist.
