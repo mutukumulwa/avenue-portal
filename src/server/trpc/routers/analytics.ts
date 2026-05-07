@@ -1,9 +1,11 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { AnalyticsAlertSeverity, AnalyticsAlertStatus, AnalyticsAlertType } from "@prisma/client";
+import { AnalyticsAlertSeverity, AnalyticsAlertStatus, AnalyticsAlertType, RiskTier } from "@prisma/client";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { AnalyticsRefreshService } from "@/server/services/analytics-refresh.service";
 import { AnalyticsService } from "@/server/services/analytics.service";
+import { getAnalyticsAccessScope } from "@/lib/analytics-access";
+import { ROLES, type UserRole } from "@/lib/rbac";
 
 const scopeShape = z.object({
   groupId: z.string().optional(),
@@ -30,6 +32,15 @@ const alertFiltersInput = z.object({
   limit: z.number().int().min(1).max(250).optional(),
 }).optional();
 
+const memberRiskFiltersInput = z.object({
+  riskTier: z.nativeEnum(RiskTier).optional(),
+  groupId: z.string().optional(),
+  chronicTag: z.string().optional(),
+  minUtilizationToCap: z.number().min(0).max(2).optional(),
+  projectedWithinDays: z.number().int().min(1).max(365).optional(),
+  limit: z.number().int().min(25).max(250).optional(),
+}).optional();
+
 const alertActionInput = z.object({
   alertId: z.string().min(1),
 });
@@ -45,14 +56,6 @@ const renewalSimulationInput = z.object({
   contributionAdjustmentPct: z.number().min(-0.5).max(1.5).optional(),
 });
 
-function scopeFromInput(tenantId: string, input?: z.infer<typeof scopeInput>) {
-  return {
-    tenantId,
-    groupId: input?.groupId,
-    intermediaryId: input?.intermediaryId,
-  };
-}
-
 function requireTenantId(tenantId?: string) {
   if (!tenantId) {
     throw new TRPCError({ code: "UNAUTHORIZED", message: "Missing tenant context" });
@@ -60,46 +63,86 @@ function requireTenantId(tenantId?: string) {
   return tenantId;
 }
 
+function mergeScope(base: Awaited<ReturnType<typeof getAnalyticsAccessScope>>, tenantId: string, input?: z.infer<typeof scopeInput>) {
+  const requestedIntermediaryId = base.intermediaryId ?? input?.intermediaryId;
+
+  return {
+    ...base,
+    tenantId,
+    groupId: input?.groupId ?? base.groupId,
+    intermediaryId: requestedIntermediaryId,
+  };
+}
+
 export const analyticsRouter = createTRPCRouter({
   portfolioSummary: protectedProcedure
     .input(scopeInput)
     .query(async ({ ctx, input }) => {
-      return AnalyticsService.getPortfolioSummary(scopeFromInput(requireTenantId(ctx.tenantId), input));
+      const scope = await getAnalyticsAccessScope(ctx.session);
+      return AnalyticsService.getPortfolioSummary(mergeScope(scope, requireTenantId(ctx.tenantId), input));
     }),
 
   schemeGrid: protectedProcedure
     .input(scopeInput)
     .query(async ({ ctx, input }) => {
-      return AnalyticsService.getSchemeGrid(scopeFromInput(requireTenantId(ctx.tenantId), input));
+      const scope = await getAnalyticsAccessScope(ctx.session);
+      return AnalyticsService.getSchemeGrid(mergeScope(scope, requireTenantId(ctx.tenantId), input));
     }),
 
   schemeDetail: protectedProcedure
     .input(scopeShape.extend({ groupId: z.string().min(1) }))
     .query(async ({ ctx, input }) => {
+      const scope = await getAnalyticsAccessScope(ctx.session);
       return AnalyticsService.getSchemeDetail({
+        ...scope,
         tenantId: requireTenantId(ctx.tenantId),
         groupId: input.groupId,
-        intermediaryId: input.intermediaryId,
+        intermediaryId: scope.intermediaryId ?? input.intermediaryId,
+      });
+    }),
+
+  providerDetail: protectedProcedure
+    .input(z.object({ providerId: z.string().min(1), groupId: z.string().optional() }))
+    .query(async ({ ctx, input }) => {
+      const scope = await getAnalyticsAccessScope(ctx.session);
+      return AnalyticsService.getProviderDetail({
+        ...scope,
+        tenantId: requireTenantId(ctx.tenantId),
+        providerId: input.providerId,
+        groupId: input.groupId,
       });
     }),
 
   providerScorecard: protectedProcedure
     .input(scopeShape.extend({ limit: z.number().int().min(1).max(100).optional() }).optional())
     .query(async ({ ctx, input }) => {
-      return AnalyticsService.getProviderScorecard(scopeFromInput(requireTenantId(ctx.tenantId), input), input?.limit);
+      const scope = await getAnalyticsAccessScope(ctx.session);
+      return AnalyticsService.getProviderScorecard(mergeScope(scope, requireTenantId(ctx.tenantId), input), input?.limit);
     }),
 
   riskComposition: protectedProcedure
     .input(scopeInput)
     .query(async ({ ctx, input }) => {
-      return AnalyticsService.getRiskComposition(scopeFromInput(requireTenantId(ctx.tenantId), input));
+      const scope = await getAnalyticsAccessScope(ctx.session);
+      return AnalyticsService.getRiskComposition(mergeScope(scope, requireTenantId(ctx.tenantId), input));
+    }),
+
+  memberRiskProfiles: protectedProcedure
+    .input(memberRiskFiltersInput)
+    .query(async ({ ctx, input }) => {
+      const scope = await getAnalyticsAccessScope(ctx.session);
+      return AnalyticsService.getMemberRiskProfiles(
+        { ...scope, tenantId: requireTenantId(ctx.tenantId) },
+        input,
+      );
     }),
 
   renewalPipeline: protectedProcedure
     .input(scopeShape.extend({ daysAhead: z.number().int().min(1).max(365).optional() }).optional())
     .query(async ({ ctx, input }) => {
+      const scope = await getAnalyticsAccessScope(ctx.session);
       return AnalyticsService.getRenewalPipeline(
-        scopeFromInput(requireTenantId(ctx.tenantId), input),
+        mergeScope(scope, requireTenantId(ctx.tenantId), input),
         input?.daysAhead,
       );
     }),
@@ -110,10 +153,12 @@ export const analyticsRouter = createTRPCRouter({
       simulation: renewalSimulationInput.optional(),
     }))
     .query(async ({ ctx, input }) => {
+      const scope = await getAnalyticsAccessScope(ctx.session);
       return AnalyticsService.getRenewalWorkspace({
+        ...scope,
         tenantId: requireTenantId(ctx.tenantId),
         groupId: input.groupId,
-        intermediaryId: input.intermediaryId,
+        intermediaryId: scope.intermediaryId ?? input.intermediaryId,
       }, input.simulation);
     }),
 
@@ -133,14 +178,16 @@ export const analyticsRouter = createTRPCRouter({
   alerts: protectedProcedure
     .input(alertFiltersInput)
     .query(async ({ ctx, input }) => {
-      return AnalyticsService.getAlerts({ tenantId: requireTenantId(ctx.tenantId) }, input);
+      const scope = await getAnalyticsAccessScope(ctx.session);
+      return AnalyticsService.getAlerts({ ...scope, tenantId: requireTenantId(ctx.tenantId) }, input);
     }),
 
   acknowledgeAlert: protectedProcedure
     .input(alertActionInput)
     .mutation(async ({ ctx, input }) => {
+      const scope = await getAnalyticsAccessScope(ctx.session);
       return AnalyticsService.acknowledgeAlert(
-        { tenantId: requireTenantId(ctx.tenantId) },
+        { ...scope, tenantId: requireTenantId(ctx.tenantId) },
         input.alertId,
         ctx.session.user.id,
       );
@@ -149,8 +196,9 @@ export const analyticsRouter = createTRPCRouter({
   resolveAlert: protectedProcedure
     .input(resolveAlertInput)
     .mutation(async ({ ctx, input }) => {
+      const scope = await getAnalyticsAccessScope(ctx.session);
       return AnalyticsService.resolveAlert(
-        { tenantId: requireTenantId(ctx.tenantId) },
+        { ...scope, tenantId: requireTenantId(ctx.tenantId) },
         input.alertId,
         ctx.session.user.id,
         input.resolutionNote,
@@ -160,6 +208,10 @@ export const analyticsRouter = createTRPCRouter({
   refreshFoundation: protectedProcedure
     .input(refreshInput)
     .mutation(async ({ ctx, input }) => {
+      if (!ctx.session.user.role || !ROLES.ADMIN_ONLY.includes(ctx.session.user.role as UserRole)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Analytics refresh requires administrator access" });
+      }
+
       return AnalyticsRefreshService.refreshFoundation({
         tenantId: input?.tenantId ?? requireTenantId(ctx.tenantId),
         from: input?.from ? new Date(input.from) : undefined,

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requireRole, ROLES } from "@/lib/rbac";
 import { writeAudit } from "@/lib/audit";
+import { getAnalyticsAccessScope } from "@/lib/analytics-access";
 import { AnalyticsService } from "@/server/services/analytics.service";
 
 function alertIdFromForm(formData: FormData) {
@@ -26,11 +27,12 @@ function revalidateAnalyticsPaths(groupId?: string | null) {
 
 export async function acknowledgeAnalyticsAlertAction(formData: FormData) {
   const session = await requireRole(ROLES.ANY_STAFF);
+  const scope = await getAnalyticsAccessScope(session);
   const alertId = alertIdFromForm(formData);
   const groupId = groupIdFromForm(formData);
 
   const alert = await AnalyticsService.acknowledgeAlert(
-    { tenantId: session.user.tenantId },
+    scope,
     alertId,
     session.user.id,
   );
@@ -48,12 +50,13 @@ export async function acknowledgeAnalyticsAlertAction(formData: FormData) {
 
 export async function resolveAnalyticsAlertAction(formData: FormData) {
   const session = await requireRole(ROLES.ANY_STAFF);
+  const scope = await getAnalyticsAccessScope(session);
   const alertId = alertIdFromForm(formData);
   const groupId = groupIdFromForm(formData);
   const note = formData.get("resolutionNote");
 
   const alert = await AnalyticsService.resolveAlert(
-    { tenantId: session.user.tenantId },
+    scope,
     alertId,
     session.user.id,
     typeof note === "string" ? note : undefined,

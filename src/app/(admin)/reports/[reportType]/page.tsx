@@ -1,4 +1,5 @@
 import { requireRole, ROLES } from "@/lib/rbac";
+import { getAnalyticsAccessScope, type AnalyticsAccessScope } from "@/lib/analytics-access";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { ArrowLeft, Download } from "lucide-react";
@@ -31,7 +32,32 @@ const REPORT_TITLES: Record<string, string> = {
   "exclusion-rejected":    "Exclusion & Rejected Claims Report",
   "claims-per-operator":   "Claims Per Operator Report",
   "user-rights-roles":     "User Rights & Roles Report",
+  // Strategic analytics
+  "analytics-portfolio-mlr":          "Portfolio MLR Report",
+  "analytics-scheme-profitability":   "Scheme Profitability Report",
+  "analytics-provider-performance":   "Provider Performance Report",
+  "analytics-renewal-recommendations":"Renewal Recommendations Report",
+  "analytics-risk-distribution":      "Risk Tier Distribution Report",
 };
+
+type Cell = string | { text: string; href: string };
+type ReportResult = { kpis: { label: string; value: string }[]; headers: string[]; data: Cell[][] };
+
+function reportGroupIdWhere(scope?: AnalyticsAccessScope) {
+  if (!scope) return {};
+  if (scope.noAccess) return { groupId: "__no_access__" };
+  if (scope.groupId) return { groupId: scope.groupId };
+  if (scope.allowedGroupIds) return scope.allowedGroupIds.length > 0 ? { groupId: { in: scope.allowedGroupIds } } : { groupId: "__no_access__" };
+  return {};
+}
+
+function reportGroupWhere(scope?: AnalyticsAccessScope) {
+  if (!scope) return {};
+  if (scope.noAccess) return { id: "__no_access__" };
+  if (scope.groupId) return { id: scope.groupId };
+  if (scope.allowedGroupIds) return scope.allowedGroupIds.length > 0 ? { id: { in: scope.allowedGroupIds } } : { id: "__no_access__" };
+  return {};
+}
 
 // ── Data fetchers per report type ─────────────────────────────────────────────
 
@@ -381,21 +407,21 @@ async function getOutstandingBillsData(tenantId: string) {
   return { kpis, headers, data };
 }
 
-async function getProviderStatementsData(tenantId: string) {
+async function getProviderStatementsData(tenantId: string): Promise<ReportResult> {
   const rows = await prisma.claim.findMany({
     where: { tenantId, status: { in: ["APPROVED", "PARTIALLY_APPROVED", "PAID"] } },
     select: {
       claimNumber: true, dateOfService: true, billedAmount: true,
       approvedAmount: true, paidAmount: true, status: true,
       benefitCategory: true,
-      provider: { select: { name: true, type: true } },
+      provider: { select: { id: true, name: true, type: true } },
       member: { select: { firstName: true, lastName: true, memberNumber: true } },
     },
     orderBy: [{ provider: { name: "asc" } }, { dateOfService: "desc" }],
   });
   const totalApproved = rows.reduce((s, r) => s + Number(r.approvedAmount), 0);
   const totalPaid     = rows.reduce((s, r) => s + Number(r.paidAmount), 0);
-  const providers     = new Set(rows.map(r => r.provider.name)).size;
+  const providers     = new Set(rows.map(r => r.provider.id)).size;
   const kpis = [
     { label: "Claims",                value: rows.length.toLocaleString() },
     { label: "Providers",             value: providers.toLocaleString() },
@@ -403,8 +429,8 @@ async function getProviderStatementsData(tenantId: string) {
     { label: "Total Paid (KES)",      value: totalPaid.toLocaleString() },
   ];
   const headers = ["Provider", "Claim No.", "Member", "Category", "Date of Service", "Billed (KES)", "Approved (KES)", "Paid (KES)", "Status"];
-  const data = rows.map(r => [
-    r.provider.name,
+  const data: Cell[][] = rows.map(r => [
+    { text: r.provider.name, href: `/analytics/providers/${r.provider.id}?from=report` },
     r.claimNumber,
     `${r.member.firstName} ${r.member.lastName} (${r.member.memberNumber})`,
     r.benefitCategory.replace(/_/g, " "),
@@ -581,10 +607,11 @@ async function getAdmissionVisitsData(tenantId: string) {
 
 // ── TRANCHE 2: Financial ──────────────────────────────────────────────────────
 
-async function getLossRatioData(tenantId: string) {
+async function getLossRatioData(tenantId: string): Promise<ReportResult> {
   const groups = await prisma.group.findMany({
     where: { tenantId },
     select: {
+      id: true,
       name: true,
       invoices: { select: { totalAmount: true, paidAmount: true } },
       members: {
@@ -602,7 +629,7 @@ async function getLossRatioData(tenantId: string) {
     const premium  = g.invoices.reduce((s, i) => s + Number(i.paidAmount), 0);
     const claims   = g.members.flatMap(m => m.claims).reduce((s, c) => s + Number(c.approvedAmount), 0);
     const lossRatio = premium > 0 ? (claims / premium) * 100 : 0;
-    return { name: g.name, premium, claims, lossRatio };
+    return { id: g.id, name: g.name, premium, claims, lossRatio };
   }).filter(r => r.premium > 0).sort((a, b) => b.lossRatio - a.lossRatio);
 
   const totalPremium = rows.reduce((s, r) => s + r.premium, 0);
@@ -616,8 +643,8 @@ async function getLossRatioData(tenantId: string) {
     { label: "Overall Loss Ratio",  value: `${overallRatio.toFixed(1)}%` },
   ];
   const headers = ["Group", "Premium Collected (KES)", "Claims Approved (KES)", "Loss Ratio %", "Rating"];
-  const data = rows.map(r => [
-    r.name,
+  const data: Cell[][] = rows.map(r => [
+    { text: r.name, href: `/analytics/schemes/${r.id}?from=report` },
     r.premium.toLocaleString(),
     r.claims.toLocaleString(),
     `${r.lossRatio.toFixed(1)}%`,
@@ -626,21 +653,21 @@ async function getLossRatioData(tenantId: string) {
   return { kpis, headers, data };
 }
 
-async function getClaimsExperienceData(tenantId: string) {
+async function getClaimsExperienceData(tenantId: string): Promise<ReportResult> {
   const claims = await prisma.claim.findMany({
     where: { tenantId },
     select: {
       billedAmount: true, approvedAmount: true, status: true,
       benefitCategory: true, serviceType: true,
-      member: { select: { group: { select: { name: true } } } },
+      member: { select: { group: { select: { id: true, name: true } } } },
     },
   });
 
   // Aggregate by group + category
-  const byKey = new Map<string, { group: string; category: string; count: number; billed: number; approved: number; declined: number }>();
+  const byKey = new Map<string, { groupId: string; group: string; category: string; count: number; billed: number; approved: number; declined: number }>();
   for (const c of claims) {
-    const key = `${c.member.group.name}||${c.benefitCategory}`;
-    const row = byKey.get(key) ?? { group: c.member.group.name, category: c.benefitCategory, count: 0, billed: 0, approved: 0, declined: 0 };
+    const key = `${c.member.group.id}||${c.benefitCategory}`;
+    const row = byKey.get(key) ?? { groupId: c.member.group.id, group: c.member.group.name, category: c.benefitCategory, count: 0, billed: 0, approved: 0, declined: 0 };
     row.count++;
     row.billed   += Number(c.billedAmount);
     row.approved += Number(c.approvedAmount);
@@ -656,8 +683,8 @@ async function getClaimsExperienceData(tenantId: string) {
     { label: "Total Declined",       value: rows.reduce((s, r) => s + r.declined, 0).toLocaleString() },
   ];
   const headers = ["Group", "Benefit Category", "Claims", "Billed (KES)", "Approved (KES)", "Declined", "Approval Rate %"];
-  const data = rows.map(r => [
-    r.group,
+  const data: Cell[][] = rows.map(r => [
+    { text: r.group, href: `/analytics/schemes/${r.groupId}?from=report` },
     r.category.replace(/_/g, " "),
     r.count.toString(),
     r.billed.toLocaleString(),
@@ -917,6 +944,291 @@ async function getUserRightsRolesData(tenantId: string) {
   return { kpis, headers, data };
 }
 
+// ── Strategic Analytics Fetchers ─────────────────────────────────────────────
+
+async function getAnalyticsPortfolioMlrData(tenantId: string, scope?: AnalyticsAccessScope): Promise<ReportResult> {
+  const [snapshots, alerts] = await Promise.all([
+    prisma.analyticsMlrSnapshot.findMany({
+      where: { tenantId, grain: "SCHEME", ...reportGroupIdWhere(scope) },
+      orderBy: [{ periodStart: "desc" }],
+      distinct: ["groupId"],
+      select: {
+        groupId: true, period: true,
+        grossContribution: true, benefitPaid: true, memberCoContribution: true,
+        mlr: true, trailing12Mlr: true,
+      },
+    }),
+    prisma.analyticsAlert.groupBy({
+      by: ["groupId"],
+      where: { tenantId, status: { in: ["OPEN", "ACKNOWLEDGED"] }, groupId: { not: null }, ...reportGroupIdWhere(scope) },
+      _count: { id: true },
+    }),
+  ]);
+
+  const groupIds = snapshots.map(s => s.groupId).filter(Boolean) as string[];
+  const groups = await prisma.group.findMany({
+    where: { id: { in: groupIds } },
+    select: { id: true, name: true },
+  });
+  const groupNameById = new Map(groups.map(g => [g.id, g.name]));
+  const alertCountByGroup = new Map(alerts.map(a => [a.groupId, a._count.id]));
+
+  const rows = snapshots
+    .map(s => ({
+      groupId: s.groupId ?? "",
+      name: groupNameById.get(s.groupId ?? "") ?? "Unknown",
+      period: s.period,
+      contribution: Number(s.grossContribution),
+      claims: Number(s.benefitPaid) + Number(s.memberCoContribution),
+      mlr: Number(s.mlr),
+      trailing12Mlr: Number(s.trailing12Mlr),
+      alerts: alertCountByGroup.get(s.groupId) ?? 0,
+    }))
+    .filter(r => r.groupId)
+    .sort((a, b) => b.mlr - a.mlr);
+
+  const kpis = [
+    { label: "Schemes",             value: rows.length.toLocaleString() },
+    { label: "Avg Portfolio MLR",   value: rows.length > 0 ? `${(rows.reduce((s, r) => s + r.mlr, 0) / rows.length * 100).toFixed(1)}%` : "—" },
+    { label: "Schemes >80% MLR",    value: rows.filter(r => r.mlr > 0.8).length.toLocaleString() },
+    { label: "Open Alerts",         value: rows.reduce((s, r) => s + r.alerts, 0).toLocaleString() },
+  ];
+  const headers = ["Scheme", "Period", "Contribution (KES)", "Claims (KES)", "MLR %", "Trailing 12M MLR", "Open Alerts"];
+  const data: Cell[][] = rows.map(r => [
+    { text: r.name, href: `/analytics/schemes/${r.groupId}?from=report` },
+    r.period,
+    r.contribution.toLocaleString(),
+    r.claims.toLocaleString(),
+    `${(r.mlr * 100).toFixed(1)}%`,
+    `${(r.trailing12Mlr * 100).toFixed(1)}%`,
+    r.alerts.toString(),
+  ]);
+  return { kpis, headers, data };
+}
+
+async function getAnalyticsSchemeProfitabilityData(tenantId: string, scope?: AnalyticsAccessScope): Promise<ReportResult> {
+  const groups = await prisma.group.findMany({
+    where: { tenantId, ...reportGroupWhere(scope) },
+    select: { id: true, name: true, renewalDate: true },
+  });
+
+  const snapshots = await prisma.analyticsMlrSnapshot.findMany({
+    where: { tenantId, grain: "SCHEME", ...reportGroupIdWhere(scope) },
+    orderBy: [{ periodStart: "desc" }],
+    distinct: ["groupId"],
+    select: {
+      groupId: true, period: true,
+      grossContribution: true, paidContribution: true,
+      benefitPaid: true, memberCoContribution: true, grossCost: true,
+      mlr: true, trailing12Mlr: true,
+    },
+  });
+
+  const snapshotByGroup = new Map(snapshots.map(s => [s.groupId, s]));
+  const groupNameById = new Map(groups.map(g => [g.id, g.name]));
+
+  const rows = snapshots
+    .map(s => {
+      const name = groupNameById.get(s.groupId ?? "") ?? "Unknown";
+      const contribution = Number(s.grossContribution);
+      const claims = Number(s.benefitPaid) + Number(s.memberCoContribution);
+      const surplus = contribution - claims;
+      return {
+        groupId: s.groupId ?? "",
+        name,
+        period: s.period,
+        contribution,
+        claims,
+        surplus,
+        mlr: Number(s.mlr),
+        trailing12Mlr: Number(s.trailing12Mlr),
+      };
+    })
+    .filter(r => r.groupId)
+    .sort((a, b) => b.mlr - a.mlr);
+
+  const kpis = [
+    { label: "Schemes",              value: rows.length.toLocaleString() },
+    { label: "Total Contribution",   value: `KES ${(rows.reduce((s, r) => s + r.contribution, 0) / 1_000_000).toFixed(1)}M` },
+    { label: "Total Claims",         value: `KES ${(rows.reduce((s, r) => s + r.claims, 0) / 1_000_000).toFixed(1)}M` },
+    { label: "Net Surplus",          value: `KES ${(rows.reduce((s, r) => s + r.surplus, 0) / 1_000_000).toFixed(1)}M` },
+  ];
+  const headers = ["Scheme", "Period", "Contribution (KES)", "Claims (KES)", "Surplus/Deficit (KES)", "MLR %", "Trailing 12M MLR", "Status"];
+  const data: Cell[][] = rows.map(r => [
+    { text: r.name, href: `/analytics/schemes/${r.groupId}?from=report` },
+    r.period,
+    r.contribution.toLocaleString(),
+    r.claims.toLocaleString(),
+    r.surplus.toLocaleString(),
+    `${(r.mlr * 100).toFixed(1)}%`,
+    `${(r.trailing12Mlr * 100).toFixed(1)}%`,
+    r.mlr > 1 ? "LOSS" : r.mlr > 0.8 ? "HIGH" : r.mlr > 0.6 ? "MODERATE" : "PROFITABLE",
+  ]);
+  return { kpis, headers, data };
+}
+
+async function getAnalyticsProviderPerformanceData(tenantId: string, scope?: AnalyticsAccessScope): Promise<ReportResult> {
+  const scopedProviderRows = scope?.allowedGroupIds || scope?.groupId || scope?.noAccess
+    ? await prisma.analyticsEncounterFact.findMany({
+        where: { tenantId, ...reportGroupIdWhere(scope) },
+        distinct: ["providerId"],
+        select: { providerId: true },
+      })
+    : null;
+  const providerIds = scopedProviderRows?.map(row => row.providerId);
+  const latest = await prisma.providerScorecard.findFirst({
+    where: { tenantId, ...(providerIds ? { providerId: { in: providerIds } } : {}) },
+    orderBy: { periodStart: "desc" },
+    select: { period: true },
+  });
+
+  if (!latest) {
+    return {
+      kpis: [{ label: "Status", value: "No scorecard data" }],
+      headers: ["Provider", "Period", "Claims", "Members", "Adjusted Cost (KES)", "Avg Cost (KES)", "CMI", "Rejection Rate"],
+      data: [],
+    };
+  }
+
+  const scorecards = await prisma.providerScorecard.findMany({
+    where: { tenantId, period: latest.period, ...(providerIds ? { providerId: { in: providerIds } } : {}) },
+    orderBy: { adjustedCost: "desc" },
+  });
+
+  const kpis = [
+    { label: "Providers Ranked",    value: scorecards.length.toLocaleString() },
+    { label: "Period",              value: latest.period },
+    { label: "Total Adjusted Cost", value: `KES ${(scorecards.reduce((s, r) => s + Number(r.adjustedCost), 0) / 1_000_000).toFixed(1)}M` },
+    { label: "Avg CMI",             value: (scorecards.reduce((s, r) => s + Number(r.caseMixIndex), 0) / Math.max(1, scorecards.length)).toFixed(2) },
+  ];
+  const headers = ["Provider", "Tier", "Period", "Claims", "Members", "Adjusted Cost (KES)", "Avg Cost (KES)", "CMI", "Rejection Rate %"];
+  const data: Cell[][] = scorecards.map(r => [
+    { text: r.providerName, href: `/analytics/providers/${r.providerId}?from=report` },
+    r.providerTier ?? "UNKNOWN",
+    r.period,
+    r.claimCount.toString(),
+    r.memberCount.toString(),
+    Number(r.adjustedCost).toLocaleString(),
+    Number(r.averageCost).toLocaleString(),
+    Number(r.caseMixIndex).toFixed(2),
+    `${(Number(r.rejectionRate) * 100).toFixed(1)}%`,
+  ]);
+  return { kpis, headers, data };
+}
+
+async function getAnalyticsRenewalRecommendationsData(tenantId: string, scope?: AnalyticsAccessScope): Promise<ReportResult> {
+  const analyses = await prisma.renewalAnalysis.findMany({
+    where: { tenantId, ...reportGroupIdWhere(scope) },
+    orderBy: { renewalDate: "asc" },
+  });
+
+  const groupIds = analyses.map(a => a.groupId);
+  const groups = await prisma.group.findMany({
+    where: { id: { in: groupIds } },
+    select: {
+      id: true, name: true,
+      broker: { select: { name: true } },
+      _count: { select: { members: { where: { status: "ACTIVE" } } } },
+    },
+  });
+  const groupById = new Map(groups.map(g => [g.id, g]));
+
+  const now = new Date();
+  const rows = analyses.map(a => {
+    const group = groupById.get(a.groupId);
+    const daysToRenewal = Math.ceil((new Date(a.renewalDate).getTime() - now.getTime()) / 86400000);
+    return {
+      groupId: a.groupId,
+      name: group?.name ?? "Unknown",
+      intermediary: group?.broker?.name ?? "Direct",
+      activeMembers: group?._count.members ?? 0,
+      renewalDate: new Date(a.renewalDate).toLocaleDateString("en-KE"),
+      daysToRenewal,
+      trailing12Mlr: Number(a.trailing12Mlr),
+      targetMlr: Number(a.targetMlr),
+      recommendedContribution: Number(a.recommendedContribution),
+      recommendedAdjustmentPct: Number(a.recommendedAdjustmentPct),
+    };
+  });
+
+  const due90 = rows.filter(r => r.daysToRenewal <= 90 && r.daysToRenewal >= 0).length;
+  const kpis = [
+    { label: "Total Analyses",     value: rows.length.toLocaleString() },
+    { label: "Due in 90 Days",     value: due90.toLocaleString() },
+    { label: "Avg Trailing MLR",   value: rows.length > 0 ? `${(rows.reduce((s, r) => s + r.trailing12Mlr, 0) / rows.length * 100).toFixed(1)}%` : "—" },
+    { label: "Avg Adjustment",     value: rows.length > 0 ? `${(rows.reduce((s, r) => s + r.recommendedAdjustmentPct, 0) / rows.length * 100).toFixed(1)}%` : "—" },
+  ];
+  const headers = ["Scheme", "Intermediary", "Members", "Renewal Date", "Days", "Trailing MLR", "Target MLR", "Recommended Contribution", "Adjustment %"];
+  const data: Cell[][] = rows.map(r => [
+    { text: r.name, href: `/analytics/renewals/${r.groupId}?from=report` },
+    r.intermediary,
+    r.activeMembers.toString(),
+    r.renewalDate,
+    r.daysToRenewal.toString(),
+    `${(r.trailing12Mlr * 100).toFixed(1)}%`,
+    `${(r.targetMlr * 100).toFixed(1)}%`,
+    `KES ${r.recommendedContribution.toLocaleString()}`,
+    `${(r.recommendedAdjustmentPct * 100).toFixed(1)}%`,
+  ]);
+  return { kpis, headers, data };
+}
+
+async function getAnalyticsRiskDistributionData(tenantId: string, scope?: AnalyticsAccessScope): Promise<ReportResult> {
+  const profiles = await prisma.memberRiskProfile.groupBy({
+    by: ["groupId", "riskTier"],
+    where: { tenantId, ...reportGroupIdWhere(scope) },
+    _count: { id: true },
+    _avg: { riskScore: true, utilizationToCap: true },
+  });
+
+  const groupIds = [...new Set(profiles.map(p => p.groupId))];
+  const groups = await prisma.group.findMany({
+    where: { id: { in: groupIds } },
+    select: { id: true, name: true },
+  });
+  const groupNameById = new Map(groups.map(g => [g.id, g.name]));
+
+  const totalByGroup = new Map<string, number>();
+  for (const p of profiles) {
+    totalByGroup.set(p.groupId, (totalByGroup.get(p.groupId) ?? 0) + p._count.id);
+  }
+
+  const rows = profiles
+    .map(p => ({
+      groupId: p.groupId,
+      groupName: groupNameById.get(p.groupId) ?? "Unknown",
+      riskTier: p.riskTier,
+      count: p._count.id,
+      total: totalByGroup.get(p.groupId) ?? 1,
+      avgScore: Number(p._avg.riskScore ?? 0),
+      avgUtilization: Number(p._avg.utilizationToCap ?? 0),
+    }))
+    .sort((a, b) => {
+      const tierOrder: Record<string, number> = { CRITICAL: 0, HIGH: 1, MODERATE: 2, LOW: 3 };
+      return (tierOrder[a.riskTier] ?? 4) - (tierOrder[b.riskTier] ?? 4) || a.groupName.localeCompare(b.groupName);
+    });
+
+  const totalMembers = new Set(profiles.map(p => p.groupId + p.riskTier)).size;
+  const critical = profiles.filter(p => p.riskTier === "CRITICAL").reduce((s, p) => s + p._count.id, 0);
+  const high = profiles.filter(p => p.riskTier === "HIGH").reduce((s, p) => s + p._count.id, 0);
+  const kpis = [
+    { label: "Profiled Members",   value: profiles.reduce((s, p) => s + p._count.id, 0).toLocaleString() },
+    { label: "Critical Risk",      value: critical.toLocaleString() },
+    { label: "High Risk",          value: high.toLocaleString() },
+    { label: "Groups Covered",     value: groupIds.length.toLocaleString() },
+  ];
+  const headers = ["Scheme", "Risk Tier", "Members", "% of Scheme", "Avg Risk Score", "Avg Utilization %"];
+  const data: Cell[][] = rows.map(r => [
+    { text: r.groupName, href: `/analytics/schemes/${r.groupId}?from=report` },
+    r.riskTier,
+    r.count.toString(),
+    `${((r.count / r.total) * 100).toFixed(1)}%`,
+    r.avgScore.toFixed(2),
+    `${(r.avgUtilization * 100).toFixed(1)}%`,
+  ]);
+  return { kpis, headers, data };
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function ReportDetailPage({
@@ -925,13 +1237,14 @@ export default async function ReportDetailPage({
   params: Promise<{ reportType: string }>;
 }) {
   const session = await requireRole(ROLES.ANY_STAFF);
+  const analyticsScope = await getAnalyticsAccessScope(session);
   const { reportType } = await params;
   const tenantId = session.user.tenantId;
   const title = REPORT_TITLES[reportType] ?? "Report";
 
   let kpis: { label: string; value: string }[] = [];
   let headers: string[] = [];
-  let data: string[][] = [];
+  let data: Cell[][] = [];
 
   if (reportType === "claims")                   ({ kpis, headers, data } = await getClaimsData(tenantId));
   else if (reportType === "membership")          ({ kpis, headers, data } = await getMembershipData(tenantId));
@@ -959,6 +1272,12 @@ export default async function ReportDetailPage({
   else if (reportType === "exclusion-rejected")  ({ kpis, headers, data } = await getExclusionRejectedData(tenantId));
   else if (reportType === "claims-per-operator") ({ kpis, headers, data } = await getClaimsPerOperatorData(tenantId));
   else if (reportType === "user-rights-roles")   ({ kpis, headers, data } = await getUserRightsRolesData(tenantId));
+  // Strategic analytics
+  else if (reportType === "analytics-portfolio-mlr")           ({ kpis, headers, data } = await getAnalyticsPortfolioMlrData(tenantId, analyticsScope));
+  else if (reportType === "analytics-scheme-profitability")    ({ kpis, headers, data } = await getAnalyticsSchemeProfitabilityData(tenantId, analyticsScope));
+  else if (reportType === "analytics-provider-performance")    ({ kpis, headers, data } = await getAnalyticsProviderPerformanceData(tenantId, analyticsScope));
+  else if (reportType === "analytics-renewal-recommendations") ({ kpis, headers, data } = await getAnalyticsRenewalRecommendationsData(tenantId, analyticsScope));
+  else if (reportType === "analytics-risk-distribution")       ({ kpis, headers, data } = await getAnalyticsRiskDistributionData(tenantId, analyticsScope));
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
@@ -991,8 +1310,8 @@ export default async function ReportDetailPage({
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {kpis.map(k => (
             <div key={k.label} className="bg-white border border-[#EEEEEE] rounded-lg p-4 shadow-sm">
-              <p className="text-xs text-avenue-text-muted font-bold uppercase">{k.label}</p>
-              <p className="text-2xl font-bold text-avenue-indigo mt-1">{k.value}</p>
+              <p className="text-[13px] font-bold uppercase tracking-normal text-avenue-text-muted">{k.label}</p>
+              <p className="text-2xl font-bold text-avenue-indigo mt-1 tabular-nums">{k.value}</p>
             </div>
           ))}
         </div>
@@ -1005,11 +1324,11 @@ export default async function ReportDetailPage({
         </div>
         {data.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
+            <table className="w-full text-sm text-left font-ui">
               <thead>
-                <tr className="bg-[#E6E7E8] text-[#6C757D] font-semibold border-b border-[#EEEEEE] text-xs">
+                <tr className="bg-[#F8F9FA] border-b border-[#EEEEEE] text-[13px] uppercase tracking-normal text-avenue-text-muted">
                   {headers.map(h => (
-                    <th key={h} className="px-4 py-3 whitespace-nowrap">{h}</th>
+                    <th key={h} className="px-4 py-3 whitespace-nowrap font-bold">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -1017,7 +1336,13 @@ export default async function ReportDetailPage({
                 {data.map((row, i) => (
                   <tr key={i} className="hover:bg-[#F8F9FA]">
                     {row.map((cell, j) => (
-                      <td key={j} className="px-4 py-3 whitespace-nowrap text-xs">{cell}</td>
+                      <td key={j} className="px-4 py-3 whitespace-nowrap text-xs">
+                        {typeof cell === "object" ? (
+                          <Link href={cell.href} className="font-semibold text-avenue-indigo hover:underline">
+                            {cell.text}
+                          </Link>
+                        ) : cell}
+                      </td>
                     ))}
                   </tr>
                 ))}

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { getAnalyticsAccessScope, type AnalyticsAccessScope } from "@/lib/analytics-access";
 import { prisma } from "@/lib/prisma";
 
 function escapeCsv(value: string): string {
@@ -17,9 +18,26 @@ function buildCsv(headers: string[], rows: string[][]): string {
   return lines.join("\r\n");
 }
 
+function reportGroupIdWhere(scope?: AnalyticsAccessScope) {
+  if (!scope) return {};
+  if (scope.noAccess) return { groupId: "__no_access__" };
+  if (scope.groupId) return { groupId: scope.groupId };
+  if (scope.allowedGroupIds) return scope.allowedGroupIds.length > 0 ? { groupId: { in: scope.allowedGroupIds } } : { groupId: "__no_access__" };
+  return {};
+}
+
+function reportGroupWhere(scope?: AnalyticsAccessScope) {
+  if (!scope) return {};
+  if (scope.noAccess) return { id: "__no_access__" };
+  if (scope.groupId) return { id: scope.groupId };
+  if (scope.allowedGroupIds) return scope.allowedGroupIds.length > 0 ? { id: { in: scope.allowedGroupIds } } : { id: "__no_access__" };
+  return {};
+}
+
 async function fetchReportData(
   tenantId: string,
-  reportType: string
+  reportType: string,
+  analyticsScope?: AnalyticsAccessScope,
 ): Promise<{ headers: string[]; rows: string[][] } | null> {
   switch (reportType) {
     case "claims": {
@@ -517,6 +535,237 @@ async function fetchReportData(
       };
     }
 
+    // ── Strategic Analytics ─────────────────────────────────────────────────
+
+    case "analytics-portfolio-mlr": {
+      const [snapshots, alerts] = await Promise.all([
+        prisma.analyticsMlrSnapshot.findMany({
+          where: { tenantId, grain: "SCHEME", ...reportGroupIdWhere(analyticsScope) },
+          orderBy: [{ periodStart: "desc" }],
+          distinct: ["groupId"],
+          select: {
+            groupId: true, period: true,
+            grossContribution: true, benefitPaid: true, memberCoContribution: true,
+            mlr: true, trailing12Mlr: true,
+          },
+        }),
+        prisma.analyticsAlert.groupBy({
+          by: ["groupId"],
+          where: { tenantId, status: { in: ["OPEN", "ACKNOWLEDGED"] }, groupId: { not: null }, ...reportGroupIdWhere(analyticsScope) },
+          _count: { id: true },
+        }),
+      ]);
+
+      const groupIds = snapshots.map((s) => s.groupId).filter(Boolean) as string[];
+      const groups = await prisma.group.findMany({
+        where: { id: { in: groupIds } },
+        select: { id: true, name: true },
+      });
+      const groupNameById = new Map(groups.map((g) => [g.id, g.name]));
+      const alertCountByGroup = new Map(alerts.map((a) => [a.groupId, a._count.id]));
+
+      const rows = snapshots
+        .map((s) => {
+          const claims = Number(s.benefitPaid) + Number(s.memberCoContribution);
+          return {
+            groupId: s.groupId ?? "",
+            name: groupNameById.get(s.groupId ?? "") ?? "Unknown",
+            period: s.period,
+            contribution: Number(s.grossContribution),
+            claims,
+            mlr: Number(s.mlr),
+            trailing12Mlr: Number(s.trailing12Mlr),
+            alerts: alertCountByGroup.get(s.groupId) ?? 0,
+          };
+        })
+        .filter((row) => row.groupId)
+        .sort((a, b) => b.mlr - a.mlr);
+
+      return {
+        headers: ["Scheme", "Period", "Contribution (KES)", "Claims (KES)", "MLR %", "Trailing 12M MLR %", "Open Alerts"],
+        rows: rows.map((row) => [
+          row.name,
+          row.period,
+          row.contribution.toString(),
+          row.claims.toString(),
+          (row.mlr * 100).toFixed(1),
+          (row.trailing12Mlr * 100).toFixed(1),
+          row.alerts.toString(),
+        ]),
+      };
+    }
+
+    case "analytics-scheme-profitability": {
+      const groups = await prisma.group.findMany({
+        where: { tenantId, ...reportGroupWhere(analyticsScope) },
+        select: { id: true, name: true },
+      });
+      const snapshots = await prisma.analyticsMlrSnapshot.findMany({
+        where: { tenantId, grain: "SCHEME", ...reportGroupIdWhere(analyticsScope) },
+        orderBy: [{ periodStart: "desc" }],
+        distinct: ["groupId"],
+        select: {
+          groupId: true, period: true,
+          grossContribution: true, benefitPaid: true, memberCoContribution: true,
+          mlr: true, trailing12Mlr: true,
+        },
+      });
+      const groupNameById = new Map(groups.map((g) => [g.id, g.name]));
+      const rows = snapshots
+        .map((s) => {
+          const contribution = Number(s.grossContribution);
+          const claims = Number(s.benefitPaid) + Number(s.memberCoContribution);
+          const surplus = contribution - claims;
+          return {
+            groupId: s.groupId ?? "",
+            name: groupNameById.get(s.groupId ?? "") ?? "Unknown",
+            period: s.period,
+            contribution,
+            claims,
+            surplus,
+            mlr: Number(s.mlr),
+            trailing12Mlr: Number(s.trailing12Mlr),
+          };
+        })
+        .filter((row) => row.groupId)
+        .sort((a, b) => b.mlr - a.mlr);
+
+      return {
+        headers: ["Scheme", "Period", "Contribution (KES)", "Claims (KES)", "Surplus/Deficit (KES)", "MLR %", "Trailing 12M MLR %", "Status"],
+        rows: rows.map((row) => [
+          row.name,
+          row.period,
+          row.contribution.toString(),
+          row.claims.toString(),
+          row.surplus.toString(),
+          (row.mlr * 100).toFixed(1),
+          (row.trailing12Mlr * 100).toFixed(1),
+          row.mlr > 1 ? "LOSS" : row.mlr > 0.8 ? "HIGH" : row.mlr > 0.6 ? "MODERATE" : "PROFITABLE",
+        ]),
+      };
+    }
+
+    case "analytics-provider-performance": {
+      const scopedProviderRows = analyticsScope?.allowedGroupIds || analyticsScope?.groupId || analyticsScope?.noAccess
+        ? await prisma.analyticsEncounterFact.findMany({
+            where: { tenantId, ...reportGroupIdWhere(analyticsScope) },
+            distinct: ["providerId"],
+            select: { providerId: true },
+          })
+        : null;
+      const providerIds = scopedProviderRows?.map((row) => row.providerId);
+      const latest = await prisma.providerScorecard.findFirst({
+        where: { tenantId, ...(providerIds ? { providerId: { in: providerIds } } : {}) },
+        orderBy: { periodStart: "desc" },
+        select: { period: true },
+      });
+      if (!latest) {
+        return {
+          headers: ["Provider", "Tier", "Period", "Claims", "Members", "Adjusted Cost (KES)", "Avg Cost (KES)", "CMI", "Rejection Rate %"],
+          rows: [],
+        };
+      }
+      const scorecards = await prisma.providerScorecard.findMany({
+        where: { tenantId, period: latest.period, ...(providerIds ? { providerId: { in: providerIds } } : {}) },
+        orderBy: { adjustedCost: "desc" },
+      });
+      return {
+        headers: ["Provider", "Tier", "Period", "Claims", "Members", "Adjusted Cost (KES)", "Avg Cost (KES)", "CMI", "Rejection Rate %"],
+        rows: scorecards.map((row) => [
+          row.providerName,
+          row.providerTier ?? "UNKNOWN",
+          row.period,
+          row.claimCount.toString(),
+          row.memberCount.toString(),
+          Number(row.adjustedCost).toString(),
+          Number(row.averageCost).toString(),
+          Number(row.caseMixIndex).toFixed(2),
+          (Number(row.rejectionRate) * 100).toFixed(1),
+        ]),
+      };
+    }
+
+    case "analytics-renewal-recommendations": {
+      const analyses = await prisma.renewalAnalysis.findMany({
+        where: { tenantId, ...reportGroupIdWhere(analyticsScope) },
+        orderBy: { renewalDate: "asc" },
+      });
+      const groupIds = analyses.map((analysis) => analysis.groupId);
+      const groups = await prisma.group.findMany({
+        where: { id: { in: groupIds } },
+        select: {
+          id: true, name: true,
+          broker: { select: { name: true } },
+          _count: { select: { members: { where: { status: "ACTIVE" } } } },
+        },
+      });
+      const groupById = new Map(groups.map((group) => [group.id, group]));
+      const now = new Date();
+
+      return {
+        headers: ["Scheme", "Intermediary", "Members", "Renewal Date", "Days", "Trailing MLR %", "Target MLR %", "Recommended Contribution (KES)", "Adjustment %"],
+        rows: analyses.map((analysis) => {
+          const group = groupById.get(analysis.groupId);
+          const renewalDate = new Date(analysis.renewalDate);
+          const daysToRenewal = Math.ceil((renewalDate.getTime() - now.getTime()) / 86400000);
+          return [
+            group?.name ?? "Unknown",
+            group?.broker?.name ?? "Direct",
+            (group?._count.members ?? 0).toString(),
+            renewalDate.toISOString().split("T")[0],
+            daysToRenewal.toString(),
+            (Number(analysis.trailing12Mlr) * 100).toFixed(1),
+            (Number(analysis.targetMlr) * 100).toFixed(1),
+            Number(analysis.recommendedContribution).toString(),
+            (Number(analysis.recommendedAdjustmentPct) * 100).toFixed(1),
+          ];
+        }),
+      };
+    }
+
+    case "analytics-risk-distribution": {
+      const profiles = await prisma.memberRiskProfile.groupBy({
+        by: ["groupId", "riskTier"],
+        where: { tenantId, ...reportGroupIdWhere(analyticsScope) },
+        _count: { id: true },
+        _avg: { riskScore: true, utilizationToCap: true },
+      });
+      const groupIds = [...new Set(profiles.map((profile) => profile.groupId))];
+      const groups = await prisma.group.findMany({
+        where: { id: { in: groupIds } },
+        select: { id: true, name: true },
+      });
+      const groupNameById = new Map(groups.map((group) => [group.id, group.name]));
+      const totalByGroup = new Map<string, number>();
+      for (const profile of profiles) {
+        totalByGroup.set(profile.groupId, (totalByGroup.get(profile.groupId) ?? 0) + profile._count.id);
+      }
+      const tierOrder: Record<string, number> = { CRITICAL: 0, HIGH: 1, MODERATE: 2, LOW: 3 };
+      const rows = profiles
+        .map((profile) => ({
+          groupId: profile.groupId,
+          groupName: groupNameById.get(profile.groupId) ?? "Unknown",
+          riskTier: profile.riskTier,
+          count: profile._count.id,
+          total: totalByGroup.get(profile.groupId) ?? 1,
+          avgScore: Number(profile._avg.riskScore ?? 0),
+          avgUtilization: Number(profile._avg.utilizationToCap ?? 0),
+        }))
+        .sort((a, b) => (tierOrder[a.riskTier] ?? 4) - (tierOrder[b.riskTier] ?? 4) || a.groupName.localeCompare(b.groupName));
+
+      return {
+        headers: ["Scheme", "Risk Tier", "Members", "% of Scheme", "Avg Risk Score", "Avg Utilization %"],
+        rows: rows.map((row) => [
+          row.groupName,
+          row.riskTier,
+          row.count.toString(),
+          ((row.count / row.total) * 100).toFixed(1),
+          row.avgScore.toFixed(2),
+          (row.avgUtilization * 100).toFixed(1),
+        ]),
+      };
+    }
+
     default:
       return null;
   }
@@ -534,7 +783,8 @@ export async function GET(
   const { reportType } = await params;
   const tenantId = session.user.tenantId;
 
-  const result = await fetchReportData(tenantId, reportType);
+  const analyticsScope = await getAnalyticsAccessScope(session);
+  const result = await fetchReportData(tenantId, reportType, analyticsScope);
   if (!result) {
     return NextResponse.json({ error: "Unknown report type" }, { status: 404 });
   }

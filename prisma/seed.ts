@@ -618,6 +618,176 @@ async function main() {
     console.log(`✅ Members: ${members.length} (already seeded)`)
   }
 
+  // Demo portfolio top-up — enough covered lives for credible analytics.
+  // Keeps the named seed members, then adds deterministic families across schemes.
+  {
+    const firstNames = [
+      'Amina', 'Brian', 'Catherine', 'Dennis', 'Edith', 'Farah', 'Grace', 'Henry', 'Irene', 'Juma',
+      'Kendi', 'Leonard', 'Miriam', 'Noah', 'Olive', 'Paul', 'Queen', 'Robert', 'Stella', 'Timothy',
+      'Uma', 'Victor', 'Wambui', 'Xavier', 'Yvonne', 'Zachary', 'Atieno', 'Barasa', 'Chebet', 'Damaris',
+    ]
+    const lastNames = [
+      'Otieno', 'Mwangi', 'Wekesa', 'Achieng', 'Mutiso', 'Kariuki', 'Naliaka', 'Muthoni', 'Kiptoo', 'Njoroge',
+      'Adhiambo', 'Omondi', 'Wairimu', 'Karanja', 'Cherono', 'Mboya', 'Nyambura', 'Kiplagat', 'Mwaura', 'Were',
+    ]
+    const groupTargets = [
+      { groupId: safaricom.id, code: 'SAF', target: 78, packageId: essentialPkg.id, packageVersionId: essentialPkg.versionId, tiers: [
+        { tierId: executiveTier?.id ?? null, packageId: executivePkg.id, versionId: executivePkg.versionId, weight: 1 },
+        { tierId: managementTier?.id ?? null, packageId: premierPkg.id, versionId: premierPkg.versionId, weight: 2 },
+        { tierId: staffTier?.id ?? null, packageId: essentialPkg.id, versionId: essentialPkg.versionId, weight: 5 },
+      ] },
+      { groupId: kcbId, code: 'KCB', target: 52, packageId: premierPkg.id, packageVersionId: premierPkg.versionId },
+      { groupId: eablId, code: 'EABL', target: 46, packageId: premierPkg.id, packageVersionId: premierPkg.versionId },
+      { groupId: bamburiId, code: 'BAM', target: 38, packageId: essentialPkg.id, packageVersionId: essentialPkg.versionId },
+      { groupId: twigaId, code: 'TWI', target: 32, packageId: essentialPkg.id, packageVersionId: essentialPkg.versionId },
+    ]
+
+    const pick = <T,>(items: T[], index: number) => items[index % items.length]
+    const enrollmentDate = (index: number) => {
+      const now = new Date()
+      return new Date(now.getFullYear(), now.getMonth() - (index % 12), Math.min(25, 1 + (index % 24)))
+    }
+    const createIfMissing = async (data: {
+      groupId: string
+      memberNumber: string
+      firstName: string
+      lastName: string
+      gender: 'MALE' | 'FEMALE'
+      dateOfBirth: Date
+      relationship: 'PRINCIPAL' | 'SPOUSE' | 'CHILD'
+      packageId: string
+      packageVersionId: string
+      benefitTierId?: string | null
+      principalId?: string
+      enrollmentDate: Date
+    }) => {
+      const existing = await prisma.member.findUnique({
+        where: { tenantId_memberNumber: { tenantId, memberNumber: data.memberNumber } },
+        select: { id: true },
+      })
+      if (existing) return existing.id
+
+      const member = await prisma.member.create({
+        data: {
+          tenantId,
+          groupId: data.groupId,
+          memberNumber: data.memberNumber,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          gender: data.gender,
+          dateOfBirth: data.dateOfBirth,
+          relationship: data.relationship,
+          principalId: data.principalId,
+          packageId: data.packageId,
+          packageVersionId: data.packageVersionId,
+          benefitTierId: data.benefitTierId,
+          enrollmentDate: data.enrollmentDate,
+          activationDate: data.enrollmentDate,
+          status: 'ACTIVE',
+        },
+        select: { id: true },
+      })
+      return member.id
+    }
+
+    let addedLives = 0
+    for (const target of groupTargets) {
+      let current = await prisma.member.count({ where: { tenantId, groupId: target.groupId, status: 'ACTIVE' } })
+      let family = 1
+
+      while (current < target.target) {
+        const tierPool: { tierId: string | null; packageId: string; versionId: string; weight: number }[] = target.tiers
+          ? target.tiers.flatMap((tier) => Array.from({ length: tier.weight }, () => tier))
+          : [{ tierId: null, packageId: target.packageId, versionId: target.packageVersionId, weight: 1 }]
+        const tier = pick(tierPool, family)
+        const lastName = pick(lastNames, family + target.code.length)
+        const principalGender = family % 2 === 0 ? 'FEMALE' as const : 'MALE' as const
+        const spouseGender = principalGender === 'MALE' ? 'FEMALE' as const : 'MALE' as const
+        const principalEnrollment = enrollmentDate(family)
+        const principalId = await createIfMissing({
+          groupId: target.groupId,
+          memberNumber: `AVH-DEMO-${target.code}-${String(family).padStart(4, '0')}-P`,
+          firstName: pick(firstNames, family),
+          lastName,
+          gender: principalGender,
+          dateOfBirth: new Date(1974 + (family % 24), family % 12, 3 + (family % 20)),
+          relationship: 'PRINCIPAL',
+          packageId: tier.packageId,
+          packageVersionId: tier.versionId,
+          benefitTierId: tier.tierId,
+          enrollmentDate: principalEnrollment,
+        })
+        current += 1
+        addedLives += 1
+        if (current >= target.target) break
+
+        if (family % 2 !== 0 || target.code === 'SAF' || target.code === 'KCB') {
+          await createIfMissing({
+            groupId: target.groupId,
+            memberNumber: `AVH-DEMO-${target.code}-${String(family).padStart(4, '0')}-S`,
+            firstName: pick(firstNames, family + 7),
+            lastName,
+            gender: spouseGender,
+            dateOfBirth: new Date(1976 + (family % 22), (family + 3) % 12, 2 + (family % 21)),
+            relationship: 'SPOUSE',
+            principalId,
+            packageId: tier.packageId,
+            packageVersionId: tier.versionId,
+            benefitTierId: tier.tierId,
+            enrollmentDate: principalEnrollment,
+          })
+          current += 1
+          addedLives += 1
+          if (current >= target.target) break
+        }
+
+        if (family % 3 !== 0) {
+          await createIfMissing({
+            groupId: target.groupId,
+            memberNumber: `AVH-DEMO-${target.code}-${String(family).padStart(4, '0')}-C1`,
+            firstName: pick(firstNames, family + 13),
+            lastName,
+            gender: family % 2 === 0 ? 'MALE' : 'FEMALE',
+            dateOfBirth: new Date(2011 + (family % 11), (family + 6) % 12, 4 + (family % 18)),
+            relationship: 'CHILD',
+            principalId,
+            packageId: tier.packageId,
+            packageVersionId: tier.versionId,
+            benefitTierId: tier.tierId,
+            enrollmentDate: principalEnrollment,
+          })
+          current += 1
+          addedLives += 1
+          if (current >= target.target) break
+        }
+
+        if (family % 5 === 0) {
+          await createIfMissing({
+            groupId: target.groupId,
+            memberNumber: `AVH-DEMO-${target.code}-${String(family).padStart(4, '0')}-C2`,
+            firstName: pick(firstNames, family + 19),
+            lastName,
+            gender: family % 2 === 0 ? 'FEMALE' : 'MALE',
+            dateOfBirth: new Date(2015 + (family % 7), (family + 9) % 12, 6 + (family % 16)),
+            relationship: 'CHILD',
+            principalId,
+            packageId: tier.packageId,
+            packageVersionId: tier.versionId,
+            benefitTierId: tier.tierId,
+            enrollmentDate: principalEnrollment,
+          })
+          current += 1
+          addedLives += 1
+        }
+
+        family += 1
+      }
+    }
+
+    members = await prisma.member.findMany({ where: { tenantId }, select: { id: true, groupId: true } })
+    console.log(`✅ Demo portfolio covered lives: ${members.length} (${addedLives} top-up lives ensured across 5 schemes)`)
+  }
+
   // ═══════════════════════════════════════════════════════════
   // 8. ICD-10 & CPT CODES
   // ═══════════════════════════════════════════════════════════
@@ -2917,7 +3087,11 @@ async function main() {
 
         const seasonal = 0.86 + ((i % 6) * 0.055)
         const claimBudget = Math.round(monthlyContribution * scenario.mlr * seasonal)
-        const claimCount = scenario.status === 'healthy' ? 2 : scenario.status === 'watch' ? 3 : 4
+        const claimCount = scenario.status === 'healthy'
+          ? Math.max(6, Math.ceil(memberCount * 0.08))
+          : scenario.status === 'watch'
+            ? Math.max(8, Math.ceil(memberCount * 0.12))
+            : Math.max(10, Math.ceil(memberCount * 0.16))
         for (let j = 0; j < claimCount; j++) {
           const member = group.members[(i + j) % group.members.length]
           const disease = scenario.diseasePattern[(i + j) % scenario.diseasePattern.length]
@@ -3113,7 +3287,9 @@ async function main() {
       `${analyticsResult.contributionFacts.facts} contribution facts, ` +
       `${analyticsResult.mlrSnapshots.snapshots} MLR snapshots, ` +
       `${analyticsResult.providerScorecards.scorecards} provider scorecards, ` +
-      `${analyticsResult.renewalAnalyses.renewalAnalyses} renewal analyses`
+      `${analyticsResult.memberRiskProfiles.riskProfiles} member risk profiles, ` +
+      `${analyticsResult.renewalAnalyses.renewalAnalyses} renewal analyses, ` +
+      `${analyticsResult.analyticsAlerts.alerts} generated alerts`
     )
   }
 

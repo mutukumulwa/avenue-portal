@@ -1,8 +1,14 @@
-import { Prisma } from "@prisma/client";
+import {
+  AnalyticsAlertSeverity,
+  AnalyticsAlertType,
+  Prisma,
+  RiskTier,
+} from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 type RefreshRange = {
   tenantId?: string;
+  groupId?: string;
   from?: Date;
   to?: Date;
 };
@@ -53,6 +59,8 @@ type DiagnosisShape = {
 const DEFAULT_CASE_MIX_WEIGHT = new Prisma.Decimal(1);
 const DEFAULT_TARGET_MLR = 0.75;
 const DEFAULT_INFLATION_ASSUMPTION = 0.08;
+const DEFAULT_RISK_CAP = 1_000_000;
+const GENERATED_ALERT_SOURCE = "analytics-refresh";
 
 function monthStart(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), 1);
@@ -149,6 +157,45 @@ function lineShare(lineBilled: number, claimBilled: number, lineCount: number) {
   if (claimBilled > 0) return lineBilled / claimBilled;
   if (lineCount > 0) return 1 / lineCount;
   return 1;
+}
+
+function chronicTagForIcdFamily(icdFamily: string | null) {
+  if (!icdFamily) return null;
+  if (icdFamily === "E10" || icdFamily === "E11") return "diabetes";
+  if (icdFamily >= "I10" && icdFamily <= "I15") return "hypertension";
+  if (icdFamily === "J45" || icdFamily === "J46") return "asthma";
+  if (icdFamily === "N18" || icdFamily === "N19") return "renal-risk";
+  if (icdFamily.startsWith("C")) return "oncology";
+  if (icdFamily === "B20" || icdFamily === "B24") return "hiv-care";
+  if (icdFamily.startsWith("O")) return "maternity";
+  if (icdFamily.startsWith("F")) return "mental-health";
+  if (icdFamily === "J18") return "respiratory-risk";
+  if (icdFamily === "K35") return "surgical-risk";
+  if (icdFamily.startsWith("M")) return "musculoskeletal";
+  return null;
+}
+
+function riskTierForScore(score: number): RiskTier {
+  if (score >= 0.85) return RiskTier.CRITICAL;
+  if (score >= 0.65) return RiskTier.HIGH;
+  if (score >= 0.4) return RiskTier.MODERATE;
+  return RiskTier.LOW;
+}
+
+function alertSeverityForRatio(value: number, critical: number, warning: number): AnalyticsAlertSeverity {
+  if (value >= critical) return AnalyticsAlertSeverity.CRITICAL;
+  if (value >= warning) return AnalyticsAlertSeverity.WARNING;
+  return AnalyticsAlertSeverity.INFO;
+}
+
+function pct(value: number) {
+  return `${(value * 100).toFixed(1)}%`;
+}
+
+function moneyShort(value: number) {
+  if (value >= 1_000_000) return `KES ${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `KES ${(value / 1_000).toFixed(0)}K`;
+  return `KES ${value.toLocaleString()}`;
 }
 
 export class AnalyticsRefreshService {
@@ -594,6 +641,161 @@ export class AnalyticsRefreshService {
     return { scorecards: rows.length };
   }
 
+  static async refreshMemberRiskProfiles(range: RefreshRange = {}) {
+    const now = new Date();
+    const trailingStart = range.from ?? addMonths(now, -12);
+    const trailingEnd = range.to ?? now;
+    const recentStart = addMonths(now, -3);
+
+    const memberAggregates = await prisma.analyticsEncounterFact.groupBy({
+      by: ["tenantId", "groupId", "memberId"],
+      where: {
+        tenantId: range.tenantId,
+        groupId: range.groupId,
+        encounterDate: { gte: trailingStart, lte: trailingEnd },
+      },
+      _sum: {
+        grossCost: true,
+        benefitPaid: true,
+        memberCoContribution: true,
+        caseMixWeight: true,
+      },
+      _count: { id: true },
+    });
+
+    const memberIds = memberAggregates.map((row) => row.memberId);
+    if (memberIds.length === 0) {
+      return { riskProfiles: 0 };
+    }
+
+    const [members, icdFacts, recentFacts, preauthCounts] = await Promise.all([
+      prisma.member.findMany({
+        where: {
+          id: { in: memberIds },
+          tenantId: range.tenantId,
+          groupId: range.groupId,
+        },
+        select: {
+          id: true,
+          package: { select: { annualLimit: true } },
+        },
+      }),
+      prisma.analyticsEncounterFact.groupBy({
+        by: ["memberId", "icdFamily"],
+        where: {
+          tenantId: range.tenantId,
+          groupId: range.groupId,
+          memberId: { in: memberIds },
+          encounterDate: { gte: trailingStart, lte: trailingEnd },
+          icdFamily: { not: null },
+        },
+        _sum: { benefitPaid: true, grossCost: true },
+        _count: { id: true },
+        orderBy: { _sum: { grossCost: "desc" } },
+      }),
+      prisma.analyticsEncounterFact.groupBy({
+        by: ["memberId"],
+        where: {
+          tenantId: range.tenantId,
+          groupId: range.groupId,
+          memberId: { in: memberIds },
+          encounterDate: { gte: recentStart, lte: trailingEnd },
+        },
+        _count: { id: true },
+      }),
+      prisma.preAuthorization.groupBy({
+        by: ["memberId"],
+        where: {
+          tenantId: range.tenantId,
+          memberId: { in: memberIds },
+          createdAt: { gte: recentStart, lte: trailingEnd },
+        },
+        _count: { id: true },
+      }),
+    ]);
+
+    const memberById = new Map(members.map((member) => [member.id, member]));
+    const recentClaimsByMember = new Map(recentFacts.map((fact) => [fact.memberId, fact._count.id]));
+    const preauthsByMember = new Map(preauthCounts.map((preauth) => [preauth.memberId, preauth._count.id]));
+    const chronicTagsByMember = new Map<string, Set<string>>();
+
+    for (const fact of icdFacts) {
+      const tag = chronicTagForIcdFamily(fact.icdFamily);
+      if (!tag) continue;
+      const tags = chronicTagsByMember.get(fact.memberId) ?? new Set<string>();
+      tags.add(tag);
+      chronicTagsByMember.set(fact.memberId, tags);
+    }
+
+    let upserted = 0;
+    for (const aggregate of memberAggregates) {
+      const member = memberById.get(aggregate.memberId);
+      if (!member) continue;
+
+      const trailing12ClaimCost = Number(aggregate._sum.benefitPaid ?? 0) + Number(aggregate._sum.memberCoContribution ?? 0);
+      const annualLimit = Number(member.package?.annualLimit ?? DEFAULT_RISK_CAP) || DEFAULT_RISK_CAP;
+      const utilizationToCap = annualLimit > 0 ? trailing12ClaimCost / annualLimit : 0;
+      const claimCount = aggregate._count.id;
+      const averageCaseMix = claimCount > 0 ? Number(aggregate._sum.caseMixWeight ?? 0) / claimCount : 1;
+      const chronicTags = Array.from(chronicTagsByMember.get(aggregate.memberId) ?? []);
+      const recentClaimCount = recentClaimsByMember.get(aggregate.memberId) ?? 0;
+      const recentPreauthCount = preauthsByMember.get(aggregate.memberId) ?? 0;
+
+      const utilizationScore = Math.min(utilizationToCap / 1.1, 1) * 0.4;
+      const frequencyScore = Math.min(claimCount / 12, 1) * 0.2;
+      const chronicScore = Math.min(chronicTags.length / 3, 1) * 0.2;
+      const caseMixScore = Math.min(Math.max(averageCaseMix - 1, 0) / 1.5, 1) * 0.1;
+      const recentActivityScore = Math.min((recentClaimCount + recentPreauthCount) / 6, 1) * 0.1;
+      const riskScore = Math.min(
+        utilizationScore + frequencyScore + chronicScore + caseMixScore + recentActivityScore,
+        1,
+      );
+      const riskTier = riskTierForScore(riskScore);
+
+      const elapsedDays = Math.max(
+        1,
+        Math.ceil((Math.min(trailingEnd.getTime(), now.getTime()) - trailingStart.getTime()) / (1000 * 3600 * 24)),
+      );
+      const dailyBurn = trailing12ClaimCost / elapsedDays;
+      const projectedExceedDate = dailyBurn > 0 && utilizationToCap >= 0.55
+        ? addDays(trailingStart, Math.ceil(annualLimit / dailyBurn))
+        : null;
+
+      await prisma.memberRiskProfile.upsert({
+        where: { memberId: aggregate.memberId },
+        update: {
+          tenantId: aggregate.tenantId,
+          groupId: aggregate.groupId,
+          riskTier,
+          riskScore: new Prisma.Decimal(riskScore.toFixed(4)),
+          chronicTags,
+          utilizationToCap: new Prisma.Decimal(utilizationToCap.toFixed(4)),
+          projectedExceedDate,
+          trailing12ClaimCost: new Prisma.Decimal(trailing12ClaimCost.toFixed(2)),
+          trailing12ClaimCount: claimCount,
+          lastCalculatedAt: now,
+        },
+        create: {
+          tenantId: aggregate.tenantId,
+          groupId: aggregate.groupId,
+          memberId: aggregate.memberId,
+          riskTier,
+          riskScore: new Prisma.Decimal(riskScore.toFixed(4)),
+          chronicTags,
+          utilizationToCap: new Prisma.Decimal(utilizationToCap.toFixed(4)),
+          projectedExceedDate,
+          trailing12ClaimCost: new Prisma.Decimal(trailing12ClaimCost.toFixed(2)),
+          trailing12ClaimCount: claimCount,
+          lastCalculatedAt: now,
+        },
+      });
+
+      upserted += 1;
+    }
+
+    return { riskProfiles: upserted };
+  }
+
   static async refreshRenewalAnalyses(options: RefreshRange & { daysAhead?: number } = {}) {
     const now = new Date();
     const horizon = addDays(now, options.daysAhead ?? 90);
@@ -758,6 +960,245 @@ export class AnalyticsRefreshService {
     return { renewalAnalyses: groups.length };
   }
 
+  static async refreshAnalyticsAlerts(range: RefreshRange = {}) {
+    const now = new Date();
+    const horizon = addDays(now, 90);
+    const recentStart = addMonths(now, -3);
+    const previousStart = addMonths(now, -6);
+
+    await prisma.analyticsAlert.deleteMany({
+      where: {
+        tenantId: range.tenantId,
+        groupId: range.groupId,
+        context: { path: ["source"], equals: GENERATED_ALERT_SOURCE },
+      },
+    });
+
+    const alerts: Prisma.AnalyticsAlertCreateManyInput[] = [];
+    const groups = await prisma.group.findMany({
+      where: {
+        tenantId: range.tenantId,
+        ...(range.groupId ? { id: range.groupId } : {}),
+      },
+      select: { id: true, name: true, brokerId: true },
+    });
+    const groupById = new Map(groups.map((group) => [group.id, group]));
+
+    const [renewalAnalyses, contributionFacts, criticalRiskProfiles, latestScorecard, recentGroupFacts, previousGroupFacts] = await Promise.all([
+      prisma.renewalAnalysis.findMany({
+        where: {
+          tenantId: range.tenantId,
+          ...(range.groupId ? { groupId: range.groupId } : {}),
+        },
+        orderBy: { renewalDate: "asc" },
+      }),
+      prisma.analyticsContributionFact.groupBy({
+        by: ["tenantId", "groupId", "intermediaryId"],
+        where: {
+          tenantId: range.tenantId,
+          groupId: range.groupId,
+          periodStart: { gte: recentStart, lte: now },
+        },
+        _sum: { grossContribution: true, paidContribution: true, outstandingAmount: true },
+      }),
+      prisma.memberRiskProfile.findMany({
+        where: {
+          tenantId: range.tenantId,
+          groupId: range.groupId,
+          riskTier: { in: [RiskTier.HIGH, RiskTier.CRITICAL] },
+        },
+        orderBy: [{ riskTier: "desc" }, { riskScore: "desc" }],
+        take: 100,
+      }),
+      prisma.providerScorecard.findFirst({
+        where: { tenantId: range.tenantId },
+        orderBy: { periodStart: "desc" },
+        select: { period: true },
+      }),
+      prisma.analyticsEncounterFact.groupBy({
+        by: ["tenantId", "groupId"],
+        where: {
+          tenantId: range.tenantId,
+          groupId: range.groupId,
+          encounterDate: { gte: recentStart, lte: now },
+        },
+        _sum: { benefitPaid: true, memberCoContribution: true },
+        _count: { id: true },
+      }),
+      prisma.analyticsEncounterFact.groupBy({
+        by: ["tenantId", "groupId"],
+        where: {
+          tenantId: range.tenantId,
+          groupId: range.groupId,
+          encounterDate: { gte: previousStart, lt: recentStart },
+        },
+        _sum: { benefitPaid: true, memberCoContribution: true },
+        _count: { id: true },
+      }),
+    ]);
+
+    for (const analysis of renewalAnalyses) {
+      const group = groupById.get(analysis.groupId);
+      const groupName = group?.name ?? "Scheme";
+      const trailingMlr = Number(analysis.trailing12Mlr);
+      const targetMlr = Number(analysis.targetMlr);
+      const adjustment = Number(analysis.recommendedAdjustmentPct);
+      const daysToRenewal = Math.ceil((analysis.renewalDate.getTime() - now.getTime()) / (1000 * 3600 * 24));
+
+      if (trailingMlr >= Math.max(0.85, targetMlr + 0.08)) {
+        alerts.push({
+          tenantId: analysis.tenantId,
+          groupId: analysis.groupId,
+          intermediaryId: group?.brokerId,
+          type: AnalyticsAlertType.MLR_DRIFT,
+          severity: alertSeverityForRatio(trailingMlr, 1, 0.85),
+          status: "OPEN",
+          title: `${groupName} MLR above target`,
+          message: `Trailing MLR is ${pct(trailingMlr)} against a ${pct(targetMlr)} target.`,
+          metricKey: "trailing12Mlr",
+          metricValue: new Prisma.Decimal(trailingMlr.toFixed(4)),
+          thresholdValue: new Prisma.Decimal(targetMlr.toFixed(4)),
+          context: { source: GENERATED_ALERT_SOURCE, renewalAnalysisId: analysis.id },
+        });
+      }
+
+      if (analysis.renewalDate <= horizon && adjustment >= 0.1) {
+        alerts.push({
+          tenantId: analysis.tenantId,
+          groupId: analysis.groupId,
+          intermediaryId: group?.brokerId,
+          type: AnalyticsAlertType.RENEWAL_RISK,
+          severity: alertSeverityForRatio(adjustment, 0.2, 0.1),
+          status: "OPEN",
+          title: `${groupName} renewal needs pricing action`,
+          message: `Recommended contribution adjustment is ${pct(adjustment)} with renewal due in ${daysToRenewal} days.`,
+          metricKey: "recommendedAdjustmentPct",
+          metricValue: new Prisma.Decimal(adjustment.toFixed(4)),
+          thresholdValue: new Prisma.Decimal("0.1000"),
+          context: { source: GENERATED_ALERT_SOURCE, renewalAnalysisId: analysis.id, dueInDays: daysToRenewal },
+        });
+      }
+    }
+
+    for (const fact of contributionFacts) {
+      const gross = Number(fact._sum.grossContribution ?? 0);
+      if (gross <= 0) continue;
+      const paid = Number(fact._sum.paidContribution ?? 0);
+      const outstanding = Number(fact._sum.outstandingAmount ?? 0);
+      const collectionRate = paid / gross;
+      if (collectionRate >= 0.9 && outstanding < gross * 0.15) continue;
+
+      const group = groupById.get(fact.groupId);
+      alerts.push({
+        tenantId: fact.tenantId,
+        groupId: fact.groupId,
+        intermediaryId: fact.intermediaryId,
+        type: AnalyticsAlertType.CONTRIBUTION_SHORTFALL,
+        severity: collectionRate < 0.75 ? AnalyticsAlertSeverity.CRITICAL : AnalyticsAlertSeverity.WARNING,
+        status: "OPEN",
+        title: `${group?.name ?? "Scheme"} contribution collection shortfall`,
+        message: `Collection rate is ${pct(collectionRate)} with ${moneyShort(outstanding)} outstanding over the recent period.`,
+        metricKey: "collectionRate",
+        metricValue: new Prisma.Decimal(collectionRate.toFixed(4)),
+        thresholdValue: new Prisma.Decimal("0.9000"),
+        context: { source: GENERATED_ALERT_SOURCE, outstandingAmount: outstanding, grossContribution: gross },
+      });
+    }
+
+    const previousByGroup = new Map(previousGroupFacts.map((fact) => [fact.groupId, fact]));
+    for (const fact of recentGroupFacts) {
+      const previous = previousByGroup.get(fact.groupId);
+      const recentCost = Number(fact._sum.benefitPaid ?? 0) + Number(fact._sum.memberCoContribution ?? 0);
+      const previousCost = Number(previous?._sum.benefitPaid ?? 0) + Number(previous?._sum.memberCoContribution ?? 0);
+      const spikeRatio = previousCost > 0 ? recentCost / previousCost : 0;
+      if (spikeRatio < 1.35 || fact._count.id < 3) continue;
+
+      const group = groupById.get(fact.groupId);
+      alerts.push({
+        tenantId: fact.tenantId,
+        groupId: fact.groupId,
+        intermediaryId: group?.brokerId,
+        type: AnalyticsAlertType.UTILIZATION_SPIKE,
+        severity: alertSeverityForRatio(spikeRatio, 1.75, 1.35),
+        status: "OPEN",
+        title: `${group?.name ?? "Scheme"} utilization spike`,
+        message: `Recent claim cost is ${spikeRatio.toFixed(2)}x the prior comparable period.`,
+        metricKey: "recentCostIndex",
+        metricValue: new Prisma.Decimal(spikeRatio.toFixed(4)),
+        thresholdValue: new Prisma.Decimal("1.3500"),
+        context: { source: GENERATED_ALERT_SOURCE, recentCost, previousCost },
+      });
+    }
+
+    if (latestScorecard?.period) {
+      const scorecards = await prisma.providerScorecard.findMany({
+        where: {
+          tenantId: range.tenantId,
+          period: latestScorecard.period,
+          claimCount: { gte: 3 },
+        },
+      });
+      const byTier = new Map<string, typeof scorecards>();
+      for (const scorecard of scorecards) {
+        const key = `${scorecard.providerTier}:${scorecard.providerType}`;
+        byTier.set(key, [...(byTier.get(key) ?? []), scorecard]);
+      }
+
+      for (const scorecard of scorecards) {
+        const peers = byTier.get(`${scorecard.providerTier}:${scorecard.providerType}`) ?? [];
+        if (peers.length < 2) continue;
+        const peerAverage = peers.reduce((sum, peer) => sum + Number(peer.adjustedCost), 0) / peers.length;
+        const adjustedCost = Number(scorecard.adjustedCost);
+        const index = peerAverage > 0 ? adjustedCost / peerAverage : 0;
+        if (index < 1.25) continue;
+
+        alerts.push({
+          tenantId: scorecard.tenantId,
+          providerId: scorecard.providerId,
+          type: AnalyticsAlertType.PROVIDER_ANOMALY,
+          severity: alertSeverityForRatio(index, 1.6, 1.25),
+          status: "OPEN",
+          title: `${scorecard.providerName} adjusted cost above peer benchmark`,
+          message: `Case-mix-adjusted cost is ${index.toFixed(2)}x the peer average for ${latestScorecard.period}.`,
+          metricKey: "adjustedCostIndex",
+          metricValue: new Prisma.Decimal(index.toFixed(4)),
+          thresholdValue: new Prisma.Decimal("1.2500"),
+          context: { source: GENERATED_ALERT_SOURCE, period: latestScorecard.period, peerAverage, adjustedCost },
+        });
+      }
+    }
+
+    for (const profile of criticalRiskProfiles) {
+      if (profile.riskTier !== RiskTier.CRITICAL && Number(profile.utilizationToCap) < 0.85) continue;
+      const group = groupById.get(profile.groupId);
+      alerts.push({
+        tenantId: profile.tenantId,
+        groupId: profile.groupId,
+        memberId: profile.memberId,
+        intermediaryId: group?.brokerId,
+        type: AnalyticsAlertType.MEMBER_RISK,
+        severity: profile.riskTier === RiskTier.CRITICAL ? AnalyticsAlertSeverity.CRITICAL : AnalyticsAlertSeverity.WARNING,
+        status: "OPEN",
+        title: `${group?.name ?? "Scheme"} member risk escalation`,
+        message: `A member is ${profile.riskTier.toLowerCase()} risk with ${pct(Number(profile.utilizationToCap))} utilization to cap.`,
+        metricKey: "riskScore",
+        metricValue: profile.riskScore,
+        thresholdValue: new Prisma.Decimal("0.6500"),
+        context: {
+          source: GENERATED_ALERT_SOURCE,
+          utilizationToCap: Number(profile.utilizationToCap),
+          chronicTags: profile.chronicTags,
+        },
+      });
+    }
+
+    if (alerts.length > 0) {
+      await prisma.analyticsAlert.createMany({ data: alerts });
+    }
+
+    return { alerts: alerts.length };
+  }
+
   private static async upsertContributionFactForInvoice(invoice: InvoiceWithAnalyticsDimensions) {
     const { start, end } = parsePeriod(invoice.period);
     const sourceKey = `invoice:${invoice.id}`;
@@ -806,7 +1247,9 @@ export class AnalyticsRefreshService {
     const contributionFacts = await this.refreshContributionFacts(range);
     const mlrSnapshots = await this.refreshMlrSnapshots(range);
     const providerScorecards = await this.refreshProviderScorecards(range);
+    const memberRiskProfiles = await this.refreshMemberRiskProfiles(range);
     const renewalAnalyses = await this.refreshRenewalAnalyses(range);
+    const analyticsAlerts = await this.refreshAnalyticsAlerts(range);
 
     return {
       caseMixWeights,
@@ -814,7 +1257,9 @@ export class AnalyticsRefreshService {
       contributionFacts,
       mlrSnapshots,
       providerScorecards,
+      memberRiskProfiles,
       renewalAnalyses,
+      analyticsAlerts,
     };
   }
 }

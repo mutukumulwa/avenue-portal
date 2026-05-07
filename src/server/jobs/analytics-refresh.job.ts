@@ -13,7 +13,9 @@ export async function runAnalyticsRefreshJob(payload: { tenantId?: string } = {}
       `${result.contributionFacts.facts} contribution fact(s), ` +
       `${result.mlrSnapshots.snapshots} MLR snapshot(s), ` +
       `${result.providerScorecards.scorecards} provider scorecard row(s), ` +
-      `${result.renewalAnalyses.renewalAnalyses} renewal analysis row(s).`,
+      `${result.memberRiskProfiles.riskProfiles} member risk profile(s), ` +
+      `${result.renewalAnalyses.renewalAnalyses} renewal analysis row(s), ` +
+      `${result.analyticsAlerts.alerts} analytics alert(s).`,
   );
 
   return result;

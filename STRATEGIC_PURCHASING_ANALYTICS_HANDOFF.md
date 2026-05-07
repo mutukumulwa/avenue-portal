@@ -114,6 +114,11 @@ This document is the source of truth for handoff. Update checkboxes and notes as
 - [x] Demo seed creates member risk profiles so Risk Composition is populated.
 - [x] Demo seed creates analytics alerts for MLR drift, provider anomaly, renewal risk, utilization spike, and contribution shortfall.
 - [x] Demo seed calls `AnalyticsRefreshService.refreshFoundation({ tenantId })` at the end so facts, snapshots, provider scorecards, and renewal analyses are populated immediately after `npm run db:seed`.
+- [x] Demo seed tops up the portfolio to a credible 200+ covered lives.
+  - Target portfolio: 246 covered lives including dependants.
+  - Spread across Safaricom PLC, KCB Group, East African Breweries, Bamburi Cement, and Twiga Foods.
+  - Preserves Safaricom tiering and includes self-funded EABL/Bamburi schemes.
+  - Monthly analytics claim generation now scales by group membership size, producing hundreds of dated encounters across the trailing period.
 - [x] Ran `npx tsc --noEmit`.
 - [x] Ran `npm run build`.
 - [ ] Run `npm run db:seed` locally after migrations to verify row counts and visual analytics output.
@@ -165,8 +170,8 @@ Implementation sequence:
 - [ ] Slice A: Scheme drilldown service/API/page and link from console.
 - [x] Slice B: Alert inbox read/action foundation and link from console alert count.
 - [x] Slice C: Renewal workspace detail and simulator.
-- [ ] Slice D: Provider drilldown.
-- [ ] Slice E: Role-scoped access enforcement for all analytics reads/pages.
+- [x] Slice D: Provider drilldown.
+- [x] Slice E: Role-scoped access enforcement for analytics reads/pages.
 - [ ] Slice F: Export/action artifacts for scheme packs and renewal packs.
 
 ### 2026-05-07 Scheme Drilldown Slice
@@ -274,44 +279,171 @@ Out of scope for this slice:
 - [ ] Create tasks/follow-ups.
 - [ ] Actuarial approval workflow.
 
-### 2026-05-07 Provider Drilldown Slice Plan
+### 2026-05-08 Provider Drilldown Slice
 
-Goal: make Provider Scorecard rows actionable. Users should be able to open a provider, understand why it ranks high/low, compare it with peer benchmarks, and jump to the operational provider record or alert queue.
+- [x] Added `AnalyticsService.getProviderDetail()` in `src/server/services/analytics.service.ts`.
+  - Loads provider identity (name, type, tier, county, contract status/dates, services offered).
+  - Returns current period scorecard metrics (adjusted cost, average cost, CMI, rejection rate).
+  - Builds scorecard trend history (last 12 periods).
+  - Peer comparison: other providers in same tier from latest period, ranked by adjusted cost.
+  - Top ICD families, benefit category mix, and scheme/group mix from `AnalyticsEncounterFact`.
+  - Open alerts scoped to this provider.
+  - Recent 10 claims with member and status detail (internal-only).
+- [x] Added `analytics.providerDetail` tRPC query in `src/server/trpc/routers/analytics.ts`.
+- [x] Built `/analytics/providers/[providerId]/page.tsx`.
+  - Header with provider name, type, county, contract status, and tier badge.
+  - Metric cards for adjusted cost, average claim, CMI, and rejection rate.
+  - Scorecard cost trend panel (bar chart by period).
+  - Peer comparison panel (inline ranking within same tier).
+  - ICD drivers, benefit mix, and scheme mix panels (with scheme links to `/analytics/schemes/[groupId]`).
+  - Open alerts inline panel.
+  - Recent claims table (claim number links to `/claims/[id]`).
+  - Action links to `/providers/[id]`, `/analytics/alerts?providerId=...`, and `/reports/provider-statements`.
+- [x] Added route loading skeleton at `/analytics/providers/[providerId]/loading.tsx`.
+- [x] Linked provider scorecard rows in `/analytics` to `/analytics/providers/[providerId]`.
+- [x] Linked provider mix rows in scheme drilldown to `/analytics/providers/[providerId]`.
+- [x] Ran `npx tsc --noEmit`.
+- [x] Ran `npm run build`.
+- [ ] Privacy note: recent named claims are internal-only; tighten before HR/intermediary exposure.
 
-Existing repo context to reuse:
+### 2026-05-08 Reports Drilldown Integration
 
-- [x] `ProviderScorecard` already stores period-level claim count, member count, gross cost, adjusted cost, average cost, case-mix index, and rejection rate.
-- [x] `AnalyticsEncounterFact` already stores provider, group, benefit category, ICD family, case-mix weight, gross cost, benefit paid, and rejected amount.
-- [x] `/providers/[id]` already exists as the operational provider detail/tariff/contract page.
-- [x] `/analytics` Provider Scorecard already ranks providers by adjusted cost.
+Goal: connect existing report tables to analytics drilldowns so users can move from summary numbers to decision context in one click.
 
-Scope for this slice:
+- [x] Changed cell type in `src/app/(admin)/reports/[reportType]/page.tsx` from `string[][]` to `(string | { text: string; href: string })[][]` — backward-compatible; plain strings still render as text.
+- [x] Updated table renderer to output `<Link>` for link cells, plain text for strings.
+- [x] Updated `getLossRatioData`: includes group `id`, group name column is now a link to `/analytics/schemes/[groupId]`.
+- [x] Updated `getClaimsExperienceData`: aggregates on group `id` (was name), group name column is now a link to `/analytics/schemes/[groupId]`.
+- [x] Updated `getProviderStatementsData`: includes provider `id`, provider name column is now a link to `/analytics/providers/[providerId]`.
+- [x] Ran `npx tsc --noEmit`.
+- [x] Ran `npm run build`.
 
-- [ ] Add `AnalyticsService.getProviderDetail()`.
-  - Load provider identity and current scorecard.
-  - Build scorecard history from `ProviderScorecard`.
-  - Compare current provider against peers in the same latest period and tier/type where possible.
-  - Aggregate top ICD families, benefit categories, scheme/group mix, active alerts, and recent claims.
-  - Keep named claim rows internal-only and link to existing claim details.
-- [ ] Add tRPC procedure.
-  - `analytics.providerDetail`
-- [ ] Build `/analytics/providers/[providerId]`.
-  - Header with provider identity, tier/type, current period, and action links.
-  - Metric cards for adjusted cost, average claim cost, case-mix index, rejection rate.
-  - Peer comparison panel.
-  - Scorecard trend panel.
-  - ICD, benefit, and scheme mix panels.
-  - Alerts and recent claims panels.
-- [ ] Link provider entry points.
-  - Provider Scorecard rows -> `/analytics/providers/[providerId]`.
-  - Scheme drilldown Provider Mix rows -> `/analytics/providers/[providerId]`.
-- [ ] Add route loading skeleton.
+### 2026-05-08 Gap Fixes After Review
 
-Out of scope for this slice:
+- [x] Fixed analytics report CSV export gap in `src/app/api/reports/[reportType]/export/route.ts`.
+  - Added `analytics-portfolio-mlr`.
+  - Added `analytics-scheme-profitability`.
+  - Added `analytics-provider-performance`.
+  - Added `analytics-renewal-recommendations`.
+  - Added `analytics-risk-distribution`.
+  - Export rows serialize drilldown link cells as plain text because CSV cannot carry app links.
+- [x] Fixed provider tier tone mismatch in `/analytics/providers/[providerId]`.
+  - Replaced non-schema `PREFERRED` tier check with schema-valid `PANEL`.
+- [x] Ran `npx tsc --noEmit`.
+- [x] Ran `npm run build`.
 
-- [ ] Provider contract/tariff edit actions; link to `/providers/[id]` instead.
-- [ ] Flag/escalate provider review workflow.
-- [ ] Provider evidence pack export.
+### 2026-05-08 Role-Scoped Analytics Access Slice
+
+Goal: prevent broad portfolio analytics leakage when non-portfolio roles reach analytics code paths directly or through APIs.
+
+Implemented access helper:
+
+- [x] Added `src/lib/analytics-access.ts`.
+  - `SUPER_ADMIN`, claims, finance, underwriting, customer service, medical, and reports viewer keep tenant-wide analytics scope.
+  - `HR_MANAGER` resolves to `session.user.groupId`; no group means no analytics access.
+  - `BROKER_USER` resolves `User.brokerId` from the database for intermediary-book scoping.
+  - `FUND_ADMINISTRATOR` resolves managed self-funded schemes through `Group.fundAdministrators`.
+
+Implemented service/API enforcement:
+
+- [x] Extended analytics service scope with `allowedGroupIds` and `noAccess`.
+- [x] Scoped portfolio summary to recompute scoped MLR from fact tables instead of using the global portfolio snapshot.
+- [x] Scoped scheme grid/detail, renewal pipeline/workspace, risk composition, alerts, provider scorecard, and provider detail.
+- [x] Scoped provider detail and peer lists so fund/broker-style users only see providers present in their permitted group/book facts.
+- [x] Scoped alert acknowledge/resolve mutations with the same group allow-list rules used by alert reads.
+- [x] Updated analytics tRPC router to derive scope from the authenticated session before every read/action procedure.
+- [x] Hardened tRPC scope merging so caller input cannot override broker intermediary scope, and HR scope carries an own-group allow-list.
+- [x] Restricted `analytics.refreshFoundation` to `SUPER_ADMIN` through `ROLES.ADMIN_ONLY`.
+- [x] Updated analytics alert server actions to use the same scope before acknowledge/resolve.
+
+Implemented route/report enforcement:
+
+- [x] Updated `/analytics`, `/analytics/schemes/[groupId]`, `/analytics/renewals/[groupId]`, `/analytics/providers/[providerId]`, and `/analytics/alerts` to call `getAnalyticsAccessScope()`.
+- [x] Updated analytics-backed report pages to apply the same group scope for the five `analytics-*` report types.
+- [x] Updated analytics report CSV exports to apply the same group scope for the five `analytics-*` report types.
+
+Still intentionally unchanged:
+
+- [ ] HR and broker users are still blocked from `(admin)` analytics routes by the admin layout. The service/API scope is defensive and ready for future HR/broker portal surfaces.
+- [ ] Non-analytics report types are not fully scoped for `FUND_ADMINISTRATOR`; fund admins normally use the fund portal. If direct admin reports exposure is desired, scope each transactional report separately.
+- [ ] Named recent claim rows are still hidden only for `REPORTS_VIEWER`; additional redaction may be needed before exposing HR/broker analytics surfaces.
+- [x] Run `npx tsc --noEmit`.
+- [x] Run `npm run build`.
+
+### 2026-05-08 Member Risk Workbench Slice
+
+Goal: make the Risk Composition panel actionable by adding a role-scoped `/analytics/risk` workbench with filters, privacy-aware member identifiers, utilization-to-cap signals, and links to existing member records where authorized.
+
+Implementation checklist:
+
+- [x] Add `AnalyticsService.getMemberRiskProfiles(scope, filters)`.
+  - Reuse `MemberRiskProfile` as the read model.
+  - Filter by risk tier, group/scheme, chronic tag, utilization-to-cap minimum, and projected exceed horizon.
+  - Apply the same analytics role scope as the rest of the module.
+  - Preserve broker/intermediary scoping defensively even though broker routes do not expose this page yet.
+  - Return summary cards, tier counts, chronic tag counts, scheme filter options, and paged rows.
+- [x] Add `analytics.memberRiskProfiles` tRPC procedure.
+- [x] Add `/analytics/risk/page.tsx`.
+  - Server-rendered, consistent with the existing analytics pages.
+  - Internal clinical/ops users can see member names and link to member detail.
+  - `REPORTS_VIEWER` and `FUND_ADMINISTRATOR` see anonymized member references and no member-detail link.
+  - HR/broker users remain blocked by the admin layout today, but the service scope should still be safe if reused later.
+- [x] Add `/analytics/risk/loading.tsx`.
+- [x] Link Risk Composition tiers from `/analytics` into `/analytics/risk?tier=...`.
+- [x] Update handoff checkboxes and remaining-work notes.
+- [x] Run `npx tsc --noEmit`.
+- [x] Run `npm run build`.
+
+### 2026-05-08 Member Risk Profile ETL Slice
+
+Goal: replace seed-only member risk profiles with deterministic analytics refresh output sourced from `AnalyticsEncounterFact` and recent pre-authorization activity.
+
+Implemented:
+
+- [x] Added `AnalyticsRefreshService.refreshMemberRiskProfiles({ tenantId?, groupId?, from?, to? })`.
+  - Groups trailing-period encounter facts by member.
+  - Scores utilization-to-cap using the member package annual limit.
+  - Scores claim frequency, chronic ICD tags, case-mix intensity, and recent claims/preauth activity.
+  - Maps ICD families into practical chronic tags such as diabetes, hypertension, maternity, oncology, renal-risk, respiratory-risk, and surgical-risk.
+  - Upserts into `MemberRiskProfile` by `memberId`, preserving idempotent refresh behavior.
+- [x] Added `groupId` to the shared refresh range type so group-specific rebuilds can target member risk profiles.
+- [x] Included member risk profile refresh inside `refreshFoundation()`.
+- [x] Run `npx tsc --noEmit`.
+- [x] Run `npm run build`.
+
+### 2026-05-08 Analytics Alert ETL Slice
+
+Goal: generate operational analytics alerts from refreshed facts and scorecards instead of relying on seed-only alert rows.
+
+Implemented:
+
+- [x] Added `AnalyticsRefreshService.refreshAnalyticsAlerts({ tenantId?, groupId? })`.
+  - Deletes and recreates only alerts with `context.source = "analytics-refresh"`.
+  - Leaves seeded/manual alerts with other source markers untouched.
+  - Generates `MLR_DRIFT` alerts from renewal trailing MLR vs target.
+  - Generates `RENEWAL_RISK` alerts from recommended contribution increases inside the 90-day horizon.
+  - Generates `CONTRIBUTION_SHORTFALL` alerts from recent contribution collection rates and outstanding amounts.
+  - Generates `UTILIZATION_SPIKE` alerts from recent scheme claim cost vs prior comparable period.
+  - Generates `PROVIDER_ANOMALY` alerts from latest provider scorecards vs peer adjusted-cost averages.
+  - Generates `MEMBER_RISK` alerts from high/critical member risk profiles and utilization-to-cap pressure.
+- [x] Included alert refresh inside `refreshFoundation()`.
+- [x] Run `npx tsc --noEmit`.
+- [x] Run `npm run build`.
+
+### 2026-05-08 Analytics-Native Reports
+
+Goal: add five analytics-backed reports to the reports listing using fact/snapshot tables rather than re-querying all transactional data.
+
+- [x] Added "Strategic Analytics" report group in `src/app/(admin)/reports/page.tsx` with five entries.
+- [x] Added five REPORT_TITLES entries and data fetchers in `src/app/(admin)/reports/[reportType]/page.tsx`:
+  - `analytics-portfolio-mlr`: MLR by scheme from `AnalyticsMlrSnapshot` (SCHEME grain). Group name links to scheme drilldown.
+  - `analytics-scheme-profitability`: Contribution vs claims, surplus/deficit, MLR status per scheme. Group name links to scheme drilldown.
+  - `analytics-provider-performance`: Full `ProviderScorecard` ranking for latest period with CMI, rejection rate, claim/member counts. Provider name links to provider drilldown.
+  - `analytics-renewal-recommendations`: All `RenewalAnalysis` rows with trailing MLR, target, recommended contribution, adjustment %. Scheme name links to renewal workspace.
+  - `analytics-risk-distribution`: `MemberRiskProfile` grouped by scheme and risk tier with avg risk score and avg utilization-to-cap. Scheme name links to scheme drilldown.
+- [x] Wired all five fetchers into the route dispatch block.
+- [x] Ran `npx tsc --noEmit`.
+- [x] Ran `npm run build`.
 
 ## Already Implemented Repo Capabilities To Reuse
 
@@ -352,7 +484,7 @@ The system already has several pieces that should be fitted into this module rat
 - [ ] Renewal Intelligence Workspace
   - Suggested route: `src/app/(admin)/analytics/renewals/page.tsx`.
   - Optional scheme detail route: `src/app/(admin)/analytics/renewals/[groupId]/page.tsx`.
-- [ ] Member Risk Workbench
+- [x] Member Risk Workbench
   - Suggested route: `src/app/(admin)/analytics/risk/page.tsx`.
 - [ ] Alert Inbox
   - Suggested route: `src/app/(admin)/analytics/alerts/page.tsx`.
@@ -436,9 +568,9 @@ Proposed enums:
   - [x] `refreshCaseMixWeights()`
   - [x] `refreshMlrSnapshots({ tenantId?, from?, to? })`
   - [x] `refreshProviderScorecards({ tenantId?, from?, to? })`
-  - [ ] `refreshMemberRiskProfiles({ tenantId?, groupId? })`
+  - [x] `refreshMemberRiskProfiles({ tenantId?, groupId? })`
   - [x] `refreshRenewalAnalyses({ tenantId?, daysAhead: 90 })`
-  - [ ] `refreshAnalyticsAlerts({ tenantId? })`
+  - [x] `refreshAnalyticsAlerts({ tenantId?, groupId? })`
 - [x] Use upsert/delete-and-recreate by deterministic source keys so reruns are safe.
 - [x] Add queue job integration if the existing queue worker supports periodic jobs.
 - [x] Add a manual admin-only refresh action or script for local/dev use.
@@ -459,7 +591,7 @@ Create a read service, likely `src/server/services/analytics.service.ts`.
   - Include claim count, total cost, adjusted cost, average cost, denial/rejection rate where available.
 - [x] Risk composition:
   - Count and percentage by risk tier.
-- [ ] Member risk list:
+- [x] Member risk list:
   - Filter by risk tier, group, chronic tag, projected cap exceed date.
 - [ ] Renewal pipeline:
   - Schemes due in next 90 days, trailing MLR, target MLR, recommendation, alert state.
@@ -480,18 +612,19 @@ Create a read service, likely `src/server/services/analytics.service.ts`.
   - [ ] `analytics.schemeDetail`
   - [x] `analytics.providerScorecard`
   - [x] `analytics.riskComposition`
-  - [ ] `analytics.memberRiskProfiles`
+  - [x] `analytics.memberRiskProfiles`
   - [x] `analytics.renewalPipeline`
   - [x] `analytics.renewalWorkspace`
   - [x] `analytics.simulateRenewal`
   - [x] `analytics.alerts`
   - [x] `analytics.acknowledgeAlert`
   - [x] `analytics.resolveAlert`
-- [ ] Enforce role scoping at the procedure/service boundary:
-  - Admin/fund roles: tenant-scoped portfolio access.
-  - HR: group-scoped only.
-  - Broker/intermediary: only groups tied to that intermediary.
-  - Member: no portfolio analytics unless a later member-safe surface is designed.
+- [x] Enforce role scoping at the procedure/service boundary for analytics service reads/actions:
+  - Admin/internal roles: tenant-scoped portfolio access.
+  - Fund administrators: assigned self-funded scheme access through `Group.fundAdministrators`.
+  - HR: group-scoped only when a future HR analytics surface calls the service/API.
+  - Broker/intermediary: only groups tied to that intermediary when a future broker analytics surface calls the service/API.
+  - Member: no portfolio analytics surface is currently exposed.
 
 ### Phase 5: Strategic Purchasing Console UI
 
@@ -536,16 +669,16 @@ Create a read service, likely `src/server/services/analytics.service.ts`.
 
 ### Phase 7: Member Risk Workbench
 
-- [ ] Build risk profile list.
-- [ ] Filters:
+- [x] Build risk profile list.
+- [x] Filters:
   - Risk tier.
   - Group/scheme.
   - Chronic tag.
   - Utilization-to-cap range.
   - Projected exceed date.
-- [ ] Show member identifiers according to role/privacy rules.
-- [ ] Show chronic tags and utilization-to-cap bars.
-- [ ] Link to existing member detail where authorized.
+- [x] Show member identifiers according to role/privacy rules.
+- [x] Show chronic tags and utilization-to-cap bars.
+- [x] Link to existing member detail where authorized.
 
 ### Phase 8: Alert Engine And Inbox
 
@@ -563,15 +696,16 @@ Create a read service, likely `src/server/services/analytics.service.ts`.
 
 ### Phase 9: Reports And Exports
 
-- [ ] Integrate new analytics into existing reports area.
-- [ ] Add/export at least the five reports from the spec:
-  - Portfolio MLR.
-  - Scheme profitability.
-  - Provider performance.
-  - Renewal recommendations.
-  - Risk tier distribution.
-- [ ] Reuse existing report-generation service/job where possible.
-- [ ] Keep existing report routes working.
+- [x] Integrate new analytics into existing reports area.
+- [x] Add the five reports from the spec under a new "Strategic Analytics" group:
+  - [x] Portfolio MLR (`analytics-portfolio-mlr`).
+  - [x] Scheme profitability (`analytics-scheme-profitability`).
+  - [x] Provider performance (`analytics-provider-performance`).
+  - [x] Renewal recommendations (`analytics-renewal-recommendations`).
+  - [x] Risk tier distribution (`analytics-risk-distribution`).
+- [x] Existing report routes unchanged.
+- [x] Drilldown links wired in `loss-ratio`, `claims-experience`, and `provider-statements` reports.
+- [x] Export CSV for the five new analytics reports.
 
 ### Phase 10: Seed Data
 
@@ -637,12 +771,12 @@ Inputs:
 
 Initial explainable scoring inputs:
 
-- [ ] Recent claims cost.
-- [ ] Claim frequency.
-- [ ] Chronic/disease-family tags.
-- [ ] Utilization-to-cap percentage.
-- [ ] Recent preauthorization volume.
-- [ ] Projected exceed date.
+- [x] Recent claims cost.
+- [x] Claim frequency.
+- [x] Chronic/disease-family tags.
+- [x] Utilization-to-cap percentage.
+- [x] Recent preauthorization volume.
+- [x] Projected exceed date.
 
 Avoid irreversible business rules until confirmed with product stakeholders.
 
@@ -656,11 +790,12 @@ Run after relevant implementation phases:
 - [x] `npm run build`
 - [ ] `npm run lint`
 
-Known baseline note: lint has unrelated existing failures at the time this plan was written:
+Known baseline note: `npm run lint` was rerun during the role-scoped QA pass. It still fails with unrelated baseline errors:
 
 - `src/components/dashboard/DashboardCharts.tsx` has `react-hooks/set-state-in-effect`.
 - `src/server/services/providers.service.ts` has `no-explicit-any` errors.
 - `src/server/services/secure-checkin/secure-checkin.service.ts` has `no-require-imports` errors.
+- Current lint run also reports unused-variable warnings in older admin/report/fund files. Analytics-specific warnings introduced during the recent slices were removed.
 
 Manual QA:
 
@@ -704,12 +839,70 @@ Recommended next slice:
 - [x] Build the first Strategic Purchasing Console UI using the new analytics reads.
 - [x] Add route-level loading skeleton for the console.
 - [x] Add sidebar navigation entry.
-- [ ] Tighten role scoping before broad UI exposure, especially HR and intermediary-specific access.
+- [x] Tighten role scoping before broad UI exposure, especially HR and intermediary-specific access.
 - [x] Build renewal pipeline data and replace the placeholder panel.
 
-Recommended next slice:
+### 2026-05-08 Polish: Rendering, Navigation, and Role Enforcement
 
-- [ ] Add member risk profile generation.
-- [ ] Add member risk list/read API.
-- [ ] Replace empty risk composition dependency with generated profiles.
-- [ ] Start the Member Risk Workbench route after profiles exist.
+**Windows text rendering fixes**
+- [x] Reports KPI card labels: changed `text-xs uppercase` → `text-[13px] uppercase tracking-normal` (same pattern as all analytics pages).
+- [x] Reports data table: added `font-ui` class and changed header row to `text-[13px] uppercase tracking-normal text-avenue-text-muted` matching analytics table style.
+- [x] `tabular-nums` added to KPI value cells in reports for consistent number layout on Windows ClearType.
+- Provider drilldown page was already correct (`tracking-normal` applied during initial build).
+
+**Navigation**
+- [x] Updated `Breadcrumbs.tsx` `SEGMENT_LABELS` to include: `analytics`, `schemes`, `providers`, `renewals`, `alerts`, `fund`, `hr`, `broker`, and all report types (so `/reports/analytics-portfolio-mlr` shows "Portfolio MLR" not a raw slug).
+- [x] Fixed ID detection in `Breadcrumbs.tsx`: `isUUID` expanded to `isId()` — now recognises cuid v1 (`c[a-z0-9]{20,}`), cuid v2/nanoid (`[a-z0-9]{20,}`), and UUID formats. These all show as "Detail" instead of raw ID strings.
+- [x] Cross-drilldown `from` param support:
+  - Scheme drilldown provider links: `?from=scheme&groupId=[id]` → provider page shows "Back to [Scheme Name]".
+  - Scheme drilldown renewal link: `?from=scheme` → renewal workspace shows "Back to scheme".
+  - Scheme drilldown accepts `?from=report` → shows "Back to reports".
+  - Provider drilldown accepts `?from=report` → shows "Back to reports".
+  - Renewal workspace accepts `?from=scheme` and `?from=report`.
+  - All report → analytics link cells pass `?from=report`.
+
+**Role enforcement**
+- [x] Audited current access model:
+  - `HR_MANAGER`, `BROKER_USER`, `MEMBER_USER`: **blocked at admin layout** — cannot reach analytics pages.
+  - `FUND_ADMINISTRATOR`: NOT blocked by layout — now scoped to assigned self-funded schemes by the analytics access helper and service layer.
+  - All other `ANY_STAFF` roles (`SUPER_ADMIN`, `CLAIMS_OFFICER`, `FINANCE_OFFICER`, `UNDERWRITER`, `CUSTOMER_SERVICE`, `MEDICAL_OFFICER`, `REPORTS_VIEWER`, `FUND_ADMINISTRATOR`): can reach all analytics pages.
+- [x] Named member data restriction: `REPORTS_VIEWER` role sees aggregated analytics but NOT the "Recent Claims" table in scheme drilldown or provider drilldown. All other ANY_STAFF roles retain full access.
+  - Scheme drilldown: `canViewNamedClaims = userRole !== "REPORTS_VIEWER"` — shows message pointing to Claims report instead.
+  - Provider drilldown: same — shows message pointing to Provider Statements report.
+- [x] `FUND_ADMINISTRATOR` scope: filters analytics service queries to only assigned self-funded schemes via `Group.fundAdministrators`.
+- [x] HR/broker portal readiness: analytics service/API now derives group-scoped HR access and intermediary-scoped broker access defensively, although those portals still do not expose analytics routes.
+
+### 2026-05-08 Role-Scoped QA Hardening Pass
+
+Goal: verify the role-access implementation paths and close easy operational gaps before adding new analytics surfaces.
+
+Completed:
+
+- [x] Confirmed package scripts: `npm run db:seed`, `npm run build`, `npm run lint`, and worker-backed analytics refresh are available.
+- [x] Confirmed seeded users for manual role checks:
+  - `admin@avenue.co.ke / AvenueAdmin2024!` as `SUPER_ADMIN`.
+  - `fund@avenue.co.ke / AvenueAdmin2024!` as `FUND_ADMINISTRATOR`.
+  - `broker@kaib.co.ke / AvenueAdmin2024!` as broker portal user.
+  - `emily.wambui@safaricom.co.ke / AvenueAdmin2024!` as HR user.
+- [x] Confirmed `/analytics`, `/analytics/alerts`, `/analytics/risk`, `/analytics/providers/[providerId]`, `/analytics/renewals/[groupId]`, and `/analytics/schemes/[groupId]` are dynamic routes in production build output.
+- [x] Updated `runAnalyticsRefreshJob()` logging so operations output includes member risk profile and generated analytics alert counts.
+- [x] Ran `npx tsc --noEmit`.
+- [x] Ran `npm run build`.
+- [ ] Ran `npm run lint`; fails only on known baseline errors/warnings listed in Verification Plan.
+
+Manual/browser QA still required after server/database refresh:
+
+- [ ] Run analytics refresh against the intended dev database only.
+- [ ] Login as `SUPER_ADMIN`; verify full analytics portfolio, alerts, risk workbench, provider, scheme, and renewal drilldowns.
+- [ ] Login as `FUND_ADMINISTRATOR`; verify `/analytics` only shows assigned self-funded schemes and anonymizes member risk rows.
+- [ ] Login as `REPORTS_VIEWER` if/when a seeded user exists; verify named recent claims and member risk names are hidden.
+- [ ] Login as HR and broker seeded users; verify admin analytics routes are still blocked by layout and future service/API scopes are ready.
+- [ ] Decide whether old non-analytics transactional reports should be fund-admin scoped or hidden from fund admins.
+
+### 2026-05-08 Recommended next slice (as of 2026-05-08):
+
+All four analytics drilldown areas are now complete (Scheme, Alert, Renewal, Provider). Reports integration is done. Remaining work in priority order:
+
+1. **Manual/browser role QA on a refreshed dev DB** — verify SUPER_ADMIN, FUND_ADMINISTRATOR, HR, broker, and REPORTS_VIEWER behavior in the browser.
+2. **Transactional report access decision** — decide whether old non-analytics reports should be hidden or scoped for `FUND_ADMINISTRATOR`.
+3. **Export artifact actions (Slice F)** — Scheme pack and renewal pack PDF/export flows.

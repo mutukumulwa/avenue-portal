@@ -1,6 +1,7 @@
 import { requireRole, ROLES } from "@/lib/rbac";
+import { getAnalyticsAccessScope } from "@/lib/analytics-access";
 import { AnalyticsService } from "@/server/services/analytics.service";
-import { Activity, AlertTriangle, BarChart3, Building2, CalendarClock, Gauge, HeartPulse, TrendingUp, Users } from "lucide-react";
+import { AlertTriangle, BarChart3, Building2, CalendarClock, Gauge, HeartPulse, TrendingUp, Users } from "lucide-react";
 import Link from "next/link";
 
 function formatMoney(value: number) {
@@ -187,12 +188,12 @@ function ProviderGrid({
           <p className="px-5 py-8 text-center text-sm text-avenue-text-muted">Provider scorecards will appear after encounter facts are refreshed.</p>
         )}
         {providers.slice(0, 8).map((provider, index) => (
-          <div key={provider.id} className="grid grid-cols-[auto_1fr_auto] items-center gap-4 px-5 py-4">
+          <Link key={provider.id} href={`/analytics/providers/${provider.providerId}`} className="grid grid-cols-[auto_1fr_auto] items-center gap-4 px-5 py-4 hover:bg-[#F8F9FA]">
             <span className="flex h-8 w-8 items-center justify-center rounded-[8px] bg-avenue-indigo/10 text-[13px] font-bold text-avenue-indigo">
               {index + 1}
             </span>
             <div className="min-w-0">
-              <p className="truncate font-semibold text-avenue-text-heading">{provider.providerName}</p>
+              <p className="truncate font-semibold text-avenue-text-heading hover:text-avenue-indigo">{provider.providerName}</p>
               <p className="text-[13px] leading-snug text-avenue-text-muted">
                 {provider.providerTier ?? "UNKNOWN"} · {provider.claimCount.toLocaleString()} claims · CMI {Number(provider.caseMixIndex).toFixed(2)}
               </p>
@@ -201,7 +202,7 @@ function ProviderGrid({
               <p className="font-bold tabular-nums text-avenue-text-heading">{formatMoney(Number(provider.adjustedCost))}</p>
               <p className="text-[13px] leading-snug text-avenue-text-muted">{formatPercent(Number(provider.rejectionRate))} rejected</p>
             </div>
-          </div>
+          </Link>
         ))}
       </div>
     </div>
@@ -227,14 +228,16 @@ function RiskComposition({
           <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Risk Composition</h2>
           <p className="text-sm text-avenue-text-muted">Member risk tiers from the analytics profile table.</p>
         </div>
-        <Activity className="h-5 w-5 text-[#17A2B8]" />
+        <Link href="/analytics/risk" className="text-sm font-semibold text-avenue-indigo hover:underline">
+          View workbench
+        </Link>
       </div>
       <div className="space-y-4">
         {tiers.length === 0 && (
           <p className="py-8 text-center text-sm text-avenue-text-muted">Risk profiles have not been generated yet.</p>
         )}
         {tiers.map((tier) => (
-          <div key={tier.riskTier}>
+          <Link key={tier.riskTier} href={`/analytics/risk?tier=${tier.riskTier}`} className="block rounded-[8px] p-2 -mx-2 hover:bg-[#F8F9FA]">
             <div className="mb-1 flex items-center justify-between text-sm">
               <span className="font-semibold text-avenue-text-heading">{tier.riskTier.replace(/_/g, " ")}</span>
               <span className="tabular-nums text-avenue-text-muted">{tier.count.toLocaleString()} · {formatPercent(tier.percentage)}</span>
@@ -242,7 +245,7 @@ function RiskComposition({
             <div className="h-2 rounded-full bg-[#E6E7E8]">
               <div className={`h-2 rounded-full ${tone[tier.riskTier] ?? "bg-avenue-indigo"}`} style={{ width: `${Math.max(3, tier.percentage * 100)}%` }} />
             </div>
-          </div>
+          </Link>
         ))}
       </div>
     </div>
@@ -316,14 +319,14 @@ function RenewalPipeline({
 
 export default async function StrategicPurchasingAnalyticsPage() {
   const session = await requireRole(ROLES.ANY_STAFF);
-  const tenantId = session.user.tenantId;
+  const scope = await getAnalyticsAccessScope(session);
 
   const [summary, schemes, providers, riskComposition, renewalPipeline] = await Promise.all([
-    AnalyticsService.getPortfolioSummary({ tenantId }),
-    AnalyticsService.getSchemeGrid({ tenantId }),
-    AnalyticsService.getProviderScorecard({ tenantId, }, 12),
-    AnalyticsService.getRiskComposition({ tenantId }),
-    AnalyticsService.getRenewalPipeline({ tenantId }),
+    AnalyticsService.getPortfolioSummary(scope),
+    AnalyticsService.getSchemeGrid(scope),
+    AnalyticsService.getProviderScorecard(scope, 12),
+    AnalyticsService.getRiskComposition(scope),
+    AnalyticsService.getRenewalPipeline(scope),
   ]);
 
   return (

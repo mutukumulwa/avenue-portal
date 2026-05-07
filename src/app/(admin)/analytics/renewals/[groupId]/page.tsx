@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AlertTriangle, ArrowLeft, BarChart3, Calculator, FileText, RefreshCw, Stethoscope, Users } from "lucide-react";
 import { requireRole, ROLES } from "@/lib/rbac";
+import { getAnalyticsAccessScope } from "@/lib/analytics-access";
 import { AnalyticsService } from "@/server/services/analytics.service";
 
 type SearchParams = {
@@ -9,6 +10,7 @@ type SearchParams = {
   inflation?: string;
   membership?: string;
   adjustment?: string;
+  from?: string;
 };
 
 type RenewalWorkspace = NonNullable<Awaited<ReturnType<typeof AnalyticsService.getRenewalWorkspace>>>;
@@ -220,6 +222,7 @@ export default async function RenewalWorkspacePage({
   const session = await requireRole(ROLES.ANY_STAFF);
   const { groupId } = await params;
   const query = await searchParams;
+  const scope = await getAnalyticsAccessScope(session);
   const defaults = {
     targetMlr: 75,
     inflation: 8,
@@ -227,7 +230,7 @@ export default async function RenewalWorkspacePage({
     adjustment: 0,
   };
   const workspace = await AnalyticsService.getRenewalWorkspace({
-    tenantId: session.user.tenantId,
+    ...scope,
     groupId,
   }, {
     targetMlr: numberParam(query.targetMlr, defaults.targetMlr) / 100,
@@ -245,9 +248,12 @@ export default async function RenewalWorkspacePage({
     <div className="space-y-6 font-ui">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <Link href="/analytics" className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-avenue-indigo hover:underline">
+          <Link
+            href={query.from === "report" ? "/reports" : query.from === "scheme" ? `/analytics/schemes/${groupId}` : "/analytics"}
+            className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-avenue-indigo hover:underline"
+          >
             <ArrowLeft className="h-4 w-4" />
-            Back to analytics
+            {query.from === "report" ? "Back to reports" : query.from === "scheme" ? "Back to scheme" : "Back to analytics"}
           </Link>
           <div className="flex items-center gap-2 text-sm font-semibold text-avenue-indigo">
             <RefreshCw className="h-4 w-4" />

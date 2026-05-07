@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireRole, ROLES } from "@/lib/rbac";
+import { getAnalyticsAccessScope } from "@/lib/analytics-access";
 import { AnalyticsService } from "@/server/services/analytics.service";
 import { AlertTriangle, ArrowLeft, BarChart3, Building2, FileText, LineChart, Receipt, RefreshCw, Stethoscope } from "lucide-react";
 
@@ -87,7 +88,7 @@ function RankedList({
   title: string;
   subtitle: string;
   icon: React.ReactNode;
-  rows: { label: string; meta: string; value: number; count: number }[];
+  rows: { label: string; meta: string; value: number; count: number; href?: string }[];
 }) {
   const max = Math.max(...rows.map((row) => row.value), 1);
   return (
@@ -107,7 +108,13 @@ function RankedList({
           <div key={row.label} className="px-5 py-4">
             <div className="mb-2 flex items-center justify-between gap-4">
               <div className="min-w-0">
-                <p className="truncate font-semibold text-avenue-text-heading">{row.label}</p>
+                {row.href ? (
+                  <Link href={row.href} className="truncate block font-semibold text-avenue-text-heading hover:text-avenue-indigo hover:underline">
+                    {row.label}
+                  </Link>
+                ) : (
+                  <p className="truncate font-semibold text-avenue-text-heading">{row.label}</p>
+                )}
                 <p className="text-[13px] text-avenue-text-muted">{row.meta}</p>
               </div>
               <p className="font-bold tabular-nums text-avenue-text-heading">{formatMoney(row.value)}</p>
@@ -122,11 +129,22 @@ function RankedList({
   );
 }
 
-export default async function SchemeAnalyticsDetailPage({ params }: { params: Promise<{ groupId: string }> }) {
+export default async function SchemeAnalyticsDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ groupId: string }>;
+  searchParams: Promise<{ from?: string }>;
+}) {
   const session = await requireRole(ROLES.ANY_STAFF);
   const { groupId } = await params;
+  const { from } = await searchParams;
+  const userRole = session.user.role;
+  // REPORTS_VIEWER has read-only aggregated access; named member records are ops/clinical data
+  const canViewNamedClaims = userRole !== "REPORTS_VIEWER";
+  const scope = await getAnalyticsAccessScope(session);
   const detail = await AnalyticsService.getSchemeDetail({
-    tenantId: session.user.tenantId,
+    ...scope,
     groupId,
   });
 
@@ -149,15 +167,19 @@ export default async function SchemeAnalyticsDetailPage({ params }: { params: Pr
     meta: `${row.providerTier ?? "UNKNOWN"} · ${row.encounterCount.toLocaleString()} encounter facts`,
     value: row.grossCost,
     count: row.encounterCount,
+    href: `/analytics/providers/${row.providerId}?from=scheme&groupId=${groupId}`,
   }));
 
   return (
     <div className="space-y-6 font-ui">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <Link href="/analytics" className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-avenue-indigo hover:underline">
+          <Link
+            href={from === "report" ? "/reports" : "/analytics"}
+            className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-avenue-indigo hover:underline"
+          >
             <ArrowLeft className="h-4 w-4" />
-            Back to analytics
+            {from === "report" ? "Back to reports" : "Back to analytics"}
           </Link>
           <h1 className="font-heading text-3xl font-bold text-avenue-text-heading">{detail.group.name}</h1>
           <p className="text-avenue-text-muted">
@@ -240,24 +262,33 @@ export default async function SchemeAnalyticsDetailPage({ params }: { params: Pr
         <div className="rounded-[8px] border border-[#EEEEEE] bg-white shadow-sm">
           <div className="border-b border-[#EEEEEE] px-5 py-4">
             <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Recent Claims</h2>
-            <p className="text-sm text-avenue-text-muted">Named claim rows are internal-only and should be role-scoped before wider exposure.</p>
+            <p className="text-sm text-avenue-text-muted">Latest 10 claims for this scheme.</p>
           </div>
-          <div className="divide-y divide-[#EEEEEE]">
-            {detail.recentClaims.map((claim) => (
-              <Link key={claim.id} href={`/claims/${claim.id}`} className="block px-5 py-4 hover:bg-[#F8F9FA]">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-avenue-text-heading">{claim.claimNumber}</p>
-                    <p className="truncate text-[13px] text-avenue-text-muted">{claim.memberName} · {claim.providerName}</p>
+          {canViewNamedClaims ? (
+            <div className="divide-y divide-[#EEEEEE]">
+              {detail.recentClaims.length === 0 && (
+                <p className="px-5 py-8 text-center text-sm text-avenue-text-muted">No claims on record yet.</p>
+              )}
+              {detail.recentClaims.map((claim) => (
+                <Link key={claim.id} href={`/claims/${claim.id}`} className="block px-5 py-4 hover:bg-[#F8F9FA]">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-avenue-text-heading">{claim.claimNumber}</p>
+                      <p className="truncate text-[13px] text-avenue-text-muted">{claim.memberName} · {claim.providerName}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold tabular-nums text-avenue-text-heading">{formatMoney(claim.approvedAmount)}</p>
+                      <p className="text-[13px] text-avenue-text-muted">{claim.status.replace(/_/g, " ")}</p>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-bold tabular-nums text-avenue-text-heading">{formatMoney(claim.approvedAmount)}</p>
-                    <p className="text-[13px] text-avenue-text-muted">{claim.status.replace(/_/g, " ")}</p>
-                  </div>
-                </div>
-              </Link>
-            ))}
-          </div>
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="px-5 py-8 text-center text-sm text-avenue-text-muted">
+              Individual claim records are not available for your role. Use the Claims report for aggregate data.
+            </p>
+          )}
         </div>
       </div>
 
@@ -276,7 +307,7 @@ export default async function SchemeAnalyticsDetailPage({ params }: { params: Pr
             <MetricCard label="Recommended Contribution" value={formatMoney(detail.renewalAnalysis.recommendedContribution)} detail="Before actuarial/product review" />
             <MetricCard label="Adjustment" value={formatPercent(detail.renewalAnalysis.recommendedAdjustmentPct)} detail="Indicative pricing movement" />
           </div>
-          <Link href={`/analytics/renewals/${detail.group.id}`} className="mt-4 inline-flex items-center gap-2 rounded-[8px] bg-avenue-indigo px-4 py-2 text-sm font-semibold text-white hover:bg-avenue-indigo/90">
+          <Link href={`/analytics/renewals/${detail.group.id}?from=scheme`} className="mt-4 inline-flex items-center gap-2 rounded-[8px] bg-avenue-indigo px-4 py-2 text-sm font-semibold text-white hover:bg-avenue-indigo/90">
             <RefreshCw className="h-4 w-4" />
             Open renewal workspace
           </Link>

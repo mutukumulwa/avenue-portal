@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AnalyticsAlertSeverity, AnalyticsAlertStatus, AnalyticsAlertType } from "@prisma/client";
 import { AlertTriangle, ArrowLeft, CheckCircle2, CircleDot, Filter, Stethoscope, Users } from "lucide-react";
 import { requireRole, ROLES } from "@/lib/rbac";
+import { getAnalyticsAccessScope } from "@/lib/analytics-access";
 import { AnalyticsService } from "@/server/services/analytics.service";
 import { acknowledgeAnalyticsAlertAction, resolveAnalyticsAlertAction } from "./actions";
 
@@ -231,12 +232,13 @@ export default async function AnalyticsAlertsPage({
   searchParams: Promise<SearchParams>;
 }) {
   const session = await requireRole(ROLES.ANY_STAFF);
+  const scope = await getAnalyticsAccessScope(session);
   const params = await searchParams;
   const status = enumValue(AnalyticsAlertStatus, params.status);
   const severity = enumValue(AnalyticsAlertSeverity, params.severity);
   const type = enumValue(AnalyticsAlertType, params.type);
   const data = await AnalyticsService.getAlerts(
-    { tenantId: session.user.tenantId },
+    scope,
     {
       status,
       severity,

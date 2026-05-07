@@ -4,7 +4,7 @@ import {
   BarChart2, Users, FileText, Receipt, PieChart, TrendingUp, Calculator,
   HeartPulse, AlertCircle, Building2, UserSquare, AlertTriangle, BedDouble,
   Activity, Percent, LineChart, Clock, BadgeDollarSign, Landmark, Droplets,
-  XCircle, UserCheck, ShieldCheck,
+  XCircle, UserCheck, ShieldCheck, BarChart3, Stethoscope, CalendarClock, ShieldAlert,
 } from "lucide-react";
 
 const REPORT_GROUPS = [
@@ -49,6 +49,16 @@ const REPORT_GROUPS = [
       { id: "quotations",        title: "Quotation Pipeline",        description: "Quotes generated, conversion rate, average premium, and broker attribution.",                   icon: Calculator,     color: "bg-[#292A83]/10 text-[#292A83]" },
       { id: "claims-per-operator",title: "Claims Per Operator",      description: "Adjudication volume and approval rates per staff member — productivity monitoring.",            icon: UserCheck,      color: "bg-[#28A745]/10 text-[#28A745]" },
       { id: "user-rights-roles", title: "User Rights & Roles",       description: "All users, their roles, active status, and last login — security audit view.",                  icon: ShieldCheck,    color: "bg-[#292A83]/10 text-[#292A83]" },
+    ],
+  },
+  {
+    label: "Strategic Analytics",
+    reports: [
+      { id: "analytics-portfolio-mlr",      title: "Portfolio MLR",              description: "Medical loss ratio by scheme from analytics snapshots. Links to scheme drilldowns.",             icon: BarChart3,      color: "bg-[#292A83]/10 text-[#292A83]" },
+      { id: "analytics-scheme-profitability",title: "Scheme Profitability",      description: "Contribution vs claims across all schemes with MLR trend and alert state.",                      icon: Percent,        color: "bg-[#28A745]/10 text-[#28A745]" },
+      { id: "analytics-provider-performance",title: "Provider Performance",      description: "Case-mix-adjusted provider ranking with CMI, rejection rate, and claim volume. Links to drilldowns.", icon: Stethoscope,  color: "bg-[#DC3545]/10 text-[#DC3545]" },
+      { id: "analytics-renewal-recommendations",title: "Renewal Recommendations",description: "Schemes due for renewal with trailing MLR, recommended adjustment, and pricing guidance.",       icon: CalendarClock,  color: "bg-[#FFC107]/10 text-[#856404]" },
+      { id: "analytics-risk-distribution",  title: "Risk Tier Distribution",     description: "Member risk profile counts and percentages by tier and scheme.",                                  icon: ShieldAlert,    color: "bg-[#17A2B8]/10 text-[#17A2B8]" },
     ],
   },
 ];
