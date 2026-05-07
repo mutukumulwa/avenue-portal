@@ -118,6 +118,201 @@ This document is the source of truth for handoff. Update checkboxes and notes as
 - [x] Ran `npm run build`.
 - [ ] Run `npm run db:seed` locally after migrations to verify row counts and visual analytics output.
 
+### 2026-05-07 Actionable Analytics Drilldown Plan
+
+Goal: move the analytics module from signal display into decision support. Users should be able to click a concerning metric, understand what is driving it, and take a privacy-appropriate next step.
+
+Access/privacy model:
+
+- [ ] Internal portfolio users (`SUPER_ADMIN`, underwriting, finance, medical/claims leadership): can view portfolio-level analytics and detailed scheme/provider/renewal/risk drilldowns.
+- [ ] HR users: can only view their scheme/group. Prefer aggregate risk/utilization data; named member details only where existing HR permissions already allow it.
+- [ ] Broker/intermediary users: can view their own book and scheme/renewal summaries, but should not see named member risk detail.
+- [ ] Fund administrators: can view assigned self-funded groups and financial/claims details consistent with the fund module.
+- [ ] Members: no portfolio analytics.
+
+Drilldown/action areas:
+
+- [ ] Scheme Drilldown
+  - Entry point: click a scheme in `/analytics`.
+  - Show contribution vs claims trend by month.
+  - Show top ICD/disease drivers.
+  - Show benefit category cost mix.
+  - Show provider mix for the scheme.
+  - Show current open alerts for the scheme.
+  - Show renewal recommendation if the scheme is in the renewal pipeline.
+  - Actions exposed as first-pass links/buttons: open group record, open reports, review renewal panel, export later.
+- [ ] Provider Drilldown
+  - Entry point: click a provider in provider scorecard.
+  - Show case-mix-adjusted cost over time.
+  - Compare provider against peer/internal benchmarks.
+  - Show top ICD families, claim volume, rejection rate.
+  - Actions: flag provider review, tariff review, evidence pack later.
+- [ ] Renewal Workspace
+  - Entry point: click a renewal in Renewal Watch.
+  - Show trailing performance, cost drivers, recommendation, simulator.
+  - Actions: save scenario, export renewal pack, create follow-up task later.
+- [ ] Alert Inbox
+  - Entry point: open alert count or sidebar subitem.
+  - Show severity/status/type stream.
+  - Actions: acknowledge, resolve, add note, assign/escalate later.
+- [ ] Member Risk Workbench
+  - Entry point: click risk tier segment.
+  - Internal-only named member list.
+  - HR/broker views should remain aggregated/anonymized.
+
+Implementation sequence:
+
+- [ ] Slice A: Scheme drilldown service/API/page and link from console.
+- [x] Slice B: Alert inbox read/action foundation and link from console alert count.
+- [x] Slice C: Renewal workspace detail and simulator.
+- [ ] Slice D: Provider drilldown.
+- [ ] Slice E: Role-scoped access enforcement for all analytics reads/pages.
+- [ ] Slice F: Export/action artifacts for scheme packs and renewal packs.
+
+### 2026-05-07 Scheme Drilldown Slice
+
+- [x] Added `AnalyticsService.getSchemeDetail()`.
+  - Returns scheme summary, monthly contribution/claims trend, benefit category spend, ICD drivers, provider mix, current alerts, renewal recommendation, and recent claims.
+  - Reads from analytics fact/snapshot tables where possible.
+  - Pulls recent claim rows from transactional claims so internal users can action specific records.
+- [x] Added `analytics.schemeDetail` tRPC query.
+- [x] Linked scheme names in `/analytics` to `/analytics/schemes/[groupId]`.
+- [x] Added scheme drilldown page at `src/app/(admin)/analytics/schemes/[groupId]/page.tsx`.
+  - Includes trend panel.
+  - Includes action links to group record, repricing workbench, and reports.
+  - Includes disease driver, benefit mix, provider mix, current alerts, recent claims, and renewal recommendation panels.
+- [x] Added loading skeleton at `src/app/(admin)/analytics/schemes/[groupId]/loading.tsx`.
+- [x] Ran `npx tsc --noEmit`.
+- [x] Ran `npm run build`.
+- [ ] Privacy note: recent named claims are internal-only and need role-scoped redaction before HR/intermediary exposure.
+
+### 2026-05-07 Alert Inbox Slice Plan
+
+Goal: make analytics alerts actionable from the Strategic Purchasing Console and scheme drilldown. The first version should support a practical internal work queue: filter, acknowledge, resolve with note, and jump back to the related scheme/provider/member record where possible.
+
+Scope for this slice:
+
+- [ ] Add service methods for alert listing and status transitions.
+  - [x] List alerts by status, severity, type, group, provider, member, and intermediary scope.
+  - [x] Enrich rows with group/provider/member/intermediary labels without adding new schema relations.
+  - [x] Return summary counts by status/severity so the inbox can show the workload at a glance.
+  - [x] Acknowledge only `OPEN` alerts; keep already resolved alerts unchanged.
+  - [x] Resolve `OPEN` or `ACKNOWLEDGED` alerts with optional resolution note.
+- [x] Add tRPC procedures for alert list/action operations.
+  - [x] `analytics.alerts`
+  - [x] `analytics.acknowledgeAlert`
+  - [x] `analytics.resolveAlert`
+- [x] Add server actions for the server-rendered inbox page.
+  - [x] Use existing `requireRole(ROLES.ANY_STAFF)` guard for now.
+  - [x] Write audit entries for acknowledge/resolve actions.
+  - [x] Revalidate `/analytics`, `/analytics/alerts`, and affected scheme drilldown paths.
+- [x] Build `/analytics/alerts`.
+  - [x] Filter tabs/links for active vs resolved status.
+  - [x] Severity/type/group context visible on each row.
+  - [x] Inline acknowledge and resolve controls.
+  - [x] Stable, dense layout consistent with the analytics console.
+- [x] Link alert entry points.
+  - [x] Portfolio Open Alerts metric -> `/analytics/alerts`.
+  - [x] Scheme table alert count -> `/analytics/alerts?groupId=...`.
+  - [x] Scheme drilldown Current Alerts panel -> `/analytics/alerts?groupId=...`.
+- [x] Added route-level loading skeleton at `src/app/(admin)/analytics/alerts/loading.tsx`.
+- [x] Ran `npx tsc --noEmit`.
+- [x] Ran `npm run build`.
+- [ ] Role/privacy note: inbox remains internal staff scoped via `ROLES.ANY_STAFF`; tighten before exposing to HR/intermediary users.
+
+Out of scope for this slice:
+
+- [ ] Assignment/escalation workflow.
+- [ ] Alert detail page.
+- [ ] Automatic alert generation thresholds beyond seeded/current data.
+- [ ] HR/broker redaction rules beyond current internal staff guard.
+
+### 2026-05-07 Renewal Workspace Slice Plan
+
+Goal: turn Renewal Watch from a passive list into a pricing decision workspace. Users should be able to open a scheme renewal, see the analytical basis, change core assumptions, and jump to existing operational repricing/quotation flows.
+
+Existing repo context to reuse:
+
+- [x] `RenewalAnalysis` already stores trailing MLR, current-year MLR, target MLR, projected claims, recommended contribution, ICD drivers, anonymized top utilizers, and simulator defaults.
+- [x] `/groups/[id]/reprice` already exists as a simpler operational renewal repricing workbench.
+- [x] `/quotations/calculator` already exists as the follow-on quote creation entry point.
+- [x] `/analytics` Renewal Watch already uses `AnalyticsService.getRenewalPipeline()`.
+
+Scope for this slice:
+
+- [ ] Add `AnalyticsService.getRenewalWorkspace()`.
+- [x] Add `AnalyticsService.getRenewalWorkspace()`.
+  - [x] Load the renewal analysis by `groupId`.
+  - [x] Enrich with group, package, intermediary, active member count, open renewal/MLR alerts, recent MLR trend, top ICD drivers, and anonymized high utilizers.
+  - [x] Return simulator defaults from stored JSON, with safe fallbacks.
+- [x] Add `AnalyticsService.simulateRenewalFromBase()`.
+  - [x] Inputs: target MLR, inflation assumption, membership change percentage, contribution adjustment percentage.
+  - [x] Outputs: projected claims, required contribution, proposed contribution, proposed rate per member, MLR after proposed change, surplus/shortfall, and break-even adjustment.
+  - [x] Keep formula deterministic and visible; do not persist scenarios yet.
+- [x] Add tRPC procedures.
+  - [x] `analytics.renewalWorkspace`
+  - [x] `analytics.simulateRenewal`
+- [x] Build `/analytics/renewals/[groupId]`.
+  - [x] Header with renewal date, days remaining, current recommendation, and action links.
+  - [x] Metric cards for trailing MLR/current MLR/current contribution/projected claims.
+  - [x] Simulator form using query params so assumptions are shareable and reload-safe.
+  - [x] Disease driver and anonymized top utilizer panels.
+  - [x] Recent MLR trend panel.
+  - [x] Active alert panel linked to `/analytics/alerts?groupId=...`.
+- [x] Link renewal entry points.
+  - [x] Renewal Watch rows -> `/analytics/renewals/[groupId]`.
+  - [x] Scheme drilldown Renewal Recommendation panel -> `/analytics/renewals/[groupId]`.
+- [x] Add route loading skeleton at `src/app/(admin)/analytics/renewals/[groupId]/loading.tsx`.
+- [x] Ran `npx tsc --noEmit`.
+- [x] Ran `npm run build`.
+- [ ] Role/privacy note: renewal workspace remains internal staff scoped via `ROLES.ANY_STAFF`; tighten before HR/intermediary exposure.
+
+Out of scope for this slice:
+
+- [ ] Persist saved scenarios.
+- [ ] Export renewal pack.
+- [ ] Create tasks/follow-ups.
+- [ ] Actuarial approval workflow.
+
+### 2026-05-07 Provider Drilldown Slice Plan
+
+Goal: make Provider Scorecard rows actionable. Users should be able to open a provider, understand why it ranks high/low, compare it with peer benchmarks, and jump to the operational provider record or alert queue.
+
+Existing repo context to reuse:
+
+- [x] `ProviderScorecard` already stores period-level claim count, member count, gross cost, adjusted cost, average cost, case-mix index, and rejection rate.
+- [x] `AnalyticsEncounterFact` already stores provider, group, benefit category, ICD family, case-mix weight, gross cost, benefit paid, and rejected amount.
+- [x] `/providers/[id]` already exists as the operational provider detail/tariff/contract page.
+- [x] `/analytics` Provider Scorecard already ranks providers by adjusted cost.
+
+Scope for this slice:
+
+- [ ] Add `AnalyticsService.getProviderDetail()`.
+  - Load provider identity and current scorecard.
+  - Build scorecard history from `ProviderScorecard`.
+  - Compare current provider against peers in the same latest period and tier/type where possible.
+  - Aggregate top ICD families, benefit categories, scheme/group mix, active alerts, and recent claims.
+  - Keep named claim rows internal-only and link to existing claim details.
+- [ ] Add tRPC procedure.
+  - `analytics.providerDetail`
+- [ ] Build `/analytics/providers/[providerId]`.
+  - Header with provider identity, tier/type, current period, and action links.
+  - Metric cards for adjusted cost, average claim cost, case-mix index, rejection rate.
+  - Peer comparison panel.
+  - Scorecard trend panel.
+  - ICD, benefit, and scheme mix panels.
+  - Alerts and recent claims panels.
+- [ ] Link provider entry points.
+  - Provider Scorecard rows -> `/analytics/providers/[providerId]`.
+  - Scheme drilldown Provider Mix rows -> `/analytics/providers/[providerId]`.
+- [ ] Add route loading skeleton.
+
+Out of scope for this slice:
+
+- [ ] Provider contract/tariff edit actions; link to `/providers/[id]` instead.
+- [ ] Flag/escalate provider review workflow.
+- [ ] Provider evidence pack export.
+
 ## Already Implemented Repo Capabilities To Reuse
 
 The system already has several pieces that should be fitted into this module rather than replaced:
@@ -269,7 +464,7 @@ Create a read service, likely `src/server/services/analytics.service.ts`.
 - [ ] Renewal pipeline:
   - Schemes due in next 90 days, trailing MLR, target MLR, recommendation, alert state.
 - [ ] Renewal workspace:
-  - Current vs target MLR, top ICD drivers, anonymized high utilizers, simulator calculations.
+  - [x] Current vs target MLR, top ICD drivers, anonymized high utilizers, simulator calculations.
 - [ ] Alert list/actions:
   - Filter by severity/status/type.
   - Acknowledge, resolve, and add resolution note if the existing audit pattern supports it.
@@ -287,11 +482,11 @@ Create a read service, likely `src/server/services/analytics.service.ts`.
   - [x] `analytics.riskComposition`
   - [ ] `analytics.memberRiskProfiles`
   - [x] `analytics.renewalPipeline`
-  - [ ] `analytics.renewalWorkspace`
-  - [ ] `analytics.simulateRenewal`
-  - [ ] `analytics.alerts`
-  - [ ] `analytics.acknowledgeAlert`
-  - [ ] `analytics.resolveAlert`
+  - [x] `analytics.renewalWorkspace`
+  - [x] `analytics.simulateRenewal`
+  - [x] `analytics.alerts`
+  - [x] `analytics.acknowledgeAlert`
+  - [x] `analytics.resolveAlert`
 - [ ] Enforce role scoping at the procedure/service boundary:
   - Admin/fund roles: tenant-scoped portfolio access.
   - HR: group-scoped only.
@@ -327,17 +522,17 @@ Create a read service, likely `src/server/services/analytics.service.ts`.
 
 ### Phase 6: Renewal Intelligence Workspace
 
-- [ ] Build scheme renewal detail page.
+- [x] Build scheme renewal detail page.
 - [x] Show trailing 12-month MLR and current year MLR.
 - [x] Show top five ICD/disease cost drivers.
 - [x] Show anonymized top ten utilizing members.
 - [x] Add contribution adjustment recommendation.
-- [ ] Add simulator controls:
-  - Target MLR.
-  - Inflation assumption.
-  - Contribution increase/decrease percentage.
+- [x] Add simulator controls:
+  - [x] Target MLR.
+  - [x] Inflation assumption.
+  - [x] Contribution increase/decrease percentage.
   - Optional benefit cap adjustment if current benefit model supports it.
-- [ ] Keep calculations explainable on-screen through labels/metric names, not verbose instructional text.
+- [x] Keep calculations explainable on-screen through labels/metric names, not verbose instructional text.
 
 ### Phase 7: Member Risk Workbench
 
@@ -362,9 +557,9 @@ Create a read service, likely `src/server/services/analytics.service.ts`.
   - Renewal risk.
   - Contribution shortfall.
   - Member risk escalation.
-- [ ] Add alert inbox UI.
-- [ ] Add acknowledge/resolve actions.
-- [ ] Add audit/activity logging if existing patterns make that straightforward.
+- [x] Add alert inbox UI.
+- [x] Add acknowledge/resolve actions.
+- [x] Add audit/activity logging if existing patterns make that straightforward.
 
 ### Phase 9: Reports And Exports
 

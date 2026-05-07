@@ -1,6 +1,7 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { AnalyticsService } from "@/server/services/analytics.service";
 import { Activity, AlertTriangle, BarChart3, Building2, CalendarClock, Gauge, HeartPulse, TrendingUp, Users } from "lucide-react";
+import Link from "next/link";
 
 function formatMoney(value: number) {
   if (value >= 1_000_000) return `KES ${(value / 1_000_000).toFixed(1)}M`;
@@ -51,6 +52,7 @@ function MetricStrip({
       detail: `${summary.claimCountYtd.toLocaleString()} YTD claim facts`,
       icon: AlertTriangle,
       tone: summary.openAlerts > 0 ? "text-[#DC3545] bg-[#DC3545]/10" : "text-[#28A745] bg-[#28A745]/10",
+      href: "/analytics/alerts",
     },
   ];
 
@@ -63,7 +65,13 @@ function MetricStrip({
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="text-[13px] font-bold uppercase tracking-normal text-avenue-text-muted">{metric.label}</p>
-                <p className="mt-2 text-2xl font-bold tabular-nums text-avenue-text-heading">{metric.value}</p>
+                {metric.href ? (
+                  <Link href={metric.href} className="mt-2 block text-2xl font-bold tabular-nums text-avenue-text-heading hover:text-avenue-indigo hover:underline">
+                    {metric.value}
+                  </Link>
+                ) : (
+                  <p className="mt-2 text-2xl font-bold tabular-nums text-avenue-text-heading">{metric.value}</p>
+                )}
               </div>
               <div className={`rounded-[8px] p-2 ${metric.tone}`}>
                 <Icon className="h-5 w-5" />
@@ -130,7 +138,9 @@ function SchemeGrid({
             {schemes.map((scheme) => (
               <tr key={scheme.groupId} className="hover:bg-[#F8F9FA]">
                 <td className="px-5 py-4">
-                  <p className="font-semibold text-avenue-text-heading">{scheme.name}</p>
+                  <Link href={`/analytics/schemes/${scheme.groupId}`} className="font-semibold text-avenue-text-heading hover:text-avenue-indigo hover:underline">
+                    {scheme.name}
+                  </Link>
                   <p className="text-[13px] leading-snug text-avenue-text-muted">{scheme.intermediaryName ?? "Direct"} · {scheme.period ?? "No period"}</p>
                 </td>
                 <td className="px-5 py-4 tabular-nums">{scheme.memberCount.toLocaleString()}</td>
@@ -145,9 +155,9 @@ function SchemeGrid({
                   <MiniSparkline values={scheme.sparkline} />
                 </td>
                 <td className="px-5 py-4">
-                  <span className="rounded-full bg-avenue-bg-alt px-2 py-1 text-[13px] font-bold text-avenue-text-heading">
+                  <Link href={`/analytics/alerts?groupId=${scheme.groupId}`} className="rounded-full bg-avenue-bg-alt px-2 py-1 text-[13px] font-bold text-avenue-text-heading hover:text-avenue-indigo hover:underline">
                     {scheme.alertCount}
-                  </span>
+                  </Link>
                 </td>
               </tr>
             ))}
@@ -264,7 +274,7 @@ function RenewalPipeline({
           <p className="px-5 py-8 text-center text-sm text-avenue-text-muted">Renewal analyses will appear after the analytics refresh runs for schemes renewing in the next 90 days.</p>
         )}
         {renewals.slice(0, 5).map((renewal) => (
-          <div key={renewal.analysisId} className="px-5 py-4">
+          <Link key={renewal.analysisId} href={`/analytics/renewals/${renewal.groupId}`} className="block px-5 py-4 hover:bg-[#F8F9FA]">
             <div className="mb-3 flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <p className="truncate font-semibold text-avenue-text-heading">{renewal.groupName}</p>
@@ -297,7 +307,7 @@ function RenewalPipeline({
             <p className="mt-3 text-[13px] leading-snug text-avenue-text-muted">
               Recommended contribution {formatMoney(renewal.recommendedContribution)}
             </p>
-          </div>
+          </Link>
         ))}
       </div>
     </div>
