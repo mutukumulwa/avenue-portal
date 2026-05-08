@@ -1062,6 +1062,10 @@ Implementation notes:
   - current-period usage is seeded from enrollment anniversary;
   - Wanjiru is included in the demo member portfolio;
   - invalid maternity-on-male demo claims are corrected on reseed.
+- Added a member mobile install prompt:
+  - Android/Chrome uses the native `beforeinstallprompt` event when available;
+  - iOS Safari shows the correct Share menu and Add to Home Screen guidance;
+  - the prompt is scoped to `/member/*`, hidden in standalone mode, and remembers dismissal locally.
 - `npx tsc --noEmit` passes as of 2026-05-08.
 - `npm run lint` passes as of 2026-05-08 with 16 existing warnings, all unused variables/imports outside the member hardening work.
 - `npm run build` passes as of 2026-05-08 on Next.js 15.5.15.
