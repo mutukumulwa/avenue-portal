@@ -5,6 +5,7 @@ import { writeAudit } from "@/lib/audit";
 import { SecureCheckInService } from "@/server/services/secure-checkin/secure-checkin.service";
 import { MemberHealthVaultService } from "@/server/services/member-health-vault.service";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 export type MemberCheckInActionState = {
   error?: string;
@@ -57,32 +58,39 @@ export async function shareHealthRecordWithCheckInAction(formData: FormData) {
   const [recordKind, recordId] = healthRecord?.split(":") ?? [];
   const expiresAt = expiryFromForm(formData.get("shareExpiry"), 24);
 
-  if (!checkInChallengeId) throw new Error("Choose an active check-in request.");
-  if (!recordKind || !recordId) throw new Error("Choose a health record to share.");
-  if (!["file", "journal"].includes(recordKind)) throw new Error("Choose a valid health record to share.");
+  const backUrl = `/member/check-in${checkInChallengeId ? `?challenge=${encodeURIComponent(checkInChallengeId)}` : ""}`;
 
-  const share = await MemberHealthVaultService.shareWithCheckIn({
-    userId: session.user.id,
-    tenantId: session.user.tenantId,
-    checkInChallengeId,
-    healthFileId: recordKind === "file" ? recordId : null,
-    journalEntryId: recordKind === "journal" ? recordId : null,
-    expiresAt,
-  });
+  if (!checkInChallengeId) redirect(`/member/check-in?shareError=${encodeURIComponent("No active check-in request found.")}`);
+  if (!recordKind || !recordId) redirect(`${backUrl}&shareError=${encodeURIComponent("Choose a health record to share.")}`);
+  if (!["file", "journal"].includes(recordKind)) redirect(`${backUrl}&shareError=${encodeURIComponent("Choose a valid health record to share.")}`);
 
-  await writeAudit({
-    userId: session.user.id,
-    action: "MEMBER_HEALTH_RECORD_SHARED_WITH_CHECKIN",
-    module: "MEMBER_PORTAL",
-    description: "Member shared a health-vault record with an active check-in.",
-    metadata: {
-      shareId: share.id,
+  try {
+    const share = await MemberHealthVaultService.shareWithCheckIn({
+      userId: session.user.id,
+      tenantId: session.user.tenantId,
       checkInChallengeId,
       healthFileId: recordKind === "file" ? recordId : null,
       journalEntryId: recordKind === "journal" ? recordId : null,
-      expiresAt: expiresAt.toISOString(),
-    },
-  });
+      expiresAt,
+    });
+
+    await writeAudit({
+      userId: session.user.id,
+      action: "MEMBER_HEALTH_RECORD_SHARED_WITH_CHECKIN",
+      module: "MEMBER_PORTAL",
+      description: "Member shared a health-vault record with an active check-in.",
+      metadata: {
+        shareId: share.id,
+        checkInChallengeId,
+        healthFileId: recordKind === "file" ? recordId : null,
+        journalEntryId: recordKind === "journal" ? recordId : null,
+        expiresAt: expiresAt.toISOString(),
+      },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to share health record.";
+    redirect(`${backUrl}&shareError=${encodeURIComponent(message)}`);
+  }
 
   revalidatePath("/member/check-in");
   revalidatePath(`/check-ins/${checkInChallengeId}`);

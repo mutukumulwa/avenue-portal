@@ -6,6 +6,7 @@ import { buildKnowledgePrompts } from "@/server/services/secure-checkin/knowledg
 import { describeCheckInStatus } from "@/server/services/secure-checkin/status";
 import { cancelCheckInAction, confirmVisitCodeAction, knowledgeFallbackAction, restartCheckInAction } from "../actions";
 import { CheckInQRCode } from "./CheckInQRCode";
+import { AutoRefresh } from "./AutoRefresh";
 
 function labelFromKey(value: string) {
   return value
@@ -33,6 +34,7 @@ export default async function CheckInDetailPage({ params }: { params: Promise<{ 
   if (!challenge) notFound();
 
   const isAwaitingCode = challenge.status === "SIGNED";
+  const isLive = !["CODE_CONFIRMED", "CANCELLED", "EXPIRED", "FAILED"].includes(challenge.status);
   const knowledgePrompts = buildKnowledgePrompts(challenge.member);
   const status = describeCheckInStatus(challenge.status, !!challenge.visitVerification);
   const canRestart = !challenge.visitVerification && challenge.status !== "CODE_CONFIRMED";
@@ -50,6 +52,7 @@ export default async function CheckInDetailPage({ params }: { params: Promise<{ 
 
   return (
     <div className="space-y-6">
+      {isLive && <AutoRefresh />}
       <div>
         <h1 className="text-2xl font-bold font-heading text-avenue-text-heading">Check-In Verification</h1>
         <p className="text-sm text-avenue-text-muted mt-1">
@@ -164,7 +167,7 @@ export default async function CheckInDetailPage({ params }: { params: Promise<{ 
 
         {challenge.sharedHealthRecords.length > 0 ? (
           <div className="mt-4 space-y-3">
-            {challenge.sharedHealthRecords.map((share) => (
+            {challenge.sharedHealthRecords.map((share: (typeof challenge.sharedHealthRecords)[number]) => (
               <div key={share.id} className="rounded-lg border border-[#EEEEEE] p-4">
                 {share.healthFile && (
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -208,7 +211,7 @@ export default async function CheckInDetailPage({ params }: { params: Promise<{ 
                     )}
                     {share.journalEntry.tags.length > 0 && (
                       <div className="mt-3 flex flex-wrap gap-2">
-                        {share.journalEntry.tags.map((tag) => (
+                        {share.journalEntry.tags.map((tag: string) => (
                           <span key={tag} className="rounded-full bg-avenue-bg-alt px-2 py-1 text-xs font-semibold text-avenue-text-muted">
                             {tag}
                           </span>

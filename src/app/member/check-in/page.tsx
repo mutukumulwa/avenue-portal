@@ -15,10 +15,10 @@ function labelFromKey(value: string) {
 }
 
 export default async function MemberCheckInPage(props: {
-  searchParams: Promise<{ challenge?: string }>;
+  searchParams: Promise<{ challenge?: string; shareError?: string }>;
 }) {
   const session = await requireRole(ROLES.MEMBER);
-  const { challenge: scannedChallengeId } = await props.searchParams;
+  const { challenge: scannedChallengeId, shareError } = await props.searchParams;
 
   if (!session.user.memberId) {
     return (
@@ -40,8 +40,10 @@ export default async function MemberCheckInPage(props: {
     }),
     MemberHealthVaultService.getVaultForUser(session.user.id, session.user.tenantId),
   ]);
+  type VaultFile = NonNullable<typeof vault>["files"][number];
+  type VaultEntry = NonNullable<typeof vault>["journalEntries"][number];
   const healthRecordOptions = [
-    ...(vault?.files ?? []).map((file) => ({
+    ...(vault?.files ?? []).map((file: VaultFile) => ({
       key: `file:${file.id}`,
       kind: "file",
       id: file.id,
@@ -49,7 +51,7 @@ export default async function MemberCheckInPage(props: {
       createdAt: file.capturedAt ?? file.createdAt,
       shares: file.shares,
     })),
-    ...(vault?.journalEntries ?? []).map((entry) => ({
+    ...(vault?.journalEntries ?? []).map((entry: VaultEntry) => ({
       key: `journal:${entry.id}`,
       kind: "journal",
       id: entry.id,
@@ -84,6 +86,11 @@ export default async function MemberCheckInPage(props: {
           {scannedChallengeId && !scannedFound && (
             <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-[#856404]">
               That scanned check-in request is not pending for this member account. Ask reception to restart check-in.
+            </div>
+          )}
+          {shareError && (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-semibold text-avenue-error">
+              {shareError}
             </div>
           )}
           {pending.map((notification) => (
@@ -141,10 +148,11 @@ export default async function MemberCheckInPage(props: {
                 )}
 
                 <div className="mt-4 space-y-2">
-                  {healthRecordOptions.flatMap((record) =>
-                    record.shares
-                      .filter((share) => share.checkInChallengeId === notification.challengeId)
-                      .map((share) => (
+                  {healthRecordOptions.flatMap((record) => {
+                    type ShareEntry = (typeof record.shares)[number];
+                    return record.shares
+                      .filter((share: ShareEntry) => share.checkInChallengeId === notification.challengeId)
+                      .map((share: ShareEntry) => (
                         <div key={share.id} className="flex flex-col gap-2 rounded-md bg-avenue-bg-alt px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between">
                           <div>
                             <p className="font-semibold text-avenue-text-heading">{record.label}</p>
@@ -161,8 +169,8 @@ export default async function MemberCheckInPage(props: {
                             </button>
                           </form>
                         </div>
-                      ))
-                  )}
+                      ));
+                  })}
                 </div>
               </section>
             </div>
