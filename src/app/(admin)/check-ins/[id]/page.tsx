@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
 import { requireRole, ROLES } from "@/lib/rbac";
 import { SecureCheckInService } from "@/server/services/secure-checkin/secure-checkin.service";
 import { buildKnowledgePrompts } from "@/server/services/secure-checkin/knowledge";
@@ -12,6 +13,16 @@ function labelFromKey(value: string) {
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
+}
+
+async function getAppOrigin() {
+  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXTAUTH_URL;
+  if (configuredUrl) return configuredUrl.replace(/\/$/, "");
+
+  const requestHeaders = await headers();
+  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host");
+  const proto = requestHeaders.get("x-forwarded-proto") ?? "https";
+  return host ? `${proto}://${host}` : "http://localhost:3000";
 }
 
 export default async function CheckInDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -33,9 +44,9 @@ export default async function CheckInDetailPage({ params }: { params: Promise<{ 
     danger: "border-red-100 bg-red-50 text-avenue-error",
     muted: "border-[#EEEEEE] bg-white text-avenue-text-body",
   }[status.tone];
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+  const appUrl = await getAppOrigin();
   const memberCheckInPath = `/member/check-in?challenge=${encodeURIComponent(challenge.id)}`;
-  const qrValue = `${appUrl.replace(/\/$/, "")}/login?callbackUrl=${encodeURIComponent(memberCheckInPath)}`;
+  const qrValue = `${appUrl}/login?callbackUrl=${encodeURIComponent(memberCheckInPath)}`;
 
   return (
     <div className="space-y-6">
