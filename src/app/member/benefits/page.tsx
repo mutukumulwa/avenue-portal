@@ -86,40 +86,40 @@ export default async function MemberBenefitsPage() {
         {state.benefitStates.map((benefit) => {
           const pct = Math.round(benefit.usedPct * 100);
           return (
-            <div key={benefit.id} className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="font-heading text-lg font-bold text-avenue-text-heading">{benefit.name}</h2>
-                    <span className={`rounded-full px-2 py-1 text-[12px] font-bold ${paceTone(benefit.pace)}`}>
-                      {benefit.pace}
-                    </span>
-                  </div>
-                  {benefit.notes && <p className="mt-1 text-sm text-avenue-text-muted">{benefit.notes}</p>}
+            <div key={benefit.id} className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-[0_8px_22px_rgba(0,0,0,0.08)]">
+              <div className="flex items-start justify-between gap-3">
+                <h2 className="min-w-0 flex-1 text-[15px] font-bold uppercase leading-snug text-avenue-text-heading sm:font-heading sm:text-lg sm:normal-case">
+                  {benefit.name}
+                </h2>
+                <span className={`shrink-0 rounded-full px-3 py-1 text-[11px] font-bold uppercase ${paceTone(benefit.pace)}`}>
+                  {benefit.pace === "On track" ? "Active" : benefit.pace}
+                </span>
+              </div>
+
+              {benefit.notes && <p className="mt-2 text-sm text-avenue-text-muted">{benefit.notes}</p>}
+
+              <div className="mt-5 grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <p className="text-[13px] text-avenue-text-muted">Allocation</p>
+                  <p className="mt-1 text-base font-bold tabular-nums text-avenue-text-heading">{formatMoney(benefit.limit)}</p>
                 </div>
-                <div className="text-left sm:text-right">
-                  <p className="font-bold tabular-nums text-avenue-indigo">{formatMoney(benefit.limit)}</p>
-                  <p className="text-[13px] text-avenue-text-muted">category sublimit</p>
+                <div>
+                  <p className="text-[13px] text-avenue-text-muted">Expenditure</p>
+                  <p className="mt-1 text-base font-bold tabular-nums text-avenue-text-heading">{formatMoney(benefit.used)}</p>
+                </div>
+                <div>
+                  <p className="text-[13px] text-avenue-text-muted">Balance</p>
+                  <p className="mt-1 text-base font-bold tabular-nums text-[#1F7A34]">{formatMoney(benefit.remaining)}</p>
                 </div>
               </div>
 
-              <div className="mt-4 h-2 overflow-hidden rounded-full bg-[#E6E7E8]">
+              <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-[#E6E7E8]">
                 <div className={`h-full rounded-full transition-all ${barTone(benefit.usedPct)}`} style={{ width: `${pct}%` }} />
               </div>
 
-              <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                <div>
-                  <p className="text-[13px] text-avenue-text-muted">Used</p>
-                  <p className="font-bold tabular-nums text-avenue-text-heading">{formatMoney(benefit.used)}</p>
-                </div>
-                <div>
-                  <p className="text-[13px] text-avenue-text-muted">Remaining</p>
-                  <p className="font-bold tabular-nums text-[#28A745]">{formatMoney(benefit.remaining)}</p>
-                </div>
-                <div>
-                  <p className="text-[13px] text-avenue-text-muted">Care events</p>
-                  <p className="font-bold tabular-nums text-avenue-text-heading">{benefit.claimCount.toLocaleString("en-KE")}</p>
-                </div>
+              <div className="mt-3 flex items-center justify-between text-[13px] text-avenue-text-muted">
+                <span>{pct}% used</span>
+                <span>{benefit.claimCount.toLocaleString("en-KE")} care event{benefit.claimCount === 1 ? "" : "s"}</span>
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2 text-[13px] text-avenue-text-muted">

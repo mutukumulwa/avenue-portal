@@ -1070,6 +1070,10 @@ Implementation notes:
   - install prompt now also appears for mobile viewports when the native browser install event does not fire;
   - dismissal key was versioned so previously dismissed test prompts do not hide the revised prompt;
   - mobile member navigation now shows icon labels in fixed-width horizontal items instead of icon-only buttons.
+- Borrowed the efficient Smart-style member information scheme without copying the visual treatment:
+  - `/member/benefits` benefit cards now prioritize category name plus Allocation, Expenditure, and Balance;
+  - `/member/utilization` care event cards now prioritize visit date/provider plus Benefit and Expenditure, with plan-approved and member-share amounts below;
+  - cards keep Avenue colors, 8px radius, readable type, and existing filters/summary context.
 - `npx tsc --noEmit` passes as of 2026-05-08.
 - `npm run lint` passes as of 2026-05-08 with 16 existing warnings, all unused variables/imports outside the member hardening work.
 - `npm run build` passes as of 2026-05-08 on Next.js 15.5.15.

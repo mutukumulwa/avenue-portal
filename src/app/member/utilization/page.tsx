@@ -17,11 +17,14 @@ function formatMoney(value: number | null) {
   return `KES ${Math.round(value).toLocaleString("en-KE")}`;
 }
 
-function formatDate(value: Date) {
-  return new Date(value).toLocaleDateString("en-KE", {
+function formatDateTime(value: Date) {
+  return new Date(value).toLocaleString("en-KE", {
     day: "2-digit",
     month: "short",
     year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
   });
 }
 
@@ -175,48 +178,60 @@ export default async function MemberUtilizationPage({
         </div>
       )}
 
-      <section className="overflow-hidden rounded-[8px] border border-[#EEEEEE] bg-white shadow-sm">
-        <div className="divide-y divide-[#EEEEEE]">
+      <section className="space-y-3">
           {history.encounters.map((encounter) => {
             const content = (
-              <div className="grid gap-4 px-5 py-4 md:grid-cols-[1fr_auto] md:items-center">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="font-bold text-avenue-text-heading">{encounter.providerName}</p>
-                    <span className={`rounded-full px-2 py-0.5 text-[12px] font-bold ${statusTone(encounter.status)}`}>
+              <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-[0_8px_22px_rgba(0,0,0,0.08)] transition-colors hover:bg-[#F8F9FA]">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[15px] font-bold uppercase leading-snug text-avenue-text-heading">
+                      {formatDateTime(encounter.dateOfService)} | {encounter.providerName}
+                    </p>
+                    <p className="mt-2 text-[13px] text-avenue-text-muted">
+                      {encounter.memberName} · {encounter.serviceType.replace(/_/g, " ")}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-2">
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${statusTone(encounter.status)}`}>
                       {encounter.status}
                     </span>
-                    {encounter.masked && (
-                      <span className="rounded-full bg-[#6C757D]/10 px-2 py-0.5 text-[12px] font-bold text-[#6C757D]">Private</span>
-                    )}
+                    {encounter.href && <ArrowRight className="h-5 w-5 text-avenue-indigo" />}
                   </div>
-                  <p className="mt-1 text-sm text-avenue-text-muted">
-                    {encounter.memberName} · {encounter.serviceType.replace(/_/g, " ")} · {encounter.benefitCategory.replace(/_/g, " ")} · {formatDate(encounter.dateOfService)}
-                  </p>
-                  <p className="mt-1 font-mono text-[13px] text-avenue-text-muted">{encounter.claimNumber}</p>
                 </div>
-                <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4 md:text-right">
-                  <div>
-                    <p className="text-[13px] text-avenue-text-muted">Bill</p>
-                    <p className="font-bold tabular-nums text-avenue-text-heading">{formatMoney(encounter.billedAmount)}</p>
+
+                {encounter.masked && (
+                  <span className="mt-3 inline-flex rounded-full bg-[#6C757D]/10 px-2 py-0.5 text-[12px] font-bold text-[#6C757D]">Private</span>
+                )}
+
+                <div className="mt-5 grid grid-cols-[1fr_auto] gap-4">
+                  <div className="min-w-0">
+                    <p className="text-[13px] text-avenue-text-muted">Benefit</p>
+                    <p className="mt-1 text-base font-semibold leading-snug text-avenue-text-heading">
+                      {encounter.masked ? "Private family event" : encounter.benefitCategory.replace(/_/g, " ")}
+                    </p>
+                    <p className="mt-2 font-mono text-[12px] text-avenue-text-muted">{encounter.claimNumber}</p>
                   </div>
+                  <div className="text-right">
+                    <p className="text-[13px] text-avenue-text-muted">Expenditure</p>
+                    <p className="mt-1 text-base font-bold tabular-nums text-avenue-text-heading">{formatMoney(encounter.billedAmount)}</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-3 border-t border-[#EEEEEE] pt-3 text-sm">
                   <div>
                     <p className="text-[13px] text-avenue-text-muted">Plan approved</p>
-                    <p className="font-bold tabular-nums text-[#28A745]">{formatMoney(encounter.planApprovedAmount)}</p>
+                    <p className="font-bold tabular-nums text-[#1F7A34]">{formatMoney(encounter.planApprovedAmount)}</p>
                   </div>
-                  <div>
+                  <div className="text-right">
                     <p className="text-[13px] text-avenue-text-muted">Your share</p>
                     <p className="font-bold tabular-nums text-[#856404]">{formatMoney(encounter.memberShare)}</p>
-                  </div>
-                  <div className="flex items-end justify-start md:justify-end">
-                    {encounter.href && <ArrowRight className="h-5 w-5 text-avenue-indigo" />}
                   </div>
                 </div>
               </div>
             );
 
             return encounter.href ? (
-              <Link key={encounter.id} href={encounter.href} className="block hover:bg-[#F8F9FA]">
+              <Link key={encounter.id} href={encounter.href} className="block">
                 {content}
               </Link>
             ) : (
@@ -225,9 +240,8 @@ export default async function MemberUtilizationPage({
           })}
 
           {history.encounters.length === 0 && (
-            <div className="px-5 py-12 text-center text-sm text-avenue-text-muted">No care events match these filters.</div>
+            <div className="rounded-[8px] border border-[#EEEEEE] bg-white px-5 py-12 text-center text-sm text-avenue-text-muted shadow-sm">No care events match these filters.</div>
           )}
-        </div>
       </section>
     </div>
   );
