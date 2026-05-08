@@ -1066,6 +1066,10 @@ Implementation notes:
   - Android/Chrome uses the native `beforeinstallprompt` event when available;
   - iOS Safari shows the correct Share menu and Add to Home Screen guidance;
   - the prompt is scoped to `/member/*`, hidden in standalone mode, and remembers dismissal locally.
+- Follow-up mobile QA fixes:
+  - install prompt now also appears for mobile viewports when the native browser install event does not fire;
+  - dismissal key was versioned so previously dismissed test prompts do not hide the revised prompt;
+  - mobile member navigation now shows icon labels in fixed-width horizontal items instead of icon-only buttons.
 - `npx tsc --noEmit` passes as of 2026-05-08.
 - `npm run lint` passes as of 2026-05-08 with 16 existing warnings, all unused variables/imports outside the member hardening work.
 - `npm run build` passes as of 2026-05-08 on Next.js 15.5.15.

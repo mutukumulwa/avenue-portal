@@ -8,7 +8,7 @@ type BeforeInstallPromptEvent = Event & {
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 };
 
-const DISMISSED_KEY = "aicare-member-install-dismissed";
+const DISMISSED_KEY = "aicare-member-install-dismissed-v2";
 
 function isStandaloneMode() {
   return (
@@ -24,9 +24,21 @@ function isIosSafari() {
   return isIos && isWebkit;
 }
 
+function isMobileViewport() {
+  return window.matchMedia("(max-width: 767px)").matches;
+}
+
+function installInstructions() {
+  const ua = window.navigator.userAgent;
+  if (/iphone|ipad|ipod/i.test(ua)) {
+    return "Open the browser share menu, then choose Add to Home Screen.";
+  }
+  return "Open your browser menu, then choose Install app or Add to Home screen.";
+}
+
 export function MemberInstallPrompt() {
   const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
-  const [showIosHint, setShowIosHint] = useState(false);
+  const [manualHint, setManualHint] = useState(false);
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
@@ -41,16 +53,16 @@ export function MemberInstallPrompt() {
 
     window.addEventListener("beforeinstallprompt", onBeforeInstallPrompt);
 
-    const iosFrame = isIosSafari()
+    const hintFrame = (isMobileViewport() || isIosSafari())
       ? window.requestAnimationFrame(() => {
-          setShowIosHint(true);
+          setManualHint(true);
           setVisible(true);
         })
       : null;
 
     return () => {
       window.removeEventListener("beforeinstallprompt", onBeforeInstallPrompt);
-      if (iosFrame !== null) window.cancelAnimationFrame(iosFrame);
+      if (hintFrame !== null) window.cancelAnimationFrame(hintFrame);
     };
   }, []);
 
@@ -70,20 +82,20 @@ export function MemberInstallPrompt() {
     setInstallEvent(null);
   };
 
-  if (!visible || (!installEvent && !showIosHint)) return null;
+  if (!visible || (!installEvent && !manualHint)) return null;
 
   return (
     <section className="mb-4 rounded-[8px] border border-avenue-indigo/15 bg-white p-4 shadow-sm md:hidden">
       <div className="flex items-start gap-3">
         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-avenue-indigo/10 text-avenue-indigo">
-          {showIosHint ? <Share className="h-5 w-5" /> : <Download className="h-5 w-5" />}
+          {installEvent ? <Download className="h-5 w-5" /> : <Share className="h-5 w-5" />}
         </div>
         <div className="min-w-0 flex-1">
           <p className="font-heading font-bold text-avenue-text-heading">Add Avenue Health to your home screen</p>
           <p className="mt-1 text-sm leading-relaxed text-avenue-text-muted">
-            {showIosHint
-              ? "Open the browser share menu, then choose Add to Home Screen."
-              : "Install the member portal for faster access from your phone."}
+            {installEvent
+              ? "Install the member portal for faster access from your phone."
+              : installInstructions()}
           </p>
           {installEvent && (
             <button

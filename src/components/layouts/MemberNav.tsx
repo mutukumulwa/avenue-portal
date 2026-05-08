@@ -75,8 +75,8 @@ export function MemberNav() {
         </div>
       </div>
       <div className="md:hidden border-t border-[#EEEEEE] bg-white">
-        <div className="max-w-5xl mx-auto px-2 py-2 overflow-x-auto">
-          <div className="flex items-center gap-1 min-w-max">
+        <div className="max-w-5xl mx-auto overflow-x-auto px-2 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex min-w-max items-stretch gap-2">
             {NAV_ITEMS.map((item) => {
               const Icon = item.icon;
               const active = pathname === item.href;
@@ -84,23 +84,23 @@ export function MemberNav() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  aria-label={item.label}
-                  className={`flex h-10 w-10 items-center justify-center rounded-lg transition-colors ${
+                  className={`flex min-h-12 w-[76px] flex-col items-center justify-center gap-1 rounded-[8px] px-2 py-1 text-center transition-colors ${
                     active
                       ? "bg-avenue-indigo/10 text-avenue-indigo"
                       : "text-avenue-text-body hover:bg-avenue-bg-alt hover:text-avenue-indigo"
                   }`}
                 >
                   <Icon size={18} />
+                  <span className="max-w-full truncate text-[10px] font-semibold leading-tight">{item.label}</span>
                 </Link>
               );
             })}
             <button
               onClick={() => signOut({ callbackUrl: "/login" })}
-              aria-label="Logout"
-              className="flex h-10 w-10 items-center justify-center rounded-lg text-avenue-error hover:bg-red-50 transition-colors"
+              className="flex min-h-12 w-[76px] flex-col items-center justify-center gap-1 rounded-[8px] px-2 py-1 text-center text-avenue-error transition-colors hover:bg-red-50"
             >
               <LogOut size={18} />
+              <span className="max-w-full truncate text-[10px] font-semibold leading-tight">Logout</span>
             </button>
           </div>
         </div>
