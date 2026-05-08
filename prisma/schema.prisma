@@ -55,6 +55,10 @@ model Tenant {
   checkInEvents                  CheckInEvent[]
   memberCheckInNotifications     MemberCheckInNotification[]
   memberNotifications            MemberNotification[]
+  memberHealthFiles              MemberHealthFile[]
+  memberVitalEntries             MemberVitalEntry[]
+  memberHealthJournalEntries     MemberHealthJournalEntry[]
+  memberHealthShares             MemberHealthShare[]
   visitVerifications             VisitVerification[]
 }
 
@@ -368,6 +372,10 @@ model Member {
   checkInEvents                  CheckInEvent[]
   checkInNotifications           MemberCheckInNotification[]
   notifications                   MemberNotification[]
+  healthFiles                    MemberHealthFile[]
+  vitalEntries                   MemberVitalEntry[]
+  healthJournalEntries           MemberHealthJournalEntry[]
+  healthShares                   MemberHealthShare[]
   visitVerifications             VisitVerification[]
 
   @@unique([tenantId, memberNumber])
@@ -671,6 +679,131 @@ model MemberNotification {
   @@index([memberId, readAt])
   @@index([tenantId, type])
   @@index([createdAt])
+}
+
+enum MemberHealthFileCategory {
+  LAB_RESULT
+  RADIOLOGY
+  PRESCRIPTION
+  DISCHARGE_SUMMARY
+  REFERRAL
+  VACCINATION
+  CLAIM_SUPPORT
+  OTHER
+}
+
+enum MemberHealthJournalType {
+  NOTE
+  SYMPTOM
+  MEDICATION
+  QUESTION
+  VOICE_NOTE
+}
+
+enum MemberHealthVisibility {
+  PRIVATE
+  SHARED_WITH_DOCTOR
+}
+
+model MemberHealthFile {
+  id               String                   @id @default(cuid())
+  tenantId         String
+  tenant           Tenant                   @relation(fields: [tenantId], references: [id])
+  memberId         String
+  member           Member                   @relation(fields: [memberId], references: [id])
+  uploadedByUserId String
+  title            String
+  category         MemberHealthFileCategory @default(OTHER)
+  fileName         String
+  fileUrl          String
+  fileSize         Int?
+  mimeType         String?
+  capturedAt       DateTime?
+  notes            String?
+  visibility       MemberHealthVisibility   @default(PRIVATE)
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  shares MemberHealthShare[]
+
+  @@index([tenantId])
+  @@index([memberId, createdAt])
+  @@index([memberId, category])
+}
+
+model MemberVitalEntry {
+  id               String   @id @default(cuid())
+  tenantId         String
+  tenant           Tenant   @relation(fields: [tenantId], references: [id])
+  memberId         String
+  member           Member   @relation(fields: [memberId], references: [id])
+  recordedByUserId String
+  recordedAt       DateTime @default(now())
+  systolicBp       Int?
+  diastolicBp      Int?
+  heartRate        Int?
+  temperatureC     Decimal?
+  oxygenSaturation Int?
+  weightKg         Decimal?
+  bloodSugar       Decimal?
+  notes            String?
+  source           String   @default("MEMBER")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([memberId, recordedAt])
+}
+
+model MemberHealthJournalEntry {
+  id            String                 @id @default(cuid())
+  tenantId      String
+  tenant        Tenant                 @relation(fields: [tenantId], references: [id])
+  memberId      String
+  member        Member                 @relation(fields: [memberId], references: [id])
+  authorUserId  String
+  entryType     MemberHealthJournalType @default(NOTE)
+  noteText      String
+  audioUrl      String?
+  transcriptText String?
+  tags          String[]                @default([])
+  recordedAt    DateTime               @default(now())
+  visibility    MemberHealthVisibility @default(PRIVATE)
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  shares MemberHealthShare[]
+
+  @@index([tenantId])
+  @@index([memberId, recordedAt])
+  @@index([memberId, entryType])
+}
+
+model MemberHealthShare {
+  id                 String    @id @default(cuid())
+  tenantId           String
+  tenant             Tenant    @relation(fields: [tenantId], references: [id])
+  memberId           String
+  member             Member    @relation(fields: [memberId], references: [id])
+  sharedByUserId     String
+  providerId         String?
+  preauthId          String?
+  checkInChallengeId String?
+  healthFileId       String?
+  healthFile         MemberHealthFile? @relation(fields: [healthFileId], references: [id])
+  journalEntryId     String?
+  journalEntry       MemberHealthJournalEntry? @relation(fields: [journalEntryId], references: [id])
+  expiresAt          DateTime?
+  revokedAt          DateTime?
+  createdAt          DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([memberId, createdAt])
+  @@index([providerId])
+  @@index([preauthId])
+  @@index([checkInChallengeId])
+  @@index([healthFileId])
+  @@index([journalEntryId])
 }
 
 model VisitVerification {

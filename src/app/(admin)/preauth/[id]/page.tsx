@@ -1,11 +1,27 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { notFound } from "next/navigation";
 import { ClaimsService } from "@/server/services/claims.service";
+import { prisma } from "@/lib/prisma";
 import { convertToClaimAction } from "./actions";
 import { PreAuthAdjudicationForm } from "./PreAuthAdjudicationForm";
-import { ArrowLeft, CheckCircle2, XCircle, Info, ArrowRightCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, Info, ArrowRightCircle, FileText, NotebookPen } from "lucide-react";
 import Link from "next/link";
 import { PreAuthDocuments } from "./PreAuthDocuments";
+
+function formatCategory(value: string) {
+  return value.replace(/_/g, " ").toLowerCase();
+}
+
+function formatDate(value: Date | null) {
+  if (!value) return "Not set";
+  return new Date(value).toLocaleDateString("en-KE", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function formatBytes(value: number | null) {
+  if (!value) return "File";
+  if (value >= 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(value / 1024))} KB`;
+}
 
 export default async function PreAuthDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requireRole(ROLES.CLINICAL);
@@ -15,6 +31,18 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
   const pa = await ClaimsService.getPreAuthById(tenantId, id);
 
   if (!pa) notFound();
+
+  const healthShares = await prisma.memberHealthShare.findMany({
+    where: {
+      tenantId,
+      memberId: pa.memberId,
+      preauthId: pa.id,
+      revokedAt: null,
+      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+    },
+    include: { healthFile: true, journalEntry: true },
+    orderBy: { createdAt: "desc" },
+  });
 
   const canAdjudicate = ["SUBMITTED", "UNDER_REVIEW"].includes(pa.status);
   const canConvert = pa.status === "APPROVED";
@@ -114,6 +142,69 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
           mimeType: d.mimeType ?? null,
         }))}
       />
+
+      <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm">
+        <div className="flex items-start justify-between gap-3 mb-4">
+          <div>
+            <h3 className="text-sm font-bold text-avenue-text-heading uppercase tracking-wide">Member-shared Health Vault records</h3>
+            <p className="text-sm text-avenue-text-body mt-1">Only records explicitly shared by the member appear here.</p>
+          </div>
+          <span className="rounded-full bg-avenue-indigo/10 px-2.5 py-1 text-xs font-bold text-avenue-indigo">{healthShares.length}</span>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          {healthShares.map((share) => (
+            <article key={share.id} className="rounded-lg border border-[#EEEEEE] p-4">
+              <p className="mb-3 text-xs font-semibold text-avenue-text-body">
+                Shared {formatDate(share.createdAt)}
+                {share.expiresAt ? ` · expires ${formatDate(share.expiresAt)}` : " · until revoked"}
+              </p>
+              {share.healthFile && (
+                <>
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-avenue-indigo/10 text-avenue-indigo">
+                      <FileText className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-avenue-text-heading">{share.healthFile.title}</p>
+                      <p className="mt-1 text-sm text-avenue-text-body">
+                        {formatCategory(share.healthFile.category)} · {formatBytes(share.healthFile.fileSize)} · {formatDate(share.healthFile.capturedAt)}
+                      </p>
+                    </div>
+                  </div>
+                  {share.healthFile.notes && <p className="mt-3 text-sm text-avenue-text-body">{share.healthFile.notes}</p>}
+                  <Link href={share.healthFile.fileUrl} className="mt-3 inline-flex text-sm font-semibold text-avenue-indigo hover:underline">
+                    Open shared file
+                  </Link>
+                </>
+              )}
+              {share.journalEntry && (
+                <>
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#17A2B8]/10 text-[#0F6F7D]">
+                      <NotebookPen className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-avenue-text-heading">{formatCategory(share.journalEntry.entryType)}</p>
+                      <p className="mt-1 text-sm text-avenue-text-body">{formatDate(share.journalEntry.recordedAt)}</p>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-sm text-avenue-text-body whitespace-pre-wrap">{share.journalEntry.noteText}</p>
+                  {share.journalEntry.audioUrl && (
+                    <audio controls src={share.journalEntry.audioUrl} className="mt-3 w-full">
+                      <track kind="captions" />
+                    </audio>
+                  )}
+                </>
+              )}
+            </article>
+          ))}
+          {healthShares.length === 0 && (
+            <div className="rounded-lg border border-dashed border-[#D6DCE5] p-6 text-center text-sm text-avenue-text-muted md:col-span-2">
+              No Health Vault records have been shared for this pre-authorization.
+            </div>
+          )}
+        </div>
+      </div>
 
       {/* Convert to claim CTA for approved preauths */}
       {canConvert && (

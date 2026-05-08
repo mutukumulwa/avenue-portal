@@ -102,6 +102,21 @@ export class MemberPreAuthService {
     });
     if (!preauth) return null;
 
+    const healthShares = await prisma.memberHealthShare.findMany({
+      where: {
+        tenantId,
+        memberId: preauth.memberId,
+        preauthId: preauth.id,
+        revokedAt: null,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      include: {
+        healthFile: true,
+        journalEntry: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
     return {
       id: preauth.id,
       preauthNumber: preauth.preauthNumber,
@@ -134,6 +149,31 @@ export class MemberPreAuthService {
         mimeType: document.mimeType,
         category: document.category,
         createdAt: document.createdAt,
+      })),
+      sharedHealthRecords: healthShares.map((share) => ({
+        id: share.id,
+        createdAt: share.createdAt,
+        expiresAt: share.expiresAt,
+        file: share.healthFile ? {
+          id: share.healthFile.id,
+          title: share.healthFile.title,
+          category: share.healthFile.category,
+          fileName: share.healthFile.fileName,
+          fileUrl: share.healthFile.fileUrl,
+          fileSize: share.healthFile.fileSize,
+          mimeType: share.healthFile.mimeType,
+          capturedAt: share.healthFile.capturedAt,
+          notes: share.healthFile.notes,
+        } : null,
+        journalEntry: share.journalEntry ? {
+          id: share.journalEntry.id,
+          entryType: share.journalEntry.entryType,
+          noteText: share.journalEntry.noteText,
+          audioUrl: share.journalEntry.audioUrl,
+          transcriptText: share.journalEntry.transcriptText,
+          tags: share.journalEntry.tags,
+          recordedAt: share.journalEntry.recordedAt,
+        } : null,
       })),
       createdAt: preauth.createdAt,
     };

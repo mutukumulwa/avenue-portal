@@ -2,7 +2,7 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { redirect, notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, FileText, NotebookPen, Share2 } from "lucide-react";
 import { ProviderContractCard } from "./ProviderContractCard";
 import { ProviderTariffsCard } from "./ProviderTariffsCard";
 import { ProviderDiagnosisTariffsCard } from "./ProviderDiagnosisTariffsCard";
@@ -26,6 +26,22 @@ export default async function ProviderDetailPage({ params }: { params: Promise<{
   });
 
   if (!provider) notFound();
+
+  const sharedHealthRecords = await prisma.memberHealthShare.findMany({
+    where: {
+      tenantId: session.user.tenantId,
+      providerId: provider.id,
+      revokedAt: null,
+      OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+    },
+    include: {
+      member: { select: { firstName: true, lastName: true, memberNumber: true } },
+      healthFile: true,
+      journalEntry: true,
+    },
+    orderBy: { createdAt: "desc" },
+    take: 50,
+  });
 
   const tierColor = (tier: string) => {
     switch (tier) {
@@ -139,6 +155,85 @@ export default async function ProviderDetailPage({ params }: { params: Promise<{
 
       {/* Diagnosis Tariff Schedule (inline CRUD) */}
       <ProviderDiagnosisTariffsCard providerId={provider.id} tariffs={diagnosisTariffs} />
+
+      <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <h2 className="font-bold text-avenue-text-heading font-heading flex items-center gap-2">
+              <Share2 className="h-5 w-5 text-avenue-indigo" />
+              Member-shared Health Vault records
+            </h2>
+            <p className="mt-1 text-sm text-avenue-text-body">
+              Active records explicitly shared by members with this provider.
+            </p>
+          </div>
+          <span className="rounded-full bg-avenue-indigo/10 px-2.5 py-1 text-xs font-bold text-avenue-indigo">
+            {sharedHealthRecords.length}
+          </span>
+        </div>
+
+        {sharedHealthRecords.length > 0 ? (
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {sharedHealthRecords.map((share) => (
+              <article key={share.id} className="rounded-lg border border-[#EEEEEE] p-4">
+                <p className="text-xs font-semibold text-avenue-text-body">
+                  {share.member.firstName} {share.member.lastName} · {share.member.memberNumber}
+                </p>
+                <p className="mt-1 text-xs text-avenue-text-muted">
+                  Shared {share.createdAt.toLocaleDateString("en-KE")}
+                  {share.expiresAt ? ` · expires ${share.expiresAt.toLocaleDateString("en-KE")}` : " · until revoked"}
+                </p>
+
+                {share.healthFile && (
+                  <div className="mt-3">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-avenue-indigo/10 text-avenue-indigo">
+                        <FileText className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-avenue-text-heading">{share.healthFile.title}</p>
+                        <p className="mt-1 text-sm text-avenue-text-body">
+                          {share.healthFile.category.replace(/_/g, " ").toLowerCase()} · {share.healthFile.fileName}
+                        </p>
+                      </div>
+                    </div>
+                    {share.healthFile.notes && <p className="mt-3 text-sm text-avenue-text-body">{share.healthFile.notes}</p>}
+                    <Link href={share.healthFile.fileUrl} className="mt-3 inline-flex text-sm font-semibold text-avenue-indigo hover:underline">
+                      Open shared file
+                    </Link>
+                  </div>
+                )}
+
+                {share.journalEntry && (
+                  <div className="mt-3">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#17A2B8]/10 text-[#0F6F7D]">
+                        <NotebookPen className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="font-bold text-avenue-text-heading">{share.journalEntry.entryType.replace(/_/g, " ").toLowerCase()}</p>
+                        <p className="mt-1 text-sm text-avenue-text-body">
+                          Recorded {share.journalEntry.recordedAt.toLocaleDateString("en-KE")}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="mt-3 whitespace-pre-wrap text-sm text-avenue-text-body">{share.journalEntry.noteText}</p>
+                    {share.journalEntry.audioUrl && (
+                      <audio controls src={share.journalEntry.audioUrl} className="mt-3 w-full">
+                        <track kind="captions" />
+                      </audio>
+                    )}
+                  </div>
+                )}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="mt-4 rounded-lg border border-dashed border-[#D6DCE5] p-6 text-center text-sm text-avenue-text-muted">
+            No active Health Vault records have been shared with this provider.
+          </p>
+        )}
+      </div>
 
       {/* Recent Claims */}
       <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">

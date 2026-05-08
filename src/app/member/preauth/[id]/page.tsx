@@ -1,7 +1,7 @@
 import { DocumentList } from "@/components/ui/DocumentList";
 import { requireRole, ROLES } from "@/lib/rbac";
 import { MemberPreAuthService } from "@/server/services/member-preauth.service";
-import { ArrowLeft, Building2, CalendarClock, CheckCircle2, CircleDot, FileText, XCircle } from "lucide-react";
+import { ArrowLeft, Building2, CalendarClock, CheckCircle2, CircleDot, FileText, NotebookPen, XCircle } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
@@ -14,6 +14,16 @@ function formatMoney(value: number | null) {
 function formatDate(value: Date | null) {
   if (!value) return "Not set";
   return new Date(value).toLocaleDateString("en-KE", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function formatCategory(value: string) {
+  return value.replace(/_/g, " ").toLowerCase();
+}
+
+function formatBytes(value: number | null) {
+  if (!value) return "File";
+  if (value >= 1024 * 1024) return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+  return `${Math.max(1, Math.round(value / 1024))} KB`;
 }
 
 function statusTone(status: string) {
@@ -155,6 +165,78 @@ export default async function MemberPreAuthDetailPage({
       <section className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
         <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Documents</h2>
         <DocumentList documents={detail.documents} />
+      </section>
+
+      <section className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Shared health records</h2>
+            <p className="mt-1 text-sm text-avenue-text-muted">Only records you explicitly shared from Health Vault appear here.</p>
+          </div>
+          <Link href="/member/health-vault" className="text-sm font-semibold text-avenue-indigo hover:underline">
+            Manage
+          </Link>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {detail.sharedHealthRecords.map((share) => (
+            <article key={share.id} className="rounded-[8px] border border-[#EEEEEE] p-4">
+              <p className="mb-3 text-xs font-semibold text-avenue-text-muted">
+                Shared {formatDate(share.createdAt)}
+                {share.expiresAt ? ` · expires ${formatDate(share.expiresAt)}` : " · until revoked"}
+              </p>
+              {share.file && (
+                <>
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] bg-avenue-indigo/10 text-avenue-indigo">
+                      <FileText className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-avenue-text-heading">{share.file.title}</p>
+                      <p className="mt-1 text-sm text-avenue-text-muted">
+                        {formatCategory(share.file.category)} · {formatBytes(share.file.fileSize)} · {formatDate(share.file.capturedAt)}
+                      </p>
+                    </div>
+                  </div>
+                  {share.file.notes && <p className="mt-3 text-sm text-avenue-text-muted">{share.file.notes}</p>}
+                  <Link href={share.file.fileUrl} className="mt-3 inline-flex text-sm font-semibold text-avenue-indigo hover:underline">
+                    Open shared file
+                  </Link>
+                </>
+              )}
+              {share.journalEntry && (
+                <>
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] bg-[#17A2B8]/10 text-[#0F6F7D]">
+                      <NotebookPen className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-avenue-text-heading">{formatCategory(share.journalEntry.entryType)}</p>
+                      <p className="mt-1 text-sm text-avenue-text-muted">{formatDate(share.journalEntry.recordedAt)}</p>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-sm leading-relaxed text-avenue-text-heading">{share.journalEntry.noteText}</p>
+                  {share.journalEntry.audioUrl && (
+                    <audio controls src={share.journalEntry.audioUrl} className="mt-3 w-full">
+                      <track kind="captions" />
+                    </audio>
+                  )}
+                  {share.journalEntry.tags.length > 0 && (
+                    <div className="mt-2 flex flex-wrap gap-1">
+                      {share.journalEntry.tags.map((tag) => (
+                        <span key={tag} className="rounded-full bg-[#F8F9FA] px-2 py-0.5 text-[11px] text-avenue-text-muted">{tag}</span>
+                      ))}
+                    </div>
+                  )}
+                </>
+              )}
+            </article>
+          ))}
+          {detail.sharedHealthRecords.length === 0 && (
+            <div className="rounded-[8px] border border-dashed border-[#D6DCE5] p-6 text-center text-sm text-avenue-text-muted md:col-span-2">
+              No Health Vault records have been shared with this pre-authorization yet.
+            </div>
+          )}
+        </div>
       </section>
     </div>
   );

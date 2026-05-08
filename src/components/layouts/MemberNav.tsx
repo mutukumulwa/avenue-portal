@@ -18,6 +18,7 @@ import {
   WalletCards,
   FileText,
   Bell,
+  HeartPulse,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -28,6 +29,7 @@ const NAV_ITEMS = [
   { label: "Pre-Auth",    href: "/member/preauth",     icon: Stethoscope     },
   { label: "Wallet",      href: "/member/wallet",      icon: WalletCards     },
   { label: "Documents",   href: "/member/documents",   icon: FileText        },
+  { label: "Health",      href: "/member/health-vault", icon: HeartPulse     },
   { label: "Alerts",      href: "/member/notifications", icon: Bell          },
   { label: "Check-In",    href: "/member/check-in",    icon: Fingerprint     },
   { label: "Facilities",  href: "/member/facilities",  icon: Building        },
@@ -75,7 +77,13 @@ export function MemberNav() {
         </div>
       </div>
       <div className="md:hidden border-t border-[#EEEEEE] bg-white">
-        <div className="max-w-5xl mx-auto overflow-x-auto px-2 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex items-center justify-between px-4 pb-1 pt-2 text-[11px] font-semibold text-avenue-text-muted">
+          <span>Member tools</span>
+          <span>Swipe for more</span>
+        </div>
+        <div className="relative max-w-5xl mx-auto overflow-hidden">
+          <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-white to-transparent" />
+          <div className="overflow-x-auto px-2 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <div className="flex min-w-max items-stretch gap-2">
             {NAV_ITEMS.map((item) => {
               const Icon = item.icon;
@@ -102,6 +110,7 @@ export function MemberNav() {
               <LogOut size={18} />
               <span className="max-w-full truncate text-[10px] font-semibold leading-tight">Logout</span>
             </button>
+          </div>
           </div>
         </div>
       </div>

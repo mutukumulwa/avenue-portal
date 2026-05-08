@@ -1074,6 +1074,10 @@ Implementation notes:
   - `/member/benefits` benefit cards now prioritize category name plus Allocation, Expenditure, and Balance;
   - `/member/utilization` care event cards now prioritize visit date/provider plus Benefit and Expenditure, with plan-approved and member-share amounts below;
   - cards keep Avenue colors, 8px radius, readable type, and existing filters/summary context.
+- Added mobile nav discoverability:
+  - `/member/*` mobile nav now labels the area as Member tools;
+  - includes a "Swipe for more" cue;
+  - includes a right-edge fade to signal horizontal overflow.
 - `npx tsc --noEmit` passes as of 2026-05-08.
 - `npm run lint` passes as of 2026-05-08 with 16 existing warnings, all unused variables/imports outside the member hardening work.
 - `npm run build` passes as of 2026-05-08 on Next.js 15.5.15.
@@ -1084,6 +1088,157 @@ Remaining Phase 10 QA:
 - Run browser QA against a live local or preview deployment, especially mobile viewport checks for the member dashboard, benefits, care history, facilities, preauth, wallet, family, profile, and security pages.
 - Run role/security QA with seeded users after migrations and seed complete.
 - Run performance QA with server timings or Prisma query logging enabled.
+
+### Phase 11 — Member Health Vault, Vitals, And Journal
+
+Goal:
+
+Give members a personal health workspace where they can store health artefacts and context that may later be shared with a doctor.
+
+Why this matters:
+
+- It turns the member app from a claims/benefits viewer into a practical daily health companion.
+- It gives members a place to keep lab results, radiology reports, prescriptions, discharge summaries, self-recorded vitals, and notes before or after visits.
+- It creates a future bridge into provider workflows, where a member can explicitly share selected records with a doctor instead of exposing everything by default.
+
+Recommended scope:
+
+- [x] Add `/member/health-vault` and a nav item called `Health`.
+- [x] Add three sections:
+  - `Files`: upload lab tests, pictures, PDFs, prescriptions, discharge summaries, and other documents.
+  - `Vitals`: record blood pressure, temperature, heart rate, oxygen saturation, weight, blood sugar, and free-text context.
+  - `Journal`: add typed notes first; voice recording/transcription should be a second slice because browser recording permissions, storage size, and transcription privacy need focused QA.
+- [x] Keep all records member-owned and tenant-scoped.
+- Principals should not automatically see adult dependent health-vault records. Use the same conservative family privacy posture as sensitive claims.
+- Add explicit `Share with doctor` status later:
+  - default state: private to member;
+  - selected records can be shared into a preauth/check-in/provider visit context;
+  - sharing should be auditable and revocable.
+
+Implemented schema:
+
+- `MemberHealthFile`
+  - tenantId, memberId, uploadedByUserId, title, category, fileName, mimeType, fileSize, fileUrl, capturedAt, notes, visibility, createdAt.
+- `MemberVitalEntry`
+  - tenantId, memberId, recordedByUserId, recordedAt, systolicBp, diastolicBp, heartRate, temperatureC, oxygenSaturation, weightKg, bloodSugar, notes, source.
+- `MemberHealthJournalEntry`
+  - tenantId, memberId, authorUserId, entryType, noteText, audioUrl, transcriptText, tags, recordedAt, visibility, createdAt.
+- `MemberHealthShare`
+  - tenantId, memberId, sharedByUserId, providerId?, preauthId?, checkInChallengeId?, healthFileId?, journalEntryId?, expiresAt, revokedAt, createdAt.
+
+Files added:
+
+- `prisma/migrations/20260508113000_member_health_vault/migration.sql`
+- `src/server/services/member-health-vault.service.ts`
+- `src/app/member/health-vault/page.tsx`
+- `src/app/member/health-vault/actions.ts`
+- `src/app/member/health-vault/VoiceNoteRecorder.tsx`
+
+Files updated:
+
+- `prisma/schema.prisma`
+- `prisma/seed.ts`
+- `src/components/layouts/MemberNav.tsx`
+- `src/app/member/check-in/page.tsx`
+- `src/app/member/check-in/actions.ts`
+- `src/app/(admin)/check-ins/[id]/page.tsx`
+- `src/app/(admin)/check-ins/visit/[id]/page.tsx`
+- `src/app/(admin)/providers/[id]/page.tsx`
+- `src/server/services/secure-checkin/secure-checkin.service.ts`
+
+Implementation notes:
+
+- First slice is self-scoped only: a member can add and view their own health vault files, vitals, and typed journal entries.
+- File uploads reuse the existing MinIO upload helper and allow PDF, images, and Word documents up to 10 MB.
+- Voice notes reuse the same storage helper, are saved as `VOICE_NOTE` journal entries, and allow common browser audio formats up to 20 MB.
+- Voice note transcription is intentionally not enabled yet; it should require explicit consent and a focused privacy pass.
+- Actions write audit records:
+  - `MEMBER_HEALTH_FILE_UPLOADED`
+  - `MEMBER_VITAL_RECORDED`
+  - `MEMBER_HEALTH_JOURNAL_ADDED`
+  - `MEMBER_HEALTH_VOICE_NOTE_ADDED`
+- Seed now adds demo health files, vitals, and journal notes for the first member demo profiles, including Wanjiru Kamau.
+- Seed rerun was validated on 2026-05-08 after applying pending migrations. The strategic analytics section now skips expensive regeneration when analytics facts/snapshots already exist, which avoids long remote pooler runs during reseed.
+- `MemberHealthShare` is now used for preauth, check-in, opened-visit, and provider-specific sharing.
+- Health Vault sharing slice is now implemented for pre-authorization context:
+  - members can share individual files or journal notes with one of their own active/submitted/under-review/approved pre-authorizations;
+  - members choose a share duration of 7 days, 30 days, or until revoked;
+  - members can revoke active shares from Health Vault;
+  - member preauth detail shows active, non-expired shared records for that preauth;
+  - admin clinical preauth detail shows active, non-expired member-shared Health Vault records to reviewers;
+  - seed adds a demo referral note shared with `PA-MEXP-001`.
+- Health Vault sharing is now implemented for active check-in context:
+  - `/member/check-in` shows a share panel under each pending secure check-in request;
+  - members can share individual files or journal notes with that active check-in;
+  - members choose 24-hour or 72-hour visit-based access;
+  - members can revoke active check-in shares from the check-in screen;
+  - staff check-in detail `/check-ins/[id]` shows only records explicitly shared for that check-in;
+  - check-in shares expire automatically after 24 hours unless revoked earlier;
+  - sharing and revocation write audit records:
+    - `MEMBER_HEALTH_RECORD_SHARED_WITH_CHECKIN`;
+    - `MEMBER_HEALTH_RECORD_CHECKIN_SHARE_REVOKED`.
+- Health Vault sharing now carries forward into opened visit context:
+  - staff visit verification detail `/check-ins/visit/[id]` shows active, non-revoked, non-expired Health Vault records shared against the originating check-in challenge;
+  - emergency override visits without a check-in challenge do not receive Health Vault records by default.
+- Provider-specific sharing is now implemented:
+  - members can share a file, typed note, or voice note directly with an active contracted provider from `/member/health-vault`;
+  - provider shares use 7-day, 30-day, or until-revoked duration controls;
+  - active share chips show both preauth and provider shares;
+  - admin provider detail `/providers/[id]` shows active, non-revoked, non-expired Health Vault records explicitly shared with that provider;
+  - provider sharing and revocation include providerId and expiry metadata in audit records.
+
+Implementation slices:
+
+- [x] Files and typed journal:
+  - add models/migration;
+  - reuse existing storage helper;
+  - add member-scoped service and server actions;
+  - add `/member/health-vault`;
+  - seed lab report/prescription examples.
+- [x] Vitals:
+  - add vital entry form;
+  - show latest BP, heart rate, temperature, and oxygen saturation chips;
+  - add realistic seed vitals.
+- [x] Sharing, first slice:
+   - add explicit share records;
+   - expose selected shared files/notes in member and admin preauth contexts;
+   - add audit logs and revocation.
+- [x] Sharing, second slice:
+  - expose selected shared records in active check-in context;
+  - add member-controlled share/revoke forms for pending check-ins;
+  - add staff-visible shared records section on check-in detail;
+  - keep access scoped to the specific challenge rather than exposing the whole vault.
+- [x] Sharing, third slice:
+  - expose selected check-in shares in the opened visit verification context;
+  - filter out revoked and expired shares;
+  - add a 24-hour default expiry for check-in-based shares.
+- [x] Sharing, fourth slice:
+  - add member-selectable expiry controls for preauth shares and check-in shares;
+  - filter expired shares out of Health Vault active-share chips, member preauth detail, clinical preauth detail, check-in detail, and opened visit detail;
+  - allow expired shares to be recreated as new active shares instead of blocking the member.
+- [x] Sharing, fifth slice:
+  - add provider-specific sharing beyond check-in-derived visit access;
+  - validate provider shares against active contracted providers in the same tenant;
+  - expose active provider shares on provider detail;
+  - keep provider shares revocable and expirable.
+- [ ] Sharing, later slices:
+  - add a true provider/staff portal view if provider users need direct access outside the admin provider page.
+- [ ] Voice notes:
+   - [x] add browser audio recording with clear permission messaging;
+   - [x] store audio as a journal voice-note record;
+   - [x] render audio playback in Health Vault, preauth shared-record views, check-in shared-record views, and opened visit views;
+   - [ ] optionally add transcription later with explicit consent.
+
+Verification:
+
+- [x] `npx prisma generate`
+- [x] `npx prisma validate`
+- [x] `npx tsc --noEmit`
+- [x] `npm run lint` passes with existing warnings only.
+- [x] `npm run build`
+- [x] Apply migration locally/preview and run `npm run db:seed`.
+- [ ] Browser-test upload, vitals entry, typed journal entry, voice note recording/playback, share-to-preauth, revoke share, share-to-check-in, revoke check-in share, member preauth detail, admin clinical preauth detail, staff check-in detail, and opened visit detail on mobile and desktop.
+- [ ] Browser-test provider-specific sharing from Health Vault and active shared-record visibility on `/providers/[id]`.
 
 ## Suggested Implementation Order
 
@@ -1128,14 +1283,25 @@ Then continue:
 - [x] Created this handoff/action plan.
 - [x] Implemented Phases 1 through 9 of member experience hardening.
 - [x] Completed Phase 10 static verification checks: type check, lint, and production build.
+- [x] Implemented Phase 11 first slice: health files, vitals, typed journal, service/actions, nav, migration, and demo seed data.
+- [x] Implemented Phase 11 check-in sharing slice: member check-in share/revoke controls plus staff check-in shared-record visibility.
+- [x] Implemented Phase 11 opened-visit sharing slice: check-in shares now appear on visit verification detail while active and unexpired.
+- [x] Implemented Phase 11 voice-note slice: member recording UI, audio upload action, journal playback, and shared voice-note playback.
+- [x] Implemented Phase 11 expiry-controls slice: member-selected share durations plus consistent expired-share filtering.
+- [x] Implemented Phase 11 provider-sharing slice: direct provider shares, revocation metadata, provider detail visibility, and active-share filtering.
+- [x] Database migrations are up to date and `npm run db:seed` completed successfully on 2026-05-08.
 - [ ] Phase 10 live browser, role/security, smoke-audit, and performance QA still need a running seeded environment.
 
 ## Next Agent Start Point
 
-Start with the remaining Phase 10 live validation:
+Start with database and browser validation:
 
 1. Apply pending Prisma migrations in a dev database.
-2. Run `npm run db:seed` from a normal terminal with a long timeout so the Phase 9 demo data can finish.
+2. Run `npm run db:seed` from a normal terminal with a long timeout so the Phase 9/11 demo data can finish.
 3. Start the app server and run `npm run audit:smoke`.
 4. Browser-test the member pages on a mobile viewport using the documented demo member logins.
-5. Record any functional or visual issues in this handoff before making further feature changes.
+5. Specifically test `/member/health-vault` file upload, vitals entry, typed journal entry, voice note recording/playback, preauth sharing with 7-day/30-day/until-revoked durations, and revocation.
+6. Test `/member/check-in` with an active pending check-in: share a file/note, revoke it, and confirm staff can see the shared record on `/check-ins/[id]`.
+7. Complete the check-in so a visit opens, then confirm the same active record appears on `/check-ins/visit/[id]`.
+8. Share a Health Vault record with a provider from `/member/health-vault`, then confirm an admin can see it on `/providers/[id]` until expiry/revocation.
+9. Record any functional or visual issues in this handoff before making further feature changes.

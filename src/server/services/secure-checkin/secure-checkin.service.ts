@@ -96,7 +96,7 @@ export class SecureCheckInService {
   static async getChallengeForStaff(tenantId: string, challengeId: string) {
     await this.expireStaleChallenges(tenantId);
 
-    return prisma.checkInChallenge.findUnique({
+    const challenge = await prisma.checkInChallenge.findUnique({
       where: { id: challengeId, tenantId },
       include: {
         member: {
@@ -128,6 +128,53 @@ export class SecureCheckInService {
         events: { orderBy: { createdAt: "desc" }, take: 10 },
       },
     });
+
+    if (!challenge) return null;
+
+    const healthShares = await prisma.memberHealthShare.findMany({
+      where: {
+        tenantId,
+        memberId: challenge.memberId,
+        checkInChallengeId: challenge.id,
+        revokedAt: null,
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+      },
+      include: {
+        healthFile: true,
+        journalEntry: true,
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return {
+      ...challenge,
+      sharedHealthRecords: healthShares.map((share) => ({
+        id: share.id,
+        createdAt: share.createdAt,
+        healthFile: share.healthFile
+          ? {
+              id: share.healthFile.id,
+              title: share.healthFile.title,
+              category: share.healthFile.category,
+              fileName: share.healthFile.fileName,
+              fileUrl: share.healthFile.fileUrl,
+              capturedAt: share.healthFile.capturedAt,
+              notes: share.healthFile.notes,
+            }
+          : null,
+        journalEntry: share.journalEntry
+          ? {
+              id: share.journalEntry.id,
+              entryType: share.journalEntry.entryType,
+              noteText: share.journalEntry.noteText,
+              audioUrl: share.journalEntry.audioUrl,
+              transcriptText: share.journalEntry.transcriptText,
+              tags: share.journalEntry.tags,
+              recordedAt: share.journalEntry.recordedAt,
+            }
+          : null,
+      })),
+    };
   }
 
   static async getPendingForMember(tenantId: string, memberId: string) {

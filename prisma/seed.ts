@@ -3058,6 +3058,10 @@ async function main() {
       return monthKey(date)
     })
 
+    const existingAnalyticsSnapshots = await prisma.analyticsMlrSnapshot.count({ where: { tenantId } })
+    if (existingAnalyticsSnapshots > 0) {
+      console.log(`✅ Strategic purchasing analytics demo: ${existingAnalyticsSnapshots} existing MLR snapshots found; skipping expensive demo regeneration`)
+    } else {
     const demoGroups = await prisma.group.findMany({
       where: {
         tenantId,
@@ -3377,18 +3381,36 @@ async function main() {
         resolvedAt: demoAnchor,
       },
     ]})
+    }
 
-    const analyticsResult = await AnalyticsRefreshService.refreshFoundation({ tenantId })
-    console.log(
-      `✅ Strategic purchasing analytics demo: ${closedMonths.length} months, ` +
-      `${analyticsResult.encounterFacts.facts} encounter facts, ` +
-      `${analyticsResult.contributionFacts.facts} contribution facts, ` +
-      `${analyticsResult.mlrSnapshots.snapshots} MLR snapshots, ` +
-      `${analyticsResult.providerScorecards.scorecards} provider scorecards, ` +
-      `${analyticsResult.memberRiskProfiles.riskProfiles} member risk profiles, ` +
-      `${analyticsResult.renewalAnalyses.renewalAnalyses} renewal analyses, ` +
-      `${analyticsResult.analyticsAlerts.alerts} generated alerts`
-    )
+    const existingAnalytics = await Promise.all([
+      prisma.analyticsEncounterFact.count({ where: { tenantId } }),
+      prisma.analyticsContributionFact.count({ where: { tenantId } }),
+      prisma.analyticsMlrSnapshot.count({ where: { tenantId } }),
+      prisma.providerScorecard.count({ where: { tenantId } }),
+      prisma.memberRiskProfile.count({ where: { tenantId } }),
+      prisma.renewalAnalysis.count({ where: { tenantId } }),
+    ])
+    const hasDemoAnalytics = existingAnalytics.every((count) => count > 0)
+
+    if (hasDemoAnalytics) {
+      console.log(
+        `✅ Strategic purchasing analytics demo: existing facts/snapshots reused ` +
+        `(${existingAnalytics.join('/')})`
+      )
+    } else {
+      const analyticsResult = await AnalyticsRefreshService.refreshFoundation({ tenantId })
+      console.log(
+        `✅ Strategic purchasing analytics demo: ${closedMonths.length} months, ` +
+        `${analyticsResult.encounterFacts.facts} encounter facts, ` +
+        `${analyticsResult.contributionFacts.facts} contribution facts, ` +
+        `${analyticsResult.mlrSnapshots.snapshots} MLR snapshots, ` +
+        `${analyticsResult.providerScorecards.scorecards} provider scorecards, ` +
+        `${analyticsResult.memberRiskProfiles.riskProfiles} member risk profiles, ` +
+        `${analyticsResult.renewalAnalyses.renewalAnalyses} renewal analyses, ` +
+        `${analyticsResult.analyticsAlerts.alerts} generated alerts`
+      )
+    }
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -3738,6 +3760,98 @@ async function main() {
         href: note.href,
         metadata: { source: 'member-experience-demo' },
       }})
+    }
+
+    const healthFileSeeds = [
+      { member: demoMembers[0], title: 'March full blood count', category: 'LAB_RESULT' as const, fileName: 'Wanjiru_Kamau_FBC_Mar_2026.pdf', fileUrl: '/seed-docs/Wanjiru_Kamau_FBC_Mar_2026.pdf', capturedAt: new Date('2026-03-18'), notes: 'Uploaded before annual wellness review.' },
+      { member: demoMembers[0], title: 'Hypertension prescription refill', category: 'PRESCRIPTION' as const, fileName: 'Wanjiru_Kamau_Prescription_Apr_2026.jpg', fileUrl: '/seed-docs/Wanjiru_Kamau_Prescription_Apr_2026.jpg', capturedAt: new Date('2026-04-12'), notes: 'Current medication list for next consultation.' },
+      { member: demoMembers[1], title: 'Chest X-ray report', category: 'RADIOLOGY' as const, fileName: 'Member_Radiology_Report_2026.pdf', fileUrl: '/seed-docs/Member_Radiology_Report_2026.pdf', capturedAt: new Date('2026-02-22'), notes: 'Follow-up imaging after respiratory symptoms.' },
+      { member: demoMembers[4], title: 'Consultation referral note', category: 'REFERRAL' as const, fileName: 'PA_MEXP_Referral_Note.pdf', fileUrl: '/seed-docs/PA_MEXP_Referral_Note.pdf', capturedAt: new Date('2026-04-02'), notes: 'Shared with the pre-authorization reviewer for context.' },
+    ]
+    for (const item of healthFileSeeds) {
+      if (!item.member) continue
+      const exists = await prisma.memberHealthFile.findFirst({ where: { tenantId, memberId: item.member.id, title: item.title } })
+      if (exists) continue
+      await prisma.memberHealthFile.create({ data: {
+        tenantId,
+        memberId: item.member.id,
+        uploadedByUserId: users['CUSTOMER_SERVICE'],
+        title: item.title,
+        category: item.category,
+        fileName: item.fileName,
+        fileUrl: item.fileUrl,
+        fileSize: 220000,
+        mimeType: item.fileName.endsWith('.jpg') ? 'image/jpeg' : 'application/pdf',
+        capturedAt: item.capturedAt,
+        notes: item.notes,
+      }})
+    }
+
+    const vitalSeeds = [
+      { member: demoMembers[0], recordedAt: new Date('2026-04-25T08:10:00'), systolicBp: 128, diastolicBp: 82, heartRate: 76, temperatureC: 36.7, oxygenSaturation: 98, weightKg: 72.4, notes: 'Morning reading before medication.' },
+      { member: demoMembers[0], recordedAt: new Date('2026-04-28T20:30:00'), systolicBp: 134, diastolicBp: 86, heartRate: 81, temperatureC: 36.9, oxygenSaturation: 97, weightKg: 72.1, notes: 'Felt light headache after work.' },
+      { member: demoMembers[1], recordedAt: new Date('2026-04-27T07:45:00'), systolicBp: 118, diastolicBp: 76, heartRate: 69, temperatureC: 36.5, oxygenSaturation: 99, weightKg: 68.2, notes: 'Routine wellness check.' },
+    ]
+    for (const item of vitalSeeds) {
+      if (!item.member) continue
+      const exists = await prisma.memberVitalEntry.findFirst({ where: { tenantId, memberId: item.member.id, recordedAt: item.recordedAt } })
+      if (exists) continue
+      await prisma.memberVitalEntry.create({ data: {
+        tenantId,
+        memberId: item.member.id,
+        recordedByUserId: users['CUSTOMER_SERVICE'],
+        recordedAt: item.recordedAt,
+        systolicBp: item.systolicBp,
+        diastolicBp: item.diastolicBp,
+        heartRate: item.heartRate,
+        temperatureC: item.temperatureC,
+        oxygenSaturation: item.oxygenSaturation,
+        weightKg: item.weightKg,
+        notes: item.notes,
+      }})
+    }
+
+    const journalSeeds = [
+      { member: demoMembers[0], entryType: 'SYMPTOM' as const, recordedAt: new Date('2026-04-28T21:00:00'), noteText: 'Mild headache in the evening. No fever. BP was slightly higher than usual.', tags: ['headache', 'blood pressure'] },
+      { member: demoMembers[0], entryType: 'QUESTION' as const, recordedAt: new Date('2026-04-29T09:15:00'), noteText: 'Ask doctor whether I should adjust timing of evening medication.', tags: ['doctor question', 'medication'] },
+      { member: demoMembers[1], entryType: 'NOTE' as const, recordedAt: new Date('2026-04-26T10:20:00'), noteText: 'Completed lab tests and uploaded report before review appointment.', tags: ['labs'] },
+    ]
+    for (const item of journalSeeds) {
+      if (!item.member) continue
+      const exists = await prisma.memberHealthJournalEntry.findFirst({ where: { tenantId, memberId: item.member.id, noteText: item.noteText } })
+      if (exists) continue
+      await prisma.memberHealthJournalEntry.create({ data: {
+        tenantId,
+        memberId: item.member.id,
+        authorUserId: users['CUSTOMER_SERVICE'],
+        entryType: item.entryType,
+        noteText: item.noteText,
+        tags: item.tags,
+        recordedAt: item.recordedAt,
+      }})
+    }
+
+    const preauthShareTarget = await prisma.preAuthorization.findUnique({
+      where: { tenantId_preauthNumber: { tenantId, preauthNumber: 'PA-MEXP-001' } },
+      select: { id: true, memberId: true },
+    })
+    const sharedFile = preauthShareTarget ? await prisma.memberHealthFile.findFirst({
+      where: { tenantId, memberId: preauthShareTarget.memberId, title: 'Consultation referral note' },
+      select: { id: true },
+    }) : null
+    if (preauthShareTarget && sharedFile) {
+      const exists = await prisma.memberHealthShare.findFirst({
+        where: { tenantId, memberId: preauthShareTarget.memberId, preauthId: preauthShareTarget.id, healthFileId: sharedFile.id, revokedAt: null },
+      })
+      if (!exists) {
+        await prisma.memberHealthShare.create({ data: {
+          tenantId,
+          memberId: preauthShareTarget.memberId,
+          sharedByUserId: users['CUSTOMER_SERVICE'],
+          preauthId: preauthShareTarget.id,
+          healthFileId: sharedFile.id,
+        }})
+      }
     }
 
     console.log(`✅ Member experience demo: ${demoMembers.length} lives available, ${usageUpserts} benefit usages, ${createdClaims.length} claims, ${walletClaims.length} wallet items, ${personaDefs.length} member logins`)
