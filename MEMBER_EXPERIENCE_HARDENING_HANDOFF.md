@@ -973,8 +973,10 @@ Implementation notes:
   - `member.demo.preauth@avenue.co.ke / AvenueAdmin2024!`
 - Seed sets deterministic demo phone numbers for the first 50 active members so SMS/USSD can be tested:
   - first five: `+254711000101` through `+254711000105`.
-- Seed upserts 50 benefit usage profiles against 2025 period data using low, medium, high, near-cap, and cap-reached/exceeded patterns.
+- Seed upserts 50 benefit usage profiles against each member's active membership-year period, derived from enrollment anniversary, using low, medium, high, near-cap, and cap-reached/exceeded patterns.
+- Wanjiru Kamau is included in the member-experience demo portfolio so `member@avenue.co.ke` remains useful for member dashboard testing. The five extra `member.demo.*` logins intentionally start from the next member to avoid the unique `User.memberId` constraint.
 - Seed creates 36 `CLM-MEXP-*` care-history claims across the trailing 12-month range with claim lines, diagnoses, approved/paid states, and sensitive category examples.
+- Maternity demo claims are guarded so they only attach to active adult female principals/spouses. A corrective seed pass reassigns any existing invalid maternity claim that landed on a male member or child to an eligible female member in the same group.
 - Seed creates member wallet demo states from the new `MemberCoContributionPayment` model:
   - pending callback;
   - confirmed;
@@ -1052,6 +1054,14 @@ Implementation notes:
 - Fixed `ProvidersService` Prisma JSON typing for provider operating hours by using `Prisma.InputJsonValue` and `Prisma.JsonNull`.
 - Fixed `DashboardCharts` client-only mounting so lint no longer flags synchronous state updates inside an effect.
 - Replaced runtime `require("decimal.js")` calls in secure check-in with a top-level `Decimal` import.
+- Fixed member benefit summary semantics after Wanjiru Kamau demo QA:
+  - the large dashboard/benefits number now uses the package annual cover limit, not the sum of category sublimits;
+  - category cards now explicitly say they are category sublimits;
+  - benefit usage lookup now prefers the active membership-year period.
+- Fixed seed consistency after Wanjiru Kamau demo QA:
+  - current-period usage is seeded from enrollment anniversary;
+  - Wanjiru is included in the demo member portfolio;
+  - invalid maternity-on-male demo claims are corrected on reseed.
 - `npx tsc --noEmit` passes as of 2026-05-08.
 - `npm run lint` passes as of 2026-05-08 with 16 existing warnings, all unused variables/imports outside the member hardening work.
 - `npm run build` passes as of 2026-05-08 on Next.js 15.5.15.

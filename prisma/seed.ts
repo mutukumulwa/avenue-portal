@@ -3403,7 +3403,6 @@ async function main() {
         dependents: { where: { status: 'ACTIVE' }, select: { id: true } },
       },
       orderBy: [{ groupId: 'asc' }, { memberNumber: 'asc' }],
-      skip: 1,
       take: 60,
     })
 
@@ -3416,11 +3415,11 @@ async function main() {
     }
 
     const personaDefs = [
-      { email: 'member.demo.low@avenue.co.ke', index: 0, label: 'Low use family' },
-      { email: 'member.demo.nearcap@avenue.co.ke', index: 1, label: 'Near cap outpatient' },
-      { email: 'member.demo.family@avenue.co.ke', index: 2, label: 'Family privacy demo' },
-      { email: 'member.demo.wallet@avenue.co.ke', index: 3, label: 'Wallet payment demo' },
-      { email: 'member.demo.preauth@avenue.co.ke', index: 4, label: 'Preauth decision demo' },
+      { email: 'member.demo.low@avenue.co.ke', index: 1, label: 'Low use family' },
+      { email: 'member.demo.nearcap@avenue.co.ke', index: 2, label: 'Near cap outpatient' },
+      { email: 'member.demo.family@avenue.co.ke', index: 3, label: 'Family privacy demo' },
+      { email: 'member.demo.wallet@avenue.co.ke', index: 4, label: 'Wallet payment demo' },
+      { email: 'member.demo.preauth@avenue.co.ke', index: 5, label: 'Preauth decision demo' },
     ]
     for (const persona of personaDefs) {
       const member = demoMembers[persona.index]
@@ -3449,8 +3448,14 @@ async function main() {
       })
     }
 
-    const periodStart = new Date('2025-01-01')
-    const periodEnd = new Date('2025-12-31')
+    const memberBenefitPeriod = (enrollmentDate: Date) => {
+      const now = new Date()
+      const enrolled = new Date(enrollmentDate)
+      let periodStart = new Date(now.getFullYear(), enrolled.getMonth(), enrolled.getDate())
+      if (periodStart > now) periodStart = new Date(now.getFullYear() - 1, enrolled.getMonth(), enrolled.getDate())
+      const periodEnd = new Date(periodStart.getFullYear() + 1, enrolled.getMonth(), enrolled.getDate())
+      return { periodStart, periodEnd }
+    }
     const usageProfiles = [
       { pct: 0.08, claims: 1 },
       { pct: 0.28, claims: 3 },
@@ -3467,6 +3472,7 @@ async function main() {
       const benefit = benefits.find(b => b.category === (i % 5 === 0 ? 'INPATIENT' : 'OUTPATIENT')) ?? benefits[0]
       if (!benefit) continue
       const limit = Number(benefit.annualSubLimit)
+      const { periodStart, periodEnd } = memberBenefitPeriod(member.enrollmentDate)
       await prisma.benefitUsage.upsert({
         where: { memberId_benefitConfigId_periodStart: { memberId: member.id, benefitConfigId: benefit.id, periodStart } },
         update: {
@@ -3499,7 +3505,11 @@ async function main() {
     const createdClaims: { id: string; claimNumber: string; memberId: string; billedAmount: number; approvedAmount: number }[] = []
     for (let i = 0; i < Math.min(36, demoMembers.length); i++) {
       const member = demoMembers[i]
-      const scenario = claimScenarios[i % claimScenarios.length]
+      let scenario = claimScenarios[i % claimScenarios.length]
+      const age = Math.floor((Date.now() - member.dateOfBirth.getTime()) / (365.25 * 24 * 60 * 60 * 1000))
+      if (scenario.benefitCategory === 'MATERNITY' && (member.gender !== 'FEMALE' || age < 18 || age > 49)) {
+        scenario = claimScenarios[(i + 1) % 4]
+      }
       const claimNumber = `CLM-MEXP-${String(i + 1).padStart(3, '0')}`
       const existing = await prisma.claim.findUnique({ where: { tenantId_claimNumber: { tenantId, claimNumber } } })
       if (existing) {
@@ -3552,6 +3562,35 @@ async function main() {
         ]},
       }})
       createdClaims.push({ id: claim.id, claimNumber, memberId: member.id, billedAmount, approvedAmount })
+    }
+
+    const invalidMaternityClaims = await prisma.claim.findMany({
+      where: {
+        tenantId,
+        benefitCategory: 'MATERNITY',
+        member: { OR: [{ gender: { not: 'FEMALE' } }, { relationship: 'CHILD' }] },
+      },
+      include: { member: { select: { id: true, groupId: true } } },
+    })
+    for (const claim of invalidMaternityClaims) {
+      const replacement = await prisma.member.findFirst({
+        where: {
+          tenantId,
+          groupId: claim.member.groupId,
+          status: 'ACTIVE',
+          gender: 'FEMALE',
+          relationship: { in: ['PRINCIPAL', 'SPOUSE'] },
+          dateOfBirth: { gte: new Date('1976-01-01'), lte: new Date('2007-12-31') },
+        },
+        orderBy: [{ relationship: 'asc' }, { memberNumber: 'asc' }],
+        select: { id: true },
+      })
+      if (replacement) {
+        await prisma.claim.update({
+          where: { id: claim.id },
+          data: { memberId: replacement.id },
+        })
+      }
     }
 
     const walletClaims = createdClaims.slice(0, 6)

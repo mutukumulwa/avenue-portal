@@ -106,12 +106,12 @@ export default async function MemberDashboardPage() {
         <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-[13px] font-bold uppercase text-avenue-text-muted">Benefit balance</p>
+              <p className="text-[13px] font-bold uppercase text-avenue-text-muted">Annual cover balance</p>
               <p className="mt-1 text-3xl font-bold tabular-nums text-avenue-text-heading">
                 {formatMoney(dashboard.summary.totalRemaining)}
               </p>
               <p className="mt-1 text-sm text-avenue-text-muted">
-                Remaining of {formatMoney(dashboard.summary.totalLimit)} this membership year
+                Remaining of {formatMoney(dashboard.summary.totalLimit)} annual cover this membership year
               </p>
             </div>
             <Shield className="h-8 w-8 text-avenue-indigo" />
@@ -123,7 +123,7 @@ export default async function MemberDashboardPage() {
             />
           </div>
           <div className="mt-2 flex justify-between text-[13px] text-avenue-text-muted">
-            <span>{formatMoney(dashboard.summary.totalUsed)} used</span>
+            <span>{formatMoney(dashboard.summary.totalUsed)} used against annual cover</span>
             <span>{usedPercent}% used</span>
           </div>
         </div>
@@ -201,7 +201,7 @@ export default async function MemberDashboardPage() {
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Benefit pressure</h2>
-              <p className="text-sm text-avenue-text-muted">Categories using the highest share of their limit.</p>
+              <p className="text-sm text-avenue-text-muted">Category sublimits can sit inside the annual cover.</p>
             </div>
             <Link href="/member/benefits" className="text-sm font-semibold text-avenue-indigo hover:underline">
               View all

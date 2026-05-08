@@ -51,6 +51,7 @@ function isSensitiveFamilyCategory(category: string) {
 function buildBenefitStates(member: {
   enrollmentDate: Date;
   package: {
+    annualLimit: unknown;
     currentVersion: {
       benefits: Array<{
         id: string;
@@ -67,14 +68,21 @@ function buildBenefitStates(member: {
   };
   benefitUsages: Array<{
     benefitConfigId: string;
+    periodStart: Date;
+    periodEnd: Date;
     amountUsed: unknown;
     claimCount: number;
     lastUpdated: Date;
   }>;
 }) {
   const benefits = member.package.currentVersion?.benefits ?? [];
-  const usageMap = new Map(member.benefitUsages.map((usage) => [usage.benefitConfigId, usage]));
   const period = benefitPeriod(member.enrollmentDate);
+  const usageMap = new Map(
+    member.benefitUsages
+      .filter((usage) => usage.periodStart <= period.periodEnd && usage.periodEnd >= period.periodStart)
+      .sort((a, b) => b.periodStart.getTime() - a.periodStart.getTime())
+      .map((usage) => [usage.benefitConfigId, usage])
+  );
 
   const benefitStates = benefits.map((benefit) => {
     const usage = usageMap.get(benefit.id);
@@ -102,8 +110,11 @@ function buildBenefitStates(member: {
     };
   });
 
-  const totalLimit = benefitStates.reduce((sum, benefit) => sum + benefit.limit, 0);
-  const totalUsed = benefitStates.reduce((sum, benefit) => sum + benefit.used, 0);
+  const categoryLimitTotal = benefitStates.reduce((sum, benefit) => sum + benefit.limit, 0);
+  const annualCoverLimit = toMoney(member.package.annualLimit) || categoryLimitTotal;
+  const categoryUsedTotal = benefitStates.reduce((sum, benefit) => sum + benefit.used, 0);
+  const totalLimit = annualCoverLimit;
+  const totalUsed = Math.min(categoryUsedTotal, totalLimit);
   const totalRemaining = Math.max(0, totalLimit - totalUsed);
   const overallUsedPct = totalLimit > 0 ? Math.min(1, totalUsed / totalLimit) : 0;
   const pressureBenefits = [...benefitStates].sort((a, b) => b.usedPct - a.usedPct).slice(0, 3);
@@ -116,6 +127,7 @@ function buildBenefitStates(member: {
       totalLimit,
       totalUsed,
       totalRemaining,
+      categoryLimitTotal,
       overallUsedPct,
       elapsedPct: period.elapsedPct,
       pace: paceLabel(overallUsedPct, period.elapsedPct),

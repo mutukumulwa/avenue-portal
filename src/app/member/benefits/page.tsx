@@ -56,10 +56,10 @@ export default async function MemberBenefitsPage() {
         <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm md:col-span-2">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-[13px] font-bold uppercase text-avenue-text-muted">Remaining balance</p>
+              <p className="text-[13px] font-bold uppercase text-avenue-text-muted">Annual cover balance</p>
               <p className="mt-1 text-3xl font-bold tabular-nums text-avenue-text-heading">{formatMoney(state.summary.totalRemaining)}</p>
               <p className="mt-1 text-sm text-avenue-text-muted">
-                Used {formatMoney(state.summary.totalUsed)} of {formatMoney(state.summary.totalLimit)}
+                Used {formatMoney(state.summary.totalUsed)} of {formatMoney(state.summary.totalLimit)} annual cover
               </p>
             </div>
             <Shield className="h-8 w-8 text-avenue-indigo" />
@@ -68,7 +68,7 @@ export default async function MemberBenefitsPage() {
             <div className={`h-full rounded-full ${barTone(state.summary.overallUsedPct)}`} style={{ width: `${usedPct}%` }} />
           </div>
           <div className="mt-2 flex justify-between text-[13px] text-avenue-text-muted">
-            <span>{usedPct}% of benefits used</span>
+            <span>{usedPct}% of annual cover used</span>
             <span>{elapsedPct}% of year elapsed</span>
           </div>
         </div>
@@ -77,7 +77,7 @@ export default async function MemberBenefitsPage() {
           <CalendarClock className="h-6 w-6 text-[#17A2B8]" />
           <p className="mt-3 text-[13px] font-bold uppercase text-avenue-text-muted">How to read this</p>
           <p className="mt-2 text-sm leading-relaxed text-avenue-text-muted">
-            The pace compares your benefit use with how far you are through the membership year. It is a guide, not a restriction.
+            The large balance tracks the annual cover. The cards below show category sublimits, which may sit inside that cover.
           </p>
         </div>
       </section>
@@ -99,7 +99,7 @@ export default async function MemberBenefitsPage() {
                 </div>
                 <div className="text-left sm:text-right">
                   <p className="font-bold tabular-nums text-avenue-indigo">{formatMoney(benefit.limit)}</p>
-                  <p className="text-[13px] text-avenue-text-muted">annual limit</p>
+                  <p className="text-[13px] text-avenue-text-muted">category sublimit</p>
                 </div>
               </div>
 
