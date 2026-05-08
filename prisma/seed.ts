@@ -3403,6 +3403,7 @@ async function main() {
         dependents: { where: { status: 'ACTIVE' }, select: { id: true } },
       },
       orderBy: [{ groupId: 'asc' }, { memberNumber: 'asc' }],
+      skip: 1,
       take: 60,
     })
 
