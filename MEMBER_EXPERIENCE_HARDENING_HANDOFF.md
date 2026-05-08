@@ -1290,6 +1290,10 @@ Then continue:
 - [x] Implemented Phase 11 expiry-controls slice: member-selected share durations plus consistent expired-share filtering.
 - [x] Implemented Phase 11 provider-sharing slice: direct provider shares, revocation metadata, provider detail visibility, and active-share filtering.
 - [x] Database migrations are up to date and `npm run db:seed` completed successfully on 2026-05-08.
+- [x] Fixed secure check-in initiation usability:
+  - admin check-in member picker now loads active members up to 500 instead of the first 100 only;
+  - member selection is now searchable by name, member number, and group;
+  - check-in initiation cards use cleaner UI font styling and avoid tiny uppercase labels that rendered fuzzily on Windows.
 - [ ] Phase 10 live browser, role/security, smoke-audit, and performance QA still need a running seeded environment.
 
 ## Next Agent Start Point

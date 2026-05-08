@@ -4,16 +4,17 @@ import { prisma } from "@/lib/prisma";
 import { requireRole, ROLES } from "@/lib/rbac";
 import { SecureCheckInService } from "@/server/services/secure-checkin/secure-checkin.service";
 import { emergencyOverrideAction, initiateCheckInAction } from "./actions";
+import { MemberLookup } from "./MemberLookup";
 
 export default async function CheckInsPage() {
   const session = await requireRole(ROLES.OPS);
 
   const [members, providers, recentChallenges, overrides] = await Promise.all([
     prisma.member.findMany({
-      where: { tenantId: session.user.tenantId },
+      where: { tenantId: session.user.tenantId, status: "ACTIVE" },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
-      take: 100,
-      select: { id: true, memberNumber: true, firstName: true, lastName: true },
+      take: 500,
+      select: { id: true, memberNumber: true, firstName: true, lastName: true, group: { select: { name: true } } },
     }),
     prisma.provider.findMany({
       where: { tenantId: session.user.tenantId, contractStatus: "ACTIVE" },
@@ -33,7 +34,7 @@ export default async function CheckInsPage() {
   ]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-ui">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold font-heading text-avenue-text-heading">Secure Check-Ins</h1>
@@ -41,34 +42,33 @@ export default async function CheckInsPage() {
             Start member visit verification and monitor same-day overrides.
           </p>
         </div>
-        <div className="rounded-lg border border-[#EEEEEE] bg-white px-4 py-3 text-right">
-          <p className="text-xs font-bold uppercase text-avenue-text-muted">Today&apos;s overrides</p>
+        <div className="rounded-[8px] border border-[#EEEEEE] bg-white px-4 py-3 text-right">
+          <p className="text-[13px] font-medium text-avenue-text-muted">Today&apos;s overrides</p>
           <p className="text-2xl font-bold text-avenue-error">{overrides.length}</p>
         </div>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[1.1fr_0.9fr]">
-        <section className="rounded-lg border border-[#EEEEEE] bg-white p-5">
+        <section className="rounded-[8px] border border-[#EEEEEE] bg-white p-5">
           <div className="flex items-center gap-2 mb-4">
             <Fingerprint className="h-5 w-5 text-avenue-indigo" />
             <h2 className="font-bold text-avenue-text-heading">Initiate Secure Check-In</h2>
           </div>
           <form action={initiateCheckInAction} className="space-y-4">
-            <label className="block">
-              <span className="text-xs font-bold uppercase text-avenue-text-muted">Member</span>
-              <select name="memberId" required className="mt-1 w-full rounded-md border border-[#EEEEEE] px-3 py-2 text-sm outline-none focus:border-avenue-indigo">
-                <option value="">Select member...</option>
-                {members.map((member) => (
-                  <option key={member.id} value={member.id}>
-                    {member.lastName}, {member.firstName} - {member.memberNumber}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <MemberLookup
+              members={members.map((member) => ({
+                id: member.id,
+                memberNumber: member.memberNumber,
+                firstName: member.firstName,
+                lastName: member.lastName,
+                groupName: member.group?.name ?? null,
+              }))}
+              name="memberId"
+            />
 
             <label className="block">
-              <span className="text-xs font-bold uppercase text-avenue-text-muted">Facility</span>
-              <select name="providerId" required className="mt-1 w-full rounded-md border border-[#EEEEEE] px-3 py-2 text-sm outline-none focus:border-avenue-indigo">
+              <span className="text-[13px] font-medium text-avenue-text-muted">Facility</span>
+              <select name="providerId" required className="mt-1 w-full rounded-[8px] border border-[#D6DCE5] px-3 py-2 text-sm text-avenue-text-heading outline-none focus:border-avenue-indigo">
                 <option value="">Select facility...</option>
                 {providers.map((provider) => (
                   <option key={provider.id} value={provider.id}>
@@ -79,8 +79,8 @@ export default async function CheckInsPage() {
             </label>
 
             <label className="block">
-              <span className="text-xs font-bold uppercase text-avenue-text-muted">Workstation</span>
-              <input name="workstationId" placeholder="Reception desk or device ID" className="mt-1 w-full rounded-md border border-[#EEEEEE] px-3 py-2 text-sm outline-none focus:border-avenue-indigo" />
+              <span className="text-[13px] font-medium text-avenue-text-muted">Workstation</span>
+              <input name="workstationId" placeholder="Reception desk or device ID" className="mt-1 w-full rounded-[8px] border border-[#D6DCE5] px-3 py-2 text-sm text-avenue-text-heading outline-none focus:border-avenue-indigo" />
             </label>
 
             <button className="rounded-full bg-avenue-indigo px-5 py-2 text-sm font-bold text-white hover:bg-avenue-secondary">
@@ -89,27 +89,29 @@ export default async function CheckInsPage() {
           </form>
         </section>
 
-        <section className="rounded-lg border border-red-100 bg-white p-5">
+        <section className="rounded-[8px] border border-red-100 bg-white p-5">
           <div className="flex items-center gap-2 mb-4">
             <ShieldAlert className="h-5 w-5 text-avenue-error" />
             <h2 className="font-bold text-avenue-text-heading">Emergency Override</h2>
           </div>
           <form action={emergencyOverrideAction} className="space-y-4">
-            <select name="memberId" required className="w-full rounded-md border border-[#EEEEEE] px-3 py-2 text-sm outline-none focus:border-avenue-indigo">
-              <option value="">Select member...</option>
-              {members.map((member) => (
-                <option key={member.id} value={member.id}>
-                  {member.lastName}, {member.firstName} - {member.memberNumber}
-                </option>
-              ))}
-            </select>
-            <select name="providerId" required className="w-full rounded-md border border-[#EEEEEE] px-3 py-2 text-sm outline-none focus:border-avenue-indigo">
+            <MemberLookup
+              members={members.map((member) => ({
+                id: member.id,
+                memberNumber: member.memberNumber,
+                firstName: member.firstName,
+                lastName: member.lastName,
+                groupName: member.group?.name ?? null,
+              }))}
+              name="memberId"
+            />
+            <select name="providerId" required className="w-full rounded-[8px] border border-[#D6DCE5] px-3 py-2 text-sm text-avenue-text-heading outline-none focus:border-avenue-indigo">
               <option value="">Select facility...</option>
               {providers.map((provider) => (
                 <option key={provider.id} value={provider.id}>{provider.name}</option>
               ))}
             </select>
-            <textarea name="reason" required minLength={10} rows={4} placeholder="Document the emergency reason for bypassing standard verification." className="w-full rounded-md border border-[#EEEEEE] px-3 py-2 text-sm outline-none focus:border-avenue-indigo" />
+            <textarea name="reason" required minLength={10} rows={4} placeholder="Document the emergency reason for bypassing standard verification." className="w-full rounded-[8px] border border-[#D6DCE5] px-3 py-2 text-sm text-avenue-text-heading outline-none focus:border-avenue-indigo" />
             <button className="rounded-full bg-avenue-error px-5 py-2 text-sm font-bold text-white hover:opacity-90">
               Open visit with override
             </button>
@@ -117,7 +119,7 @@ export default async function CheckInsPage() {
         </section>
       </div>
 
-      <section className="rounded-lg border border-[#EEEEEE] bg-white">
+      <section className="rounded-[8px] border border-[#EEEEEE] bg-white">
         <div className="border-b border-[#EEEEEE] px-5 py-4">
           <h2 className="font-bold text-avenue-text-heading">Recent Check-Ins</h2>
         </div>
