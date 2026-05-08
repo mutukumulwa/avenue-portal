@@ -8,7 +8,10 @@ import {
 
 function ClientOnly({ children, fallbackHeight = 220 }: { children: React.ReactNode; fallbackHeight?: number }) {
   const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => setMounted(true));
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
   if (!mounted) return <div style={{ height: fallbackHeight }} />;
   return <>{children}</>;
 }

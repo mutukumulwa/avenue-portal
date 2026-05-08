@@ -1,93 +1,172 @@
 import { requireRole, ROLES } from "@/lib/rbac";
+import { MemberAppService } from "@/server/services/member-app.service";
+import { EyeOff, Shield, User, Users } from "lucide-react";
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/prisma";
-import { User, Plus } from "lucide-react";
+
+function formatMoney(value: number | null) {
+  if (value === null) return "Private";
+  if (value >= 1_000_000) return `KES ${(value / 1_000_000).toFixed(1)}M`;
+  return `KES ${Math.round(value).toLocaleString("en-KE")}`;
+}
+
+function formatDate(value: Date) {
+  return new Date(value).toLocaleDateString("en-KE", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function barTone(pct: number) {
+  if (pct >= 0.9) return "bg-[#DC3545]";
+  if (pct >= 0.7) return "bg-[#FFC107]";
+  return "bg-[#28A745]";
+}
+
+function statusTone(status: string) {
+  return status === "ACTIVE" ? "bg-[#28A745]/10 text-[#28A745]" : "bg-[#6C757D]/10 text-[#6C757D]";
+}
 
 export default async function MemberDependentsPage() {
   const session = await requireRole(ROLES.MEMBER);
+  const family = await MemberAppService.getFamilyViewForUser(session.user.id, session.user.tenantId);
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    include: {
-      member: {
-        include: {
-          dependents: { orderBy: { relationship: "asc" } },
-        },
-      },
-    },
-  });
+  if (!family) redirect("/login");
 
-  const member = user?.member;
-  if (!member) redirect("/login");
-
-  const age = (dob: Date) => {
-    const years = new Date().getFullYear() - dob.getFullYear();
-    return years;
-  };
-
-  const statusColor = (status: string) =>
-    status === "ACTIVE" ? "bg-[#28A745]/10 text-[#28A745]" : "bg-[#6C757D]/10 text-[#6C757D]";
+  const familyUsedPct = Math.round(family.familySummary.usedPct * 100);
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="space-y-6 font-ui">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold font-heading text-avenue-text-heading">My Dependents</h1>
-          <p className="text-avenue-text-muted mt-1">Family members covered under your plan.</p>
+          <h1 className="font-heading text-2xl font-bold text-avenue-text-heading">Family Coverage</h1>
+          <p className="mt-1 text-avenue-text-muted">
+            {family.viewer.isPrincipalViewer ? "Your covered family members and benefit position." : "Your own covered membership details."}
+          </p>
         </div>
-        <button className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-5 py-2 rounded-full font-semibold text-sm transition-colors flex items-center gap-2 shadow-sm">
-          <Plus size={16} /> Add Dependent
-        </button>
       </div>
 
-      <div className="space-y-3">
-        {/* Principal card (self) */}
-        <div className="bg-white border-2 border-avenue-indigo/20 rounded-lg p-5 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-avenue-indigo/10 rounded-full flex items-center justify-center">
-              <User size={22} className="text-avenue-indigo" />
+      <section className="grid gap-4 md:grid-cols-3">
+        <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm md:col-span-2">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-[13px] font-bold uppercase text-avenue-text-muted">Family benefit balance</p>
+              <p className="mt-1 text-3xl font-bold tabular-nums text-avenue-text-heading">{formatMoney(family.familySummary.totalRemaining)}</p>
+              <p className="mt-1 text-sm text-avenue-text-muted">
+                {formatMoney(family.familySummary.totalUsed)} used of {formatMoney(family.familySummary.totalLimit)}
+              </p>
             </div>
-            <div className="flex-1">
-              <div className="flex items-center gap-2">
-                <p className="font-bold text-avenue-text-heading">{member.firstName} {member.lastName}</p>
-                <span className="bg-avenue-indigo/10 text-avenue-indigo px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">Principal</span>
-              </div>
-              <p className="text-xs text-avenue-text-muted mt-0.5">{member.memberNumber} · Age {age(member.dateOfBirth)}</p>
-            </div>
-            <span className={`px-3 py-1 text-[10px] font-bold uppercase rounded-full ${statusColor(member.status)}`}>
-              {member.status.replace(/_/g, " ")}
-            </span>
+            <Users className="h-8 w-8 text-avenue-indigo" />
+          </div>
+          <div className="mt-5 h-2 overflow-hidden rounded-full bg-[#E6E7E8]">
+            <div className={`h-full rounded-full ${barTone(family.familySummary.usedPct)}`} style={{ width: `${familyUsedPct}%` }} />
+          </div>
+          <div className="mt-2 flex justify-between text-[13px] text-avenue-text-muted">
+            <span>{family.familySummary.memberCount.toLocaleString("en-KE")} covered member(s)</span>
+            <span>{familyUsedPct}% used</span>
           </div>
         </div>
 
-        {member.dependents.map((dep) => (
-          <div key={dep.id} className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-[#E6E7E8] rounded-full flex items-center justify-center">
-                <User size={22} className="text-[#6C757D]" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="font-bold text-avenue-text-heading">{dep.firstName} {dep.lastName}</p>
-                  <span className="bg-[#F5C6B6]/50 text-[#a0522d] px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">
-                    {dep.relationship}
-                  </span>
+        <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
+          <Shield className="h-6 w-6 text-[#17A2B8]" />
+          <p className="mt-3 text-[13px] font-bold uppercase text-avenue-text-muted">Privacy guardrail</p>
+          <p className="mt-2 text-sm leading-relaxed text-avenue-text-muted">{family.privacyNote}</p>
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        {family.members.map((member) => {
+          const usedPct = Math.round(member.summary.overallUsedPct * 100);
+          const displayName = `${member.firstName} ${member.lastName}`;
+          return (
+            <div key={member.id} className={`rounded-[8px] border bg-white p-5 shadow-sm ${member.isSelf ? "border-avenue-indigo/30" : "border-[#EEEEEE]"}`}>
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="flex min-w-0 items-start gap-4">
+                  <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${member.isSelf ? "bg-avenue-indigo/10 text-avenue-indigo" : "bg-[#E6E7E8] text-[#6C757D]"}`}>
+                    <User className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h2 className="font-heading text-lg font-bold text-avenue-text-heading">{displayName}</h2>
+                      <span className="rounded-full bg-avenue-indigo/10 px-2 py-0.5 text-[12px] font-bold text-avenue-indigo">
+                        {member.isSelf ? "You" : member.relationship.replace(/_/g, " ")}
+                      </span>
+                      <span className={`rounded-full px-2 py-0.5 text-[12px] font-bold ${statusTone(member.status)}`}>
+                        {member.status.replace(/_/g, " ")}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm text-avenue-text-muted">
+                      {member.memberNumber} · Age {member.age} · {member.packageName}
+                    </p>
+                  </div>
                 </div>
-                <p className="text-xs text-avenue-text-muted mt-0.5">{dep.memberNumber} · Age {age(dep.dateOfBirth)}</p>
+                <div className="text-left lg:text-right">
+                  <p className="text-[13px] text-avenue-text-muted">Remaining</p>
+                  <p className="text-xl font-bold tabular-nums text-avenue-text-heading">{formatMoney(member.summary.totalRemaining)}</p>
+                </div>
               </div>
-              <span className={`px-3 py-1 text-[10px] font-bold uppercase rounded-full ${statusColor(dep.status)}`}>
-                {dep.status.replace(/_/g, " ")}
-              </span>
-            </div>
-          </div>
-        ))}
 
-        {member.dependents.length === 0 && (
-          <div className="bg-white border border-[#EEEEEE] rounded-lg p-8 text-center text-avenue-text-body shadow-sm">
-            No dependents added yet. Click &quot;Add Dependent&quot; to register family members.
-          </div>
-        )}
-      </div>
+              <div className="mt-5 h-2 overflow-hidden rounded-full bg-[#E6E7E8]">
+                <div className={`h-full rounded-full ${barTone(member.summary.overallUsedPct)}`} style={{ width: `${usedPct}%` }} />
+              </div>
+              <div className="mt-2 flex justify-between text-[13px] text-avenue-text-muted">
+                <span>{formatMoney(member.summary.totalUsed)} used</span>
+                <span>{member.summary.pace}</span>
+              </div>
+
+              <div className="mt-5 grid gap-3 lg:grid-cols-2">
+                <div className="rounded-[8px] bg-[#F8F9FA] p-4">
+                  <p className="mb-3 text-[13px] font-bold uppercase text-avenue-text-muted">Benefit categories</p>
+                  <div className="space-y-3">
+                    {member.categoryDetails.slice(0, 4).map((benefit) => (
+                      <div key={benefit.id}>
+                        <div className="mb-1 flex justify-between gap-3 text-sm">
+                          <span className="font-semibold text-avenue-text-heading">{benefit.name}</span>
+                          <span className="tabular-nums text-avenue-text-muted">
+                            {benefit.masked ? "Private" : `${Math.round((benefit.usedPct ?? 0) * 100)}%`}
+                          </span>
+                        </div>
+                        <div className="h-1.5 overflow-hidden rounded-full bg-[#E6E7E8]">
+                          <div
+                            className={`h-full rounded-full ${benefit.masked ? "bg-[#6C757D]" : barTone(benefit.usedPct ?? 0)}`}
+                            style={{ width: `${benefit.masked ? 100 : Math.round((benefit.usedPct ?? 0) * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-[8px] bg-[#F8F9FA] p-4">
+                  <p className="mb-3 text-[13px] font-bold uppercase text-avenue-text-muted">Recent visible care</p>
+                  <div className="space-y-3">
+                    {member.recentVisibleEncounters.map((encounter) => (
+                      <div key={encounter.id} className="flex items-start justify-between gap-3 text-sm">
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-avenue-text-heading">{encounter.providerName}</p>
+                          <p className="text-[13px] text-avenue-text-muted">
+                            {encounter.benefitCategory.replace(/_/g, " ")} · {formatDate(encounter.dateOfService)}
+                          </p>
+                        </div>
+                        <p className="shrink-0 font-bold tabular-nums text-avenue-text-heading">{formatMoney(encounter.approvedAmount)}</p>
+                      </div>
+                    ))}
+                    {member.recentVisibleEncounters.length === 0 && (
+                      <p className="text-sm text-avenue-text-muted">No visible care events yet.</p>
+                    )}
+                    {member.hiddenSensitiveEncounterCount > 0 && (
+                      <div className="flex items-center gap-2 rounded-[8px] bg-white px-3 py-2 text-[13px] text-avenue-text-muted">
+                        <EyeOff className="h-4 w-4" />
+                        {member.hiddenSensitiveEncounterCount} private event(s) summarized only.
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </section>
     </div>
   );
 }

@@ -1,162 +1,296 @@
 import { requireRole, ROLES } from "@/lib/rbac";
-import { prisma } from "@/lib/prisma";
-import { QrCode, Phone } from "lucide-react";
+import { MemberAppService } from "@/server/services/member-app.service";
+import {
+  ArrowRight,
+  BadgeCheck,
+  Bell,
+  Building2,
+  CalendarClock,
+  CreditCard,
+  HeartPulse,
+  History,
+  Phone,
+  QrCode,
+  Shield,
+  Stethoscope,
+  Users,
+} from "lucide-react";
+import Link from "next/link";
+
+function formatMoney(value: number) {
+  if (value >= 1_000_000) return `KES ${(value / 1_000_000).toFixed(1)}M`;
+  return `KES ${Math.round(value).toLocaleString("en-KE")}`;
+}
+
+function formatDate(value: Date) {
+  return new Date(value).toLocaleDateString("en-KE", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+function statusTone(status: string) {
+  const normalized = status.toUpperCase();
+  if (normalized.includes("APPROVED") || normalized.includes("PAID") || normalized.includes("COLLECTED") || normalized.includes("CONVERTED")) {
+    return "bg-[#28A745]/10 text-[#28A745]";
+  }
+  if (normalized.includes("REVIEW") || normalized.includes("SUBMITTED") || normalized.includes("PENDING") || normalized.includes("PARTIAL")) {
+    return "bg-[#17A2B8]/10 text-[#17A2B8]";
+  }
+  if (normalized.includes("DECLINED") || normalized.includes("FAILED") || normalized.includes("VOID")) {
+    return "bg-[#DC3545]/10 text-[#DC3545]";
+  }
+  return "bg-[#6C757D]/10 text-[#6C757D]";
+}
+
+function pressureTone(pace: string) {
+  if (pace === "Cap reached" || pace === "Near cap") return "bg-[#DC3545]";
+  if (pace === "Ahead of expected use") return "bg-[#FFC107]";
+  return "bg-[#28A745]";
+}
 
 export default async function MemberDashboardPage() {
   const session = await requireRole(ROLES.MEMBER);
+  const dashboard = await MemberAppService.getDashboardForUser(session.user.id, session.user.tenantId);
 
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    include: {
-      member: {
-        include: {
-          group: { select: { name: true, renewalDate: true } },
-          package: {
-            include: {
-              currentVersion: {
-                include: { benefits: true },
-              },
-            },
-          },
-          benefitUsages: {
-            include: { benefitConfig: { select: { category: true, annualSubLimit: true } } },
-          },
-          claims: {
-            orderBy: { createdAt: "desc" },
-            take: 5,
-            select: { claimNumber: true, status: true, billedAmount: true, createdAt: true },
-          },
-          preauths: {
-            orderBy: { createdAt: "desc" },
-            take: 3,
-            select: { preauthNumber: true, status: true, estimatedCost: true, createdAt: true },
-          },
-        },
-      },
-    },
-  });
-
-  const member = user?.member;
-  if (!member) {
+  if (!dashboard) {
     return (
-      <div className="text-center py-12 text-avenue-text-body">
+      <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-8 text-center text-avenue-text-body shadow-sm">
         No member profile linked to your account. Please contact support.
       </div>
     );
   }
 
-  const benefits = member.package.currentVersion?.benefits ?? [];
-  const totalLimit = benefits.reduce((s, b) => s + Number(b.annualSubLimit), 0);
-  const totalUsed = member.benefitUsages.reduce((s, u) => s + Number(u.amountUsed), 0);
-  const totalRemaining = totalLimit - totalUsed;
-
-  const statusColor = (status: string) => {
-    switch (status) {
-      case "APPROVED": case "PAID": case "CONVERTED_TO_CLAIM": return "text-[#28A745]";
-      case "RECEIVED": case "UNDER_REVIEW": case "SUBMITTED": return "text-[#17A2B8]";
-      case "DECLINED": return "text-[#DC3545]";
-      default: return "text-[#6C757D]";
-    }
-  };
+  const memberName = `${dashboard.member.firstName} ${dashboard.member.lastName}`;
+  const usedPercent = Math.round(dashboard.summary.overallUsedPct * 100);
+  const quickActions = [
+    { label: "Find care", href: "/member/facilities", icon: Building2 },
+    { label: "Request pre-auth", href: "/member/preauth", icon: Stethoscope },
+    { label: "Check in", href: "/member/check-in", icon: QrCode },
+    { label: "Family", href: "/member/dependents", icon: Users },
+  ];
 
   return (
-    <div className="space-y-6">
-      {/* Digital Member Card */}
-      <div className="bg-gradient-to-br from-avenue-indigo to-[#435BA1] text-white rounded-2xl p-6 shadow-lg">
-        <div className="flex justify-between items-start">
-          <div>
-            <p className="text-xs font-bold uppercase opacity-70 tracking-wide">Avenue Healthcare</p>
-            <h1 className="text-2xl font-bold font-heading mt-1">{member.firstName} {member.lastName}</h1>
-            <p className="opacity-80 text-sm mt-0.5">{member.group.name}</p>
-            <p className="text-xs opacity-60 mt-2 font-mono">{member.memberNumber}</p>
+    <div className="space-y-5 font-ui">
+      <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
+        <div className="rounded-[8px] bg-avenue-indigo p-5 text-white shadow-sm">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[13px] font-bold uppercase opacity-80">Avenue Health Member</p>
+              <h1 className="mt-1 truncate font-heading text-2xl font-bold">{memberName}</h1>
+              <p className="mt-1 text-sm opacity-85">{dashboard.group.name}</p>
+              <p className="mt-3 font-mono text-[13px] opacity-80">{dashboard.member.memberNumber}</p>
+            </div>
+            <div className="rounded-[8px] bg-white/15 p-2">
+              <QrCode className="h-12 w-12 opacity-90" />
+            </div>
           </div>
-          <div className="bg-white/20 p-2 rounded-lg">
-            <QrCode size={48} className="opacity-80" />
+
+          <div className="mt-5 grid grid-cols-3 gap-3 border-t border-white/20 pt-4 text-sm">
+            <div>
+              <p className="text-[13px] opacity-70">Package</p>
+              <p className="mt-0.5 font-semibold">{dashboard.package.name}</p>
+            </div>
+            <div>
+              <p className="text-[13px] opacity-70">Renewal</p>
+              <p className="mt-0.5 font-semibold">{formatDate(dashboard.group.renewalDate)}</p>
+            </div>
+            <div>
+              <p className="text-[13px] opacity-70">Status</p>
+              <p className="mt-0.5 font-semibold">{dashboard.member.status.replace(/_/g, " ")}</p>
+            </div>
           </div>
         </div>
-        <div className="mt-5 pt-4 border-t border-white/20 flex justify-between text-sm">
-          <div>
-            <p className="opacity-60 text-xs uppercase">Package</p>
-            <p className="font-semibold">{member.package.name}</p>
+
+        <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[13px] font-bold uppercase text-avenue-text-muted">Benefit balance</p>
+              <p className="mt-1 text-3xl font-bold tabular-nums text-avenue-text-heading">
+                {formatMoney(dashboard.summary.totalRemaining)}
+              </p>
+              <p className="mt-1 text-sm text-avenue-text-muted">
+                Remaining of {formatMoney(dashboard.summary.totalLimit)} this membership year
+              </p>
+            </div>
+            <Shield className="h-8 w-8 text-avenue-indigo" />
           </div>
-          <div>
-            <p className="opacity-60 text-xs uppercase">Renewal</p>
-            <p className="font-semibold">{new Date(member.group.renewalDate).toLocaleDateString("en-KE")}</p>
+          <div className="mt-5 h-2 overflow-hidden rounded-full bg-[#E6E7E8]">
+            <div
+              className={`h-full rounded-full ${usedPercent >= 90 ? "bg-[#DC3545]" : usedPercent >= 70 ? "bg-[#FFC107]" : "bg-[#28A745]"}`}
+              style={{ width: `${usedPercent}%` }}
+            />
           </div>
-          <div>
-            <p className="opacity-60 text-xs uppercase">Status</p>
-            <p className="font-semibold">{member.status.replace(/_/g, " ")}</p>
+          <div className="mt-2 flex justify-between text-[13px] text-avenue-text-muted">
+            <span>{formatMoney(dashboard.summary.totalUsed)} used</span>
+            <span>{usedPercent}% used</span>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Benefit Summary */}
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          { label: "Annual Limit (KES)", value: totalLimit.toLocaleString(), color: "text-avenue-indigo" },
-          { label: "Used (KES)", value: totalUsed.toLocaleString(), color: "text-[#FFC107]" },
-          { label: "Remaining (KES)", value: totalRemaining.toLocaleString(), color: "text-[#28A745]" },
-        ].map((s) => (
-          <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-lg p-4 shadow-sm font-ui">
-            <p className="text-xs text-avenue-text-muted font-bold uppercase tracking-wide">{s.label}</p>
-            <p className={`text-xl font-bold tabular-nums mt-1 ${s.color}`}>{s.value}</p>
+      {dashboard.summary.outstandingMemberShare > 0 && (
+        <section className="rounded-[8px] border border-[#FFC107]/40 bg-[#FFC107]/10 p-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <CreditCard className="mt-0.5 h-5 w-5 text-[#856404]" />
+              <div>
+                <p className="font-bold text-avenue-text-heading">Member share pending</p>
+                <p className="text-sm text-avenue-text-muted">
+                  {formatMoney(dashboard.summary.outstandingMemberShare)} is awaiting collection or payment confirmation.
+                </p>
+              </div>
+            </div>
+            <Link href="/member/utilization" className="inline-flex items-center justify-center gap-2 rounded-[8px] bg-white px-3 py-2 text-sm font-semibold text-avenue-indigo shadow-sm hover:underline">
+              Review costs <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
-        ))}
-      </div>
+        </section>
+      )}
 
-      <div className="grid md:grid-cols-2 gap-6">
-        {/* Recent Claims */}
-        <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#EEEEEE] flex justify-between items-center">
-            <h2 className="font-bold text-avenue-text-heading font-heading">Recent Claims</h2>
-            <a href="/member/utilization" className="text-avenue-indigo text-xs font-semibold hover:underline">View all</a>
+      {dashboard.notifications.length > 0 && (
+        <section className="rounded-[8px] border border-[#EEEEEE] bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-[#EEEEEE] px-5 py-4">
+            <div>
+              <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Notifications</h2>
+              <p className="text-sm text-avenue-text-muted">Recent approvals, payments, and member updates.</p>
+            </div>
+            <Link href="/member/notifications" className="inline-flex items-center gap-2 text-sm font-semibold text-avenue-indigo hover:underline">
+              View all <ArrowRight className="h-4 w-4" />
+            </Link>
           </div>
           <div className="divide-y divide-[#EEEEEE]">
-            {member.claims.map((c) => (
-              <div key={c.claimNumber} className="px-5 py-3 flex justify-between items-center text-sm">
-                <div>
-                  <p className="font-mono text-xs text-avenue-text-muted">{c.claimNumber}</p>
-                  <p className="font-semibold text-avenue-text-heading">KES {Number(c.billedAmount).toLocaleString()}</p>
+            {dashboard.notifications.slice(0, 3).map((notification) => (
+              <Link
+                key={notification.id}
+                href={notification.href ?? "/member/notifications"}
+                className="grid grid-cols-[auto_1fr_auto] items-center gap-3 px-5 py-4 hover:bg-[#F8F9FA]"
+              >
+                <div className="flex h-9 w-9 items-center justify-center rounded-[8px] bg-avenue-indigo/10 text-avenue-indigo">
+                  <Bell className="h-4 w-4" />
                 </div>
-                <span className={`text-xs font-bold ${statusColor(c.status)}`}>{c.status.replace(/_/g, " ")}</span>
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-avenue-text-heading">{notification.title}</p>
+                  <p className="truncate text-[13px] text-avenue-text-muted">{notification.body}</p>
+                </div>
+                {notification.readAt === null && (
+                  <span className="rounded-full bg-[#28A745]/10 px-2 py-0.5 text-[10px] font-bold uppercase text-[#1F7A34]">
+                    New
+                  </span>
+                )}
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {quickActions.map((action) => {
+          const Icon = action.icon;
+          return (
+            <Link key={action.href} href={action.href} className="rounded-[8px] border border-[#EEEEEE] bg-white p-4 shadow-sm transition-colors hover:border-avenue-indigo/40 hover:text-avenue-indigo">
+              <Icon className="h-5 w-5" />
+              <p className="mt-3 text-sm font-bold">{action.label}</p>
+            </Link>
+          );
+        })}
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+        <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Benefit pressure</h2>
+              <p className="text-sm text-avenue-text-muted">Categories using the highest share of their limit.</p>
+            </div>
+            <Link href="/member/benefits" className="text-sm font-semibold text-avenue-indigo hover:underline">
+              View all
+            </Link>
+          </div>
+          <div className="space-y-4">
+            {dashboard.pressureBenefits.map((benefit) => (
+              <div key={benefit.id}>
+                <div className="mb-1 flex items-center justify-between gap-3 text-sm">
+                  <span className="font-semibold text-avenue-text-heading">{benefit.name}</span>
+                  <span className="tabular-nums text-avenue-text-muted">{Math.round(benefit.usedPct * 100)}%</span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-[#E6E7E8]">
+                  <div className={`h-full rounded-full ${pressureTone(benefit.pace)}`} style={{ width: `${Math.round(benefit.usedPct * 100)}%` }} />
+                </div>
+                <div className="mt-1 flex justify-between text-[13px] text-avenue-text-muted">
+                  <span>{benefit.pace}</span>
+                  <span>{formatMoney(benefit.remaining)} left</span>
+                </div>
               </div>
             ))}
-            {member.claims.length === 0 && (
-              <div className="px-5 py-6 text-center text-avenue-text-body text-sm">No claims on record.</div>
+            {dashboard.pressureBenefits.length === 0 && (
+              <p className="py-8 text-center text-sm text-avenue-text-muted">Your benefit schedule is not configured yet.</p>
             )}
           </div>
         </div>
 
-        {/* Pre-Auths */}
-        <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-[#EEEEEE] flex justify-between items-center">
-            <h2 className="font-bold text-avenue-text-heading font-heading">Pre-Authorizations</h2>
-            <a href="/member/preauth" className="text-avenue-indigo text-xs font-semibold hover:underline">View all</a>
+        <div className="rounded-[8px] border border-[#EEEEEE] bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-[#EEEEEE] px-5 py-4">
+            <div>
+              <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Recent activity</h2>
+              <p className="text-sm text-avenue-text-muted">Care visits, pre-authorizations, and member-share updates.</p>
+            </div>
+            <History className="h-5 w-5 text-avenue-indigo" />
           </div>
           <div className="divide-y divide-[#EEEEEE]">
-            {member.preauths.map((p) => (
-              <div key={p.preauthNumber} className="px-5 py-3 flex justify-between items-center text-sm">
-                <div>
-                  <p className="font-mono text-xs text-avenue-text-muted">{p.preauthNumber}</p>
-                  <p className="font-semibold text-avenue-text-heading">KES {Number(p.estimatedCost).toLocaleString()}</p>
+            {dashboard.recentActivity.map((activity) => (
+              <Link key={activity.id} href={activity.href} className="grid grid-cols-[auto_1fr_auto] items-center gap-3 px-5 py-4 hover:bg-[#F8F9FA]">
+                <div className="flex h-9 w-9 items-center justify-center rounded-[8px] bg-avenue-indigo/10 text-avenue-indigo">
+                  {activity.type === "PREAUTH" ? <Stethoscope className="h-4 w-4" /> : activity.type === "MEMBER_SHARE" ? <CreditCard className="h-4 w-4" /> : <HeartPulse className="h-4 w-4" />}
                 </div>
-                <span className={`text-xs font-bold ${statusColor(p.status)}`}>{p.status.replace(/_/g, " ")}</span>
-              </div>
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-avenue-text-heading">{activity.title}</p>
+                  <p className="truncate text-[13px] text-avenue-text-muted">{activity.description} · {formatDate(activity.date)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="font-bold tabular-nums text-avenue-text-heading">{formatMoney(activity.amount)}</p>
+                  <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[12px] font-bold ${statusTone(activity.status)}`}>
+                    {activity.status}
+                  </span>
+                </div>
+              </Link>
             ))}
-            {member.preauths.length === 0 && (
-              <div className="px-5 py-6 text-center text-avenue-text-body text-sm">No pre-authorizations.</div>
+            {dashboard.recentActivity.length === 0 && (
+              <p className="px-5 py-8 text-center text-sm text-avenue-text-muted">No activity has been recorded yet.</p>
             )}
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* WhatsApp CTA */}
+      <section className="grid gap-4 md:grid-cols-3">
+        <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
+          <Users className="h-5 w-5 text-avenue-indigo" />
+          <p className="mt-3 text-[13px] font-bold uppercase text-avenue-text-muted">Family covered</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums text-avenue-text-heading">
+            {dashboard.summary.activeDependentCount + 1}
+          </p>
+          <p className="mt-1 text-sm text-avenue-text-muted">Including you and active dependants.</p>
+        </div>
+        <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
+          <CalendarClock className="h-5 w-5 text-[#17A2B8]" />
+          <p className="mt-3 text-[13px] font-bold uppercase text-avenue-text-muted">Membership year</p>
+          <p className="mt-1 text-lg font-bold text-avenue-text-heading">{formatDate(dashboard.period.periodStart)}</p>
+          <p className="mt-1 text-sm text-avenue-text-muted">Runs until {formatDate(dashboard.period.periodEnd)}.</p>
+        </div>
+        <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
+          <BadgeCheck className="h-5 w-5 text-[#28A745]" />
+          <p className="mt-3 text-[13px] font-bold uppercase text-avenue-text-muted">Next best action</p>
+          <p className="mt-1 text-lg font-bold text-avenue-text-heading">Keep your digital card ready</p>
+          <p className="mt-1 text-sm text-avenue-text-muted">Use check-in when you arrive at an Avenue or partner facility.</p>
+        </div>
+      </section>
+
       <a
         href="https://wa.me/254700000000"
-        className="fixed bottom-6 right-6 bg-[#25D366] text-white p-4 rounded-full shadow-lg hover:scale-105 transition-transform flex items-center gap-2"
+        className="fixed bottom-6 right-6 flex items-center gap-2 rounded-full bg-[#25D366] p-4 text-white shadow-lg transition-transform hover:scale-105"
       >
-        <Phone size={22} />
-        <span className="font-semibold text-sm">WhatsApp Us</span>
+        <Phone className="h-5 w-5" />
+        <span className="hidden text-sm font-semibold sm:inline">WhatsApp Us</span>
       </a>
     </div>
   );

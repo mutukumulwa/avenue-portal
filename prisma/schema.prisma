@@ -41,6 +41,7 @@ model Tenant {
   coContributionRules            CoContributionRule[]
   annualCoContributionCaps       AnnualCoContributionCap[]
   coContributionTransactions     CoContributionTransaction[]
+  memberCoContributionPayments   MemberCoContributionPayment[]
   memberAnnualCoContributions    MemberAnnualCoContribution[]
   familyAnnualCoContributions    FamilyAnnualCoContribution[]
   selfFundedAccounts             SelfFundedAccount[]
@@ -53,6 +54,7 @@ model Tenant {
   checkInChallenges              CheckInChallenge[]
   checkInEvents                  CheckInEvent[]
   memberCheckInNotifications     MemberCheckInNotification[]
+  memberNotifications            MemberNotification[]
   visitVerifications             VisitVerification[]
 }
 
@@ -353,6 +355,7 @@ model Member {
   endorsements                   Endorsement[]                   @relation("EndorsementMember")
   complaints                     Complaint[]
   coContributionTransactions     CoContributionTransaction[]
+  coContributionPayments         MemberCoContributionPayment[]
   annualCoContributions          MemberAnnualCoContribution[]
   familyCoContributions          FamilyAnnualCoContribution[]    @relation("FamilyCoContributions")
   user                           User?
@@ -364,6 +367,7 @@ model Member {
   checkInChallenges              CheckInChallenge[]
   checkInEvents                  CheckInEvent[]
   checkInNotifications           MemberCheckInNotification[]
+  notifications                   MemberNotification[]
   visitVerifications             VisitVerification[]
 
   @@unique([tenantId, memberNumber])
@@ -625,6 +629,48 @@ model MemberCheckInNotification {
   @@index([challengeId])
   @@index([status])
   @@index([expiresAt])
+}
+
+enum MemberNotificationType {
+  PREAUTH_STATUS
+  PAYMENT_STATUS
+  BENEFIT_ALERT
+  RENEWAL_REMINDER
+  DOCUMENT_AVAILABLE
+  CLAIM_STATUS
+  SUPPORT_MESSAGE
+  SECURITY_ALERT
+}
+
+enum MemberNotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+}
+
+model MemberNotification {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id])
+
+  type     MemberNotificationType
+  priority MemberNotificationPriority @default(NORMAL)
+  title    String
+  body     String
+  href     String?
+  metadata Json?
+
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([memberId])
+  @@index([memberId, readAt])
+  @@index([tenantId, type])
+  @@index([createdAt])
 }
 
 model VisitVerification {
@@ -2121,6 +2167,15 @@ enum CoContributionPaymentMethod {
   OFFSET
 }
 
+enum MemberCoContributionPaymentStatus {
+  INITIATED
+  PENDING_CALLBACK
+  CONFIRMED
+  FAILED
+  TIMED_OUT
+  CANCELLED
+}
+
 // One rule per (package × benefit category × network tier × effective period)
 // benefitCategory == null means package-wide default for that tier
 model CoContributionRule {
@@ -2201,6 +2256,7 @@ model CoContributionTransaction {
   mpesaTransactionRef String?
   mpesaPhoneNumber    String?
   receiptNumber       String?
+  paymentAttempts     MemberCoContributionPayment[]
 
   waiverReason     String?
   waiverApprovedBy String?
@@ -2215,6 +2271,42 @@ model CoContributionTransaction {
   @@index([tenantId])
   @@index([memberId])
   @@index([collectionStatus])
+}
+
+model MemberCoContributionPayment {
+  id        String @id @default(cuid())
+  tenantId  String
+  tenant    Tenant @relation(fields: [tenantId], references: [id])
+  memberId  String
+  member    Member @relation(fields: [memberId], references: [id])
+
+  coContributionTransactionId String
+  coContributionTransaction   CoContributionTransaction @relation(fields: [coContributionTransactionId], references: [id])
+
+  amount         Decimal                             @db.Decimal(12, 2)
+  phoneNumber    String
+  status         MemberCoContributionPaymentStatus  @default(INITIATED)
+  idempotencyKey String
+
+  checkoutRequestId String  @unique
+  merchantRequestId String?
+  mpesaReceipt      String?
+  resultCode        String?
+  resultDescription String?
+
+  requestedAt DateTime  @default(now())
+  confirmedAt DateTime?
+  failedAt    DateTime?
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId])
+  @@index([memberId])
+  @@index([coContributionTransactionId])
+  @@index([status])
+  @@index([expiresAt])
 }
 
 // Running annual total per member (updated on each co-contribution event)

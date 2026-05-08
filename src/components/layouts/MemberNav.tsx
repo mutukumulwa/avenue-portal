@@ -15,6 +15,9 @@ import {
   LogOut,
   Fingerprint,
   Smartphone,
+  WalletCards,
+  FileText,
+  Bell,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -23,6 +26,9 @@ const NAV_ITEMS = [
   { label: "Dependents",  href: "/member/dependents",  icon: Users           },
   { label: "Utilization", href: "/member/utilization", icon: TrendingUp      },
   { label: "Pre-Auth",    href: "/member/preauth",     icon: Stethoscope     },
+  { label: "Wallet",      href: "/member/wallet",      icon: WalletCards     },
+  { label: "Documents",   href: "/member/documents",   icon: FileText        },
+  { label: "Alerts",      href: "/member/notifications", icon: Bell          },
   { label: "Check-In",    href: "/member/check-in",    icon: Fingerprint     },
   { label: "Facilities",  href: "/member/facilities",  icon: Building        },
   { label: "Support",     href: "/member/support",     icon: HelpCircle      },

@@ -2,36 +2,59 @@
 
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { MapPin, Phone, Navigation } from "lucide-react";
+import { BadgeCheck, CircleDollarSign, MapPin, Navigation, Phone, SlidersHorizontal } from "lucide-react";
 import { getNearbyProvidersAction } from "./actions";
 import type { ProviderLocation } from "./MemberMap";
 
+const PROCEDURES = [
+  { label: "General consultation", cptCode: "99213", serviceHint: "Outpatient" },
+  { label: "Specialist consultation", cptCode: "99214", serviceHint: "Outpatient" },
+  { label: "Full blood count", cptCode: "85025", serviceHint: "Laboratory" },
+  { label: "Chest X-ray", cptCode: "71046", serviceHint: "Imaging" },
+  { label: "Abdominal ultrasound", cptCode: "76700", serviceHint: "Imaging" },
+  { label: "Caesarean section", cptCode: "59510", serviceHint: "Maternity" },
+  { label: "Eye examination", cptCode: "92004", serviceHint: "Optical" },
+];
+
 const MemberMap = dynamic(() => import("./MemberMap"), {
   ssr: false,
-  loading: () => <div className="w-full h-full bg-slate-100 animate-pulse rounded-lg flex items-center justify-center text-slate-400">Loading interactive map...</div>,
+  loading: () => <div className="flex h-full w-full items-center justify-center rounded-[8px] bg-slate-100 text-slate-400">Loading interactive map...</div>,
 });
+
+function formatMoney(value: number) {
+  if (value >= 1_000_000) return `KES ${(value / 1_000_000).toFixed(1)}M`;
+  return `KES ${Math.round(value).toLocaleString("en-KE")}`;
+}
+
+function tierLabel(tier: string) {
+  if (tier === "OWN") return "Avenue facility";
+  if (tier === "PARTNER") return "Partner facility";
+  return "Panel facility";
+}
 
 export function FacilitiesMap() {
   const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null);
   const [providers, setProviders] = useState<ProviderLocation[]>([]);
   const [loading, setLoading] = useState(false);
   const [radius, setRadius] = useState(20);
+  const [procedureCode, setProcedureCode] = useState("99213");
+  const [providerTier, setProviderTier] = useState<"ALL" | "OWN" | "PARTNER" | "PANEL">("ALL");
+  const procedure = PROCEDURES.find((item) => item.cptCode === procedureCode) ?? PROCEDURES[0];
 
   useEffect(() => {
     let mounted = true;
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          if(mounted) setPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+          if (mounted) setPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude });
         },
-        (err) => {
-          console.error("Geolocation error:", err);
-          if(mounted) setPosition({ lat: -1.2921, lng: 36.8219 });
-        }
+        () => {
+          if (mounted) setPosition({ lat: -1.2921, lng: 36.8219 });
+        },
       );
     } else {
       setTimeout(() => {
-        if(mounted) setPosition({ lat: -1.2921, lng: 36.8219 });
+        if (mounted) setPosition({ lat: -1.2921, lng: 36.8219 });
       }, 0);
     }
     return () => { mounted = false; };
@@ -42,7 +65,7 @@ export function FacilitiesMap() {
     if (position) {
       const fetchProviders = async () => {
         setLoading(true);
-        const data = await getNearbyProvidersAction(position.lat, position.lng, radius);
+        const data = await getNearbyProvidersAction(position.lat, position.lng, radius, procedureCode, providerTier, procedure.serviceHint);
         if (mounted) {
           setProviders(data);
           setLoading(false);
@@ -51,69 +74,132 @@ export function FacilitiesMap() {
       fetchProviders();
     }
     return () => { mounted = false; };
-  }, [position, radius]);
+  }, [position, radius, procedureCode, providerTier, procedure.serviceHint]);
 
-  if (!position) return <div className="h-96 bg-slate-100 animate-pulse rounded-lg flex items-center justify-center">Locating you...</div>;
+  if (!position) {
+    return <div className="flex h-96 items-center justify-center rounded-[8px] bg-slate-100 text-avenue-text-muted">Locating you...</div>;
+  }
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm border border-[#EEEEEE]">
-        <h2 className="font-bold text-avenue-text-heading">Nearby Facilities (Within {radius}km)</h2>
-        <select 
-          value={radius} 
-          onChange={(e) => setRadius(Number(e.target.value))}
-          className="border border-[#EEEEEE] rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-avenue-indigo"
-        >
-          <option value={5}>5 km</option>
-          <option value={10}>10 km</option>
-          <option value={20}>20 km</option>
-          <option value={50}>50 km</option>
-          <option value={100}>100 km</option>
-        </select>
+    <div className="space-y-4 font-ui">
+      <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-4 shadow-sm">
+        <div className="mb-4 flex items-center gap-2">
+          <SlidersHorizontal className="h-5 w-5 text-avenue-indigo" />
+          <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Find care with cost preview</h2>
+        </div>
+        <div className="grid gap-3 md:grid-cols-3">
+          <label className="space-y-1">
+            <span className="text-[13px] font-bold uppercase text-avenue-text-muted">Procedure</span>
+            <select
+              value={procedureCode}
+              onChange={(event) => setProcedureCode(event.target.value)}
+              className="w-full rounded-[8px] border border-[#EEEEEE] bg-white px-3 py-2 text-sm outline-none focus:border-avenue-indigo"
+            >
+              {PROCEDURES.map((item) => (
+                <option key={item.cptCode} value={item.cptCode}>{item.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-1">
+            <span className="text-[13px] font-bold uppercase text-avenue-text-muted">Facility type</span>
+            <select
+              value={providerTier}
+              onChange={(event) => setProviderTier(event.target.value as typeof providerTier)}
+              className="w-full rounded-[8px] border border-[#EEEEEE] bg-white px-3 py-2 text-sm outline-none focus:border-avenue-indigo"
+            >
+              <option value="ALL">All active facilities</option>
+              <option value="OWN">Avenue facilities</option>
+              <option value="PARTNER">Partner facilities</option>
+              <option value="PANEL">Panel facilities</option>
+            </select>
+          </label>
+          <label className="space-y-1">
+            <span className="text-[13px] font-bold uppercase text-avenue-text-muted">Distance</span>
+            <select
+              value={radius}
+              onChange={(event) => setRadius(Number(event.target.value))}
+              className="w-full rounded-[8px] border border-[#EEEEEE] bg-white px-3 py-2 text-sm outline-none focus:border-avenue-indigo"
+            >
+              <option value={5}>Within 5 km</option>
+              <option value={10}>Within 10 km</option>
+              <option value={20}>Within 20 km</option>
+              <option value={50}>Within 50 km</option>
+              <option value={100}>Within 100 km</option>
+            </select>
+          </label>
+        </div>
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 h-[500px] border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="h-[520px] overflow-hidden rounded-[8px] border border-[#EEEEEE] shadow-sm lg:col-span-2">
           <MemberMap position={position} providers={providers} />
         </div>
 
-        <div className="space-y-3 h-[500px] overflow-y-auto pr-2">
+        <div className="h-[520px] space-y-3 overflow-y-auto pr-1">
           {loading ? (
-            <div className="text-center py-10 text-avenue-text-muted">Searching...</div>
+            <div className="rounded-[8px] border border-[#EEEEEE] bg-white py-10 text-center text-avenue-text-muted">Searching...</div>
           ) : providers.length === 0 ? (
-            <div className="text-center py-10 text-avenue-text-muted bg-white rounded-lg border border-[#EEEEEE]">
-              No facilities found within {radius}km.
+            <div className="rounded-[8px] border border-[#EEEEEE] bg-white py-10 text-center text-avenue-text-muted">
+              No facilities found within {radius} km for {procedure.label.toLowerCase()}.
             </div>
           ) : (
-            providers.map((p) => (
-              <div key={p.id} className="bg-white border border-[#EEEEEE] rounded-lg p-4 shadow-sm hover:border-avenue-indigo transition-colors cursor-pointer">
-                <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <p className="font-bold text-avenue-text-heading">{p.name}</p>
-                    <p className="text-[10px] uppercase font-bold text-avenue-indigo">{p.type} • {Number(p.distance).toFixed(1)} km away</p>
+            providers.map((provider) => (
+              <div key={provider.id} className="rounded-[8px] border border-[#EEEEEE] bg-white p-4 shadow-sm transition-colors hover:border-avenue-indigo/40">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="font-bold text-avenue-text-heading">{provider.name}</p>
+                    <p className="mt-1 text-[13px] font-semibold text-avenue-indigo">
+                      {tierLabel(provider.tier)} - {provider.type.replace(/_/g, " ")} - {Number(provider.distance).toFixed(1)} km
+                    </p>
                   </div>
+                  {provider.estimate?.confidence === "TARIFF" && <BadgeCheck className="h-5 w-5 shrink-0 text-[#28A745]" />}
                 </div>
-                {p.address && (
-                  <div className="flex items-start gap-1.5 text-xs text-avenue-text-muted mt-2">
-                    <MapPin size={12} className="mt-0.5 shrink-0" />
-                    <span>{p.address}</span>
+
+                {provider.estimate && (
+                  <div className="mt-4 rounded-[8px] bg-[#F8F9FA] p-3">
+                    <div className="flex items-center gap-2">
+                      <CircleDollarSign className="h-4 w-4 text-avenue-indigo" />
+                      <p className="text-[13px] font-bold uppercase text-avenue-text-muted">Estimated cost</p>
+                    </div>
+                    <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
+                      <div>
+                        <p className="text-[13px] text-avenue-text-muted">Total</p>
+                        <p className="font-bold tabular-nums text-avenue-text-heading">{formatMoney(provider.estimate.estimatedCost)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[13px] text-avenue-text-muted">Plan</p>
+                        <p className="font-bold tabular-nums text-[#28A745]">{formatMoney(provider.estimate.planCovers)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[13px] text-avenue-text-muted">You</p>
+                        <p className="font-bold tabular-nums text-[#856404]">{formatMoney(provider.estimate.estimatedMemberShare)}</p>
+                      </div>
+                    </div>
+                    <p className="mt-2 text-[12px] leading-snug text-avenue-text-muted">{provider.estimate.explanation}</p>
                   </div>
                 )}
-                {p.phone && (
-                  <div className="flex items-center gap-1.5 text-xs text-avenue-text-muted mt-1">
-                    <Phone size={12} className="shrink-0" />
-                    <a href={`tel:${p.phone}`} className="hover:text-avenue-indigo">{p.phone}</a>
+
+                {provider.address && (
+                  <div className="mt-3 flex items-start gap-1.5 text-[13px] text-avenue-text-muted">
+                    <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span>{provider.address}</span>
                   </div>
                 )}
-                <div className="mt-3 pt-3 border-t border-[#EEEEEE]">
-                  <a 
-                    href={`https://www.google.com/maps/dir/?api=1&destination=${p.geoLatitude},${p.geoLongitude}`}
+                {provider.phone && (
+                  <div className="mt-1 flex items-center gap-1.5 text-[13px] text-avenue-text-muted">
+                    <Phone className="h-3.5 w-3.5 shrink-0" />
+                    <a href={`tel:${provider.phone}`} className="hover:text-avenue-indigo">{provider.phone}</a>
+                  </div>
+                )}
+                <div className="mt-3 border-t border-[#EEEEEE] pt-3">
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${provider.geoLatitude},${provider.geoLongitude}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-2 w-full bg-slate-50 hover:bg-avenue-indigo hover:text-white text-avenue-text-heading px-3 py-1.5 rounded text-xs font-bold transition-colors"
+                    className="flex w-full items-center justify-center gap-2 rounded-[8px] bg-slate-50 px-3 py-2 text-sm font-bold text-avenue-text-heading transition-colors hover:bg-avenue-indigo hover:text-white"
                   >
-                    <Navigation size={14} />
-                    Navigate Here
+                    <Navigation className="h-4 w-4" />
+                    Navigate
                   </a>
                 </div>
               </div>

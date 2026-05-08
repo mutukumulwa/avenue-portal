@@ -13,6 +13,7 @@ import { reportsRouter } from "./routers/reports";
 import { settingsRouter } from "./routers/settings";
 import { coContributionRouter } from "./routers/coContribution";
 import { analyticsRouter } from "./routers/analytics";
+import { memberAppRouter } from "./routers/memberApp";
 
 export const appRouter = createTRPCRouter({
   healthcheck: publicProcedure.query(() => {
@@ -30,6 +31,7 @@ export const appRouter = createTRPCRouter({
   quotations: quotationsRouter,
   reports: reportsRouter,
   analytics: analyticsRouter,
+  memberApp: memberAppRouter,
   settings: settingsRouter,
   coContribution: coContributionRouter,
 });

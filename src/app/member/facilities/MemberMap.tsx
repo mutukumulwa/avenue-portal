@@ -24,11 +24,24 @@ export type ProviderLocation = {
   id: string;
   name: string;
   type: string;
+  tier: string;
   distance: number;
   geoLatitude: number;
   geoLongitude: number;
   address?: string | null;
   phone?: string | null;
+  servicesOffered?: string[];
+  estimate?: {
+    procedureCode: string;
+    procedureLabel: string;
+    benefitCategory: string;
+    estimatedCost: number;
+    planCovers: number;
+    estimatedMemberShare: number;
+    remainingBenefitBeforeVisit: number;
+    confidence: string;
+    explanation: string;
+  };
 };
 
 function MapBounds({ providers, userPos }: { providers: ProviderLocation[]; userPos: { lat: number; lng: number } }) {
@@ -74,7 +87,12 @@ export default function MemberMap({ position, providers }: { position: { lat: nu
           <Popup>
             <div className="font-sans">
               <p className="font-bold text-sm m-0 leading-tight">{p.name}</p>
-              <p className="text-xs text-gray-500 m-0 mt-1">{p.type} • {Number(p.distance).toFixed(1)} km</p>
+              <p className="text-xs text-gray-500 m-0 mt-1">{p.type} - {Number(p.distance).toFixed(1)} km</p>
+              {p.estimate && (
+                <p className="text-xs text-gray-700 m-0 mt-1">
+                  Est. KES {Math.round(p.estimate.estimatedCost).toLocaleString("en-KE")}
+                </p>
+              )}
               <a 
                 href={`https://www.google.com/maps/dir/?api=1&destination=${p.geoLatitude},${p.geoLongitude}`}
                 target="_blank"

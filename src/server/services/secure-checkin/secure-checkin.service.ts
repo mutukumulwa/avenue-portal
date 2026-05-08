@@ -1,4 +1,5 @@
 import { CheckInChallengeStatus, CheckInFlow, CheckInNotificationStatus, CheckInOutcome } from "@prisma/client";
+import { Decimal } from "decimal.js";
 import { prisma } from "@/lib/prisma";
 import { addSeconds, generateVisitCode, hashesMatch, randomBase64Url, sha256 } from "./crypto";
 import { appendCheckInEvent } from "./audit-chain";
@@ -223,8 +224,8 @@ export class SecureCheckInService {
       outcome: isFlagged ? CheckInOutcome.FLAGGED_FOR_REVIEW : CheckInOutcome.INITIATED,
       initiatedById: challenge.initiatedById,
       reviewRequired: true,
-      geoLatitude: input.latitude ? new (require('decimal.js').Decimal)(input.latitude) : undefined,
-      geoLongitude: input.longitude ? new (require('decimal.js').Decimal)(input.longitude) : undefined,
+      geoLatitude: input.latitude ? new Decimal(input.latitude) : undefined,
+      geoLongitude: input.longitude ? new Decimal(input.longitude) : undefined,
       reasonCode: isFlagged ? "GEOFENCE_FAILED" : undefined,
       metadata: { status: "member_confirmed_presence", providerName: challenge.provider.name, distanceKm },
     });

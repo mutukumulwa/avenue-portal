@@ -3391,6 +3391,318 @@ async function main() {
     )
   }
 
+  // ═══════════════════════════════════════════════════════════
+  // 19. MEMBER EXPERIENCE DEMO PORTFOLIO — Phase 9
+  // ═══════════════════════════════════════════════════════════
+  {
+    const demoMembers = await prisma.member.findMany({
+      where: { tenantId, status: 'ACTIVE' },
+      include: {
+        group: true,
+        package: { include: { currentVersion: { include: { benefits: true } } } },
+        dependents: { where: { status: 'ACTIVE' }, select: { id: true } },
+      },
+      orderBy: [{ groupId: 'asc' }, { memberNumber: 'asc' }],
+      take: 60,
+    })
+
+    const demoPhones = ['+254711000101', '+254711000102', '+254711000103', '+254711000104', '+254711000105']
+    for (let i = 0; i < Math.min(50, demoMembers.length); i++) {
+      await prisma.member.update({
+        where: { id: demoMembers[i].id },
+        data: { phone: `+2547111${String(i + 1).padStart(5, '0')}` },
+      })
+    }
+
+    const personaDefs = [
+      { email: 'member.demo.low@avenue.co.ke', index: 0, label: 'Low use family' },
+      { email: 'member.demo.nearcap@avenue.co.ke', index: 1, label: 'Near cap outpatient' },
+      { email: 'member.demo.family@avenue.co.ke', index: 2, label: 'Family privacy demo' },
+      { email: 'member.demo.wallet@avenue.co.ke', index: 3, label: 'Wallet payment demo' },
+      { email: 'member.demo.preauth@avenue.co.ke', index: 4, label: 'Preauth decision demo' },
+    ]
+    for (const persona of personaDefs) {
+      const member = demoMembers[persona.index]
+      if (!member) continue
+      await prisma.member.update({ where: { id: member.id }, data: { phone: demoPhones[persona.index] } })
+      await prisma.user.upsert({
+        where: { tenantId_email: { tenantId, email: persona.email } },
+        update: {
+          passwordHash: pw,
+          isActive: true,
+          role: 'MEMBER_USER',
+          memberId: member.id,
+          firstName: member.firstName,
+          lastName: member.lastName,
+        },
+        create: {
+          tenantId,
+          email: persona.email,
+          passwordHash: pw,
+          firstName: member.firstName,
+          lastName: member.lastName,
+          role: 'MEMBER_USER',
+          isActive: true,
+          memberId: member.id,
+        },
+      })
+    }
+
+    const periodStart = new Date('2025-01-01')
+    const periodEnd = new Date('2025-12-31')
+    const usageProfiles = [
+      { pct: 0.08, claims: 1 },
+      { pct: 0.28, claims: 3 },
+      { pct: 0.54, claims: 6 },
+      { pct: 0.82, claims: 9 },
+      { pct: 0.96, claims: 12 },
+      { pct: 1.04, claims: 14 },
+    ]
+    let usageUpserts = 0
+    for (let i = 0; i < Math.min(50, demoMembers.length); i++) {
+      const member = demoMembers[i]
+      const benefits = member.package.currentVersion?.benefits ?? []
+      const profile = usageProfiles[i % usageProfiles.length]
+      const benefit = benefits.find(b => b.category === (i % 5 === 0 ? 'INPATIENT' : 'OUTPATIENT')) ?? benefits[0]
+      if (!benefit) continue
+      const limit = Number(benefit.annualSubLimit)
+      await prisma.benefitUsage.upsert({
+        where: { memberId_benefitConfigId_periodStart: { memberId: member.id, benefitConfigId: benefit.id, periodStart } },
+        update: {
+          periodEnd,
+          amountUsed: Math.round(limit * profile.pct),
+          claimCount: profile.claims,
+          lastUpdated: new Date(),
+        },
+        create: {
+          memberId: member.id,
+          benefitConfigId: benefit.id,
+          periodStart,
+          periodEnd,
+          amountUsed: Math.round(limit * profile.pct),
+          claimCount: profile.claims,
+        },
+      })
+      usageUpserts += 1
+    }
+
+    const claimScenarios = [
+      { icd: 'J06.9', label: 'Acute upper respiratory infection', serviceType: 'OUTPATIENT' as const, benefitCategory: 'OUTPATIENT' as const, base: 6800, status: 'PAID' as const },
+      { icd: 'E11.9', label: 'Type 2 diabetes review', serviceType: 'OUTPATIENT' as const, benefitCategory: 'CHRONIC_DISEASE' as const, base: 14500, status: 'APPROVED' as const },
+      { icd: 'A09', label: 'Gastroenteritis', serviceType: 'OUTPATIENT' as const, benefitCategory: 'OUTPATIENT' as const, base: 9200, status: 'PAID' as const },
+      { icd: 'J18.9', label: 'Pneumonia admission', serviceType: 'INPATIENT' as const, benefitCategory: 'INPATIENT' as const, base: 78000, status: 'APPROVED' as const },
+      { icd: 'F41.9', label: 'Anxiety counselling', serviceType: 'OUTPATIENT' as const, benefitCategory: 'MENTAL_HEALTH' as const, base: 12000, status: 'APPROVED' as const },
+      { icd: 'O80', label: 'Maternity consultation', serviceType: 'OUTPATIENT' as const, benefitCategory: 'MATERNITY' as const, base: 18500, status: 'APPROVED' as const },
+    ]
+    const monthOffsets = [11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0]
+    const createdClaims: { id: string; claimNumber: string; memberId: string; billedAmount: number; approvedAmount: number }[] = []
+    for (let i = 0; i < Math.min(36, demoMembers.length); i++) {
+      const member = demoMembers[i]
+      const scenario = claimScenarios[i % claimScenarios.length]
+      const claimNumber = `CLM-MEXP-${String(i + 1).padStart(3, '0')}`
+      const existing = await prisma.claim.findUnique({ where: { tenantId_claimNumber: { tenantId, claimNumber } } })
+      if (existing) {
+        createdClaims.push({ id: existing.id, claimNumber, memberId: existing.memberId, billedAmount: Number(existing.billedAmount), approvedAmount: Number(existing.approvedAmount) })
+        continue
+      }
+      const serviceDate = new Date(2025, 3 - monthOffsets[i % monthOffsets.length], Math.min(26, 5 + (i % 20)))
+      const billedAmount = Math.round(scenario.base * (0.88 + (i % 5) * 0.09))
+      const approvedAmount = Math.round(billedAmount * (scenario.benefitCategory === 'OUTPATIENT' ? 0.9 : 0.94))
+      const claim = await prisma.claim.create({ data: {
+        tenantId,
+        claimNumber,
+        invoiceNumber: `MEXP-INV-${String(i + 1).padStart(3, '0')}`,
+        memberId: member.id,
+        providerId: providers[i % providers.length],
+        serviceType: scenario.serviceType,
+        benefitCategory: scenario.benefitCategory,
+        dateOfService: serviceDate,
+        receivedAt: serviceDate,
+        decidedAt: new Date(serviceDate.getTime() + 2 * 24 * 60 * 60 * 1000),
+        paidAt: scenario.status === 'PAID' ? new Date(serviceDate.getTime() + 10 * 24 * 60 * 60 * 1000) : null,
+        diagnoses: [{ icdCode: scenario.icd, description: scenario.label, isPrimary: true }],
+        procedures: [],
+        billedAmount,
+        approvedAmount,
+        paidAmount: scenario.status === 'PAID' ? approvedAmount : 0,
+        memberLiability: billedAmount - approvedAmount,
+        status: scenario.status,
+        claimLines: { create: [
+          {
+            lineNumber: 1,
+            serviceCategory: scenario.serviceType === 'INPATIENT' ? 'PROCEDURE' : 'CONSULTATION',
+            description: `${scenario.label} clinical review`,
+            icdCode: scenario.icd,
+            quantity: 1,
+            unitCost: Math.round(billedAmount * 0.55),
+            billedAmount: Math.round(billedAmount * 0.55),
+            approvedAmount: Math.round(approvedAmount * 0.55),
+          },
+          {
+            lineNumber: 2,
+            serviceCategory: scenario.benefitCategory === 'CHRONIC_DISEASE' ? 'PHARMACY' : 'LABORATORY',
+            description: scenario.benefitCategory === 'CHRONIC_DISEASE' ? 'Medication refill and consumables' : 'Diagnostics and consumables',
+            icdCode: scenario.icd,
+            quantity: 1,
+            unitCost: billedAmount - Math.round(billedAmount * 0.55),
+            billedAmount: billedAmount - Math.round(billedAmount * 0.55),
+            approvedAmount: approvedAmount - Math.round(approvedAmount * 0.55),
+          },
+        ]},
+      }})
+      createdClaims.push({ id: claim.id, claimNumber, memberId: member.id, billedAmount, approvedAmount })
+    }
+
+    const walletClaims = createdClaims.slice(0, 6)
+    for (let i = 0; i < walletClaims.length; i++) {
+      const claim = walletClaims[i]
+      const existingTx = await prisma.coContributionTransaction.findUnique({ where: { claimId: claim.id } })
+      const amount = [1250, 2400, 3600, 1800, 5200, 900][i] ?? 1500
+      const status = i === 1 ? 'COLLECTED' : i === 2 ? 'PARTIAL' : i === 5 ? 'DEFERRED' : 'PENDING'
+      const tx = existingTx ?? await prisma.coContributionTransaction.create({ data: {
+        tenantId,
+        claimId: claim.id,
+        memberId: claim.memberId,
+        serviceCost: claim.billedAmount,
+        calculatedAmount: amount,
+        cappedAmount: amount,
+        finalAmount: amount,
+        planShare: Math.max(0, claim.billedAmount - amount),
+        annualCapApplied: false,
+        capsApplied: [],
+        collectionStatus: status as never,
+        amountCollected: status === 'COLLECTED' ? amount : status === 'PARTIAL' ? Math.round(amount / 2) : 0,
+        paymentMethod: status === 'COLLECTED' ? 'MPESA' : null,
+        mpesaTransactionRef: status === 'COLLECTED' ? `MEXPMPESA${i + 1}` : null,
+        mpesaPhoneNumber: demoPhones[i % demoPhones.length],
+        receiptNumber: status === 'COLLECTED' ? `RCPT-MEXP-${i + 1}` : null,
+        collectedAt: status === 'COLLECTED' ? new Date('2025-03-15') : null,
+      }})
+
+      const paymentStates = [
+        { status: 'PENDING_CALLBACK', receipt: null, resultCode: null, desc: 'Sandbox STK prompt sent' },
+        { status: 'CONFIRMED', receipt: 'RKT900001', resultCode: '0', desc: 'The service request is processed successfully.' },
+        { status: 'FAILED', receipt: null, resultCode: '1', desc: 'Insufficient funds' },
+        { status: 'TIMED_OUT', receipt: null, resultCode: 'TIMEOUT', desc: 'No callback received before checkout expiry' },
+      ] as const
+      const state = paymentStates[i % paymentStates.length]
+      const checkoutRequestId = `AICARE-MEXP-${String(i + 1).padStart(3, '0')}`
+      const existingPayment = await prisma.memberCoContributionPayment.findUnique({ where: { checkoutRequestId } })
+      if (!existingPayment) {
+        await prisma.memberCoContributionPayment.create({ data: {
+          tenantId,
+          memberId: claim.memberId,
+          coContributionTransactionId: tx.id,
+          amount,
+          phoneNumber: demoPhones[i % demoPhones.length],
+          status: state.status,
+          idempotencyKey: `mexp-${i + 1}`,
+          checkoutRequestId,
+          merchantRequestId: `MR-MEXP-${String(i + 1).padStart(3, '0')}`,
+          mpesaReceipt: state.receipt,
+          resultCode: state.resultCode,
+          resultDescription: state.desc,
+          requestedAt: new Date('2025-03-10'),
+          confirmedAt: state.status === 'CONFIRMED' ? new Date('2025-03-10T10:15:00') : null,
+          failedAt: state.status === 'FAILED' || state.status === 'TIMED_OUT' ? new Date('2025-03-10T10:20:00') : null,
+          expiresAt: new Date('2025-03-10T10:20:00'),
+        }})
+      }
+    }
+
+    const preauthSeeds = [
+      { num: 'PA-MEXP-001', member: demoMembers[4], cpt: '99213', label: 'General consultation', cat: 'OUTPATIENT' as const, service: 'OUTPATIENT' as const, cost: 2500, status: 'APPROVED' as const, approved: 2500, notes: 'Auto-approved low-risk outpatient consultation.' },
+      { num: 'PA-MEXP-002', member: demoMembers[5], cpt: '76700', label: 'Ultrasound abdomen', cat: 'OUTPATIENT' as const, service: 'OUTPATIENT' as const, cost: 6000, status: 'UNDER_REVIEW' as const, approved: null, notes: 'Routed for review due to clinical notes requiring validation.' },
+      { num: 'PA-MEXP-003', member: demoMembers[6], cpt: '44950', label: 'Appendectomy', cat: 'SURGICAL' as const, service: 'INPATIENT' as const, cost: 145000, status: 'UNDER_REVIEW' as const, approved: null, notes: 'High-value surgical request awaiting medical officer review.' },
+      { num: 'PA-MEXP-004', member: demoMembers[7], cpt: '92004', label: 'Eye examination', cat: 'OPTICAL' as const, service: 'OUTPATIENT' as const, cost: 16000, status: 'DECLINED' as const, approved: 0, notes: 'Optical benefit exhausted for the period.' },
+    ]
+    for (const item of preauthSeeds) {
+      if (!item.member) continue
+      const existing = await prisma.preAuthorization.findUnique({ where: { tenantId_preauthNumber: { tenantId, preauthNumber: item.num } } })
+      if (existing) continue
+      await prisma.preAuthorization.create({ data: {
+        tenantId,
+        preauthNumber: item.num,
+        memberId: item.member.id,
+        providerId: providers[0],
+        serviceType: item.service,
+        benefitCategory: item.cat,
+        submittedBy: 'MEMBER',
+        expectedDateOfService: new Date('2025-04-20'),
+        diagnoses: [{ icdCode: 'Z00', description: item.label, isPrimary: true }],
+        procedures: [{ cptCode: item.cpt, description: item.label, quantity: 1, unitCost: item.cost, total: item.cost }],
+        estimatedCost: item.cost,
+        approvedAmount: item.approved,
+        clinicalNotes: item.notes,
+        status: item.status,
+        approvedBy: item.status === 'APPROVED' ? 'AUTO' : null,
+        approvedAt: item.status === 'APPROVED' ? new Date('2025-04-05') : null,
+        validFrom: item.status === 'APPROVED' ? new Date('2025-04-05') : null,
+        validUntil: item.status === 'APPROVED' ? new Date('2025-04-19') : null,
+        declineReasonCode: item.status === 'DECLINED' ? 'BENEFIT_EXHAUSTED' : null,
+        declineNotes: item.status === 'DECLINED' ? 'The selected benefit does not have remaining balance for this request.' : null,
+      }})
+    }
+
+    const docsToEnsure: Array<{
+      fileName: string
+      category: string
+      url: string
+      groupId?: string
+      claimNumber?: string
+      preauthNumber?: string
+    }> = [
+      { fileName: 'Avenue_Member_Benefit_Guide_2025.pdf', category: 'BENEFIT_GUIDE', groupId: safaricom.id, url: '/seed-docs/Avenue_Member_Benefit_Guide_2025.pdf' },
+      { fileName: 'Safaricom_Benefit_Schedule_2025.pdf', category: 'BENEFIT_SCHEDULE', groupId: safaricom.id, url: '/seed-docs/Safaricom_Benefit_Schedule_2025.pdf' },
+      { fileName: 'PA-MEXP-001_Approval_Letter.pdf', category: 'PREAUTH_APPROVAL', preauthNumber: 'PA-MEXP-001', url: '/seed-docs/PA-MEXP-001_Approval_Letter.pdf' },
+      { fileName: 'CLM-MEXP-001_Claim_Support.pdf', category: 'CLAIM_SUPPORT', claimNumber: 'CLM-MEXP-001', url: '/seed-docs/CLM-MEXP-001_Claim_Support.pdf' },
+    ]
+    for (const doc of docsToEnsure) {
+      const exists = await prisma.document.findFirst({ where: { fileName: doc.fileName } })
+      if (exists) continue
+      const claim = doc.claimNumber ? await prisma.claim.findUnique({ where: { tenantId_claimNumber: { tenantId, claimNumber: doc.claimNumber } }, select: { id: true } }) : null
+      const preauth = doc.preauthNumber ? await prisma.preAuthorization.findUnique({ where: { tenantId_preauthNumber: { tenantId, preauthNumber: doc.preauthNumber } }, select: { id: true } }) : null
+      await prisma.document.create({ data: {
+        fileName: doc.fileName,
+        fileUrl: doc.url,
+        fileSize: 180000,
+        mimeType: 'application/pdf',
+        category: doc.category,
+        uploadedBy: users['CUSTOMER_SERVICE'],
+        groupId: doc.groupId ?? null,
+        claimId: claim?.id,
+        preauthId: preauth?.id,
+      }})
+    }
+
+    const notificationSeeds = [
+      { member: demoMembers[0], type: 'BENEFIT_ALERT' as const, title: 'You are on track', body: 'Your outpatient benefit usage is comfortably within the expected range.', href: '/member/benefits', priority: 'LOW' as const },
+      { member: demoMembers[1], type: 'BENEFIT_ALERT' as const, title: 'Outpatient benefit near cap', body: 'You have used more than 90% of one benefit category this year.', href: '/member/benefits', priority: 'HIGH' as const },
+      { member: demoMembers[2], type: 'CLAIM_STATUS' as const, title: 'Care event recorded', body: 'A recent outpatient visit has been added to your care history.', href: '/member/utilization', priority: 'NORMAL' as const },
+      { member: demoMembers[3], type: 'PAYMENT_STATUS' as const, title: 'M-Pesa payment confirmed', body: 'Your wallet payment has been confirmed and matched to your member share.', href: '/member/wallet', priority: 'HIGH' as const },
+      { member: demoMembers[4], type: 'PREAUTH_STATUS' as const, title: 'Pre-authorization approved', body: 'Your consultation pre-authorization was approved instantly.', href: '/member/preauth', priority: 'HIGH' as const },
+      { member: demoMembers[0], type: 'RENEWAL_REMINDER' as const, title: 'Scheme renewal coming up', body: 'Your employer scheme renewal date is approaching.', href: '/member/dashboard', priority: 'NORMAL' as const },
+      { member: demoMembers[0], type: 'DOCUMENT_AVAILABLE' as const, title: 'Benefit guide available', body: 'Your 2025 member benefit guide is available in Documents.', href: '/member/documents', priority: 'NORMAL' as const },
+    ]
+    for (const note of notificationSeeds) {
+      if (!note.member) continue
+      const exists = await prisma.memberNotification.findFirst({ where: { tenantId, memberId: note.member.id, title: note.title } })
+      if (exists) continue
+      await prisma.memberNotification.create({ data: {
+        tenantId,
+        memberId: note.member.id,
+        type: note.type,
+        priority: note.priority,
+        title: note.title,
+        body: note.body,
+        href: note.href,
+        metadata: { source: 'member-experience-demo' },
+      }})
+    }
+
+    console.log(`✅ Member experience demo: ${demoMembers.length} lives available, ${usageUpserts} benefit usages, ${createdClaims.length} claims, ${walletClaims.length} wallet items, ${personaDefs.length} member logins`)
+  }
+
   console.log('\n🎉 Seed complete! All features populated.\n')
   console.log('  Login: admin@avenue.co.ke / AvenueAdmin2024!')
   console.log('')
@@ -3420,6 +3732,7 @@ async function main() {
   console.log('  • Self-funded scheme 2: Bamburi Cement — KES 3.8M balance below KES 5M minimum (low-balance demo)')
   console.log('  • Fund admin: fund@avenue.co.ke / AvenueAdmin2024! — linked to all self-funded schemes')
   console.log('  • Member: member@avenue.co.ke / AvenueAdmin2024! — linked to an active member')
+  console.log('  • Member demo logins: member.demo.low@avenue.co.ke, member.demo.nearcap@avenue.co.ke, member.demo.family@avenue.co.ke, member.demo.wallet@avenue.co.ke, member.demo.preauth@avenue.co.ke / AvenueAdmin2024!')
   console.log('  • Admin sidebar: Self-Funded Schemes link under Finance → /fund/dashboard')
   console.log('  • Scheme transfer endorsement: KCB member → EABL (career change)')
   console.log('  • Tier change endorsement: Safaricom Staff → Management (promotion)')
@@ -3431,6 +3744,13 @@ async function main() {
   console.log('  • Exceeded limits: 4 benefit usage records (1 exceeded, 1 at limit, 2 at >80%)')
   console.log('  • Commission statements: 6 records across 3 brokers (4 paid, 2 pending)')
   console.log('  • Levies & taxes: first invoice updated with SD/TL/PHCF amounts')
+  console.log('')
+  console.log('  Member Experience Demo:')
+  console.log('  • 50 member benefit-usage profiles across low, moderate, high, near-cap, and cap-reached states')
+  console.log('  • 36 recent care-history claims across the trailing 12 months')
+  console.log('  • Pre-auth scenarios: auto-approved, human-review, surgical review, declined/exhausted')
+  console.log('  • Wallet scenarios: pending callback, confirmed, failed, timed out, partial/deferred')
+  console.log('  • Documents and notifications visible in the member portal')
 }
 
 main()
