@@ -181,7 +181,8 @@ function NavGroupSection({ group, pathname }: { group: NavGroup; pathname: strin
 
 export function AdminSidebar({ userRole }: { userRole: UserRole | null }) {
   const pathname = usePathname();
-  const setupActive = pathname === "/settings" || pathname.startsWith("/settings/");
+  const SETUP_ROUTES = ["/settings", "/settings/approval-matrix", "/settings/pricing-models", "/settings/audit-log"];
+  const setupActive = SETUP_ROUTES.some(r => pathname === r || pathname.startsWith(r + "/"));
 
   const visibleGroups = NAV_GROUPS
     .map(group => ({
