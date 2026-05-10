@@ -8,7 +8,7 @@ import {
   Stethoscope, Receipt, CreditCard, Building, PieChart,
   Settings, LogOut, Calculator, UserCheck, MessageSquareText,
   ShieldAlert, MessageSquareWarning, Wallet, Fingerprint,
-  BarChart3,
+  BarChart3, TriangleAlert,
 } from "lucide-react";
 import { PortalSwitcher } from "./PortalSwitcher";
 import { useState } from "react";
@@ -18,10 +18,10 @@ type SubItem = { label: string; href: string };
 type NavItem  = { label: string; href: string; icon: React.ElementType; roles: UserRole[]; children?: SubItem[] };
 type NavGroup = { label: string; items: NavItem[] };
 
-const ANY_STAFF: UserRole[] = ["SUPER_ADMIN","CLAIMS_OFFICER","FINANCE_OFFICER","UNDERWRITER","CUSTOMER_SERVICE","MEDICAL_OFFICER","REPORTS_VIEWER"];
-const OPS:       UserRole[] = ["SUPER_ADMIN","CLAIMS_OFFICER","MEDICAL_OFFICER","CUSTOMER_SERVICE","UNDERWRITER"];
-const FINANCE:   UserRole[] = ["SUPER_ADMIN","FINANCE_OFFICER"];
-const FUND_PORTAL: UserRole[] = ["SUPER_ADMIN"];
+const ANY_STAFF:    UserRole[] = ["SUPER_ADMIN","CLAIMS_OFFICER","FINANCE_OFFICER","UNDERWRITER","CUSTOMER_SERVICE","MEDICAL_OFFICER","REPORTS_VIEWER"];
+const OPS:          UserRole[] = ["SUPER_ADMIN","CLAIMS_OFFICER","MEDICAL_OFFICER","CUSTOMER_SERVICE","UNDERWRITER"];
+const FINANCE:      UserRole[] = ["SUPER_ADMIN","FINANCE_OFFICER"];
+const FUND_PORTAL:  UserRole[] = ["SUPER_ADMIN"];
 const UNDERWRITING: UserRole[] = ["SUPER_ADMIN","UNDERWRITER"];
 const ADMIN_ONLY:   UserRole[] = ["SUPER_ADMIN"];
 
@@ -44,28 +44,29 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Clinical",
     items: [
-      { label: "Claims",             href: "/claims",    icon: Receipt,     roles: OPS        },
-      { label: "Pre-Authorizations", href: "/preauth",   icon: Stethoscope, roles: OPS        },
-      { label: "Secure Check-Ins",   href: "/check-ins", icon: Fingerprint, roles: OPS        },
-      { label: "Providers",          href: "/providers", icon: Building,    roles: ADMIN_ONLY },
+      { label: "Claims",             href: "/claims",             icon: Receipt,        roles: OPS        },
+      { label: "Pre-Authorizations", href: "/preauth",            icon: Stethoscope,    roles: OPS        },
+      { label: "Exceptions",         href: "/settings/exceptions",icon: TriangleAlert,  roles: OPS        },
+      { label: "Secure Check-Ins",   href: "/check-ins",          icon: Fingerprint,    roles: OPS        },
+      { label: "Providers",          href: "/providers",          icon: Building,       roles: ADMIN_ONLY },
     ],
   },
   {
     label: "Finance",
     items: [
-      { label: "Billing & Invoices",  href: "/billing",           icon: CreditCard, roles: FINANCE },
-      { label: "General Ledger",      href: "/billing/gl",        icon: FileText,   roles: FINANCE },
-      { label: "Account Ledger",      href: "/billing/gl/ledger", icon: FileText,   roles: FINANCE },
-      { label: "Self-Funded Schemes", href: "/fund/dashboard", icon: Wallet,     roles: FUND_PORTAL  },
-      { label: "Brokers",             href: "/brokers",        icon: UserCheck,  roles: ADMIN_ONLY   },
-      { label: "Quotations",          href: "/quotations",     icon: Calculator, roles: UNDERWRITING },
+      { label: "Billing & Invoices",  href: "/billing",           icon: CreditCard, roles: FINANCE      },
+      { label: "General Ledger",      href: "/billing/gl",        icon: FileText,   roles: FINANCE      },
+      { label: "Account Ledger",      href: "/billing/gl/ledger", icon: FileText,   roles: FINANCE      },
+      { label: "Self-Funded Schemes", href: "/fund/dashboard",    icon: Wallet,     roles: FUND_PORTAL  },
+      { label: "Brokers",             href: "/brokers",           icon: UserCheck,  roles: ADMIN_ONLY   },
+      { label: "Quotations",          href: "/quotations",        icon: Calculator, roles: UNDERWRITING },
     ],
   },
   {
     label: "Insights",
     items: [
       { label: "Strategic Purchasing", href: "/analytics", icon: BarChart3, roles: ANY_STAFF },
-      { label: "Reports", href: "/reports", icon: PieChart, roles: ANY_STAFF },
+      { label: "Reports",              href: "/reports",   icon: PieChart,  roles: ANY_STAFF },
     ],
   },
   {
@@ -77,17 +78,24 @@ const NAV_GROUPS: NavGroup[] = [
         label: "Fraud Alerts", href: "/fraud", icon: ShieldAlert, roles: OPS,
         children: [
           { label: "Claim Alerts",    href: "/fraud"           },
-          { label: "Check-In Audit", href: "/fraud/check-ins" },
+          { label: "Check-In Audit",  href: "/fraud/check-ins" },
         ],
       },
     ],
   },
   {
-    label: "Administration",
+    label: "Reinstatements",
     items: [
-      { label: "Settings", href: "/settings", icon: Settings, roles: ADMIN_ONLY },
+      { label: "Reinstatement Queue", href: "/members/reinstatement", icon: Users, roles: OPS },
     ],
   },
+];
+
+const SETUP_SUB: SubItem[] = [
+  { label: "Users & Access",   href: "/settings"                   },
+  { label: "Approval Matrix",  href: "/settings/approval-matrix"   },
+  { label: "Pricing Models",   href: "/settings/pricing-models"    },
+  { label: "Audit Log",        href: "/settings/audit-log"         },
 ];
 
 function SubItems({ items, pathname }: { items: SubItem[]; pathname: string }) {
@@ -153,7 +161,8 @@ function NavGroupSection({ group, pathname }: { group: NavGroup; pathname: strin
     <div>
       <button
         onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center justify-between px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest text-avenue-text-muted hover:text-avenue-text-heading transition-colors"
+        className="w-full flex items-center justify-between px-2 py-1.5 text-[10px] font-bold uppercase text-avenue-text-muted hover:text-avenue-text-heading transition-colors"
+        style={{ letterSpacing: 0 }}
       >
         {group.label}
         <span className="text-[10px]">{open ? "▾" : "▸"}</span>
@@ -170,15 +179,9 @@ function NavGroupSection({ group, pathname }: { group: NavGroup; pathname: strin
   );
 }
 
-const SETTINGS_SUB: SubItem[] = [
-  { label: "General",    href: "/settings"            },
-  { label: "Exceptions", href: "/settings/exceptions" },
-  { label: "Audit Log",  href: "/settings/audit-log"  },
-];
-
 export function AdminSidebar({ userRole }: { userRole: UserRole | null }) {
   const pathname = usePathname();
-  const settingsActive = pathname === "/settings" || pathname.startsWith("/settings/");
+  const setupActive = pathname === "/settings" || pathname.startsWith("/settings/");
 
   const visibleGroups = NAV_GROUPS
     .map(group => ({
@@ -189,7 +192,7 @@ export function AdminSidebar({ userRole }: { userRole: UserRole | null }) {
     }))
     .filter(group => group.items.length > 0);
 
-  const showSettings = !userRole || ADMIN_ONLY.includes(userRole);
+  const showSetup = !userRole || ADMIN_ONLY.includes(userRole);
 
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-60 border-r border-[#EEEEEE] bg-white">
@@ -197,9 +200,9 @@ export function AdminSidebar({ userRole }: { userRole: UserRole | null }) {
         {/* Logo */}
         <Link href="/dashboard" className="mb-5 flex items-center pl-1 space-x-2">
           <div className="h-8 w-8 bg-avenue-indigo rounded-full shrink-0" />
-          <span className="text-lg font-bold font-heading text-avenue-indigo tracking-tight leading-tight">
+          <span className="text-lg font-bold font-heading text-avenue-indigo leading-tight" style={{ letterSpacing: 0 }}>
             AiCare<br />
-            <span className="text-xs font-semibold text-avenue-text-muted font-body tracking-normal">Avenue Healthcare</span>
+            <span className="text-xs font-semibold text-avenue-text-muted font-body">Avenue Healthcare</span>
           </span>
         </Link>
 
@@ -213,23 +216,23 @@ export function AdminSidebar({ userRole }: { userRole: UserRole | null }) {
           ))}
         </nav>
 
-        {/* Bottom */}
+        {/* Bottom — superuser setup area */}
         <div className="pt-3 border-t border-[#EEEEEE] space-y-0.5">
-          {showSettings && (
+          {showSetup && (
             <>
               <Link
                 href="/settings"
                 className={`group flex items-center rounded-[8px] px-2 py-2 transition-colors ${
-                  settingsActive
+                  setupActive
                     ? "bg-avenue-indigo/10 text-avenue-indigo"
                     : "text-avenue-text-body hover:bg-avenue-bg-alt hover:text-avenue-indigo"
                 }`}
               >
-                <Settings className={`h-4 w-4 shrink-0 ${settingsActive ? "text-avenue-indigo" : "text-avenue-text-muted group-hover:text-avenue-indigo"}`} />
-                <span className="ml-2.5 text-sm font-semibold">Settings</span>
+                <Settings className={`h-4 w-4 shrink-0 ${setupActive ? "text-avenue-indigo" : "text-avenue-text-muted group-hover:text-avenue-indigo"}`} />
+                <span className="ml-2.5 text-sm font-semibold">Setup</span>
               </Link>
-              {settingsActive && (
-                <SubItems items={SETTINGS_SUB} pathname={pathname} />
+              {setupActive && (
+                <SubItems items={SETUP_SUB} pathname={pathname} />
               )}
             </>
           )}

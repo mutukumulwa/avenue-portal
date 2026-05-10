@@ -30,7 +30,7 @@ export function FundSidebar({ schemes, userRole }: Props) {
           <div className="h-8 w-8 bg-[#28A745] rounded-full flex items-center justify-center">
             <Wallet size={16} className="text-white" />
           </div>
-          <span className="text-xl font-bold font-heading text-[#28A745] tracking-tight">
+          <span className="text-xl font-bold font-heading text-[#28A745]">
             Fund Admin
           </span>
         </Link>

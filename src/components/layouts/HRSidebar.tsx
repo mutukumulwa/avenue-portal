@@ -74,7 +74,7 @@ function NavItemRow({ item, pathname }: { item: NavItem; pathname: string }) {
 function NavGroupSection({ group, pathname }: { group: NavGroup; pathname: string }) {
   return (
     <div className="mb-4">
-      <div className="px-2 py-1.5 text-[10px] font-bold uppercase tracking-widest text-avenue-text-muted">
+      <div className="px-2 py-1.5 text-[10px] font-bold uppercase text-avenue-text-muted">
         {group.label}
       </div>
       <ul className="space-y-0.5 mt-1">
@@ -95,9 +95,9 @@ export function HRSidebar({ groupName, userRole }: { groupName: string; userRole
         {/* Logo */}
         <Link href="/hr/dashboard" className="mb-4 flex items-center pl-1 space-x-2">
           <div className="h-8 w-8 bg-avenue-indigo rounded-full shrink-0" />
-          <span className="text-lg font-bold font-heading text-avenue-indigo tracking-tight leading-tight">
+          <span className="text-lg font-bold font-heading text-avenue-indigo leading-tight">
             AiCare<br />
-            <span className="text-xs font-semibold text-avenue-text-muted font-body tracking-normal">{groupName}</span>
+            <span className="text-xs font-semibold text-avenue-text-muted font-body">{groupName}</span>
           </span>
         </Link>
 

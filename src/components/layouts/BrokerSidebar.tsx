@@ -30,7 +30,7 @@ export function BrokerSidebar({ userRole }: { userRole: string }) {
       <div className="flex h-full flex-col overflow-y-auto px-3 py-4">
         <Link href="/broker/dashboard" className="mb-4 flex items-center pl-2.5 space-x-2">
           <div className="h-8 w-8 bg-avenue-indigo rounded-full" />
-          <span className="self-center whitespace-nowrap text-xl font-bold font-heading text-avenue-indigo tracking-tight">
+          <span className="self-center whitespace-nowrap text-xl font-bold font-heading text-avenue-indigo">
             AiCare | Broker
           </span>
         </Link>

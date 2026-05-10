@@ -62,6 +62,19 @@ h1, h2, h3, h4, h5, h6 {
   font-kerning: normal;
 }
 
-:where(.tracking-tight, .tracking-wide, .tracking-wider, .tracking-widest) {
+/* Windows ClearType: wide letter-spacing blurs sub-12px text — zero it everywhere */
+.tracking-tight,
+.tracking-normal,
+.tracking-wide,
+.tracking-wider,
+.tracking-widest,
+.uppercase,
+.lowercase,
+.capitalize {
   letter-spacing: 0 !important;
+}
+
+/* Ensure heading-font elements inherit font synthesis suppression */
+.font-heading {
+  font-synthesis: none;
 }
