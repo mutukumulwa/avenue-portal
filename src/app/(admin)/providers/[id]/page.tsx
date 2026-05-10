@@ -6,6 +6,7 @@ import { ArrowLeft, FileText, NotebookPen, Share2 } from "lucide-react";
 import { ProviderContractCard } from "./ProviderContractCard";
 import { ProviderTariffsCard } from "./ProviderTariffsCard";
 import { ProviderDiagnosisTariffsCard } from "./ProviderDiagnosisTariffsCard";
+import { ProviderPractitionersCard } from "./ProviderPractitionersCard";
 
 export default async function ProviderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requireRole(ROLES.ADMIN_ONLY);
@@ -16,6 +17,14 @@ export default async function ProviderDetailPage({ params }: { params: Promise<{
     include: {
       tariffs:         { orderBy: { effectiveFrom: "desc" } },
       diagnosisTariffs:{ orderBy: { effectiveFrom: "desc" } },
+      practitioners: {
+        include: {
+          practitioner: {
+            include: { credentials: { orderBy: { expiryDate: "desc" } } },
+          },
+        },
+        orderBy: { joinedAt: "desc" },
+      },
       claims: {
         orderBy: { createdAt: "desc" },
         take: 20,
@@ -234,6 +243,28 @@ export default async function ProviderDetailPage({ params }: { params: Promise<{
           </p>
         )}
       </div>
+
+      {/* Practitioners */}
+      <ProviderPractitionersCard
+        providerId={provider.id}
+        practitioners={provider.practitioners.map(link => ({
+          practitionerId: link.practitionerId,
+          isPrimary: link.isPrimary,
+          practitioner: {
+            id: link.practitioner.id,
+            firstName: link.practitioner.firstName,
+            lastName: link.practitioner.lastName,
+            licenseType: link.practitioner.licenseType,
+            licenseNumber: link.practitioner.licenseNumber,
+            credentials: link.practitioner.credentials.map(c => ({
+              id: c.id,
+              documentType: c.documentType,
+              expiryDate: c.expiryDate.toISOString(),
+              status: c.status,
+            })),
+          },
+        }))}
+      />
 
       {/* Recent Claims */}
       <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">

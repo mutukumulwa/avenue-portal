@@ -53,4 +53,59 @@ export const packagesRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       return PackagesService.createPackage(ctx.tenantId, input);
     }),
+
+  // Shared Limit Groups
+  getSharedLimits: protectedProcedure
+    .input(z.object({ packageVersionId: z.string() }))
+    .query(async ({ input, ctx }) => {
+      return ctx.prisma.sharedLimitGroup.findMany({
+        where: { packageVersionId: input.packageVersionId },
+        include: { benefitConfigs: { include: { benefitConfig: true } } },
+      });
+    }),
+
+  createSharedLimit: protectedProcedure
+    .input(
+      z.object({
+        packageVersionId: z.string(),
+        name: z.string().min(1),
+        limitAmount: z.number().min(0),
+        appliesTo: z.enum(["MEMBER", "FAMILY"]),
+        benefitConfigIds: z.array(z.string()),
+      })
+    )
+    .mutation(async ({ input, ctx }) => {
+      // Create the group
+      const group = await ctx.prisma.sharedLimitGroup.create({
+        data: {
+          packageVersionId: input.packageVersionId,
+          name: input.name,
+          limitAmount: input.limitAmount,
+          appliesTo: input.appliesTo,
+        },
+      });
+
+      // Link benefits
+      if (input.benefitConfigIds.length > 0) {
+        await ctx.prisma.benefitConfigSharedLimit.createMany({
+          data: input.benefitConfigIds.map((id) => ({
+            sharedLimitGroupId: group.id,
+            benefitConfigId: id,
+          })),
+        });
+      }
+
+      return group;
+    }),
+
+  deleteSharedLimit: protectedProcedure
+    .input(z.object({ id: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      await ctx.prisma.benefitConfigSharedLimit.deleteMany({
+        where: { sharedLimitGroupId: input.id },
+      });
+      return ctx.prisma.sharedLimitGroup.delete({
+        where: { id: input.id },
+      });
+    }),
 });

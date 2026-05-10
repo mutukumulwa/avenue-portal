@@ -1,9 +1,12 @@
 import { requireRole, ROLES } from "@/lib/rbac";
-import { redirect, notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import { PackagesService } from "@/server/services/packages.service";
+import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { updatePackageAction } from "./actions";
+import { SharedLimitsManager } from "./SharedLimitsManager";
+import { ProviderEligibilityManager } from "./ProviderEligibilityManager";
 
 const BENEFIT_CATEGORIES = [
   "INPATIENT","OUTPATIENT","MATERNITY","DENTAL","OPTICAL",
@@ -19,6 +22,23 @@ export default async function EditPackagePage({ params }: { params: Promise<{ id
   if (!pkg) notFound();
 
   const benefits = pkg.currentVersion?.benefits ?? [];
+
+  const versionId = pkg.currentVersion?.id ?? "";
+  const [sharedLimits, eligibilityRules, allProviders] = await Promise.all([
+    prisma.sharedLimitGroup.findMany({
+      where: { packageVersionId: versionId },
+      include: { benefitConfigs: { include: { benefitConfig: true } } },
+    }),
+    prisma.packageProviderEligibility.findMany({
+      where: { packageVersionId: versionId },
+      include: { provider: { select: { name: true } } },
+    }),
+    prisma.provider.findMany({
+      where: { tenantId: session.user.tenantId, contractStatus: "ACTIVE" },
+      select: { id: true, name: true, tier: true },
+      orderBy: { name: "asc" },
+    }),
+  ]);
 
   const inputCls = "w-full border border-[#EEEEEE] rounded-[8px] px-3 py-2 text-sm text-avenue-text-heading focus:ring-2 focus:ring-avenue-indigo outline-none bg-white";
   const labelCls = "block text-xs font-bold text-avenue-text-muted uppercase mb-1";
@@ -160,6 +180,45 @@ export default async function EditPackagePage({ params }: { params: Promise<{ id
             </table>
           </div>
         </div>
+
+        {pkg.currentVersion && (
+          <ProviderEligibilityManager
+            packageVersionId={pkg.currentVersion.id}
+            initialRules={eligibilityRules.map(r => ({
+              id: r.id,
+              inclusionType: r.inclusionType as "INCLUDE" | "EXCLUDE",
+              providerId: r.providerId,
+              providerTier: r.providerTier,
+              providerName: r.provider?.name ?? null,
+            }))}
+            availableProviders={allProviders.map(p => ({
+              id: p.id,
+              name: p.name,
+              tier: p.tier,
+            }))}
+          />
+        )}
+
+        {pkg.currentVersion && (
+          <SharedLimitsManager
+            packageVersionId={pkg.currentVersion.id}
+            availableBenefits={benefits.map(b => ({
+              id: b.id,
+              category: b.category,
+              customCategoryName: b.customCategoryName ?? null,
+            }))}
+            initialLimits={sharedLimits.map(sl => ({
+              id: sl.id,
+              name: sl.name,
+              limitAmount: Number(sl.limitAmount),
+              appliesTo: sl.appliesTo as "MEMBER" | "FAMILY",
+              benefitConfigs: sl.benefitConfigs.map(bc => ({
+                benefitConfigId: bc.benefitConfigId,
+                category: bc.benefitConfig.category,
+              })),
+            }))}
+          />
+        )}
 
         <div className="flex justify-end gap-3">
           <Link href={`/packages/${id}`}

@@ -60,6 +60,8 @@ model Tenant {
   memberHealthJournalEntries     MemberHealthJournalEntry[]
   memberHealthShares             MemberHealthShare[]
   visitVerifications             VisitVerification[]
+  practitioners                  Practitioner[]
+  reinstatementRequests          MembershipReinstatementRequest[]
 }
 
 // ─── USERS & AUTH ────────────────────────────────────────
@@ -111,7 +113,8 @@ model User {
   initiatedCheckInEvents      CheckInEvent[]               @relation("CheckInEventInitiatedBy")
   overrideCheckInEvents       CheckInEvent[]               @relation("CheckInEventOverrideBy")
   confirmedVisits             VisitVerification[]          @relation("VisitConfirmedBy")
-  webAuthnEnrollmentApprovals WebAuthnEnrollmentApproval[] @relation("WebAuthnEnrollmentApprovedBy")
+  webAuthnEnrollmentApprovals    WebAuthnEnrollmentApproval[]    @relation("WebAuthnEnrollmentApprovedBy")
+  reinstatementDecisions         MembershipReinstatementRequest[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -377,6 +380,7 @@ model Member {
   healthJournalEntries           MemberHealthJournalEntry[]
   healthShares                   MemberHealthShare[]
   visitVerifications             VisitVerification[]
+  reinstatementRequests          MembershipReinstatementRequest[]
 
   @@unique([tenantId, memberNumber])
   @@index([tenantId])
@@ -998,9 +1002,11 @@ model PackageVersion {
   pricingConfig   Json? // Structured pricing parameters
   createdAt       DateTime        @default(now())
 
-  currentForPackage Package? @relation("CurrentVersion")
-  groups            Group[]
-  members           Member[]
+  currentForPackage  Package? @relation("CurrentVersion")
+  groups             Group[]
+  members            Member[]
+  sharedLimitGroups  SharedLimitGroup[]
+  eligibilityRules   PackageProviderEligibility[]
 
   @@unique([packageId, versionNumber])
 }
@@ -1043,8 +1049,40 @@ model BenefitConfig {
   exclusions         String[]
 
   benefitUsages BenefitUsage[]
+  sharedLimitGroups BenefitConfigSharedLimit[]
 
   @@index([packageVersionId])
+}
+
+enum LimitScope {
+  MEMBER
+  FAMILY
+}
+
+model SharedLimitGroup {
+  id               String          @id @default(cuid())
+  packageVersionId String
+  packageVersion   PackageVersion  @relation(fields: [packageVersionId], references: [id])
+  name             String
+  limitAmount      Decimal         @db.Decimal(14, 2)
+  appliesTo        LimitScope      @default(FAMILY)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  benefitConfigs   BenefitConfigSharedLimit[]
+
+  @@index([packageVersionId])
+}
+
+model BenefitConfigSharedLimit {
+  benefitConfigId    String
+  benefitConfig      BenefitConfig    @relation(fields: [benefitConfigId], references: [id])
+  sharedLimitGroupId String
+  sharedLimitGroup   SharedLimitGroup @relation(fields: [sharedLimitGroupId], references: [id])
+  createdAt          DateTime         @default(now())
+
+  @@id([benefitConfigId, sharedLimitGroupId])
+  @@index([sharedLimitGroupId])
 }
 
 model BenefitUsage {
@@ -1453,9 +1491,17 @@ model Provider {
   checkInChallenges  CheckInChallenge[]
   checkInEvents      CheckInEvent[]
   visitVerifications VisitVerification[]
+  eligibilityRules   PackageProviderEligibility[]
+  practitioners      ProviderPractitioner[]
 
   @@index([tenantId])
   @@index([tenantId, tier])
+}
+
+enum TariffType {
+  NEGOTIATED
+  PUBLISHED
+  GAZETTED
 }
 
 model ProviderTariff {
@@ -1465,6 +1511,7 @@ model ProviderTariff {
   cptCode       String?
   serviceName   String
   agreedRate    Decimal // KES — overrides standard CPT charge for this provider
+  tariffType    TariffType @default(NEGOTIATED)
   effectiveFrom DateTime
   effectiveTo   DateTime?
   isActive      Boolean   @default(true) // Never delete — deactivate instead
@@ -1484,6 +1531,7 @@ model ProviderDiagnosisTariff {
   diagnosisLabel String // Human-readable label (copied at time of creation)
   bundledRate    Decimal? // Fixed package rate for the whole episode (KES)
   perDayRate     Decimal? // Per diem rate (KES/day) — for inpatient
+  tariffType     TariffType @default(NEGOTIATED)
   notes          String? // Any special conditions or inclusions
   effectiveFrom  DateTime
   effectiveTo    DateTime?
@@ -1492,6 +1540,111 @@ model ProviderDiagnosisTariff {
 
   @@index([providerId])
   @@index([providerId, icdCode])
+}
+
+// ─── PHASE B: PROVIDER & POLICY HARDENING ───────────────
+
+enum EligibilityRule {
+  INCLUDE
+  EXCLUDE
+}
+
+model PackageProviderEligibility {
+  id               String          @id @default(cuid())
+  packageVersionId String
+  packageVersion   PackageVersion  @relation(fields: [packageVersionId], references: [id])
+  providerId       String?
+  provider         Provider?       @relation(fields: [providerId], references: [id])
+  providerTier     ProviderTier?
+  inclusionType    EligibilityRule
+  createdAt        DateTime        @default(now())
+
+  @@index([packageVersionId])
+  @@index([providerId])
+}
+
+model Practitioner {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  firstName     String
+  lastName      String
+  licenseType   String
+  licenseNumber String
+  phone         String?
+  email         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  credentials PractitionerCredential[]
+  providers   ProviderPractitioner[]
+
+  @@unique([tenantId, licenseNumber])
+  @@index([tenantId])
+}
+
+enum PractitionerCredentialStatus {
+  ACTIVE
+  EXPIRED
+  SUSPENDED
+}
+
+model PractitionerCredential {
+  id             String                    @id @default(cuid())
+  practitionerId String
+  practitioner   Practitioner              @relation(fields: [practitionerId], references: [id])
+  documentType   String
+  documentUrl    String?
+  issueDate      DateTime?
+  expiryDate     DateTime
+  status         PractitionerCredentialStatus @default(ACTIVE)
+  notes          String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([practitionerId])
+  @@index([expiryDate])
+}
+
+model ProviderPractitioner {
+  providerId     String
+  provider       Provider     @relation(fields: [providerId], references: [id])
+  practitionerId String
+  practitioner   Practitioner @relation(fields: [practitionerId], references: [id])
+  isPrimary      Boolean      @default(false)
+  joinedAt       DateTime     @default(now())
+
+  @@id([providerId, practitionerId])
+  @@index([practitionerId])
+}
+
+enum ReinstatementStatus {
+  PENDING
+  APPROVED
+  DECLINED
+}
+
+model MembershipReinstatementRequest {
+  id                 String              @id @default(cuid())
+  tenantId           String
+  tenant             Tenant              @relation(fields: [tenantId], references: [id])
+  memberId           String
+  member             Member              @relation(fields: [memberId], references: [id])
+  lapsedDate         DateTime
+  requestDate        DateTime            @default(now())
+  status             ReinstatementStatus @default(PENDING)
+  catchUpAmount      Decimal             @db.Decimal(14, 2)
+  periodsCovered     Int
+  resetWaitingPeriod Boolean             @default(false)
+  approvedById       String?
+  approvedBy         User?               @relation(fields: [approvedById], references: [id])
+  declineReason      String?
+  decidedAt          DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([tenantId, status])
+  @@index([memberId])
 }
 
 // ─── BROKERS ─────────────────────────────────────────────
@@ -1945,6 +2098,24 @@ model PricingModel {
   updatedAt   DateTime @updatedAt
 
   quotations Quotation[]
+  rateTables ContributionRateTable[]
+}
+
+model ContributionRateTable {
+  id             String       @id @default(cuid())
+  pricingModelId String
+  pricingModel   PricingModel @relation(fields: [pricingModelId], references: [id], onDelete: Cascade)
+  minAge         Int
+  maxAge         Int
+  gender         String
+  familySize     String
+  location       String?
+  baseRate       Decimal      @db.Decimal(14, 2)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([pricingModelId])
+  @@index([pricingModelId, minAge, maxAge])
 }
 
 // ─── SUPPORTING ENTITIES ────────────────────────────────

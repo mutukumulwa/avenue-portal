@@ -120,3 +120,94 @@ export async function deleteDiagnosisTariffAction(formData: FormData) {
   await prisma.providerDiagnosisTariff.delete({ where: { id: tariffId } });
   revalidatePath(`/providers/${providerId}`);
 }
+
+// ── Practitioners ──────────────────────────────────────────────────────────
+
+export async function createPractitionerAndLinkAction(_prev: unknown, formData: FormData) {
+  const session = await requireRole(ROLES.ADMIN_ONLY);
+  const providerId    = formData.get("providerId")    as string;
+  const firstName     = (formData.get("firstName")    as string).trim();
+  const lastName      = (formData.get("lastName")     as string).trim();
+  const licenseType   = (formData.get("licenseType")  as string).trim();
+  const licenseNumber = (formData.get("licenseNumber") as string).trim();
+
+  const provider = await prisma.provider.findUnique({ where: { id: providerId, tenantId: session.user.tenantId } });
+  if (!provider) return { error: "Provider not found" };
+
+  const existing = await prisma.practitioner.findUnique({
+    where: { tenantId_licenseNumber: { tenantId: session.user.tenantId, licenseNumber } },
+  });
+  if (existing) return { error: `A practitioner with license number ${licenseNumber} already exists. Use "Link Existing" instead.` };
+
+  const practitioner = await prisma.practitioner.create({
+    data: { tenantId: session.user.tenantId, firstName, lastName, licenseType, licenseNumber },
+  });
+  await prisma.providerPractitioner.create({
+    data: { providerId, practitionerId: practitioner.id },
+  });
+
+  revalidatePath(`/providers/${providerId}`);
+  return { success: true };
+}
+
+export async function linkExistingPractitionerAction(_prev: unknown, formData: FormData) {
+  const session = await requireRole(ROLES.ADMIN_ONLY);
+  const providerId    = formData.get("providerId")    as string;
+  const licenseNumber = (formData.get("licenseNumber") as string).trim();
+
+  const provider = await prisma.provider.findUnique({ where: { id: providerId, tenantId: session.user.tenantId } });
+  if (!provider) return { error: "Provider not found" };
+
+  const practitioner = await prisma.practitioner.findUnique({
+    where: { tenantId_licenseNumber: { tenantId: session.user.tenantId, licenseNumber } },
+  });
+  if (!practitioner) return { error: `No practitioner found with license number ${licenseNumber}` };
+
+  const alreadyLinked = await prisma.providerPractitioner.findUnique({
+    where: { providerId_practitionerId: { providerId, practitionerId: practitioner.id } },
+  });
+  if (alreadyLinked) return { error: "This practitioner is already linked to this provider" };
+
+  await prisma.providerPractitioner.create({ data: { providerId, practitionerId: practitioner.id } });
+  revalidatePath(`/providers/${providerId}`);
+  return { success: true };
+}
+
+export async function unlinkPractitionerAction(providerId: string, practitionerId: string) {
+  await requireRole(ROLES.ADMIN_ONLY);
+  await prisma.providerPractitioner.delete({
+    where: { providerId_practitionerId: { providerId, practitionerId } },
+  });
+  revalidatePath(`/providers/${providerId}`);
+}
+
+export async function addCredentialAction(_prev: unknown, formData: FormData) {
+  const session = await requireRole(ROLES.ADMIN_ONLY);
+  const practitionerId = formData.get("practitionerId") as string;
+  const providerId     = formData.get("providerId")     as string;
+  const documentType   = (formData.get("documentType") as string).trim();
+  const expiryDate     = formData.get("expiryDate")     as string;
+  const notes          = (formData.get("notes") as string) || null;
+
+  if (!documentType || !expiryDate) return { error: "Document type and expiry date are required" };
+
+  // Verify practitioner belongs to tenant
+  const practitioner = await prisma.practitioner.findUnique({ where: { id: practitionerId, tenantId: session.user.tenantId } });
+  if (!practitioner) return { error: "Practitioner not found" };
+
+  const expiry = new Date(expiryDate);
+  const isExpired = expiry < new Date();
+
+  await prisma.practitionerCredential.create({
+    data: {
+      practitionerId,
+      documentType,
+      expiryDate: expiry,
+      status: isExpired ? "EXPIRED" : "ACTIVE",
+      notes,
+    },
+  });
+
+  revalidatePath(`/providers/${providerId}`);
+  return { success: true };
+}

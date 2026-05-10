@@ -14,6 +14,7 @@ import { settingsRouter } from "./routers/settings";
 import { coContributionRouter } from "./routers/coContribution";
 import { analyticsRouter } from "./routers/analytics";
 import { memberAppRouter } from "./routers/memberApp";
+import { pricingRouter } from "./routers/pricing";
 
 export const appRouter = createTRPCRouter({
   healthcheck: publicProcedure.query(() => {
@@ -34,6 +35,7 @@ export const appRouter = createTRPCRouter({
   memberApp: memberAppRouter,
   settings: settingsRouter,
   coContribution: coContributionRouter,
+  pricing: pricingRouter,
 });
 
 export type AppRouter = typeof appRouter;

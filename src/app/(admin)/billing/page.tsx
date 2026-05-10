@@ -4,6 +4,7 @@ import Link from "next/link";
 import { sendInvoiceAction, recordPaymentAction } from "./actions";
 import { requireRole, ROLES } from "@/lib/rbac";
 import { NewInvoiceModal } from "./NewInvoiceModal";
+import { DebitNoteButton } from "@/components/pdf/DebitNoteButton";
 
 export default async function BillingPage() {
   const session = await requireRole(ROLES.FINANCE);
@@ -144,6 +145,20 @@ export default async function BillingPage() {
                           </button>
                         </form>
                       )}
+                      <DebitNoteButton data={{
+                        invoiceNumber: inv.invoiceNumber,
+                        groupName: inv.group.name,
+                        period: inv.period,
+                        memberCount: inv.memberCount,
+                        ratePerMember: Number(inv.ratePerMember),
+                        totalAmount: Number(inv.totalAmount),
+                        stampDuty: Number(inv.stampDuty),
+                        trainingLevy: Number(inv.trainingLevy),
+                        phcf: Number(inv.phcf),
+                        taxTotal: Number(inv.taxTotal),
+                        dueDate: new Date(inv.dueDate).toLocaleDateString("en-KE"),
+                        issuedDate: new Date(inv.createdAt).toLocaleDateString("en-KE"),
+                      }} />
                       <Link href={`/billing/gl/ledger?account=1100`} className="text-avenue-indigo hover:text-avenue-secondary font-semibold inline-flex items-center gap-1 text-sm">
                         <ArrowRight size={14} />
                       </Link>

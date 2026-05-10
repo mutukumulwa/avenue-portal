@@ -76,9 +76,16 @@ export class ClaimsService {
         effectiveFrom: { lte: claim.dateOfService },
         OR: [{ effectiveTo: null }, { effectiveTo: { gte: claim.dateOfService } }],
       },
+      orderBy: { tariffType: "asc" }, // GAZETTED < NEGOTIATED < PUBLISHED lexically; use explicit priority below
     });
 
-    const tariffMap = new Map(tariffs.map(t => [t.cptCode!, Number(t.agreedRate)]));
+    // Priority: NEGOTIATED(0) > GAZETTED(1) > PUBLISHED(2)
+    const TARIFF_PRIORITY: Record<string, number> = { NEGOTIATED: 0, GAZETTED: 1, PUBLISHED: 2 };
+    tariffs.sort((a, b) => (TARIFF_PRIORITY[a.tariffType] ?? 9) - (TARIFF_PRIORITY[b.tariffType] ?? 9));
+    const tariffMap = new Map<string, number>();
+    for (const t of tariffs) {
+      if (!tariffMap.has(t.cptCode!)) tariffMap.set(t.cptCode!, Number(t.agreedRate));
+    }
 
     return claim.claimLines.map(l => {
       const agreedRate = l.cptCode ? (tariffMap.get(l.cptCode) ?? null) : null;
@@ -148,12 +155,49 @@ export class ClaimsService {
     // ── Provider gate ────────────────────────────────────────────────────────
     const provider = await prisma.provider.findUnique({
       where: { id: data.providerId },
-      select: { contractStatus: true, name: true },
+      select: { contractStatus: true, name: true, tier: true },
     });
     if (provider && ["EXPIRED", "SUSPENDED"].includes(provider.contractStatus)) {
       throw new Error(
         `Provider "${provider.name}" contract is ${provider.contractStatus}. Claims cannot be submitted against this provider.`
       );
+    }
+
+    // ── Package-level provider eligibility gate ──────────────────────────────
+    const memberPkg = await prisma.member.findUnique({
+      where: { id: data.memberId },
+      select: { packageVersionId: true },
+    });
+    if (memberPkg?.packageVersionId && provider) {
+      const rules = await prisma.packageProviderEligibility.findMany({
+        where: { packageVersionId: memberPkg.packageVersionId },
+      });
+      if (rules.length > 0) {
+        const includeRules = rules.filter(r => r.inclusionType === "INCLUDE");
+        const excludeRules = rules.filter(r => r.inclusionType === "EXCLUDE");
+
+        const matchesRule = (r: (typeof rules)[number]) =>
+          (r.providerId === data.providerId) ||
+          (r.providerTier !== null && r.providerTier === provider.tier);
+
+        const isExcluded = excludeRules.some(matchesRule);
+        if (isExcluded) {
+          throw new Error(
+            `Provider "${provider.name}" is explicitly excluded from this member's package. ` +
+            "Please direct the member to an eligible facility."
+          );
+        }
+
+        if (includeRules.length > 0) {
+          const isIncluded = includeRules.some(matchesRule);
+          if (!isIncluded) {
+            throw new Error(
+              `Provider "${provider.name}" is not in the list of eligible providers for this member's package. ` +
+              "Please direct the member to an eligible facility."
+            );
+          }
+        }
+      }
     }
 
     const count = await prisma.claim.count({ where: { tenantId } });
@@ -230,6 +274,31 @@ export class ClaimsService {
       throw new Error("Claim cannot be adjudicated in current status");
     }
 
+    // ── Practitioner credential gate ─────────────────────────────────────────
+    const fullClaim = await prisma.claim.findUnique({
+      where: { id: claimId },
+      select: { attendingDoctor: true },
+    });
+    if (fullClaim?.attendingDoctor) {
+      const practitioner = await prisma.practitioner.findFirst({
+        where: { tenantId, licenseNumber: fullClaim.attendingDoctor },
+        include: {
+          credentials: {
+            where: { status: "ACTIVE", expiryDate: { gte: new Date() } },
+            take: 1,
+          },
+        },
+      });
+      if (practitioner && practitioner.credentials.length === 0) {
+        if (decision.action !== "DECLINED") {
+          throw new Error(
+            `Practitioner license ${fullClaim.attendingDoctor} has no active credentials. ` +
+            "Renew the credential in the provider's practitioner registry before approving."
+          );
+        }
+      }
+    }
+
     const approvedAmount = decision.approvedAmount ?? 0;
     const copay = approvedAmount * 0.1; // Default 10% copay — will come from benefit config in 1.10
     const memberLiability = copay;
@@ -243,14 +312,23 @@ export class ClaimsService {
       });
       const cptCodes = lines.map(l => l.cptCode).filter(Boolean) as string[];
       if (cptCodes.length > 0) {
+        const claimMeta = (await tx.claim.findUnique({ where: { id: claimId }, select: { providerId: true, dateOfService: true } }))!;
         const tariffs = await tx.providerTariff.findMany({
           where: {
-            providerId: (await tx.claim.findUnique({ where: { id: claimId }, select: { providerId: true, dateOfService: true } }))!.providerId,
+            providerId: claimMeta.providerId,
             cptCode: { in: cptCodes },
+            effectiveFrom: { lte: claimMeta.dateOfService },
+            OR: [{ effectiveTo: null }, { effectiveTo: { gte: claimMeta.dateOfService } }],
           },
-          select: { cptCode: true, agreedRate: true },
+          select: { cptCode: true, agreedRate: true, tariffType: true },
         });
-        const tariffMap = new Map(tariffs.map(t => [t.cptCode!, Number(t.agreedRate)]));
+        // Priority: NEGOTIATED(0) > GAZETTED(1) > PUBLISHED(2)
+        const TARIFF_PRIORITY: Record<string, number> = { NEGOTIATED: 0, GAZETTED: 1, PUBLISHED: 2 };
+        tariffs.sort((a, b) => (TARIFF_PRIORITY[a.tariffType] ?? 9) - (TARIFF_PRIORITY[b.tariffType] ?? 9));
+        const tariffMap = new Map<string, number>();
+        for (const t of tariffs) {
+          if (!tariffMap.has(t.cptCode!)) tariffMap.set(t.cptCode!, Number(t.agreedRate));
+        }
         for (const line of lines) {
           const rate = line.cptCode ? tariffMap.get(line.cptCode) : undefined;
           if (rate !== undefined) {
@@ -429,6 +507,15 @@ export class ClaimsService {
 
     const config = await tx.benefitConfig.findFirst({
       where: { packageVersionId: member.packageVersionId, category: benefitCategory },
+      include: {
+        sharedLimitGroups: {
+          include: {
+            sharedLimitGroup: {
+              include: { benefitConfigs: true },
+            },
+          },
+        },
+      },
     });
     if (!config) return { configId: null, remaining: 0 };
 
@@ -447,6 +534,31 @@ export class ClaimsService {
     const limit = Number(config.annualSubLimit);
     const newUsed = currentUsed + amount;
 
+    // Evaluate shared limit groups
+    let sharedRemaining = Infinity;
+    if (config.sharedLimitGroups && config.sharedLimitGroups.length > 0) {
+      for (const link of config.sharedLimitGroups) {
+        const group = link.sharedLimitGroup;
+        const configIds = group.benefitConfigs.map(bc => bc.benefitConfigId);
+        
+        const groupUsages = await tx.benefitUsage.findMany({
+          where: {
+            memberId,
+            benefitConfigId: { in: configIds },
+            periodStart,
+          },
+        });
+        
+        const groupUsedSoFar = groupUsages.reduce((sum, u) => sum + Number(u.amountUsed), 0);
+        const groupLimit = Number(group.limitAmount);
+        const remainingForGroup = Math.max(0, groupLimit - (groupUsedSoFar + amount));
+        
+        if (remainingForGroup < sharedRemaining) {
+          sharedRemaining = remainingForGroup;
+        }
+      }
+    }
+
     if (existing) {
       await tx.benefitUsage.update({
         where: { id: existing.id },
@@ -458,7 +570,11 @@ export class ClaimsService {
       });
     }
 
-    return { configId: config.id, remaining: Math.max(0, limit - newUsed) };
+    const standardRemaining = Math.max(0, limit - newUsed);
+    return { 
+      configId: config.id, 
+      remaining: sharedRemaining !== Infinity ? Math.min(standardRemaining, sharedRemaining) : standardRemaining 
+    };
   }
 
   /**

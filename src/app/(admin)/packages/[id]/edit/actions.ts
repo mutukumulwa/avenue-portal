@@ -3,6 +3,7 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { redirect, notFound } from "next/navigation";
+import { revalidatePath } from "next/cache";
 
 const BENEFIT_CATEGORIES = [
   "INPATIENT","OUTPATIENT","MATERNITY","DENTAL","OPTICAL",
@@ -69,4 +70,67 @@ export async function updatePackageAction(formData: FormData) {
   });
 
   redirect(`/packages/${packageId}`);
+}
+
+export async function createSharedLimitAction(_prev: unknown, formData: FormData) {
+  const session = await requireRole(ROLES.UNDERWRITING);
+  void session;
+
+  const packageVersionId = formData.get("packageVersionId") as string;
+  const name = (formData.get("name") as string).trim();
+  const limitAmount = Number(formData.get("limitAmount"));
+  const appliesTo = formData.get("appliesTo") as "MEMBER" | "FAMILY";
+  const benefitConfigIds = formData.getAll("benefitConfigIds") as string[];
+
+  if (!name) return { error: "Name is required" };
+  if (limitAmount <= 0) return { error: "Limit must be greater than 0" };
+  if (benefitConfigIds.length < 2) return { error: "Select at least 2 benefits" };
+
+  const group = await prisma.sharedLimitGroup.create({
+    data: { packageVersionId, name, limitAmount, appliesTo },
+  });
+  await prisma.benefitConfigSharedLimit.createMany({
+    data: benefitConfigIds.map(id => ({ sharedLimitGroupId: group.id, benefitConfigId: id })),
+  });
+
+  revalidatePath(`/packages/${packageVersionId}/edit`);
+  return { success: true };
+}
+
+export async function deleteSharedLimitAction(id: string) {
+  await requireRole(ROLES.UNDERWRITING);
+  await prisma.benefitConfigSharedLimit.deleteMany({ where: { sharedLimitGroupId: id } });
+  await prisma.sharedLimitGroup.delete({ where: { id } });
+  revalidatePath("/packages");
+}
+
+// ── Provider Eligibility ───────────────────────────────────────────────────
+
+export async function createProviderEligibilityAction(_prev: unknown, formData: FormData) {
+  await requireRole(ROLES.UNDERWRITING);
+
+  const packageVersionId = formData.get("packageVersionId") as string;
+  const inclusionType = formData.get("inclusionType") as "INCLUDE" | "EXCLUDE";
+  const providerId = (formData.get("providerId") as string) || null;
+  const providerTier = (formData.get("providerTier") as string) || null;
+
+  if (!providerId && !providerTier) return { error: "Select a specific provider or a provider tier" };
+
+  await prisma.packageProviderEligibility.create({
+    data: {
+      packageVersionId,
+      inclusionType,
+      providerId: providerId || null,
+      providerTier: providerTier as never || null,
+    },
+  });
+
+  revalidatePath("/packages");
+  return { success: true };
+}
+
+export async function deleteProviderEligibilityAction(id: string) {
+  await requireRole(ROLES.UNDERWRITING);
+  await prisma.packageProviderEligibility.delete({ where: { id } });
+  revalidatePath("/packages");
 }

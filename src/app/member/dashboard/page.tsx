@@ -73,6 +73,20 @@ export default async function MemberDashboardPage() {
 
   return (
     <div className="space-y-5 font-ui">
+      {dashboard.member.status === "LAPSED" && (
+        <div className="rounded-[8px] border border-[#DC3545]/30 bg-[#DC3545]/10 p-4 flex items-center justify-between gap-4">
+          <div>
+            <p className="font-bold text-[#DC3545] text-sm">Your membership is lapsed</p>
+            <p className="text-sm text-avenue-text-body mt-0.5">Benefits are suspended. Request reinstatement to resume cover.</p>
+          </div>
+          <a
+            href="/member/reinstatement"
+            className="shrink-0 rounded-full bg-[#DC3545] px-4 py-2 text-xs font-bold text-white hover:bg-[#b02a37] transition-colors"
+          >
+            Request Reinstatement
+          </a>
+        </div>
+      )}
       <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="rounded-[8px] bg-avenue-indigo p-5 text-white shadow-sm">
           <div className="flex items-start justify-between gap-4">
