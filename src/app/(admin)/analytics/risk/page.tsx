@@ -8,10 +8,12 @@ import {
   ShieldAlert,
   TrendingUp,
   UserRound,
+  Users,
 } from "lucide-react";
 import { requireRole, ROLES, type UserRole } from "@/lib/rbac";
 import { getAnalyticsAccessScope } from "@/lib/analytics-access";
 import { AnalyticsService } from "@/server/services/analytics.service";
+import { bulkEnrolCareManagementAction } from "./actions";
 
 type SearchParams = {
   tier?: string;
@@ -368,6 +370,40 @@ export default async function MemberRiskWorkbenchPage({
           ))}
         </div>
       </div>
+
+      {/* ── Process 14: Bulk care management enrolment ─────── */}
+      {data.profiles.length > 0 && (
+        <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-4">
+          <h2 className="font-bold text-avenue-text-heading text-sm font-heading flex items-center gap-2">
+            <Users size={15} className="text-avenue-indigo" /> Bulk Enrol in Care Management
+          </h2>
+          <p className="text-xs text-avenue-text-muted">
+            Enrol all <strong>{data.profiles.length}</strong> member{data.profiles.length !== 1 ? "s" : ""} matching the current
+            filter into a care management programme. This records a health journal note on each member visible to
+            their clinical team.
+          </p>
+          <form action={bulkEnrolCareManagementAction} className="flex gap-3 items-center flex-wrap">
+            <input
+              type="hidden"
+              name="memberIds"
+              value={data.profiles.map((p) => p.memberId).join(",")}
+            />
+            <input
+              name="programName"
+              type="text"
+              required
+              placeholder="Programme name (e.g. Diabetes Care, Hypertension Management)"
+              className="flex-1 min-w-64 border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-avenue-indigo focus:outline-none"
+            />
+            <button
+              type="submit"
+              className="bg-avenue-indigo text-white px-5 py-2 rounded-full text-sm font-semibold hover:bg-avenue-secondary transition-colors flex items-center gap-2 whitespace-nowrap"
+            >
+              <Users size={14} /> Enrol {data.profiles.length} Member{data.profiles.length !== 1 ? "s" : ""}
+            </button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

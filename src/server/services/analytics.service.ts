@@ -1326,4 +1326,218 @@ export class AnalyticsService {
       },
     });
   }
+
+  // ── Process 14: Bulk-enrol members in care management ────────────────────
+
+  static async bulkEnrolCareManagement(
+    tenantId: string,
+    memberIds: string[],
+    programName: string,
+    enrolledById: string,
+  ) {
+    if (memberIds.length === 0) return { enrolled: 0 };
+
+    // Record the enrolment as a health journal entry on each member
+    const entries = await prisma.memberHealthJournalEntry.createMany({
+      data: memberIds.map((memberId) => ({
+        tenantId,
+        memberId,
+        authorUserId: enrolledById,
+        entryType:    "NOTE" as const,
+        noteText:     `Enrolled in care management programme: ${programName}`,
+        visibility:   "SHARED_WITH_DOCTOR" as const,
+        recordedAt:   new Date(),
+        tags:         ["care-management", programName.toLowerCase().replace(/\s+/g, "-")],
+      })),
+      skipDuplicates: false,
+    });
+
+    return { enrolled: entries.count };
+  }
+
+  // ── Process 14: Parity compliance dashboard ──────────────────────────────
+
+  static async getParityDashboard(tenantId: string) {
+    // Internal vs external provider cost comparison (per spec §14)
+    // "Internal" = Avenue's own facilities (ProviderTier.OWN)
+    // "External" = all others
+
+    const internalProviders = await prisma.provider.findMany({
+      where: { tenantId, tier: "OWN", contractStatus: "ACTIVE" },
+      select: { id: true, name: true, type: true },
+    });
+    const internalIds = internalProviders.map((p) => p.id);
+
+    const ytdStart = new Date(new Date().getFullYear(), 0, 1);
+
+    const [internalEncounters, externalEncounters] = await Promise.all([
+      prisma.analyticsEncounterFact.aggregate({
+        where: { tenantId, providerId: { in: internalIds }, encounterDate: { gte: ytdStart } },
+        _sum: { grossCost: true, benefitPaid: true },
+        _count: { id: true },
+        _avg: { grossCost: true },
+      }),
+      prisma.analyticsEncounterFact.aggregate({
+        where: { tenantId, providerId: { notIn: internalIds }, encounterDate: { gte: ytdStart } },
+        _sum: { grossCost: true, benefitPaid: true },
+        _count: { id: true },
+        _avg: { grossCost: true },
+      }),
+    ]);
+
+    // Per-provider breakdown for drill-down
+    const providerBreakdown = await prisma.analyticsEncounterFact.groupBy({
+      by: ["providerId"],
+      where: { tenantId, encounterDate: { gte: ytdStart } },
+      _sum: { grossCost: true, benefitPaid: true },
+      _count: { id: true },
+      _avg: { grossCost: true },
+      orderBy: { _sum: { grossCost: "desc" } },
+      take: 20,
+    });
+
+    const providerIds = providerBreakdown.map((p) => p.providerId).filter(Boolean) as string[];
+    const providers = await prisma.provider.findMany({
+      where: { id: { in: providerIds } },
+      select: { id: true, name: true, type: true, tier: true },
+    });
+    const providerMap = new Map(providers.map((p) => [p.id, p]));
+
+    return {
+      internal: {
+        encounterCount:   internalEncounters._count.id,
+        totalCost:        toNumber(internalEncounters._sum.grossCost),
+        benefitPaid:      toNumber(internalEncounters._sum.benefitPaid),
+        avgCostPerVisit:  toNumber(internalEncounters._avg.grossCost),
+      },
+      external: {
+        encounterCount:   externalEncounters._count.id,
+        totalCost:        toNumber(externalEncounters._sum.grossCost),
+        benefitPaid:      toNumber(externalEncounters._sum.benefitPaid),
+        avgCostPerVisit:  toNumber(externalEncounters._avg.grossCost),
+      },
+      breakdown: providerBreakdown.map((p) => ({
+        providerId:      p.providerId,
+        providerName:    providerMap.get(p.providerId ?? "")?.name ?? "Unknown",
+        tier:            providerMap.get(p.providerId ?? "")?.tier ?? "PANEL",
+        encounterCount:  p._count.id,
+        totalCost:       toNumber(p._sum.grossCost),
+        avgCostPerVisit: toNumber(p._avg.grossCost),
+      })),
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  // ── Process 14: Monthly board pack data ──────────────────────────────────
+
+  static async getBoardPackData(tenantId: string, month: number, year: number) {
+    const startDate = new Date(year, month - 1, 1);
+    const endDate   = new Date(year, month, 0, 23, 59, 59);
+    const prevStart = new Date(year, month - 2, 1);
+    const prevEnd   = new Date(year, month - 1, 0, 23, 59, 59);
+
+    const [
+      portfolio,
+      schemeGrid,
+      topIcdCodes,
+      providerScores,
+      overrideCount,
+      fraudAlertCount,
+      newMemberCount,
+      lapsedCount,
+    ] = await Promise.all([
+      // Current month portfolio summary
+      prisma.analyticsMlrSnapshot.findFirst({
+        where: { tenantId, grain: "PORTFOLIO" },
+        orderBy: { periodStart: "desc" },
+      }),
+      // Top 10 schemes by MLR
+      prisma.analyticsMlrSnapshot.findMany({
+        where: { tenantId, grain: "GROUP", periodStart: { gte: startDate, lte: endDate } },
+        orderBy: { mlr: "desc" },
+        take: 10,
+        select: { groupId: true, mlr: true, grossContribution: true },
+      }),
+      // Top ICD-10 drivers this month
+      prisma.analyticsEncounterFact.groupBy({
+        by: ["icdCode"],
+        where: { tenantId, encounterDate: { gte: startDate, lte: endDate } },
+        _sum: { grossCost: true },
+        _count: { _all: true },
+        orderBy: { _sum: { grossCost: "desc" } },
+        take: 10,
+      }),
+      // Provider performance
+      prisma.providerScorecard.findMany({
+        where: { tenantId },
+        orderBy: { claimCount: "desc" },
+        take: 10,
+        select: {
+          providerName: true, providerType: true,
+          claimCount: true, averageCost: true, rejectionRate: true,
+        },
+      }),
+      // Override volume
+      prisma.overrideRecord.count({
+        where: { tenantId, createdAt: { gte: startDate, lte: endDate } },
+      }),
+      // Fraud alerts
+      prisma.claimFraudAlert.count({
+        where: {
+          tenantId,
+          createdAt: { gte: startDate, lte: endDate },
+        },
+      }),
+      // New members
+      prisma.member.count({
+        where: { tenantId, enrollmentDate: { gte: startDate, lte: endDate } },
+      }),
+      // Lapsed members
+      prisma.membershipLapseRecord.count({
+        where: { tenantId, lapseDate: { gte: startDate, lte: endDate } },
+      }),
+    ]);
+
+    return {
+      period: `${year}-${String(month).padStart(2, "0")}`,
+      portfolio: {
+        mlr:              portfolio ? toNumber(portfolio.mlr) : 0,
+        trailing12Mlr:    portfolio ? toNumber(portfolio.trailing12Mlr) : 0,
+        contributionYtd:  portfolio ? toNumber(portfolio.grossContribution) : 0,
+      },
+      schemeGrid: await Promise.all(schemeGrid.map(async (s) => {
+        const group = s.groupId ? await prisma.group.findUnique({
+          where: { id: s.groupId },
+          select: { name: true, _count: { select: { members: { where: { status: "ACTIVE" } } } } },
+        }) : null;
+        return {
+          groupName:     group?.name ?? s.groupId ?? "Unknown",
+          activeMembers: group?._count.members ?? 0,
+          mlr:           toNumber(s.mlr),
+          contribution:  toNumber(s.grossContribution),
+        };
+      })),
+      topIcdCodes: topIcdCodes.map((c) => ({
+        icdCode:    c.icdCode ?? "Unknown",
+        cost:       toNumber(c._sum?.grossCost),
+        encounters: c._count._all,
+      })),
+      providerScores: providerScores.map((p) => ({
+        providerName:  p.providerName,
+        providerType:  String(p.providerType ?? ""),
+        encounterCount: p.claimCount,
+        avgCost:       toNumber(p.averageCost),
+        approvalRate:  1 - toNumber(p.rejectionRate),
+      })),
+      compliance: {
+        overrideCount,
+        fraudAlertCount,
+      },
+      membership: {
+        newMemberCount,
+        lapsedCount,
+      },
+      generatedAt: new Date().toISOString(),
+    };
+  }
 }

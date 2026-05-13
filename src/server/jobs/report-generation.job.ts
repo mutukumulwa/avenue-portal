@@ -8,6 +8,9 @@
 
 import { prisma } from "@/lib/prisma";
 import { overrideService } from "../services/override.service";
+import { AnalyticsService } from "../services/analytics.service";
+import { pdfService } from "../services/pdf.service";
+import { renderBoardPackHtml } from "../templates/pdf/board-pack.template";
 
 export async function runReportGenerationJob() {
   const now = new Date();
@@ -96,6 +99,37 @@ export async function runReportGenerationJob() {
           },
         });
         console.info(`  Override monthly report generated for ${monthlyReport.period} (${monthlyReport.totalRequested} records)`);
+
+        // ── Process 14: Monthly board pack PDF ───────────────
+        try {
+          const tenantRecord = await prisma.tenant.findUnique({
+            where: { id: tenant.id },
+            select: { name: true },
+          });
+          const packData = await AnalyticsService.getBoardPackData(tenant.id, prevMonth, prevYear);
+          const html     = renderBoardPackHtml({ ...packData, tenantName: tenantRecord?.name ?? tenant.name });
+          const pdf      = await pdfService.renderToPdf(html, { format: "A4" });
+
+          // Log to ActivityLog so it appears in the board-pack page history
+          await prisma.activityLog.create({
+            data: {
+              entityType:  "SYSTEM",
+              entityId:    tenant.id,
+              action:      "BOARD_PACK_GENERATED",
+              description: `Monthly board pack auto-generated for ${packData.period} (${packData.schemeGrid.length} schemes)`,
+              metadata:    {
+                period:       packData.period,
+                schemeCount:  packData.schemeGrid.length,
+                generatedAt:  packData.generatedAt,
+                sizeBytes:    pdf.length,
+              } as never,
+            },
+          });
+          console.info(`  Board pack PDF generated for ${packData.period} (${(pdf.length / 1024).toFixed(0)} KB)`);
+        } catch (boardPackErr) {
+          // Board pack failure is non-critical — log and continue
+          console.error(`  Board pack generation failed for ${tenant.name}:`, boardPackErr);
+        }
       }
     }
 

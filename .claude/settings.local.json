@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(rm -f tsconfig.tsbuildinfo)",
+      "Bash(npx tsc *)"
+    ]
+  }
+}
