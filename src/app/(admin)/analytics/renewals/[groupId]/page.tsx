@@ -1,9 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AlertTriangle, ArrowLeft, BarChart3, Calculator, FileText, RefreshCw, Stethoscope, Users } from "lucide-react";
+import { AlertTriangle, ArrowLeft, BarChart3, Calculator, FileText, RefreshCw, Stethoscope, Users, Cpu, CheckCircle2, Send } from "lucide-react";
 import { requireRole, ROLES } from "@/lib/rbac";
 import { getAnalyticsAccessScope } from "@/lib/analytics-access";
 import { AnalyticsService } from "@/server/services/analytics.service";
+import { renewalService } from "@/server/services/renewal.service";
+import { prisma } from "@/lib/prisma";
+import {
+  computeIntelligenceAction, saveScenarioAction,
+  commitScenarioAction, dispatchNoticeAction,
+} from "./renewal-actions";
 
 type SearchParams = {
   targetMlr?: string;
@@ -241,6 +247,20 @@ export default async function RenewalWorkspacePage({
 
   if (!workspace) notFound();
 
+  // Process 11: spec algorithm recommendation + saved scenarios + group renewal status
+  const [enrichedAnalysis, savedScenarios, groupStatus] = await Promise.all([
+    prisma.renewalAnalysis.findFirst({
+      where: { tenantId: scope.tenantId, groupId },
+      orderBy: { renewalDate: "asc" },
+      select: { id: true, recommendationBasis: true, requiresActuarialReview: true, isLossLeader: true },
+    }),
+    renewalService.getScenariosForAnalysis(workspace.analysis.id, scope.tenantId),
+    prisma.group.findUnique({
+      where: { id: groupId },
+      select: { renewalStatus: true, renewalNoticeDispatchedAt: true, priorPeriodReconciled: true },
+    }),
+  ]);
+
   const daysToRenewal = daysUntil(workspace.analysis.renewalDate);
   const recommendationTone = workspace.analysis.recommendedAdjustmentPct > 0.15 ? "text-[#DC3545]" : workspace.analysis.recommendedAdjustmentPct > 0 ? "text-[#856404]" : "text-[#28A745]";
 
@@ -318,6 +338,155 @@ export default async function RenewalWorkspacePage({
       </div>
 
       <DriverPanel workspace={workspace} />
+
+      {/* ── Process 11: Spec algorithm recommendation ──────── */}
+      <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="font-bold text-avenue-text-heading text-sm font-heading flex items-center gap-2">
+            <Cpu size={15} className="text-avenue-indigo" /> Renewal Intelligence — Spec Algorithm
+          </h2>
+          <form action={computeIntelligenceAction}>
+            <input type="hidden" name="groupId" value={groupId} />
+            <button type="submit"
+              className="text-xs font-semibold text-avenue-indigo border border-avenue-indigo/30 px-3 py-1 rounded-full hover:bg-avenue-indigo/5 transition-colors flex items-center gap-1">
+              <RefreshCw size={11} /> Recompute
+            </button>
+          </form>
+        </div>
+
+        {enrichedAnalysis?.recommendationBasis ? (
+          <div className="space-y-3">
+            <div className={`rounded-[8px] p-4 border ${enrichedAnalysis.requiresActuarialReview ? "bg-[#DC3545]/10 border-[#DC3545]/30" : "bg-[#F8F9FF] border-avenue-indigo/20"}`}>
+              <p className={`text-sm font-semibold mb-1 ${enrichedAnalysis.requiresActuarialReview ? "text-[#DC3545]" : "text-avenue-indigo"}`}>
+                {enrichedAnalysis.requiresActuarialReview
+                  ? "⚠ Actuarial review required — MLR > target × 1.20"
+                  : "Recommendation"}
+              </p>
+              <p className="text-sm text-avenue-text-body">{enrichedAnalysis.recommendationBasis}</p>
+            </div>
+            {enrichedAnalysis.isLossLeader && (
+              <div className="bg-[#FFC107]/10 border border-[#FFC107]/30 rounded-[6px] p-3 text-xs text-[#856404]">
+                <strong>Loss leader</strong> — scheme is being priced below technical rate for strategic reasons.
+                Senior Assessor sign-off with documented justification required before renewal.
+              </div>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-avenue-text-muted">
+            Click <strong>Recompute</strong> to run the spec §11 algorithm and generate a recommendation.
+          </p>
+        )}
+      </div>
+
+      {/* ── Process 11: Scenario save / commit ─────────────── */}
+      <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-4">
+        <h2 className="font-bold text-avenue-text-heading text-sm font-heading flex items-center gap-2">
+          <Calculator size={15} className="text-avenue-indigo" /> Save Scenario
+        </h2>
+        <p className="text-xs text-avenue-text-muted">
+          Save the current simulator parameters as a named scenario for comparison.
+          Scenarios do not modify the scheme — only a committed scenario feeds into the renewal quotation.
+        </p>
+
+        {enrichedAnalysis && (
+          <form action={saveScenarioAction} className="flex flex-wrap gap-3 items-end">
+            <input type="hidden" name="groupId" value={groupId} />
+            <input type="hidden" name="renewalAnalysisId" value={enrichedAnalysis.id} />
+            <div>
+              <label className="block text-xs font-semibold text-avenue-text-muted mb-1">Scenario name</label>
+              <input name="scenarioName" type="text" placeholder={`Scenario ${new Date().toLocaleDateString("en-KE")}`}
+                className="border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-avenue-indigo focus:outline-none w-52" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-avenue-text-muted mb-1">Rate adjustment (%)</label>
+              <input name="proposedRateAdj" type="number" step={0.5} placeholder="e.g. 5 for +5%"
+                className="border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-avenue-indigo focus:outline-none w-36" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-avenue-text-muted mb-1">Co-contrib adj (%)</label>
+              <input name="proposedCoContribAdj" type="number" step={0.5} placeholder="optional"
+                className="border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-avenue-indigo focus:outline-none w-32" />
+            </div>
+            <button type="submit"
+              className="bg-avenue-indigo text-white px-5 py-2 rounded-full text-sm font-semibold hover:bg-avenue-secondary transition-colors">
+              Save Scenario
+            </button>
+          </form>
+        )}
+
+        {/* Saved scenarios list */}
+        {savedScenarios.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-xs font-bold uppercase text-avenue-text-muted tracking-wide">Saved Scenarios</p>
+            {savedScenarios.map((s) => (
+              <div key={s.id} className={`flex items-center justify-between border rounded-[6px] px-4 py-2.5 ${s.isCommitted ? "border-[#28A745]/30 bg-[#28A745]/5" : "border-[#EEEEEE]"}`}>
+                <div>
+                  <p className="text-sm font-semibold text-avenue-text-heading">{s.scenarioName}</p>
+                  <p className="text-xs text-avenue-text-muted mt-0.5">
+                    Rate adj: {(Number(s.proposedRateAdj) * 100).toFixed(1)}% ·
+                    Projected MLR: {(Number(s.projectedMlr) * 100).toFixed(1)}% ·
+                    Contribution: KES {Number(s.projectedContribution).toLocaleString("en-KE")}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {s.isCommitted ? (
+                    <span className="text-[10px] font-bold text-[#28A745] flex items-center gap-1">
+                      <CheckCircle2 size={11} /> Committed
+                    </span>
+                  ) : (
+                    <form action={commitScenarioAction}>
+                      <input type="hidden" name="groupId" value={groupId} />
+                      <input type="hidden" name="scenarioId" value={s.id} />
+                      <button type="submit"
+                        className="text-xs font-semibold text-avenue-indigo border border-avenue-indigo/30 px-3 py-1 rounded-full hover:bg-avenue-indigo/5 transition-colors">
+                        Commit
+                      </button>
+                    </form>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Process 11: Pipeline status & notice dispatch ───── */}
+      <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-4">
+        <h2 className="font-bold text-avenue-text-heading text-sm font-heading flex items-center gap-2">
+          <Send size={15} className="text-avenue-indigo" /> Pipeline Status
+        </h2>
+        <div className="grid grid-cols-3 gap-4 text-sm">
+          <div>
+            <p className="text-xs text-avenue-text-muted">Renewal status</p>
+            <p className="font-semibold text-avenue-text-heading mt-0.5">
+              {groupStatus?.renewalStatus?.replace(/_/g," ") ?? "Not started"}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-avenue-text-muted">Notice dispatched</p>
+            <p className="font-semibold text-avenue-text-heading mt-0.5">
+              {groupStatus?.renewalNoticeDispatchedAt
+                ? new Date(groupStatus.renewalNoticeDispatchedAt).toLocaleDateString("en-KE")
+                : "Not yet"}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-avenue-text-muted">Prior period reconciled</p>
+            <p className={`font-semibold mt-0.5 ${groupStatus?.priorPeriodReconciled ? "text-[#28A745]" : "text-[#856404]"}`}>
+              {groupStatus?.priorPeriodReconciled ? "Yes" : "No — required before binding"}
+            </p>
+          </div>
+        </div>
+        {!groupStatus?.renewalNoticeDispatchedAt && (
+          <form action={dispatchNoticeAction}>
+            <input type="hidden" name="groupId" value={groupId} />
+            <button type="submit"
+              className="border border-avenue-indigo text-avenue-indigo px-4 py-2 rounded-full text-sm font-semibold hover:bg-avenue-indigo hover:text-white transition-colors flex items-center gap-2">
+              <Send size={13} /> Dispatch Renewal Notice
+            </button>
+          </form>
+        )}
+      </div>
     </div>
   );
 }

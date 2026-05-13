@@ -1,11 +1,19 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
-import { ArrowRight, Calculator, FileText } from "lucide-react";
+import { ArrowRight, Calculator, FileText, Plus } from "lucide-react";
 import Link from "next/link";
 import { SearchFilterBar } from "@/components/ui/SearchFilterBar";
 import { Suspense } from "react";
 
 const STATUS_OPTIONS = [
+  // Assessment stages
+  { value: "PENDING_VALIDATION",          label: "Pending Validation"      },
+  { value: "PENDING_ASSESSMENT",          label: "Pending Assessment"      },
+  { value: "ASSESSED",                    label: "Assessed"                },
+  { value: "ASSESSED_PENDING_SENIOR_APPROVAL", label: "Awaiting Senior"   },
+  { value: "DECLINED_BY_UNDERWRITING",    label: "Declined (UW)"          },
+  { value: "WITHDRAWN_BY_SUBMITTER",      label: "Withdrawn"               },
+  // Pricing stages
   { value: "DRAFT",    label: "Draft"    },
   { value: "SENT",     label: "Sent"     },
   { value: "REVISED",  label: "Revised"  },
@@ -15,12 +23,29 @@ const STATUS_OPTIONS = [
 ];
 
 const STATUS_STYLE: Record<string, string> = {
+  PENDING_VALIDATION:               "bg-[#FFC107]/10 text-[#856404]",
+  PENDING_ASSESSMENT:               "bg-[#17A2B8]/10 text-[#17A2B8]",
+  ASSESSED:                         "bg-[#292A83]/10 text-[#292A83]",
+  ASSESSED_PENDING_SENIOR_APPROVAL: "bg-[#FD7E14]/10 text-[#C4500A]",
+  DECLINED_BY_UNDERWRITING:         "bg-[#DC3545]/10 text-[#DC3545]",
+  WITHDRAWN_BY_SUBMITTER:           "bg-[#6C757D]/10 text-[#6C757D]",
   DRAFT:    "bg-[#6C757D]/10 text-[#6C757D]",
   SENT:     "bg-[#17A2B8]/10 text-[#17A2B8]",
   REVISED:  "bg-[#292A83]/10 text-[#292A83]",
   ACCEPTED: "bg-[#28A745]/10 text-[#28A745]",
   DECLINED: "bg-[#DC3545]/10 text-[#DC3545]",
   EXPIRED:  "bg-[#FFC107]/10 text-[#856404]",
+};
+
+const STATUS_LABEL: Record<string, string> = {
+  PENDING_VALIDATION:               "Pending Validation",
+  PENDING_ASSESSMENT:               "Pending Assessment",
+  ASSESSED:                         "Assessed",
+  ASSESSED_PENDING_SENIOR_APPROVAL: "Awaiting Senior",
+  DECLINED_BY_UNDERWRITING:         "Declined (UW)",
+  WITHDRAWN_BY_SUBMITTER:           "Withdrawn",
+  DRAFT: "Draft", SENT: "Sent", REVISED: "Revised",
+  ACCEPTED: "Accepted", DECLINED: "Declined", EXPIRED: "Expired",
 };
 
 export default async function QuotationsPage({
@@ -76,13 +101,22 @@ export default async function QuotationsPage({
           <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Quotations</h1>
           <p className="text-avenue-text-muted mt-1 text-sm">Track and manage all quotations and the premium calculator.</p>
         </div>
-        <Link
-          href="/quotations/calculator"
-          className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors flex items-center gap-2 shadow-sm"
-        >
-          <Calculator size={18} />
-          New Quotation
-        </Link>
+        <div className="flex items-center gap-3">
+          <Link
+            href="/quotations/new"
+            className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-5 py-2 rounded-full font-semibold transition-colors flex items-center gap-2 shadow-sm text-sm"
+          >
+            <Plus size={16} />
+            New Intake
+          </Link>
+          <Link
+            href="/quotations/calculator"
+            className="border border-avenue-indigo text-avenue-indigo hover:bg-avenue-indigo hover:text-white px-5 py-2 rounded-full font-semibold transition-colors flex items-center gap-2 text-sm"
+          >
+            <Calculator size={16} />
+            Quick Quote
+          </Link>
+        </div>
       </div>
 
       {/* Summary stats */}
@@ -137,17 +171,24 @@ export default async function QuotationsPage({
                   <td className="px-6 py-4 text-avenue-text-body">{q.broker?.name ?? "Direct"}</td>
                   <td className="px-6 py-4 font-semibold text-avenue-text-heading">{q.memberCount + q.dependentCount}</td>
                   <td className="px-6 py-4 font-semibold text-avenue-indigo">{Number(q.finalPremium).toLocaleString("en-KE")}</td>
-                  <td className="px-6 py-4 text-avenue-text-body">{new Date(q.validUntil).toLocaleDateString("en-KE")}</td>
+                  <td className="px-6 py-4 text-avenue-text-body">{q.validUntil ? new Date(q.validUntil).toLocaleDateString("en-KE") : "—"}</td>
                   <td className="px-6 py-4">
                     <span className={`px-3 py-1 text-[10px] font-bold uppercase rounded-full ${STATUS_STYLE[q.status] ?? STATUS_STYLE.DRAFT}`}>
-                      {q.status}
+                      {STATUS_LABEL[q.status] ?? q.status}
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <Link href={`/quotations/${q.id}`}
-                      className="text-avenue-indigo hover:text-avenue-secondary font-semibold text-xs inline-flex items-center gap-1 transition-colors">
-                      View <ArrowRight size={13} />
-                    </Link>
+                    {["PENDING_ASSESSMENT","ASSESSED_PENDING_SENIOR_APPROVAL"].includes(q.status) ? (
+                      <Link href={`/quotations/${q.id}/assess`}
+                        className="text-[#FD7E14] hover:text-[#C4500A] font-semibold text-xs inline-flex items-center gap-1 transition-colors">
+                        Assess <ArrowRight size={13} />
+                      </Link>
+                    ) : (
+                      <Link href={`/quotations/${q.id}`}
+                        className="text-avenue-indigo hover:text-avenue-secondary font-semibold text-xs inline-flex items-center gap-1 transition-colors">
+                        View <ArrowRight size={13} />
+                      </Link>
+                    )}
                   </td>
                 </tr>
               ))}

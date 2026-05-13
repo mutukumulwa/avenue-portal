@@ -61,7 +61,7 @@ export async function acceptQuotationAction(formData: FormData) {
         contactPersonPhone: "",
         contactPersonEmail: q.prospectEmail ?? "",
         packageId: q.packageId,
-        contributionRate: q.ratePerMember,
+        contributionRate: q.ratePerMember ?? 0,
         effectiveDate,
         renewalDate,
         status: "PENDING",

@@ -1,5 +1,5 @@
 import { Worker, Job } from "bullmq";
-import { connection, scheduleEscalationJob, scheduleDailyJobs, scheduleCommissionReconciliationJob, scheduleAnalyticsRefreshJob } from "../../lib/queue";
+import { connection, scheduleEscalationJob, scheduleDailyJobs, scheduleCommissionReconciliationJob, scheduleAnalyticsRefreshJob, scheduleIntakeJobs, scheduleQuotationExpiryJob, scheduleMembershipActivationJob, scheduleLapseDetectionJob, scheduleReportGenerationJob } from "../../lib/queue";
 import { NotificationService } from "../services/notification.service";
 import { runPreauthEscalationJob } from "./preauth-escalation.job";
 import { runRenewalReminderJob }    from "./renewal-reminder.job";
@@ -7,6 +7,11 @@ import { runSuspensionCheckJob }    from "./suspension-check.job";
 import { runFundBalanceAlertJob }   from "./fund-balance-alert.job";
 import { runCommissionReconciliationJob } from "./commission-reconciliation.job";
 import { runAnalyticsRefreshJob } from "./analytics-refresh.job";
+import { runIntakeAllocationJob } from "./intake-allocation.job";
+import { runMembershipActivationJob } from "./membership-activation.job";
+import { runSlaBreachJob } from "./sla-breach.job";
+import { runQuotationExpiryJob } from "./quotation-expiry.job";
+import { runLapseDetectionJob } from "./lapse-detection.job";
 
 console.log("Starting background workers...");
 
@@ -15,6 +20,11 @@ scheduleEscalationJob().catch(err => console.error("[Worker] Failed to schedule 
 scheduleDailyJobs().catch(err => console.error("[Worker] Failed to schedule daily jobs:", err));
 scheduleCommissionReconciliationJob().catch(err => console.error("[Worker] Failed to schedule commission reconciliation job:", err));
 scheduleAnalyticsRefreshJob().catch(err => console.error("[Worker] Failed to schedule analytics refresh job:", err));
+scheduleIntakeJobs().catch(err => console.error("[Worker] Failed to schedule intake jobs:", err));
+scheduleQuotationExpiryJob().catch(err => console.error("[Worker] Failed to schedule quotation expiry job:", err));
+scheduleMembershipActivationJob().catch(err => console.error("[Worker] Failed to schedule membership activation job:", err));
+scheduleLapseDetectionJob().catch(err => console.error("[Worker] Failed to schedule lapse detection job:", err));
+scheduleReportGenerationJob().catch(err => console.error("[Worker] Failed to schedule report generation job:", err));
 
 /**
  * NOTIFICATIONS WORKER
@@ -53,7 +63,7 @@ billingWorker.on('failed', (job: Job | undefined, err: Error) => {
 
 /**
  * SYSTEM WORKER
- * Daily jobs: renewal reminders + suspension checks
+ * Daily jobs: renewal reminders, suspension checks, intake allocation, SLA breach.
  */
 const systemWorker = new Worker("system", async (job: Job) => {
   if (job.name === "renewal-reminders") {
@@ -67,6 +77,31 @@ const systemWorker = new Worker("system", async (job: Job) => {
   if (job.name === "fund-balance-alert") {
     console.log("[Worker] Running fund balance alerts...");
     await runFundBalanceAlertJob();
+  }
+  if (job.name === "intake-allocation") {
+    const result = await runIntakeAllocationJob();
+    console.log(`[Worker] Intake allocation complete — ${result.totalAllocated} quotation(s) allocated`);
+  }
+  if (job.name === "sla-breach-check") {
+    const result = await runSlaBreachJob();
+    console.log(`[Worker] SLA breach check complete — ${result.breachedCount} breach(es) flagged`);
+  }
+  if (job.name === "quotation-expiry") {
+    const result = await runQuotationExpiryJob();
+    console.log(`[Worker] Quotation expiry check complete — ${result.totalExpired} expired`);
+  }
+  if (job.name === "membership-activation") {
+    const result = await runMembershipActivationJob();
+    console.log(`[Worker] Membership activation complete — ${result.totalActivated} activated, ${result.totalLapsed} lapsed`);
+  }
+  if (job.name === "lapse-detection") {
+    const result = await runLapseDetectionJob();
+    console.log(`[Worker] Lapse detection complete — ${result.totalLapsed} lapsed, ${result.totalExpired} catch-up windows expired`);
+  }
+  if (job.name === "report-generation") {
+    const { runReportGenerationJob } = await import("./report-generation.job");
+    await runReportGenerationJob();
+    console.log("[Worker] Report generation complete");
   }
 }, { connection });
 

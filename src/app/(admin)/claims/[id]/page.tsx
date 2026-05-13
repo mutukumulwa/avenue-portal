@@ -1,12 +1,18 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { notFound } from "next/navigation";
 import { ClaimsService } from "@/server/services/claims.service";
+import { claimAdjudicationService } from "@/server/services/claim-adjudication.service";
+import { prisma } from "@/lib/prisma";
 import { adjudicateClaimAction, resolveExceptionAction } from "./actions";
+import { disburseReimbursementAction } from "./reimbursement-actions";
+import {
+  adjudicateLineAction, computeOutcomeAction, approveClaimAction,
+  approveSeniorClaimAction, initiateAppealAction, computeVarianceAction,
+} from "./adjudication-actions";
 import { ExceptionModal } from "./ExceptionModal";
-import { ArrowLeft, Clock, CheckCircle2, XCircle, AlertTriangle, Info, FlaskConical, Pill, ScanLine, Stethoscope, Scissors, HelpCircle, ShieldAlert, ShieldCheck, ShieldX, Percent } from "lucide-react";
+import { ArrowLeft, Clock, CheckCircle2, XCircle, AlertTriangle, Info, FlaskConical, Pill, ScanLine, Stethoscope, Scissors, HelpCircle, ShieldAlert, ShieldCheck, ShieldX, Percent, BarChart2, Scale } from "lucide-react";
 import Link from "next/link";
 import { ClaimDocuments } from "./ClaimDocuments";
-import { prisma } from "@/lib/prisma";
 import { CoContributionCollectionForm } from "./CoContributionCollectionForm";
 
 const LINE_CAT_META: Record<string, { label: string; color: string; Icon: React.ElementType }> = {
@@ -23,10 +29,12 @@ export default async function ClaimDetailPage({ params }: { params: Promise<{ id
 
   const { id } = await params;
   const tenantId = session.user.tenantId;
-  const [claim, tariffVariances, coContribTx] = await Promise.all([
+  const [claim, tariffVariances, coContribTx, reimbRequest, claimLines] = await Promise.all([
     ClaimsService.getClaimById(tenantId, id),
     ClaimsService.getClaimTariffVariances(tenantId, id),
     prisma.coContributionTransaction.findUnique({ where: { claimId: id } }),
+    prisma.reimbursementRequest.findUnique({ where: { claimId: id } }),
+    prisma.claimLine.findMany({ where: { claimId: id }, orderBy: { lineNumber: "asc" } }),
   ]);
 
   if (!claim) notFound();
@@ -43,6 +51,27 @@ export default async function ClaimDetailPage({ params }: { params: Promise<{ id
 
   const canCapture    = ["RECEIVED", "INCURRED"].includes(claim.status);
   const canAdjudicate = ["CAPTURED", "UNDER_REVIEW"].includes(claim.status);
+
+  // Process 9 derived state
+  const p9Claim = await prisma.claim.findUnique({
+    where: { id },
+    select: {
+      contractedRate: true, contractedVariancePct: true,
+      adjudicatorId: true, seniorAdjudicatorId: true, appealReviewerId: true,
+      settlementBatchId: true,
+    },
+  });
+  const variancePct    = p9Claim?.contractedVariancePct ? Number(p9Claim.contractedVariancePct) : null;
+  const hasHighVar     = variancePct !== null && variancePct > 0.20;
+  const allLinesDecided = claimLines.length > 0 && claimLines.every((l) => !!l.adjudicationDecision);
+  const canComputeOutcome = allLinesDecided && canAdjudicate;
+  const isOutcomeSet   = ["APPROVED","PARTIALLY_APPROVED","DECLINED"].includes(claim.status);
+  const needsSenior    = isOutcomeSet && !p9Claim?.seniorAdjudicatorId
+    && Number(claim.approvedAmount) > 100_000;
+  const canFinalize    = isOutcomeSet
+    && (Number(claim.approvedAmount) <= 100_000 || !!p9Claim?.seniorAdjudicatorId)
+    && !p9Claim?.settlementBatchId;
+  const canAppeal      = ["DECLINED","PARTIALLY_APPROVED"].includes(claim.status);
   const diagnoses = claim.diagnoses as { code?: string; icdCode?: string; description: string; isPrimary?: boolean }[];
 
   // Group structured claim lines by service category
@@ -422,6 +451,298 @@ export default async function ClaimDetailPage({ params }: { params: Promise<{ id
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* ── Process 9: Contracted rate variance ──────────────── */}
+      {!claim.isReimbursement && (
+        <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-bold text-avenue-text-heading text-sm font-heading flex items-center gap-2">
+              <BarChart2 size={15} className="text-avenue-indigo" /> Contracted Rate Analysis
+            </h2>
+            {!p9Claim?.contractedRate && (
+              <form action={computeVarianceAction}>
+                <input type="hidden" name="claimId" value={id} />
+                <button type="submit"
+                  className="text-xs font-semibold text-avenue-indigo border border-avenue-indigo/30 px-3 py-1 rounded-full hover:bg-avenue-indigo/5 transition-colors">
+                  Compute Variance
+                </button>
+              </form>
+            )}
+          </div>
+          {p9Claim?.contractedRate ? (
+            <div className="grid grid-cols-3 gap-4 text-sm">
+              <div>
+                <p className="text-xs text-avenue-text-muted">Billed amount</p>
+                <p className="font-semibold text-avenue-text-heading mt-0.5">
+                  KES {Number(claim.billedAmount).toLocaleString("en-KE")}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-avenue-text-muted">Contracted rate</p>
+                <p className="font-semibold text-avenue-text-heading mt-0.5">
+                  KES {Number(p9Claim.contractedRate).toLocaleString("en-KE")}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-avenue-text-muted">Variance</p>
+                <p className={`font-bold mt-0.5 ${hasHighVar ? "text-[#DC3545]" : "text-[#28A745]"}`}>
+                  {variancePct !== null ? `${(variancePct * 100).toFixed(1)}%` : "—"}
+                  {hasHighVar && <span className="text-[10px] ml-1 font-bold">⚠ FRAUD FLAG</span>}
+                </p>
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-avenue-text-muted">Click "Compute Variance" to look up contracted tariff rates.</p>
+          )}
+        </div>
+      )}
+
+      {/* ── Process 9: Line-item adjudication ────────────────── */}
+      {canAdjudicate && claimLines.length > 0 && (
+        <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
+          <div className="px-5 py-3 border-b border-[#EEEEEE] flex items-center justify-between">
+            <h2 className="font-bold text-avenue-text-heading text-sm font-heading flex items-center gap-2">
+              <Scale size={15} className="text-avenue-indigo" /> Line-by-Line Adjudication
+            </h2>
+            {canComputeOutcome && (
+              <form action={computeOutcomeAction}>
+                <input type="hidden" name="claimId" value={id} />
+                <button type="submit"
+                  className="text-xs bg-avenue-indigo text-white px-4 py-1.5 rounded-full font-semibold hover:bg-avenue-secondary transition-colors">
+                  Compute Outcome
+                </button>
+              </form>
+            )}
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-[#E6E7E8] text-[#6C757D] text-xs font-semibold">
+                <th className="px-4 py-2 text-left">Line</th>
+                <th className="px-4 py-2 text-left">Description</th>
+                <th className="px-4 py-2 text-right">Billed</th>
+                <th className="px-4 py-2 text-left">Decision</th>
+                <th className="px-4 py-2 text-right">Approved</th>
+                <th className="px-4 py-2 text-left w-48">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#EEEEEE]">
+              {claimLines.map((line) => (
+                <tr key={line.id} className="hover:bg-[#F8F9FA]">
+                  <td className="px-4 py-2.5 text-avenue-text-muted text-xs font-mono">{line.lineNumber}</td>
+                  <td className="px-4 py-2.5">
+                    <p className="font-semibold text-avenue-text-heading text-xs">{line.description}</p>
+                    {line.cptCode && <p className="text-[10px] text-avenue-text-muted">{line.cptCode}</p>}
+                  </td>
+                  <td className="px-4 py-2.5 text-right font-mono text-xs">
+                    {Number(line.billedAmount).toLocaleString("en-KE")}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    {line.adjudicationDecision ? (
+                      <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                        line.adjudicationDecision === "APPROVED"                 ? "bg-[#28A745]/10 text-[#28A745]" :
+                        line.adjudicationDecision === "APPROVED_WITH_ADJUSTMENT" ? "bg-[#17A2B8]/10 text-[#17A2B8]" :
+                        "bg-[#DC3545]/10 text-[#DC3545]"
+                      }`}>
+                        {line.adjudicationDecision.replace(/_/g, " ")}
+                      </span>
+                    ) : <span className="text-[10px] text-avenue-text-muted">Pending</span>}
+                  </td>
+                  <td className="px-4 py-2.5 text-right font-mono text-xs text-[#28A745]">
+                    {line.adjudicationDecision
+                      ? Number(line.approvedAmount).toLocaleString("en-KE")
+                      : "—"}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    <form action={adjudicateLineAction} className="flex gap-1 flex-wrap">
+                      <input type="hidden" name="claimId" value={id} />
+                      <input type="hidden" name="claimLineId" value={line.id} />
+                      <input type="hidden" name="decision" value="APPROVED" />
+                      <button type="submit"
+                        className="text-[10px] font-bold px-2 py-1 rounded border border-[#28A745] text-[#28A745] hover:bg-[#28A745]/10 transition-colors">
+                        ✓
+                      </button>
+                    </form>
+                    {line.adjudicationDecision !== "DECLINED" && (
+                      <form action={adjudicateLineAction} className="flex gap-1 flex-wrap mt-1">
+                        <input type="hidden" name="claimId" value={id} />
+                        <input type="hidden" name="claimLineId" value={line.id} />
+                        <input type="hidden" name="decision" value="DECLINED" />
+                        <button type="submit"
+                          className="text-[10px] font-bold px-2 py-1 rounded border border-[#DC3545] text-[#DC3545] hover:bg-[#DC3545]/10 transition-colors">
+                          ✕
+                        </button>
+                      </form>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* ── Process 9: Finalize + senior approval + appeal ────── */}
+      {(isOutcomeSet || canFinalize || needsSenior || canAppeal) && (
+        <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-4">
+          <h2 className="font-bold text-avenue-text-heading text-sm font-heading border-b border-[#EEEEEE] pb-2">
+            Adjudication Workflow
+          </h2>
+
+          {isOutcomeSet && (
+            <div className="flex items-center gap-3 text-sm">
+              <span className={`font-bold text-lg ${claim.status === "APPROVED" ? "text-[#28A745]" : claim.status === "PARTIALLY_APPROVED" ? "text-[#17A2B8]" : "text-[#DC3545]"}`}>
+                Outcome: {claim.status.replace(/_/g," ")}
+              </span>
+              <span className="text-avenue-text-muted">
+                Net approved: <strong>KES {Number(claim.approvedAmount).toLocaleString("en-KE")}</strong>
+              </span>
+            </div>
+          )}
+
+          {needsSenior && (
+            <div className="bg-[#FFC107]/10 border border-[#FFC107]/30 rounded-[8px] p-3 flex items-center justify-between">
+              <p className="text-xs text-[#856404] font-semibold">
+                Senior approval required (net &gt; KES 100,000)
+              </p>
+              <form action={approveSeniorClaimAction}>
+                <input type="hidden" name="claimId" value={id} />
+                <button type="submit"
+                  className="bg-[#856404] text-white px-4 py-1.5 rounded-full text-xs font-semibold hover:opacity-90 transition-opacity">
+                  Senior Approve
+                </button>
+              </form>
+            </div>
+          )}
+
+          {canFinalize && (
+            <form action={approveClaimAction}>
+              <input type="hidden" name="claimId" value={id} />
+              <button type="submit"
+                className="bg-avenue-indigo text-white px-5 py-2 rounded-full text-sm font-semibold hover:bg-avenue-secondary transition-colors flex items-center gap-2">
+                <CheckCircle2 size={14} /> Finalize &amp; Queue for Settlement
+              </button>
+            </form>
+          )}
+
+          {canAppeal && (
+            <form action={initiateAppealAction} className="flex gap-2 items-center">
+              <input type="hidden" name="claimId" value={id} />
+              <input name="appealNotes" type="text" required placeholder="Appeal reason"
+                className="flex-1 border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-avenue-indigo focus:outline-none" />
+              <button type="submit"
+                className="border border-avenue-indigo text-avenue-indigo px-4 py-2 rounded-full text-sm font-semibold hover:bg-avenue-indigo/5 transition-colors whitespace-nowrap">
+                Initiate Appeal
+              </button>
+            </form>
+          )}
+
+          {p9Claim?.settlementBatchId && (
+            <p className="text-sm text-[#28A745] font-semibold flex items-center gap-2">
+              <CheckCircle2 size={14} /> Queued in settlement batch
+              <Link href="/settlement" className="text-avenue-indigo hover:underline font-normal text-xs ml-1">
+                View →
+              </Link>
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* ── Process 10: Reimbursement panel ──────────────────── */}
+      {claim.isReimbursement && (
+        <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-6 space-y-5">
+          <h2 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-3 flex items-center gap-2">
+            <CheckCircle2 size={16} className="text-avenue-indigo" />
+            Reimbursement Details
+          </h2>
+
+          {/* Payment destination */}
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="text-xs text-avenue-text-muted font-bold uppercase mb-1">Payout destination</p>
+              {claim.reimbursementMpesaPhone ? (
+                <p className="font-semibold text-avenue-text-heading">M-Pesa: {claim.reimbursementMpesaPhone}</p>
+              ) : claim.reimbursementBankName ? (
+                <p className="font-semibold text-avenue-text-heading">
+                  {claim.reimbursementBankName} — {claim.reimbursementAccountNo ?? "—"}
+                </p>
+              ) : (
+                <p className="text-avenue-text-muted italic">Not specified</p>
+              )}
+            </div>
+            <div>
+              <p className="text-xs text-avenue-text-muted font-bold uppercase mb-1">Reimbursed at</p>
+              <p className="font-semibold text-avenue-text-heading">
+                {claim.reimbursedAt ? new Date(claim.reimbursedAt).toLocaleDateString("en-KE") : "—"}
+              </p>
+            </div>
+          </div>
+
+          {/* Proof of payment */}
+          {reimbRequest && (
+            <div className="bg-[#F8F9FA] border border-[#EEEEEE] rounded-[8px] p-4 space-y-3">
+              <p className="text-xs font-bold uppercase text-avenue-text-muted">Proof of Payment</p>
+              <div className="grid grid-cols-3 gap-4 text-sm">
+                <div>
+                  <p className="text-xs text-avenue-text-muted">Proof type</p>
+                  <p className="font-semibold text-avenue-text-heading mt-0.5">
+                    {reimbRequest.proofType.replace(/_/g, " ")}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-avenue-text-muted">Total paid by member</p>
+                  <p className="font-semibold text-avenue-text-heading mt-0.5">
+                    KES {Number(reimbRequest.totalPaidByMember).toLocaleString("en-KE")}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-avenue-text-muted">Within 90-day window</p>
+                  <p className={`font-semibold mt-0.5 ${reimbRequest.submittedWithinWindow ? "text-[#28A745]" : "text-[#DC3545]"}`}>
+                    {reimbRequest.submittedWithinWindow ? "Yes" : "No — review required"}
+                  </p>
+                </div>
+              </div>
+
+              {reimbRequest.mpesaConfirmationCode && (
+                <div className="flex items-start gap-2.5 bg-[#FFC107]/10 border border-[#FFC107]/30 rounded-[6px] p-3">
+                  <AlertTriangle size={13} className="text-[#856404] mt-0.5 shrink-0" />
+                  <div className="text-xs text-[#856404]">
+                    <strong>M-Pesa confirmation code:</strong> {reimbRequest.mpesaConfirmationCode}
+                    {reimbRequest.mpesaNote && (
+                      <p className="mt-0.5 opacity-80">{reimbRequest.mpesaNote}</p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {reimbRequest.proofFileUrl && (
+                <a href={reimbRequest.proofFileUrl} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-avenue-indigo hover:underline">
+                  View proof document →
+                </a>
+              )}
+            </div>
+          )}
+
+          {/* Disbursement action (Finance only, after approval) */}
+          {["APPROVED","PARTIALLY_APPROVED"].includes(claim.status) && !claim.reimbursedAt && (
+            <form action={disburseReimbursementAction} className="flex items-center gap-3">
+              <input type="hidden" name="claimId" value={id} />
+              <input name="disbursementRef" type="text" required placeholder="Disbursement reference (e.g. bank TXN ID or M-Pesa code)"
+                className="flex-1 border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-avenue-indigo focus:outline-none" />
+              <button type="submit"
+                className="bg-[#28A745] hover:bg-[#218838] text-white px-5 py-2 rounded-full text-sm font-semibold transition-colors whitespace-nowrap">
+                Disburse to Member
+              </button>
+            </form>
+          )}
+
+          {claim.reimbursedAt && (
+            <p className="text-sm text-[#28A745] font-semibold flex items-center gap-2">
+              <CheckCircle2 size={14} /> Reimbursed on {new Date(claim.reimbursedAt).toLocaleDateString("en-KE")}
+            </p>
+          )}
         </div>
       )}
     </div>

@@ -144,6 +144,10 @@ export async function submitReimbursementClaimAction(data: {
   reimbursementBankName?: string;
   reimbursementAccountNo?: string;
   reimbursementMpesaPhone?: string;
+  // Process 10 additions
+  proofFileUrl?: string;
+  proofType?: string;
+  mpesaConfirmationCode?: string;
 }) {
   const session = await requireRole(ROLES.OPS);
   const tenantId = session.user.tenantId;
@@ -204,6 +208,29 @@ export async function submitReimbursementClaimAction(data: {
       },
     },
   });
+
+  // Process 10: create ReimbursementRequest record if proof provided
+  if (data.proofFileUrl) {
+    const provider = await prisma.provider.findUnique({ where: { id: data.providerId }, select: { name: true } });
+    await prisma.reimbursementRequest.create({
+      data: {
+        tenantId,
+        claimId:              claim.id,
+        memberId:             data.memberId,
+        providerName:         provider?.name ?? "Unknown Provider",
+        serviceDate:          new Date(data.dateOfService),
+        totalPaidByMember:    billedAmount,
+        proofType:            (data.proofType as "RECEIPT_PHOTO" | "MPESA_SMS" | "BANK_STATEMENT" | "OTHER") ?? "RECEIPT_PHOTO",
+        proofFileUrl:         data.proofFileUrl,
+        mpesaConfirmationCode: data.mpesaConfirmationCode || null,
+        mpesaNote:            data.proofType === "MPESA_SMS" && data.mpesaConfirmationCode
+          ? "M-Pesa Daraja verification not yet integrated — verify manually"
+          : null,
+        submittedWithinWindow: true,
+        disbursementMethod:   data.reimbursementMpesaPhone ? "MPESA" : data.reimbursementBankName ? "BANK_TRANSFER" : null,
+      },
+    });
+  }
 
   await FraudService.evaluateClaim(claim.id, tenantId);
 

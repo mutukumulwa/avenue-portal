@@ -6,6 +6,23 @@ import bcrypt from "bcryptjs";
 import { cache } from "react";
 import { measureAsync } from "@/lib/perf";
 
+/** Loads all active permission codes for a user from UserRoleAssignment. */
+async function loadUserPermissions(userId: string, tenantId: string): Promise<string[]> {
+  const assignments = await prisma.userRoleAssignment.findMany({
+    where: { userId, tenantId, isActive: true, status: "ACTIVE" },
+    include: {
+      role: {
+        include: { permissions: { include: { permission: { select: { code: true } } } } },
+      },
+    },
+  });
+  const codes = new Set<string>();
+  for (const a of assignments) {
+    for (const rp of a.role.permissions) codes.add(rp.permission.code);
+  }
+  return [...codes];
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
@@ -54,6 +71,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             return null;
           }
 
+          const permissions = await loadUserPermissions(user.id, user.tenantId);
+
           return {
             id: user.id,
             email: user.email,
@@ -62,6 +81,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             tenantId: user.tenantId,
             groupId: user.groupId ?? undefined,
             memberId: user.memberId ?? undefined,
+            permissions,
           };
         });
       }
@@ -75,6 +95,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.tenantId = user.tenantId;
         token.groupId = user.groupId;
         token.memberId = user.memberId;
+        token.permissions = user.permissions;
       }
       return token;
     },
@@ -85,6 +106,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.tenantId = token.tenantId as string;
         session.user.groupId = token.groupId as string | undefined;
         session.user.memberId = token.memberId as string | undefined;
+        session.user.permissions = token.permissions as string[] | undefined;
       }
       return session;
     }

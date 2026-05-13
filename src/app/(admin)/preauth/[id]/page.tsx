@@ -3,8 +3,13 @@ import { notFound } from "next/navigation";
 import { ClaimsService } from "@/server/services/claims.service";
 import { prisma } from "@/lib/prisma";
 import { convertToClaimAction } from "./actions";
+import { preauthAdjudicationService } from "@/server/services/preauth-adjudication.service";
+import {
+  runAutoDecisionAction, approveByHumanAction, declineByHumanAction,
+  releaseBenefitHoldAction, cancelPreAuthAction,
+} from "./preauth-process8-actions";
 import { PreAuthAdjudicationForm } from "./PreAuthAdjudicationForm";
-import { ArrowLeft, CheckCircle2, XCircle, Info, ArrowRightCircle, FileText, NotebookPen } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, Info, ArrowRightCircle, FileText, NotebookPen, AlertTriangle, Clock, Shield, PlusCircle } from "lucide-react";
 import Link from "next/link";
 import { PreAuthDocuments } from "./PreAuthDocuments";
 
@@ -44,10 +49,26 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
     orderBy: { createdAt: "desc" },
   });
 
+  // Process 8 enriched data
+  const enriched = await preauthAdjudicationService.getEnrichedDetail(id, tenantId);
+
   const canAdjudicate = ["SUBMITTED", "UNDER_REVIEW"].includes(pa.status);
   const canConvert = pa.status === "APPROVED";
   const diagnoses = pa.diagnoses as { icdCode?: string; description: string; isPrimary?: boolean }[];
   const procedures = pa.procedures as { cptCode?: string; description: string; quantity?: number; unitCost?: number; total?: number }[];
+
+  const isEmergency   = enriched?.isEmergency ?? false;
+  const autoLog       = enriched?.autoDecisionLog as Array<{ gate: string; outcome: string; reason?: string }> | null;
+  const hold          = enriched?.hold;
+  const benefitBalance = enriched?.benefitBalance;
+  const slaDeadline   = enriched?.slaDeadlineAt;
+  const slaBreached   = enriched?.slaBreachedAt;
+  const parentPreAuth = enriched?.parentPreAuthId
+    ? await prisma.preAuthorization.findUnique({ where: { id: enriched.parentPreAuthId }, select: { preauthNumber: true } })
+    : null;
+
+  const now = new Date();
+  const slaMinutesLeft = slaDeadline ? Math.max(0, Math.floor((slaDeadline.getTime() - now.getTime()) / 60000)) : null;
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -256,6 +277,195 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
           </h3>
           <Link href={`/claims/${pa.claim.id}`} className="text-avenue-indigo hover:text-avenue-secondary font-semibold mt-2 inline-block">
             View Claim →
+          </Link>
+        </div>
+      )}
+
+      {/* ── Process 8: Emergency banner ─────────────────────── */}
+      {isEmergency && (
+        <div className="bg-[#DC3545]/10 border border-[#DC3545]/30 rounded-[8px] p-4 flex items-center gap-3">
+          <AlertTriangle size={18} className="text-[#DC3545] shrink-0" />
+          <p className="font-bold text-[#DC3545] text-sm">EMERGENCY pre-authorization — expedited handling required</p>
+        </div>
+      )}
+
+      {/* ── Process 8: SLA timer ────────────────────────────── */}
+      {slaDeadline && canAdjudicate && (
+        <div className={`rounded-[8px] p-4 flex items-center gap-3 border ${slaBreached ? "bg-[#DC3545]/10 border-[#DC3545]/30" : slaMinutesLeft !== null && slaMinutesLeft < 30 ? "bg-[#FFC107]/10 border-[#FFC107]/30" : "bg-[#28A745]/10 border-[#28A745]/30"}`}>
+          <Clock size={16} className={slaBreached ? "text-[#DC3545]" : "text-current"} />
+          <div>
+            <p className="font-semibold text-sm">
+              {slaBreached
+                ? "SLA breached — escalate immediately"
+                : slaMinutesLeft !== null
+                ? `SLA: ${slaMinutesLeft}m remaining`
+                : "SLA active"}
+            </p>
+            <p className="text-xs text-avenue-text-muted mt-0.5">
+              Deadline: {new Date(slaDeadline).toLocaleTimeString("en-KE", { hour: "2-digit", minute: "2-digit" })}
+              {" · "}Type: {enriched?.slaType?.replace(/_/g," ") ?? "—"}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Process 8: Benefit hold panel ───────────────────── */}
+      {(hold || benefitBalance) && (
+        <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-4">
+          <h2 className="font-bold text-avenue-text-heading text-sm font-heading border-b border-[#EEEEEE] pb-2 flex items-center gap-2">
+            <Shield size={15} className="text-avenue-indigo" /> Benefit Balance &amp; Hold
+          </h2>
+          {benefitBalance && (
+            <div className="grid grid-cols-4 gap-3 text-sm">
+              {[
+                { label: "Annual Limit",   value: `KES ${Number(benefitBalance.limit).toLocaleString("en-KE")}`,     color: "text-avenue-text-heading" },
+                { label: "Consumed",       value: `KES ${Number(benefitBalance.used).toLocaleString("en-KE")}`,      color: "text-[#DC3545]" },
+                { label: "Active Holds",   value: `KES ${Number(benefitBalance.held).toLocaleString("en-KE")}`,      color: "text-[#856404]" },
+                { label: "Available",      value: `KES ${Number(benefitBalance.remaining).toLocaleString("en-KE")}`, color: "text-[#28A745] font-bold" },
+              ].map(({ label, value, color }) => (
+                <div key={label}>
+                  <p className="text-xs text-avenue-text-muted">{label}</p>
+                  <p className={`font-semibold mt-0.5 ${color}`}>{value}</p>
+                </div>
+              ))}
+            </div>
+          )}
+          {hold && (
+            <div className="flex items-center justify-between bg-[#FFC107]/10 border border-[#FFC107]/30 rounded-[6px] p-3">
+              <div>
+                <p className="text-sm font-semibold text-[#856404]">
+                  Pending Authorization Hold: KES {Number(hold.heldAmount).toLocaleString("en-KE")}
+                </p>
+                <p className="text-xs text-avenue-text-muted mt-0.5">
+                  Expires: {new Date(hold.expiresAt).toLocaleDateString("en-KE")}
+                  {" · "}Status: {hold.status}
+                </p>
+              </div>
+              {hold.status === "ACTIVE" && (
+                <form action={releaseBenefitHoldAction}>
+                  <input type="hidden" name="preAuthId" value={id} />
+                  <button type="submit"
+                    className="text-xs font-semibold text-[#DC3545] border border-[#DC3545]/30 px-3 py-1 rounded-full hover:bg-[#DC3545]/10 transition-colors">
+                    Release Hold
+                  </button>
+                </form>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Process 8: Auto-decision log ─────────────────────── */}
+      {autoLog && autoLog.length > 0 && (
+        <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-3">
+          <h2 className="font-bold text-avenue-text-heading text-sm font-heading border-b border-[#EEEEEE] pb-2">
+            Auto-Decision Gate Log
+          </h2>
+          <div className="space-y-1.5">
+            {autoLog.map((gate, i) => (
+              <div key={i} className="flex items-start gap-2.5 text-xs">
+                {gate.outcome === "PASS"
+                  ? <CheckCircle2 size={13} className="text-[#28A745] mt-0.5 shrink-0" />
+                  : gate.outcome === "FAIL"
+                  ? <XCircle size={13} className="text-[#DC3545] mt-0.5 shrink-0" />
+                  : <AlertTriangle size={13} className="text-[#856404] mt-0.5 shrink-0" />}
+                <div>
+                  <span className="font-mono font-semibold text-avenue-text-heading">{gate.gate.replace(/_/g," ")}</span>
+                  {gate.reason && <span className="text-avenue-text-muted ml-2">{gate.reason}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Process 8: Mid-treatment parent link ─────────────── */}
+      {parentPreAuth && (
+        <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-4 flex items-center justify-between">
+          <div className="flex items-center gap-2 text-sm">
+            <PlusCircle size={15} className="text-avenue-indigo" />
+            <span className="text-avenue-text-muted">Mid-treatment amendment of</span>
+            <Link href={`/preauth/${enriched?.parentPreAuthId}`} className="text-avenue-indigo font-semibold hover:underline">
+              {parentPreAuth.preauthNumber}
+            </Link>
+          </div>
+        </div>
+      )}
+
+      {/* ── Process 8: Human review actions ──────────────────── */}
+      {canAdjudicate && (
+        <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-bold text-avenue-text-heading text-sm font-heading">Human Review Actions</h2>
+            {!autoLog && (
+              <form action={runAutoDecisionAction}>
+                <input type="hidden" name="preAuthId" value={id} />
+                <button type="submit"
+                  className="text-xs font-semibold text-avenue-indigo border border-avenue-indigo/30 px-3 py-1 rounded-full hover:bg-avenue-indigo/5 transition-colors">
+                  Run Auto-Decision
+                </button>
+              </form>
+            )}
+          </div>
+
+          {/* Approve */}
+          <form action={approveByHumanAction} className="flex gap-2 items-center">
+            <input type="hidden" name="preAuthId" value={id} />
+            <div className="flex-1">
+              <input name="approvedAmount" type="number" required
+                placeholder={`Approved amount (est. KES ${Number(pa.estimatedCost).toLocaleString("en-KE")})`}
+                defaultValue={Number(pa.estimatedCost)}
+                className="w-full border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm" />
+            </div>
+            <input name="notes" type="text" placeholder="Approval notes (optional)"
+              className="flex-1 border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm" />
+            <button type="submit"
+              className="bg-[#28A745] text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-[#218838] transition-colors whitespace-nowrap flex items-center gap-1.5 shrink-0">
+              <CheckCircle2 size={14} /> Approve
+            </button>
+          </form>
+
+          {/* Decline */}
+          <form action={declineByHumanAction} className="flex gap-2 items-center">
+            <input type="hidden" name="preAuthId" value={id} />
+            <select name="reasonCode" required
+              className="border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm">
+              <option value="">Decline reason…</option>
+              <option value="NOT_COVERED">Not covered under package</option>
+              <option value="EXCLUDED_CONDITION">Excluded condition</option>
+              <option value="WAITING_PERIOD">Waiting period not elapsed</option>
+              <option value="BENEFIT_EXHAUSTED">Benefit limit exhausted</option>
+              <option value="CLINICAL_NECESSITY">Clinical necessity not established</option>
+              <option value="PROVIDER_OUT_OF_NETWORK">Provider not in network</option>
+              <option value="OTHER">Other</option>
+            </select>
+            <input name="notes" type="text" placeholder="Decline notes" required
+              className="flex-1 border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm" />
+            <button type="submit"
+              className="border border-[#DC3545] text-[#DC3545] px-4 py-2 rounded-full text-sm font-semibold hover:bg-[#DC3545]/10 transition-colors whitespace-nowrap flex items-center gap-1.5 shrink-0">
+              <XCircle size={14} /> Decline
+            </button>
+          </form>
+
+          {/* Cancel */}
+          <form action={cancelPreAuthAction} className="flex gap-2 items-center">
+            <input type="hidden" name="preAuthId" value={id} />
+            <input name="reason" type="text" placeholder="Cancellation reason"
+              className="flex-1 border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm" />
+            <button type="submit"
+              className="border border-[#6C757D] text-[#6C757D] px-4 py-2 rounded-full text-sm font-semibold hover:bg-[#6C757D]/10 transition-colors whitespace-nowrap shrink-0">
+              Cancel PA
+            </button>
+          </form>
+        </div>
+      )}
+
+      {/* Link to create mid-treatment amendment */}
+      {pa.status === "APPROVED" && (
+        <div className="text-center">
+          <Link href={`/preauth/new?parentPreAuthId=${id}`}
+            className="text-xs text-avenue-indigo font-semibold hover:underline inline-flex items-center gap-1">
+            <PlusCircle size={13} /> Create mid-treatment amendment
           </Link>
         </div>
       )}

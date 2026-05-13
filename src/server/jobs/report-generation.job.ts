@@ -7,8 +7,9 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import { overrideService } from "../services/override.service";
 
-async function runReportGenerationJob() {
+export async function runReportGenerationJob() {
   const now = new Date();
   const fromDate = new Date(now);
   fromDate.setDate(fromDate.getDate() - 30); // Last 30 days
@@ -57,6 +58,45 @@ async function runReportGenerationJob() {
       console.info(`  Billing (30d): ${billingSummary.total} invoices, collected KES ${billingSummary.totalCollected.toLocaleString()}`);
 
       // In production: store these snapshots in a ReportCache table or push to an S3/MinIO bucket as JSON/PDF.
+
+      // ── Process 13: Override compliance reports ───────────
+      // Expire any SLA-breached overrides
+      const expiredCount = await overrideService.expireSlaBreached(tenant.id);
+      if (expiredCount > 0) {
+        console.info(`  Overrides: ${expiredCount} SLA-breached record(s) expired`);
+      }
+
+      // Daily summary (stored to activity log for compliance inbox)
+      const overrideSummary = await overrideService.generateDailySummary(tenant.id);
+      if (overrideSummary.pending > 0 || overrideSummary.slaBreached > 0) {
+        await prisma.activityLog.create({
+          data: {
+            entityType:  "SYSTEM",
+            entityId:    tenant.id,
+            action:      "OVERRIDE_DAILY_SUMMARY",
+            description: `Override summary: ${overrideSummary.pending} pending, ${overrideSummary.approvedToday} approved, ${overrideSummary.rejectedToday} rejected, ${overrideSummary.slaBreached} SLA breached`,
+            metadata:    overrideSummary as never,
+          },
+        });
+      }
+
+      // Monthly report — runs on the 1st of each month
+      const now = new Date();
+      if (now.getDate() === 1) {
+        const prevMonth = now.getMonth() === 0 ? 12 : now.getMonth();
+        const prevYear  = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+        const monthlyReport = await overrideService.generateMonthlyReport(tenant.id, prevMonth, prevYear);
+        await prisma.activityLog.create({
+          data: {
+            entityType:  "SYSTEM",
+            entityId:    tenant.id,
+            action:      "OVERRIDE_MONTHLY_REPORT",
+            description: `Monthly override report for ${monthlyReport.period}: ${monthlyReport.totalRequested} requests, ${Math.round(monthlyReport.approvalRate * 100)}% approval rate`,
+            metadata:    monthlyReport as never,
+          },
+        });
+        console.info(`  Override monthly report generated for ${monthlyReport.period} (${monthlyReport.totalRequested} records)`);
+      }
     }
 
     console.info(`[report-generation] Done.`);

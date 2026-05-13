@@ -8,6 +8,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { NotificationService } from "../services/notification.service";
+import { preauthAdjudicationService } from "../services/preauth-adjudication.service";
 
 export async function runPreauthEscalationJob() {
   console.info("[preauth-escalation] Scanning for overdue pre-authorizations…");
@@ -69,6 +70,26 @@ export async function runPreauthEscalationJob() {
       escalated++;
     }
   }
+
+  // Also release expired benefit holds
+  const allTenants = await prisma.tenant.findMany({ select: { id: true } });
+  let releasedHolds = 0;
+  for (const tenant of allTenants) {
+    releasedHolds += await preauthAdjudicationService.releaseExpiredHolds(tenant.id);
+  }
+  if (releasedHolds > 0) {
+    console.info(`[preauth-escalation] Released ${releasedHolds} expired benefit hold(s).`);
+  }
+
+  // Mark SLA breaches on UNDER_REVIEW PAs
+  await prisma.preAuthorization.updateMany({
+    where: {
+      status:       "UNDER_REVIEW",
+      slaDeadlineAt: { lt: new Date() },
+      slaBreachedAt: null,
+    },
+    data: { slaBreachedAt: new Date() },
+  });
 
   console.info(`[preauth-escalation] Done — ${escalated} pre-auth(s) escalated.`);
   return escalated;

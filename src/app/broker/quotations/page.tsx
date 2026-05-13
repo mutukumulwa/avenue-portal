@@ -66,7 +66,7 @@ export default async function BrokerQuotationsPage() {
                 <td className="px-6 py-4 font-semibold">{q.prospectName ?? "—"}</td>
                 <td className="px-6 py-4">{q.memberCount + q.dependentCount}</td>
                 <td className="px-6 py-4 font-semibold text-avenue-indigo">{Number(q.finalPremium).toLocaleString()}</td>
-                <td className="px-6 py-4">{new Date(q.validUntil).toLocaleDateString("en-KE")}</td>
+                <td className="px-6 py-4">{q.validUntil ? new Date(q.validUntil).toLocaleDateString("en-KE") : "—"}</td>
                 <td className="px-6 py-4">
                   <span className={`px-3 py-1 text-[10px] font-bold uppercase rounded-full ${statusColor(q.status)}`}>
                     {q.status}

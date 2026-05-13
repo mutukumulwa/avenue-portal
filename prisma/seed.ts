@@ -3,6 +3,7 @@ import { prisma } from '../src/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { GLService } from '../src/server/services/gl.service'
 import { AnalyticsRefreshService } from '../src/server/services/analytics-refresh.service'
+import { seedRbac } from './seeds/rbac'
 
 async function main() {
   console.log('🌱 Starting comprehensive seed...')
@@ -3856,6 +3857,12 @@ async function main() {
 
     console.log(`✅ Member experience demo: ${demoMembers.length} lives available, ${usageUpserts} benefit usages, ${createdClaims.length} claims, ${walletClaims.length} wallet items, ${personaDefs.length} member logins`)
   }
+
+  // ═══════════════════════════════════════════════════════════
+  // RBAC — seed roles, permissions, and migrate existing assignments
+  // ═══════════════════════════════════════════════════════════
+  console.log('\n⚙️  Seeding RBAC...')
+  await seedRbac(prisma, tenantId)
 
   console.log('\n🎉 Seed complete! All features populated.\n')
   console.log('  Login: admin@avenue.co.ke / AvenueAdmin2024!')

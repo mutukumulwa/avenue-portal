@@ -15,6 +15,11 @@ import { coContributionRouter } from "./routers/coContribution";
 import { analyticsRouter } from "./routers/analytics";
 import { memberAppRouter } from "./routers/memberApp";
 import { pricingRouter } from "./routers/pricing";
+import { rolesRouter } from "./routers/roles";
+import { overridesRouter } from "./routers/overrides";
+import { auditChainRouter } from "./routers/auditChain";
+import { intakeRouter } from "./routers/intake";
+import { bindingRouter } from "./routers/binding";
 
 export const appRouter = createTRPCRouter({
   healthcheck: publicProcedure.query(() => {
@@ -36,6 +41,11 @@ export const appRouter = createTRPCRouter({
   settings: settingsRouter,
   coContribution: coContributionRouter,
   pricing: pricingRouter,
+  roles: rolesRouter,
+  overrides: overridesRouter,
+  auditChain: auditChainRouter,
+  intake: intakeRouter,
+  binding: bindingRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -1,5 +1,5 @@
 import { requireRole, ROLES } from "@/lib/rbac";
-import { redirect, notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import {
@@ -37,7 +37,7 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
   });
   if (!q) notFound();
 
-  const isExpired = new Date(q.validUntil) < new Date() && q.status === "SENT";
+  const isExpired = q.validUntil != null && new Date(q.validUntil) < new Date() && q.status === "SENT";
   const status = isExpired ? "EXPIRED" : q.status;
 
   const finalPremium    = Number(q.finalPremium);
@@ -57,6 +57,8 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
   const canAction  = q.status === "SENT";
   const canExpire  = q.status === "DRAFT" || q.status === "SENT";
   const canConvert = q.status === "ACCEPTED" && !q.groupId && !!q.packageId;
+  const canBuild   = ["ASSESSED", "DRAFT"].includes(q.status);
+  const canBind    = q.status === "ACCEPTED";
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -88,6 +90,18 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
         </div>
 
         <div className="flex flex-wrap gap-2">
+          {canBuild && (
+            <Link href={`/quotations/${q.id}/build`}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold border border-avenue-indigo text-avenue-indigo hover:bg-avenue-indigo hover:text-white transition-colors">
+              <Calculator size={14} /> Build Pricing
+            </Link>
+          )}
+          {canBind && (
+            <Link href={`/quotations/${q.id}/bind`}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold bg-[#28A745] hover:bg-[#218838] text-white transition-colors shadow-sm">
+              <BadgeCheck size={14} /> Bind Membership
+            </Link>
+          )}
           {canSend && (
             <form action={sendQuotationAction}>
               <input type="hidden" name="quotationId" value={q.id} />
@@ -170,7 +184,7 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
           { label: "Final Annual Premium", value: fmt(finalPremium), color: "text-avenue-indigo", icon: <Calculator size={16} className="text-avenue-indigo" /> },
           { label: "Rate per Member", value: fmt(ratePerMember), color: "text-[#28A745]", icon: <Users size={16} className="text-[#28A745]" /> },
           { label: "Total Lives Covered", value: totalLives.toLocaleString(), color: "text-[#17A2B8]", icon: <Users size={16} className="text-[#17A2B8]" /> },
-          { label: "Valid Until", value: new Date(q.validUntil).toLocaleDateString("en-KE"), color: new Date(q.validUntil) < new Date() ? "text-[#DC3545]" : "text-[#856404]", icon: <Calendar size={16} /> },
+          { label: "Valid Until", value: q.validUntil ? new Date(q.validUntil).toLocaleDateString("en-KE") : "—", color: q.validUntil && new Date(q.validUntil) < new Date() ? "text-[#DC3545]" : "text-[#856404]", icon: <Calendar size={16} /> },
         ].map(s => (
           <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-[8px] p-4 shadow-sm">
             <div className="flex justify-between items-center mb-1">

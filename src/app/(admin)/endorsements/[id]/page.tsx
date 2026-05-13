@@ -1,6 +1,11 @@
-import { ArrowLeft, CheckCircle, Calculator, Building, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle, Calculator, Building, XCircle, AlertTriangle, GitCompareArrows, PlayCircle } from "lucide-react";
 import Link from "next/link";
 import { approveEndorsementAction, rejectEndorsementAction } from "./actions";
+import { amendmentService } from "@/server/services/amendment.service";
+import {
+  computeProRataAction, approveAmendmentAction, applyAmendmentAction,
+  rejectAmendmentAction, submitAmendmentAction,
+} from "./amendment-actions";
 import { EndorsementsService } from "@/server/services/endorsement.service";
 import { requireRole, ROLES } from "@/lib/rbac";
 import { notFound } from "next/navigation";
@@ -37,11 +42,23 @@ export default async function EndorsementReviewPage({ params }: { params: Promis
   const endorsement = await EndorsementsService.getEndorsementById(session.user.tenantId, id);
   if (!endorsement) notFound();
 
+  // Load enriched amendment data (Process 7 extensions)
+  const richEndorsement = await amendmentService.getWithProRata(id, session.user.tenantId);
+
   const details = endorsement.changeDetails as Record<string, string>;
   const amount = Number(endorsement.proratedAmount ?? 0);
   const isCredit = amount < 0;
   const hasFinancialImpact = amount !== 0;
   const canAction = ["SUBMITTED", "UNDER_REVIEW"].includes(endorsement.status);
+
+  // Process 7 derived state
+  const proRata         = richEndorsement?.proRataCalculation;
+  const isBackDated     = richEndorsement?.backDated ?? false;
+  const isMaker         = richEndorsement?.makerId === session.user.id;
+  const isDraft         = endorsement.status === "DRAFT";
+  const isApproved      = endorsement.status === "APPROVED";
+  const beforeSnap      = richEndorsement?.beforeSnapshot as Record<string, unknown> | null;
+  const afterSnap       = richEndorsement?.afterSnapshot  as Record<string, unknown> | null;
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -157,6 +174,169 @@ export default async function EndorsementReviewPage({ params }: { params: Promis
         {Object.keys(details).length === 0 && (
           <p className="text-sm text-avenue-text-muted">No change details recorded.</p>
         )}
+      </div>
+
+      {/* ── Process 7: Back-date warning ─────────────────────── */}
+      {isBackDated && (
+        <div className="bg-[#FFC107]/10 border border-[#FFC107]/30 rounded-[8px] p-4 flex items-start gap-3">
+          <AlertTriangle size={16} className="text-[#856404] mt-0.5 shrink-0" />
+          <div>
+            <p className="font-semibold text-[#856404] text-sm">Back-dated amendment</p>
+            <p className="text-xs text-avenue-text-muted mt-1">
+              Effective date is in the past. A <strong>BACK_DATED_AMENDMENT</strong> override record
+              {richEndorsement?.overrideRecordId
+                ? <span className="text-[#28A745]"> is linked ({richEndorsement.overrideRecordId.slice(0,8)}…)</span>
+                : <span className="text-[#DC3545]"> has not been linked yet</span>}.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* ── Process 7: Pro-rata detail breakdown ─────────────── */}
+      {proRata && (
+        <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-3">
+          <h2 className="font-bold text-avenue-text-heading text-sm font-heading border-b border-[#EEEEEE] pb-2 flex items-center gap-2">
+            <Calculator size={15} className="text-avenue-indigo" />
+            Pro-Rata Calculation (Day-Count)
+          </h2>
+          <div className="grid grid-cols-3 gap-4 text-sm">
+            {[
+              { label: "Days remaining", value: proRata.daysRemaining.toString() },
+              { label: "Total days in period", value: proRata.totalDaysInPeriod.toString() },
+              { label: "Pro-rata factor", value: `${(Number(proRata.prorataFactor) * 100).toFixed(2)}%` },
+              { label: "Prev contribution", value: `KES ${Number(proRata.previousContribution).toLocaleString("en-KE")}` },
+              { label: "New contribution",  value: `KES ${Number(proRata.newContribution).toLocaleString("en-KE")}` },
+              { label: "Adjustment",        value: <strong className={proRata.adjustmentType === "CREDIT" ? "text-[#28A745]" : "text-[#C4500A]"}>
+                {proRata.adjustmentType === "CREDIT" ? "−" : "+"} KES {Math.abs(Number(proRata.adjustmentAmount)).toLocaleString("en-KE")}
+              </strong> },
+            ].map(({ label, value }) => (
+              <div key={label}>
+                <p className="text-xs text-avenue-text-muted">{label}</p>
+                <p className="font-semibold text-avenue-text-heading mt-0.5">{value}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Process 7: Before/After snapshot diff ────────────── */}
+      {(beforeSnap || afterSnap) && (
+        <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-3">
+          <h2 className="font-bold text-avenue-text-heading text-sm font-heading border-b border-[#EEEEEE] pb-2 flex items-center gap-2">
+            <GitCompareArrows size={15} className="text-avenue-indigo" />
+            Before / After Snapshot
+          </h2>
+          <div className="grid grid-cols-2 gap-4 text-xs font-mono">
+            <div>
+              <p className="font-bold text-avenue-text-muted mb-2 uppercase tracking-wide">Before</p>
+              {beforeSnap ? Object.entries(beforeSnap).filter(([k]) => k !== "snapshotAt").map(([k, v]) => (
+                <div key={k} className="flex justify-between border-b border-[#EEEEEE]/50 py-1">
+                  <span className="text-avenue-text-muted">{k}</span>
+                  <span className="text-avenue-text-heading">{String(v ?? "—")}</span>
+                </div>
+              )) : <p className="text-avenue-text-muted italic">Not captured</p>}
+            </div>
+            <div>
+              <p className="font-bold text-avenue-text-muted mb-2 uppercase tracking-wide">After</p>
+              {afterSnap ? Object.entries(afterSnap).filter(([k]) => k !== "snapshotAt").map(([k, v]) => {
+                const changed = beforeSnap && beforeSnap[k] !== v;
+                return (
+                  <div key={k} className={`flex justify-between border-b border-[#EEEEEE]/50 py-1 ${changed ? "bg-[#28A745]/5" : ""}`}>
+                    <span className="text-avenue-text-muted">{k}</span>
+                    <span className={`${changed ? "text-[#28A745] font-bold" : "text-avenue-text-heading"}`}>{String(v ?? "—")}</span>
+                  </div>
+                );
+              }) : <p className="text-avenue-text-muted italic">Populated on apply</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Process 7: Maker-checker & workflow actions ───────── */}
+      <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-4">
+        <h2 className="font-bold text-avenue-text-heading text-sm font-heading border-b border-[#EEEEEE] pb-2">
+          Workflow Actions
+        </h2>
+
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <p className="text-xs text-avenue-text-muted">Maker</p>
+            <p className="font-semibold text-avenue-text-heading mt-0.5">
+              {richEndorsement?.maker ? `${richEndorsement.maker.firstName} ${richEndorsement.maker.lastName}` : (endorsement.requestedBy ?? "—")}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-avenue-text-muted">Checker / Approver</p>
+            <p className="font-semibold text-avenue-text-heading mt-0.5">
+              {richEndorsement?.approver ? `${richEndorsement.approver.firstName} ${richEndorsement.approver.lastName}` : "Pending"}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {/* Compute / refresh pro-rata */}
+          {canAction && (
+            <form action={computeProRataAction}>
+              <input type="hidden" name="endorsementId" value={id} />
+              <button type="submit"
+                className="border border-avenue-indigo text-avenue-indigo px-4 py-1.5 rounded-full text-xs font-semibold hover:bg-avenue-indigo hover:text-white transition-colors flex items-center gap-1">
+                <Calculator size={12} /> Compute Pro-Rata
+              </button>
+            </form>
+          )}
+
+          {/* Submit (DRAFT → SUBMITTED) */}
+          {isDraft && (
+            <form action={submitAmendmentAction}>
+              <input type="hidden" name="endorsementId" value={id} />
+              <button type="submit"
+                className="bg-[#17A2B8] text-white px-4 py-1.5 rounded-full text-xs font-semibold hover:bg-[#138496] transition-colors">
+                Submit for Approval
+              </button>
+            </form>
+          )}
+
+          {/* Approve (SUBMITTED → APPROVED) — only non-maker */}
+          {canAction && !isMaker && (
+            <form action={approveAmendmentAction}>
+              <input type="hidden" name="endorsementId" value={id} />
+              <button type="submit"
+                className="bg-[#28A745] text-white px-4 py-1.5 rounded-full text-xs font-semibold hover:bg-[#218838] transition-colors flex items-center gap-1">
+                <CheckCircle size={12} /> Approve
+              </button>
+            </form>
+          )}
+
+          {/* Apply (APPROVED → APPLIED) */}
+          {isApproved && (
+            <form action={applyAmendmentAction}>
+              <input type="hidden" name="endorsementId" value={id} />
+              <button type="submit"
+                className="bg-avenue-indigo text-white px-4 py-1.5 rounded-full text-xs font-semibold hover:bg-avenue-secondary transition-colors flex items-center gap-1">
+                <PlayCircle size={12} /> Apply Amendment
+              </button>
+            </form>
+          )}
+
+          {/* Reject */}
+          {canAction && (
+            <form action={rejectAmendmentAction} className="flex gap-2">
+              <input type="hidden" name="endorsementId" value={id} />
+              <input name="reason" type="text" required placeholder="Rejection reason"
+                className="border border-[#DC3545]/40 text-avenue-text-heading px-3 py-1.5 rounded-[6px] text-xs focus:outline-none focus:ring-1 focus:ring-[#DC3545]" />
+              <button type="submit"
+                className="border border-[#DC3545] text-[#DC3545] px-4 py-1.5 rounded-full text-xs font-semibold hover:bg-[#DC3545]/10 transition-colors flex items-center gap-1">
+                <XCircle size={12} /> Reject
+              </button>
+            </form>
+          )}
+
+          {isMaker && canAction && (
+            <p className="text-xs text-[#856404] flex items-center gap-1 self-center">
+              <AlertTriangle size={11} /> You initiated this amendment. A different user must approve.
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );
