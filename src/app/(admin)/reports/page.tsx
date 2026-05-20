@@ -5,6 +5,7 @@ import {
   HeartPulse, AlertCircle, Building2, UserSquare, AlertTriangle, BedDouble,
   Activity, Percent, LineChart, Clock, BadgeDollarSign, Landmark, Droplets,
   XCircle, UserCheck, ShieldCheck, BarChart3, Stethoscope, CalendarClock, ShieldAlert,
+  Scale, CreditCard, Briefcase, ArrowUpDown, Wrench, GitMerge,
 } from "lucide-react";
 
 const REPORT_GROUPS = [
@@ -40,11 +41,17 @@ const REPORT_GROUPS = [
       { id: "commission-statements",title: "Commission Statements",  description: "Broker commissions earned, paid, and outstanding per group.",                                    icon: BadgeDollarSign,color: "bg-[#17A2B8]/10 text-[#17A2B8]" },
       { id: "levies-taxes",      title: "Levies & Taxes",            description: "Stamp Duty, Training Levy, and PHCF per invoice — IRA regulatory compliance view.",             icon: Landmark,       color: "bg-[#6C757D]/10 text-[#6C757D]" },
       { id: "fund-utilisation",  title: "Fund Utilisation (Self-Funded)", description: "Balance, deposits, claims deducted, and admin fees per self-funded scheme.",               icon: Droplets,       color: "bg-[#17A2B8]/10 text-[#17A2B8]" },
+      { id: "debtors-creditors", title: "Debtors & Creditors",       description: "Outstanding receivables from schemes and payables to providers — ageing by bucket.",             icon: Scale,          color: "bg-[#DC3545]/10 text-[#DC3545]" },
+      { id: "fees-statements",   title: "Fees Statement",            description: "Card issuance, reinstatement, and admin fees charged across schemes in a period.",               icon: CreditCard,     color: "bg-[#292A83]/10 text-[#292A83]" },
+      { id: "admin-fee",         title: "Admin Fee Statement (Self-Funded)", description: "Administration fees invoiced to self-funded schemes — flat-per-insured and %-of-claims breakdown.", icon: Briefcase, color: "bg-[#FFC107]/10 text-[#856404]" },
     ],
   },
   {
     label: "Analytical & System",
     reports: [
+      { id: "organic-growth",     title: "Organic Growth",            description: "New enrolments vs. lapses vs. cancellations per month — net membership change.",            icon: ArrowUpDown,    color: "bg-[#28A745]/10 text-[#28A745]" },
+      { id: "comparison-services",title: "Service Cost Comparison",  description: "Contracted rate vs. average billed vs. average approved per CPT procedure code.",               icon: Wrench,         color: "bg-[#17A2B8]/10 text-[#17A2B8]" },
+      { id: "quotation-funnel",  title: "Quotation Funnel",          description: "Quotation pipeline by status — draft, assessed, issued, accepted, declined, expired.",           icon: GitMerge,       color: "bg-[#6C757D]/10 text-[#6C757D]" },
       { id: "endorsements",      title: "Endorsement Report",        description: "Endorsements by type and group with pro-rata financial impact.",                                 icon: TrendingUp,     color: "bg-[#6C757D]/10 text-[#6C757D]" },
       { id: "quotations",        title: "Quotation Pipeline",        description: "Quotes generated, conversion rate, average premium, and broker attribution.",                   icon: Calculator,     color: "bg-[#292A83]/10 text-[#292A83]" },
       { id: "claims-per-operator",title: "Claims Per Operator",      description: "Adjudication volume and approval rates per staff member — productivity monitoring.",            icon: UserCheck,      color: "bg-[#28A745]/10 text-[#28A745]" },

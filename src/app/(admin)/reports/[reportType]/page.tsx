@@ -38,6 +38,14 @@ const REPORT_TITLES: Record<string, string> = {
   "analytics-provider-performance":   "Provider Performance Report",
   "analytics-renewal-recommendations":"Renewal Recommendations Report",
   "analytics-risk-distribution":      "Risk Tier Distribution Report",
+  // Tranche 2 additions
+  "debtors-creditors":  "Debtors & Creditors Report",
+  "fees-statements":    "Fees Statement Report",
+  "admin-fee":          "Admin Fee Statement (Self-Funded)",
+  // Tranche 3 additions
+  "organic-growth":       "Organic Growth Report",
+  "comparison-services":  "Service Cost Comparison Report",
+  "quotation-funnel":     "Quotation Funnel Report",
 };
 
 type Cell = string | { text: string; href: string };
@@ -1229,6 +1237,313 @@ async function getAnalyticsRiskDistributionData(tenantId: string, scope?: Analyt
   return { kpis, headers, data };
 }
 
+// ── R-10: Debtors & Creditors ─────────────────────────────────────────────────
+async function getDebtorsCreditorsData(tenantId: string): Promise<ReportResult> {
+  const now = new Date();
+
+  // Debtors: unpaid invoice balances per group, bucketed by days overdue
+  const invoices = await prisma.invoice.findMany({
+    where: { tenantId, balance: { gt: 0 } },
+    select: {
+      balance: true, dueDate: true, invoiceNumber: true,
+      group: { select: { name: true } },
+    },
+  });
+
+  const bucket = (due: Date) => {
+    const d = Math.ceil((now.getTime() - due.getTime()) / 864e5);
+    if (d <= 0)  return "Current";
+    if (d <= 30) return "1–30 days";
+    if (d <= 60) return "31–60 days";
+    if (d <= 90) return "61–90 days";
+    return "91+ days";
+  };
+
+  const debtorRows = invoices.map(i => [
+    i.invoiceNumber,
+    i.group.name,
+    `KES ${Number(i.balance).toLocaleString("en-KE")}`,
+    bucket(i.dueDate),
+    new Date(i.dueDate).toLocaleDateString("en-KE"),
+  ]);
+
+  // Creditors: approved claims not yet in a settled batch (payable to providers)
+  const unsettledClaims = await prisma.claim.findMany({
+    where: { tenantId, status: { in: ["APPROVED", "PARTIALLY_APPROVED"] }, settlementBatchId: null },
+    select: {
+      claimNumber: true, approvedAmount: true,
+      provider: { select: { name: true } },
+      decidedAt: true,
+    },
+  });
+
+  const creditorRows = unsettledClaims.map(c => [
+    c.claimNumber,
+    c.provider.name,
+    `KES ${Number(c.approvedAmount ?? 0).toLocaleString("en-KE")}`,
+    "Provider Payable",
+    c.decidedAt ? new Date(c.decidedAt).toLocaleDateString("en-KE") : "—",
+  ]);
+
+  const totalDebtors   = invoices.reduce((s, i) => s + Number(i.balance), 0);
+  const totalCreditors = unsettledClaims.reduce((s, c) => s + Number(c.approvedAmount ?? 0), 0);
+
+  return {
+    kpis: [
+      { label: "Total Receivables (KES)", value: totalDebtors.toLocaleString("en-KE") },
+      { label: "Total Payables (KES)",    value: totalCreditors.toLocaleString("en-KE") },
+      { label: "Net Position (KES)",      value: (totalDebtors - totalCreditors).toLocaleString("en-KE") },
+      { label: "Unsettled Claim Batches", value: unsettledClaims.length.toString() },
+    ],
+    headers: ["Reference", "Counterparty", "Amount (KES)", "Type / Age Bucket", "Date"],
+    data: [...debtorRows, ...creditorRows],
+  };
+}
+
+// ── R-12: Fees Statement ──────────────────────────────────────────────────────
+async function getFeesStatementData(tenantId: string): Promise<ReportResult> {
+  // Card issuance fees — from MembershipCard records that have a replacementFeeInvoiceId
+  const cardFeeInvoices = await prisma.invoice.findMany({
+    where: { tenantId, notes: { contains: "Card" } },
+    select: { invoiceNumber: true, totalAmount: true, createdAt: true, group: { select: { name: true } } },
+    orderBy: { createdAt: "desc" },
+    take: 100,
+  });
+
+  // Reinstatement fees — invoices with "Reinstate" in notes
+  const reinstateFeeInvoices = await prisma.invoice.findMany({
+    where: { tenantId, notes: { contains: "Reinstate" } },
+    select: { invoiceNumber: true, totalAmount: true, createdAt: true, group: { select: { name: true } } },
+    orderBy: { createdAt: "desc" },
+    take: 100,
+  });
+
+  const cardRows = cardFeeInvoices.map(i => [
+    i.invoiceNumber, i.group.name, "Card Issuance",
+    `KES ${Number(i.totalAmount).toLocaleString("en-KE")}`,
+    new Date(i.createdAt).toLocaleDateString("en-KE"),
+  ]);
+  const reinstateRows = reinstateFeeInvoices.map(i => [
+    i.invoiceNumber, i.group.name, "Reinstatement",
+    `KES ${Number(i.totalAmount).toLocaleString("en-KE")}`,
+    new Date(i.createdAt).toLocaleDateString("en-KE"),
+  ]);
+
+  const all = [...cardRows, ...reinstateRows];
+  const total = [...cardFeeInvoices, ...reinstateFeeInvoices].reduce((s, i) => s + Number(i.totalAmount), 0);
+
+  return {
+    kpis: [
+      { label: "Card Fees",          value: `KES ${cardFeeInvoices.reduce((s, i) => s + Number(i.totalAmount), 0).toLocaleString("en-KE")}` },
+      { label: "Reinstatement Fees", value: `KES ${reinstateFeeInvoices.reduce((s, i) => s + Number(i.totalAmount), 0).toLocaleString("en-KE")}` },
+      { label: "Total Fees",         value: `KES ${total.toLocaleString("en-KE")}` },
+      { label: "Records",            value: all.length.toString() },
+    ],
+    headers: ["Invoice No.", "Scheme", "Fee Type", "Amount (KES)", "Date"],
+    data: all,
+  };
+}
+
+// ── R-15: Admin Fee Statement (self-funded) ───────────────────────────────────
+async function getAdminFeeData(tenantId: string): Promise<ReportResult> {
+  const feeTransactions = await prisma.fundTransaction.findMany({
+    where: { tenantId, type: "ADMIN_FEE" },
+    select: {
+      id: true, amount: true, postedAt: true, description: true,
+      selfFundedAccount: {
+        select: { group: { select: { name: true, adminFeeMethod: true, adminFeeRate: true } } },
+      },
+    },
+    orderBy: { postedAt: "desc" },
+    take: 200,
+  });
+
+  const total = feeTransactions.reduce((s, t) => s + Number(t.amount), 0);
+
+  return {
+    kpis: [
+      { label: "Admin Fee Transactions", value: feeTransactions.length.toString() },
+      { label: "Total Admin Fees (KES)", value: `KES ${total.toLocaleString("en-KE")}` },
+      { label: "Self-Funded Schemes",    value: new Set(feeTransactions.map(t => t.selfFundedAccount.group.name)).size.toString() },
+      { label: "Avg Fee (KES)",          value: feeTransactions.length > 0 ? `KES ${(total / feeTransactions.length).toLocaleString("en-KE")}` : "—" },
+    ],
+    headers: ["Scheme", "Calc Method", "Fee Rate", "Amount (KES)", "Date", "Description"],
+    data: feeTransactions.map(t => [
+      t.selfFundedAccount.group.name,
+      t.selfFundedAccount.group.adminFeeMethod ?? "—",
+      t.selfFundedAccount.group.adminFeeRate ? `${Number(t.selfFundedAccount.group.adminFeeRate)}` : "—",
+      `KES ${Number(t.amount).toLocaleString("en-KE")}`,
+      new Date(t.postedAt).toLocaleDateString("en-KE"),
+      t.description ?? "—",
+    ]),
+  };
+}
+
+// ── R-17: Organic Growth ──────────────────────────────────────────────────────
+async function getOrganicGrowthData(tenantId: string): Promise<ReportResult> {
+  const twelveMonthsAgo = new Date();
+  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+
+  const [newMembers, lapses, cancellations] = await Promise.all([
+    prisma.member.groupBy({
+      by: ["enrollmentDate"],
+      where: { tenantId, enrollmentDate: { gte: twelveMonthsAgo } },
+      _count: { _all: true },
+    }),
+    prisma.membershipLapseRecord.groupBy({
+      by: ["lapseDate"],
+      where: { tenantId, lapseDate: { gte: twelveMonthsAgo } },
+      _count: { _all: true },
+    }),
+    prisma.membershipCancellationRecord.groupBy({
+      by: ["effectiveDate"],
+      where: { tenantId, effectiveDate: { gte: twelveMonthsAgo } },
+      _count: { _all: true },
+    }),
+  ]);
+
+  // Aggregate by month
+  const byMonth: Record<string, { month: string; newCount: number; lapsed: number; cancelled: number }> = {};
+  const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  const monthLabel = (k: string) => new Date(k + "-01").toLocaleDateString("en-KE", { month: "short", year: "numeric" });
+
+  for (const r of newMembers) {
+    const k = monthKey(new Date(r.enrollmentDate));
+    if (!byMonth[k]) byMonth[k] = { month: monthLabel(k), newCount: 0, lapsed: 0, cancelled: 0 };
+    byMonth[k].newCount += r._count._all;
+  }
+  for (const r of lapses) {
+    const k = monthKey(new Date(r.lapseDate));
+    if (!byMonth[k]) byMonth[k] = { month: monthLabel(k), newCount: 0, lapsed: 0, cancelled: 0 };
+    byMonth[k].lapsed += r._count._all;
+  }
+  for (const r of cancellations) {
+    const k = monthKey(new Date(r.effectiveDate));
+    if (!byMonth[k]) byMonth[k] = { month: monthLabel(k), newCount: 0, lapsed: 0, cancelled: 0 };
+    byMonth[k].cancelled += r._count._all;
+  }
+
+  const rows = Object.entries(byMonth).sort(([a], [b]) => a.localeCompare(b))
+    .map(([, v]) => [
+      v.month,
+      v.newCount.toString(),
+      v.lapsed.toString(),
+      v.cancelled.toString(),
+      (v.newCount - v.lapsed - v.cancelled).toString(),
+    ]);
+
+  const totalNew       = newMembers.reduce((s, r) => s + r._count._all, 0);
+  const totalLapsed    = lapses.reduce((s, r) => s + r._count._all, 0);
+  const totalCancelled = cancellations.reduce((s, r) => s + r._count._all, 0);
+
+  return {
+    kpis: [
+      { label: "New Enrolments (12m)",  value: totalNew.toString() },
+      { label: "Lapses (12m)",          value: totalLapsed.toString() },
+      { label: "Cancellations (12m)",   value: totalCancelled.toString() },
+      { label: "Net Growth (12m)",      value: (totalNew - totalLapsed - totalCancelled).toString() },
+    ],
+    headers: ["Month", "New Enrolments", "Lapses", "Cancellations", "Net Growth"],
+    data: rows,
+  };
+}
+
+// ── R-22: Service Cost Comparison ─────────────────────────────────────────────
+async function getComparisonServicesData(tenantId: string): Promise<ReportResult> {
+  // Group claim lines by CPT code to compare contracted vs billed vs approved
+  const lines = await prisma.claimLine.findMany({
+    where: { claim: { tenantId } },
+    select: {
+      cptCode: true, description: true,
+      billedAmount: true, approvedAmount: true, tariffRate: true,
+    },
+    take: 2000,
+  });
+
+  const byCpt: Record<string, { desc: string; billed: number[]; approved: number[]; tariff: number[] }> = {};
+  for (const l of lines) {
+    const code = l.cptCode ?? "UNCODED";
+    if (!byCpt[code]) byCpt[code] = { desc: l.description, billed: [], approved: [], tariff: [] };
+    byCpt[code].billed.push(Number(l.billedAmount));
+    if (l.approvedAmount) byCpt[code].approved.push(Number(l.approvedAmount));
+    if (l.tariffRate) byCpt[code].tariff.push(Number(l.tariffRate));
+  }
+
+  const avg = (arr: number[]) => arr.length > 0 ? arr.reduce((s, v) => s + v, 0) / arr.length : 0;
+
+  const rows = Object.entries(byCpt)
+    .map(([code, v]) => {
+      const avgBilled    = avg(v.billed);
+      const avgApproved  = avg(v.approved);
+      const avgContracted = avg(v.tariff);
+      const variance = avgContracted > 0 ? ((avgBilled - avgContracted) / avgContracted * 100).toFixed(1) + "%" : "—";
+      return [
+        code, v.desc.slice(0, 60),
+        `KES ${avgContracted > 0 ? Math.round(avgContracted).toLocaleString("en-KE") : "—"}`,
+        `KES ${Math.round(avgBilled).toLocaleString("en-KE")}`,
+        `KES ${avgApproved > 0 ? Math.round(avgApproved).toLocaleString("en-KE") : "—"}`,
+        variance,
+        v.billed.length.toString(),
+      ];
+    })
+    .sort((a, b) => (a[0] as string).localeCompare(b[0] as string));
+
+  return {
+    kpis: [
+      { label: "Distinct CPT Codes",   value: Object.keys(byCpt).length.toString() },
+      { label: "Total Claim Lines",    value: lines.length.toString() },
+      { label: "Lines with Tariff",    value: lines.filter(l => l.tariffRate).length.toString() },
+      { label: "Lines without Tariff", value: lines.filter(l => !l.tariffRate).length.toString() },
+    ],
+    headers: ["CPT Code", "Description", "Contracted (avg)", "Billed (avg)", "Approved (avg)", "Billed vs Contracted", "Occurrences"],
+    data: rows,
+  };
+}
+
+// ── R-23: Quotation Funnel ────────────────────────────────────────────────────
+async function getQuotationFunnelData(tenantId: string): Promise<ReportResult> {
+  const quotations = await prisma.quotation.findMany({
+    where: { tenantId },
+    select: {
+      quoteNumber: true, status: true, clientType: true, memberCount: true,
+      finalPremium: true, createdAt: true, isRenewal: true,
+      broker: { select: { name: true } },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 200,
+  });
+
+  const byStatus: Record<string, number> = {};
+  for (const q of quotations) {
+    byStatus[q.status] = (byStatus[q.status] ?? 0) + 1;
+  }
+
+  const total      = quotations.length;
+  const accepted   = byStatus["ACCEPTED"] ?? 0;
+  const convRate   = total > 0 ? ((accepted / total) * 100).toFixed(1) + "%" : "—";
+  const totalValue = quotations.filter(q => q.finalPremium).reduce((s, q) => s + Number(q.finalPremium), 0);
+
+  return {
+    kpis: [
+      { label: "Total Quotations",   value: total.toString() },
+      { label: "Accepted",           value: accepted.toString() },
+      { label: "Conversion Rate",    value: convRate },
+      { label: "Pipeline Value (KES)", value: `KES ${Math.round(totalValue).toLocaleString("en-KE")}` },
+    ],
+    headers: ["Quote No.", "Status", "Client Type", "Lives", "Premium (KES)", "Renewal", "Broker", "Date"],
+    data: quotations.map(q => [
+      q.quoteNumber,
+      q.status.replace(/_/g, " "),
+      q.clientType ?? "—",
+      q.memberCount.toString(),
+      q.finalPremium ? `KES ${Number(q.finalPremium).toLocaleString("en-KE")}` : "—",
+      q.isRenewal ? "Yes" : "No",
+      q.broker?.name ?? "Direct",
+      new Date(q.createdAt).toLocaleDateString("en-KE"),
+    ]),
+  };
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function ReportDetailPage({
@@ -1262,6 +1577,9 @@ export default async function ReportDetailPage({
   else if (reportType === "admissions")          ({ kpis, headers, data } = await getAdmissionsData(tenantId));
   else if (reportType === "admission-visits")    ({ kpis, headers, data } = await getAdmissionVisitsData(tenantId));
   // Tranche 2
+  else if (reportType === "debtors-creditors")   ({ kpis, headers, data } = await getDebtorsCreditorsData(tenantId));
+  else if (reportType === "fees-statements")     ({ kpis, headers, data } = await getFeesStatementData(tenantId));
+  else if (reportType === "admin-fee")           ({ kpis, headers, data } = await getAdminFeeData(tenantId));
   else if (reportType === "loss-ratio")          ({ kpis, headers, data } = await getLossRatioData(tenantId));
   else if (reportType === "claims-experience")   ({ kpis, headers, data } = await getClaimsExperienceData(tenantId));
   else if (reportType === "ageing-analysis")     ({ kpis, headers, data } = await getAgeingAnalysisData(tenantId));
@@ -1269,6 +1587,9 @@ export default async function ReportDetailPage({
   else if (reportType === "levies-taxes")        ({ kpis, headers, data } = await getLeviesTaxesData(tenantId));
   else if (reportType === "fund-utilisation")    ({ kpis, headers, data } = await getFundUtilisationData(tenantId));
   // Tranche 3
+  else if (reportType === "organic-growth")      ({ kpis, headers, data } = await getOrganicGrowthData(tenantId));
+  else if (reportType === "comparison-services") ({ kpis, headers, data } = await getComparisonServicesData(tenantId));
+  else if (reportType === "quotation-funnel")    ({ kpis, headers, data } = await getQuotationFunnelData(tenantId));
   else if (reportType === "exclusion-rejected")  ({ kpis, headers, data } = await getExclusionRejectedData(tenantId));
   else if (reportType === "claims-per-operator") ({ kpis, headers, data } = await getClaimsPerOperatorData(tenantId));
   else if (reportType === "user-rights-roles")   ({ kpis, headers, data } = await getUserRightsRolesData(tenantId));
@@ -1295,13 +1616,24 @@ export default async function ReportDetailPage({
           </div>
         </div>
         {data.length > 0 && (
-          <a
-            href={`/api/reports/${reportType}/export`}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-avenue-indigo border border-avenue-indigo/30 rounded-full hover:bg-avenue-indigo hover:text-white transition-colors"
-          >
-            <Download size={15} />
-            Export CSV
-          </a>
+          <div className="flex items-center gap-2">
+            <a
+              href={`/api/reports/${reportType}/export`}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-avenue-indigo border border-avenue-indigo/30 rounded-full hover:bg-avenue-indigo hover:text-white transition-colors"
+            >
+              <Download size={15} />
+              Export CSV
+            </a>
+            <a
+              href={`/api/reports/pdf?reportType=${reportType}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-[#DC3545] border border-[#DC3545]/30 rounded-full hover:bg-[#DC3545] hover:text-white transition-colors"
+            >
+              <Download size={15} />
+              Export PDF
+            </a>
+          </div>
         )}
       </div>
 

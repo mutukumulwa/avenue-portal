@@ -766,6 +766,113 @@ async function fetchReportData(
       };
     }
 
+    // ── Additional reports ────────────────────────────────────────────────────
+
+    case "debtors-creditors": {
+      const now = new Date();
+      const bucket = (due: Date) => {
+        const d = Math.ceil((now.getTime() - due.getTime()) / 864e5);
+        if (d <= 0) return "Current"; if (d <= 30) return "1-30d";
+        if (d <= 60) return "31-60d"; if (d <= 90) return "61-90d"; return "91+d";
+      };
+      const invoices = await prisma.invoice.findMany({
+        where: { tenantId, balance: { gt: 0 } },
+        select: { invoiceNumber: true, balance: true, dueDate: true, group: { select: { name: true } } },
+      });
+      const unsettled = await prisma.claim.findMany({
+        where: { tenantId, status: { in: ["APPROVED","PARTIALLY_APPROVED"] }, settlementBatchId: null },
+        select: { claimNumber: true, approvedAmount: true, provider: { select: { name: true } }, decidedAt: true },
+      });
+      return {
+        headers: ["Reference", "Counterparty", "Amount (KES)", "Type", "Age Bucket", "Date"],
+        rows: [
+          ...invoices.map(i => [i.invoiceNumber, i.group.name, Number(i.balance).toFixed(2), "Debtor", bucket(i.dueDate), new Date(i.dueDate).toISOString().split("T")[0]]),
+          ...unsettled.map(c => [c.claimNumber, c.provider.name, Number(c.approvedAmount ?? 0).toFixed(2), "Creditor", "—", c.decidedAt ? new Date(c.decidedAt).toISOString().split("T")[0] : ""]),
+        ],
+      };
+    }
+
+    case "fees-statements": {
+      const cardInv  = await prisma.invoice.findMany({ where: { tenantId, notes: { contains: "Card" } }, select: { invoiceNumber: true, totalAmount: true, createdAt: true, group: { select: { name: true } } } });
+      const reinInv  = await prisma.invoice.findMany({ where: { tenantId, notes: { contains: "Reinstate" } }, select: { invoiceNumber: true, totalAmount: true, createdAt: true, group: { select: { name: true } } } });
+      return {
+        headers: ["Invoice No.", "Scheme", "Fee Type", "Amount (KES)", "Date"],
+        rows: [
+          ...cardInv.map(i => [i.invoiceNumber, i.group.name, "Card Issuance", Number(i.totalAmount).toFixed(2), new Date(i.createdAt).toISOString().split("T")[0]]),
+          ...reinInv.map(i => [i.invoiceNumber, i.group.name, "Reinstatement", Number(i.totalAmount).toFixed(2), new Date(i.createdAt).toISOString().split("T")[0]]),
+        ],
+      };
+    }
+
+    case "admin-fee": {
+      const txs = await prisma.fundTransaction.findMany({
+        where: { tenantId, type: "ADMIN_FEE" },
+        select: { amount: true, postedAt: true, description: true, selfFundedAccount: { select: { group: { select: { name: true, adminFeeMethod: true } } } } },
+        orderBy: { postedAt: "desc" },
+      });
+      return {
+        headers: ["Scheme", "Calc Method", "Amount (KES)", "Date", "Description"],
+        rows: txs.map(t => [t.selfFundedAccount.group.name, t.selfFundedAccount.group.adminFeeMethod ?? "—", Number(t.amount).toFixed(2), new Date(t.postedAt).toISOString().split("T")[0], t.description ?? ""]),
+      };
+    }
+
+    case "organic-growth": {
+      const twelveAgo = new Date(); twelveAgo.setMonth(twelveAgo.getMonth() - 12);
+      const [nm, la, ca] = await Promise.all([
+        prisma.member.groupBy({ by: ["enrollmentDate"], where: { tenantId, enrollmentDate: { gte: twelveAgo } }, _count: { _all: true } }),
+        prisma.membershipLapseRecord.groupBy({ by: ["lapseDate"], where: { tenantId, lapseDate: { gte: twelveAgo } }, _count: { _all: true } }),
+        prisma.membershipCancellationRecord.groupBy({ by: ["effectiveDate"], where: { tenantId, effectiveDate: { gte: twelveAgo } }, _count: { _all: true } }),
+      ]);
+      const mk = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+      const byM: Record<string, [number,number,number]> = {};
+      for (const r of nm) { const k = mk(new Date(r.enrollmentDate)); if (!byM[k]) byM[k]=[0,0,0]; byM[k][0]+=r._count._all; }
+      for (const r of la) { const k = mk(new Date(r.lapseDate)); if (!byM[k]) byM[k]=[0,0,0]; byM[k][1]+=r._count._all; }
+      for (const r of ca) { const k = mk(new Date(r.effectiveDate)); if (!byM[k]) byM[k]=[0,0,0]; byM[k][2]+=r._count._all; }
+      return {
+        headers: ["Month", "New Enrolments", "Lapses", "Cancellations", "Net Growth"],
+        rows: Object.entries(byM).sort(([a],[b])=>a.localeCompare(b)).map(([k,[n,l,c]]) => [k, n.toString(), l.toString(), c.toString(), (n-l-c).toString()]),
+      };
+    }
+
+    case "comparison-services": {
+      const lines = await prisma.claimLine.findMany({
+        where: { claim: { tenantId } },
+        select: { cptCode: true, description: true, billedAmount: true, approvedAmount: true, tariffRate: true },
+        take: 5000,
+      });
+      const byCpt: Record<string, { desc: string; billed: number[]; approved: number[]; tariff: number[] }> = {};
+      for (const l of lines) {
+        const c = l.cptCode ?? "UNCODED";
+        if (!byCpt[c]) byCpt[c] = { desc: l.description, billed: [], approved: [], tariff: [] };
+        byCpt[c].billed.push(Number(l.billedAmount));
+        if (l.approvedAmount) byCpt[c].approved.push(Number(l.approvedAmount));
+        if (l.tariffRate) byCpt[c].tariff.push(Number(l.tariffRate));
+      }
+      const avg = (a: number[]) => a.length > 0 ? a.reduce((s,v)=>s+v,0)/a.length : 0;
+      return {
+        headers: ["CPT Code", "Description", "Avg Contracted (KES)", "Avg Billed (KES)", "Avg Approved (KES)", "Billed vs Contracted", "Count"],
+        rows: Object.entries(byCpt).sort(([a],[b])=>a.localeCompare(b)).map(([c,v]) => {
+          const ab = avg(v.billed), at = avg(v.tariff);
+          return [c, v.desc.slice(0,60), at > 0 ? at.toFixed(2) : "—", ab.toFixed(2), avg(v.approved).toFixed(2),
+            at > 0 ? `${(((ab-at)/at)*100).toFixed(1)}%` : "—", v.billed.length.toString()];
+        }),
+      };
+    }
+
+    case "quotation-funnel": {
+      const qs = await prisma.quotation.findMany({
+        where: { tenantId },
+        select: { quoteNumber: true, status: true, clientType: true, memberCount: true, finalPremium: true, createdAt: true, isRenewal: true, broker: { select: { name: true } } },
+        orderBy: { createdAt: "desc" }, take: 500,
+      });
+      return {
+        headers: ["Quote No.", "Status", "Client Type", "Lives", "Premium (KES)", "Renewal", "Broker", "Date"],
+        rows: qs.map(q => [q.quoteNumber, q.status, q.clientType ?? "—", q.memberCount.toString(),
+          q.finalPremium ? Number(q.finalPremium).toFixed(2) : "—", q.isRenewal ? "Yes" : "No",
+          q.broker?.name ?? "Direct", new Date(q.createdAt).toISOString().split("T")[0]]),
+      };
+    }
+
     default:
       return null;
   }

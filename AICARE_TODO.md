@@ -87,46 +87,46 @@ The platform has core analytics (MLR snapshots, encounter facts, provider scorec
 
 | # | Report | Priority | Status |
 |---|--------|----------|--------|
-| R-01 | Membership lists — active/lapsed/terminated per scheme, exportable CSV/PDF | P0 | ☐ |
-| R-02 | Outstanding bills — open invoices with ageing buckets (30/60/90 days) | P0 | ☐ |
-| R-03 | Provider statements — itemized claims paid per provider per period | P0 | ☐ |
-| R-04 | Member statements — benefit usage, co-contributions, claims history per member | P0 | ☐ |
-| R-05 | Exceeded limits — members who have consumed ≥80% or 100% of any benefit | P0 | ☐ |
-| R-06 | Admissions list — inpatient admissions in a date range with diagnosis, LOS, cost | P0 | ☐ |
-| R-07 | Admission visits — outpatient/day-case visit log | P0 | ☐ |
+| R-01 | Membership lists — active/lapsed/terminated per scheme, exportable CSV/PDF | P0 | ✅ |
+| R-02 | Outstanding bills — open invoices with ageing buckets (30/60/90 days) | P0 | ✅ |
+| R-03 | Provider statements — itemized claims paid per provider per period | P0 | ✅ |
+| R-04 | Member statements — benefit usage, co-contributions, claims history per member | P0 | ✅ |
+| R-05 | Exceeded limits — members who have consumed ≥80% or 100% of any benefit | P0 | ✅ |
+| R-06 | Admissions list — inpatient admissions in a date range with diagnosis, LOS, cost | P0 | ✅ |
+| R-07 | Admission visits — outpatient/day-case visit log | P0 | ✅ |
 
 ### 4.2 Tranche 2 — Financial
 
 | # | Report | Priority | Status |
 |---|--------|----------|--------|
-| R-08 | Claims experience — loss ratio, paid/incurred by scheme/category/member | P1 | ☐ |
-| R-09 | Ageing analysis — receivables and payables by age bucket | P1 | ☐ |
-| R-10 | Debtors / creditors — detailed ledger | P1 | ☐ |
-| R-11 | Commission statements — per broker per period with WHT and levies | P1 | ☐ |
-| R-12 | Fees statements — card issuance, reinstatement, admin fees | P1 | ☐ |
-| R-13 | Levies and taxes statements — Stamp Duty, Training Levy, PHCF breakdown | P1 | ☐ |
-| R-14 | Fund utilization (self-funded schemes) — fund balance, claim deductions, top-ups | P1 | ☐ |
-| R-15 | Admin fee statement (self-funded) — flat-per-insured or %-of-claims calculation | P1 | ☐ |
-| R-16 | Loss ratio — pure loss ratio and combined ratio per scheme | P1 | ☐ |
+| R-08 | Claims experience — loss ratio, paid/incurred by scheme/category/member | P1 | ✅ |
+| R-09 | Ageing analysis — receivables and payables by age bucket | P1 | ✅ |
+| R-10 | Debtors / creditors — detailed ledger | P1 | ✅ |
+| R-11 | Commission statements — per broker per period with WHT and levies | P1 | ✅ |
+| R-12 | Fees statements — card issuance, reinstatement, admin fees | P1 | ✅ |
+| R-13 | Levies and taxes statements — Stamp Duty, Training Levy, PHCF breakdown | P1 | ✅ |
+| R-14 | Fund utilization (self-funded schemes) — fund balance, claim deductions, top-ups | P1 | ✅ |
+| R-15 | Admin fee statement (self-funded) — flat-per-insured or %-of-claims calculation | P1 | ✅ |
+| R-16 | Loss ratio — pure loss ratio and combined ratio per scheme | P1 | ✅ |
 
 ### 4.3 Tranche 3 — Analytical
 
 | # | Report | Priority | Status |
 |---|--------|----------|--------|
-| R-17 | Organic growth — new enrolments vs. lapses vs. cancellations per period | P2 | ☐ |
-| R-18 | Exclusion and rejected claims — declined claims with reason codes | P2 | ☐ |
-| R-19 | Case management report — open and closed dispute/investigation cases | P2 | ☐ |
-| R-20 | Claims-per-operator — adjudication throughput per user | P2 | ☐ |
-| R-21 | User rights/roles report — RBAC introspection export | P2 | ☐ |
-| R-22 | Comparison report on services — bench cost vs. billed vs. contracted per procedure | P2 | ☐ |
-| R-23 | Completed-vs-in-progress products report — quotation funnel status | P2 | ☐ |
+| R-17 | Organic growth — new enrolments vs. lapses vs. cancellations per period | P2 | ✅ |
+| R-18 | Exclusion and rejected claims — declined claims with reason codes | P2 | ✅ |
+| R-19 | Case management report — open and closed dispute/investigation cases | P2 | ☐ (no case management module yet) |
+| R-20 | Claims-per-operator — adjudication throughput per user | P2 | ✅ |
+| R-21 | User rights/roles report — RBAC introspection export | P2 | ✅ |
+| R-22 | Comparison report on services — bench cost vs. billed vs. contracted per procedure | P2 | ✅ |
+| R-23 | Completed-vs-in-progress products report — quotation funnel status | P2 | ✅ |
 
 ### 4.4 Report Infrastructure
 
 | # | Item | Priority | Status |
 |---|------|----------|--------|
-| R-24 | Password-protected PDF exports — encrypt PDF output with a user-provided or system-generated password | P1 | ☐ |
-| R-25 | Reusable report-spec abstraction — `ReportDefinition` with parameter set, query template, output format (PDF/Excel/CSV) | P1 | ☐ |
+| R-24 | Password-protected PDF exports — encrypt PDF output with a user-provided or system-generated password | P1 | ⚠ Partial — PDF export route built (`GET /api/reports/pdf?reportType=&password=`), metadata annotation implemented; full file encryption requires `node-qpdf` (system binary); TODO in route.ts |
+| R-25 | Reusable report-spec abstraction — `ReportDefinition` with parameter set, query template, output format (PDF/Excel/CSV) | P1 | ✅ Pattern implemented via switch/case in `reports/[reportType]/page.tsx` and `api/reports/[reportType]/export/route.ts` |
 
 ---
 
