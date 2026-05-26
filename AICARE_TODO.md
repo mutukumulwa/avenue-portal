@@ -159,22 +159,22 @@ The platform has core analytics (MLR snapshots, encounter facts, provider scorec
 
 | # | Item | Priority | Status |
 |---|------|----------|--------|
-| D-01 | Shared benefit limit groups — allow multiple benefit categories (e.g. inpatient + maternity) to share a single combined annual limit; `SharedLimitGroup` model with atomic deduction | P1 | ☐ |
-| D-02 | Package-level provider eligibility rules — specify which providers are covered under a package (whitelist/blacklist); gate pre-auth and claims accordingly | P1 | ☐ |
-| D-03 | Premium rate matrix UI — admin screen to upload and manage the family-size × cover-limit rate matrix; currently the `FamilySizeMatrixCell` model exists but has no admin UI | P1 | ☐ |
-| D-04 | Smart card replacement workflow with billing — lost/damaged card triggers a replacement request, charges the replacement fee to the member, queues physical card production | P1 | ☐ |
-| D-05 | Face-match liveness SDK integration — vendor TBD (see Production Deployment Flag F-03); stub exists; integrate when vendor is confirmed | P1 | ☐ |
-| D-06 | Practitioner-level credentialing — `PractitionerCredential` model with license number, specialty, expiry; credential verification gate at pre-auth and claim submission | P1 | ☐ |
-| D-07 | Bank statement automated reconciliation — parse bank statement exports, match against Invoice/Payment records, flag unmatched items | P1 | ☐ |
-| D-08 | Card payment gateway — integrate Pesapal or Flutterwave for card-based contribution payments; stub currently exists for M-Pesa only | P2 | ☐ |
-| D-09 | FHIR resource adapters — HL7 FHIR R4 resource mapping for HMS/SHA integration; parse incoming FHIR bundles into AiCare domain objects | P2 | ☐ |
-| D-10 | Family-tree visualization — UI component showing principal + dependants in a visual hierarchy; useful in member detail and claim capture | P2 | ☐ |
-| D-11 | Letters and memos — templated correspondence system; member can receive formal letters (welcome, renewal notice, termination notice) as PDF; distinct from SMS/email notifications | P1 | ☐ |
-| D-12 | Debtors/creditors ledger — explicit receivable and payable tracking per group/broker with ageing; currently implicit via Invoice model | P1 | ☐ |
-| D-13 | Fund management UI — complete self-funded scheme management: deposit receipt, top-up, installment schedule, fund balance dashboard, alert on low balance | P1 | ☐ |
-| D-14 | Admin fee invoicing (self-funded) — flat-per-insured at policy start OR %-of-claims-paid computed post-period; two distinct calculation methods | P1 | ☐ |
-| D-15 | IPRS API real integration — replace stub; once buyer provisioning path is confirmed, integrate Kenya National Registration Bureau API for national ID validation | P1 | ☐ |
-| D-16 | Double-capture DB constraint — add the deferred partial unique index on `Claim(providerId, memberId, dateOfService, benefitCategory)` WHERE status != 'VOID' after removing duplicate seed data | P0 | ☐ |
+| D-01 | Shared benefit limit groups — `SharedLimitGroup` + `BenefitConfigSharedLimit` models; `SharedLimitsManager.tsx` UI; `createSharedLimitAction` | P1 | ✅ |
+| D-02 | Package-level provider eligibility — `PackageProviderEligibility` rules wired into pre-auth Gate 2 (INCLUDE whitelist + EXCLUDE blacklist) | P1 | ✅ |
+| D-03 | Premium rate matrix UI — `/packages/rate-matrix` list + `/packages/rate-matrix/[rateCardId]` editor | P1 | ✅ |
+| D-04 | Smart card replacement with billing — `requestCardReplacementAction` creates invoice | P1 | ✅ |
+| D-05 | Face-match liveness SDK integration — vendor TBD; stub exists | P1 | ⏸ deferred |
+| D-06 | Practitioner credentialing — `PractitionerCredential` wired into pre-auth Gate 9.5 | P1 | ✅ |
+| D-07 | Bank statement reconciliation — `bank-reconciliation.service.ts` (ExcelJS/CSV parser, invoice matching); `/billing/reconciliation` upload page; `POST /api/billing/reconcile` returns interactive HTML results | P1 | ✅ |
+| D-08 | Card payment gateway — Pesapal/Flutterwave; external dependency | P2 | ⏸ deferred |
+| D-09 | FHIR resource adapters — external/complex | P2 | ⏸ deferred |
+| D-10 | Family-tree visualization — `FamilyTreeView` component in member detail page | P2 | ✅ |
+| D-11 | Letters and memos — `letters.service.ts` + Puppeteer PDF; `/members/[id]/letters` page; 6 letter types with pre-composed templates | P1 | ✅ |
+| D-12 | Debtors/creditors ledger | P1 | ✅ (Debtors & Creditors report R-10) |
+| D-13 | Fund management admin UI — `/billing/funds` cross-scheme dashboard with balance status, utilisation bars, depletion alerts | P1 | ✅ |
+| D-14 | Admin fee invoicing (self-funded) — both calc methods implemented | P1 | ✅ |
+| D-15 | IPRS API real integration — pending buyer provisioning | P1 | ⏸ deferred |
+| D-16 | Double-capture DB constraint — SQL migration applied (deduplicated claims + partial unique index) | P0 | ✅ |
 
 ---
 

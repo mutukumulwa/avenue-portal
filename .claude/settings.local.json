@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(rm -f tsconfig.tsbuildinfo)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(Find-ChildItem -Path \"c:\\\\Coding\\\\avenue-portal\" -Name \"schema.prisma\" -Type File)",
+      "Bash(Select-Object -ExpandProperty FullName)"
     ]
   }
 }

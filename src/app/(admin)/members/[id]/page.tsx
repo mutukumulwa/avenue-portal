@@ -10,6 +10,7 @@ import {
   terminateForFraudAction, terminateForBreachAction, recordDeathAction,
 } from "./lifecycle-actions";
 import { MemberProfileTabs } from "@/components/members/MemberProfileTabs";
+import { FamilyTreeView } from "@/components/members/FamilyTreeView";
 import { MemberTransferPanel } from "./transfer/MemberTransferPanel";
 import { PortalLoginPanel } from "./PortalLoginPanel";
 import { BranchEnrollmentPanel } from "./webauthn/BranchEnrollmentPanel";
@@ -253,6 +254,12 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
             Onboarding
           </Link>
           <Link
+            href={`/members/${id}/letters`}
+            className="flex items-center gap-1.5 text-xs font-semibold text-[#6C757D] border border-[#6C757D]/30 hover:bg-[#6C757D]/5 px-3 py-1.5 rounded-full transition-colors"
+          >
+            Letters
+          </Link>
+          <Link
             href={`/members/${id}/card`}
             className="flex items-center gap-1.5 text-xs font-semibold text-[#17A2B8] border border-[#17A2B8]/30 hover:bg-[#17A2B8]/5 px-3 py-1.5 rounded-full transition-colors"
           >
@@ -304,6 +311,31 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
       />
 
       <BranchEnrollmentPanel memberId={member.id} />
+
+      {/* D-10: Family tree */}
+      {member.relationship === "PRINCIPAL" && (
+        <FamilyTreeView
+          principal={{
+            id: member.id,
+            memberNumber: member.memberNumber,
+            firstName: member.firstName,
+            lastName: member.lastName,
+            relationship: member.relationship,
+            status: member.status,
+            dateOfBirth: member.dateOfBirth,
+          }}
+          dependants={member.dependents.map((d) => ({
+            id: d.id,
+            memberNumber: d.memberNumber,
+            firstName: d.firstName,
+            lastName: d.lastName,
+            relationship: d.relationship,
+            status: d.status,
+            dateOfBirth: d.dateOfBirth,
+          }))}
+          highlightId={id}
+        />
+      )}
 
       {/* Tabbed profile */}
       <MemberProfileTabs member={safeMember} age={age} />

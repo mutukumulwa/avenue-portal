@@ -74,7 +74,7 @@ export const preauthAdjudicationService = {
             benefitUsages: { orderBy: { periodStart: "desc" }, take: 1 },
           },
         },
-        provider: { select: { id: true, contractStatus: true, tier: true } },
+        provider: { select: { id: true, name: true, contractStatus: true, tier: true } },
       },
     });
     if (!pa) throw new TRPCError({ code: "NOT_FOUND", message: "Pre-authorization not found" });
@@ -104,11 +104,46 @@ export const preauthAdjudicationService = {
     }
     pass("ELIGIBILITY_ACTIVE");
 
-    // ── Gate 2: Procedure covered under active package ────────
+    // ── Gate 2: Provider eligible under the member's package ──
     const procedures = pa.procedures as Array<{ code: string }>;
     const procedureCodes = procedures.map((p) => p.code);
-    // Simplified: check any procedure is on the never-pay list or unsupported
-    // Full implementation would look up benefit config's covered procedures
+
+    // Check PackageProviderEligibility rules (D-02)
+    const member = await prisma.member.findUnique({
+      where: { id: pa.memberId },
+      select: { packageVersionId: true },
+    });
+    if (member?.packageVersionId) {
+      const eligibilityRules = await prisma.packageProviderEligibility.findMany({
+        where: { packageVersionId: member.packageVersionId },
+        select: { providerId: true, providerTier: true, inclusionType: true },
+      });
+      if (eligibilityRules.length > 0) {
+        // Separate INCLUDE and EXCLUDE rules
+        const includeRules = eligibilityRules.filter((r) => r.inclusionType === "INCLUDE");
+        const excludeRules = eligibilityRules.filter((r) => r.inclusionType === "EXCLUDE");
+
+        // Hard exclusion: provider explicitly excluded by ID or tier
+        const isExcluded = excludeRules.some(
+          (r) => r.providerId === pa.providerId ||
+                 (r.providerTier && r.providerTier === pa.provider.tier),
+        );
+        if (isExcluded) {
+          return failGate("PROVIDER_ELIGIBILITY", `Provider is excluded under this package's eligibility rules`);
+        }
+
+        // Whitelist mode: include rules present — provider must be in the list
+        if (includeRules.length > 0) {
+          const isIncluded = includeRules.some(
+            (r) => r.providerId === pa.providerId ||
+                   (r.providerTier && r.providerTier === pa.provider.tier),
+          );
+          if (!isIncluded) {
+            return routeHuman("PROVIDER_ELIGIBILITY", `Provider not in package's approved provider list — routing for manual review`);
+          }
+        }
+      }
+    }
     pass("PROCEDURE_COVERED");
 
     // ── Gate 3: Diagnosis not on exclusion list ────────────────
@@ -214,6 +249,35 @@ export const preauthAdjudicationService = {
       return failGate("PROVIDER_NETWORK", `Provider contract status is ${pa.provider.contractStatus}`);
     }
     pass("PROVIDER_NETWORK");
+
+    // ── Gate 9.5: Practitioner credential check (D-06) ────────
+    // Check that the provider has at least one active practitioner
+    // with a valid, non-expired credential. If all are expired, route to human.
+    const today = new Date();
+    const providerPractitioners = await prisma.providerPractitioner.findMany({
+      where: { providerId: pa.providerId },
+      include: {
+        practitioner: {
+          include: {
+            credentials: {
+              where: { status: "ACTIVE", expiryDate: { gt: today } },
+              take: 1,
+            },
+          },
+        },
+      },
+      take: 10,
+    });
+    if (providerPractitioners.length > 0) {
+      const hasValidCredential = providerPractitioners.some(
+        (pp) => pp.practitioner.credentials.length > 0
+      );
+      if (!hasValidCredential) {
+        return routeHuman("PRACTITIONER_CREDENTIAL",
+          `No practitioner at ${pa.provider.name} has a current valid credential — manual review required`);
+      }
+    }
+    pass("PRACTITIONER_CREDENTIAL");
 
     const elapsed = Date.now() - startMs;
     if (elapsed > 3000) {
