@@ -2,7 +2,7 @@ import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { Calculator } from "lucide-react";
+import { ArrowRight, Calculator } from "lucide-react";
 
 export default async function BrokerQuotationsPage() {
   const session = await auth();
@@ -57,6 +57,7 @@ export default async function BrokerQuotationsPage() {
               <th className="px-6 py-4">Final Premium (KES)</th>
               <th className="px-6 py-4">Valid Until</th>
               <th className="px-6 py-4">Status</th>
+              <th className="px-6 py-4">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#EEEEEE] text-avenue-text-body">
@@ -72,10 +73,15 @@ export default async function BrokerQuotationsPage() {
                     {q.status}
                   </span>
                 </td>
+                <td className="px-6 py-4">
+                  <Link href={`/broker/quotations/${q.id}`} className="text-avenue-indigo hover:text-avenue-secondary font-semibold inline-flex items-center gap-1">
+                    View <ArrowRight size={14} />
+                  </Link>
+                </td>
               </tr>
             ))}
             {quotations.length === 0 && (
-              <tr><td colSpan={6} className="px-6 py-12 text-center text-avenue-text-body">No quotations yet. Click &quot;New Quote&quot; to generate one.</td></tr>
+              <tr><td colSpan={7} className="px-6 py-12 text-center text-avenue-text-body">No quotations yet. Click &quot;New Quote&quot; to generate one.</td></tr>
             )}
           </tbody>
         </table>

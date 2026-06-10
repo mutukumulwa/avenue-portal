@@ -64,10 +64,6 @@ export async function runSuspensionCheckJob() {
     console.info(`[suspension-check] Done.`);
   } catch (err) {
     console.error("[suspension-check] ERROR:", err);
-    process.exit(1);
-  } finally {
-    await prisma.$disconnect();
+    throw err;
   }
 }
-
-runSuspensionCheckJob();

@@ -494,7 +494,7 @@ export default async function ClaimDetailPage({ params }: { params: Promise<{ id
               </div>
             </div>
           ) : (
-            <p className="text-sm text-avenue-text-muted">Click "Compute Variance" to look up contracted tariff rates.</p>
+            <p className="text-sm text-avenue-text-muted">Click &quot;Compute Variance&quot; to look up contracted tariff rates.</p>
           )}
         </div>
       )}

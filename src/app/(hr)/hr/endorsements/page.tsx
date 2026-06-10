@@ -105,10 +105,10 @@ export default async function HREndorsementsPage(
                      </span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button className="text-avenue-indigo hover:text-avenue-secondary inline-flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Link href={`/hr/endorsements/${en.id}`} className="text-avenue-indigo hover:text-avenue-secondary inline-flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
                       <Eye className="w-4 h-4 mr-1" />
                       <span className="text-xs font-bold">View</span>
-                    </button>
+                    </Link>
                   </td>
                 </tr>
               ))}

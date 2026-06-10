@@ -64,7 +64,7 @@ export const bankReconciliationService = {
 
     // Detect header row (first row with a date-like or "Date" cell)
     const rows: StatementRow[] = [];
-    let headerRow = 1;
+    const headerRow = 1;
     sheet.eachRow((row, rowNum) => {
       if (rowNum === headerRow) return; // skip header
       const vals = (row.values as (string | number | Date | null)[]).slice(1);

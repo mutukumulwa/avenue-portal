@@ -270,7 +270,7 @@ export class ClaimsService {
     });
 
     if (!claim) throw new Error("Claim not found");
-    if (!["RECEIVED", "UNDER_REVIEW"].includes(claim.status)) {
+    if (!["RECEIVED", "CAPTURED", "UNDER_REVIEW"].includes(claim.status)) {
       throw new Error("Claim cannot be adjudicated in current status");
     }
 

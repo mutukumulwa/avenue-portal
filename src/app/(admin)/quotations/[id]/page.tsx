@@ -9,7 +9,6 @@ import {
 } from "lucide-react";
 import {
   sendQuotationAction,
-  acceptQuotationAction,
   declineQuotationAction,
   expireQuotationAction,
 } from "./actions";
@@ -56,7 +55,6 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
   const canSend    = q.status === "DRAFT";
   const canAction  = q.status === "SENT";
   const canExpire  = q.status === "DRAFT" || q.status === "SENT";
-  const canConvert = q.status === "ACCEPTED" && !q.groupId && !!q.packageId;
   const canBuild   = ["ASSESSED", "DRAFT"].includes(q.status);
   const canBind    = q.status === "ACCEPTED";
 
@@ -120,23 +118,11 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
                   <XCircle size={14} /> Decline
                 </button>
               </form>
-              <form action={acceptQuotationAction}>
-                <input type="hidden" name="quotationId" value={q.id} />
-                <button type="submit"
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold bg-[#28A745] hover:bg-[#218838] text-white transition-colors">
-                  <CheckCircle size={14} /> Accept & Convert
-                </button>
-              </form>
+              <Link href={`/quotations/${q.id}/bind`}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold bg-[#28A745] hover:bg-[#218838] text-white transition-colors">
+                <CheckCircle size={14} /> Record Acceptance
+              </Link>
             </>
-          )}
-          {canConvert && (
-            <form action={acceptQuotationAction}>
-              <input type="hidden" name="quotationId" value={q.id} />
-              <button type="submit"
-                className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold bg-avenue-indigo hover:bg-avenue-secondary text-white transition-colors">
-                <Building2 size={14} /> Create Group
-              </button>
-            </form>
           )}
           {canExpire && (
             <form action={expireQuotationAction}>

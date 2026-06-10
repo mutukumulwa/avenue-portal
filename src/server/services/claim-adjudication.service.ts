@@ -399,8 +399,8 @@ export const claimAdjudicationService = {
     const valid: Array<{ row: number; data: Record<string, unknown> }> = [];
     const errors: Array<{ row: number; errors: string[] }> = [];
 
-    sheet.eachRow(async (row, rowNum) => {
-      if (rowNum === 1) return; // skip header
+    for (let rowNum = 2; rowNum <= sheet.rowCount; rowNum++) {
+      const row = sheet.getRow(rowNum);
 
       const values = row.values as (string | number | Date | null)[];
       // Expected columns: MemberNumber, ProviderName, DateOfService, DiagnosisCode, CPTCode, BilledAmount, InvoiceNumber
@@ -420,7 +420,7 @@ export const claimAdjudicationService = {
           data: { memberNumber, providerName, dateOfService, diagnosisCode, cptCode, billedAmount, invoiceNumber },
         });
       }
-    });
+    }
 
     return { valid, errors };
   },

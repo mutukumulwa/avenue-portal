@@ -14,7 +14,8 @@ export default async function OverridePatternsPage({
   const lookbackDays = daysParam ? Number(daysParam) : 30;
 
   const tenantId = session.user.tenantId;
-  const fromDate = new Date(Date.now() - lookbackDays * 24 * 60 * 60 * 1000);
+  const now = new Date();
+  const fromDate = new Date(now.getTime() - lookbackDays * 24 * 60 * 60 * 1000);
 
   const [patterns, summary] = await Promise.all([
     overrideService.getPatterns(tenantId, { fromDate }),

@@ -43,7 +43,8 @@ export default async function AssessPage({ params }: { params: Promise<{ id: str
   const canSubmitForPricing = quotation.status === "PENDING_ASSESSMENT";
 
   const slaInfo = quotation.workQueueItem;
-  const slaMs = slaInfo ? new Date(slaInfo.slaDeadlineAt).getTime() - Date.now() : null;
+  const now = new Date();
+  const slaMs = slaInfo ? new Date(slaInfo.slaDeadlineAt).getTime() - now.getTime() : null;
   const slaHours = slaMs ? Math.max(0, Math.floor(slaMs / (1000 * 60 * 60))) : null;
   const slaBreached = slaInfo?.slaBreached ?? false;
 
@@ -181,7 +182,7 @@ export default async function AssessPage({ params }: { params: Promise<{ id: str
             ) : (
               <div className="divide-y divide-[#EEEEEE]">
                 {quotation.lives.map((life) => {
-                  const age = Math.floor((Date.now() - new Date(life.dateOfBirth).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+                  const age = Math.floor((now.getTime() - new Date(life.dateOfBirth).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
                   const decision = life.decision;
                   const history = (life.medicalHistory as Array<{ icd10Code: string }> | null) ?? [];
 

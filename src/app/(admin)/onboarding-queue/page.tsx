@@ -22,7 +22,8 @@ export default async function OnboardingQueuePage({
   const tenantId = session.user.tenantId;
   const { gap } = await searchParams;
 
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const now = new Date();
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
   // Get members with outstanding checklist items
   const pendingItems = await prisma.onboardingChecklistItem.findMany({

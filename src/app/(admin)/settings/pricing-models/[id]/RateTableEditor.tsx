@@ -164,7 +164,7 @@ export function RateTableEditor({ pricingModelId, initialData }: { pricingModelI
             {entries.length === 0 && editingId !== "new" && (
               <tr>
                 <td colSpan={6} className="p-8 text-center text-avenue-text-muted">
-                  No rate bands defined. Click "Add Band" to start building the matrix.
+                  No rate bands defined. Click &quot;Add Band&quot; to start building the matrix.
                 </td>
               </tr>
             )}

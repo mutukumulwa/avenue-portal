@@ -10,9 +10,9 @@ import Link from "next/link";
  *   MemberNumber | ProviderName | DateOfService | DiagnosisCode |
  *   CPTCode | BilledAmount (KES) | InvoiceNumber
  *
- * Parsing and validation happen server-side via ExcelJS in
- * claimAdjudicationService.parseBulkImport(). This page provides
- * the upload UI and shows the parse result before final submission.
+ * Parsing, validation, and import happen server-side via the
+ * /api/claims/import route. Valid rows are imported as RECEIVED
+ * batch claims; invalid rows are skipped and reported back.
  */
 
 export default async function ClaimsBulkImportPage() {
@@ -72,11 +72,11 @@ export default async function ClaimsBulkImportPage() {
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-4">
         <h2 className="font-semibold text-avenue-text-heading text-sm">Upload File</h2>
         <p className="text-xs text-avenue-text-muted">
-          The file will be parsed and validated. You will see a row-by-row result before any claims are created.
-          Rows that fail validation are excluded — only valid rows are imported.
+          The file will be parsed and validated server-side. Rows that pass validation are imported as
+          RECEIVED batch claims; rows that fail validation are skipped and shown in the import summary.
         </p>
 
-        {/* Client-side upload — handled via /api/claims/import route */}
+        {/* Upload handled by /api/claims/import route */}
         <form action="/api/claims/import" method="POST" encType="multipart/form-data"
           className="space-y-4">
           <div className="border-2 border-dashed border-[#EEEEEE] rounded-[8px] p-8 text-center hover:border-avenue-indigo transition-colors">
@@ -96,7 +96,7 @@ export default async function ClaimsBulkImportPage() {
             </div>
             <button type="submit"
               className="bg-avenue-indigo text-white px-6 py-2.5 rounded-full text-sm font-semibold hover:bg-avenue-secondary transition-colors flex items-center gap-2">
-              <Upload size={14} /> Parse &amp; Validate
+              <Upload size={14} /> Import Valid Rows
             </button>
           </div>
         </form>
@@ -108,8 +108,7 @@ export default async function ClaimsBulkImportPage() {
         <ul className="text-xs text-avenue-text-muted space-y-1 list-disc list-inside">
           <li>Each row is checked: member exists, provider exists, no duplicate invoice, no double-capture</li>
           <li>Rows with errors are shown in a table with the specific validation failure</li>
-          <li>Valid rows are shown for your confirmation before any claims are created</li>
-          <li>After confirmation, valid claims are created in RECEIVED status and routed to the review queue</li>
+          <li>Valid rows are imported immediately in RECEIVED status and routed to the review queue</li>
           <li>A fraud screening pass runs automatically on each imported claim</li>
         </ul>
       </div>

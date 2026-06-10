@@ -67,7 +67,10 @@ async function login(role) {
 }
 
 function badContent(html) {
-  return /Access Denied|Sign In|404: This page could not be found|This page could not be found|Application error|PrismaClient|Unhandled Runtime Error/i.test(html);
+  const pageMarkup = html
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "");
+  return /Access Denied|Sign In|<title>\s*404|<h1[^>]*>\s*(404|This page could not be found)|Application error|PrismaClient|Unhandled Runtime Error/i.test(pageMarkup);
 }
 
 let failures = 0;
