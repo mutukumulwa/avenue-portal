@@ -22,36 +22,52 @@ async function verifyFundAccess(groupId: string, userId: string, tenantId: strin
 }
 
 export async function recordDepositAction(formData: FormData): Promise<{ error?: string }> {
-  const session = await requireRole(ROLES.FUND);
-  const groupId = formData.get("groupId") as string;
-  const amount  = Number(formData.get("amount"));
-  const type    = (formData.get("type") as "DEPOSIT" | "TOP_UP") || "DEPOSIT";
-  const ref     = (formData.get("referenceNumber") as string) || null;
-  const note    = (formData.get("description") as string) || (type === "TOP_UP" ? "Fund top-up" : "Fund deposit");
+  try {
+    const session = await requireRole(ROLES.FUND);
+    const groupId = formData.get("groupId") as string;
+    const amount  = Number(formData.get("amount"));
+    const type    = (formData.get("type") as "DEPOSIT" | "TOP_UP") || "DEPOSIT";
+    const ref     = (formData.get("referenceNumber") as string) || null;
+    const note    = (formData.get("description") as string) || (type === "TOP_UP" ? "Fund top-up" : "Fund deposit");
 
-  if (!amount || amount <= 0) return { error: "Amount must be greater than zero." };
+    if (!amount || amount <= 0) return { error: "Amount must be greater than zero." };
 
-  const group = await verifyFundAccess(groupId, session.user.id, session.user.tenantId, session.user.role as string);
-  const acc   = group.selfFundedAccount!;
+    const group = await verifyFundAccess(groupId, session.user.id, session.user.tenantId, session.user.role as string);
 
-  await prisma.$transaction(async (tx) => {
-    const newBalance = Number(acc.balance) + amount;
-    await tx.selfFundedAccount.update({
-      where: { id: acc.id },
-      data: { balance: newBalance, totalDeposited: { increment: amount } },
+    await prisma.$transaction(async (tx) => {
+      let acc = group.selfFundedAccount;
+      if (!acc) {
+        acc = await tx.selfFundedAccount.create({
+          data: {
+            tenantId: session.user.tenantId,
+            groupId,
+            balance: 0,
+            totalDeposited: 0,
+            totalClaims: 0,
+            totalAdminFees: 0,
+          }
+        });
+      }
+      const newBalance = Number(acc.balance) + amount;
+      await tx.selfFundedAccount.update({
+        where: { id: acc.id },
+        data: { balance: newBalance, totalDeposited: { increment: amount } },
+      });
+      await tx.fundTransaction.create({
+        data: {
+          tenantId: session.user.tenantId, selfFundedAccountId: acc.id,
+          type, amount, balanceAfter: newBalance, description: note, referenceNumber: ref,
+          postedById: session.user.id,
+        },
+      });
     });
-    await tx.fundTransaction.create({
-      data: {
-        tenantId: session.user.tenantId, selfFundedAccountId: acc.id,
-        type, amount, balanceAfter: newBalance, description: note, referenceNumber: ref,
-        postedById: session.user.id,
-      },
-    });
-  });
 
-  revalidatePath(`/fund/${groupId}`);
-  revalidatePath("/fund/dashboard");
-  return {};
+    revalidatePath(`/fund/${groupId}`);
+    revalidatePath("/fund/dashboard");
+    return {};
+  } catch (err: any) {
+    return { error: err instanceof Error ? err.message : "An unknown error occurred" };
+  }
 }
 
 export async function toggleCategoryHoldAction(formData: FormData): Promise<{ error?: string }> {

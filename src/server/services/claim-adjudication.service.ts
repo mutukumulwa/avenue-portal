@@ -508,7 +508,7 @@ export const claimAdjudicationService = {
 
     const updated = await prisma.providerSettlementBatch.update({
       where: { id: batchId },
-      data:  { status: "CHECKER_APPROVED", checkerId, settledAt: new Date() },
+      data:  { status: "CHECKER_APPROVED", checkerId },
     });
 
     // Mark claims as PAID
@@ -526,6 +526,34 @@ export const claimAdjudicationService = {
       payload:    { totalAmount: Number(batch.totalAmount), checkerId },
       tenantId,
       description: `Settlement batch approved — KES ${Number(batch.totalAmount).toLocaleString("en-KE")}`,
+    });
+
+    return updated;
+  },
+
+  async markSettlementBatchPaid(batchId: string, tenantId: string, userId: string) {
+    const batch = await prisma.providerSettlementBatch.findUnique({ where: { id: batchId } });
+    if (!batch || batch.tenantId !== tenantId) {
+      throw new TRPCError({ code: "NOT_FOUND", message: "Settlement batch not found" });
+    }
+    if (batch.status !== "CHECKER_APPROVED") {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Batch is not approved yet" });
+    }
+
+    const updated = await prisma.providerSettlementBatch.update({
+      where: { id: batchId },
+      data: { status: "SETTLED", settledAt: new Date() },
+    });
+
+    await auditChainService.append({
+      actorId: userId,
+      action: "SETTLEMENT:BATCH_SETTLED",
+      module: "BILLING",
+      entityType: "ProviderSettlementBatch",
+      entityId: batchId,
+      payload: { totalAmount: Number(batch.totalAmount), userId },
+      tenantId,
+      description: `Settlement batch marked as SETTLED — KES ${Number(batch.totalAmount).toLocaleString("en-KE")}`,
     });
 
     return updated;

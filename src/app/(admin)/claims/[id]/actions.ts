@@ -12,156 +12,161 @@ import { writeAudit } from "@/lib/audit";
 
 export async function adjudicateClaimAction(formData: FormData) {
   const session = await requireRole(ROLES.OPS);
-
   const tenantId = session.user.tenantId;
   const claimId = formData.get("claimId") as string;
   const action = formData.get("action") as "CAPTURED" | "APPROVED" | "PARTIALLY_APPROVED" | "DECLINED";
 
-  // CAPTURED is a state transition only — mark claim as data-entry complete
-  if (action === "CAPTURED") {
-    await prisma.claim.update({
-      where: { id: claimId, tenantId },
-      data: { status: "CAPTURED" },
-    });
-    await prisma.adjudicationLog.create({
-      data: { claimId, action: "CAPTURED", toStatus: "CAPTURED", notes: "Claim data entry complete — forwarded for review.", userId: session.user.id },
-    });
-    revalidatePath(`/claims/${claimId}`);
-    revalidatePath("/claims");
-    return;
-  }
-
-  const approvedAmount = action !== "DECLINED" ? Number(formData.get("approvedAmount") || 0) : 0;
-
-  // ── Approval matrix check ─────────────────────────────────────────────────
-  if (action === "APPROVED" || action === "PARTIALLY_APPROVED") {
-    const claim = await prisma.claim.findUnique({
-      where: { id: claimId, tenantId },
-      select: { billedAmount: true, serviceType: true, benefitCategory: true },
-    });
-    if (claim) {
-      const matrix = await prisma.approvalMatrix.findFirst({
-        where: {
-          tenantId,
-          isActive: true,
-          OR: [{ serviceType: claim.serviceType }, { serviceType: null }],
-          AND: [
-            { OR: [{ benefitCategory: claim.benefitCategory }, { benefitCategory: null }] },
-            { OR: [{ claimValueMin: null }, { claimValueMin: { lte: approvedAmount } }] },
-            { OR: [{ claimValueMax: null }, { claimValueMax: { gte: approvedAmount } }] },
-          ],
-        },
-        orderBy: { claimValueMin: "desc" }, // most specific rule wins
+  let errorMsg = "";
+  try {
+    // CAPTURED is a state transition only — mark claim as data-entry complete
+    if (action === "CAPTURED") {
+      await prisma.claim.update({
+        where: { id: claimId, tenantId },
+        data: { status: "CAPTURED" },
       });
-      if (matrix) {
-        const roleHierarchy = ["SUPER_ADMIN", "UNDERWRITER", "MEDICAL_OFFICER", "CLAIMS_OFFICER", "FINANCE_OFFICER", "CUSTOMER_SERVICE"];
-        const userIdx   = roleHierarchy.indexOf(session.user.role as string);
-        const reqIdx    = roleHierarchy.indexOf(matrix.requiredRole);
-        if (userIdx > reqIdx) {
-          throw new Error(`Approval matrix: this claim (KES ${approvedAmount.toLocaleString()}) requires a ${matrix.requiredRole.replace(/_/g, " ")} or above. Your role (${session.user.role}) is not authorised to approve it.`);
+      await prisma.adjudicationLog.create({
+        data: { claimId, action: "CAPTURED", toStatus: "CAPTURED", notes: "Claim data entry complete — forwarded for review.", userId: session.user.id },
+      });
+      revalidatePath(`/claims/${claimId}`);
+      revalidatePath("/claims");
+      return;
+    }
+
+    const approvedAmount = action !== "DECLINED" ? Number(formData.get("approvedAmount") || 0) : 0;
+
+    // ── Approval matrix check ─────────────────────────────────────────────────
+    if (action === "APPROVED" || action === "PARTIALLY_APPROVED") {
+      const claim = await prisma.claim.findUnique({
+        where: { id: claimId, tenantId },
+        select: { billedAmount: true, serviceType: true, benefitCategory: true },
+      });
+      if (claim) {
+        const matrix = await prisma.approvalMatrix.findFirst({
+          where: {
+            tenantId,
+            isActive: true,
+            OR: [{ serviceType: claim.serviceType }, { serviceType: null }],
+            AND: [
+              { OR: [{ benefitCategory: claim.benefitCategory }, { benefitCategory: null }] },
+              { OR: [{ claimValueMin: null }, { claimValueMin: { lte: approvedAmount } }] },
+              { OR: [{ claimValueMax: null }, { claimValueMax: { gte: approvedAmount } }] },
+            ],
+          },
+          orderBy: { claimValueMin: "desc" }, // most specific rule wins
+        });
+        if (matrix) {
+          const roleHierarchy = ["SUPER_ADMIN", "UNDERWRITER", "MEDICAL_OFFICER", "CLAIMS_OFFICER", "FINANCE_OFFICER", "CUSTOMER_SERVICE"];
+          const userIdx   = roleHierarchy.indexOf(session.user.role as string);
+          const reqIdx    = roleHierarchy.indexOf(matrix.requiredRole);
+          if (userIdx > reqIdx) {
+            throw new Error(`Approval matrix: this claim (KES ${approvedAmount.toLocaleString()}) requires a ${matrix.requiredRole.replace(/_/g, " ")} or above. Your role (${session.user.role}) is not authorised to approve it.`);
+          }
         }
       }
     }
-  }
 
-  // Tariff Validation Block
-  if (action === "APPROVED" || action === "PARTIALLY_APPROVED") {
-    const variances = await ClaimsService.getClaimTariffVariances(tenantId, claimId);
-    if (variances.length > 0) {
-      let contractedMax = 0;
-      let hasContractRates = false;
-      
-      for (const v of variances) {
-        if (v.agreedRate !== null) {
-          hasContractRates = true;
-          contractedMax += v.agreedRate;
-        } else {
-          contractedMax += v.unitCost; // Untariffed lines fallback to billed
+    // Tariff Validation Block
+    if (action === "APPROVED" || action === "PARTIALLY_APPROVED") {
+      const variances = await ClaimsService.getClaimTariffVariances(tenantId, claimId);
+      if (variances.length > 0) {
+        let contractedMax = 0;
+        let hasContractRates = false;
+        
+        for (const v of variances) {
+          if (v.agreedRate !== null) {
+            hasContractRates = true;
+            contractedMax += v.agreedRate;
+          } else {
+            contractedMax += v.unitCost; // Untariffed lines fallback to billed
+          }
+        }
+
+        if (hasContractRates && approvedAmount > contractedMax) {
+          throw new Error(`Tariff Validation Failed: Approved amount (${approvedAmount}) exceeds the contracted maximum allowed for this provider (${contractedMax}). Reduce amount or reject and query.`);
         }
       }
+    }
 
-      if (hasContractRates && approvedAmount > contractedMax) {
-        throw new Error(`Tariff Validation Failed: Approved amount (${approvedAmount}) exceeds the contracted maximum allowed for this provider (${contractedMax}). Reduce amount or reject and query.`);
+    const claim = await ClaimsService.adjudicateClaim(tenantId, claimId, {
+      action,
+      approvedAmount,
+      declineReasonCode: formData.get("declineReasonCode") as string || undefined,
+      declineNotes: formData.get("declineNotes") as string || undefined,
+      notes: formData.get("notes") as string || undefined,
+      reviewerId: session.user.id,
+    });
+
+    // Auto-post GL entry when claim is approved or partially approved
+    if ((action === "APPROVED" || action === "PARTIALLY_APPROVED") && approvedAmount > 0) {
+      try {
+        const coTx = await prisma.coContributionTransaction.findUnique({
+          where: { claimId },
+          select: { finalAmount: true },
+        });
+        const coContribAmount = coTx ? Number(coTx.finalAmount) : 0;
+
+        await GLService.postClaimApproved(tenantId, {
+          sourceId:  claim.id,
+          reference: claim.claimNumber,
+          amount:    approvedAmount,
+          coContributionAmount: coContribAmount,
+          postedById: session.user.id,
+        });
+      } catch {
+        // GL not yet set up — swallow silently so adjudication still completes
       }
     }
-  }
 
-  const claim = await ClaimsService.adjudicateClaim(tenantId, claimId, {
-    action,
-    approvedAmount,
-    declineReasonCode: formData.get("declineReasonCode") as string || undefined,
-    declineNotes: formData.get("declineNotes") as string || undefined,
-    notes: formData.get("notes") as string || undefined,
-    reviewerId: session.user.id,
-  });
-
-  // Auto-post GL entry when claim is approved or partially approved
-  if ((action === "APPROVED" || action === "PARTIALLY_APPROVED") && approvedAmount > 0) {
-    try {
-      // Fetch co-contribution transaction so GL correctly splits plan share vs member share
-      const coTx = await prisma.coContributionTransaction.findUnique({
-        where: { claimId },
-        select: { finalAmount: true },
-      });
-      const coContribAmount = coTx ? Number(coTx.finalAmount) : 0;
-
-      await GLService.postClaimApproved(tenantId, {
-        sourceId:  claim.id,
-        reference: claim.claimNumber,
-        amount:    approvedAmount,
-        coContributionAmount: coContribAmount,
-        postedById: session.user.id,
-      });
-    } catch {
-      // GL not yet set up — swallow silently so adjudication still completes
-    }
-  }
-
-  // ── Self-funded deduction ──────────────────────────────────────────────────
-  // If the member's group is SELF_FUNDED, deduct the approved amount from the
-  // fund and record a CLAIM_DEDUCTION transaction. Soft warning only — never
-  // blocks adjudication.
-  if ((action === "APPROVED" || action === "PARTIALLY_APPROVED") && approvedAmount > 0) {
-    try {
-      const memberGroup = await prisma.member.findUnique({
-        where: { id: claim.memberId },
-        select: { group: { select: { fundingMode: true, selfFundedAccount: { select: { id: true, balance: true } } } } },
-      });
-      const account = memberGroup?.group?.selfFundedAccount;
-      if (memberGroup?.group?.fundingMode === "SELF_FUNDED" && account) {
-        const newBalance = Number(account.balance) - approvedAmount;
-        await prisma.$transaction([
-          prisma.selfFundedAccount.update({
-            where: { id: account.id },
-            data: { balance: newBalance, totalClaims: { increment: approvedAmount } },
-          }),
-          prisma.fundTransaction.create({
-            data: {
-              tenantId,
-              selfFundedAccountId: account.id,
-              claimId: claim.id,
-              type: "CLAIM_DEDUCTION",
-              amount: approvedAmount,
-              balanceAfter: newBalance,
-              description: `Claim ${claim.claimNumber} — ${action.replace(/_/g, " ").toLowerCase()}`,
-              postedById: session.user.id,
-            },
-          }),
-        ]);
+    // ── Self-funded deduction ──────────────────────────────────────────────────
+    if ((action === "APPROVED" || action === "PARTIALLY_APPROVED") && approvedAmount > 0) {
+      try {
+        const memberGroup = await prisma.member.findUnique({
+          where: { id: claim.memberId },
+          select: { group: { select: { fundingMode: true, selfFundedAccount: { select: { id: true, balance: true } } } } },
+        });
+        const account = memberGroup?.group?.selfFundedAccount;
+        if (memberGroup?.group?.fundingMode === "SELF_FUNDED" && account) {
+          const newBalance = Number(account.balance) - approvedAmount;
+          await prisma.$transaction([
+            prisma.selfFundedAccount.update({
+              where: { id: account.id },
+              data: { balance: newBalance, totalClaims: { increment: approvedAmount } },
+            }),
+            prisma.fundTransaction.create({
+              data: {
+                tenantId,
+                selfFundedAccountId: account.id,
+                claimId: claim.id,
+                type: "CLAIM_DEDUCTION",
+                amount: approvedAmount,
+                balanceAfter: newBalance,
+                description: `Claim ${claim.claimNumber} — ${action.replace(/_/g, " ").toLowerCase()}`,
+                postedById: session.user.id,
+              },
+            }),
+          ]);
+        }
+      } catch {
+        // Fund deduction failed — log silently, adjudication already committed
       }
-    } catch {
-      // Fund deduction failed — log silently, adjudication already committed
     }
+
+    await writeAudit({
+      userId: session.user.id,
+      action: `CLAIM_${action}`,
+      module: "CLAIMS",
+      description: `Claim ${claim.claimNumber} ${action.toLowerCase().replace(/_/g, " ")} — KES ${approvedAmount.toLocaleString()}`,
+      metadata: { claimId, action, approvedAmount },
+    });
+  } catch (err: any) {
+    if (err.message === "NEXT_REDIRECT") throw err;
+    errorMsg = err instanceof Error ? err.message : "An error occurred";
   }
 
-  await writeAudit({
-    userId: session.user.id,
-    action: `CLAIM_${action}`,
-    module: "CLAIMS",
-    description: `Claim ${claim.claimNumber} ${action.toLowerCase().replace(/_/g, " ")} — KES ${approvedAmount.toLocaleString()}`,
-    metadata: { claimId, action, approvedAmount },
-  });
-
+  if (errorMsg) {
+    redirect(`/claims/${claimId}?error=${encodeURIComponent(errorMsg)}`);
+  }
+  
   redirect(`/claims`);
 }
 

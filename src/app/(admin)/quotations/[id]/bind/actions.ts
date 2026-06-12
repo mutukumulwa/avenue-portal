@@ -26,6 +26,9 @@ export async function createMembershipsAction(formData: FormData) {
 
   await bindingService.createMemberships(quotationId, session.user.tenantId, session.user.id);
   revalidatePath(`/quotations/${quotationId}`);
+  revalidatePath(`/quotations/${quotationId}/bind`);
+  revalidatePath(`/groups`);
+  redirect(`/quotations/${quotationId}/bind`);
 }
 
 export async function approveBinderAction(formData: FormData) {

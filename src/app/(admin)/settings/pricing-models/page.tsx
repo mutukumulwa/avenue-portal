@@ -1,10 +1,16 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { PlusCircle, FileSpreadsheet, Activity } from "lucide-react";
+import { FileSpreadsheet, Activity, AlertTriangle } from "lucide-react";
+import { CreateModelModal } from "./CreateModelModal";
 
-export default async function PricingModelsPage() {
+export default async function PricingModelsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
   const session = await requireRole(ROLES.UNDERWRITING);
+  const { error } = await searchParams;
 
   const models = await prisma.pricingModel.findMany({
     where: { tenantId: session.user.tenantId },
@@ -16,6 +22,15 @@ export default async function PricingModelsPage() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
+      {error && (
+        <div className="flex items-center gap-3 bg-[#FFF8E1] border border-[#FFC107]/50 rounded-lg px-4 py-3">
+          <AlertTriangle size={18} className="text-[#856404] shrink-0" />
+          <p className="text-sm font-semibold text-[#856404] flex-1">
+            {error}
+          </p>
+        </div>
+      )}
+
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Pricing Models</h1>
@@ -23,11 +38,7 @@ export default async function PricingModelsPage() {
             Manage contribution rate tables and pricing algorithms.
           </p>
         </div>
-        {/* Placeholder for future Create Model modal */}
-        <button className="bg-avenue-indigo text-white px-4 py-2 rounded font-bold hover:bg-avenue-indigo/90 flex items-center gap-2 text-sm transition-colors">
-          <PlusCircle size={16} />
-          Create Model
-        </button>
+        <CreateModelModal />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -9,6 +9,7 @@ import {
   approveBinderAction,
   postDebitNoteAction,
 } from "./actions";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 
 const STEP_STYLE = {
   done:    "bg-[#28A745]/10 border-[#28A745]/30 text-[#28A745]",
@@ -136,10 +137,10 @@ export default async function BindPage({ params }: { params: Promise<{ id: strin
               </div>
             </div>
             <div className="flex justify-end">
-              <button type="submit"
+              <SubmitButton
                 className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-5 py-2 rounded-full text-sm font-semibold transition-colors">
                 Record Acceptance
-              </button>
+              </SubmitButton>
             </div>
           </form>
         )}
@@ -173,10 +174,9 @@ export default async function BindPage({ params }: { params: Promise<{ id: strin
             </p>
             <form action={createMembershipsAction}>
               <input type="hidden" name="quotationId" value={id} />
-              <button type="submit"
-                className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-5 py-2 rounded-full text-sm font-semibold transition-colors">
+              <SubmitButton className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-5 py-2 rounded-full text-sm font-semibold transition-colors">
                 Create Memberships
-              </button>
+              </SubmitButton>
             </form>
           </div>
         )}
@@ -250,10 +250,10 @@ export default async function BindPage({ params }: { params: Promise<{ id: strin
                 </p>
                 <form action={approveBinderAction}>
                   <input type="hidden" name="quotationId" value={id} />
-                  <button type="submit"
+                  <SubmitButton
                     className="bg-[#28A745] hover:bg-[#218838] text-white px-5 py-2 rounded-full text-sm font-semibold transition-colors flex items-center gap-2">
                     <CheckCircle size={15} /> Approve Binder
-                  </button>
+                  </SubmitButton>
                 </form>
               </div>
             )}
@@ -289,10 +289,10 @@ export default async function BindPage({ params }: { params: Promise<{ id: strin
             </p>
             <form action={postDebitNoteAction}>
               <input type="hidden" name="quotationId" value={id} />
-              <button type="submit"
+              <SubmitButton
                 className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-5 py-2 rounded-full text-sm font-semibold transition-colors">
                 Post Debit Note
-              </button>
+              </SubmitButton>
             </form>
           </div>
         )}

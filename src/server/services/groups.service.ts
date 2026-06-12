@@ -50,6 +50,13 @@ export class GroupsService {
 
     if (!pkg) throw new Error("Target package does not exist for this tenant.");
 
+    const existing = await prisma.group.findFirst({
+      where: { tenantId, name: { equals: data.name, mode: "insensitive" } },
+    });
+    if (existing) {
+      throw new Error(`A group named "${data.name}" already exists.`);
+    }
+
     const effectiveDateObj = new Date(data.effectiveDate);
     const renewalDate = new Date(effectiveDateObj);
     renewalDate.setFullYear(renewalDate.getFullYear() + 1);

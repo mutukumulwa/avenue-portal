@@ -12,34 +12,86 @@ const STATUS_STYLE: Record<string, string> = {
   REJECTED:         "bg-[#DC3545]/10 text-[#DC3545]",
 };
 
+import { redirect } from "next/navigation";
+
 async function approveSettlementBatchAction(formData: FormData) {
   "use server";
-  const { requireRole, ROLES } = await import("@/lib/rbac");
-  const session = await requireRole(ROLES.FINANCE);
-  const batchId = formData.get("batchId") as string;
-  await claimAdjudicationService.approveSettlementBatch(batchId, session.user.tenantId, session.user.id);
+  let errorMsg = "";
+  try {
+    const { requireRole, ROLES } = await import("@/lib/rbac");
+    const session = await requireRole(ROLES.FINANCE);
+    const batchId = formData.get("batchId") as string;
+    await claimAdjudicationService.approveSettlementBatch(batchId, session.user.tenantId, session.user.id);
+  } catch (err: any) {
+    if (err.message === "NEXT_REDIRECT") throw err;
+    errorMsg = err instanceof Error ? err.message : "An error occurred";
+  }
+
+  if (errorMsg) {
+    redirect(`/settlement?error=${encodeURIComponent(errorMsg)}`);
+  }
+  
+  const { revalidatePath } = await import("next/cache");
+  revalidatePath("/settlement");
+  redirect("/settlement");
 }
 
 async function createSettlementBatchAction(formData: FormData) {
   "use server";
-  const { requireRole, ROLES } = await import("@/lib/rbac");
-  const session = await requireRole(ROLES.FINANCE);
-  const providerId  = formData.get("providerId") as string;
-  const cycleMonth  = Number(formData.get("cycleMonth"));
-  const cycleYear   = Number(formData.get("cycleYear"));
-  await claimAdjudicationService.createSettlementBatch(
-    session.user.tenantId, providerId, cycleMonth, cycleYear, session.user.id,
-  );
+  let errorMsg = "";
+  try {
+    const { requireRole, ROLES } = await import("@/lib/rbac");
+    const session = await requireRole(ROLES.FINANCE);
+    const providerId  = formData.get("providerId") as string;
+    const cycleMonth  = Number(formData.get("cycleMonth"));
+    const cycleYear   = Number(formData.get("cycleYear"));
+    await claimAdjudicationService.createSettlementBatch(
+      session.user.tenantId, providerId, cycleMonth, cycleYear, session.user.id,
+    );
+  } catch (err: any) {
+    if (err.message === "NEXT_REDIRECT") throw err;
+    errorMsg = err instanceof Error ? err.message : "An error occurred";
+  }
+
+  if (errorMsg) {
+    redirect(`/settlement?error=${encodeURIComponent(errorMsg)}`);
+  }
+  
+  const { revalidatePath } = await import("next/cache");
+  revalidatePath("/settlement");
+  redirect("/settlement");
+}
+
+async function markSettlementBatchPaidAction(formData: FormData) {
+  "use server";
+  let errorMsg = "";
+  try {
+    const { requireRole, ROLES } = await import("@/lib/rbac");
+    const session = await requireRole(ROLES.FINANCE);
+    const batchId = formData.get("batchId") as string;
+    await claimAdjudicationService.markSettlementBatchPaid(batchId, session.user.tenantId, session.user.id);
+  } catch (err: any) {
+    if (err.message === "NEXT_REDIRECT") throw err;
+    errorMsg = err instanceof Error ? err.message : "An error occurred";
+  }
+
+  if (errorMsg) {
+    redirect(`/settlement?error=${encodeURIComponent(errorMsg)}`);
+  }
+  
+  const { revalidatePath } = await import("next/cache");
+  revalidatePath("/settlement");
+  redirect("/settlement");
 }
 
 export default async function SettlementPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string, error?: string }>;
 }) {
   const session = await requireRole(ROLES.FINANCE);
   const tenantId = session.user.tenantId;
-  const { status } = await searchParams;
+  const { status, error } = await searchParams;
 
   const { items: batches } = await claimAdjudicationService.listSettlementBatches(tenantId, {
     status: status as never,
@@ -59,6 +111,16 @@ export default async function SettlementPage({
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
+      {/* Error banner from server actions */}
+      {error && (
+        <div className="flex items-center gap-3 bg-[#FFF8E1] border border-[#FFC107]/50 rounded-lg px-4 py-3">
+          <AlertTriangle size={18} className="text-[#856404] shrink-0" />
+          <p className="text-sm font-semibold text-[#856404] flex-1">
+            {error}
+          </p>
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Provider Settlements</h1>
@@ -158,8 +220,17 @@ export default async function SettlementPage({
                       </form>
                     )}
                     {batch.status === "CHECKER_APPROVED" && (
-                      <span className="text-[10px] text-[#28A745] flex items-center gap-1">
-                        <CheckCircle2 size={11} /> Paid
+                      <form action={markSettlementBatchPaidAction}>
+                        <input type="hidden" name="batchId" value={batch.id} />
+                        <button type="submit"
+                          className="text-xs font-semibold text-avenue-indigo border border-avenue-indigo/30 px-3 py-1 rounded-full hover:bg-avenue-indigo/10 transition-colors flex items-center gap-1">
+                          <DollarSign size={11} /> Mark Paid
+                        </button>
+                      </form>
+                    )}
+                    {batch.status === "SETTLED" && (
+                      <span className="text-[10px] text-avenue-indigo flex items-center gap-1">
+                        <CheckCircle2 size={11} /> Settled
                       </span>
                     )}
                   </td>

@@ -1,4 +1,6 @@
+import puppeteerCore from "puppeteer-core";
 import puppeteer, { Browser } from "puppeteer";
+import chromium from "@sparticuz/chromium";
 
 // ─── PUPPETEER BROWSER POOL ───────────────────────────────────────────────────
 // A single shared browser instance with up to MAX_PAGES concurrent pages.
@@ -10,15 +12,24 @@ let activePages = 0;
 
 async function getBrowser(): Promise<Browser> {
   if (!browser || !browser.connected) {
-    browser = await puppeteer.launch({
-      headless: true,
-      args: [
-        "--no-sandbox",
-        "--disable-setuid-sandbox",
-        "--disable-dev-shm-usage",
-        "--disable-gpu",
-      ],
-    });
+    if (process.env.VERCEL) {
+      browser = await puppeteerCore.launch({
+        args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+        defaultViewport: chromium.defaultViewport,
+        executablePath: await chromium.executablePath(),
+        headless: chromium.headless,
+      }) as unknown as Browser;
+    } else {
+      browser = await puppeteer.launch({
+        headless: true,
+        args: [
+          "--no-sandbox",
+          "--disable-setuid-sandbox",
+          "--disable-dev-shm-usage",
+          "--disable-gpu",
+        ],
+      });
+    }
   }
   return browser;
 }

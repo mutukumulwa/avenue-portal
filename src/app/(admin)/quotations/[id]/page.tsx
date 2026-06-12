@@ -70,7 +70,7 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-lg font-bold text-avenue-text-heading font-heading">
-                {q.group?.name ?? q.prospectName ?? "Unnamed Prospect"}
+                {q.group?.name ?? q.legalName ?? q.prospectName ?? "Unnamed Prospect"}
               </h1>
               <span className="font-mono text-xs bg-[#E6E7E8] text-[#6C757D] px-2 py-0.5 rounded">
                 {q.quoteNumber}
@@ -205,7 +205,7 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
           ) : (
             <>
               {[
-                { label: "Prospect Name", value: q.prospectName ?? "—" },
+                { label: "Prospect Name", value: q.legalName ?? q.prospectName ?? "—" },
                 { label: "Industry", value: q.prospectIndustry ?? "—" },
                 { label: "Contact Email", value: q.prospectEmail ?? "—" },
                 { label: "Contact Person", value: q.prospectContact ?? "—" },

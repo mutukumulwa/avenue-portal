@@ -84,6 +84,16 @@ export default async function ClaimDetailPage({ params }: { params: Promise<{ id
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
+      {/* Error banner from server actions */}
+      {error && (
+        <div className="flex items-center gap-3 bg-[#FFF8E1] border border-[#FFC107]/50 rounded-lg px-4 py-3">
+          <AlertTriangle size={18} className="text-[#856404] shrink-0" />
+          <p className="text-sm font-semibold text-[#856404] flex-1">
+            {error}
+          </p>
+        </div>
+      )}
+
       {/* Exception banner */}
       {claim.hasException && (
         <div className="flex items-center gap-3 bg-[#FFF8E1] border border-[#FFC107]/50 rounded-lg px-4 py-3">

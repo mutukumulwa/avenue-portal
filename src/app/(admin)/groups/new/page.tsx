@@ -1,17 +1,32 @@
-import { Save, ArrowLeft } from "lucide-react";
+import { Save, ArrowLeft, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { enrollGroupAction } from "./actions";
 import { PackagesService } from "@/server/services/packages.service";
 import { requireRole, ROLES } from "@/lib/rbac";
+import { SubmitButton } from "@/components/ui/SubmitButton";
 
-export default async function GroupEnrollmentHero() {
+export default async function GroupEnrollmentHero({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
   const session = await requireRole(ROLES.OPS);
+  const { error } = await searchParams;
   
   const tenantId = session.user.tenantId;
   const packages = await PackagesService.getPackages(tenantId);
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
+      {error && (
+        <div className="flex items-center gap-3 bg-[#FFF8E1] border border-[#FFC107]/50 rounded-lg px-4 py-3">
+          <AlertTriangle size={18} className="text-[#856404] shrink-0" />
+          <p className="text-sm font-semibold text-[#856404] flex-1">
+            {error}
+          </p>
+        </div>
+      )}
+
       <div className="flex items-center space-x-4">
         <Link href="/groups" className="text-[#848E9F] hover:text-avenue-text-heading transition-colors">
           <ArrowLeft size={24} />
@@ -81,13 +96,9 @@ export default async function GroupEnrollmentHero() {
           </div>
 
           <div className="pt-6 flex justify-end">
-            <button 
-              type="submit"
-              className="bg-[#292A83] hover:bg-[#435BA1] text-white px-8 py-3 rounded-full font-semibold transition-colors flex items-center space-x-2 shadow-sm"
-            >
-              <Save size={18} />
-              <span>Register Organization</span>
-            </button>
+            <SubmitButton icon={<Save size={18} />}>
+              Register Organization
+            </SubmitButton>
           </div>
         </form>
       </div>
