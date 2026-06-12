@@ -1,0 +1,11 @@
+import { launch, login, BASE } from './lib.mjs'
+const b = await launch()
+const p = await b.newPage()
+await login(p, 'admin@avenue.co.ke')
+await p.goto(BASE + '/settlement', { waitUntil: 'networkidle2' })
+await new Promise(r => setTimeout(r, 2000))
+const t = await p.evaluate(() => document.body.innerText.replace(/\s+/g, ' '))
+const i = t.indexOf('Create Batch')
+console.log('SETTLEMENT PAGE:', t.slice(i, i + 500))
+await p.screenshot({ path: 'C:/Coding/avenue-portal/uat/screenshots/9.5-after-crash.png' })
+await b.close()

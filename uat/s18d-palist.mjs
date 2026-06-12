@@ -1,0 +1,10 @@
+import { launch, login, BASE } from './lib.mjs'
+const b = await launch()
+const p = await b.newPage()
+await login(p, 'member@avenue.co.ke')
+await p.goto(BASE + '/member/preauth', { waitUntil: 'networkidle2' })
+await new Promise(r => setTimeout(r, 2000))
+const t = await p.evaluate(() => document.body.innerText.replace(/\s+/g, ' '))
+console.log('PREAUTH LIST:', t.slice(t.indexOf('Pre-Authorizations'), t.indexOf('Pre-Authorizations') + 600))
+await p.screenshot({ path: 'C:/Coding/avenue-portal/uat/screenshots/18.9-list.png' })
+await b.close()
