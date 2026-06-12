@@ -25,10 +25,9 @@ export async function addProviderAction(
       contactPerson:     formData.get("contactPerson")     as string,
       servicesOffered:   servicesRaw.filter(Boolean),
       paymentTermDays:   Number(formData.get("paymentTermDays") || 30),
-      contractStatus:    formData.get("contractStatus")    as string,
-      contractStartDate: formData.get("contractStartDate") as string,
-      contractEndDate:   formData.get("contractEndDate")   as string,
-      contractNotes:     formData.get("contractNotes")     as string,
+      // Contract data now lives in the ProviderContract register — providers
+      // start as PENDING until an agreement is activated.
+      contractStatus:    "PENDING",
       geoLatitude:       formData.get("geoLatitude") ? Number(formData.get("geoLatitude")) : undefined,
       geoLongitude:      formData.get("geoLongitude") ? Number(formData.get("geoLongitude")) : undefined,
     });

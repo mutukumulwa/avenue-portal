@@ -29,6 +29,7 @@ model Tenant {
   claims                         Claim[]
   preauths                       PreAuthorization[]
   providers                      Provider[]
+  providerContracts              ProviderContract[]
   brokers                        Broker[]
   endorsements                   Endorsement[]
   invoices                       Invoice[]
@@ -105,32 +106,32 @@ model User {
   groupId  String?
   group    Group?  @relation("HRManagerGroup", fields: [groupId], references: [id])
 
-  managedFundGroups           Group[]                      @relation("FundAdminGroups")
+  managedFundGroups           Group[]                          @relation("FundAdminGroups")
   auditLogs                   AuditLog[]
-  claimReviews                Claim[]                      @relation("ClaimReviewer")
-  raisedExceptions            ExceptionLog[]               @relation("ExceptionRaisedBy")
-  resolvedExceptions          ExceptionLog[]               @relation("ExceptionResolvedBy")
+  claimReviews                Claim[]                          @relation("ClaimReviewer")
+  raisedExceptions            ExceptionLog[]                   @relation("ExceptionRaisedBy")
+  resolvedExceptions          ExceptionLog[]                   @relation("ExceptionResolvedBy")
   roleAssignments             UserRoleAssignment[]
-  madeOverrides               OverrideRecord[]             @relation("OverrideMaker")
-  checkedOverrides            OverrideRecord[]             @relation("OverrideChecker")
-  blacklistEntries            InternalBlacklist[]          @relation("BlacklistAdder")
-  assignedQuotations          Quotation[]                  @relation("QuotationAssessor")
+  madeOverrides               OverrideRecord[]                 @relation("OverrideMaker")
+  checkedOverrides            OverrideRecord[]                 @relation("OverrideChecker")
+  blacklistEntries            InternalBlacklist[]              @relation("BlacklistAdder")
+  assignedQuotations          Quotation[]                      @relation("QuotationAssessor")
   assessorWorkQueueItems      AssessorWorkQueueItem[]
-  underwritingDecisions       UnderwritingDecision[]       @relation("UWDecider")
-  acceptances                 QuotationAcceptance[]        @relation("AcceptanceUser")
-  madeEndorsements            Endorsement[]               @relation("EndorsementMaker")
-  approvedEndorsements        Endorsement[]               @relation("EndorsementApprover")
-  adjudicatedClaims           Claim[]                     @relation("ClaimAdjudicator")
-  seniorApprovedClaims        Claim[]                     @relation("ClaimSeniorAdjudicator")
-  submittedServiceRequests    ServiceRequest[]             @relation("SRSubmitter")
-  respondedServiceRequests    ServiceRequest[]             @relation("SRResponder")
-  escalatedPreauths           PreAuthorization[]           @relation("PreauthEscalation")
-  initiatedCheckIns           CheckInChallenge[]           @relation("CheckInInitiatedBy")
-  initiatedCheckInEvents      CheckInEvent[]               @relation("CheckInEventInitiatedBy")
-  overrideCheckInEvents       CheckInEvent[]               @relation("CheckInEventOverrideBy")
-  confirmedVisits             VisitVerification[]          @relation("VisitConfirmedBy")
-  webAuthnEnrollmentApprovals    WebAuthnEnrollmentApproval[]    @relation("WebAuthnEnrollmentApprovedBy")
-  reinstatementDecisions         MembershipReinstatementRequest[]
+  underwritingDecisions       UnderwritingDecision[]           @relation("UWDecider")
+  acceptances                 QuotationAcceptance[]            @relation("AcceptanceUser")
+  madeEndorsements            Endorsement[]                    @relation("EndorsementMaker")
+  approvedEndorsements        Endorsement[]                    @relation("EndorsementApprover")
+  adjudicatedClaims           Claim[]                          @relation("ClaimAdjudicator")
+  seniorApprovedClaims        Claim[]                          @relation("ClaimSeniorAdjudicator")
+  submittedServiceRequests    ServiceRequest[]                 @relation("SRSubmitter")
+  respondedServiceRequests    ServiceRequest[]                 @relation("SRResponder")
+  escalatedPreauths           PreAuthorization[]               @relation("PreauthEscalation")
+  initiatedCheckIns           CheckInChallenge[]               @relation("CheckInInitiatedBy")
+  initiatedCheckInEvents      CheckInEvent[]                   @relation("CheckInEventInitiatedBy")
+  overrideCheckInEvents       CheckInEvent[]                   @relation("CheckInEventOverrideBy")
+  confirmedVisits             VisitVerification[]              @relation("VisitConfirmedBy")
+  webAuthnEnrollmentApprovals WebAuthnEnrollmentApproval[]     @relation("WebAuthnEnrollmentApprovedBy")
+  reinstatementDecisions      MembershipReinstatementRequest[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -190,46 +191,46 @@ enum FundTransactionType {
 }
 
 model Group {
-  id                 String           @id @default(cuid())
-  tenantId           String
-  tenant             Tenant           @relation(fields: [tenantId], references: [id])
-  name               String
-  industry           String?
-  registrationNumber String?
-  contactPersonName  String
-  contactPersonPhone String
-  contactPersonEmail String
-  address            String?
-  county             String?
-  packageId          String
-  package            Package          @relation(fields: [packageId], references: [id])
-  packageVersionId   String?
-  packageVersion     PackageVersion?  @relation(fields: [packageVersionId], references: [id])
-  brokerId           String?
-  broker             Broker?          @relation(fields: [brokerId], references: [id])
-  producers          BrokerProducer[] @relation("ProducerSchemes")
-  paymentFrequency   PaymentFrequency @default(ANNUAL)
-  contributionRate   Decimal // Per-member contribution amount
-  effectiveDate      DateTime
-  renewalDate        DateTime
-  status             GroupStatus      @default(PENDING)
-  suspendedAt        DateTime?
-  suspensionReason   String?
-  terminatedAt       DateTime?
-  notes              String?
-  clientType         ClientType       @default(CORPORATE)
+  id                        String              @id @default(cuid())
+  tenantId                  String
+  tenant                    Tenant              @relation(fields: [tenantId], references: [id])
+  name                      String
+  industry                  String?
+  registrationNumber        String?
+  contactPersonName         String
+  contactPersonPhone        String
+  contactPersonEmail        String
+  address                   String?
+  county                    String?
+  packageId                 String
+  package                   Package             @relation(fields: [packageId], references: [id])
+  packageVersionId          String?
+  packageVersion            PackageVersion?     @relation(fields: [packageVersionId], references: [id])
+  brokerId                  String?
+  broker                    Broker?             @relation(fields: [brokerId], references: [id])
+  producers                 BrokerProducer[]    @relation("ProducerSchemes")
+  paymentFrequency          PaymentFrequency    @default(ANNUAL)
+  contributionRate          Decimal // Per-member contribution amount
+  effectiveDate             DateTime
+  renewalDate               DateTime
+  status                    GroupStatus         @default(PENDING)
+  suspendedAt               DateTime?
+  suspensionReason          String?
+  terminatedAt              DateTime?
+  notes                     String?
+  clientType                ClientType          @default(CORPORATE)
   // ── Process 11: Renewal lifecycle ─────────────────────────
-  renewalStatus              GroupRenewalStatus? // pipeline status
-  supersededByGroupId        String?            // points to the successor Group on renewal
-  renewalNoticeDispatchedAt  DateTime?          // when the 60-day notice was sent
-  priorPeriodReconciled      Boolean            @default(false) // block binding until settled
+  renewalStatus             GroupRenewalStatus? // pipeline status
+  supersededByGroupId       String? // points to the successor Group on renewal
+  renewalNoticeDispatchedAt DateTime? // when the 60-day notice was sent
+  priorPeriodReconciled     Boolean             @default(false) // block binding until settled
   // Funding mode — INSURED (default) or SELF_FUNDED
-  fundingMode        FundingMode      @default(INSURED)
+  fundingMode               FundingMode         @default(INSURED)
   // Self-funded admin fee config (ignored when fundingMode = INSURED)
-  adminFeeMethod     AdminFeeMethod?
-  adminFeeRate       Decimal? // KES flat (FLAT_PER_INSURED) or % (PCT_OF_CLAIMS)
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
+  adminFeeMethod            AdminFeeMethod?
+  adminFeeRate              Decimal? // KES flat (FLAT_PER_INSURED) or % (PCT_OF_CLAIMS)
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
 
   members            Member[]
   benefitTiers       GroupBenefitTier[]
@@ -326,13 +327,13 @@ enum MemberStatus {
   ACTIVE
   SUSPENDED
   LAPSED
-  LAPSED_BEFORE_ACTIVATION  // bound but first contribution never received
+  LAPSED_BEFORE_ACTIVATION // bound but first contribution never received
   TERMINATED
-  CANCELLED_COOLING_OFF     // Process 12: cancelled within cooling-off window
-  TERMINATED_FRAUD          // Process 12: fraud-confirmed termination
-  TERMINATED_BREACH         // Process 12: terms breach termination
-  TERMINATED_DEATH          // Process 12: principal death
-  EXPIRED                   // cover period ended without renewal
+  CANCELLED_COOLING_OFF // Process 12: cancelled within cooling-off window
+  TERMINATED_FRAUD // Process 12: fraud-confirmed termination
+  TERMINATED_BREACH // Process 12: terms breach termination
+  TERMINATED_DEATH // Process 12: principal death
+  EXPIRED // cover period ended without renewal
 }
 
 enum MemberRelationship {
@@ -349,56 +350,56 @@ enum Gender {
 }
 
 model Member {
-  id               String             @id @default(cuid())
-  tenantId         String
-  tenant           Tenant             @relation(fields: [tenantId], references: [id])
-  memberNumber     String // e.g., AVH-2024-00001
-  groupId          String
-  group            Group              @relation(fields: [groupId], references: [id])
-  firstName        String
-  lastName         String
-  otherNames       String?
-  idNumber         String? // National ID / Passport
-  dateOfBirth      DateTime
-  gender           Gender
-  phone            String?
-  email            String?
-  photoUrl         String?
-  relationship     MemberRelationship @default(PRINCIPAL)
-  principalId      String? // If dependent, links to principal member
-  principal        Member?            @relation("Dependents", fields: [principalId], references: [id])
-  dependents       Member[]           @relation("Dependents")
-  packageId        String // Inherited from group tier or set directly
-  package          Package            @relation(fields: [packageId], references: [id])
-  packageVersionId String?
-  packageVersion   PackageVersion?    @relation(fields: [packageVersionId], references: [id])
-  benefitTierId    String? // Optional: links to a GroupBenefitTier
-  benefitTier      GroupBenefitTier?  @relation(fields: [benefitTierId], references: [id])
-  enrollmentDate   DateTime
-  activationDate   DateTime?
-  coverStartDate   DateTime?          // set during binding (may differ from activationDate)
-  coverEndDate     DateTime?
-  status           MemberStatus       @default(PENDING_ACTIVATION)
-  waitingPeriodEnd DateTime? // General waiting period end
-  smartCardNumber  String? // SMART card number if integrated
-  slade360MemberId String? // Slade360 member ID if integrated
+  id                     String             @id @default(cuid())
+  tenantId               String
+  tenant                 Tenant             @relation(fields: [tenantId], references: [id])
+  memberNumber           String // e.g., AVH-2024-00001
+  groupId                String
+  group                  Group              @relation(fields: [groupId], references: [id])
+  firstName              String
+  lastName               String
+  otherNames             String?
+  idNumber               String? // National ID / Passport
+  dateOfBirth            DateTime
+  gender                 Gender
+  phone                  String?
+  email                  String?
+  photoUrl               String?
+  relationship           MemberRelationship @default(PRINCIPAL)
+  principalId            String? // If dependent, links to principal member
+  principal              Member?            @relation("Dependents", fields: [principalId], references: [id])
+  dependents             Member[]           @relation("Dependents")
+  packageId              String // Inherited from group tier or set directly
+  package                Package            @relation(fields: [packageId], references: [id])
+  packageVersionId       String?
+  packageVersion         PackageVersion?    @relation(fields: [packageVersionId], references: [id])
+  benefitTierId          String? // Optional: links to a GroupBenefitTier
+  benefitTier            GroupBenefitTier?  @relation(fields: [benefitTierId], references: [id])
+  enrollmentDate         DateTime
+  activationDate         DateTime?
+  coverStartDate         DateTime? // set during binding (may differ from activationDate)
+  coverEndDate           DateTime?
+  status                 MemberStatus       @default(PENDING_ACTIVATION)
+  waitingPeriodEnd       DateTime? // General waiting period end
+  smartCardNumber        String? // SMART card number if integrated
+  slade360MemberId       String? // Slade360 member ID if integrated
   // Binding provenance
-  underwritingDecisionId String?      // links to UnderwritingDecision applied to this member
+  underwritingDecisionId String? // links to UnderwritingDecision applied to this member
   bindingMakerId         String?
   bindingCheckerId       String?
-  quotationId            String?      // source quotation
-  createdAt        DateTime           @default(now())
-  updatedAt        DateTime           @updatedAt
+  quotationId            String? // source quotation
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
 
   claims                         Claim[]
   preauths                       PreAuthorization[]
   benefitUsages                  BenefitUsage[]
-  endorsements                   Endorsement[]                   @relation("EndorsementMember")
+  endorsements                   Endorsement[]                    @relation("EndorsementMember")
   complaints                     Complaint[]
   coContributionTransactions     CoContributionTransaction[]
   coContributionPayments         MemberCoContributionPayment[]
   annualCoContributions          MemberAnnualCoContribution[]
-  familyCoContributions          FamilyAnnualCoContribution[]    @relation("FamilyCoContributions")
+  familyCoContributions          FamilyAnnualCoContribution[]     @relation("FamilyCoContributions")
   user                           User?
   correspondences                Correspondence[]
   activityLogs                   ActivityLog[]
@@ -408,7 +409,7 @@ model Member {
   checkInChallenges              CheckInChallenge[]
   checkInEvents                  CheckInEvent[]
   checkInNotifications           MemberCheckInNotification[]
-  notifications                   MemberNotification[]
+  notifications                  MemberNotification[]
   healthFiles                    MemberHealthFile[]
   vitalEntries                   MemberVitalEntry[]
   healthJournalEntries           MemberHealthJournalEntry[]
@@ -709,8 +710,8 @@ model MemberNotification {
   metadata Json?
 
   readAt    DateTime?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   @@index([tenantId])
   @@index([memberId])
@@ -794,21 +795,21 @@ model MemberVitalEntry {
 }
 
 model MemberHealthJournalEntry {
-  id            String                 @id @default(cuid())
-  tenantId      String
-  tenant        Tenant                 @relation(fields: [tenantId], references: [id])
-  memberId      String
-  member        Member                 @relation(fields: [memberId], references: [id])
-  authorUserId  String
-  entryType     MemberHealthJournalType @default(NOTE)
-  noteText      String
-  audioUrl      String?
+  id             String                  @id @default(cuid())
+  tenantId       String
+  tenant         Tenant                  @relation(fields: [tenantId], references: [id])
+  memberId       String
+  member         Member                  @relation(fields: [memberId], references: [id])
+  authorUserId   String
+  entryType      MemberHealthJournalType @default(NOTE)
+  noteText       String
+  audioUrl       String?
   transcriptText String?
-  tags          String[]                @default([])
-  recordedAt    DateTime               @default(now())
-  visibility    MemberHealthVisibility @default(PRIVATE)
-  createdAt     DateTime               @default(now())
-  updatedAt     DateTime               @updatedAt
+  tags           String[]                @default([])
+  recordedAt     DateTime                @default(now())
+  visibility     MemberHealthVisibility  @default(PRIVATE)
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
 
   shares MemberHealthShare[]
 
@@ -818,22 +819,22 @@ model MemberHealthJournalEntry {
 }
 
 model MemberHealthShare {
-  id                 String    @id @default(cuid())
+  id                 String                    @id @default(cuid())
   tenantId           String
-  tenant             Tenant    @relation(fields: [tenantId], references: [id])
+  tenant             Tenant                    @relation(fields: [tenantId], references: [id])
   memberId           String
-  member             Member    @relation(fields: [memberId], references: [id])
+  member             Member                    @relation(fields: [memberId], references: [id])
   sharedByUserId     String
   providerId         String?
   preauthId          String?
   checkInChallengeId String?
   healthFileId       String?
-  healthFile         MemberHealthFile? @relation(fields: [healthFileId], references: [id])
+  healthFile         MemberHealthFile?         @relation(fields: [healthFileId], references: [id])
   journalEntryId     String?
   journalEntry       MemberHealthJournalEntry? @relation(fields: [journalEntryId], references: [id])
   expiresAt          DateTime?
   revokedAt          DateTime?
-  createdAt          DateTime @default(now())
+  createdAt          DateTime                  @default(now())
 
   @@index([tenantId])
   @@index([memberId, createdAt])
@@ -1036,11 +1037,11 @@ model PackageVersion {
   pricingConfig   Json? // Structured pricing parameters
   createdAt       DateTime        @default(now())
 
-  currentForPackage  Package? @relation("CurrentVersion")
-  groups             Group[]
-  members            Member[]
-  sharedLimitGroups  SharedLimitGroup[]
-  eligibilityRules   PackageProviderEligibility[]
+  currentForPackage Package?                     @relation("CurrentVersion")
+  groups            Group[]
+  members           Member[]
+  sharedLimitGroups SharedLimitGroup[]
+  eligibilityRules  PackageProviderEligibility[]
 
   @@unique([packageId, versionNumber])
 }
@@ -1082,7 +1083,7 @@ model BenefitConfig {
   notes              String?
   exclusions         String[]
 
-  benefitUsages BenefitUsage[]
+  benefitUsages     BenefitUsage[]
   sharedLimitGroups BenefitConfigSharedLimit[]
 
   @@index([packageVersionId])
@@ -1094,16 +1095,16 @@ enum LimitScope {
 }
 
 model SharedLimitGroup {
-  id               String          @id @default(cuid())
+  id               String         @id @default(cuid())
   packageVersionId String
-  packageVersion   PackageVersion  @relation(fields: [packageVersionId], references: [id])
+  packageVersion   PackageVersion @relation(fields: [packageVersionId], references: [id])
   name             String
-  limitAmount      Decimal         @db.Decimal(14, 2)
-  appliesTo        LimitScope      @default(FAMILY)
-  createdAt        DateTime        @default(now())
-  updatedAt        DateTime        @updatedAt
+  limitAmount      Decimal        @db.Decimal(14, 2)
+  appliesTo        LimitScope     @default(FAMILY)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
-  benefitConfigs   BenefitConfigSharedLimit[]
+  benefitConfigs BenefitConfigSharedLimit[]
 
   @@index([packageVersionId])
 }
@@ -1120,17 +1121,17 @@ model BenefitConfigSharedLimit {
 }
 
 model BenefitUsage {
-  id              String        @id @default(cuid())
-  memberId        String
-  member          Member        @relation(fields: [memberId], references: [id])
-  benefitConfigId String
-  benefitConfig   BenefitConfig @relation(fields: [benefitConfigId], references: [id])
-  periodStart     DateTime // Start of the benefit period (usually enrollment anniversary)
-  periodEnd       DateTime
-  amountUsed      Decimal       @default(0)
-  activeHoldAmount Decimal      @default(0) @db.Decimal(14,2) // sum of active BenefitHold records
-  claimCount      Int           @default(0)
-  lastUpdated     DateTime      @default(now())
+  id               String        @id @default(cuid())
+  memberId         String
+  member           Member        @relation(fields: [memberId], references: [id])
+  benefitConfigId  String
+  benefitConfig    BenefitConfig @relation(fields: [benefitConfigId], references: [id])
+  periodStart      DateTime // Start of the benefit period (usually enrollment anniversary)
+  periodEnd        DateTime
+  amountUsed       Decimal       @default(0)
+  activeHoldAmount Decimal       @default(0) @db.Decimal(14, 2) // sum of active BenefitHold records
+  claimCount       Int           @default(0)
+  lastUpdated      DateTime      @default(now())
 
   @@unique([memberId, benefitConfigId, periodStart])
   @@index([memberId])
@@ -1140,22 +1141,22 @@ model BenefitUsage {
 // Endorsements track mid-term changes to a group's membership
 
 enum EndorsementType {
-  MEMBER_ADDITION       // New member joins mid-term
-  MEMBER_DELETION       // Member exits mid-term
-  DEPENDENT_ADDITION    // New dependent added
-  DEPENDENT_DELETION    // Dependent removed
-  PACKAGE_UPGRADE       // Member/group moves to higher package
-  PACKAGE_DOWNGRADE     // Member/group moves to lower package
-  AGE_BAND_CHANGE       // Age reclassification
-  BENEFIT_MODIFICATION  // Change in benefits (e.g., maternity rider added)
-  SALARY_CHANGE         // If contribution is salary-based
-  GROUP_DATA_CHANGE     // Contact info, payment terms change
-  TIER_CHANGE           // Member moved between benefit tiers within the same group
-  SCHEME_TRANSFER       // Member moves to a different group entirely
-  CORRECTION            // Error correction
-  BENEFICIARY_UPDATE    // Beneficiary designation change
+  MEMBER_ADDITION // New member joins mid-term
+  MEMBER_DELETION // Member exits mid-term
+  DEPENDENT_ADDITION // New dependent added
+  DEPENDENT_DELETION // Dependent removed
+  PACKAGE_UPGRADE // Member/group moves to higher package
+  PACKAGE_DOWNGRADE // Member/group moves to lower package
+  AGE_BAND_CHANGE // Age reclassification
+  BENEFIT_MODIFICATION // Change in benefits (e.g., maternity rider added)
+  SALARY_CHANGE // If contribution is salary-based
+  GROUP_DATA_CHANGE // Contact info, payment terms change
+  TIER_CHANGE // Member moved between benefit tiers within the same group
+  SCHEME_TRANSFER // Member moves to a different group entirely
+  CORRECTION // Error correction
+  BENEFICIARY_UPDATE // Beneficiary designation change
   BANKING_DETAILS_UPDATE // Member/group banking/M-Pesa details
-  MID_TERM_RATE_CHANGE  // Scheme contribution rate change between renewals
+  MID_TERM_RATE_CHANGE // Scheme contribution rate change between renewals
 }
 
 enum EndorsementStatus {
@@ -1216,17 +1217,17 @@ model Endorsement {
   appliedBy String?
 
   // ── Process 7: Amendment enrichments ──────────────────────
-  beforeSnapshot         Json?    // full membership state before amendment
-  afterSnapshot          Json?    // full membership state after (populated on approval)
-  proRataCalculationId   String?  // FK to ProRataCalculation
-  makerId                String?  // user who initiated (maps to requestedBy FK)
-  approverId             String?  // user who approved
-  backDated              Boolean  @default(false)
-  overrideRecordId       String?  // required when backDated=true
-  requiresAssessment     Boolean  @default(false)
-  assessmentDecisionId   String?  // UnderwritingDecision.id if re-assessment done
+  beforeSnapshot       Json? // full membership state before amendment
+  afterSnapshot        Json? // full membership state after (populated on approval)
+  proRataCalculationId String? // FK to ProRataCalculation
+  makerId              String? // user who initiated (maps to requestedBy FK)
+  approverId           String? // user who approved
+  backDated            Boolean @default(false)
+  overrideRecordId     String? // required when backDated=true
+  requiresAssessment   Boolean @default(false)
+  assessmentDecisionId String? // UnderwritingDecision.id if re-assessment done
 
-  maker    User? @relation("EndorsementMaker",   fields: [makerId],    references: [id])
+  maker    User? @relation("EndorsementMaker", fields: [makerId], references: [id])
   approver User? @relation("EndorsementApprover", fields: [approverId], references: [id])
 
   proRataCalculation ProRataCalculation?
@@ -1253,15 +1254,15 @@ model ProRataCalculation {
   id                   String      @id @default(cuid())
   tenantId             String
   endorsementId        String      @unique
-  previousContribution Decimal     @db.Decimal(19,4)
-  newContribution      Decimal     @db.Decimal(19,4)
+  previousContribution Decimal     @db.Decimal(19, 4)
+  newContribution      Decimal     @db.Decimal(19, 4)
   periodStartDate      DateTime
   periodEndDate        DateTime
   effectiveDate        DateTime
   daysRemaining        Int
   totalDaysInPeriod    Int
-  prorataFactor        Decimal     @db.Decimal(10,8)  // daysRemaining / totalDaysInPeriod
-  adjustmentAmount     Decimal     @db.Decimal(19,4)  // positive=charge, negative=credit
+  prorataFactor        Decimal     @db.Decimal(10, 8) // daysRemaining / totalDaysInPeriod
+  adjustmentAmount     Decimal     @db.Decimal(19, 4) // positive=charge, negative=credit
   adjustmentType       ProRataType
   computedAt           DateTime    @default(now())
 
@@ -1340,16 +1341,16 @@ model Claim {
   benefitUsageId  String?
 
   // ── Process 9 adjudication extensions ────────────────────
-  contractedRate       Decimal? @db.Decimal(14,2)   // looked-up from ProviderTariff at adjudication
-  contractedVariancePct Decimal? @db.Decimal(5,4)   // (billed - contracted) / contracted
-  adjudicatorId        String?                       // FK to User who adjudicated
-  seniorAdjudicatorId  String?                       // FK to User who gave senior approval
-  appealReviewerId     String?                       // must differ from adjudicatorId
-  settlementBatchId    String?                       // FK to ProviderSettlementBatch
+  contractedRate        Decimal? @db.Decimal(14, 2) // looked-up from ProviderTariff at adjudication
+  contractedVariancePct Decimal? @db.Decimal(5, 4) // (billed - contracted) / contracted
+  adjudicatorId         String? // FK to User who adjudicated
+  seniorAdjudicatorId   String? // FK to User who gave senior approval
+  appealReviewerId      String? // must differ from adjudicatorId
+  settlementBatchId     String? // FK to ProviderSettlementBatch
 
-  adjudicator     User?                   @relation("ClaimAdjudicator",     fields: [adjudicatorId],       references: [id])
-  seniorAdjudicator User?                 @relation("ClaimSeniorAdjudicator", fields: [seniorAdjudicatorId], references: [id])
-  settlementBatch ProviderSettlementBatch? @relation(fields: [settlementBatchId], references: [id])
+  adjudicator       User?                    @relation("ClaimAdjudicator", fields: [adjudicatorId], references: [id])
+  seniorAdjudicator User?                    @relation("ClaimSeniorAdjudicator", fields: [seniorAdjudicatorId], references: [id])
+  settlementBatch   ProviderSettlementBatch? @relation(fields: [settlementBatchId], references: [id])
 
   // Status & workflow
   status             ClaimStatus @default(RECEIVED)
@@ -1436,25 +1437,25 @@ enum SettlementStatus {
 }
 
 model ClaimLine {
-  id              String            @id @default(cuid())
-  claimId         String
-  claim           Claim             @relation(fields: [claimId], references: [id])
-  lineNumber      Int
-  serviceCategory ClaimLineCategory @default(CONSULTATION)
-  description     String
-  icdCode         String? // Diagnosis code for this line (may differ from claim header)
-  cptCode         String?
-  quantity        Int               @default(1)
-  unitCost        Decimal
-  billedAmount    Decimal
-  tariffRate      Decimal?          // Contracted rate from provider tariff
-  approvedAmount  Decimal           @default(0)
-  isException     Boolean           @default(false) // Manual override applied
-  exceptionRef    String?           // Reference code for exception
-  notes           String?
+  id                   String             @id @default(cuid())
+  claimId              String
+  claim                Claim              @relation(fields: [claimId], references: [id])
+  lineNumber           Int
+  serviceCategory      ClaimLineCategory  @default(CONSULTATION)
+  description          String
+  icdCode              String? // Diagnosis code for this line (may differ from claim header)
+  cptCode              String?
+  quantity             Int                @default(1)
+  unitCost             Decimal
+  billedAmount         Decimal
+  tariffRate           Decimal? // Contracted rate from provider tariff
+  approvedAmount       Decimal            @default(0)
+  isException          Boolean            @default(false) // Manual override applied
+  exceptionRef         String? // Reference code for exception
+  notes                String?
   // Process 9: per-line adjudication decision
   adjudicationDecision ClaimLineDecision?
-  adjustedAmount       Decimal?     @db.Decimal(14,2)  // approved amount when adjusted
+  adjustedAmount       Decimal?           @db.Decimal(14, 2) // approved amount when adjusted
   adjustmentReason     String?
   declineReason        String?
 
@@ -1536,14 +1537,14 @@ model PreAuthorization {
   convertedAt DateTime?
 
   // ── Process 8 extensions ──────────────────────────────────
-  isEmergency          Boolean   @default(false)
-  slaType              String?   // OUTPATIENT | INPATIENT_PREADMISSION | EMERGENCY
-  slaDeadlineAt        DateTime?
-  slaBreachedAt        DateTime?
-  parentPreAuthId      String?   // for mid-treatment amendments — links to parent PA
-  estimatedComponents  Json?     // breakdown for multi-component PAs (theatre + ICU + ward)
-  autoDecisionLog      Json?     // gate-by-gate result from auto-decision pipeline
-  fraudFlags           Json?     // fraud rule firings at decision time
+  isEmergency         Boolean   @default(false)
+  slaType             String? // OUTPATIENT | INPATIENT_PREADMISSION | EMERGENCY
+  slaDeadlineAt       DateTime?
+  slaBreachedAt       DateTime?
+  parentPreAuthId     String? // for mid-treatment amendments — links to parent PA
+  estimatedComponents Json? // breakdown for multi-component PAs (theatre + ICU + ward)
+  autoDecisionLog     Json? // gate-by-gate result from auto-decision pipeline
+  fraudFlags          Json? // fraud rule firings at decision time
 
   benefitHold BenefitHold?
 
@@ -1569,17 +1570,17 @@ enum HoldStatus {
 }
 
 model BenefitHold {
-  id               String     @id @default(cuid())
-  tenantId         String
-  memberId         String
-  preAuthId        String     @unique
-  benefitCategory  String
-  heldAmount       Decimal    @db.Decimal(14,2)
-  expiresAt        DateTime
-  status           HoldStatus @default(ACTIVE)
-  releasedAt       DateTime?
+  id                 String     @id @default(cuid())
+  tenantId           String
+  memberId           String
+  preAuthId          String     @unique
+  benefitCategory    String
+  heldAmount         Decimal    @db.Decimal(14, 2)
+  expiresAt          DateTime
+  status             HoldStatus @default(ACTIVE)
+  releasedAt         DateTime?
   convertedToClaimId String?
-  createdAt        DateTime   @default(now())
+  createdAt          DateTime   @default(now())
 
   preAuth PreAuthorization @relation(fields: [preAuthId], references: [id])
 
@@ -1637,6 +1638,7 @@ model Provider {
 
   tariffs            ProviderTariff[]
   diagnosisTariffs   ProviderDiagnosisTariff[]
+  contracts          ProviderContract[]
   claims             Claim[]
   preauths           PreAuthorization[]
   settlementBatches  ProviderSettlementBatch[]
@@ -1657,41 +1659,133 @@ enum TariffType {
 }
 
 model ProviderTariff {
-  id            String    @id @default(cuid())
-  providerId    String
-  provider      Provider  @relation(fields: [providerId], references: [id])
-  cptCode       String?
-  serviceName   String
-  agreedRate    Decimal // KES — overrides standard CPT charge for this provider
-  tariffType    TariffType @default(NEGOTIATED)
-  effectiveFrom DateTime
-  effectiveTo   DateTime?
-  isActive      Boolean   @default(true) // Never delete — deactivate instead
-  createdAt     DateTime  @default(now())
+  id                  String            @id @default(cuid())
+  providerId          String
+  provider            Provider          @relation(fields: [providerId], references: [id])
+  contractId          String? // null = standalone/legacy rate not tied to an agreement
+  contract            ProviderContract? @relation(fields: [contractId], references: [id])
+  cptCode             String?
+  serviceName         String
+  agreedRate          Decimal // KES — overrides standard CPT charge for this provider
+  tariffType          TariffType        @default(NEGOTIATED)
+  requiresPreauth     Boolean           @default(false) // contract requires PA before this service is payable
+  maxQuantityPerVisit Int? // contractual cap on units per encounter
+  effectiveFrom       DateTime
+  effectiveTo         DateTime?
+  isActive            Boolean           @default(true) // Never delete — deactivate instead
+  createdAt           DateTime          @default(now())
 
   @@index([providerId])
   @@index([providerId, cptCode])
   @@index([providerId, isActive])
+  @@index([contractId])
 }
 
 // Diagnosis-based bundled rates — e.g. malaria admission = KES 8,000/day flat
 model ProviderDiagnosisTariff {
-  id             String    @id @default(cuid())
+  id             String            @id @default(cuid())
   providerId     String
-  provider       Provider  @relation(fields: [providerId], references: [id])
+  provider       Provider          @relation(fields: [providerId], references: [id])
+  contractId     String? // null = standalone/legacy rate not tied to an agreement
+  contract       ProviderContract? @relation(fields: [contractId], references: [id])
   icdCode        String // ICD-10 code this rate applies to
   diagnosisLabel String // Human-readable label (copied at time of creation)
   bundledRate    Decimal? // Fixed package rate for the whole episode (KES)
   perDayRate     Decimal? // Per diem rate (KES/day) — for inpatient
-  tariffType     TariffType @default(NEGOTIATED)
+  tariffType     TariffType        @default(NEGOTIATED)
   notes          String? // Any special conditions or inclusions
   effectiveFrom  DateTime
   effectiveTo    DateTime?
-  isActive       Boolean   @default(true) // Never delete — deactivate instead
-  createdAt      DateTime  @default(now())
+  isActive       Boolean           @default(true) // Never delete — deactivate instead
+  createdAt      DateTime          @default(now())
 
   @@index([providerId])
   @@index([providerId, icdCode])
+  @@index([contractId])
+}
+
+// ─── PROVIDER CONTRACTS ─────────────────────────────────
+// A signed commercial agreement with a provider. Owns the rate schedule,
+// exclusions, and billing rules that adjudication enforces.
+
+enum ProviderContractStatus {
+  DRAFT // being negotiated — rates not yet applied
+  ACTIVE // in force — adjudication uses this contract's schedule
+  SUSPENDED // temporarily not honoured (e.g. compliance issue)
+  EXPIRED // past end date
+  TERMINATED // ended early
+}
+
+// How services NOT on the tariff schedule are paid. This is the single most
+// important billing rule in a provider agreement — without it every uncoded
+// invoice line is payable at whatever the provider billed.
+enum UnlistedServiceRule {
+  PAY_AS_BILLED // honour billed charges for unlisted services
+  DISCOUNT_OFF_BILLED // pay billed × (1 − unlistedDiscountPct)
+  REFER_FOR_REVIEW // no automatic ceiling — flag for manual adjudication
+  REJECT // unlisted services are not payable at all
+}
+
+model ProviderContract {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  providerId String
+  provider   Provider @relation(fields: [providerId], references: [id])
+
+  contractNumber String // PC-2026-001 — generated per tenant
+  title          String // e.g. "2026 Master Services Agreement"
+  status         ProviderContractStatus @default(DRAFT)
+
+  startDate  DateTime
+  endDate    DateTime
+  signedDate DateTime?
+  autoRenew  Boolean   @default(false)
+
+  // Commercial terms
+  paymentTermDays    Int      @default(30)
+  creditLimit        Decimal? // max outstanding payable (KES)
+  invoiceDiscountPct Decimal? // negotiated % discount applied across the invoice
+
+  // Billing rules
+  unlistedServiceRule UnlistedServiceRule @default(REFER_FOR_REVIEW)
+  unlistedDiscountPct Decimal? // required when unlistedServiceRule = DISCOUNT_OFF_BILLED
+
+  documentUrl String? // scanned signed agreement
+  notes       String?
+
+  // Renewal chain: old contract points at the contract that replaced it
+  supersededById String?           @unique
+  supersededBy   ProviderContract? @relation("ContractRenewal", fields: [supersededById], references: [id])
+  predecessor    ProviderContract? @relation("ContractRenewal")
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tariffLines      ProviderTariff[]
+  diagnosisTariffs ProviderDiagnosisTariff[]
+  exclusions       ProviderContractExclusion[]
+
+  @@unique([tenantId, contractNumber])
+  @@index([providerId, status])
+  @@index([tenantId])
+  @@index([endDate])
+}
+
+// Services that are contractually NOT payable at this provider
+// (e.g. cosmetic procedures, services the facility is not accredited for).
+model ProviderContractExclusion {
+  id          String           @id @default(cuid())
+  contractId  String
+  contract    ProviderContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  cptCode     String? // match by CPT when coded
+  serviceName String // human-readable service description (used for display + uncoded match)
+  reason      String? // why it is excluded
+  createdAt   DateTime         @default(now())
+
+  @@index([contractId])
+  @@index([contractId, cptCode])
 }
 
 // ─── PHASE B: PROVIDER & POLICY HARDENING ───────────────
@@ -1742,17 +1836,17 @@ enum PractitionerCredentialStatus {
 }
 
 model PractitionerCredential {
-  id             String                    @id @default(cuid())
+  id             String                       @id @default(cuid())
   practitionerId String
-  practitioner   Practitioner              @relation(fields: [practitionerId], references: [id])
+  practitioner   Practitioner                 @relation(fields: [practitionerId], references: [id])
   documentType   String
   documentUrl    String?
   issueDate      DateTime?
   expiryDate     DateTime
   status         PractitionerCredentialStatus @default(ACTIVE)
   notes          String?
-  createdAt      DateTime         @default(now())
-  updatedAt      DateTime         @updatedAt
+  createdAt      DateTime                     @default(now())
+  updatedAt      DateTime                     @updatedAt
 
   @@index([practitionerId])
   @@index([expiryDate])
@@ -1889,40 +1983,40 @@ enum PayoutBatchStatus {
 }
 
 model Broker {
-  id            String   @id @default(cuid())
-  tenantId      String
-  tenant        Tenant   @relation(fields: [tenantId], references: [id])
-  name          String // Company name
-  brokerCode    String?  @unique
-  legalName     String?
-  tradingName   String?
-  brokerType    BrokerType @default(MASTER_BROKER)
-  intermediaryCategory IntermediaryCategory @default(REGULATED_BROKER)
-  requiresIraRegistration Boolean @default(true)
-  canReceiveCommission Boolean @default(true)
-  commissionBasis CommissionBasis @default(COMMISSION)
-  referralFeeAmount Decimal? @db.Decimal(18, 2)
-  sourceDescription String?
-  parentBrokerId String?
-  parent        Broker?  @relation("BrokerHierarchy", fields: [parentBrokerId], references: [id])
-  children      Broker[] @relation("BrokerHierarchy")
-  contactPerson String
-  phone         String
-  email         String
-  address       String?
-  licenseNumber String? // IRA license
-  iraExpiryDate DateTime?
-  kraPin        String?
-  vatRegistered Boolean  @default(false)
-  vatNumber     String?
-  bankAccountReference String?
-  mpesaPaybillNumber String?
-  effectiveFrom DateTime @default(now())
-  effectiveTo   DateTime?
-  approvedById  String?
-  approvedAt    DateTime?
-  status        String   @default("ACTIVE")
-  dateOnboarded DateTime @default(now())
+  id                      String               @id @default(cuid())
+  tenantId                String
+  tenant                  Tenant               @relation(fields: [tenantId], references: [id])
+  name                    String // Company name
+  brokerCode              String?              @unique
+  legalName               String?
+  tradingName             String?
+  brokerType              BrokerType           @default(MASTER_BROKER)
+  intermediaryCategory    IntermediaryCategory @default(REGULATED_BROKER)
+  requiresIraRegistration Boolean              @default(true)
+  canReceiveCommission    Boolean              @default(true)
+  commissionBasis         CommissionBasis      @default(COMMISSION)
+  referralFeeAmount       Decimal?             @db.Decimal(18, 2)
+  sourceDescription       String?
+  parentBrokerId          String?
+  parent                  Broker?              @relation("BrokerHierarchy", fields: [parentBrokerId], references: [id])
+  children                Broker[]             @relation("BrokerHierarchy")
+  contactPerson           String
+  phone                   String
+  email                   String
+  address                 String?
+  licenseNumber           String? // IRA license
+  iraExpiryDate           DateTime?
+  kraPin                  String?
+  vatRegistered           Boolean              @default(false)
+  vatNumber               String?
+  bankAccountReference    String?
+  mpesaPaybillNumber      String?
+  effectiveFrom           DateTime             @default(now())
+  effectiveTo             DateTime?
+  approvedById            String?
+  approvedAt              DateTime?
+  status                  String               @default("ACTIVE")
+  dateOnboarded           DateTime             @default(now())
 
   // Commission structure
   firstYearCommissionPct Decimal  @default(0) // % of first-year contribution
@@ -1930,17 +2024,17 @@ model Broker {
   flatFeePerMember       Decimal? // Alternative: flat fee per member
   commissionStructure    Json? // Complex tiered structures
 
-  groups      Group[]
-  commissions Commission[]
-  producers   BrokerProducer[]
+  groups              Group[]
+  commissions         Commission[]
+  producers           BrokerProducer[]
   commissionSchedules BrokerCommissionSchedule[]
-  commissionLedger CommissionLedgerEntry[]
-  kycDocuments BrokerKycDocument[]
-  documents   Document[]
-  user        User?
-  quotations  Quotation[]
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  commissionLedger    CommissionLedgerEntry[]
+  kycDocuments        BrokerKycDocument[]
+  documents           Document[]
+  user                User?
+  quotations          Quotation[]
+  createdAt           DateTime                   @default(now())
+  updatedAt           DateTime                   @updatedAt
 
   @@index([tenantId])
   @@index([tenantId, status])
@@ -1951,68 +2045,68 @@ model Broker {
 }
 
 model BrokerKycDocument {
-  id            String            @id @default(cuid())
-  brokerId      String
-  broker        Broker            @relation(fields: [brokerId], references: [id])
-  documentType  KycDocumentType
-  fileUri       String
-  fileName      String
-  uploadedAt    DateTime          @default(now())
-  uploadedById  String
-  verifiedAt    DateTime?
-  verifiedById  String?
-  expiresAt     DateTime?
-  status        KycDocumentStatus @default(PENDING_REVIEW)
-  notes         String?
+  id           String            @id @default(cuid())
+  brokerId     String
+  broker       Broker            @relation(fields: [brokerId], references: [id])
+  documentType KycDocumentType
+  fileUri      String
+  fileName     String
+  uploadedAt   DateTime          @default(now())
+  uploadedById String
+  verifiedAt   DateTime?
+  verifiedById String?
+  expiresAt    DateTime?
+  status       KycDocumentStatus @default(PENDING_REVIEW)
+  notes        String?
 
   @@index([brokerId, documentType])
   @@index([status, expiresAt])
 }
 
 model BrokerProducer {
-  id                  String   @id @default(cuid())
+  id                  String    @id @default(cuid())
   brokerId            String
-  broker              Broker   @relation(fields: [brokerId], references: [id])
+  broker              Broker    @relation(fields: [brokerId], references: [id])
   producerName        String
-  producerCode        String   @unique
+  producerCode        String    @unique
   iraIndividualNumber String?
   email               String
   phone               String
   effectiveFrom       DateTime
   effectiveTo         DateTime?
-  status              String   @default("ACTIVE")
-  groups              Group[]  @relation("ProducerSchemes")
+  status              String    @default("ACTIVE")
+  groups              Group[]   @relation("ProducerSchemes")
 
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([brokerId, status])
 }
 
 model BrokerCommissionSchedule {
-  id              String                 @id @default(cuid())
-  brokerId        String
-  broker          Broker                 @relation(fields: [brokerId], references: [id])
-  scheduleName    String
-  scheduleType    CommissionScheduleType
-  packageId       String?
-  groupId         String?
-  clientType      ClientType?
-  newBusinessRate Decimal                @db.Decimal(8, 5)
-  renewalRate     Decimal                @db.Decimal(8, 5)
-  overrideRate    Decimal?               @db.Decimal(8, 5)
-  grossCommissionCeiling Decimal?        @db.Decimal(8, 5)
-  payoutCycleDays Int                    @default(30)
-  tiers           CommissionTier[]
-  effectiveFrom   DateTime
-  effectiveTo     DateTime?
-  status          ScheduleStatus         @default(DRAFT)
-  createdById     String
-  approvedById    String?
-  approvedAt      DateTime?
-  ledgerEntries   CommissionLedgerEntry[]
-  createdAt       DateTime               @default(now())
-  updatedAt       DateTime               @updatedAt
+  id                     String                  @id @default(cuid())
+  brokerId               String
+  broker                 Broker                  @relation(fields: [brokerId], references: [id])
+  scheduleName           String
+  scheduleType           CommissionScheduleType
+  packageId              String?
+  groupId                String?
+  clientType             ClientType?
+  newBusinessRate        Decimal                 @db.Decimal(8, 5)
+  renewalRate            Decimal                 @db.Decimal(8, 5)
+  overrideRate           Decimal?                @db.Decimal(8, 5)
+  grossCommissionCeiling Decimal?                @db.Decimal(8, 5)
+  payoutCycleDays        Int                     @default(30)
+  tiers                  CommissionTier[]
+  effectiveFrom          DateTime
+  effectiveTo            DateTime?
+  status                 ScheduleStatus          @default(DRAFT)
+  createdById            String
+  approvedById           String?
+  approvedAt             DateTime?
+  ledgerEntries          CommissionLedgerEntry[]
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
 
   @@index([brokerId, effectiveFrom, effectiveTo])
   @@index([brokerId, status])
@@ -2021,14 +2115,14 @@ model BrokerCommissionSchedule {
 }
 
 model CommissionTier {
-  id              String                    @id @default(cuid())
+  id              String                   @id @default(cuid())
   scheduleId      String
-  schedule        BrokerCommissionSchedule  @relation(fields: [scheduleId], references: [id])
+  schedule        BrokerCommissionSchedule @relation(fields: [scheduleId], references: [id])
   tierOrder       Int
   thresholdMetric TierMetric
-  thresholdMin    Decimal                   @db.Decimal(18, 2)
-  thresholdMax    Decimal?                  @db.Decimal(18, 2)
-  rate            Decimal                   @db.Decimal(8, 5)
+  thresholdMin    Decimal                  @db.Decimal(18, 2)
+  thresholdMax    Decimal?                 @db.Decimal(18, 2)
+  rate            Decimal                  @db.Decimal(8, 5)
 
   @@index([scheduleId, tierOrder])
 }
@@ -2070,22 +2164,22 @@ model CommissionLedgerEntry {
 }
 
 model CommissionPayoutBatch {
-  id              String                  @id @default(cuid())
-  batchReference  String                  @unique
-  batchDate       DateTime
-  totalGross      Decimal                 @db.Decimal(18, 2)
-  totalWHT        Decimal                 @db.Decimal(18, 2)
-  totalVAT        Decimal                 @db.Decimal(18, 2)
-  totalLevy       Decimal                 @db.Decimal(18, 2)
-  totalNet        Decimal                 @db.Decimal(18, 2)
-  currency        String                  @default("KES")
-  status          PayoutBatchStatus
-  generatedById   String
-  approvedById    String?
-  approvedAt      DateTime?
-  disbursedAt     DateTime?
-  entries         CommissionLedgerEntry[]
-  createdAt       DateTime                @default(now())
+  id             String                  @id @default(cuid())
+  batchReference String                  @unique
+  batchDate      DateTime
+  totalGross     Decimal                 @db.Decimal(18, 2)
+  totalWHT       Decimal                 @db.Decimal(18, 2)
+  totalVAT       Decimal                 @db.Decimal(18, 2)
+  totalLevy      Decimal                 @db.Decimal(18, 2)
+  totalNet       Decimal                 @db.Decimal(18, 2)
+  currency       String                  @default("KES")
+  status         PayoutBatchStatus
+  generatedById  String
+  approvedById   String?
+  approvedAt     DateTime?
+  disbursedAt    DateTime?
+  entries        CommissionLedgerEntry[]
+  createdAt      DateTime                @default(now())
 
   @@index([status, batchDate])
 }
@@ -2219,12 +2313,12 @@ model Quotation {
   id          String  @id @default(cuid())
   tenantId    String
   tenant      Tenant  @relation(fields: [tenantId], references: [id])
-  quoteNumber String  // e.g., QUO-2025-00001
+  quoteNumber String // e.g., QUO-2025-00001
   groupId     String? // If quoting for existing group (renewal)
   group       Group?  @relation(fields: [groupId], references: [id])
   brokerId    String? // If submitted by broker
   broker      Broker? @relation(fields: [brokerId], references: [id])
-  createdBy   String  // User ID
+  createdBy   String // User ID
 
   // Prospect info (if new group / no groupId yet)
   prospectName     String?
@@ -2233,14 +2327,14 @@ model Quotation {
   prospectIndustry String?
 
   // ── Assessment-stage fields (Process 3) ──────────────────
-  clientType         ClientType? // CORPORATE | INDIVIDUAL
-  fundingMode        FundingMode @default(INSURED) // INSURED=contribution-bearing, SELF_FUNDED=fund-managed
-  headcount          Int?        // Corporate: declared headcount
-  legalName          String?     // Corporate: legal entity name
-  kraPinCorporate    String?
+  clientType          ClientType? // CORPORATE | INDIVIDUAL
+  fundingMode         FundingMode @default(INSURED) // INSURED=contribution-bearing, SELF_FUNDED=fund-managed
+  headcount           Int? // Corporate: declared headcount
+  legalName           String? // Corporate: legal entity name
+  kraPinCorporate     String?
   billingContactEmail String?
   requestedCoverStart DateTime?
-  censusFileUrl      String?     // Uploaded CSV/Excel for corporate census
+  censusFileUrl       String? // Uploaded CSV/Excel for corporate census
 
   // Workflow / maker-checker
   assignedAssessorId    String?
@@ -2250,19 +2344,19 @@ model Quotation {
   declineReason         String?
 
   // Renewal linkage
-  isRenewal        Boolean  @default(false)
+  isRenewal        Boolean @default(false)
   priorQuotationId String?
 
   // ── Pricing fields (nullable until assessment complete) ───
   packageId      String?
-  memberCount    Int      @default(0)
-  dependentCount Int      @default(0)
-  ageBands       Json?    // [{ minAge, maxAge, count, rate }]
-  ratePerMember  Decimal? @db.Decimal(14,2)
-  annualPremium  Decimal? @db.Decimal(14,2)
-  loadings       Json?    // { claimsHistory: 15, industry: 5 }
-  discounts      Json?    // { groupSize: -10, loyaltyYears: -5 }
-  finalPremium   Decimal? @db.Decimal(14,2)
+  memberCount    Int             @default(0)
+  dependentCount Int             @default(0)
+  ageBands       Json? // [{ minAge, maxAge, count, rate }]
+  ratePerMember  Decimal?        @db.Decimal(14, 2)
+  annualPremium  Decimal?        @db.Decimal(14, 2)
+  loadings       Json? // { claimsHistory: 15, industry: 5 }
+  discounts      Json? // { groupSize: -10, loyaltyYears: -5 }
+  finalPremium   Decimal?        @db.Decimal(14, 2)
   pricingNotes   String?
   validUntil     DateTime?
   status         QuotationStatus @default(DRAFT)
@@ -2276,7 +2370,7 @@ model Quotation {
   decisions     UnderwritingDecision[]
   riskProfile   QuotationRiskProfile?
   workQueueItem AssessorWorkQueueItem?
-  assessor      User?   @relation("QuotationAssessor", fields: [assignedAssessorId], references: [id])
+  assessor      User?                  @relation("QuotationAssessor", fields: [assignedAssessorId], references: [id])
   // ── Pricing & issuance relations ──────────────────────────
   versions      QuotationVersion[]
   lineItems     QuotationLineItem[]
@@ -2400,8 +2494,8 @@ model AuditLog {
   // Chain fields — populated by audit-chain.service.ts
   entityType    String?
   entityId      String?
-  payloadHash   String?  // SHA-256 of canonical JSON payload
-  previousHash  String?  // payloadHash of the preceding entry in this tenant's chain
+  payloadHash   String? // SHA-256 of canonical JSON payload
+  previousHash  String? // payloadHash of the preceding entry in this tenant's chain
   chainSequence BigInt   @default(autoincrement())
   createdAt     DateTime @default(now())
 
@@ -2794,18 +2888,18 @@ model CoContributionTransaction {
 }
 
 model MemberCoContributionPayment {
-  id        String @id @default(cuid())
-  tenantId  String
-  tenant    Tenant @relation(fields: [tenantId], references: [id])
-  memberId  String
-  member    Member @relation(fields: [memberId], references: [id])
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+  memberId String
+  member   Member @relation(fields: [memberId], references: [id])
 
   coContributionTransactionId String
   coContributionTransaction   CoContributionTransaction @relation(fields: [coContributionTransactionId], references: [id])
 
-  amount         Decimal                             @db.Decimal(12, 2)
+  amount         Decimal                           @db.Decimal(12, 2)
   phoneNumber    String
-  status         MemberCoContributionPaymentStatus  @default(INITIATED)
+  status         MemberCoContributionPaymentStatus @default(INITIATED)
   idempotencyKey String
 
   checkoutRequestId String  @unique
@@ -2906,43 +3000,43 @@ enum AnalyticsAlertStatus {
 }
 
 model AnalyticsEncounterFact {
-  id                    String                 @id @default(cuid())
-  sourceKey             String                 @unique
-  sourceClaimId         String
-  sourceClaimLineId     String?
-  tenantId              String
-  groupId               String
-  packageId             String?
-  benefitTierId         String?
-  intermediaryId        String?
-  memberId              String
-  providerId            String
-  providerTier          ProviderTier?
-  providerType          ProviderType?
-  isInternalProvider    Boolean                @default(false)
-  encounterDate         DateTime
-  encounterMonth        DateTime
-  encounterType         AnalyticsEncounterType
-  benefitCategory       BenefitCategory?
-  icdCode               String?
-  icdFamily             String?
-  memberAge             Int?
-  memberAgeBand         String?
-  memberGender          Gender?
-  memberRelationship    MemberRelationship?
-  familySizeBand        String?
-  memberCounty          String?
-  groupCounty           String?
-  providerCounty        String?
-  grossCost             Decimal                @db.Decimal(18, 2)
-  benefitPaid           Decimal                @db.Decimal(18, 2)
-  memberCoContribution  Decimal                @default(0) @db.Decimal(18, 2)
-  rejectedAmount        Decimal                @default(0) @db.Decimal(18, 2)
-  caseMixWeight         Decimal                @default(1) @db.Decimal(10, 4)
-  usedDefaultCaseMix    Boolean                @default(true)
-  status                ClaimStatus
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
+  id                   String                 @id @default(cuid())
+  sourceKey            String                 @unique
+  sourceClaimId        String
+  sourceClaimLineId    String?
+  tenantId             String
+  groupId              String
+  packageId            String?
+  benefitTierId        String?
+  intermediaryId       String?
+  memberId             String
+  providerId           String
+  providerTier         ProviderTier?
+  providerType         ProviderType?
+  isInternalProvider   Boolean                @default(false)
+  encounterDate        DateTime
+  encounterMonth       DateTime
+  encounterType        AnalyticsEncounterType
+  benefitCategory      BenefitCategory?
+  icdCode              String?
+  icdFamily            String?
+  memberAge            Int?
+  memberAgeBand        String?
+  memberGender         Gender?
+  memberRelationship   MemberRelationship?
+  familySizeBand       String?
+  memberCounty         String?
+  groupCounty          String?
+  providerCounty       String?
+  grossCost            Decimal                @db.Decimal(18, 2)
+  benefitPaid          Decimal                @db.Decimal(18, 2)
+  memberCoContribution Decimal                @default(0) @db.Decimal(18, 2)
+  rejectedAmount       Decimal                @default(0) @db.Decimal(18, 2)
+  caseMixWeight        Decimal                @default(1) @db.Decimal(10, 4)
+  usedDefaultCaseMix   Boolean                @default(true)
+  status               ClaimStatus
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
 
   @@index([tenantId, encounterDate])
   @@index([tenantId, encounterMonth])
@@ -2955,24 +3049,24 @@ model AnalyticsEncounterFact {
 }
 
 model AnalyticsContributionFact {
-  id                    String   @id @default(cuid())
-  sourceKey             String   @unique
-  sourceInvoiceId       String?
-  sourcePaymentId       String?
-  tenantId              String
-  groupId               String
-  packageId             String?
-  benefitTierId         String?
-  intermediaryId        String?
-  period                String
-  periodStart           DateTime
-  periodEnd             DateTime
-  memberCount           Int
-  grossContribution     Decimal  @db.Decimal(18, 2)
-  paidContribution      Decimal  @default(0) @db.Decimal(18, 2)
-  outstandingAmount     Decimal  @default(0) @db.Decimal(18, 2)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  id                String   @id @default(cuid())
+  sourceKey         String   @unique
+  sourceInvoiceId   String?
+  sourcePaymentId   String?
+  tenantId          String
+  groupId           String
+  packageId         String?
+  benefitTierId     String?
+  intermediaryId    String?
+  period            String
+  periodStart       DateTime
+  periodEnd         DateTime
+  memberCount       Int
+  grossContribution Decimal  @db.Decimal(18, 2)
+  paidContribution  Decimal  @default(0) @db.Decimal(18, 2)
+  outstandingAmount Decimal  @default(0) @db.Decimal(18, 2)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 
   @@index([tenantId, periodStart])
   @@index([groupId, periodStart])
@@ -2981,38 +3075,38 @@ model AnalyticsContributionFact {
 }
 
 model CaseMixWeight {
-  id              String   @id @default(cuid())
-  icdFamily       String   @unique
-  label           String
-  weight          Decimal  @default(1) @db.Decimal(10, 4)
-  effectiveFrom   DateTime @default(now())
-  effectiveTo     DateTime?
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id            String    @id @default(cuid())
+  icdFamily     String    @unique
+  label         String
+  weight        Decimal   @default(1) @db.Decimal(10, 4)
+  effectiveFrom DateTime  @default(now())
+  effectiveTo   DateTime?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   @@index([isActive])
 }
 
 model AnalyticsMlrSnapshot {
-  id                    String   @id @default(cuid())
-  tenantId              String
-  groupId               String?
-  packageId             String?
-  benefitTierId         String?
-  intermediaryId        String?
-  grain                 String
-  period                String
-  periodStart           DateTime
-  grossContribution     Decimal  @db.Decimal(18, 2)
-  paidContribution      Decimal  @default(0) @db.Decimal(18, 2)
-  grossCost             Decimal  @default(0) @db.Decimal(18, 2)
-  benefitPaid           Decimal  @default(0) @db.Decimal(18, 2)
-  memberCoContribution  Decimal  @default(0) @db.Decimal(18, 2)
-  mlr                   Decimal  @default(0) @db.Decimal(10, 4)
-  trailing12Mlr         Decimal  @default(0) @db.Decimal(10, 4)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  tenantId             String
+  groupId              String?
+  packageId            String?
+  benefitTierId        String?
+  intermediaryId       String?
+  grain                String
+  period               String
+  periodStart          DateTime
+  grossContribution    Decimal  @db.Decimal(18, 2)
+  paidContribution     Decimal  @default(0) @db.Decimal(18, 2)
+  grossCost            Decimal  @default(0) @db.Decimal(18, 2)
+  benefitPaid          Decimal  @default(0) @db.Decimal(18, 2)
+  memberCoContribution Decimal  @default(0) @db.Decimal(18, 2)
+  mlr                  Decimal  @default(0) @db.Decimal(10, 4)
+  trailing12Mlr        Decimal  @default(0) @db.Decimal(10, 4)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   @@unique([tenantId, grain, period, groupId, packageId, benefitTierId, intermediaryId], map: "AnalyticsMlrSnapshot_scope_key")
   @@index([tenantId, periodStart])
@@ -3021,23 +3115,23 @@ model AnalyticsMlrSnapshot {
 }
 
 model ProviderScorecard {
-  id                    String   @id @default(cuid())
-  tenantId              String
-  providerId            String
-  period                String
-  periodStart           DateTime
-  providerName          String
-  providerTier          ProviderTier?
-  providerType          ProviderType?
-  claimCount            Int
-  memberCount           Int
-  grossCost             Decimal  @db.Decimal(18, 2)
-  adjustedCost          Decimal  @db.Decimal(18, 2)
-  averageCost           Decimal  @default(0) @db.Decimal(18, 2)
-  caseMixIndex          Decimal  @default(1) @db.Decimal(10, 4)
-  rejectionRate         Decimal  @default(0) @db.Decimal(10, 4)
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  id            String        @id @default(cuid())
+  tenantId      String
+  providerId    String
+  period        String
+  periodStart   DateTime
+  providerName  String
+  providerTier  ProviderTier?
+  providerType  ProviderType?
+  claimCount    Int
+  memberCount   Int
+  grossCost     Decimal       @db.Decimal(18, 2)
+  adjustedCost  Decimal       @db.Decimal(18, 2)
+  averageCost   Decimal       @default(0) @db.Decimal(18, 2)
+  caseMixIndex  Decimal       @default(1) @db.Decimal(10, 4)
+  rejectionRate Decimal       @default(0) @db.Decimal(10, 4)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
   @@unique([tenantId, providerId, period])
   @@index([tenantId, periodStart])
@@ -3045,20 +3139,20 @@ model ProviderScorecard {
 }
 
 model MemberRiskProfile {
-  id                    String   @id @default(cuid())
-  tenantId              String
-  groupId               String
-  memberId              String
-  riskTier              RiskTier @default(LOW)
-  riskScore             Decimal  @default(0) @db.Decimal(10, 4)
-  chronicTags           String[]
-  utilizationToCap      Decimal  @default(0) @db.Decimal(10, 4)
-  projectedExceedDate   DateTime?
-  trailing12ClaimCost   Decimal  @default(0) @db.Decimal(18, 2)
-  trailing12ClaimCount  Int      @default(0)
-  lastCalculatedAt      DateTime @default(now())
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  id                   String    @id @default(cuid())
+  tenantId             String
+  groupId              String
+  memberId             String
+  riskTier             RiskTier  @default(LOW)
+  riskScore            Decimal   @default(0) @db.Decimal(10, 4)
+  chronicTags          String[]
+  utilizationToCap     Decimal   @default(0) @db.Decimal(10, 4)
+  projectedExceedDate  DateTime?
+  trailing12ClaimCost  Decimal   @default(0) @db.Decimal(18, 2)
+  trailing12ClaimCount Int       @default(0)
+  lastCalculatedAt     DateTime  @default(now())
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   @@unique([memberId])
   @@index([tenantId, riskTier])
@@ -3078,75 +3172,75 @@ enum GroupRenewalStatus {
 }
 
 model RenewalScenario {
-  id                   String   @id @default(cuid())
-  tenantId             String
-  renewalAnalysisId    String
-  scenarioName         String
-  proposedRateAdj      Decimal  @db.Decimal(5,4)   // e.g. 0.05 = +5%
-  proposedCoContribAdj Decimal? @db.Decimal(5,4)
-  proposedNetworkTier  String?
-  projectedMlr         Decimal  @db.Decimal(5,4)
-  projectedContribution Decimal @db.Decimal(19,4)
-  isCommitted          Boolean  @default(false)
-  createdById          String
-  createdAt            DateTime @default(now())
+  id                    String   @id @default(cuid())
+  tenantId              String
+  renewalAnalysisId     String
+  scenarioName          String
+  proposedRateAdj       Decimal  @db.Decimal(5, 4) // e.g. 0.05 = +5%
+  proposedCoContribAdj  Decimal? @db.Decimal(5, 4)
+  proposedNetworkTier   String?
+  projectedMlr          Decimal  @db.Decimal(5, 4)
+  projectedContribution Decimal  @db.Decimal(19, 4)
+  isCommitted           Boolean  @default(false)
+  createdById           String
+  createdAt             DateTime @default(now())
 
   @@index([tenantId, renewalAnalysisId])
 }
 
 model RenewalAnalysis {
-  id                         String   @id @default(cuid())
-  tenantId                   String
-  groupId                    String
-  renewalDate                DateTime
-  trailing12Mlr              Decimal  @default(0) @db.Decimal(10, 4)
-  currentYearMlr             Decimal  @default(0) @db.Decimal(10, 4)
-  targetMlr                  Decimal  @default(0.75) @db.Decimal(10, 4)
-  currentContribution        Decimal  @default(0) @db.Decimal(18, 2)
-  projectedClaims            Decimal  @default(0) @db.Decimal(18, 2)
-  recommendedContribution    Decimal  @default(0) @db.Decimal(18, 2)
-  recommendedAdjustmentPct   Decimal  @default(0) @db.Decimal(10, 4)
-  topIcdDrivers              Json     @default("[]")
-  anonymizedTopUtilizers     Json     @default("[]")
-  simulatorDefaults          Json     @default("{}")
+  id                       String   @id @default(cuid())
+  tenantId                 String
+  groupId                  String
+  renewalDate              DateTime
+  trailing12Mlr            Decimal  @default(0) @db.Decimal(10, 4)
+  currentYearMlr           Decimal  @default(0) @db.Decimal(10, 4)
+  targetMlr                Decimal  @default(0.75) @db.Decimal(10, 4)
+  currentContribution      Decimal  @default(0) @db.Decimal(18, 2)
+  projectedClaims          Decimal  @default(0) @db.Decimal(18, 2)
+  recommendedContribution  Decimal  @default(0) @db.Decimal(18, 2)
+  recommendedAdjustmentPct Decimal  @default(0) @db.Decimal(10, 4)
+  topIcdDrivers            Json     @default("[]")
+  anonymizedTopUtilizers   Json     @default("[]")
+  simulatorDefaults        Json     @default("{}")
   // ── Process 11: Spec algorithm outputs ───────────────────
-  recommendationBasis        String?  // narrative explaining recommendation
-  requiresActuarialReview    Boolean  @default(false)
-  actuarialOpinionDocUrl     String?
-  isLossLeader               Boolean  @default(false)
-  lossLeaderJustification    String?
-  lossLeaderApprovedById     String?
-  lastCalculatedAt           DateTime @default(now())
-  createdAt                  DateTime @default(now())
-  updatedAt                  DateTime @updatedAt
+  recommendationBasis      String? // narrative explaining recommendation
+  requiresActuarialReview  Boolean  @default(false)
+  actuarialOpinionDocUrl   String?
+  isLossLeader             Boolean  @default(false)
+  lossLeaderJustification  String?
+  lossLeaderApprovedById   String?
+  lastCalculatedAt         DateTime @default(now())
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
 
   @@unique([groupId, renewalDate])
   @@index([tenantId, renewalDate])
 }
 
 model AnalyticsAlert {
-  id                 String                 @id @default(cuid())
-  tenantId           String
-  groupId            String?
-  providerId         String?
-  memberId           String?
-  intermediaryId     String?
-  type               AnalyticsAlertType
-  severity           AnalyticsAlertSeverity @default(INFO)
-  status             AnalyticsAlertStatus   @default(OPEN)
-  title              String
-  message            String
-  metricKey          String?
-  metricValue        Decimal?               @db.Decimal(18, 4)
-  thresholdValue     Decimal?               @db.Decimal(18, 4)
-  context            Json                   @default("{}")
-  acknowledgedById   String?
-  acknowledgedAt     DateTime?
-  resolvedById       String?
-  resolvedAt         DateTime?
-  resolutionNote     String?
-  createdAt          DateTime               @default(now())
-  updatedAt          DateTime               @updatedAt
+  id               String                 @id @default(cuid())
+  tenantId         String
+  groupId          String?
+  providerId       String?
+  memberId         String?
+  intermediaryId   String?
+  type             AnalyticsAlertType
+  severity         AnalyticsAlertSeverity @default(INFO)
+  status           AnalyticsAlertStatus   @default(OPEN)
+  title            String
+  message          String
+  metricKey        String?
+  metricValue      Decimal?               @db.Decimal(18, 4)
+  thresholdValue   Decimal?               @db.Decimal(18, 4)
+  context          Json                   @default("{}")
+  acknowledgedById String?
+  acknowledgedAt   DateTime?
+  resolvedById     String?
+  resolvedAt       DateTime?
+  resolutionNote   String?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
 
   @@index([tenantId, status, severity, createdAt])
   @@index([groupId, status])
@@ -3162,7 +3256,7 @@ model QuotationLife {
   tenantId        String
   quotationId     String
   role            LifeRole
-  principalLifeId String?  // for dependants: links to their principal QuotationLife
+  principalLifeId String? // for dependants: links to their principal QuotationLife
   firstName       String
   lastName        String
   nationalId      String?
@@ -3170,24 +3264,24 @@ model QuotationLife {
   gender          Gender
   isChronic       Boolean  @default(false)
   iprsValidated   Boolean  @default(false)
-  medicalHistory  Json?    // [{ icd10Code, description, isCurrentCondition }]
+  medicalHistory  Json? // [{ icd10Code, description, isCurrentCondition }]
   createdAt       DateTime @default(now())
 
-  quotation  Quotation           @relation(fields: [quotationId], references: [id])
-  decision   UnderwritingDecision?
+  quotation Quotation             @relation(fields: [quotationId], references: [id])
+  decision  UnderwritingDecision?
 
   @@index([quotationId])
   @@index([tenantId, nationalId])
 }
 
 model UnderwritingDecision {
-  id                      String          @id @default(cuid())
+  id                      String         @id @default(cuid())
   tenantId                String
   quotationId             String
-  quotationLifeId         String?         @unique
-  memberId                String?         // set when decision carries to an active membership
+  quotationLifeId         String?        @unique
+  memberId                String? // set when decision carries to an active membership
   decision                UWDecisionType
-  loadingMultiplier       Decimal?        @db.Decimal(5,4) // e.g. 1.25 means 25% loading
+  loadingMultiplier       Decimal?       @db.Decimal(5, 4) // e.g. 1.25 means 25% loading
   excludedIcd10Codes      String[]
   waitingPeriodDays       Int?
   waitingPeriodCategories String[]
@@ -3196,27 +3290,27 @@ model UnderwritingDecision {
   decidedById             String
   seniorApprovedById      String?
   seniorApprovedAt        DateTime?
-  createdAt               DateTime        @default(now())
-  updatedAt               DateTime        @updatedAt
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
 
-  quotation     Quotation       @relation(fields: [quotationId], references: [id])
-  quotationLife QuotationLife?  @relation(fields: [quotationLifeId], references: [id])
-  decidedBy     User            @relation("UWDecider", fields: [decidedById], references: [id])
+  quotation     Quotation      @relation(fields: [quotationId], references: [id])
+  quotationLife QuotationLife? @relation(fields: [quotationLifeId], references: [id])
+  decidedBy     User           @relation("UWDecider", fields: [decidedById], references: [id])
 
   @@index([tenantId, quotationId])
   @@index([tenantId, memberId])
 }
 
 model MembershipExclusion {
-  id               String   @id @default(cuid())
+  id               String    @id @default(cuid())
   tenantId         String
   memberId         String
   icd10Code        String
   description      String?
-  sourceDecisionId String   // links to UnderwritingDecision.id
+  sourceDecisionId String // links to UnderwritingDecision.id
   effectiveFrom    DateTime
   effectiveTo      DateTime?
-  isActive         Boolean  @default(true)
+  isActive         Boolean   @default(true)
   deactivatedAt    DateTime?
 
   @@index([tenantId, memberId])
@@ -3224,13 +3318,13 @@ model MembershipExclusion {
 }
 
 model WaitingPeriodApplication {
-  id                String   @id @default(cuid())
+  id                String    @id @default(cuid())
   tenantId          String
   memberId          String
   benefitCategories String[]
   waitingPeriodDays Int
   startDate         DateTime
-  endDate           DateTime  // startDate + waitingPeriodDays
+  endDate           DateTime // startDate + waitingPeriodDays
   sourceDecisionId  String
   isActive          Boolean   @default(true)
   deactivatedAt     DateTime?
@@ -3298,13 +3392,13 @@ model MemberKycRecord {
   tenantId          String
   memberId          String    @unique
   status            KycStatus @default(PENDING)
-  govIdType         String?   // NATIONAL_ID | PASSPORT | BIRTH_CERT
+  govIdType         String? // NATIONAL_ID | PASSPORT | BIRTH_CERT
   govIdNumber       String?
   iprsValidated     Boolean   @default(false)
   iprsCheckedAt     DateTime?
-  iprsNote          String?   // "IPRS integration pending — manual verification required"
+  iprsNote          String? // "IPRS integration pending — manual verification required"
   biometricEnrolled Boolean   @default(false)
-  biometricType     String?   // FINGERPRINT | FACE
+  biometricType     String? // FINGERPRINT | FACE
   photoUrl          String?
   completedAt       DateTime?
   updatedAt         DateTime  @updatedAt
@@ -3353,14 +3447,14 @@ model MembershipCard {
 }
 
 model OnboardingChecklistItem {
-  id           String               @id @default(cuid())
-  tenantId     String
-  memberId     String
-  itemType     OnboardingItemType
-  status       OnboardingItemStatus @default(PENDING)
-  notes        String?
-  completedAt  DateTime?
-  updatedAt    DateTime             @updatedAt
+  id          String               @id @default(cuid())
+  tenantId    String
+  memberId    String
+  itemType    OnboardingItemType
+  status      OnboardingItemStatus @default(PENDING)
+  notes       String?
+  completedAt DateTime?
+  updatedAt   DateTime             @updatedAt
 
   @@unique([memberId, itemType])
   @@index([tenantId, memberId])
@@ -3372,28 +3466,28 @@ model QuotationRiskProfile {
   tenantId            String
   quotationId         String    @unique
   quotation           Quotation @relation(fields: [quotationId], references: [id])
-  ageDistribution     Json     // { "0-17": n, "18-35": n, "36-50": n, "51-60": n, "60+": n }
-  genderSplit         Json     // { "MALE": n, "FEMALE": n, "OTHER": n }
-  dependantRatio      Decimal  @db.Decimal(5,4)
-  icd10ChapterSummary Json     // { chapterCode: count }
-  priorLossRatio      Decimal? @db.Decimal(5,4)
-  geographicDist      Json?    // { countyCode: count }
-  benchmarkMlr        Decimal? @db.Decimal(5,4)
-  preExistingFlags    Json?    // { icd10Code: lifeCount }
-  blacklistMatches    Int      @default(0)
-  computedAt          DateTime @default(now())
+  ageDistribution     Json // { "0-17": n, "18-35": n, "36-50": n, "51-60": n, "60+": n }
+  genderSplit         Json // { "MALE": n, "FEMALE": n, "OTHER": n }
+  dependantRatio      Decimal   @db.Decimal(5, 4)
+  icd10ChapterSummary Json // { chapterCode: count }
+  priorLossRatio      Decimal?  @db.Decimal(5, 4)
+  geographicDist      Json? // { countyCode: count }
+  benchmarkMlr        Decimal?  @db.Decimal(5, 4)
+  preExistingFlags    Json? // { icd10Code: lifeCount }
+  blacklistMatches    Int       @default(0)
+  computedAt          DateTime  @default(now())
 }
 
 model AssessorWorkQueueItem {
-  id              String    @id @default(cuid())
-  tenantId        String
-  quotationId     String    @unique
-  assignedToId    String
-  assignedAt      DateTime  @default(now())
-  slaDeadlineAt   DateTime
-  slaBreached     Boolean   @default(false)
-  completedAt     DateTime?
-  priority        Int       @default(0)
+  id            String    @id @default(cuid())
+  tenantId      String
+  quotationId   String    @unique
+  assignedToId  String
+  assignedAt    DateTime  @default(now())
+  slaDeadlineAt DateTime
+  slaBreached   Boolean   @default(false)
+  completedAt   DateTime?
+  priority      Int       @default(0)
 
   assignedTo User      @relation(fields: [assignedToId], references: [id])
   quotation  Quotation @relation(fields: [quotationId], references: [id])
@@ -3418,50 +3512,50 @@ enum TerminationType {
 }
 
 model MembershipLapseRecord {
-  id               String   @id @default(cuid())
-  tenantId         String
-  memberId         String
-  lapseDate        DateTime
-  unpaidAmount     Decimal  @db.Decimal(14,2)
-  gracePeriodDays  Int
-  catchupDeadline  DateTime // lapseDate + catchupWindowDays (default 60)
-  reinstatedAt     DateTime?
-  catchupExpired   Boolean  @default(false)
-  createdAt        DateTime @default(now())
+  id              String    @id @default(cuid())
+  tenantId        String
+  memberId        String
+  lapseDate       DateTime
+  unpaidAmount    Decimal   @db.Decimal(14, 2)
+  gracePeriodDays Int
+  catchupDeadline DateTime // lapseDate + catchupWindowDays (default 60)
+  reinstatedAt    DateTime?
+  catchupExpired  Boolean   @default(false)
+  createdAt       DateTime  @default(now())
 
   @@index([tenantId, memberId])
   @@index([tenantId, catchupExpired])
 }
 
 model MembershipCancellationRecord {
-  id                String           @id @default(cuid())
-  tenantId          String
-  memberId          String
-  cancellationType  CancellationType
-  requestedById     String
-  effectiveDate     DateTime
-  isCoolingOff      Boolean
-  refundAmount      Decimal          @db.Decimal(14,2) @default(0)
-  adminFeeDeducted  Decimal          @db.Decimal(14,2) @default(0)
-  benefitsClawedBack Boolean         @default(false)
-  processedAt       DateTime?
-  createdAt         DateTime         @default(now())
+  id                 String           @id @default(cuid())
+  tenantId           String
+  memberId           String
+  cancellationType   CancellationType
+  requestedById      String
+  effectiveDate      DateTime
+  isCoolingOff       Boolean
+  refundAmount       Decimal          @default(0) @db.Decimal(14, 2)
+  adminFeeDeducted   Decimal          @default(0) @db.Decimal(14, 2)
+  benefitsClawedBack Boolean          @default(false)
+  processedAt        DateTime?
+  createdAt          DateTime         @default(now())
 
   @@index([tenantId, memberId])
 }
 
 model MembershipTerminationRecord {
-  id               String          @id @default(cuid())
-  tenantId         String
-  memberId         String
-  terminationType  TerminationType
-  initiatedById    String
-  reasonCode       String
-  narrative        String?
-  effectiveDate    DateTime
-  proRataRefund    Decimal         @db.Decimal(14,2) @default(0)
-  blacklisted      Boolean         @default(false)
-  processedAt      DateTime        @default(now())
+  id              String          @id @default(cuid())
+  tenantId        String
+  memberId        String
+  terminationType TerminationType
+  initiatedById   String
+  reasonCode      String
+  narrative       String?
+  effectiveDate   DateTime
+  proRataRefund   Decimal         @default(0) @db.Decimal(14, 2)
+  blacklisted     Boolean         @default(false)
+  processedAt     DateTime        @default(now())
 
   @@index([tenantId, memberId])
 }
@@ -3497,23 +3591,23 @@ model QuotationAcceptance {
   method         AcceptanceMethod
   acceptedById   String
   acceptedAt     DateTime
-  documentUrl    String?          // uploaded signed letter if applicable
-  coolingOffEnds DateTime?        // 14 days after cover start (configurable)
+  documentUrl    String? // uploaded signed letter if applicable
+  coolingOffEnds DateTime? // 14 days after cover start (configurable)
 
   quotation  Quotation @relation(fields: [quotationId], references: [id])
   acceptedBy User      @relation("AcceptanceUser", fields: [acceptedById], references: [id])
 }
 
 model MembershipBindingDocument {
-  id            String       @id @default(cuid())
+  id            String         @id @default(cuid())
   tenantId      String
   memberId      String?
   groupId       String?
   documentType  BindingDocType
   fileUrl       String
-  generatedAt   DateTime     @default(now())
-  version       Int          @default(1)
-  isActive      Boolean      @default(true)
+  generatedAt   DateTime       @default(now())
+  version       Int            @default(1)
+  isActive      Boolean        @default(true)
   deactivatedAt DateTime?
 
   @@index([tenantId, memberId])
@@ -3525,9 +3619,9 @@ model FundDepositRequest {
   tenantId          String
   selfFundedAccId   String
   groupId           String            @unique
-  requiredAmount    Decimal           @db.Decimal(19,4)
-  receivedAmount    Decimal           @db.Decimal(19,4) @default(0)
-  minimumToActivate Decimal           @db.Decimal(19,4)  // 50% of required, configurable
+  requiredAmount    Decimal           @db.Decimal(19, 4)
+  receivedAmount    Decimal           @default(0) @db.Decimal(19, 4)
+  minimumToActivate Decimal           @db.Decimal(19, 4) // 50% of required, configurable
   status            FundDepositStatus @default(PENDING)
   dueDate           DateTime
   settledAt         DateTime?
@@ -3566,7 +3660,7 @@ model QuotationVersion {
   quotationId   String
   versionNumber Int
   status        QuotationStatus
-  snapshotData  Json            // full computation at time of issue
+  snapshotData  Json // full computation at time of issue
   issuedById    String?
   issuedAt      DateTime?
   expiresAt     DateTime?
@@ -3585,12 +3679,12 @@ model QuotationLineItem {
   quotationId          String
   lineType             QuotationLineType
   description          String
-  quotationLifeId      String?           // null = scheme-level item
+  quotationLifeId      String? // null = scheme-level item
   lifeName             String?
   ageBand              String?
-  baseAmount           Decimal           @db.Decimal(19,4)
-  adjustmentPct        Decimal?          @db.Decimal(5,4)  // loading or discount factor
-  netAmount            Decimal           @db.Decimal(19,4)
+  baseAmount           Decimal           @db.Decimal(19, 4)
+  adjustmentPct        Decimal?          @db.Decimal(5, 4) // loading or discount factor
+  netAmount            Decimal           @db.Decimal(19, 4)
   displayOrder         Int
   isVisibleToSubmitter Boolean           @default(true)
 
@@ -3600,15 +3694,15 @@ model QuotationLineItem {
 }
 
 model FamilySizeMatrixCell {
-  id                 String   @id @default(cuid())
+  id                 String    @id @default(cuid())
   tenantId           String
   rateCardId         String
-  familySize         String   // "M", "M+1", "M+2", ... "M+7", "M+7+"
-  benefitLimitBand   String   // e.g. "1000000" — the tier ceiling in KES
-  contributionAmount Decimal  @db.Decimal(19,4)
+  familySize         String // "M", "M+1", "M+2", ... "M+7", "M+7+"
+  benefitLimitBand   String // e.g. "1000000" — the tier ceiling in KES
+  contributionAmount Decimal   @db.Decimal(19, 4)
   effectiveFrom      DateTime
   effectiveTo        DateTime?
-  isActive           Boolean  @default(true)
+  isActive           Boolean   @default(true)
 
   @@unique([rateCardId, familySize, benefitLimitBand, effectiveFrom])
   @@index([tenantId, rateCardId, isActive])
@@ -3617,31 +3711,31 @@ model FamilySizeMatrixCell {
 model CustomPricingModelFile {
   id             String          @id @default(cuid())
   tenantId       String
-  packageId      String?         // the product this model applies to
-  groupId        String?         // or a scheme-level override
+  packageId      String? // the product this model applies to
+  groupId        String? // or a scheme-level override
   fileType       PricingFileType
-  fileUrl        String          // MinIO / storage path
+  fileUrl        String // MinIO / storage path
   uploadedById   String
   uploadedAt     DateTime        @default(now())
   isActive       Boolean         @default(true)
   deactivatedAt  DateTime?
   lastTestedAt   DateTime?
-  lastTestResult Json?           // { success, errors, sampleOutput }
+  lastTestResult Json? // { success, errors, sampleOutput }
 
   @@index([tenantId, isActive])
 }
 
 model CustomPricingRunLog {
-  id            String   @id @default(cuid())
-  tenantId      String
-  quotationId   String
-  modelFileId   String
-  inputSnapshot Json     // census data passed to the model
-  outputSnapshot Json?   // contribution data returned
-  executionMs   Int?
-  succeeded     Boolean
-  errorMessage  String?
-  ranAt         DateTime @default(now())
+  id             String   @id @default(cuid())
+  tenantId       String
+  quotationId    String
+  modelFileId    String
+  inputSnapshot  Json // census data passed to the model
+  outputSnapshot Json? // contribution data returned
+  executionMs    Int?
+  succeeded      Boolean
+  errorMessage   String?
+  ranAt          DateTime @default(now())
 
   @@index([tenantId, quotationId])
 }
@@ -3649,20 +3743,20 @@ model CustomPricingRunLog {
 // ─── CLAIM ADJUDICATION (Process 9) ──────────────────────
 
 model ProviderSettlementBatch {
-  id           String          @id @default(cuid())
-  tenantId     String
-  providerId   String
-  cycleMonth   Int
-  cycleYear    Int
-  status       SettlementStatus @default(PENDING)
-  totalAmount  Decimal          @db.Decimal(19,4) @default(0)
-  claimCount   Int              @default(0)
-  makerId      String
-  checkerId    String?
-  settledAt    DateTime?
-  notes        String?
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  id          String           @id @default(cuid())
+  tenantId    String
+  providerId  String
+  cycleMonth  Int
+  cycleYear   Int
+  status      SettlementStatus @default(PENDING)
+  totalAmount Decimal          @default(0) @db.Decimal(19, 4)
+  claimCount  Int              @default(0)
+  makerId     String
+  checkerId   String?
+  settledAt   DateTime?
+  notes       String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 
   provider Provider @relation(fields: [providerId], references: [id])
   claims   Claim[]
@@ -3687,25 +3781,25 @@ enum ReimbursementPaymentMethod {
 }
 
 model ReimbursementRequest {
-  id                    String                     @id @default(cuid())
-  tenantId              String
-  claimId               String                     @unique
-  memberId              String
-  providerName          String
-  serviceDate           DateTime
-  totalPaidByMember     Decimal                    @db.Decimal(19,4)
-  proofType             ProofType
-  proofFileUrl          String
-  mpesaConfirmationCode String?
-  mpesaVerified         Boolean                    @default(false)
+  id                      String                      @id @default(cuid())
+  tenantId                String
+  claimId                 String                      @unique
+  memberId                String
+  providerName            String
+  serviceDate             DateTime
+  totalPaidByMember       Decimal                     @db.Decimal(19, 4)
+  proofType               ProofType
+  proofFileUrl            String
+  mpesaConfirmationCode   String?
+  mpesaVerified           Boolean                     @default(false)
   // Stub note — surfaced to reviewer when M-Pesa Daraja not yet integrated
-  mpesaNote             String?
-  submittedWithinWindow Boolean                    @default(true)
-  reimbursementWindowDays Int                      @default(90)
-  disbursementMethod    ReimbursementPaymentMethod?
-  disbursedAt           DateTime?
-  disbursementRef       String?
-  createdAt             DateTime                   @default(now())
+  mpesaNote               String?
+  submittedWithinWindow   Boolean                     @default(true)
+  reimbursementWindowDays Int                         @default(90)
+  disbursementMethod      ReimbursementPaymentMethod?
+  disbursedAt             DateTime?
+  disbursementRef         String?
+  createdAt               DateTime                    @default(now())
 
   claim Claim @relation(fields: [claimId], references: [id])
 
@@ -3720,13 +3814,13 @@ model Role {
   id           String   @id @default(cuid())
   tenantId     String
   tenant       Tenant   @relation(fields: [tenantId], references: [id])
-  code         String   // e.g. "UNDERWRITER", "SENIOR_UNDERWRITER"
+  code         String // e.g. "UNDERWRITER", "SENIOR_UNDERWRITER"
   isSystemRole Boolean  @default(false)
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
 
-  permissions  RolePermission[]
-  assignments  UserRoleAssignment[]
+  permissions RolePermission[]
+  assignments UserRoleAssignment[]
 
   @@unique([tenantId, code])
   @@index([tenantId, isActive])
@@ -3735,9 +3829,9 @@ model Role {
 model Permission {
   id          String @id @default(cuid())
   code        String @unique // e.g. "QUOTATION:ISSUE"
-  module      String          // e.g. "QUOTATION", "CLAIM"
-  action      String          // e.g. "CREATE", "APPROVE"
-  resource    String          // e.g. "QUOTATION", "CLAIM"
+  module      String // e.g. "QUOTATION", "CLAIM"
+  action      String // e.g. "CREATE", "APPROVE"
+  resource    String // e.g. "QUOTATION", "CLAIM"
   description String
 
   roles RolePermission[]
@@ -3763,19 +3857,19 @@ enum RoleAssignmentStatus {
 }
 
 model UserRoleAssignment {
-  id           String               @id @default(cuid())
-  userId       String
-  roleId       String
-  tenantId     String
-  assignedAt   DateTime             @default(now())
-  expiresAt    DateTime?
-  isActive     Boolean              @default(true)
-  revokedAt    DateTime?
-  revokedById  String?
+  id          String               @id @default(cuid())
+  userId      String
+  roleId      String
+  tenantId    String
+  assignedAt  DateTime             @default(now())
+  expiresAt   DateTime?
+  isActive    Boolean              @default(true)
+  revokedAt   DateTime?
+  revokedById String?
   // Maker-checker: role assignment itself requires two-person approval (spec §13)
-  makerId      String
-  checkerId    String?
-  status       RoleAssignmentStatus @default(PENDING_APPROVAL)
+  makerId     String
+  checkerId   String?
+  status      RoleAssignmentStatus @default(PENDING_APPROVAL)
 
   user   User   @relation(fields: [userId], references: [id])
   role   Role   @relation(fields: [roleId], references: [id])
@@ -3823,24 +3917,24 @@ enum OverrideReasonCode {
 }
 
 model OverrideRecord {
-  id             String             @id @default(cuid())
-  tenantId       String
-  overrideType   OverrideType
-  makerId        String
-  checkerId      String?
-  checker2Id     String?            // second approver for dual-control overrides
-  status         OverrideStatus     @default(PENDING)
-  reasonCode     OverrideReasonCode
-  justification  String
-  entityType     String
-  entityId       String
-  preState       Json?
-  postState      Json?
-  slaDeadlineAt  DateTime
-  resolvedAt     DateTime?
-  auditEntryId   String?
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
+  id            String             @id @default(cuid())
+  tenantId      String
+  overrideType  OverrideType
+  makerId       String
+  checkerId     String?
+  checker2Id    String? // second approver for dual-control overrides
+  status        OverrideStatus     @default(PENDING)
+  reasonCode    OverrideReasonCode
+  justification String
+  entityType    String
+  entityId      String
+  preState      Json?
+  postState     Json?
+  slaDeadlineAt DateTime
+  resolvedAt    DateTime?
+  auditEntryId  String?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
 
   tenant  Tenant @relation(fields: [tenantId], references: [id])
   maker   User   @relation("OverrideMaker", fields: [makerId], references: [id])

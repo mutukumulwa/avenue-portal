@@ -65,24 +65,57 @@ export async function adjudicateClaimAction(formData: FormData) {
       }
     }
 
-    // Tariff Validation Block
+    // ── Contract enforcement block ────────────────────────────────────────────
+    // The provider's ACTIVE contract governs what each line may pay:
+    // scheduled rates cap coded lines, exclusions pay zero, the contract's
+    // unlisted-service rule decides everything else.
     if (action === "APPROVED" || action === "PARTIALLY_APPROVED") {
-      const variances = await ClaimsService.getClaimTariffVariances(tenantId, claimId);
-      if (variances.length > 0) {
-        let contractedMax = 0;
-        let hasContractRates = false;
-        
-        for (const v of variances) {
-          if (v.agreedRate !== null) {
-            hasContractRates = true;
-            contractedMax += v.agreedRate;
+      const { contract, lines: rates } = await ClaimsService.resolveClaimContractRates(tenantId, claimId);
+      if (rates.length > 0) {
+        const claimMeta = await prisma.claim.findUnique({
+          where: { id: claimId, tenantId },
+          select: { preauthId: true },
+        });
+
+        // Contract requires pre-authorization for specific services
+        const paLines = rates.filter(r => r.requiresPreauth);
+        if (paLines.length > 0 && !claimMeta?.preauthId) {
+          const codes = paLines.map(r => r.cptCode ?? "uncoded").join(", ");
+          throw new Error(
+            `Contract ${contract?.contractNumber ?? ""} requires pre-authorization for: ${codes}. Link an approved PA to this claim or decline the line(s).`,
+          );
+        }
+
+        // Quantity caps per visit
+        const qtyLines = rates.filter(r => r.quantityExceeded);
+        if (qtyLines.length > 0) {
+          const detail = qtyLines.map(r => `${r.cptCode ?? "uncoded"} (${r.quantity} > max ${r.maxQuantityPerVisit})`).join(", ");
+          throw new Error(`Contract quantity limits exceeded: ${detail}. Reduce the billed quantity or query the provider.`);
+        }
+
+        // Payable ceiling: enforce wherever the contract gives a hard number.
+        let ceiling = 0;
+        let hasEnforceableLines = false;
+        const zeroRules: string[] = [];
+        for (const r of rates) {
+          const cappedQty = r.maxQuantityPerVisit != null ? Math.min(r.quantity, r.maxQuantityPerVisit) : r.quantity;
+          if (r.allowedUnit !== null) {
+            hasEnforceableLines = true;
+            ceiling += r.allowedUnit * cappedQty;
+            if (r.allowedUnit === 0) zeroRules.push(`${r.cptCode ?? "uncoded"} (${r.ruleApplied === "EXCLUDED" ? "excluded by contract" : "unlisted services not payable"})`);
           } else {
-            contractedMax += v.unitCost; // Untariffed lines fallback to billed
+            ceiling += r.unitCost * cappedQty; // REFER_FOR_REVIEW / no contract — reviewer judgement
           }
         }
 
-        if (hasContractRates && approvedAmount > contractedMax) {
-          throw new Error(`Tariff Validation Failed: Approved amount (${approvedAmount}) exceeds the contracted maximum allowed for this provider (${contractedMax}). Reduce amount or reject and query.`);
+        if (hasEnforceableLines && approvedAmount > ceiling) {
+          const ruleNote = contract
+            ? `Contract ${contract.contractNumber} (unlisted services: ${contract.unlistedServiceRule.replace(/_/g, " ").toLowerCase()}${contract.unlistedDiscountPct != null ? ` ${contract.unlistedDiscountPct}%` : ""})`
+            : "Provider tariff schedule";
+          const zeroNote = zeroRules.length ? ` Non-payable lines: ${zeroRules.join("; ")}.` : "";
+          throw new Error(
+            `Contract enforcement: approved amount (KES ${approvedAmount.toLocaleString()}) exceeds the payable ceiling of KES ${Math.round(ceiling).toLocaleString()} under ${ruleNote}.${zeroNote} Reduce the amount or query the provider.`,
+          );
         }
       }
     }
@@ -158,8 +191,8 @@ export async function adjudicateClaimAction(formData: FormData) {
       description: `Claim ${claim.claimNumber} ${action.toLowerCase().replace(/_/g, " ")} — KES ${approvedAmount.toLocaleString()}`,
       metadata: { claimId, action, approvedAmount },
     });
-  } catch (err: any) {
-    if (err.message === "NEXT_REDIRECT") throw err;
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message === "NEXT_REDIRECT") throw err;
     errorMsg = err instanceof Error ? err.message : "An error occurred";
   }
 

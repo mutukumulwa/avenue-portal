@@ -10,7 +10,7 @@ import {
   approveSeniorClaimAction, initiateAppealAction, computeVarianceAction,
 } from "./adjudication-actions";
 import { ExceptionModal } from "./ExceptionModal";
-import { ArrowLeft, Clock, CheckCircle2, XCircle, AlertTriangle, Info, FlaskConical, Pill, ScanLine, Stethoscope, Scissors, HelpCircle, ShieldAlert, ShieldCheck, ShieldX, Percent, BarChart2, Scale } from "lucide-react";
+import { ArrowLeft, Clock, CheckCircle2, XCircle, AlertTriangle, Info, FlaskConical, Pill, ScanLine, Stethoscope, Scissors, HelpCircle, ShieldAlert, ShieldCheck, ShieldX, Percent, BarChart2, Scale, FileSignature } from "lucide-react";
 import Link from "next/link";
 import { ClaimDocuments } from "./ClaimDocuments";
 import { CoContributionCollectionForm } from "./CoContributionCollectionForm";
@@ -24,20 +24,29 @@ const LINE_CAT_META: Record<string, { label: string; color: string; Icon: React.
   OTHER:        { label: "Other",        color: "bg-[#6C757D]/10 text-[#6C757D]",          Icon: HelpCircle   },
 };
 
-export default async function ClaimDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ClaimDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
   const session = await requireRole(ROLES.OPS);
 
   const { id } = await params;
   const tenantId = session.user.tenantId;
-  const [claim, tariffVariances, coContribTx, reimbRequest, claimLines] = await Promise.all([
+  const [claim, contractRates, coContribTx, reimbRequest, claimLines] = await Promise.all([
     ClaimsService.getClaimById(tenantId, id),
-    ClaimsService.getClaimTariffVariances(tenantId, id),
+    ClaimsService.resolveClaimContractRates(tenantId, id),
     prisma.coContributionTransaction.findUnique({ where: { claimId: id } }),
     prisma.reimbursementRequest.findUnique({ where: { claimId: id } }),
     prisma.claimLine.findMany({ where: { claimId: id }, orderBy: { lineNumber: "asc" } }),
   ]);
 
   if (!claim) notFound();
+  const tariffVariances = contractRates.lines;
+  const governingContract = contractRates.contract;
 
   // Build a lookup map: lineId → variance data
   const tariffMap = new Map(tariffVariances.map(v => [v.lineId, v]));
@@ -171,6 +180,35 @@ export default async function ClaimDetailPage({ params }: { params: Promise<{ id
         </div>
       </div>
 
+      {/* Governing contract banner */}
+      {governingContract ? (
+        <div className="flex items-start gap-3 bg-avenue-indigo/5 border border-avenue-indigo/20 rounded-lg px-4 py-3 text-sm">
+          <FileSignature size={18} className="text-avenue-indigo shrink-0 mt-0.5" />
+          <div>
+            <p className="text-avenue-text-heading">
+              Adjudicating under{" "}
+              <Link href={`/providers/${claim.providerId}/contracts/${governingContract.id}`} className="font-bold text-avenue-indigo hover:underline">
+                {governingContract.contractNumber}
+              </Link>{" "}
+              — {governingContract.title}
+            </p>
+            <p className="text-xs text-avenue-text-muted mt-0.5">
+              Unlisted services: {governingContract.unlistedServiceRule.replace(/_/g, " ").toLowerCase()}
+              {governingContract.unlistedDiscountPct != null && ` (−${governingContract.unlistedDiscountPct}%)`}
+              {" · "}contract ends {new Date(governingContract.endDate).toLocaleDateString("en-KE")}
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-start gap-3 bg-[#FFF8E1] border border-[#FFC107]/50 rounded-lg px-4 py-3 text-sm text-[#856404]">
+          <AlertTriangle size={18} className="shrink-0 mt-0.5" />
+          <p>
+            <span className="font-bold">No active contract covers this service date.</span>{" "}
+            No payable ceiling is enforced — every line is reviewer judgement. Set up a contract from the provider page.
+          </p>
+        </div>
+      )}
+
       {/* Tariff variance banner */}
       {overbilledLines.length > 0 && (
         <div className="flex items-start gap-3 bg-[#FFF8E1] border border-[#FFC107]/50 rounded-lg px-4 py-3">
@@ -239,17 +277,32 @@ export default async function ClaimDetailPage({ params }: { params: Promise<{ id
                               {Number(l.unitCost).toLocaleString("en-KE")}
                             </td>
                             <td className="px-5 py-2.5 text-right text-avenue-text-muted">
-                              {tv?.agreedRate !== null && tv?.agreedRate !== undefined
-                                ? <span className="flex items-center justify-end gap-1">
-                                    {tv.agreedRate.toLocaleString("en-KE")}
-                                    {isOver && tv.variancePct !== null && (
-                                      <span className="text-[10px] font-bold text-[#856404] bg-[#FFC107]/20 px-1 rounded">
-                                        +{tv.variancePct}%
-                                      </span>
-                                    )}
-                                  </span>
-                                : <span className="text-avenue-text-muted/40">—</span>
-                              }
+                              {tv?.agreedRate !== null && tv?.agreedRate !== undefined ? (
+                                <span className="flex items-center justify-end gap-1">
+                                  {tv.agreedRate.toLocaleString("en-KE")}
+                                  {tv.requiresPreauth && (
+                                    <span className="text-[10px] font-bold text-[#856404] bg-[#FFC107]/20 px-1 rounded" title="Contract requires pre-authorization for this service">PA</span>
+                                  )}
+                                  {isOver && tv.variancePct !== null && (
+                                    <span className="text-[10px] font-bold text-[#856404] bg-[#FFC107]/20 px-1 rounded">
+                                      +{tv.variancePct}%
+                                    </span>
+                                  )}
+                                </span>
+                              ) : tv?.ruleApplied === "EXCLUDED" ? (
+                                <span className="text-[10px] font-bold text-[#DC3545] bg-[#DC3545]/10 px-1.5 py-0.5 rounded" title="Contractually excluded at this provider — pays KES 0">NOT COVERED</span>
+                              ) : tv?.ruleApplied === "UNLISTED_REJECT" ? (
+                                <span className="text-[10px] font-bold text-[#DC3545] bg-[#DC3545]/10 px-1.5 py-0.5 rounded" title="Contract does not pay unlisted services">NOT PAYABLE</span>
+                              ) : tv?.ruleApplied === "UNLISTED_DISCOUNT" && tv.allowedUnit !== null ? (
+                                <span className="flex items-center justify-end gap-1">
+                                  {tv.allowedUnit.toLocaleString("en-KE")}
+                                  <span className="text-[10px] font-bold text-avenue-indigo bg-avenue-indigo/10 px-1 rounded" title="Unlisted service — contract discount off billed applied">unlisted</span>
+                                </span>
+                              ) : tv?.ruleApplied === "UNLISTED_PAY_AS_BILLED" ? (
+                                <span className="text-[10px] font-bold text-avenue-text-muted bg-[#F8F9FA] px-1.5 py-0.5 rounded" title="Unlisted service — contract honours billed charges">as billed</span>
+                              ) : (
+                                <span className="text-avenue-text-muted/40" title="No contracted rate — reviewer judgement">—</span>
+                              )}
                             </td>
                             <td className={`px-5 py-2.5 text-right font-semibold ${isOver ? "text-[#DC3545]" : "text-avenue-text-heading"}`}>
                               {Number(l.billedAmount).toLocaleString("en-KE")}

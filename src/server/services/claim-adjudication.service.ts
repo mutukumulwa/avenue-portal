@@ -17,6 +17,7 @@ import { TRPCError } from "@trpc/server";
 import { ClaimLineDecision, SettlementStatus } from "@prisma/client";
 import { auditChainService } from "./audit-chain.service";
 import { preauthAdjudicationService } from "./preauth-adjudication.service";
+import { ProviderContractsService } from "./provider-contracts.service";
 
 // Senior approval threshold in KES (configurable per scheme; this is the default)
 const SENIOR_APPROVAL_THRESHOLD_KES = 100_000;
@@ -109,9 +110,9 @@ export const claimAdjudicationService = {
   // ── 2. Compute contracted rate variance ────────────────────────────────────
 
   /**
-   * Looks up ProviderTariff for each CPT code on the claim.
-   * Computes variance between billed and contracted.
-   * Fires a ClaimFraudAlert if variance > threshold.
+   * Resolves the contracted rate for each line via the provider's ACTIVE
+   * contract (standalone tariffs as fallback), computes billed-vs-contracted
+   * variance, and fires a ClaimFraudAlert if variance > threshold.
    */
   async computeContractedRateVariance(claimId: string, tenantId: string) {
     const claim = await prisma.claim.findUnique({
@@ -123,26 +124,29 @@ export const claimAdjudicationService = {
     });
     if (!claim) throw new TRPCError({ code: "NOT_FOUND", message: "Claim not found" });
 
+    const { lines: rates } = await ProviderContractsService.resolveClaimLineRates(
+      tenantId,
+      claim.providerId,
+      claim.dateOfService,
+      claim.claimLines.map(l => ({
+        id: l.id,
+        cptCode: l.cptCode,
+        description: l.description,
+        unitCost: Number(l.unitCost),
+        quantity: l.quantity,
+      })),
+    );
+
     let totalBilled     = 0;
     let totalContracted = 0;
     let hasContractedRate = false;
 
     for (const line of claim.claimLines) {
       totalBilled += Number(line.billedAmount);
-      if (line.cptCode) {
-        const tariff = await prisma.providerTariff.findFirst({
-          where: {
-            providerId: claim.providerId,
-            cptCode:    line.cptCode,
-            isActive:   true,
-          },
-          select: { agreedRate: true },
-          orderBy: { effectiveFrom: "desc" },
-        });
-        if (tariff) {
-          totalContracted += Number(tariff.agreedRate) * line.quantity;
-          hasContractedRate = true;
-        }
+      const rate = rates.find(r => r.lineId === line.id);
+      if (rate?.agreedRate != null) {
+        totalContracted += rate.agreedRate * line.quantity;
+        hasContractedRate = true;
       }
     }
 

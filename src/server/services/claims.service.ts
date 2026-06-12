@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { ClaimStatus, PreauthStatus, BenefitCategory, ServiceType, Prisma } from "@prisma/client";
 import { FraudService } from "./fraud.service";
+import { ProviderContractsService, type ResolvedClaimRates } from "./provider-contracts.service";
 
 export class ClaimsService {
   // ─── CLAIMS ─────────────────────────────────────────────
@@ -49,10 +50,16 @@ export class ClaimsService {
   }
 
   /**
-   * Fetch contracted tariff rates for every CPT-coded line on a claim and
-   * return per-line variance data.  Does NOT write to the DB.
+   * Resolve the contracted position (rate, exclusions, unlisted-service rule,
+   * preauth/quantity flags) for every line on a claim.  Does NOT write to the DB.
    */
   static async getClaimTariffVariances(tenantId: string, claimId: string) {
+    const resolved = await this.resolveClaimContractRates(tenantId, claimId);
+    return resolved.lines;
+  }
+
+  /** Full contract-aware resolution incl. the governing contract itself. */
+  static async resolveClaimContractRates(tenantId: string, claimId: string): Promise<ResolvedClaimRates> {
     const claim = await prisma.claim.findUnique({
       where: { id: claimId, tenantId },
       select: {
@@ -60,48 +67,24 @@ export class ClaimsService {
         providerId: true,
         claimLines: {
           orderBy: { lineNumber: "asc" },
-          select: { id: true, cptCode: true, unitCost: true, quantity: true, billedAmount: true },
+          select: { id: true, cptCode: true, description: true, unitCost: true, quantity: true },
         },
       },
     });
-    if (!claim) return [];
+    if (!claim) return { contract: null, lines: [] };
 
-    const cptCodes = claim.claimLines.map(l => l.cptCode).filter(Boolean) as string[];
-    if (cptCodes.length === 0) return claim.claimLines.map(l => ({ lineId: l.id, cptCode: null, agreedRate: null, unitCost: Number(l.unitCost), variance: null, variancePct: null }));
-
-    const tariffs = await prisma.providerTariff.findMany({
-      where: {
-        providerId: claim.providerId,
-        cptCode:    { in: cptCodes },
-        effectiveFrom: { lte: claim.dateOfService },
-        OR: [{ effectiveTo: null }, { effectiveTo: { gte: claim.dateOfService } }],
-      },
-      orderBy: { tariffType: "asc" }, // GAZETTED < NEGOTIATED < PUBLISHED lexically; use explicit priority below
-    });
-
-    // Priority: NEGOTIATED(0) > GAZETTED(1) > PUBLISHED(2)
-    const TARIFF_PRIORITY: Record<string, number> = { NEGOTIATED: 0, GAZETTED: 1, PUBLISHED: 2 };
-    tariffs.sort((a, b) => (TARIFF_PRIORITY[a.tariffType] ?? 9) - (TARIFF_PRIORITY[b.tariffType] ?? 9));
-    const tariffMap = new Map<string, number>();
-    for (const t of tariffs) {
-      if (!tariffMap.has(t.cptCode!)) tariffMap.set(t.cptCode!, Number(t.agreedRate));
-    }
-
-    return claim.claimLines.map(l => {
-      const agreedRate = l.cptCode ? (tariffMap.get(l.cptCode) ?? null) : null;
-      const unitCost   = Number(l.unitCost);
-      const variance   = agreedRate !== null ? unitCost - agreedRate : null;
-      return {
-        lineId:      l.id,
-        cptCode:     l.cptCode,
-        agreedRate,
-        unitCost,
-        variance,
-        variancePct: agreedRate && agreedRate > 0 && variance !== null
-          ? Math.round((variance / agreedRate) * 100)
-          : null,
-      };
-    });
+    return ProviderContractsService.resolveClaimLineRates(
+      tenantId,
+      claim.providerId,
+      claim.dateOfService,
+      claim.claimLines.map(l => ({
+        id: l.id,
+        cptCode: l.cptCode,
+        description: l.description,
+        unitCost: Number(l.unitCost),
+        quantity: l.quantity,
+      })),
+    );
   }
 
   /**
@@ -305,35 +288,13 @@ export class ClaimsService {
     const isApproved = decision.action !== "DECLINED";
 
     return prisma.$transaction(async (tx) => {
-      // 1. Stamp tariff rates onto claim lines (audit trail)
-      const lines = await tx.claimLine.findMany({
-        where: { claimId },
-        select: { id: true, cptCode: true, unitCost: true },
-      });
-      const cptCodes = lines.map(l => l.cptCode).filter(Boolean) as string[];
-      if (cptCodes.length > 0) {
-        const claimMeta = (await tx.claim.findUnique({ where: { id: claimId }, select: { providerId: true, dateOfService: true } }))!;
-        const tariffs = await tx.providerTariff.findMany({
-          where: {
-            providerId: claimMeta.providerId,
-            cptCode: { in: cptCodes },
-            effectiveFrom: { lte: claimMeta.dateOfService },
-            OR: [{ effectiveTo: null }, { effectiveTo: { gte: claimMeta.dateOfService } }],
-          },
-          select: { cptCode: true, agreedRate: true, tariffType: true },
-        });
-        // Priority: NEGOTIATED(0) > GAZETTED(1) > PUBLISHED(2)
-        const TARIFF_PRIORITY: Record<string, number> = { NEGOTIATED: 0, GAZETTED: 1, PUBLISHED: 2 };
-        tariffs.sort((a, b) => (TARIFF_PRIORITY[a.tariffType] ?? 9) - (TARIFF_PRIORITY[b.tariffType] ?? 9));
-        const tariffMap = new Map<string, number>();
-        for (const t of tariffs) {
-          if (!tariffMap.has(t.cptCode!)) tariffMap.set(t.cptCode!, Number(t.agreedRate));
-        }
-        for (const line of lines) {
-          const rate = line.cptCode ? tariffMap.get(line.cptCode) : undefined;
-          if (rate !== undefined) {
-            await tx.claimLine.update({ where: { id: line.id }, data: { tariffRate: rate } });
-          }
+      // 1. Stamp contracted tariff rates onto claim lines (audit trail).
+      // Resolution is contract-aware: the ACTIVE agreement's schedule governs,
+      // standalone provider rates are the fallback.
+      const resolved = await ClaimsService.resolveClaimContractRates(tenantId, claimId);
+      for (const line of resolved.lines) {
+        if (line.agreedRate !== null) {
+          await tx.claimLine.update({ where: { id: line.lineId }, data: { tariffRate: line.agreedRate } });
         }
       }
 

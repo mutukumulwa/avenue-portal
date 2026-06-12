@@ -9,7 +9,7 @@ async function verifyFundAccess(groupId: string, userId: string, tenantId: strin
   const group = await prisma.group.findUnique({
     where: { id: groupId, tenantId },
     select: {
-      id: true, fundingMode: true,
+      id: true, fundingMode: true, effectiveDate: true, renewalDate: true,
       fundAdministrators: { select: { id: true } },
       selfFundedAccount: true,
     },
@@ -37,6 +37,9 @@ export async function recordDepositAction(formData: FormData): Promise<{ error?:
     await prisma.$transaction(async (tx) => {
       let acc = group.selfFundedAccount;
       if (!acc) {
+        // Fund period follows the group's policy period; fall back to 12 months from today.
+        const periodStartDate = group.effectiveDate ?? new Date();
+        const periodEndDate = group.renewalDate ?? new Date(new Date(periodStartDate).setFullYear(periodStartDate.getFullYear() + 1));
         acc = await tx.selfFundedAccount.create({
           data: {
             tenantId: session.user.tenantId,
@@ -45,6 +48,8 @@ export async function recordDepositAction(formData: FormData): Promise<{ error?:
             totalDeposited: 0,
             totalClaims: 0,
             totalAdminFees: 0,
+            periodStartDate,
+            periodEndDate,
           }
         });
       }
@@ -65,7 +70,7 @@ export async function recordDepositAction(formData: FormData): Promise<{ error?:
     revalidatePath(`/fund/${groupId}`);
     revalidatePath("/fund/dashboard");
     return {};
-  } catch (err: any) {
+  } catch (err: unknown) {
     return { error: err instanceof Error ? err.message : "An unknown error occurred" };
   }
 }

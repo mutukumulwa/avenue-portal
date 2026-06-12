@@ -15,9 +15,8 @@ async function getBrowser(): Promise<Browser> {
     if (process.env.VERCEL) {
       browser = await puppeteerCore.launch({
         args: [...chromium.args, "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
-        defaultViewport: chromium.defaultViewport,
         executablePath: await chromium.executablePath(),
-        headless: chromium.headless,
+        headless: true,
       }) as unknown as Browser;
     } else {
       browser = await puppeteer.launch({

@@ -109,29 +109,15 @@ export function ProviderNewForm() {
           <h3 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Contract</h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={labelCls}>Contract Status *</label>
-              <select required name="contractStatus" className={inputCls}>
-                <option value="ACTIVE">Active</option>
-                <option value="PENDING">Pending</option>
-                <option value="EXPIRED">Expired</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelCls}>Payment Terms (days)</label>
+              <label className={labelCls}>Default Payment Terms (days)</label>
               <input name="paymentTermDays" type="number" min="1" defaultValue="30" className={inputCls} />
             </div>
-            <div>
-              <label className={labelCls}>Contract Start Date</label>
-              <input name="contractStartDate" type="date" className={inputCls} />
-            </div>
-            <div>
-              <label className={labelCls}>Contract End Date</label>
-              <input name="contractEndDate" type="date" className={inputCls} />
-            </div>
-            <div className="col-span-2">
-              <label className={labelCls}>Contract Notes</label>
-              <textarea name="contractNotes" rows={3} className={inputCls + " resize-none"} placeholder="Special terms, co-payment arrangements…" />
-            </div>
+          </div>
+          <div className="mt-3 bg-avenue-indigo/5 border border-avenue-indigo/15 rounded-lg px-4 py-3 text-xs text-avenue-text-body leading-relaxed">
+            The provider is created <strong>without an agreement</strong> (contract status “Pending”). Once saved, open the
+            provider&apos;s <strong>Contracts</strong> register to capture the signed agreement: tariff schedule (CSV import
+            supported), excluded services, the unlisted-service billing rule, payment terms and credit limit. Claims from this
+            provider have no enforced payable ceiling until a contract is activated.
           </div>
         </div>
 

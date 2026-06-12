@@ -3,7 +3,7 @@ import { redirect, notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { ArrowLeft, FileText, NotebookPen, Share2 } from "lucide-react";
-import { ProviderContractCard } from "./ProviderContractCard";
+import { ProviderContractsCard } from "./ProviderContractsCard";
 import { ProviderTariffsCard } from "./ProviderTariffsCard";
 import { ProviderDiagnosisTariffsCard } from "./ProviderDiagnosisTariffsCard";
 import { ProviderPractitionersCard } from "./ProviderPractitionersCard";
@@ -17,6 +17,10 @@ export default async function ProviderDetailPage({ params }: { params: Promise<{
     include: {
       tariffs:         { orderBy: { effectiveFrom: "desc" } },
       diagnosisTariffs:{ orderBy: { effectiveFrom: "desc" } },
+      contracts: {
+        orderBy: [{ startDate: "desc" }],
+        include: { _count: { select: { tariffLines: { where: { isActive: true } }, exclusions: true } } },
+      },
       practitioners: {
         include: {
           practitioner: {
@@ -61,8 +65,24 @@ export default async function ProviderDetailPage({ params }: { params: Promise<{
     }
   };
 
+  const contracts = provider.contracts.map(c => ({
+    id: c.id,
+    contractNumber: c.contractNumber,
+    title: c.title,
+    status: c.status,
+    startDate: c.startDate.toISOString(),
+    endDate: c.endDate.toISOString(),
+    unlistedServiceRule: c.unlistedServiceRule,
+    tariffCount: c._count.tariffLines,
+    exclusionCount: c._count.exclusions,
+  }));
+
+  // Standalone rates only — contract-scoped lines are managed in the contract workspace
+  const standaloneTariffs = provider.tariffs.filter(t => !t.contractId);
+  const standaloneDiagTariffs = provider.diagnosisTariffs.filter(t => !t.contractId);
+
   // Serialize Decimal → number for client components
-  const tariffs = provider.tariffs.map(t => ({
+  const tariffs = standaloneTariffs.map(t => ({
     id:           t.id,
     serviceName:  t.serviceName,
     cptCode:      t.cptCode,
@@ -71,7 +91,7 @@ export default async function ProviderDetailPage({ params }: { params: Promise<{
     effectiveTo:  t.effectiveTo?.toISOString() ?? null,
   }));
 
-  const diagnosisTariffs = provider.diagnosisTariffs.map(t => ({
+  const diagnosisTariffs = standaloneDiagTariffs.map(t => ({
     id:            t.id,
     icdCode:       t.icdCode,
     diagnosisLabel:t.diagnosisLabel,
@@ -125,8 +145,8 @@ export default async function ProviderDetailPage({ params }: { params: Promise<{
           {[
             { label: "Total Claims",        value: provider._count.claims,           color: "text-avenue-indigo"  },
             { label: "Pre-Authorizations",  value: provider._count.preauths,         color: "text-[#17A2B8]"      },
-            { label: "CPT Tariff Lines",    value: provider.tariffs.length,          color: "text-[#28A745]"      },
-            { label: "Diagnosis Rates",     value: provider.diagnosisTariffs.length, color: "text-[#FFC107]"      },
+            { label: "Contracts",           value: provider.contracts.length,        color: "text-[#28A745]"      },
+            { label: "Tariff Lines",        value: provider.tariffs.length,          color: "text-[#FFC107]"      },
           ].map(s => (
             <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-lg p-4 shadow-sm">
               <p className="text-[10px] text-avenue-text-muted font-bold uppercase">{s.label}</p>
@@ -136,16 +156,8 @@ export default async function ProviderDetailPage({ params }: { params: Promise<{
         </div>
       </div>
 
-      {/* Contract Details (editable) */}
-      <ProviderContractCard
-        providerId={provider.id}
-        contractStatus={provider.contractStatus}
-        contractStartDate={provider.contractStartDate?.toISOString() ?? null}
-        contractEndDate={provider.contractEndDate?.toISOString() ?? null}
-        paymentTermDays={provider.paymentTermDays}
-        creditLimit={provider.creditLimit != null ? Number(provider.creditLimit) : null}
-        contractNotes={provider.contractNotes}
-      />
+      {/* Contract register — agreements own the rate schedules & billing rules */}
+      <ProviderContractsCard providerId={provider.id} contracts={contracts} />
 
       {/* Services offered */}
       {provider.servicesOffered.length > 0 && (
@@ -159,11 +171,15 @@ export default async function ProviderDetailPage({ params }: { params: Promise<{
         </div>
       )}
 
-      {/* CPT Tariff Schedule (inline CRUD) */}
-      <ProviderTariffsCard providerId={provider.id} tariffs={tariffs} />
-
-      {/* Diagnosis Tariff Schedule (inline CRUD) */}
-      <ProviderDiagnosisTariffsCard providerId={provider.id} tariffs={diagnosisTariffs} />
+      {/* Standalone rates — kept for back-compat; contract-scoped rates live in the contract workspace */}
+      {(tariffs.length > 0 || diagnosisTariffs.length > 0) && (
+        <div className="flex items-start gap-2.5 bg-[#F8F9FA] border border-[#EEEEEE] rounded-lg px-4 py-3 text-xs text-avenue-text-muted">
+          The schedules below are <strong>standalone rates not linked to any contract</strong>. They still apply as a fallback during
+          adjudication, but new rate schedules should be captured inside a contract so they expire, renew and audit together.
+        </div>
+      )}
+      {tariffs.length > 0 && <ProviderTariffsCard providerId={provider.id} tariffs={tariffs} />}
+      {diagnosisTariffs.length > 0 && <ProviderDiagnosisTariffsCard providerId={provider.id} tariffs={diagnosisTariffs} />}
 
       <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm">
         <div className="flex items-start justify-between gap-3">
