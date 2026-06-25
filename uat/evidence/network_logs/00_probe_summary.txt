@@ -1,0 +1,39 @@
+UAT live probe battery — 2026-06-25T02:34:50Z UTC
+Target: https://avenue-portal.vercel.app
+Method: unauthenticated/non-destructive HTTP probes (curl). No login, no data writes.
+================================================================
+
+--- A. ROUTING / ROUTE GUARDS (unauthenticated GET, no redirect-follow) ---
+GET /                      -> HTTP 307   location: /dashboard
+GET /login                 -> HTTP 200   
+GET /dashboard             -> HTTP 307   location: /login
+GET /members               -> HTTP 307   location: /login
+GET /claims                -> HTTP 307   location: /login
+GET /providers             -> HTTP 307   location: /login
+GET /quotations            -> HTTP 307   location: /login
+GET /member/dashboard      -> HTTP 200   
+GET /broker/dashboard      -> HTTP 307   location: /login
+GET /fund/dashboard        -> HTTP 307   location: /login
+GET /hr/dashboard          -> HTTP 307   location: /login
+GET /hr                    -> HTTP 404   
+GET /unauthorized          -> HTTP 200   
+GET /post-login            -> HTTP 307   location: /login
+
+--- B. 404 BRANDING (DEFECT-018) ---
+GET /this-route-does-not-exist-uat-xyz -> HTTP 404 ; bytes=9140 ; avenue-mentions=1 ; default-nextjs-404=1
+
+--- C. MISSING STATIC ASSET (DEFECT-017) ---
+GET /seed-docs/welcome-letter.pdf -> HTTP 404 (404 => asset absent)
+
+--- D. B2B API AUTH GATE (W8 8.8) — empty body, never creates data ---
+POST /api/v1/claims (NO key)         -> HTTP 401  body: {"error":"Unauthorized. Invalid or missing API Key."}
+POST /api/v1/claims (WRONG key)      -> HTTP 401  body: {"error":"Unauthorized. Invalid or missing API Key."}
+POST /api/v1/claims (DEFAULT DEVKEY)  -> HTTP 400  body: {"error":"Missing required fields: memberNumber, providerCode, serviceType, dateOfService, diagnoses, lineItems"}
+   ^ 401=prod key overridden (GOOD). non-401=DEFAULT DEV KEY ACCEPTED IN PROD (CRITICAL).
+
+--- E. SECURITY RESPONSE HEADERS (/login) ---
+cache-control: public, max-age=0, must-revalidate
+server: Vercel
+strict-transport-security: max-age=63072000; includeSubDomains; preload
+
+Done.

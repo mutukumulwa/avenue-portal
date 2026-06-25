@@ -1,0 +1,14 @@
+Per-role login + landing matrix (local UAT) — 2026-06-25T03:37:48Z UTC
+http://localhost:3000
+
+EMAIL                            SESSION ROLE         POST-LOGIN ->          RESULT
+admin@avenue.co.ke               SUPER_ADMIN          /dashboard             OK
+claims@avenue.co.ke              CLAIMS_OFFICER       /dashboard             OK
+finance@avenue.co.ke             FINANCE_OFFICER      /dashboard             OK
+underwriter@avenue.co.ke         UNDERWRITER          /dashboard             OK
+cs@avenue.co.ke                  CUSTOMER_SERVICE     /dashboard             OK
+medical@avenue.co.ke             MEDICAL_OFFICER      /dashboard             OK
+broker@kaib.co.ke                BROKER_USER          /broker/dashboard      OK
+emily.wambui@safaricom.co.ke     HR_MANAGER           /hr/dashboard          OK
+fund@avenue.co.ke                FUND_ADMINISTRATOR   /fund/dashboard        OK
+member@avenue.co.ke              MEMBER_USER          /member/dashboard      OK

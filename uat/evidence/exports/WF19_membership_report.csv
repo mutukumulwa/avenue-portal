@@ -1,0 +1,250 @@
+Member No.,First Name,Last Name,Group,Package,Relationship,Gender,Status,Enrolled
+AVH-DEMO-TWI-0012-P,Miriam,Mboya,Twiga Foods,Avenue Essential,PRINCIPAL,FEMALE,ACTIVE,2026-06-12
+AVH-DEMO-KCB-0012-P,Miriam,Mboya,KCB Group,Avenue Premier,PRINCIPAL,FEMALE,ACTIVE,2026-06-12
+AVH-DEMO-BAM-0012-P,Miriam,Mboya,Bamburi Cement,Avenue Essential,PRINCIPAL,FEMALE,ACTIVE,2026-06-12
+AVH-DEMO-KCB-0012-S,Timothy,Mboya,KCB Group,Avenue Premier,SPOUSE,MALE,ACTIVE,2026-06-12
+AVH-DEMO-EABL-0012-P,Miriam,Nyambura,East African Breweries,Avenue Premier,PRINCIPAL,FEMALE,ACTIVE,2026-06-12
+AVH-DEMO-SAF-0012-S,Timothy,Mboya,Safaricom PLC,Avenue Essential,SPOUSE,MALE,ACTIVE,2026-06-12
+AVH-DEMO-SAF-0012-P,Miriam,Mboya,Safaricom PLC,Avenue Essential,PRINCIPAL,FEMALE,ACTIVE,2026-06-12
+AVH-DEMO-SAF-0024-S,Brian,Muthoni,Safaricom PLC,Avenue Executive,SPOUSE,MALE,ACTIVE,2026-05-31
+AVH-DEMO-SAF-0024-P,Yvonne,Muthoni,Safaricom PLC,Avenue Executive,PRINCIPAL,FEMALE,ACTIVE,2026-05-31
+AVH-DEMO-TWI-0013-P,Noah,Nyambura,Twiga Foods,Avenue Essential,PRINCIPAL,MALE,ACTIVE,2026-05-13
+AVH-DEMO-EABL-0013-P,Noah,Kiplagat,East African Breweries,Avenue Premier,PRINCIPAL,MALE,ACTIVE,2026-05-13
+AVH-DEMO-EABL-0013-S,Uma,Kiplagat,East African Breweries,Avenue Premier,SPOUSE,FEMALE,ACTIVE,2026-05-13
+AVH-DEMO-EABL-0013-C1,Atieno,Kiplagat,East African Breweries,Avenue Premier,CHILD,FEMALE,ACTIVE,2026-05-13
+AVH-DEMO-SAF-0013-S,Uma,Nyambura,Safaricom PLC,Avenue Essential,SPOUSE,FEMALE,ACTIVE,2026-05-13
+AVH-DEMO-SAF-0013-P,Noah,Nyambura,Safaricom PLC,Avenue Essential,PRINCIPAL,MALE,ACTIVE,2026-05-13
+AVH-DEMO-SAF-0013-C1,Atieno,Nyambura,Safaricom PLC,Avenue Essential,CHILD,FEMALE,ACTIVE,2026-05-13
+AVH-DEMO-BAM-0013-C1,Atieno,Nyambura,Bamburi Cement,Avenue Essential,CHILD,FEMALE,ACTIVE,2026-05-13
+AVH-DEMO-BAM-0013-S,Uma,Nyambura,Bamburi Cement,Avenue Essential,SPOUSE,FEMALE,ACTIVE,2026-05-13
+AVH-DEMO-BAM-0013-P,Noah,Nyambura,Bamburi Cement,Avenue Essential,PRINCIPAL,MALE,ACTIVE,2026-05-13
+AVH-DEMO-TWI-0013-S,Uma,Nyambura,Twiga Foods,Avenue Essential,SPOUSE,FEMALE,ACTIVE,2026-05-13
+AVH-DEMO-TWI-0013-C1,Atieno,Nyambura,Twiga Foods,Avenue Essential,CHILD,FEMALE,ACTIVE,2026-05-13
+AVH-DEMO-KCB-0013-C1,Atieno,Nyambura,KCB Group,Avenue Premier,CHILD,FEMALE,ACTIVE,2026-05-13
+AVH-DEMO-KCB-0013-S,Uma,Nyambura,KCB Group,Avenue Premier,SPOUSE,FEMALE,ACTIVE,2026-05-13
+AVH-DEMO-KCB-0013-P,Noah,Nyambura,KCB Group,Avenue Premier,PRINCIPAL,MALE,ACTIVE,2026-05-13
+AVH-DEMO-SAF-0025-P,Zachary,Kiptoo,Safaricom PLC,Avenue Premier,PRINCIPAL,MALE,ACTIVE,2026-05-01
+AVH-DEMO-TWI-0001-C1,Olive,Mutiso,Twiga Foods,Avenue Essential,CHILD,FEMALE,ACTIVE,2026-05-01
+AVH-DEMO-TWI-0001-S,Irene,Mutiso,Twiga Foods,Avenue Essential,SPOUSE,FEMALE,ACTIVE,2026-05-01
+AVH-DEMO-TWI-0001-P,Brian,Mutiso,Twiga Foods,Avenue Essential,PRINCIPAL,MALE,ACTIVE,2026-05-01
+AVH-DEMO-SAF-0001-C1,Olive,Mutiso,Safaricom PLC,Avenue Premier,CHILD,FEMALE,ACTIVE,2026-05-01
+AVH-DEMO-SAF-0001-P,Brian,Mutiso,Safaricom PLC,Avenue Premier,PRINCIPAL,MALE,ACTIVE,2026-05-01
+AVH-DEMO-SAF-0001-S,Irene,Mutiso,Safaricom PLC,Avenue Premier,SPOUSE,FEMALE,ACTIVE,2026-05-01
+AVH-DEMO-BAM-0001-C1,Olive,Mutiso,Bamburi Cement,Avenue Essential,CHILD,FEMALE,ACTIVE,2026-05-01
+AVH-DEMO-BAM-0001-S,Irene,Mutiso,Bamburi Cement,Avenue Essential,SPOUSE,FEMALE,ACTIVE,2026-05-01
+AVH-DEMO-BAM-0001-P,Brian,Mutiso,Bamburi Cement,Avenue Essential,PRINCIPAL,MALE,ACTIVE,2026-05-01
+AVH-DEMO-EABL-0001-C1,Olive,Kariuki,East African Breweries,Avenue Premier,CHILD,FEMALE,ACTIVE,2026-05-01
+AVH-DEMO-EABL-0001-S,Irene,Kariuki,East African Breweries,Avenue Premier,SPOUSE,FEMALE,ACTIVE,2026-05-01
+AVH-DEMO-EABL-0001-P,Brian,Kariuki,East African Breweries,Avenue Premier,PRINCIPAL,MALE,ACTIVE,2026-05-01
+AVH-DEMO-SAF-0025-S,Catherine,Kiptoo,Safaricom PLC,Avenue Premier,SPOUSE,FEMALE,ACTIVE,2026-05-01
+AVH-DEMO-KCB-0001-P,Brian,Mutiso,KCB Group,Avenue Premier,PRINCIPAL,MALE,ACTIVE,2026-05-01
+AVH-DEMO-KCB-0001-S,Irene,Mutiso,KCB Group,Avenue Premier,SPOUSE,FEMALE,ACTIVE,2026-05-01
+AVH-DEMO-KCB-0001-C1,Olive,Mutiso,KCB Group,Avenue Premier,CHILD,FEMALE,ACTIVE,2026-05-01
+AVH-DEMO-EABL-0014-C1,Barasa,Mwaura,East African Breweries,Avenue Premier,CHILD,MALE,ACTIVE,2026-04-14
+AVH-DEMO-KCB-0014-C1,Barasa,Kiplagat,KCB Group,Avenue Premier,CHILD,MALE,ACTIVE,2026-04-14
+AVH-DEMO-SAF-0014-C1,Barasa,Kiplagat,Safaricom PLC,Avenue Essential,CHILD,MALE,ACTIVE,2026-04-14
+AVH-DEMO-SAF-0014-S,Victor,Kiplagat,Safaricom PLC,Avenue Essential,SPOUSE,MALE,ACTIVE,2026-04-14
+AVH-DEMO-BAM-0014-C1,Barasa,Kiplagat,Bamburi Cement,Avenue Essential,CHILD,MALE,ACTIVE,2026-04-14
+AVH-DEMO-KCB-0014-P,Olive,Kiplagat,KCB Group,Avenue Premier,PRINCIPAL,FEMALE,ACTIVE,2026-04-14
+AVH-DEMO-KCB-0014-S,Victor,Kiplagat,KCB Group,Avenue Premier,SPOUSE,MALE,ACTIVE,2026-04-14
+AVH-DEMO-EABL-0014-P,Olive,Mwaura,East African Breweries,Avenue Premier,PRINCIPAL,FEMALE,ACTIVE,2026-04-14
+AVH-DEMO-BAM-0014-P,Olive,Kiplagat,Bamburi Cement,Avenue Essential,PRINCIPAL,FEMALE,ACTIVE,2026-04-14
+AVH-DEMO-SAF-0014-P,Olive,Kiplagat,Safaricom PLC,Avenue Essential,PRINCIPAL,FEMALE,ACTIVE,2026-04-14
+AVH-DEMO-EABL-0002-P,Catherine,Naliaka,East African Breweries,Avenue Premier,PRINCIPAL,FEMALE,ACTIVE,2026-04-02
+AVH-DEMO-KCB-0002-S,Juma,Kariuki,KCB Group,Avenue Premier,SPOUSE,MALE,ACTIVE,2026-04-02
+AVH-DEMO-KCB-0002-P,Catherine,Kariuki,KCB Group,Avenue Premier,PRINCIPAL,FEMALE,ACTIVE,2026-04-02
+AVH-DEMO-KCB-0002-C1,Paul,Kariuki,KCB Group,Avenue Premier,CHILD,MALE,ACTIVE,2026-04-02
+AVH-DEMO-BAM-0002-P,Catherine,Kariuki,Bamburi Cement,Avenue Essential,PRINCIPAL,FEMALE,ACTIVE,2026-04-02
+AVH-DEMO-BAM-0002-C1,Paul,Kariuki,Bamburi Cement,Avenue Essential,CHILD,MALE,ACTIVE,2026-04-02
+AVH-DEMO-TWI-0002-C1,Paul,Kariuki,Twiga Foods,Avenue Essential,CHILD,MALE,ACTIVE,2026-04-02
+AVH-DEMO-TWI-0002-P,Catherine,Kariuki,Twiga Foods,Avenue Essential,PRINCIPAL,FEMALE,ACTIVE,2026-04-02
+AVH-DEMO-SAF-0002-S,Juma,Kariuki,Safaricom PLC,Avenue Premier,SPOUSE,MALE,ACTIVE,2026-04-02
+AVH-DEMO-SAF-0002-P,Catherine,Kariuki,Safaricom PLC,Avenue Premier,PRINCIPAL,FEMALE,ACTIVE,2026-04-02
+AVH-DEMO-SAF-0002-C1,Paul,Kariuki,Safaricom PLC,Avenue Premier,CHILD,MALE,ACTIVE,2026-04-02
+AVH-DEMO-EABL-0002-C1,Paul,Naliaka,East African Breweries,Avenue Premier,CHILD,MALE,ACTIVE,2026-04-02
+AVH-DEMO-SAF-0015-C2,Edith,Mwaura,Safaricom PLC,Avenue Essential,CHILD,MALE,ACTIVE,2026-03-15
+AVH-DEMO-EABL-0015-S,Wambui,Were,East African Breweries,Avenue Premier,SPOUSE,FEMALE,ACTIVE,2026-03-15
+AVH-DEMO-EABL-0015-P,Paul,Were,East African Breweries,Avenue Premier,PRINCIPAL,MALE,ACTIVE,2026-03-15
+AVH-DEMO-BAM-0015-P,Paul,Mwaura,Bamburi Cement,Avenue Essential,PRINCIPAL,MALE,ACTIVE,2026-03-15
+AVH-DEMO-SAF-0015-S,Wambui,Mwaura,Safaricom PLC,Avenue Essential,SPOUSE,FEMALE,ACTIVE,2026-03-15
+AVH-DEMO-BAM-0015-S,Wambui,Mwaura,Bamburi Cement,Avenue Essential,SPOUSE,FEMALE,ACTIVE,2026-03-15
+AVH-DEMO-KCB-0015-C2,Edith,Mwaura,KCB Group,Avenue Premier,CHILD,MALE,ACTIVE,2026-03-15
+AVH-DEMO-KCB-0015-S,Wambui,Mwaura,KCB Group,Avenue Premier,SPOUSE,FEMALE,ACTIVE,2026-03-15
+AVH-DEMO-EABL-0015-C2,Edith,Were,East African Breweries,Avenue Premier,CHILD,MALE,ACTIVE,2026-03-15
+AVH-DEMO-SAF-0015-P,Paul,Mwaura,Safaricom PLC,Avenue Essential,PRINCIPAL,MALE,ACTIVE,2026-03-15
+AVH-DEMO-KCB-0015-P,Paul,Mwaura,KCB Group,Avenue Premier,PRINCIPAL,MALE,ACTIVE,2026-03-15
+AVH-DEMO-BAM-0015-C2,Edith,Mwaura,Bamburi Cement,Avenue Essential,CHILD,MALE,ACTIVE,2026-03-15
+AVH-DEMO-TWI-0003-S,Kendi,Naliaka,Twiga Foods,Avenue Essential,SPOUSE,FEMALE,ACTIVE,2026-03-03
+AVH-DEMO-EABL-0003-S,Kendi,Muthoni,East African Breweries,Avenue Premier,SPOUSE,FEMALE,ACTIVE,2026-03-03
+AVH-DEMO-KCB-0003-P,Dennis,Naliaka,KCB Group,Avenue Premier,PRINCIPAL,MALE,ACTIVE,2026-03-03
+AVH-DEMO-BAM-0003-S,Kendi,Naliaka,Bamburi Cement,Avenue Essential,SPOUSE,FEMALE,ACTIVE,2026-03-03
+AVH-DEMO-BAM-0003-P,Dennis,Naliaka,Bamburi Cement,Avenue Essential,PRINCIPAL,MALE,ACTIVE,2026-03-03
+AVH-DEMO-SAF-0003-P,Dennis,Naliaka,Safaricom PLC,Avenue Essential,PRINCIPAL,MALE,ACTIVE,2026-03-03
+AVH-DEMO-SAF-0003-S,Kendi,Naliaka,Safaricom PLC,Avenue Essential,SPOUSE,FEMALE,ACTIVE,2026-03-03
+AVH-DEMO-KCB-0003-S,Kendi,Naliaka,KCB Group,Avenue Premier,SPOUSE,FEMALE,ACTIVE,2026-03-03
+AVH-DEMO-TWI-0003-P,Dennis,Naliaka,Twiga Foods,Avenue Essential,PRINCIPAL,MALE,ACTIVE,2026-03-03
+AVH-DEMO-EABL-0003-P,Dennis,Muthoni,East African Breweries,Avenue Premier,PRINCIPAL,MALE,ACTIVE,2026-03-03
+AVH-DEMO-KCB-0016-C1,Damaris,Were,KCB Group,Avenue Premier,CHILD,MALE,ACTIVE,2026-02-16
+AVH-DEMO-KCB-0016-S,Xavier,Were,KCB Group,Avenue Premier,SPOUSE,MALE,ACTIVE,2026-02-16
+AVH-DEMO-EABL-0016-C1,Damaris,Otieno,East African Breweries,Avenue Premier,CHILD,MALE,ACTIVE,2026-02-16
+AVH-DEMO-EABL-0016-P,Queen,Otieno,East African Breweries,Avenue Premier,PRINCIPAL,FEMALE,ACTIVE,2026-02-16
+AVH-DEMO-SAF-0016-C1,Damaris,Were,Safaricom PLC,Avenue Executive,CHILD,MALE,ACTIVE,2026-02-16
+AVH-DEMO-SAF-0016-S,Xavier,Were,Safaricom PLC,Avenue Executive,SPOUSE,MALE,ACTIVE,2026-02-16
+AVH-DEMO-KCB-0016-P,Queen,Were,KCB Group,Avenue Premier,PRINCIPAL,FEMALE,ACTIVE,2026-02-16
+AVH-DEMO-SAF-0016-P,Queen,Were,Safaricom PLC,Avenue Executive,PRINCIPAL,FEMALE,ACTIVE,2026-02-16
+AVH-DEMO-KCB-0004-C1,Robert,Muthoni,KCB Group,Avenue Premier,CHILD,MALE,ACTIVE,2026-02-04
+AVH-DEMO-SAF-0004-P,Edith,Muthoni,Safaricom PLC,Avenue Essential,PRINCIPAL,FEMALE,ACTIVE,2026-02-04
+AVH-DEMO-SAF-0004-S,Leonard,Muthoni,Safaricom PLC,Avenue Essential,SPOUSE,MALE,ACTIVE,2026-02-04
+AVH-DEMO-KCB-0004-P,Edith,Muthoni,KCB Group,Avenue Premier,PRINCIPAL,FEMALE,ACTIVE,2026-02-04
+AVH-DEMO-KCB-0004-S,Leonard,Muthoni,KCB Group,Avenue Premier,SPOUSE,MALE,ACTIVE,2026-02-04
+AVH-DEMO-EABL-0004-P,Edith,Kiptoo,East African Breweries,Avenue Premier,PRINCIPAL,FEMALE,ACTIVE,2026-02-04
+AVH-DEMO-EABL-0004-C1,Robert,Kiptoo,East African Breweries,Avenue Premier,CHILD,MALE,ACTIVE,2026-02-04
+AVH-DEMO-BAM-0004-P,Edith,Muthoni,Bamburi Cement,Avenue Essential,PRINCIPAL,FEMALE,ACTIVE,2026-02-04
+AVH-DEMO-BAM-0004-C1,Robert,Muthoni,Bamburi Cement,Avenue Essential,CHILD,MALE,ACTIVE,2026-02-04
+AVH-DEMO-TWI-0004-P,Edith,Muthoni,Twiga Foods,Avenue Essential,PRINCIPAL,FEMALE,ACTIVE,2026-02-04
+AVH-DEMO-TWI-0004-C1,Robert,Muthoni,Twiga Foods,Avenue Essential,CHILD,MALE,ACTIVE,2026-02-04
+AVH-DEMO-SAF-0004-C1,Robert,Muthoni,Safaricom PLC,Avenue Essential,CHILD,MALE,ACTIVE,2026-02-04
+AVH-DEMO-EABL-0017-P,Robert,Mwangi,East African Breweries,Avenue Premier,PRINCIPAL,MALE,ACTIVE,2026-01-17
+AVH-DEMO-SAF-0017-P,Robert,Otieno,Safaricom PLC,Avenue Premier,PRINCIPAL,MALE,ACTIVE,2026-01-17
+AVH-DEMO-SAF-0017-S,Yvonne,Otieno,Safaricom PLC,Avenue Premier,SPOUSE,FEMALE,ACTIVE,2026-01-17
+AVH-DEMO-KCB-0017-C1,Amina,Otieno,KCB Group,Avenue Premier,CHILD,FEMALE,ACTIVE,2026-01-17
+AVH-DEMO-EABL-0017-C1,Amina,Mwangi,East African Breweries,Avenue Premier,CHILD,FEMALE,ACTIVE,2026-01-17
+AVH-DEMO-SAF-0017-C1,Amina,Otieno,Safaricom PLC,Avenue Premier,CHILD,FEMALE,ACTIVE,2026-01-17
+AVH-DEMO-KCB-0017-S,Yvonne,Otieno,KCB Group,Avenue Premier,SPOUSE,FEMALE,ACTIVE,2026-01-17
+AVH-DEMO-EABL-0017-S,Yvonne,Mwangi,East African Breweries,Avenue Premier,SPOUSE,FEMALE,ACTIVE,2026-01-17
+AVH-DEMO-KCB-0017-P,Robert,Otieno,KCB Group,Avenue Premier,PRINCIPAL,MALE,ACTIVE,2026-01-17
+AVH-DEMO-KCB-0005-C1,Stella,Kiptoo,KCB Group,Avenue Premier,CHILD,FEMALE,ACTIVE,2026-01-05
+AVH-DEMO-KCB-0005-S,Miriam,Kiptoo,KCB Group,Avenue Premier,SPOUSE,FEMALE,ACTIVE,2026-01-05
+AVH-DEMO-KCB-0005-P,Farah,Kiptoo,KCB Group,Avenue Premier,PRINCIPAL,MALE,ACTIVE,2026-01-05
+AVH-DEMO-BAM-0005-C1,Stella,Kiptoo,Bamburi Cement,Avenue Essential,CHILD,FEMALE,ACTIVE,2026-01-05
+AVH-DEMO-TWI-0005-C2,Yvonne,Kiptoo,Twiga Foods,Avenue Essential,CHILD,MALE,ACTIVE,2026-01-05
+AVH-DEMO-SAF-0005-S,Miriam,Kiptoo,Safaricom PLC,Avenue Essential,SPOUSE,FEMALE,ACTIVE,2026-01-05
+AVH-DEMO-EABL-0005-C1,Stella,Njoroge,East African Breweries,Avenue Premier,CHILD,FEMALE,ACTIVE,2026-01-05
+AVH-DEMO-TWI-0005-C1,Stella,Kiptoo,Twiga Foods,Avenue Essential,CHILD,FEMALE,ACTIVE,2026-01-05
+AVH-DEMO-TWI-0005-S,Miriam,Kiptoo,Twiga Foods,Avenue Essential,SPOUSE,FEMALE,ACTIVE,2026-01-05
+AVH-DEMO-EABL-0005-P,Farah,Njoroge,East African Breweries,Avenue Premier,PRINCIPAL,MALE,ACTIVE,2026-01-05
+AVH-DEMO-EABL-0005-S,Miriam,Njoroge,East African Breweries,Avenue Premier,SPOUSE,FEMALE,ACTIVE,2026-01-05
+AVH-DEMO-BAM-0005-C2,Yvonne,Kiptoo,Bamburi Cement,Avenue Essential,CHILD,MALE,ACTIVE,2026-01-05
+AVH-DEMO-BAM-0005-P,Farah,Kiptoo,Bamburi Cement,Avenue Essential,PRINCIPAL,MALE,ACTIVE,2026-01-05
+AVH-DEMO-BAM-0005-S,Miriam,Kiptoo,Bamburi Cement,Avenue Essential,SPOUSE,FEMALE,ACTIVE,2026-01-05
+AVH-DEMO-KCB-0005-C2,Yvonne,Kiptoo,KCB Group,Avenue Premier,CHILD,MALE,ACTIVE,2026-01-05
+AVH-DEMO-SAF-0005-C2,Yvonne,Kiptoo,Safaricom PLC,Avenue Essential,CHILD,MALE,ACTIVE,2026-01-05
+AVH-DEMO-TWI-0005-P,Farah,Kiptoo,Twiga Foods,Avenue Essential,PRINCIPAL,MALE,ACTIVE,2026-01-05
+AVH-DEMO-EABL-0005-C2,Yvonne,Njoroge,East African Breweries,Avenue Premier,CHILD,MALE,ACTIVE,2026-01-05
+AVH-DEMO-SAF-0005-P,Farah,Kiptoo,Safaricom PLC,Avenue Essential,PRINCIPAL,MALE,ACTIVE,2026-01-05
+AVH-DEMO-SAF-0005-C1,Stella,Kiptoo,Safaricom PLC,Avenue Essential,CHILD,FEMALE,ACTIVE,2026-01-05
+AVH-DEMO-SAF-0018-P,Stella,Mwangi,Safaricom PLC,Avenue Premier,PRINCIPAL,FEMALE,ACTIVE,2025-12-18
+AVH-DEMO-EABL-0018-P,Stella,Wekesa,East African Breweries,Avenue Premier,PRINCIPAL,FEMALE,ACTIVE,2025-12-18
+AVH-DEMO-SAF-0018-S,Zachary,Mwangi,Safaricom PLC,Avenue Premier,SPOUSE,MALE,ACTIVE,2025-12-18
+AVH-DEMO-SAF-0006-S,Noah,Njoroge,Safaricom PLC,Avenue Essential,SPOUSE,MALE,ACTIVE,2025-12-06
+AVH-DEMO-BAM-0006-P,Grace,Njoroge,Bamburi Cement,Avenue Essential,PRINCIPAL,FEMALE,ACTIVE,2025-12-06
+AVH-DEMO-KCB-0006-S,Noah,Njoroge,KCB Group,Avenue Premier,SPOUSE,MALE,ACTIVE,2025-12-06
+AVH-DEMO-KCB-0006-P,Grace,Njoroge,KCB Group,Avenue Premier,PRINCIPAL,FEMALE,ACTIVE,2025-12-06
+AVH-DEMO-TWI-0006-P,Grace,Njoroge,Twiga Foods,Avenue Essential,PRINCIPAL,FEMALE,ACTIVE,2025-12-06
+AVH-DEMO-EABL-0006-P,Grace,Adhiambo,East African Breweries,Avenue Premier,PRINCIPAL,FEMALE,ACTIVE,2025-12-06
+AVH-DEMO-SAF-0006-P,Grace,Njoroge,Safaricom PLC,Avenue Essential,PRINCIPAL,FEMALE,ACTIVE,2025-12-06
+AVH-DEMO-SAF-0019-P,Timothy,Wekesa,Safaricom PLC,Avenue Essential,PRINCIPAL,MALE,ACTIVE,2025-11-19
+AVH-DEMO-EABL-0019-S,Atieno,Achieng,East African Breweries,Avenue Premier,SPOUSE,FEMALE,ACTIVE,2025-11-19
+AVH-DEMO-EABL-0019-P,Timothy,Achieng,East African Breweries,Avenue Premier,PRINCIPAL,MALE,ACTIVE,2025-11-19
+AVH-DEMO-SAF-0019-C1,Catherine,Wekesa,Safaricom PLC,Avenue Essential,CHILD,FEMALE,ACTIVE,2025-11-19
+AVH-DEMO-SAF-0019-S,Atieno,Wekesa,Safaricom PLC,Avenue Essential,SPOUSE,FEMALE,ACTIVE,2025-11-19
+AVH-DEMO-BAM-0007-P,Henry,Adhiambo,Bamburi Cement,Avenue Essential,PRINCIPAL,MALE,ACTIVE,2025-11-07
+AVH-DEMO-EABL-0007-P,Henry,Omondi,East African Breweries,Avenue Premier,PRINCIPAL,MALE,ACTIVE,2025-11-07
+AVH-DEMO-EABL-0007-S,Olive,Omondi,East African Breweries,Avenue Premier,SPOUSE,FEMALE,ACTIVE,2025-11-07
+AVH-DEMO-EABL-0007-C1,Uma,Omondi,East African Breweries,Avenue Premier,CHILD,FEMALE,ACTIVE,2025-11-07
+AVH-DEMO-TWI-0007-P,Henry,Adhiambo,Twiga Foods,Avenue Essential,PRINCIPAL,MALE,ACTIVE,2025-11-07
+AVH-DEMO-TWI-0007-S,Olive,Adhiambo,Twiga Foods,Avenue Essential,SPOUSE,FEMALE,ACTIVE,2025-11-07
+AVH-DEMO-SAF-0007-C1,Uma,Adhiambo,Safaricom PLC,Avenue Essential,CHILD,FEMALE,ACTIVE,2025-11-07
+AVH-DEMO-SAF-0007-P,Henry,Adhiambo,Safaricom PLC,Avenue Essential,PRINCIPAL,MALE,ACTIVE,2025-11-07
+AVH-DEMO-BAM-0007-C1,Uma,Adhiambo,Bamburi Cement,Avenue Essential,CHILD,FEMALE,ACTIVE,2025-11-07
+AVH-DEMO-BAM-0007-S,Olive,Adhiambo,Bamburi Cement,Avenue Essential,SPOUSE,FEMALE,ACTIVE,2025-11-07
+AVH-DEMO-KCB-0007-C1,Uma,Adhiambo,KCB Group,Avenue Premier,CHILD,FEMALE,ACTIVE,2025-11-07
+AVH-DEMO-TWI-0007-C1,Uma,Adhiambo,Twiga Foods,Avenue Essential,CHILD,FEMALE,ACTIVE,2025-11-07
+AVH-DEMO-KCB-0007-P,Henry,Adhiambo,KCB Group,Avenue Premier,PRINCIPAL,MALE,ACTIVE,2025-11-07
+AVH-DEMO-KCB-0007-S,Olive,Adhiambo,KCB Group,Avenue Premier,SPOUSE,FEMALE,ACTIVE,2025-11-07
+AVH-DEMO-SAF-0007-S,Olive,Adhiambo,Safaricom PLC,Avenue Essential,SPOUSE,FEMALE,ACTIVE,2025-11-07
+AVH-DEMO-SAF-0020-P,Uma,Achieng,Safaricom PLC,Avenue Essential,PRINCIPAL,FEMALE,ACTIVE,2025-10-20
+AVH-DEMO-SAF-0020-S,Barasa,Achieng,Safaricom PLC,Avenue Essential,SPOUSE,MALE,ACTIVE,2025-10-20
+AVH-DEMO-SAF-0020-C1,Dennis,Achieng,Safaricom PLC,Avenue Essential,CHILD,MALE,ACTIVE,2025-10-20
+AVH-DEMO-SAF-0020-C2,Juma,Achieng,Safaricom PLC,Avenue Essential,CHILD,FEMALE,ACTIVE,2025-10-20
+AVH-DEMO-SAF-0008-P,Irene,Omondi,Safaricom PLC,Avenue Executive,PRINCIPAL,FEMALE,ACTIVE,2025-10-08
+AVH-DEMO-SAF-0008-C1,Victor,Omondi,Safaricom PLC,Avenue Executive,CHILD,MALE,ACTIVE,2025-10-08
+AVH-DEMO-TWI-0008-P,Irene,Omondi,Twiga Foods,Avenue Essential,PRINCIPAL,FEMALE,ACTIVE,2025-10-08
+AVH-DEMO-KCB-0008-P,Irene,Omondi,KCB Group,Avenue Premier,PRINCIPAL,FEMALE,ACTIVE,2025-10-08
+AVH-DEMO-KCB-0008-C1,Victor,Omondi,KCB Group,Avenue Premier,CHILD,MALE,ACTIVE,2025-10-08
+AVH-DEMO-BAM-0008-P,Irene,Omondi,Bamburi Cement,Avenue Essential,PRINCIPAL,FEMALE,ACTIVE,2025-10-08
+AVH-DEMO-EABL-0008-C1,Victor,Wairimu,East African Breweries,Avenue Premier,CHILD,MALE,ACTIVE,2025-10-08
+AVH-DEMO-SAF-0008-S,Paul,Omondi,Safaricom PLC,Avenue Executive,SPOUSE,MALE,ACTIVE,2025-10-08
+AVH-DEMO-KCB-0008-S,Paul,Omondi,KCB Group,Avenue Premier,SPOUSE,MALE,ACTIVE,2025-10-08
+AVH-DEMO-BAM-0008-C1,Victor,Omondi,Bamburi Cement,Avenue Essential,CHILD,MALE,ACTIVE,2025-10-08
+AVH-DEMO-TWI-0008-C1,Victor,Omondi,Twiga Foods,Avenue Essential,CHILD,MALE,ACTIVE,2025-10-08
+AVH-DEMO-EABL-0008-P,Irene,Wairimu,East African Breweries,Avenue Premier,PRINCIPAL,FEMALE,ACTIVE,2025-10-08
+AVH-DEMO-SAF-0021-P,Victor,Mutiso,Safaricom PLC,Avenue Essential,PRINCIPAL,MALE,ACTIVE,2025-09-21
+AVH-DEMO-SAF-0021-S,Chebet,Mutiso,Safaricom PLC,Avenue Essential,SPOUSE,FEMALE,ACTIVE,2025-09-21
+AVH-DEMO-TWI-0009-P,Juma,Wairimu,Twiga Foods,Avenue Essential,PRINCIPAL,MALE,ACTIVE,2025-09-09
+AVH-DEMO-KCB-0009-S,Queen,Wairimu,KCB Group,Avenue Premier,SPOUSE,FEMALE,ACTIVE,2025-09-09
+AVH-DEMO-EABL-0009-P,Juma,Karanja,East African Breweries,Avenue Premier,PRINCIPAL,MALE,ACTIVE,2025-09-09
+AVH-DEMO-EABL-0009-S,Queen,Karanja,East African Breweries,Avenue Premier,SPOUSE,FEMALE,ACTIVE,2025-09-09
+AVH-DEMO-SAF-0009-S,Queen,Wairimu,Safaricom PLC,Avenue Premier,SPOUSE,FEMALE,ACTIVE,2025-09-09
+AVH-DEMO-SAF-0009-P,Juma,Wairimu,Safaricom PLC,Avenue Premier,PRINCIPAL,MALE,ACTIVE,2025-09-09
+AVH-DEMO-BAM-0009-P,Juma,Wairimu,Bamburi Cement,Avenue Essential,PRINCIPAL,MALE,ACTIVE,2025-09-09
+AVH-DEMO-BAM-0009-S,Queen,Wairimu,Bamburi Cement,Avenue Essential,SPOUSE,FEMALE,ACTIVE,2025-09-09
+AVH-DEMO-KCB-0009-P,Juma,Wairimu,KCB Group,Avenue Premier,PRINCIPAL,MALE,ACTIVE,2025-09-09
+AVH-DEMO-TWI-0009-S,Queen,Wairimu,Twiga Foods,Avenue Essential,SPOUSE,FEMALE,ACTIVE,2025-09-09
+AVH-DEMO-SAF-0022-P,Wambui,Kariuki,Safaricom PLC,Avenue Essential,PRINCIPAL,FEMALE,ACTIVE,2025-08-22
+AVH-DEMO-SAF-0022-C1,Farah,Kariuki,Safaricom PLC,Avenue Essential,CHILD,MALE,ACTIVE,2025-08-22
+AVH-DEMO-SAF-0022-S,Damaris,Kariuki,Safaricom PLC,Avenue Essential,SPOUSE,MALE,ACTIVE,2025-08-22
+AVH-DEMO-KCB-0010-C1,Xavier,Karanja,KCB Group,Avenue Premier,CHILD,MALE,ACTIVE,2025-08-10
+AVH-DEMO-BAM-0010-P,Kendi,Karanja,Bamburi Cement,Avenue Essential,PRINCIPAL,FEMALE,ACTIVE,2025-08-10
+AVH-DEMO-BAM-0010-C1,Xavier,Karanja,Bamburi Cement,Avenue Essential,CHILD,MALE,ACTIVE,2025-08-10
+AVH-DEMO-BAM-0010-C2,Damaris,Karanja,Bamburi Cement,Avenue Essential,CHILD,FEMALE,ACTIVE,2025-08-10
+AVH-DEMO-SAF-0010-C1,Xavier,Karanja,Safaricom PLC,Avenue Premier,CHILD,MALE,ACTIVE,2025-08-10
+AVH-DEMO-TWI-0010-C2,Damaris,Karanja,Twiga Foods,Avenue Essential,CHILD,FEMALE,ACTIVE,2025-08-10
+AVH-DEMO-TWI-0010-C1,Xavier,Karanja,Twiga Foods,Avenue Essential,CHILD,MALE,ACTIVE,2025-08-10
+AVH-DEMO-TWI-0010-P,Kendi,Karanja,Twiga Foods,Avenue Essential,PRINCIPAL,FEMALE,ACTIVE,2025-08-10
+AVH-DEMO-KCB-0010-P,Kendi,Karanja,KCB Group,Avenue Premier,PRINCIPAL,FEMALE,ACTIVE,2025-08-10
+AVH-DEMO-KCB-0010-S,Robert,Karanja,KCB Group,Avenue Premier,SPOUSE,MALE,ACTIVE,2025-08-10
+AVH-DEMO-SAF-0010-P,Kendi,Karanja,Safaricom PLC,Avenue Premier,PRINCIPAL,FEMALE,ACTIVE,2025-08-10
+AVH-DEMO-EABL-0010-C2,Damaris,Cherono,East African Breweries,Avenue Premier,CHILD,FEMALE,ACTIVE,2025-08-10
+AVH-DEMO-EABL-0010-P,Kendi,Cherono,East African Breweries,Avenue Premier,PRINCIPAL,FEMALE,ACTIVE,2025-08-10
+AVH-DEMO-EABL-0010-C1,Xavier,Cherono,East African Breweries,Avenue Premier,CHILD,MALE,ACTIVE,2025-08-10
+AVH-DEMO-SAF-0010-S,Robert,Karanja,Safaricom PLC,Avenue Premier,SPOUSE,MALE,ACTIVE,2025-08-10
+AVH-DEMO-SAF-0010-C2,Damaris,Karanja,Safaricom PLC,Avenue Premier,CHILD,FEMALE,ACTIVE,2025-08-10
+AVH-DEMO-KCB-0010-C2,Damaris,Karanja,KCB Group,Avenue Premier,CHILD,FEMALE,ACTIVE,2025-08-10
+AVH-DEMO-SAF-0023-S,Amina,Naliaka,Safaricom PLC,Avenue Essential,SPOUSE,FEMALE,ACTIVE,2025-07-23
+AVH-DEMO-SAF-0023-P,Xavier,Naliaka,Safaricom PLC,Avenue Essential,PRINCIPAL,MALE,ACTIVE,2025-07-23
+AVH-DEMO-SAF-0023-C1,Grace,Naliaka,Safaricom PLC,Avenue Essential,CHILD,FEMALE,ACTIVE,2025-07-23
+AVH-DEMO-SAF-0011-P,Leonard,Cherono,Safaricom PLC,Avenue Essential,PRINCIPAL,MALE,ACTIVE,2025-07-11
+AVH-DEMO-BAM-0011-S,Stella,Cherono,Bamburi Cement,Avenue Essential,SPOUSE,FEMALE,ACTIVE,2025-07-11
+AVH-DEMO-TWI-0011-P,Leonard,Cherono,Twiga Foods,Avenue Essential,PRINCIPAL,MALE,ACTIVE,2025-07-11
+AVH-DEMO-TWI-0011-S,Stella,Cherono,Twiga Foods,Avenue Essential,SPOUSE,FEMALE,ACTIVE,2025-07-11
+AVH-DEMO-TWI-0011-C1,Yvonne,Cherono,Twiga Foods,Avenue Essential,CHILD,FEMALE,ACTIVE,2025-07-11
+AVH-DEMO-EABL-0011-P,Leonard,Mboya,East African Breweries,Avenue Premier,PRINCIPAL,MALE,ACTIVE,2025-07-11
+AVH-DEMO-BAM-0011-P,Leonard,Cherono,Bamburi Cement,Avenue Essential,PRINCIPAL,MALE,ACTIVE,2025-07-11
+AVH-DEMO-EABL-0011-S,Stella,Mboya,East African Breweries,Avenue Premier,SPOUSE,FEMALE,ACTIVE,2025-07-11
+AVH-DEMO-SAF-0011-C1,Yvonne,Cherono,Safaricom PLC,Avenue Essential,CHILD,FEMALE,ACTIVE,2025-07-11
+AVH-DEMO-KCB-0011-C1,Yvonne,Cherono,KCB Group,Avenue Premier,CHILD,FEMALE,ACTIVE,2025-07-11
+AVH-DEMO-KCB-0011-S,Stella,Cherono,KCB Group,Avenue Premier,SPOUSE,FEMALE,ACTIVE,2025-07-11
+AVH-DEMO-KCB-0011-P,Leonard,Cherono,KCB Group,Avenue Premier,PRINCIPAL,MALE,ACTIVE,2025-07-11
+AVH-DEMO-BAM-0011-C1,Yvonne,Cherono,Bamburi Cement,Avenue Essential,CHILD,FEMALE,ACTIVE,2025-07-11
+AVH-DEMO-EABL-0011-C1,Yvonne,Mboya,East African Breweries,Avenue Premier,CHILD,FEMALE,ACTIVE,2025-07-11
+AVH-DEMO-SAF-0011-S,Stella,Cherono,Safaricom PLC,Avenue Essential,SPOUSE,FEMALE,ACTIVE,2025-07-11
+AVH-2024-00249,Patricia,Wanjiru,Patricia Wanjiru,Avenue Executive,PRINCIPAL,FEMALE,ACTIVE,2024-03-01
+AVH-2024-00003,Brian,Karanja,Safaricom PLC,Avenue Executive,PRINCIPAL,MALE,ACTIVE,2024-01-15
+AVH-2024-00018,Winnie,Cherop,Twiga Foods,Avenue Essential,PRINCIPAL,FEMALE,PENDING_ACTIVATION,2024-01-15
+AVH-2024-00004,Kevin,Odera,Safaricom PLC,Avenue Premier,PRINCIPAL,MALE,ACTIVE,2024-01-15
+AVH-2024-00017,Daniel,Njuguna,Twiga Foods,Avenue Essential,PRINCIPAL,MALE,ACTIVE,2024-01-15
+AVH-2024-00016,Elizabeth,Nduta,Bamburi Cement,Avenue Essential,PRINCIPAL,FEMALE,ACTIVE,2024-01-15
+AVH-2024-00005,Mercy,Odera,Safaricom PLC,Avenue Premier,SPOUSE,FEMALE,ACTIVE,2024-01-15
+AVH-2024-00006,Diana,Njoroge,Safaricom PLC,Avenue Premier,PRINCIPAL,FEMALE,ACTIVE,2024-01-15
+AVH-2024-00007,Felix,Wekesa,Safaricom PLC,Avenue Essential,PRINCIPAL,MALE,ACTIVE,2024-01-15
+AVH-2024-00001,Wanjiru,Kamau,Safaricom PLC,Avenue Executive,PRINCIPAL,FEMALE,ACTIVE,2024-01-15
+AVH-2024-00008,Sharon,Auma,Safaricom PLC,Avenue Essential,PRINCIPAL,FEMALE,ACTIVE,2024-01-15
+AVH-2024-00002,Kenneth,Kamau,Safaricom PLC,Avenue Executive,SPOUSE,MALE,ACTIVE,2024-01-15
+AVH-2024-00009,Joseph,Mwangi,KCB Group,Avenue Premier,PRINCIPAL,MALE,ACTIVE,2024-01-15
+AVH-2024-00015,Hassan,Mohamed,Bamburi Cement,Avenue Essential,PRINCIPAL,MALE,ACTIVE,2024-01-15
+AVH-2024-00014,Esther,Wairimu,East African Breweries,Avenue Premier,PRINCIPAL,FEMALE,ACTIVE,2024-01-15
+AVH-2024-00013,George,Onyango,East African Breweries,Avenue Premier,PRINCIPAL,MALE,ACTIVE,2024-01-15
+AVH-2024-00012,Patrick,Kibet,KCB Group,Avenue Premier,PRINCIPAL,MALE,SUSPENDED,2024-01-15
+AVH-2024-00010,Agnes,Mwangi,KCB Group,Avenue Premier,SPOUSE,FEMALE,ACTIVE,2024-01-15
+AVH-2024-00011,Cynthia,Adhiambo,KCB Group,Avenue Premier,PRINCIPAL,FEMALE,ACTIVE,2024-01-15

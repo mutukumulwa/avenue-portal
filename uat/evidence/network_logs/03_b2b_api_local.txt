@@ -1,0 +1,15 @@
+B2B API local tests (W8 8.7-8.10) — 2026-06-25T05:50:23Z UTC
+Local API_KEY is set, so the dev-key default must now be REJECTED (DEF-001 config-fix check)
+
+--- AUTH GATE (local) ---
+no key       -> 401
+dev default  -> 401  (expect 401 now — DEF-001 fixable by setting API_KEY)
+real key {}  -> {"error":"Missing required fields: memberNumber, providerCode, serviceType, dateOfService, diagnoses, lineItems"} 400  (expect 400 missing fields - 8.10)
+
+--- ELIGIBILITY (GET, real key) ---
+active member AVH-2024-00009: {"payer":"Avenue Healthcare","member":{"firstName":"Joseph","lastName":"Mwangi","memberNumber":"AVH-2024-00009","dob":"1980-12-20","gender":"MALE","relationship":"PRINCIPAL"},"policy":{"groupName":"KCB Group","packageNam
+suspended member AVH-2024-00012: {"payer":"Avenue Healthcare","member":{"firstName":"Patrick","lastName":"Kibet","memberNumber":"AVH-2024-00012","dob":"1978-02-17","gender":"MALE","relationship":"PRINCIPAL"},"policy":{"groupName":"KCB Group","packageNam
+
+--- CLAIMS POST eligibility gate (real key) ---
+blocked member claim (8.9): {"error":"Member status is SUSPENDED — not eligible"} [HTTP 403]  (expect 403 not eligible)
+active member, bogus provider: {"error":"Provider not found"} [HTTP 404]  (expect 404 provider not found = auth+member OK)

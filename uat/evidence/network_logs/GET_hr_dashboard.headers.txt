@@ -1,0 +1,15 @@
+HTTP/2 307 
+age: 0
+cache-control: private, no-cache, no-store, max-age=0, must-revalidate
+content-type: text/html; charset=utf-8
+date: Thu, 25 Jun 2026 02:35:00 GMT
+link: </_next/static/media/1e41be92c43b3255-s.p.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/media/4de1fea1a954a5b6-s.p.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/media/6d664cce900333ee-s.p.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/media/a075426ba0520f30-s.p.woff2>; rel=preload; as="font"; crossorigin=""; type="font/woff2", </_next/static/css/36ed8f0f2792d482.css>; rel=preload; as="style"
+location: /login
+server: Vercel
+strict-transport-security: max-age=63072000; includeSubDomains; preload
+vary: rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch
+x-matched-path: /hr/dashboard
+x-powered-by: Next.js
+x-vercel-cache: MISS
+x-vercel-id: cpt1::iad1::fsqpj-1782354899699-18a585eeab9a
+

@@ -1,0 +1,17 @@
+B2B API /api/v1 auth matrix — 2026-06-25T02:38:08Z UTC
+Target: https://avenue-portal.vercel.app
+Non-destructive: no-key expects 401; dev-key uses bogus/empty inputs (no real data, no writes).
+
+### NO API KEY (expect 401 for all) ###
+GET    /api/v1/eligibility?memberNumber=UAT-NONEXISTENT-MEMBER-000 -> HTTP 401  {"error":"Unauthorized. Invalid or missing API Key."}
+GET    /api/v1/benefits?memberNumber=UAT-NONEXISTENT-MEMBER-000 -> HTTP 401  {"error":"Unauthorized. Invalid or missing API Key."}
+POST   /api/v1/preauth                          -> HTTP 401  {"error":"Unauthorized. Invalid or missing API Key."}
+POST   /api/v1/upload                           -> HTTP 401  {"error":"Unauthorized"}
+POST   /api/v1/claims                           -> HTTP 401  {"error":"Unauthorized. Invalid or missing API Key."}
+
+### DEFAULT DEV KEY "av-slade360-dev-key" (401 = good/overridden; non-401 = key ACCEPTED in prod = CRITICAL) ###
+GET    /api/v1/eligibility?memberNumber=UAT-NONEXISTENT-MEMBER-000 -> HTTP 500  {"error":"Internal Server Error"}
+GET    /api/v1/benefits?memberNumber=UAT-NONEXISTENT-MEMBER-000 -> HTTP 500  {"error":"Internal Server Error"}
+POST   /api/v1/preauth                          -> HTTP 400  {"error":"Missing required clinical parameters"}
+POST   /api/v1/upload                           -> HTTP 401  {"error":"Unauthorized"}
+POST   /api/v1/claims                           -> HTTP 400  {"error":"Missing required fields: memberNumber, providerCode, serviceType, dateOfService, diagnoses, lineItems"}
