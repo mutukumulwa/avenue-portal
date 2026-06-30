@@ -70,6 +70,8 @@ model Tenant {
   clients                        Client[]
   terminologyEntries             TerminologyEntry[]
   terminologyApprovals           TerminologyApproval[]
+  approvalRequests               ApprovalRequest[]
+  fxRates                        FxRate[]
 }
 
 // ── Multi-client TPA tenancy (Medvex spec §2.1 / gap G2.1) ──────────────
@@ -129,6 +131,8 @@ model Client {
   groups             Group[]
   users              User[]
   terminologyEntries TerminologyEntry[]
+  approvalMatrices   ApprovalMatrix[]
+  approvalRequests   ApprovalRequest[]
 
   @@unique([operatorTenantId, slug])
   @@index([operatorTenantId])
@@ -1100,18 +1104,48 @@ model TaxRate {
 // ─── APPROVAL MATRIX ─────────────────────────────────────
 
 // Configures which role must approve a claim based on value and type
-model ApprovalMatrix {
-  id       String @id @default(cuid())
-  tenantId String
-  tenant   Tenant @relation(fields: [tenantId], references: [id])
+// ── Approval-matrix engine (Medvex spec §3.1 / gap G3.1) ───────────────
+// Client-scoped, action-typed, currency-normalised, multi-level, SLA-timed,
+// version-resolved authorization. Extended additively from the original thin
+// (claims-only, single-role) model so existing rules/UI/claims path keep
+// working: legacy rows are CLAIM_PAYMENT, clientId null (all clients), single
+// step via requiredRole; new rules use actionType + ApprovalStep levels.
+enum ApprovalActionType {
+  CLAIM_PAYMENT
+  PREAUTH_GOP
+  LIMIT_OVERRIDE
+  SCHEME_ACTIVATION
+  COMMISSION_CHANGE
+  MEMBER_ENDORSEMENT
+  PROVIDER_TARIFF_CHANGE
+  FUND_TOPUP
+  WRITEOFF_REFUND
+}
 
-  claimValueMin   Decimal? // null = no lower bound
-  claimValueMax   Decimal? // null = no upper bound
+model ApprovalMatrix {
+  id       String  @id @default(cuid())
+  tenantId String
+  tenant   Tenant  @relation(fields: [tenantId], references: [id])
+  clientId String? // client scope; null = applies to all clients (operator default)
+  client   Client? @relation(fields: [clientId], references: [id])
+
+  actionType ApprovalActionType @default(CLAIM_PAYMENT)
+
+  // Amount band. Stored in `currency`; the engine FX-normalises to base (UGX)
+  // before comparing. claimValueMin/Max retained as the band columns.
+  claimValueMin Decimal? // null = no lower bound
+  claimValueMax Decimal? // null = no upper bound
+  currency      String   @default("UGX")
+
   serviceType     ServiceType? // null = applies to all service types
   benefitCategory BenefitCategory? // null = applies to all categories
 
-  requiredRole String // Maps to UserRole enum value
-  requiresDual Boolean @default(false) // Maker-checker: needs two approvers
+  requiredRole String // legacy single-step role (used when no ApprovalSteps)
+  requiresDual Boolean @default(false) // legacy maker-checker flag
+
+  // SLA / escalation defaults (per-step overrides on ApprovalStep)
+  slaMinutes           Int?
+  escalationTargetRole String?
 
   effectiveFrom DateTime
   effectiveTo   DateTime?
@@ -1120,7 +1154,107 @@ model ApprovalMatrix {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  steps    ApprovalStep[]
+  requests ApprovalRequest[]
+
   @@index([tenantId])
+  @@index([tenantId, actionType])
+  @@index([clientId])
+}
+
+// Sequential approval levels for a matrix rule (level 1 first, then 2, …).
+model ApprovalStep {
+  id       String         @id @default(cuid())
+  matrixId String
+  matrix   ApprovalMatrix @relation(fields: [matrixId], references: [id], onDelete: Cascade)
+
+  level                Int // 1-based sequence
+  requiredRole         String
+  slaMinutes           Int?
+  escalationTargetRole String?
+
+  @@unique([matrixId, level])
+  @@index([matrixId])
+}
+
+enum ApprovalRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  ESCALATED
+  CANCELLED
+}
+
+// Runtime approval workflow for a governed action. Records the resolved matrix
+// (version-at-decision-time) and walks ApprovalStep levels with enforced SoD.
+model ApprovalRequest {
+  id       String  @id @default(cuid())
+  tenantId String
+  tenant   Tenant  @relation(fields: [tenantId], references: [id])
+  clientId String?
+  client   Client? @relation(fields: [clientId], references: [id])
+
+  actionType ApprovalActionType
+  entityType String // e.g. "Claim", "PreAuthorization"
+  entityId   String
+
+  amount      Decimal?
+  currency    String   @default("UGX")
+  baseAmount  Decimal? // amount normalised to base (UGX) at request time
+  matrixId    String? // resolved matrix rule (version in force at request time)
+  matrix      ApprovalMatrix? @relation(fields: [matrixId], references: [id])
+
+  status       ApprovalRequestStatus @default(PENDING)
+  currentLevel Int                   @default(1)
+  makerId      String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  decisions ApprovalDecision[]
+
+  @@index([tenantId, status])
+  @@index([clientId])
+  @@index([entityType, entityId])
+}
+
+model ApprovalDecision {
+  id        String          @id @default(cuid())
+  requestId String
+  request   ApprovalRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  level       Int
+  decidedById String
+  decision    String // APPROVED | REJECTED
+  notes       String?
+  decidedAt   DateTime @default(now())
+
+  @@index([requestId])
+}
+
+// ── Multi-currency reference (G3.5 schema-only; FX engine lands later) ──
+model Currency {
+  code     String  @id // ISO 4217, e.g. "UGX", "USD"
+  name     String
+  symbol   String?
+  isActive Boolean @default(true)
+}
+
+model FxRate {
+  id       String @id @default(cuid())
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id])
+
+  baseCurrency  String // normalisation base, e.g. "UGX"
+  quoteCurrency String
+  rate          Decimal // 1 quote = `rate` base
+  source        String?
+
+  effectiveFrom DateTime  @default(now())
+  effectiveTo   DateTime?
+  isActive      Boolean   @default(true)
+
+  @@index([tenantId, baseCurrency, quoteCurrency])
 }
 
 // ─── PACKAGES & BENEFITS ────────────────────────────────
