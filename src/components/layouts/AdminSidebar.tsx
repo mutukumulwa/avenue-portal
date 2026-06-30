@@ -8,7 +8,7 @@ import {
   Stethoscope, Receipt, CreditCard, Building, PieChart,
   Settings, LogOut, Calculator, UserCheck, MessageSquareText,
   ShieldAlert, MessageSquareWarning, Wallet, Fingerprint,
-  BarChart3, TriangleAlert,
+  BarChart3, TriangleAlert, Landmark,
 } from "lucide-react";
 import { PortalSwitcher } from "./PortalSwitcher";
 import { useState } from "react";
@@ -35,6 +35,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Membership",
     items: [
+      { label: "Clients",      href: "/clients",      icon: Landmark,         roles: ADMIN_ONLY   },
       { label: "Groups",       href: "/groups",       icon: Building2,        roles: OPS          },
       { label: "Members",      href: "/members",      icon: Users,            roles: OPS          },
       { label: "Endorsements", href: "/endorsements", icon: FileText,         roles: OPS          },
