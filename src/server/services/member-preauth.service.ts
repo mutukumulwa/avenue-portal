@@ -213,7 +213,7 @@ export class MemberPreAuthService {
     ]);
 
     if (!member) throw new Error("Member not found.");
-    if (!provider || provider.contractStatus !== "ACTIVE") throw new Error("Select an active Avenue or partner facility.");
+    if (!provider || provider.contractStatus !== "ACTIVE") throw new Error("Select an active Medvex or partner facility.");
 
     const benefitCategory = procedure.benefitCategory as BenefitCategory;
     const benefit = member.package.currentVersion?.benefits.find((item) => item.category === benefitCategory);

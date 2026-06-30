@@ -5,7 +5,7 @@ import Link from "next/link";
 
 /**
  * Parity Compliance Dashboard — Process 14 §14 spec
- * Internal (Avenue own facilities) vs external provider cost comparison.
+ * Internal (Medvex own facilities) vs external provider cost comparison.
  * Access-gated to ADMIN_ONLY (maps to COMPLIANCE_OFFICER in the new RBAC system).
  */
 
@@ -47,7 +47,7 @@ export default async function ParityDashboardPage() {
             Parity Compliance Dashboard
           </h1>
           <p className="text-avenue-text-muted text-sm mt-0.5">
-            Internal (Avenue own) vs external provider cost comparison — YTD
+            Internal (Medvex own) vs external provider cost comparison — YTD
           </p>
         </div>
         <span className="ml-auto text-[10px] font-bold uppercase px-3 py-1 rounded-full bg-avenue-indigo/10 text-avenue-indigo">
@@ -76,7 +76,7 @@ export default async function ParityDashboardPage() {
       {/* Internal vs External side-by-side */}
       <div className="grid grid-cols-2 gap-4">
         {[
-          { label: "Internal (Avenue Own)", data: parity.internal, color: "text-avenue-indigo", bg: "bg-avenue-indigo/5 border-avenue-indigo/20" },
+          { label: "Internal (Medvex Own)", data: parity.internal, color: "text-avenue-indigo", bg: "bg-avenue-indigo/5 border-avenue-indigo/20" },
           { label: "External Providers",    data: parity.external, color: "text-[#17A2B8]",     bg: "bg-[#17A2B8]/5 border-[#17A2B8]/20" },
         ].map(({ label, data, color, bg }) => (
           <div key={label} className={`border rounded-[8px] p-5 ${bg} space-y-4`}>

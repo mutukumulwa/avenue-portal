@@ -1,5 +1,5 @@
 // ─── FORMAL LETTER PDF TEMPLATE ──────────────────────────────────────────────
-// Brand: Quicksand headings, Lato body, indigo (#292A83).
+// Brand: Sora headings, Hanken Grotesk body, indigo (#0B1437).
 // Used for Welcome Letters, Renewal Notices, Termination Notices, and custom memos.
 
 export type LetterType =
@@ -46,20 +46,20 @@ export function renderLetterHtml(data: LetterData): string {
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@600;700&family=Lato:wght@400;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Hanken+Grotesk:wght@400;700&display=swap" rel="stylesheet" />
 <title>${subject}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Lato', sans-serif; color: #1a1a2e; font-size: 13px; line-height: 1.6; background: white; }
-  h1,h2,h3 { font-family: 'Quicksand', sans-serif; }
+  body { font-family: 'Hanken Grotesk', sans-serif; color: #1a1a2e; font-size: 13px; line-height: 1.6; background: white; }
+  h1,h2,h3 { font-family: 'Sora', sans-serif; }
 </style>
 </head>
 <body>
   <!-- Letterhead -->
-  <div style="border-bottom: 3px solid #292A83; padding: 28px 48px 20px;">
+  <div style="border-bottom: 3px solid #0B1437; padding: 28px 48px 20px;">
     <div style="display:flex; justify-content:space-between; align-items:flex-start;">
       <div>
-        <h1 style="font-size:22px;font-weight:700;color:#292A83;">${data.tenantName}</h1>
+        <h1 style="font-size:22px;font-weight:700;color:#0B1437;">${data.tenantName}</h1>
         <p style="font-size:11px;color:#6C757D;margin-top:3px;">Membership Services</p>
       </div>
       <div style="text-align:right;font-size:11px;color:#6C757D;line-height:1.7;">
@@ -78,14 +78,14 @@ export function renderLetterHtml(data: LetterData): string {
     </div>
 
     <!-- Membership reference line -->
-    <div style="background:#f8f9ff;border-left:3px solid #292A83;padding:10px 14px;margin-bottom:22px;font-size:12px;">
+    <div style="background:#f8f9ff;border-left:3px solid #0B1437;padding:10px 14px;margin-bottom:22px;font-size:12px;">
       <strong>Member No.:</strong> ${data.memberNumber} &nbsp;|&nbsp;
       <strong>Group:</strong> ${data.groupName} &nbsp;|&nbsp;
       <strong>Package:</strong> ${data.packageName}
     </div>
 
     <!-- Subject -->
-    <p style="font-weight:700;font-size:14px;margin-bottom:18px;text-decoration:underline;color:#292A83;">
+    <p style="font-weight:700;font-size:14px;margin-bottom:18px;text-decoration:underline;color:#0B1437;">
       RE: ${subject}
     </p>
 

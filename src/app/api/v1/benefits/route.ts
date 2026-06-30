@@ -100,7 +100,7 @@ async function getBenefits(req: Request) {
 
     return NextResponse.json(
       {
-        payer: "Avenue Healthcare",
+        payer: "Medvex",
         member: {
           memberNumber: member.memberNumber,
           firstName:    member.firstName,

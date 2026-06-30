@@ -12,12 +12,12 @@ async function main() {
   // 1. TENANT
   // ═══════════════════════════════════════════════════════════
   const tenant = await prisma.tenant.upsert({
-    where:  { slug: 'avenue' },
+    where:  { slug: 'medvex' },
     update: {},
     create: {
-      name: 'Avenue Healthcare', slug: 'avenue',
-      primaryColor: '#292A83', accentColor: '#435BA1', warmColor: '#F5C6B6',
-      fontHeading: 'Quicksand', fontBody: 'Lato', config: {},
+      name: 'Medvex', slug: 'medvex',
+      primaryColor: '#000523', accentColor: '#06B9AB', warmColor: '#F2715A',
+      fontHeading: 'Sora', fontBody: 'Hanken Grotesk', config: {},
     },
   })
   console.log(`✅ Tenant: ${tenant.name}`)
@@ -103,15 +103,15 @@ async function main() {
   // ═══════════════════════════════════════════════════════════
   // 2. USERS
   // ═══════════════════════════════════════════════════════════
-  const pw = await bcrypt.hash('AvenueAdmin2024!', 10)
+  const pw = await bcrypt.hash('MedvexAdmin2024!', 10)
   const userDefs = [
-    { email: 'admin@avenue.co.ke',       firstName: 'James',    lastName: 'Kamau',    role: 'SUPER_ADMIN'        },
-    { email: 'claims@avenue.co.ke',      firstName: 'Grace',    lastName: 'Wanjiku',  role: 'CLAIMS_OFFICER'     },
-    { email: 'finance@avenue.co.ke',     firstName: 'Peter',    lastName: 'Ochieng',  role: 'FINANCE_OFFICER'    },
-    { email: 'underwriter@avenue.co.ke', firstName: 'Faith',    lastName: 'Muthoni',  role: 'UNDERWRITER'        },
-    { email: 'cs@avenue.co.ke',          firstName: 'David',    lastName: 'Kipchoge', role: 'CUSTOMER_SERVICE'   },
-    { email: 'medical@avenue.co.ke',     firstName: 'Dr. Sarah',lastName: 'Achieng',  role: 'MEDICAL_OFFICER'    },
-    { email: 'fund@avenue.co.ke',        firstName: 'Caroline', lastName: 'Mwaura',   role: 'FUND_ADMINISTRATOR' },
+    { email: 'admin@medvex.co.ug',       firstName: 'James',    lastName: 'Kamau',    role: 'SUPER_ADMIN'        },
+    { email: 'claims@medvex.co.ug',      firstName: 'Grace',    lastName: 'Wanjiku',  role: 'CLAIMS_OFFICER'     },
+    { email: 'finance@medvex.co.ug',     firstName: 'Peter',    lastName: 'Ochieng',  role: 'FINANCE_OFFICER'    },
+    { email: 'underwriter@medvex.co.ug', firstName: 'Faith',    lastName: 'Muthoni',  role: 'UNDERWRITER'        },
+    { email: 'cs@medvex.co.ug',          firstName: 'David',    lastName: 'Kipchoge', role: 'CUSTOMER_SERVICE'   },
+    { email: 'medical@medvex.co.ug',     firstName: 'Dr. Sarah',lastName: 'Achieng',  role: 'MEDICAL_OFFICER'    },
+    { email: 'fund@medvex.co.ug',        firstName: 'Caroline', lastName: 'Mwaura',   role: 'FUND_ADMINISTRATOR' },
   ] as const
   const users: Record<string, string> = {}
   for (const u of userDefs) {
@@ -122,20 +122,20 @@ async function main() {
     })
     users[u.role] = user.id
   }
-  console.log(`✅ Users: ${userDefs.length} (incl. fund@avenue.co.ke / FUND_ADMINISTRATOR)`)
+  console.log(`✅ Users: ${userDefs.length} (incl. fund@medvex.co.ug / FUND_ADMINISTRATOR)`)
 
   // ═══════════════════════════════════════════════════════════
   // 3. PACKAGES (Essential, Premier, Executive)
   // ═══════════════════════════════════════════════════════════
   const pkgDefs = [
-    { name: 'Avenue Essential', annual: 500000, contrib: 95000, benefits: [
+    { name: 'Medvex Essential', annual: 500000, contrib: 95000, benefits: [
       { cat: 'INPATIENT' as const,           limit: 500000,  copay: 0,  wait: 30  },
       { cat: 'OUTPATIENT' as const,          limit: 100000,  copay: 10, wait: 0   },
       { cat: 'MATERNITY' as const,           limit: 80000,   copay: 0,  wait: 365 },
       { cat: 'DENTAL' as const,              limit: 20000,   copay: 20, wait: 90  },
       { cat: 'OPTICAL' as const,             limit: 15000,   copay: 20, wait: 90  },
     ]},
-    { name: 'Avenue Premier', annual: 2000000, contrib: 210000, benefits: [
+    { name: 'Medvex Premier', annual: 2000000, contrib: 210000, benefits: [
       { cat: 'INPATIENT' as const,           limit: 2000000, copay: 0,  wait: 0   },
       { cat: 'OUTPATIENT' as const,          limit: 300000,  copay: 5,  wait: 0   },
       { cat: 'MATERNITY' as const,           limit: 200000,  copay: 0,  wait: 270 },
@@ -144,7 +144,7 @@ async function main() {
       { cat: 'MENTAL_HEALTH' as const,       limit: 100000,  copay: 10, wait: 90  },
       { cat: 'CHRONIC_DISEASE' as const,     limit: 300000,  copay: 0,  wait: 0   },
     ]},
-    { name: 'Avenue Executive', annual: 5000000, contrib: 480000, benefits: [
+    { name: 'Medvex Executive', annual: 5000000, contrib: 480000, benefits: [
       { cat: 'INPATIENT' as const,           limit: 5000000, copay: 0,  wait: 0   },
       { cat: 'OUTPATIENT' as const,          limit: 500000,  copay: 0,  wait: 0   },
       { cat: 'MATERNITY' as const,           limit: 500000,  copay: 0,  wait: 180 },
@@ -188,8 +188,8 @@ async function main() {
   // ═══════════════════════════════════════════════════════════
   const providerDefs = [
     {
-      name: 'Avenue Hospital - Parklands', type: 'HOSPITAL' as const, tier: 'OWN' as const,
-      county: 'Nairobi', phone: '+254202345678', email: 'parklands@avenue.co.ke',
+      name: 'Medvex Hospital - Parklands', type: 'HOSPITAL' as const, tier: 'OWN' as const,
+      county: 'Nairobi', phone: '+254202345678', email: 'parklands@medvex.co.ug',
       contactPerson: 'Dr. Kariuki Mbugua',
       contractStatus: 'ACTIVE', paymentTermDays: 14, creditLimit: 5000000,
       contractNotes: 'Flagship facility. All services covered. Priority settlement.',
@@ -213,8 +213,8 @@ async function main() {
       ],
     },
     {
-      name: 'Avenue Hospital - Thika', type: 'HOSPITAL' as const, tier: 'OWN' as const,
-      county: 'Kiambu', phone: '+254202456789', email: 'thika@avenue.co.ke',
+      name: 'Medvex Hospital - Thika', type: 'HOSPITAL' as const, tier: 'OWN' as const,
+      county: 'Kiambu', phone: '+254202456789', email: 'thika@medvex.co.ug',
       contactPerson: 'Dr. Jane Muthee',
       contractStatus: 'ACTIVE', paymentTermDays: 14, creditLimit: 2000000,
       contractNotes: 'Outpatient and maternity focus. Inpatient capacity up to 50 beds.',
@@ -1306,7 +1306,7 @@ async function main() {
       {
         tenantId, endorsementNumber: 'END-2024-00003', groupId: otherGroups[0],
         type: 'PACKAGE_UPGRADE', status: 'SUBMITTED', effectiveDate: new Date('2024-07-01'),
-        changeDetails: { fromPackage: 'Avenue Premier', toPackage: 'Avenue Executive', reason: 'Group renewal upgrade' },
+        changeDetails: { fromPackage: 'Medvex Premier', toPackage: 'Medvex Executive', reason: 'Group renewal upgrade' },
         proratedAmount: 75000, previousPremium: 75000, newPremium: 150000, premiumDelta: 75000,
       },
       {
@@ -1585,7 +1585,7 @@ async function main() {
         },
         {
           tenantId,
-          subject: 'Aga Khan Hospital refused to accept Avenue card',
+          subject: 'Aga Khan Hospital refused to accept Medvex card',
           type: 'FACILITY',
           description: 'Member presented at AKUH on 12 June 2024 for specialist visit. Front desk refused direct billing and demanded payment upfront. Member had to pay out of pocket and seek reimbursement.',
           status: 'OPEN',
@@ -1707,7 +1707,7 @@ async function main() {
       const m1 = activeMembers[1]
       await prisma.activityLog.createMany({ data: [
         { entityType:'MEMBER', entityId:m0.id, memberId:m0.id, action:'MEMBER_ACTIVATED', description:'Member activated after premium confirmed.', userId: users['CUSTOMER_SERVICE'] },
-        { entityType:'MEMBER', entityId:m0.id, memberId:m0.id, action:'CLAIM_SUBMITTED',  description:'Claim CLM-2024-00001 submitted by member at Avenue Hospital Parklands.', userId: users['CLAIMS_OFFICER'] },
+        { entityType:'MEMBER', entityId:m0.id, memberId:m0.id, action:'CLAIM_SUBMITTED',  description:'Claim CLM-2024-00001 submitted by member at Medvex Hospital Parklands.', userId: users['CLAIMS_OFFICER'] },
         { entityType:'MEMBER', entityId:m0.id, memberId:m0.id, action:'CLAIM_APPROVED',   description:'Claim CLM-2024-00001 approved — KES 5,700 authorised.', userId: users['CLAIMS_OFFICER'] },
         { entityType:'MEMBER', entityId:m1.id, memberId:m1.id, action:'MEMBER_ACTIVATED', description:'Member activated after group enrollment confirmation.', userId: users['CUSTOMER_SERVICE'] },
         { entityType:'MEMBER', entityId:m1.id, memberId:m1.id, action:'PREAUTH_REQUESTED',description:'Pre-authorisation PA-2024-00002 submitted for cardiac inpatient admission.', userId: users['CLAIMS_OFFICER'] },
@@ -1725,7 +1725,7 @@ async function main() {
   {
     const exists = await prisma.claim.findFirst({ where: { tenantId, claimNumber: 'CLM-FRAUD-001' } })
     if (!exists && activeMembers.length >= 2) {
-      const parklands = providers[0] // Avenue Hospital - Parklands (has CPT 99213 @ 2,500)
+      const parklands = providers[0] // Medvex Hospital - Parklands (has CPT 99213 @ 2,500)
       const nairobi   = providers[2] // Nairobi Hospital            (has CPT 99213 @ 3,000)
 
       // Need a guaranteed MALE member for the gender-mismatch scenario
@@ -1934,9 +1934,9 @@ async function main() {
     })
 
     if (!existingRule) {
-      const essentialPkg = packages.find(p => p.name === 'Avenue Essential')!
-      const premierPkg   = packages.find(p => p.name === 'Avenue Premier')!
-      const execPkg      = packages.find(p => p.name === 'Avenue Executive')!
+      const essentialPkg = packages.find(p => p.name === 'Medvex Essential')!
+      const premierPkg   = packages.find(p => p.name === 'Medvex Premier')!
+      const execPkg      = packages.find(p => p.name === 'Medvex Executive')!
 
       // ── Essential: outpatient 10% applies to all network tiers ───────────
       for (const tier of ['TIER_1', 'TIER_2', 'TIER_3'] as const) {
@@ -2172,7 +2172,7 @@ async function main() {
       // Scheme 1: East African Breweries — healthy fund, multi-category claims
       const eabl = await prisma.group.findFirst({ where: { tenantId, name: 'East African Breweries' } })
       if (eabl) {
-        const fundAdminUser = await prisma.user.findFirst({ where: { tenantId, email: 'fund@avenue.co.ke' } })
+        const fundAdminUser = await prisma.user.findFirst({ where: { tenantId, email: 'fund@medvex.co.ug' } })
         await prisma.group.update({ where: { id: eabl.id }, data: {
           fundingMode: 'SELF_FUNDED', adminFeeMethod: 'FLAT_PER_INSURED', adminFeeRate: 2000,
           fundAdministrators: fundAdminUser ? { connect: { id: fundAdminUser.id } } : undefined,
@@ -2377,7 +2377,7 @@ async function main() {
       // Scheme 2: Bamburi Cement — LOW balance, triggers alert demonstration
       const bamburi = await prisma.group.findFirst({ where: { tenantId, name: 'Bamburi Cement' } })
       if (bamburi) {
-        const fundAdminUser = await prisma.user.findFirst({ where: { tenantId, email: 'fund@avenue.co.ke' } })
+        const fundAdminUser = await prisma.user.findFirst({ where: { tenantId, email: 'fund@medvex.co.ug' } })
         await prisma.group.update({ where: { id: bamburi.id }, data: {
           fundingMode: 'SELF_FUNDED', adminFeeMethod: 'PCT_OF_CLAIMS', adminFeeRate: 5,
           fundAdministrators: fundAdminUser ? { connect: { id: fundAdminUser.id } } : undefined,
@@ -2672,7 +2672,7 @@ async function main() {
               requiresIraRegistration: true,
               canReceiveCommission: true,
               commissionBasis: 'COMMISSION',
-              sourceDescription: 'Regulated master broker used for Avenue corporate business demos.',
+              sourceDescription: 'Regulated master broker used for Medvex corporate business demos.',
               iraExpiryDate: new Date('2026-12-31'),
               kraPin: 'P051234567A',
               vatRegistered: true,
@@ -2731,9 +2731,9 @@ async function main() {
           const internalSalesSource = await prisma.broker.create({
             data: {
               tenantId,
-              name: 'Avenue Corporate Sales Desk',
+              name: 'Medvex Corporate Sales Desk',
               brokerCode: 'SRC-AVENUE-SALES',
-              legalName: 'Avenue Healthcare Corporate Sales Desk',
+              legalName: 'Medvex Corporate Sales Desk',
               brokerType: 'INDIVIDUAL_PRODUCER',
               intermediaryCategory: 'INTERNAL_SALES',
               requiresIraRegistration: false,
@@ -2742,7 +2742,7 @@ async function main() {
               sourceDescription: 'Internal sales attribution source. No external commission or referral payout is generated.',
               contactPerson: 'Corporate Sales Lead',
               phone: '+254700300300',
-              email: 'corporate.sales@avenuehealthcare.com',
+              email: 'corporate.sales@medvex.co.ug',
               effectiveFrom: new Date('2024-01-01'),
               approvedById: adminUserId,
               approvedAt: new Date('2024-01-10'),
@@ -2979,11 +2979,11 @@ async function main() {
   // 17. NOTIFICATION TEMPLATES
   // ═══════════════════════════════════════════════════════════
   const notifTemplates = [
-    { name: 'Welcome Email',          type: 'WELCOME',              channel: 'EMAIL', subject: 'Welcome to Avenue Healthcare',         bodyTemplate: 'Dear {{firstName}}, welcome to Avenue Healthcare. Your member number is {{memberNumber}}.' },
+    { name: 'Welcome Email',          type: 'WELCOME',              channel: 'EMAIL', subject: 'Welcome to Medvex',         bodyTemplate: 'Dear {{firstName}}, welcome to Medvex. Your member number is {{memberNumber}}.' },
     { name: 'Claim Approved',         type: 'CLAIM_APPROVED',       channel: 'EMAIL', subject: 'Claim Approved — {{claimNumber}}',     bodyTemplate: 'Your claim {{claimNumber}} for KES {{approvedAmount}} has been approved.' },
     { name: 'Claim Declined',         type: 'CLAIM_DECLINED',       channel: 'EMAIL', subject: 'Claim Declined — {{claimNumber}}',     bodyTemplate: 'Your claim {{claimNumber}} has been declined. Reason: {{declineReason}}.' },
     { name: 'Renewal Reminder 30',    type: 'RENEWAL_REMINDER_30',  channel: 'EMAIL', subject: 'Policy Renewal in 30 days',            bodyTemplate: 'Your policy renews on {{renewalDate}}. Please ensure premiums are up to date.' },
-    { name: 'Payment Overdue',        type: 'PAYMENT_OVERDUE',      channel: 'SMS',   subject: null,                                   bodyTemplate: 'Avenue Healthcare: Invoice {{invoiceNumber}} of KES {{balance}} is overdue. Pay now to avoid suspension.' },
+    { name: 'Payment Overdue',        type: 'PAYMENT_OVERDUE',      channel: 'SMS',   subject: null,                                   bodyTemplate: 'Medvex: Invoice {{invoiceNumber}} of KES {{balance}} is overdue. Pay now to avoid suspension.' },
     { name: 'Pre-Auth Approved SMS',  type: 'PREAUTH_STATUS',       channel: 'SMS',   subject: null,                                   bodyTemplate: 'Pre-auth {{preauthNumber}} approved for KES {{approvedAmount}}. Valid until {{validUntil}}.' },
     { name: 'Suspension Notice',      type: 'SUSPENSION_NOTICE',    channel: 'EMAIL', subject: 'Cover Suspended — Action Required',    bodyTemplate: 'Dear {{firstName}}, your cover has been suspended due to outstanding premium. Contact us immediately.' },
   ]
@@ -3003,7 +3003,7 @@ async function main() {
   })
   if (firstActiveMember) {
     await prisma.user.upsert({
-      where: { tenantId_email: { tenantId, email: 'member@avenue.co.ke' } },
+      where: { tenantId_email: { tenantId, email: 'member@medvex.co.ug' } },
       update: {
         passwordHash: pw,
         isActive: true,
@@ -3012,7 +3012,7 @@ async function main() {
       },
       create: {
         tenantId,
-        email: 'member@avenue.co.ke',
+        email: 'member@medvex.co.ug',
         firstName: firstActiveMember.firstName,
         lastName: firstActiveMember.lastName,
         role: 'MEMBER_USER',
@@ -3023,7 +3023,7 @@ async function main() {
     })
   }
 
-  const fundAdminUser = await prisma.user.findFirst({ where: { tenantId, email: 'fund@avenue.co.ke' } })
+  const fundAdminUser = await prisma.user.findFirst({ where: { tenantId, email: 'fund@medvex.co.ug' } })
   if (fundAdminUser) {
     const selfFundedGroups = await prisma.group.findMany({
       where: { tenantId, fundingMode: 'SELF_FUNDED' },
@@ -3335,7 +3335,7 @@ async function main() {
         severity: 'WARNING',
         status: 'OPEN',
         title: 'Aga Khan adjusted cost above peer benchmark',
-        message: 'Case-mix-adjusted inpatient cost is materially above Avenue-owned facilities.',
+        message: 'Case-mix-adjusted inpatient cost is materially above Medvex-owned facilities.',
         metricKey: 'adjustedCostIndex',
         metricValue: 1.34,
         thresholdValue: 1.15,
@@ -3438,11 +3438,11 @@ async function main() {
     }
 
     const personaDefs = [
-      { email: 'member.demo.low@avenue.co.ke', index: 1, label: 'Low use family' },
-      { email: 'member.demo.nearcap@avenue.co.ke', index: 2, label: 'Near cap outpatient' },
-      { email: 'member.demo.family@avenue.co.ke', index: 3, label: 'Family privacy demo' },
-      { email: 'member.demo.wallet@avenue.co.ke', index: 4, label: 'Wallet payment demo' },
-      { email: 'member.demo.preauth@avenue.co.ke', index: 5, label: 'Preauth decision demo' },
+      { email: 'member.demo.low@medvex.co.ug', index: 1, label: 'Low use family' },
+      { email: 'member.demo.nearcap@medvex.co.ug', index: 2, label: 'Near cap outpatient' },
+      { email: 'member.demo.family@medvex.co.ug', index: 3, label: 'Family privacy demo' },
+      { email: 'member.demo.wallet@medvex.co.ug', index: 4, label: 'Wallet payment demo' },
+      { email: 'member.demo.preauth@medvex.co.ug', index: 5, label: 'Preauth decision demo' },
     ]
     for (const persona of personaDefs) {
       const member = demoMembers[persona.index]
@@ -3715,7 +3715,7 @@ async function main() {
       claimNumber?: string
       preauthNumber?: string
     }> = [
-      { fileName: 'Avenue_Member_Benefit_Guide_2025.pdf', category: 'BENEFIT_GUIDE', groupId: safaricom.id, url: '/seed-docs/Avenue_Member_Benefit_Guide_2025.pdf' },
+      { fileName: 'Medvex_Member_Benefit_Guide_2025.pdf', category: 'BENEFIT_GUIDE', groupId: safaricom.id, url: '/seed-docs/Medvex_Member_Benefit_Guide_2025.pdf' },
       { fileName: 'Safaricom_Benefit_Schedule_2025.pdf', category: 'BENEFIT_SCHEDULE', groupId: safaricom.id, url: '/seed-docs/Safaricom_Benefit_Schedule_2025.pdf' },
       { fileName: 'PA-MEXP-001_Approval_Letter.pdf', category: 'PREAUTH_APPROVAL', preauthNumber: 'PA-MEXP-001', url: '/seed-docs/PA-MEXP-001_Approval_Letter.pdf' },
       { fileName: 'CLM-MEXP-001_Claim_Support.pdf', category: 'CLAIM_SUPPORT', claimNumber: 'CLM-MEXP-001', url: '/seed-docs/CLM-MEXP-001_Claim_Support.pdf' },
@@ -3865,7 +3865,7 @@ async function main() {
   await seedRbac(prisma, tenantId)
 
   console.log('\n🎉 Seed complete! All features populated.\n')
-  console.log('  Login: admin@avenue.co.ke / AvenueAdmin2024!')
+  console.log('  Login: admin@medvex.co.ug / MedvexAdmin2024!')
   console.log('')
   console.log('  Core:')
   console.log('  • Safaricom — 3 benefit tiers (Executive/Management/Staff) with different packages')
@@ -3891,9 +3891,9 @@ async function main() {
   console.log('  • Individual client: Patricia Wanjiru (clientType=INDIVIDUAL, Executive)')
   console.log('  • Self-funded scheme 1: EABL — KES 32M deposit, real claim deductions by claimId, admin fee')
   console.log('  • Self-funded scheme 2: Bamburi Cement — KES 3.8M balance below KES 5M minimum (low-balance demo)')
-  console.log('  • Fund admin: fund@avenue.co.ke / AvenueAdmin2024! — linked to all self-funded schemes')
-  console.log('  • Member: member@avenue.co.ke / AvenueAdmin2024! — linked to an active member')
-  console.log('  • Member demo logins: member.demo.low@avenue.co.ke, member.demo.nearcap@avenue.co.ke, member.demo.family@avenue.co.ke, member.demo.wallet@avenue.co.ke, member.demo.preauth@avenue.co.ke / AvenueAdmin2024!')
+  console.log('  • Fund admin: fund@medvex.co.ug / MedvexAdmin2024! — linked to all self-funded schemes')
+  console.log('  • Member: member@medvex.co.ug / MedvexAdmin2024! — linked to an active member')
+  console.log('  • Member demo logins: member.demo.low@medvex.co.ug, member.demo.nearcap@medvex.co.ug, member.demo.family@medvex.co.ug, member.demo.wallet@medvex.co.ug, member.demo.preauth@medvex.co.ug / MedvexAdmin2024!')
   console.log('  • Admin sidebar: Self-Funded Schemes link under Finance → /fund/dashboard')
   console.log('  • Scheme transfer endorsement: KCB member → EABL (career change)')
   console.log('  • Tier change endorsement: Safaricom Staff → Management (promotion)')

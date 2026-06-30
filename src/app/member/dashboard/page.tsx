@@ -91,7 +91,7 @@ export default async function MemberDashboardPage() {
         <div className="rounded-[8px] bg-avenue-indigo p-5 text-white shadow-sm">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <p className="text-[13px] font-bold uppercase opacity-80">Avenue Health Member</p>
+              <p className="text-[13px] font-bold uppercase opacity-80">Medvex Member</p>
               <h1 className="mt-1 truncate font-heading text-2xl font-bold">{memberName}</h1>
               <p className="mt-1 text-sm opacity-85">{dashboard.group.name}</p>
               <p className="mt-3 font-mono text-[13px] opacity-80">{dashboard.member.memberNumber}</p>
@@ -295,7 +295,7 @@ export default async function MemberDashboardPage() {
           <BadgeCheck className="h-5 w-5 text-[#28A745]" />
           <p className="mt-3 text-[13px] font-bold uppercase text-avenue-text-muted">Next best action</p>
           <p className="mt-1 text-lg font-bold text-avenue-text-heading">Keep your digital card ready</p>
-          <p className="mt-1 text-sm text-avenue-text-muted">Use check-in when you arrive at an Avenue or partner facility.</p>
+          <p className="mt-1 text-sm text-avenue-text-muted">Use check-in when you arrive at an Medvex or partner facility.</p>
         </div>
       </section>
 

@@ -481,7 +481,7 @@ export const bindingService = {
       quoteNumber: member.memberNumber,
       issuedDate: new Date().toLocaleDateString("en-KE"),
       validUntil: member.coverEndDate ? new Date(member.coverEndDate).toLocaleDateString("en-KE") : "—",
-      tenantName: tenant?.name ?? "Avenue Healthcare",
+      tenantName: tenant?.name ?? "Medvex",
       tenantLogoUrl: tenant?.logoUrl ?? undefined,
       clientName: `${member.firstName} ${member.lastName}`,
       clientType: "INDIVIDUAL",

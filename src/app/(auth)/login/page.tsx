@@ -67,7 +67,7 @@ function LoginForm() {
           <CardHeader className="space-y-2 text-center">
             <CardTitle className="text-2xl">Sign In</CardTitle>
             <CardDescription>
-              Enter your Avenue Healthcare credentials
+              Enter your Medvex credentials
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -90,7 +90,7 @@ function LoginForm() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="bg-white border border-[#EEEEEE] text-avenue-text-heading text-sm rounded-[8px] focus:ring-2 focus:ring-avenue-indigo focus:border-avenue-indigo block w-full pl-10 p-2.5 outline-none transition-all"
-                    placeholder="name@avenue.co.ke"
+                    placeholder="name@medvex.co.ug"
                     required
                   />
                 </div>
@@ -122,9 +122,9 @@ function LoginForm() {
               </button>
 
               <p className="text-center text-xs text-avenue-text-muted pt-1">
-                Admin: admin@avenue.co.ke · HR: emily.wambui@safaricom.co.ke
-                <br />Broker: broker@kaib.co.ke · Member: member@avenue.co.ke
-                <br />Password: <span className="font-mono">AvenueAdmin2024!</span>
+                Admin: admin@medvex.co.ug · HR: emily.wambui@safaricom.co.ke
+                <br />Broker: broker@kaib.co.ke · Member: member@medvex.co.ug
+                <br />Password: <span className="font-mono">MedvexAdmin2024!</span>
               </p>
             </form>
           </CardContent>

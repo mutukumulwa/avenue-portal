@@ -92,7 +92,7 @@ function InsuranceCard({ member }: { member: Member }) {
     <div
       className="relative w-full rounded-2xl overflow-hidden shadow-xl text-white select-none"
       style={{
-        background: "linear-gradient(135deg, #292A83 0%, #435BA1 60%, #F5C6B6 150%)",
+        background: "linear-gradient(135deg, #0B1437 0%, #142150 60%, #F2715A 150%)",
         minHeight: 200,
       }}
     >
@@ -109,7 +109,7 @@ function InsuranceCard({ member }: { member: Member }) {
               <Shield size={18} className="text-white" />
             </div>
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-white/70">Avenue Healthcare</p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-white/70">Medvex</p>
               <p className="text-xs font-bold text-white">{member.package.name}</p>
             </div>
           </div>
@@ -147,7 +147,7 @@ function InsuranceCard({ member }: { member: Member }) {
               value={member.memberNumber}
               size={72}
               bgColor="#ffffff"
-              fgColor="#292A83"
+              fgColor="#0B1437"
               level="M"
             />
           </div>

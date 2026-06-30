@@ -15,7 +15,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     marginBottom: 20,
   },
-  brand: { fontSize: 24, fontWeight: "bold", color: "#292A83" },
+  brand: { fontSize: 24, fontWeight: "bold", color: "#0B1437" },
   date: { fontSize: 10, color: "#6C757D", marginTop: 8 },
   title: { fontSize: 18, fontWeight: "bold", color: "#333333", marginBottom: 15 },
   card: {
@@ -25,7 +25,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   label: { fontSize: 10, color: "#6C757D", textTransform: "uppercase", marginBottom: 5 },
-  value: { fontSize: 24, color: "#292A83", fontWeight: "bold" },
+  value: { fontSize: 24, color: "#0B1437", fontWeight: "bold" },
   footer: {
     position: "absolute",
     bottom: 30,
@@ -45,7 +45,7 @@ export const ReportDocument = ({ title, data }: { title: string, data: ReportPdf
     <Page size="A4" style={styles.page}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.brand}>Avenue Healthcare</Text>
+          <Text style={styles.brand}>Medvex</Text>
           <Text style={styles.date}>Generated on {new Date().toLocaleDateString()}</Text>
         </View>
       </View>

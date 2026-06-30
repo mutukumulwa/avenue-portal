@@ -8,7 +8,7 @@ import { CardManagementPanel } from "./CardManagementPanel";
 const CARD_STATUS_STYLE: Record<string, string> = {
   PENDING_ISSUANCE: "bg-[#FFC107]/10 text-[#856404]",
   ISSUED:     "bg-[#17A2B8]/10 text-[#17A2B8]",
-  DISPATCHED: "bg-[#292A83]/10 text-[#292A83]",
+  DISPATCHED: "bg-[#0B1437]/10 text-[#0B1437]",
   DELIVERED:  "bg-[#28A745]/10 text-[#28A745]",
   ACTIVATED:  "bg-[#28A745]/10 text-[#28A745]",
   LOST:       "bg-[#DC3545]/10 text-[#DC3545]",

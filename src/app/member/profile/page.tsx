@@ -85,7 +85,7 @@ export default async function MemberProfilePage() {
           <h2 className="font-bold text-avenue-text-heading font-heading">Contact Details</h2>
         </div>
         <p className="text-xs text-avenue-text-muted">
-          You can update your phone number and email. Name, DOB, and membership details require Avenue&apos;s approval — contact support to request changes.
+          You can update your phone number and email. Name, DOB, and membership details require Medvex&apos;s approval — contact support to request changes.
         </p>
         <ProfileForm member={member} />
       </div>

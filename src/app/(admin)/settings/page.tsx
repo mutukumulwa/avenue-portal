@@ -34,10 +34,10 @@ export default async function SettingsPage() {
 
   const roleColor = (role: string) => {
     switch (role) {
-      case "SUPER_ADMIN": return "bg-[#292A83]/10 text-[#292A83]";
+      case "SUPER_ADMIN": return "bg-[#0B1437]/10 text-[#0B1437]";
       case "CLAIMS_OFFICER": return "bg-[#17A2B8]/10 text-[#17A2B8]";
       case "FINANCE_OFFICER": return "bg-[#28A745]/10 text-[#28A745]";
-      case "MEDICAL_OFFICER": return "bg-[#F5C6B6]/50 text-[#a0522d]";
+      case "MEDICAL_OFFICER": return "bg-[#F2715A]/50 text-[#C04A39]";
       case "BROKER_USER": return "bg-[#FFC107]/10 text-[#856404]";
       default: return "bg-[#6C757D]/10 text-[#6C757D]";
     }

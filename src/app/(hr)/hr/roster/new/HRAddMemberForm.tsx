@@ -20,7 +20,7 @@ export function HRAddMemberForm() {
         </div>
         <h2 className="text-xl font-bold text-avenue-text-heading font-heading mb-2">Request Submitted</h2>
         <p className="text-sm text-avenue-text-body mb-6">
-          Your endorsement request <strong>{state.endorsementNumber}</strong> has been successfully submitted to Avenue Healthcare for processing.
+          Your endorsement request <strong>{state.endorsementNumber}</strong> has been successfully submitted to Medvex for processing.
         </p>
         <Link 
           href="/hr/endorsements" 

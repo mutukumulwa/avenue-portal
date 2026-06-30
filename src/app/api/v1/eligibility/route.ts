@@ -28,7 +28,7 @@ async function getEligibility(req: Request) {
 
     // Slade360 SMART interface shape
     const responseSchema = {
-      payer: "Avenue Healthcare",
+      payer: "Medvex",
       member: {
         firstName: member.firstName,
         lastName: member.lastName,

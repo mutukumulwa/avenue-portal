@@ -1,42 +1,36 @@
 import type { Metadata, Viewport } from "next";
-import { Quicksand, Lato, Roboto } from "next/font/google";
+import { Sora, Hanken_Grotesk } from "next/font/google";
 import { PWARegister } from "@/components/PWARegister";
 import "./globals.css";
 
-const quicksand = Quicksand({
+const sora = Sora({
   subsets: ["latin"],
-  variable: "--font-quicksand",
-  weight: ["700"],
+  variable: "--font-sora",
+  weight: ["400", "600", "700", "800"],
 });
 
-const lato = Lato({
+const hanken = Hanken_Grotesk({
   subsets: ["latin"],
-  variable: "--font-lato",
-  weight: ["400", "700"],
-});
-
-const roboto = Roboto({
-  subsets: ["latin"],
-  variable: "--font-roboto",
-  weight: ["400", "500", "700"],
+  variable: "--font-hanken",
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
-  applicationName: "Avenue Health",
+  applicationName: "Medvex",
   title: {
-    default: "AiCare Platform - Avenue Healthcare",
-    template: "%s | Avenue Health",
+    default: "Medvex — Health Administration Platform",
+    template: "%s | Medvex",
   },
-  description: "Next-generation health membership platform",
+  description: "Third-party health benefits administration for Uganda",
   manifest: "/manifest.webmanifest",
   icons: {
-    icon: "/icons/avenue-icon.svg",
-    apple: "/icons/avenue-icon.svg",
+    icon: "/icons/medvex-icon.svg",
+    apple: "/icons/medvex-icon.svg",
   },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Avenue Health",
+    title: "Medvex",
   },
   formatDetection: {
     telephone: false,
@@ -47,7 +41,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#292A83",
+  themeColor: "#000523",
 };
 
 export default function RootLayout({
@@ -58,7 +52,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${quicksand.variable} ${lato.variable} ${roboto.variable}`}
+      className={`${sora.variable} ${hanken.variable}`}
     >
       <body className="antialiased min-h-screen bg-avenue-bg text-avenue-text-body font-body">
         {children}

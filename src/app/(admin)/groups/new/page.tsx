@@ -32,8 +32,8 @@ export default async function GroupEnrollmentHero({
           <ArrowLeft size={24} />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-['Quicksand']">Enroll Corporate Group</h1>
-          <p className="text-[#848E9F] font-['Lato'] mt-1">Register a new client organization.</p>
+          <h1 className="text-2xl font-bold text-avenue-text-heading font-['Sora']">Enroll Corporate Group</h1>
+          <p className="text-[#848E9F] font-['Hanken_Grotesk'] mt-1">Register a new client organization.</p>
         </div>
       </div>
 
@@ -41,47 +41,47 @@ export default async function GroupEnrollmentHero({
         <form action={enrollGroupAction} className="space-y-6">
           
           <div className="border-b border-[#EEEEEE] pb-6 space-y-4">
-             <h3 className="text-lg font-bold text-avenue-text-heading font-['Quicksand']">Organization Details</h3>
+             <h3 className="text-lg font-bold text-avenue-text-heading font-['Sora']">Organization Details</h3>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-avenue-text-heading">Company Name</label>
-                  <input required name="name" type="text" className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-[#292A83] transition-colors" placeholder="e.g. Acme Corp" />
+                  <input required name="name" type="text" className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-[#0B1437] transition-colors" placeholder="e.g. Acme Corp" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-avenue-text-heading">Industry</label>
-                  <input name="industry" type="text" className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-[#292A83] transition-colors" placeholder="e.g. Technology" />
+                  <input name="industry" type="text" className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-[#0B1437] transition-colors" placeholder="e.g. Technology" />
                 </div>
                 <div className="space-y-2 md:col-span-2">
                   <label className="text-sm font-semibold text-avenue-text-heading">Business Registration Number (PIN)</label>
-                  <input name="registrationNumber" type="text" className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-[#292A83] transition-colors" placeholder="e.g. P000000000A" />
+                  <input name="registrationNumber" type="text" className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-[#0B1437] transition-colors" placeholder="e.g. P000000000A" />
                 </div>
              </div>
           </div>
 
           <div className="border-b border-[#EEEEEE] pb-6 space-y-4">
-             <h3 className="text-lg font-bold text-avenue-text-heading font-['Quicksand']">Primary Contact Person</h3>
+             <h3 className="text-lg font-bold text-avenue-text-heading font-['Sora']">Primary Contact Person</h3>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2 md:col-span-2">
                   <label className="text-sm font-semibold text-avenue-text-heading">Full Name</label>
-                  <input required name="contactPersonName" type="text" className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-[#292A83] transition-colors" placeholder="Jane Doe" />
+                  <input required name="contactPersonName" type="text" className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-[#0B1437] transition-colors" placeholder="Jane Doe" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-avenue-text-heading">Phone Number</label>
-                  <input required name="contactPersonPhone" type="text" className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-[#292A83] transition-colors" placeholder="+254 700 000000" />
+                  <input required name="contactPersonPhone" type="text" className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-[#0B1437] transition-colors" placeholder="+254 700 000000" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-avenue-text-heading">Email Address</label>
-                  <input required name="contactPersonEmail" type="email" className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-[#292A83] transition-colors" placeholder="jane.doe@example.com" />
+                  <input required name="contactPersonEmail" type="email" className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-[#0B1437] transition-colors" placeholder="jane.doe@example.com" />
                 </div>
              </div>
           </div>
 
           <div className="space-y-4">
-             <h3 className="text-lg font-bold text-avenue-text-heading font-['Quicksand']">Coverage Details</h3>
+             <h3 className="text-lg font-bold text-avenue-text-heading font-['Sora']">Coverage Details</h3>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-[#F8F9FA] p-4 rounded-lg border border-[#EEEEEE]">
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-avenue-text-heading">Select Package</label>
-                  <select required name="packageId" className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-[#292A83] transition-colors">
+                  <select required name="packageId" className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-[#0B1437] transition-colors">
                     {packages.map((pkg) => (
                        <option key={pkg.id} value={pkg.id}>{pkg.name} (Max KES {Number(pkg.annualLimit).toLocaleString()})</option>
                     ))}
@@ -90,7 +90,7 @@ export default async function GroupEnrollmentHero({
                 
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-avenue-text-heading">Effective Start Date</label>
-                  <input required name="effectiveDate" type="date" className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-[#292A83] transition-colors" />
+                  <input required name="effectiveDate" type="date" className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-[#0B1437] transition-colors" />
                 </div>
              </div>
           </div>

@@ -91,7 +91,7 @@ export function MemberInstallPrompt() {
           {installEvent ? <Download className="h-5 w-5" /> : <Share className="h-5 w-5" />}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="font-heading font-bold text-avenue-text-heading">Add Avenue Health to your home screen</p>
+          <p className="font-heading font-bold text-avenue-text-heading">Add Medvex to your home screen</p>
           <p className="mt-1 text-sm leading-relaxed text-avenue-text-muted">
             {installEvent
               ? "Install the member portal for faster access from your phone."

@@ -13,7 +13,7 @@ export function normalizeChannelPhone(phone: string) {
 }
 
 export function lowBandwidthSafeFallback() {
-  return "We could not verify your member profile. Please contact Avenue support or use the member portal.";
+  return "We could not verify your member profile. Please contact Medvex support or use the member portal.";
 }
 
 export function formatKes(value: number) {

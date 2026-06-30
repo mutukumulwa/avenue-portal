@@ -5,7 +5,7 @@ import { submitComplaintAction } from "./actions";
 import { CheckCircle } from "lucide-react";
 
 const COMPLAINT_TYPES = [
-  { value: "SERVICE",   label: "Avenue Service" },
+  { value: "SERVICE",   label: "Medvex Service" },
   { value: "FACILITY",  label: "Network Facility" },
   { value: "BILLING",   label: "Billing / Invoice Dispute" },
   { value: "CLINICAL",  label: "Clinical Care" },

@@ -507,7 +507,7 @@ export const quotationBuilderService = {
       quoteNumber: quotation.quoteNumber,
       issuedDate: new Date().toLocaleDateString("en-KE"),
       validUntil: quotation.validUntil ? new Date(quotation.validUntil).toLocaleDateString("en-KE") : "—",
-      tenantName: tenant?.name ?? "Avenue Healthcare",
+      tenantName: tenant?.name ?? "Medvex",
       tenantLogoUrl: tenant?.logoUrl ?? undefined,
       clientName: quotation.legalName ?? quotation.prospectName ?? "—",
       clientType: quotation.clientType ?? "CORPORATE",

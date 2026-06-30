@@ -1611,7 +1611,7 @@ export default async function ReportDetailPage({
           <div>
             <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">{title}</h1>
             <p className="text-avenue-text-body text-sm mt-0.5">
-              Avenue Healthcare · {data.length} record{data.length !== 1 ? "s" : ""}
+              Medvex · {data.length} record{data.length !== 1 ? "s" : ""}
             </p>
           </div>
         </div>

@@ -27,7 +27,7 @@ export async function GET(req: Request) {
       prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true } }),
     ]);
 
-    const html = renderBoardPackHtml({ ...packData, tenantName: tenant?.name ?? "Avenue Healthcare" });
+    const html = renderBoardPackHtml({ ...packData, tenantName: tenant?.name ?? "Medvex" });
     const pdf  = await pdfService.renderToPdf(html, { format: "A4" });
 
     const filename = `board-pack-${packData.period}.pdf`;

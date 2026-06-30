@@ -7,7 +7,7 @@ type DashboardChartsProps = {
   relationshipData: { name: string; value: number }[];
 };
 
-const COLORS = ["#292A83", "#435BA1", "#F5C6B6", "#848E9F"];
+const COLORS = ["#0B1437", "#06B9AB", "#F2715A", "#5A6B7B"];
 
 export function DashboardCharts({ memberTrendData, relationshipData }: DashboardChartsProps) {
   return (
@@ -24,7 +24,7 @@ export function DashboardCharts({ memberTrendData, relationshipData }: Dashboard
                 cursor={{ fill: "#F8F9FA" }} 
                 contentStyle={{ borderRadius: '8px', border: '1px solid #EEEEEE', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
               />
-              <Bar dataKey="count" fill="#292A83" radius={[4, 4, 0, 0]} barSize={32} />
+              <Bar dataKey="count" fill="#0B1437" radius={[4, 4, 0, 0]} barSize={32} />
             </BarChart>
           </ResponsiveContainer>
         </div>

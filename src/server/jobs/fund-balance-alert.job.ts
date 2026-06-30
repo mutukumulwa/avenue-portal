@@ -40,7 +40,7 @@ export async function runFundBalanceAlertJob() {
       await NotificationService.executeEmailDispatch({
         to:      admin.email,
         subject: `⚠ Low Fund Balance — ${acc.group.name}`,
-        body: `Hi ${admin.firstName},\n\nThe self-funded account for ${acc.group.name} has dropped below its minimum balance threshold.\n\nCurrent balance: KES ${balance.toLocaleString()}\nMinimum balance: KES ${minimum.toLocaleString()}\nShortfall: KES ${(minimum - balance).toLocaleString()}\n\nPlease arrange a top-up to avoid disruption to member claims.\n\nLog in to the Fund Admin portal to record a deposit:\nhttps://avenue.co.ke/fund/${acc.groupId}\n\nAvenue Healthcare`,
+        body: `Hi ${admin.firstName},\n\nThe self-funded account for ${acc.group.name} has dropped below its minimum balance threshold.\n\nCurrent balance: KES ${balance.toLocaleString()}\nMinimum balance: KES ${minimum.toLocaleString()}\nShortfall: KES ${(minimum - balance).toLocaleString()}\n\nPlease arrange a top-up to avoid disruption to member claims.\n\nLog in to the Fund Admin portal to record a deposit:\nhttps://medvex.co.ug/fund/${acc.groupId}\n\nMedvex`,
       });
       alerted++;
     }

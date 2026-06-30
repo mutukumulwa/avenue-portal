@@ -1,5 +1,5 @@
 // ─── MONTHLY BOARD PACK PDF TEMPLATE ─────────────────────────────────────────
-// Rendered by Puppeteer. Brand: Quicksand headings, Lato body, indigo (#292A83).
+// Rendered by Puppeteer. Brand: Sora headings, Hanken Grotesk body, indigo (#0B1437).
 
 export interface BoardPackData {
   period: string;         // e.g. "2026-04"
@@ -56,25 +56,25 @@ export function renderBoardPackHtml(data: BoardPackData): string {
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@600;700&family=Lato:wght@400;700&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Hanken+Grotesk:wght@400;700&display=swap" rel="stylesheet" />
 <title>Board Pack — ${data.period}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: 'Lato', sans-serif; color: #1a1a2e; font-size: 12px; line-height: 1.5; }
-  h1,h2,h3 { font-family: 'Quicksand', sans-serif; }
+  body { font-family: 'Hanken Grotesk', sans-serif; color: #1a1a2e; font-size: 12px; line-height: 1.5; }
+  h1,h2,h3 { font-family: 'Sora', sans-serif; }
   .page-break { page-break-before: always; }
-  .header { background: #292A83; color: white; padding: 24px 32px; }
+  .header { background: #0B1437; color: white; padding: 24px 32px; }
   .header h1 { font-size: 24px; font-weight: 700; }
   .header .sub { font-size: 13px; opacity: 0.8; margin-top: 4px; }
   .body { padding: 28px 32px; }
   .section { margin-bottom: 28px; }
-  .section-title { font-family:'Quicksand',sans-serif; font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:#292A83; margin-bottom:10px; padding-bottom:4px; border-bottom:2px solid #292A83; }
+  .section-title { font-family:'Sora',sans-serif; font-size:11px; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:#0B1437; margin-bottom:10px; padding-bottom:4px; border-bottom:2px solid #0B1437; }
   .kpi-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px; }
   .kpi { border:1px solid #eee; border-radius:6px; padding:14px; }
   .kpi .label { font-size:10px; color:#6C757D; font-weight:700; text-transform:uppercase; }
-  .kpi .value { font-size:20px; font-weight:700; font-family:'Quicksand',sans-serif; margin-top:4px; }
+  .kpi .value { font-size:20px; font-weight:700; font-family:'Sora',sans-serif; margin-top:4px; }
   table { width:100%; border-collapse:collapse; font-size:12px; }
-  thead th { background:#E6E7E8; padding:7px 10px; text-align:left; font-family:'Quicksand',sans-serif; font-size:10px; font-weight:700; text-transform:uppercase; color:#292A83; }
+  thead th { background:#E6E7E8; padding:7px 10px; text-align:left; font-family:'Sora',sans-serif; font-size:10px; font-weight:700; text-transform:uppercase; color:#0B1437; }
   thead th:last-child,thead th:nth-child(n+2) { text-align:right; }
   .footer { padding: 16px 32px; border-top:1px solid #eee; font-size:10px; color:#6C757D; display:flex; justify-content:space-between; }
   .compliance-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
@@ -105,7 +105,7 @@ export function renderBoardPackHtml(data: BoardPackData): string {
       </div>
       <div class="kpi">
         <div class="label">Contribution YTD</div>
-        <div class="value" style="color:#292A83">${fmt(data.portfolio.contributionYtd)}</div>
+        <div class="value" style="color:#0B1437">${fmt(data.portfolio.contributionYtd)}</div>
       </div>
       <div class="kpi">
         <div class="label">New Members</div>
@@ -147,7 +147,7 @@ export function renderBoardPackHtml(data: BoardPackData): string {
     <div class="compliance-grid">
       <div class="kpi">
         <div class="label">Override Requests</div>
-        <div class="value" style="color:${data.compliance.overrideCount > 20 ? "#DC3545" : "#292A83"}">${data.compliance.overrideCount}</div>
+        <div class="value" style="color:${data.compliance.overrideCount > 20 ? "#DC3545" : "#0B1437"}">${data.compliance.overrideCount}</div>
       </div>
       <div class="kpi">
         <div class="label">Fraud Alerts</div>

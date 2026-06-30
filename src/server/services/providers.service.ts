@@ -258,7 +258,7 @@ export class ProvidersService {
           confidence: tariff ? "TARIFF" : "FALLBACK",
           explanation: tariff
             ? "Based on this facility's active contracted tariff."
-            : "Estimated from Avenue's default demo rate because no active tariff was found for this facility.",
+            : "Estimated from Medvex's default demo rate because no active tariff was found for this facility.",
         },
       };
     });

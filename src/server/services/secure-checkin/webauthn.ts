@@ -34,7 +34,7 @@ function getOrigin() {
 }
 
 function getRpName() {
-  return process.env.WEBAUTHN_RP_NAME ?? "Avenue Health";
+  return process.env.WEBAUTHN_RP_NAME ?? "Medvex";
 }
 
 function toBase64Url(value: Uint8Array) {

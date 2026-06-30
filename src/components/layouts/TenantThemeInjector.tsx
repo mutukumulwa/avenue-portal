@@ -35,21 +35,21 @@ export async function TenantThemeInjector({ tenantId }: { tenantId: string }) {
   // Only inject non-default values to avoid redundant CSS
   const vars: string[] = [];
 
-  if (tenant.primaryColor && tenant.primaryColor !== "#292A83") {
+  if (tenant.primaryColor && tenant.primaryColor !== "#000523") {
     vars.push(`  --color-avenue-indigo: ${tenant.primaryColor};`);
     // Derive a slightly lighter secondary tone if nothing explicit
     vars.push(`  --color-avenue-secondary: ${tenant.accentColor || tenant.primaryColor};`);
   }
-  if (tenant.accentColor && tenant.accentColor !== "#435BA1") {
+  if (tenant.accentColor && tenant.accentColor !== "#06B9AB") {
     vars.push(`  --color-avenue-indigo-hover: ${tenant.accentColor};`);
   }
-  if (tenant.warmColor && tenant.warmColor !== "#F5C6B6") {
+  if (tenant.warmColor && tenant.warmColor !== "#F2715A") {
     vars.push(`  --color-avenue-pink: ${tenant.warmColor};`);
   }
-  if (tenant.fontHeading && tenant.fontHeading !== "Quicksand") {
+  if (tenant.fontHeading && tenant.fontHeading !== "Sora") {
     vars.push(`  --font-heading: "${tenant.fontHeading}", sans-serif;`);
   }
-  if (tenant.fontBody && tenant.fontBody !== "Lato") {
+  if (tenant.fontBody && tenant.fontBody !== "Hanken Grotesk") {
     vars.push(`  --font-body: "${tenant.fontBody}", sans-serif;`);
   }
 

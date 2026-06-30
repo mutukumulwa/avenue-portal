@@ -3,8 +3,8 @@ const RUNTIME_CACHE = "aicare-member-runtime-v1";
 
 const SHELL_ASSETS = [
   "/manifest.webmanifest",
-  "/icons/avenue-icon.svg",
-  "/icons/avenue-maskable.svg",
+  "/icons/medvex-icon.svg",
+  "/icons/medvex-maskable.svg",
   "/login",
 ];
 

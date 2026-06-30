@@ -37,7 +37,7 @@ export function ProfileForm({ member }: { member: Member }) {
             disabled
             className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2.5 text-sm bg-[#F8F9FA] text-avenue-text-muted cursor-not-allowed"
           />
-          <p className="text-[10px] text-avenue-text-muted mt-1">Contact Avenue to change your name.</p>
+          <p className="text-[10px] text-avenue-text-muted mt-1">Contact Medvex to change your name.</p>
         </div>
         <div>
           <label className="block text-xs font-bold text-avenue-text-muted uppercase mb-1">Last Name</label>

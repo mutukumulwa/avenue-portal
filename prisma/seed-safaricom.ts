@@ -32,7 +32,7 @@ async function main() {
   console.log("🌱 Safaricom top-up seed starting…");
 
   // ── 1. Resolve tenant & Safaricom group ─────────────────────────────────────
-  const tenant = await prisma.tenant.findFirstOrThrow({ where: { slug: "avenue" } });
+  const tenant = await prisma.tenant.findFirstOrThrow({ where: { slug: "medvex" } });
   const tenantId = tenant.id;
 
   const safaricom = await prisma.group.findFirstOrThrow({
@@ -50,12 +50,12 @@ async function main() {
   const staffTier = tiers[2];
 
   // ── 3. Resolve packages ───────────────────────────────────────────────────────
-  const execPkg    = await prisma.packageVersion.findFirstOrThrow({ where: { package: { name: "Avenue Executive" } }, include: { package: true } });
-  const premierPkg = await prisma.packageVersion.findFirstOrThrow({ where: { package: { name: "Avenue Premier"   } }, include: { package: true } });
-  const essentialPkg = await prisma.packageVersion.findFirstOrThrow({ where: { package: { name: "Avenue Essential" } }, include: { package: true } });
+  const execPkg    = await prisma.packageVersion.findFirstOrThrow({ where: { package: { name: "Medvex Executive" } }, include: { package: true } });
+  const premierPkg = await prisma.packageVersion.findFirstOrThrow({ where: { package: { name: "Medvex Premier"   } }, include: { package: true } });
+  const essentialPkg = await prisma.packageVersion.findFirstOrThrow({ where: { package: { name: "Medvex Essential" } }, include: { package: true } });
 
   // ── 4. HR_MANAGER user ────────────────────────────────────────────────────────
-  const pw = await bcrypt.hash("AvenueAdmin2024!", 10);
+  const pw = await bcrypt.hash("MedvexAdmin2024!", 10);
 
   const existing = await prisma.user.findFirst({
     where: { tenantId, email: "emily.wambui@safaricom.co.ke" },
@@ -422,7 +422,7 @@ async function main() {
   }
 
   console.log("\n🎉 Safaricom top-up complete!");
-  console.log("   HR Login: emily.wambui@safaricom.co.ke / AvenueAdmin2024!");
+  console.log("   HR Login: emily.wambui@safaricom.co.ke / MedvexAdmin2024!");
 }
 
 main()

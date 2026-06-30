@@ -79,18 +79,18 @@ function renderSummary(imported: ImportedClaim[], errors: ImportError[]) {
         <style>
           body { font-family: Arial, sans-serif; margin: 32px; color: #212529; background: #f8f9fa; }
           main { max-width: 1100px; margin: 0 auto; background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 24px; }
-          h1 { margin: 0 0 8px; color: #292A83; }
+          h1 { margin: 0 0 8px; color: #0B1437; }
           .summary { display: flex; gap: 16px; margin: 20px 0; }
           .pill { border: 1px solid #eee; border-radius: 8px; padding: 12px 16px; min-width: 160px; }
           .count { font-size: 28px; font-weight: 700; }
           table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
           th, td { border-bottom: 1px solid #eee; text-align: left; padding: 10px; vertical-align: top; }
-          th { background: #e6e7e8; color: #6c757d; font-size: 12px; text-transform: uppercase; }
+          th { background: #eef2f4; color: #6c757d; font-size: 12px; text-transform: uppercase; }
           .num { text-align: right; font-variant-numeric: tabular-nums; }
-          a { color: #292A83; font-weight: 700; text-decoration: none; }
+          a { color: #058a80; font-weight: 700; text-decoration: none; }
           .actions { margin-top: 24px; display: flex; gap: 12px; }
-          .button { display: inline-block; border-radius: 999px; padding: 10px 16px; background: #292A83; color: #fff; }
-          .secondary { background: #fff; color: #292A83; border: 1px solid #292A83; }
+          .button { display: inline-block; border-radius: 999px; padding: 10px 16px; background: #0B1437; color: #fff; }
+          .secondary { background: #fff; color: #0B1437; border: 1px solid #0B1437; }
         </style>
       </head>
       <body>

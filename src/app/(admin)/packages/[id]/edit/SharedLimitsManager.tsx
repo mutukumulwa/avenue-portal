@@ -69,7 +69,7 @@ export function SharedLimitsManager({
           type="button"
           onClick={() => { setAdding(true); setForm(initialForm); }}
           disabled={adding || availableBenefits.length < 2}
-          className="text-xs bg-[#292A83]/10 text-avenue-indigo px-3 py-1.5 rounded flex items-center gap-1 font-bold disabled:opacity-50"
+          className="text-xs bg-[#0B1437]/10 text-avenue-indigo px-3 py-1.5 rounded flex items-center gap-1 font-bold disabled:opacity-50"
         >
           <Plus size={14} /> Add Shared Limit
         </button>

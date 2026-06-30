@@ -203,7 +203,7 @@ export function AdminSidebar({ userRole }: { userRole: UserRole | null }) {
           <div className="h-8 w-8 bg-avenue-indigo rounded-full shrink-0" />
           <span className="text-lg font-bold font-heading text-avenue-indigo leading-tight" style={{ letterSpacing: 0 }}>
             AiCare<br />
-            <span className="text-xs font-semibold text-avenue-text-muted font-body">Avenue Healthcare</span>
+            <span className="text-xs font-semibold text-avenue-text-muted font-body">Medvex</span>
           </span>
         </Link>
 

@@ -27,7 +27,7 @@ function formatMoney(value: number) {
 }
 
 function tierLabel(tier: string) {
-  if (tier === "OWN") return "Avenue facility";
+  if (tier === "OWN") return "Medvex facility";
   if (tier === "PARTNER") return "Partner facility";
   return "Panel facility";
 }
@@ -108,7 +108,7 @@ export function FacilitiesMap() {
               className="w-full rounded-[8px] border border-[#EEEEEE] bg-white px-3 py-2 text-sm outline-none focus:border-avenue-indigo"
             >
               <option value="ALL">All active facilities</option>
-              <option value="OWN">Avenue facilities</option>
+              <option value="OWN">Medvex facilities</option>
               <option value="PARTNER">Partner facilities</option>
               <option value="PANEL">Panel facilities</option>
             </select>

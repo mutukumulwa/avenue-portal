@@ -53,7 +53,7 @@ export async function runPreauthEscalationJob() {
         await NotificationService.executeEmailDispatch({
           to:      pa.escalatedTo.email,
           subject: `Pre-Auth Escalation — ${pa.preauthNumber} requires your review`,
-          body:    `Hi ${pa.escalatedTo.firstName},\n\nPre-authorization ${pa.preauthNumber} for member ${pa.member.firstName} ${pa.member.lastName} (${pa.member.memberNumber}) at ${pa.provider.name} has been pending for ${Math.round(hoursSinceSubmission)} hours and has been escalated to you for review.\n\nPlease log in to the Avenue Portal to action this request.`,
+          body:    `Hi ${pa.escalatedTo.firstName},\n\nPre-authorization ${pa.preauthNumber} for member ${pa.member.firstName} ${pa.member.lastName} (${pa.member.memberNumber}) at ${pa.provider.name} has been pending for ${Math.round(hoursSinceSubmission)} hours and has been escalated to you for review.\n\nPlease log in to the Medvex Portal to action this request.`,
         });
       }
 

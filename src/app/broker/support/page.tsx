@@ -43,7 +43,7 @@ export default async function BrokerSupportPage(
       <div className="grid gap-4">
         {[
           { icon: Phone, title: "Call Us", desc: "Speak directly to an underwriter or customer service rep.", action: "0800 720 999", href: "tel:0800720999" },
-          { icon: Mail, title: "Email Support", desc: "Send us a query and receive a response within 24 hours.", action: "support@avenue.healthcare", href: "mailto:support@avenue.healthcare" },
+          { icon: Mail, title: "Email Support", desc: "Send us a query and receive a response within 24 hours.", action: "support@medvex.co.ug", href: "mailto:support@medvex.co.ug" },
           { icon: MessageSquare, title: "WhatsApp", desc: "Chat with us on WhatsApp for quick turnaround.", action: "+254 700 000 000", href: "https://wa.me/254700000000" },
         ].map((item) => {
           const Icon = item.icon;

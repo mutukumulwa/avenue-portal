@@ -54,7 +54,7 @@ export class SmsQueryService {
 
       const result = await MemberAppService.getLowBandwidthProvidersByArea({ phone, area, tenantSlug: input.tenantSlug });
       await logLowBandwidthLookup({ tenantId: snapshot.tenantId, memberId: snapshot.memberId, channel: "SMS", action: "PROVIDER_SEARCH", phone, metadata: { area } });
-      if (!result || result.providers.length === 0) return `AiCare: No active providers found for ${area}. Call Avenue support for help.`;
+      if (!result || result.providers.length === 0) return `AiCare: No active providers found for ${area}. Call Medvex support for help.`;
       return `AiCare providers near ${area}: ${result.providers.map((provider) => `${provider.name}${provider.phone ? ` ${provider.phone}` : ""}`).join("; ")}`;
     }
 

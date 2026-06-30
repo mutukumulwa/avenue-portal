@@ -897,7 +897,7 @@ export async function GET(
   }
 
   const csv = buildCsv(result.headers, result.rows);
-  const filename = `avenue-${reportType}-${new Date().toISOString().split("T")[0]}.csv`;
+  const filename = `medvex-${reportType}-${new Date().toISOString().split("T")[0]}.csv`;
 
   return new Response(csv, {
     status: 200,

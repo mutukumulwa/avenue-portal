@@ -26,7 +26,7 @@ async function generateBoardPackAction(formData: FormData) {
     prisma.tenant.findUnique({ where: { id: tenantId }, select: { name: true } }),
   ]);
 
-  const html = renderBoardPackHtml({ ...packData, tenantName: tenant?.name ?? "Avenue Healthcare" });
+  const html = renderBoardPackHtml({ ...packData, tenantName: tenant?.name ?? "Medvex" });
   const pdf  = await pdfService.renderToPdf(html, { format: "A4" });
 
   // Log the generation to ActivityLog
@@ -124,7 +124,7 @@ export default async function BoardPackPage({
           </button>
         </form>
         <p className="text-xs text-avenue-text-muted">
-          The PDF is rendered server-side using Puppeteer and includes Avenue&apos;s brand identity. Generation takes approximately 3–5 seconds.
+          The PDF is rendered server-side using Puppeteer and includes Medvex&apos;s brand identity. Generation takes approximately 3–5 seconds.
         </p>
       </div>
 

@@ -29,7 +29,7 @@ export default async function ProvidersPage() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Avenue Own",        count: providers.filter(p => p.tier === "OWN").length,     color: "text-avenue-indigo" },
+          { label: "Medvex Own",        count: providers.filter(p => p.tier === "OWN").length,     color: "text-avenue-indigo" },
           { label: "Partner Facilities", count: providers.filter(p => p.tier === "PARTNER").length, color: "text-[#28A745]"    },
           { label: "Panel Providers",   count: providers.filter(p => p.tier === "PANEL").length,   color: "text-[#17A2B8]"    },
         ].map(s => (

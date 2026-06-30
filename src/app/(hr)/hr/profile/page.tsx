@@ -43,7 +43,7 @@ export default async function HRProfilePage() {
               </h3>
               <p className="text-sm mt-1">
                  {isExpired 
-                    ? `Your coverage expired on ${new Date(group.renewalDate).toLocaleDateString()}. Please contact Avenue Healthcare immediately.` 
+                    ? `Your coverage expired on ${new Date(group.renewalDate).toLocaleDateString()}. Please contact Medvex immediately.` 
                     : `Your coverage is due for renewal in ${daysToRenewal} days (on ${new Date(group.renewalDate).toLocaleDateString()}). Please submit your renewal endorsement.`}
               </p>
            </div>

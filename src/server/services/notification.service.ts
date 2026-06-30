@@ -27,7 +27,7 @@ export class NotificationService {
    */
   static async executeEmailDispatch(payload: { to: string; subject: string; body: string; html?: string; correspondenceId?: string }) {
     await transporter.sendMail({
-      from: process.env.EMAIL_FROM || '"Avenue Healthcare" <noreply@avenue.co.ke>',
+      from: process.env.EMAIL_FROM || '"Medvex" <noreply@medvex.co.ug>',
       to: payload.to,
       subject: payload.subject,
       text: payload.body,

@@ -46,7 +46,7 @@ export function MemberNav() {
       <div className="max-w-5xl mx-auto px-4 flex items-center justify-between h-14">
         <Link href="/member/dashboard" className="flex items-center space-x-2">
           <div className="h-7 w-7 bg-avenue-indigo rounded-full" />
-          <span className="font-bold font-heading text-avenue-indigo text-lg">Avenue Health</span>
+          <span className="font-bold font-heading text-avenue-indigo text-lg">Medvex</span>
         </Link>
         <div className="hidden md:flex items-center gap-1">
           {NAV_ITEMS.map((item) => {

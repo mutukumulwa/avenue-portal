@@ -18,9 +18,9 @@ const AGE_BANDS = [
 // Hard-coded tiers as fallback — calculator is client-only so we can't hit DB directly.
 // In production, pass packages as props from a parent server component if needed.
 const DEFAULT_PACKAGES = [
-  { id: null, name: "Avenue Essential",  annualLimit: 300000,  ratePerMember: 30000  },
-  { id: null, name: "Avenue Premier",    annualLimit: 750000,  ratePerMember: 75000  },
-  { id: null, name: "Avenue Executive",  annualLimit: 1500000, ratePerMember: 150000 },
+  { id: null, name: "Medvex Essential",  annualLimit: 300000,  ratePerMember: 30000  },
+  { id: null, name: "Medvex Premier",    annualLimit: 750000,  ratePerMember: 75000  },
+  { id: null, name: "Medvex Executive",  annualLimit: 1500000, ratePerMember: 150000 },
 ];
 
 const LOADINGS = [

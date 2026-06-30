@@ -40,7 +40,7 @@ export default async function PricingModelDetailPage({ params }: { params: Promi
 
       <div className="bg-white border border-[#EEEEEE] rounded-lg p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded bg-[#292A83]/10 text-avenue-indigo flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 rounded bg-[#0B1437]/10 text-avenue-indigo flex items-center justify-center shrink-0">
             <FileSpreadsheet size={24} />
           </div>
           <div>

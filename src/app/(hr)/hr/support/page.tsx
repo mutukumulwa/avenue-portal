@@ -39,7 +39,7 @@ export default async function HRSupportPage() {
       <div className="flex justify-between items-center bg-white p-6 rounded-[8px] border border-[#EEEEEE] shadow-sm">
         <div>
           <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Support Desk</h1>
-          <p className="text-avenue-text-body mt-1">Raise service queries directly with Avenue Healthcare Operations.</p>
+          <p className="text-avenue-text-body mt-1">Raise service queries directly with Medvex Operations.</p>
         </div>
         <Link 
           href="/hr/support/new" 
@@ -54,7 +54,7 @@ export default async function HRSupportPage() {
           <div className="text-center py-20">
             <MessageSquareText size={48} className="mx-auto text-avenue-border mb-4" />
             <h3 className="text-lg font-bold text-avenue-text-heading font-heading">No support requests</h3>
-            <p className="text-sm text-avenue-text-muted mt-2">You haven&apos;t opened any queries with Avenue Healthcare yet.</p>
+            <p className="text-sm text-avenue-text-muted mt-2">You haven&apos;t opened any queries with Medvex yet.</p>
           </div>
         ) : (
           <div className="divide-y divide-[#EEEEEE]">
@@ -83,7 +83,7 @@ export default async function HRSupportPage() {
                 {req.response && (
                   <div className="mt-3 bg-[#E6F4EA] border border-[#28A745]/30 rounded p-4 text-sm">
                     <p className="text-[10px] uppercase font-bold text-[#155724] mb-1">
-                      Response from Avenue ({req.respondedBy?.firstName} {req.respondedBy?.lastName})
+                      Response from Medvex ({req.respondedBy?.firstName} {req.respondedBy?.lastName})
                     </p>
                     <p className="text-[#155724] whitespace-pre-wrap">{req.response}</p>
                     <p className="text-[10px] text-[#155724]/70 mt-2">{req.respondedAt ? new Date(req.respondedAt).toLocaleString() : ""}</p>

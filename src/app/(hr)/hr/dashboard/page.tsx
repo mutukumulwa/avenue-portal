@@ -24,7 +24,7 @@ export default async function HRDashboard() {
   if (!groupId) {
     return (
       <div className="p-8 text-center text-avenue-text-muted">
-        <p>No corporate group assigned. Please contact your Avenue administrator.</p>
+        <p>No corporate group assigned. Please contact your Medvex administrator.</p>
       </div>
     );
   }

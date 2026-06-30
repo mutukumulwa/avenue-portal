@@ -131,7 +131,7 @@ export default async function EndorsementReviewPage({ params }: { params: Promis
         {/* Financial impact */}
         {hasFinancialImpact ? (
           <div className="rounded-[8px] p-5 shadow-sm space-y-4 relative overflow-hidden text-white"
-            style={{ backgroundColor: "#292A83" }}>
+            style={{ backgroundColor: "#0B1437" }}>
             <div className="absolute opacity-10 right-[-20px] top-[-20px]">
               <Calculator size={120} />
             </div>

@@ -78,7 +78,7 @@ async function fetchRowsForReport(
 }
 
 function buildReportHtml(title: string, headers: string[], rows: string[][], tenant: string): string {
-  const headerCells = headers.map(h => `<th style="padding:7px 12px;background:#292A83;color:white;text-align:left;font-size:11px;font-family:Quicksand,sans-serif;font-weight:700;letter-spacing:.5px;text-transform:uppercase;">${h}</th>`).join("");
+  const headerCells = headers.map(h => `<th style="padding:7px 12px;background:#0B1437;color:white;text-align:left;font-size:11px;font-family:Sora,sans-serif;font-weight:700;letter-spacing:.5px;text-transform:uppercase;">${h}</th>`).join("");
   const bodyRows = rows.map((row, i) =>
     `<tr style="background:${i % 2 === 0 ? "#fff" : "#f8f9ff"};">${
       row.map(c => `<td style="padding:6px 12px;border-bottom:1px solid #eee;font-size:12px;color:#1a1a2e;">${c}</td>`).join("")
@@ -86,11 +86,11 @@ function buildReportHtml(title: string, headers: string[], rows: string[][], ten
   ).join("");
 
   return `<!DOCTYPE html><html><head>
-<link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@600;700&family=Lato:wght@400;700&display=swap" rel="stylesheet" />
-<style>body{font-family:'Lato',sans-serif;margin:0;padding:0;} table{border-collapse:collapse;width:100%;}</style>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700&family=Hanken+Grotesk:wght@400;700&display=swap" rel="stylesheet" />
+<style>body{font-family:'Hanken Grotesk',sans-serif;margin:0;padding:0;} table{border-collapse:collapse;width:100%;}</style>
 </head><body>
-<div style="background:#292A83;color:white;padding:20px 28px;">
-  <h1 style="font-family:'Quicksand',sans-serif;font-size:20px;font-weight:700;margin:0;">${tenant}</h1>
+<div style="background:#0B1437;color:white;padding:20px 28px;">
+  <h1 style="font-family:'Sora',sans-serif;font-size:20px;font-weight:700;margin:0;">${tenant}</h1>
   <p style="margin:4px 0 0;font-size:13px;opacity:.8;">${title} · Generated ${new Date().toLocaleDateString("en-KE")}</p>
 </div>
 <div style="padding:20px 28px;">
@@ -98,7 +98,7 @@ function buildReportHtml(title: string, headers: string[], rows: string[][], ten
     <thead><tr>${headerCells}</tr></thead>
     <tbody>${bodyRows}</tbody>
   </table>
-  <p style="font-size:10px;color:#6C757D;margin-top:20px;">Avenue Healthcare Membership Platform · Confidential</p>
+  <p style="font-size:10px;color:#6C757D;margin-top:20px;">Medvex Health Administration Platform · Confidential</p>
 </div>
 </body></html>`;
 }
@@ -126,7 +126,7 @@ export async function GET(req: Request) {
   }
 
   // 1. Render to PDF via Puppeteer
-  const html = buildReportHtml(result.title, result.headers, result.rows, tenant?.name ?? "Avenue Healthcare");
+  const html = buildReportHtml(result.title, result.headers, result.rows, tenant?.name ?? "Medvex");
   let pdfBytes = await pdfService.renderToPdf(html, { format: "A4", landscape: result.headers.length > 6 });
 
   // 2. Password protection — pdf-lib does not support native encryption.
@@ -143,7 +143,7 @@ export async function GET(req: Request) {
     // pdfBytes = await qpdf.encrypt(pdfBytes, password, { keyLength: 128, useAes: true });
   }
 
-  const filename = `avenue-${reportType}-${new Date().toISOString().split("T")[0]}${password ? "-protected" : ""}.pdf`;
+  const filename = `medvex-${reportType}-${new Date().toISOString().split("T")[0]}${password ? "-protected" : ""}.pdf`;
 
   return new NextResponse(new Uint8Array(pdfBytes), {
     status: 200,

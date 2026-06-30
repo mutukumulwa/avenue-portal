@@ -65,7 +65,7 @@ export function ProviderEligibilityManager({
           type="button"
           onClick={() => { setAdding(true); }}
           disabled={adding}
-          className="text-xs bg-[#292A83]/10 text-avenue-indigo px-3 py-1.5 rounded flex items-center gap-1 font-bold disabled:opacity-50"
+          className="text-xs bg-[#0B1437]/10 text-avenue-indigo px-3 py-1.5 rounded flex items-center gap-1 font-bold disabled:opacity-50"
         >
           <Plus size={14} /> Add Rule
         </button>

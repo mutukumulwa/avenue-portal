@@ -49,7 +49,7 @@ export default async function PricingModelsPage({
             className="block border border-[#EEEEEE] rounded-lg p-5 bg-white hover:shadow-md hover:border-avenue-indigo/30 transition-all group"
           >
             <div className="flex justify-between items-start mb-3">
-              <div className="w-10 h-10 rounded bg-[#292A83]/10 text-avenue-indigo flex items-center justify-center">
+              <div className="w-10 h-10 rounded bg-[#0B1437]/10 text-avenue-indigo flex items-center justify-center">
                 <FileSpreadsheet size={20} />
               </div>
               <span className={`text-xs px-2 py-1 rounded font-bold ${model.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>

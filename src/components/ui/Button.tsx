@@ -13,7 +13,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = "primary", size = "default", asChild = false, ...props }, ref) => {
     const Comp = asChild ? Slot : "button"
     
-    // Avenue rules: Primary uses pill shape (50px radius), Lato 700
+    // Brand rules: Primary uses pill shape (50px radius), Hanken Grotesk 700
     return (
       <Comp
         className={cn(

@@ -83,7 +83,7 @@ function buildResultsHtml(
       <td style="padding:7px 12px;">
         ${m.matchedInvoiceId ? `
           <button onclick="postPayment('${m.matchedInvoiceId}',${m.statementRow.amount},'${m.statementRow.reference}','${m.statementRow.date}')"
-            style="background:#292A83;color:white;border:none;padding:4px 10px;border-radius:20px;font-size:11px;cursor:pointer;">
+            style="background:#0B1437;color:white;border:none;padding:4px 10px;border-radius:20px;font-size:11px;cursor:pointer;">
             Post
           </button>` : ""}
       </td>
@@ -91,9 +91,9 @@ function buildResultsHtml(
 
   return `<!DOCTYPE html><html><head>
 <title>Reconciliation Results</title>
-<style>body{font-family:Lato,sans-serif;margin:0;padding:24px;color:#1a1a2e;} table{border-collapse:collapse;width:100%;} th{background:#E6E7E8;padding:8px 12px;text-align:left;font-size:11px;text-transform:uppercase;color:#6C757D;}</style>
+<style>body{font-family:'Hanken Grotesk',sans-serif;margin:0;padding:24px;color:#1a1a2e;} table{border-collapse:collapse;width:100%;} th{background:#EEF2F4;padding:8px 12px;text-align:left;font-size:11px;text-transform:uppercase;color:#6C757D;}</style>
 </head><body>
-<div style="background:#292A83;color:white;padding:16px 24px;border-radius:8px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;">
+<div style="background:#0B1437;color:white;padding:16px 24px;border-radius:8px;margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;">
   <div><h1 style="font-size:18px;margin:0;">Reconciliation Results</h1><p style="margin:4px 0 0;font-size:12px;opacity:.8;">${matches.length} transactions parsed</p></div>
   <div style="display:flex;gap:16px;text-align:center;font-size:12px;">
     <div><div style="font-size:22px;font-weight:700;">${summary.exact}</div><div>Exact Matches</div></div>

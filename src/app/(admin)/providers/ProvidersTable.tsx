@@ -17,7 +17,7 @@ interface Provider {
 
 const tierColor = (tier: string) => {
   switch (tier) {
-    case "OWN":     return "bg-[#292A83]/10 text-[#292A83]";
+    case "OWN":     return "bg-[#0B1437]/10 text-[#0B1437]";
     case "PARTNER": return "bg-[#28A745]/10 text-[#28A745]";
     case "PANEL":   return "bg-[#17A2B8]/10 text-[#17A2B8]";
     default:        return "bg-[#6C757D]/10 text-[#6C757D]";

@@ -68,7 +68,7 @@ export class UssdService {
 
       const result = await MemberAppService.getLowBandwidthProvidersByArea({ phone, area, tenantSlug: input.tenantSlug });
       await logLowBandwidthLookup({ tenantId: snapshot.tenantId, memberId: snapshot.memberId, channel: "USSD", action: "PROVIDER_SEARCH", phone, metadata: { area } });
-      if (!result || result.providers.length === 0) return `END No active providers found for ${area}. Call Avenue support for help.`;
+      if (!result || result.providers.length === 0) return `END No active providers found for ${area}. Call Medvex support for help.`;
       return `END Providers near ${area}:\n${result.providers.map((provider) => `${provider.name}${provider.phone ? ` ${provider.phone}` : ""}`).join("\n")}`;
     }
 

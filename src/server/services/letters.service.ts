@@ -23,7 +23,7 @@ function buildLetterBody(
   const firstName = member.firstName;
   switch (type) {
     case "WELCOME":
-      return `Dear ${firstName},\n\nWelcome to ${ctx.tenantName ?? "Avenue Healthcare"} Membership! We are delighted to have you and your family as part of our healthcare community.\n\nYour membership number is <strong>${member.memberNumber}</strong>. Please keep this number safe as you will need it when accessing healthcare services at any of our network facilities.\n\nYour digital membership card is available immediately in the member portal. If you need assistance accessing any covered services, please contact our Member Services team.\n\nWe look forward to supporting your health and wellness journey.`;
+      return `Dear ${firstName},\n\nWelcome to ${ctx.tenantName ?? "Medvex"} Membership! We are delighted to have you and your family as part of our healthcare community.\n\nYour membership number is <strong>${member.memberNumber}</strong>. Please keep this number safe as you will need it when accessing healthcare services at any of our network facilities.\n\nYour digital membership card is available immediately in the member portal. If you need assistance accessing any covered services, please contact our Member Services team.\n\nWe look forward to supporting your health and wellness journey.`;
 
     case "RENEWAL_NOTICE":
       return `Dear ${firstName},\n\nThis letter serves as formal notice that your membership (${member.memberNumber}) is due for renewal on <strong>${ctx.renewalDate ?? "the date indicated above"}</strong>.\n\nTo ensure uninterrupted access to your healthcare benefits, please arrange payment of your renewal contribution before the due date. If you have any questions about your renewal terms or wish to discuss any changes to your cover, please contact your account manager or our Member Services team at your earliest convenience.\n\nFailure to renew by the due date may result in a lapse of cover, after which a re-assessment and waiting period may apply.`;
@@ -75,12 +75,12 @@ export const lettersService = {
 
     const date           = new Date().toLocaleDateString("en-KE", { day: "2-digit", month: "long", year: "numeric" });
     const refNumber      = `LTR-${member.memberNumber}-${Date.now().toString(36).toUpperCase()}`;
-    const body           = buildLetterBody(letterType, member, { tenantName: tenant?.name ?? "Avenue Healthcare", ...context });
+    const body           = buildLetterBody(letterType, member, { tenantName: tenant?.name ?? "Medvex", ...context });
     const generatorUser  = await prisma.user.findUnique({ where: { id: generatedById }, select: { firstName: true, lastName: true } });
 
     const html = renderLetterHtml({
       letterType,
-      tenantName:      tenant?.name ?? "Avenue Healthcare",
+      tenantName:      tenant?.name ?? "Medvex",
       tenantLogoUrl:   tenant?.logoUrl ?? undefined,
       recipientName:   `${member.firstName} ${member.lastName}`,
       memberNumber:    member.memberNumber,

@@ -14,7 +14,7 @@ export default async function NewServiceRequestPage() {
         </Link>
         <div>
           <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Submit Service Request</h1>
-          <p className="text-avenue-text-body font-body mt-1">Need help? Open a query to Avenue&apos;s customer success team.</p>
+          <p className="text-avenue-text-body font-body mt-1">Need help? Open a query to Medvex&apos;s customer success team.</p>
         </div>
       </div>
 

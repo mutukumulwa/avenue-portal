@@ -13,12 +13,12 @@ export default async function PackagesPage() {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-['Quicksand']">Packages</h1>
-          <p className="text-[#848E9F] font-['Lato'] mt-1">Manage benefit packages and configuration limits.</p>
+          <h1 className="text-2xl font-bold text-avenue-text-heading font-['Sora']">Packages</h1>
+          <p className="text-[#848E9F] font-['Hanken_Grotesk'] mt-1">Manage benefit packages and configuration limits.</p>
         </div>
         <Link 
           href="/packages/builder"
-          className="bg-[#292A83] hover:bg-[#435BA1] text-white px-6 py-2 rounded-full font-semibold transition-colors flex items-center space-x-2 shadow-sm"
+          className="bg-[#0B1437] hover:bg-[#142150] text-white px-6 py-2 rounded-full font-semibold transition-colors flex items-center space-x-2 shadow-sm"
         >
           <PlusCircle size={18} />
           <span>New Package</span>
@@ -63,7 +63,7 @@ export default async function PackagesPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <Link href={`/packages/${pkg.id}`} className="text-[#292A83] hover:text-[#435BA1] font-semibold inline-flex items-center gap-1">
+                    <Link href={`/packages/${pkg.id}`} className="text-[#0B1437] hover:text-[#142150] font-semibold inline-flex items-center gap-1">
                       <FileText size={16} /> View
                     </Link>
                   </td>

@@ -43,7 +43,7 @@ export function ClaimsTrendChart({ data }: { data: MonthlyRow[] }) {
               contentStyle={{ borderRadius: 8, border: "1px solid #EEEEEE", fontSize: 12 }}
               formatter={(v: number) => [v, "Claims"]}
             />
-            <Bar dataKey="claims" fill="#292A83" radius={[4, 4, 0, 0]} maxBarSize={40} name="Claims" />
+            <Bar dataKey="claims" fill="#0B1437" radius={[4, 4, 0, 0]} maxBarSize={40} name="Claims" />
           </BarChart>
         </ResponsiveContainer>
       </ClientOnly>
@@ -66,7 +66,7 @@ export function PremiumVsClaimsChart({ data }: { data: MonthlyRow[] }) {
               formatter={(v: number) => [`KES ${Number(v).toLocaleString()}`, ""]}
             />
             <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12 }} />
-            <Line type="monotone" dataKey="billed"   stroke="#292A83" strokeWidth={2} dot={false} name="Billed" />
+            <Line type="monotone" dataKey="billed"   stroke="#0B1437" strokeWidth={2} dot={false} name="Billed" />
             <Line type="monotone" dataKey="approved" stroke="#28A745" strokeWidth={2} dot={false} name="Approved" />
           </LineChart>
         </ResponsiveContainer>

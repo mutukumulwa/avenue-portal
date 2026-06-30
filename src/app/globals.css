@@ -1,30 +1,48 @@
 @import "tailwindcss";
 
 @theme {
-  --color-avenue-indigo: #292a83;
-  --color-avenue-indigo-hover: #435ba1;
-  --color-avenue-pink: #f5c6b6;
+  /* ── Medvex brand identity ──────────────────────────────────
+     Token NAMES are retained as `avenue-*` for now so the ~3,800
+     existing class usages keep working; only the VALUES are
+     repointed to the Medvex palette. The neutral `brand-*` rename
+     is a separate workstream (see §D of the gap-analysis plan).
+     Palette source: "Medvex Design Language" handoff.            */
+
+  /* Primary = Ink navy (buttons, headings, links) */
+  --color-avenue-indigo: #0b1437;
+  --color-avenue-indigo-hover: #142150;
+  /* Secondary = teal-dark signal (hover targets across the app) */
+  --color-avenue-secondary: #058a80;
+  /* Warm = Medvex coral (sparing, human touches) */
+  --color-avenue-pink: #f2715a;
+
+  /* Brand core (available for new Medvex components) */
+  --color-avenue-navy: #000523;
+  --color-avenue-navy-700: #142150;
+  --color-avenue-teal: #06b9ab;
+  --color-avenue-teal-tint: #e4f7f5;
+  --color-avenue-coral: #f2715a;
 
   /* Neutrals */
-  --color-avenue-text-heading: #212529;
-  --color-avenue-text-body: #848e9f;
-  --color-avenue-text-muted: #6c757d;
-  --color-avenue-bg: #ffffff;
-  --color-avenue-bg-alt: #e6e7e8;
-  --color-avenue-border: #eeeeee;
-  --color-avenue-border-subtle: #e7ebef;
-  --color-avenue-divider: #dcdcdc;
+  --color-avenue-text-heading: #0b1437; /* Ink */
+  --color-avenue-text-body: #41505e;
+  --color-avenue-text-muted: #5a6b7b; /* Slate */
+  --color-avenue-bg: #ffffff; /* Surface */
+  --color-avenue-bg-alt: #eef2f4; /* Mist */
+  --color-avenue-border: #e2e8ec;
+  --color-avenue-border-subtle: #e6edf0;
+  --color-avenue-divider: #e1e7ea;
 
-  /* Functional */
-  --color-avenue-success: #28a745;
-  --color-avenue-error: #dc3545;
-  --color-avenue-info: #17a2b8;
+  /* Functional (Medvex status palette) */
+  --color-avenue-success: #0f8a5f; /* Approved */
+  --color-avenue-error: #c04a39; /* Denied */
+  --color-avenue-info: #0b8077; /* In review */
   --color-avenue-whatsapp: #25d366;
 
-  /* Typography */
-  --font-heading: var(--font-quicksand), "Nunito", "Poppins", sans-serif;
-  --font-body: var(--font-lato), "Open Sans", "Helvetica Neue", sans-serif;
-  --font-ui: var(--font-roboto), var(--font-lato), sans-serif;
+  /* Typography — Sora (display) + Hanken Grotesk (body/UI) */
+  --font-heading: var(--font-sora), "Poppins", system-ui, sans-serif;
+  --font-body: var(--font-hanken), "Inter", "Helvetica Neue", sans-serif;
+  --font-ui: var(--font-hanken), system-ui, sans-serif;
 
   /* Radii */
   --radius-pill: 50px;
@@ -32,13 +50,13 @@
 
 :root {
   --background: #ffffff;
-  --foreground: #212529;
+  --foreground: #0b1437;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #ffffff; /* Keep white for now to adhere to medical design */
-    --foreground: #212529;
+    --foreground: #0b1437;
   }
 }
 

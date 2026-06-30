@@ -238,7 +238,7 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
 
         {/* Pricing breakdown */}
         <div className="rounded-[8px] p-5 shadow-sm space-y-4 relative overflow-hidden text-white"
-          style={{ backgroundColor: "#292A83" }}>
+          style={{ backgroundColor: "#0B1437" }}>
           <div className="absolute opacity-10 right-[-20px] top-[-20px]">
             <Calculator size={120} />
           </div>
@@ -275,7 +275,7 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
             ))}
             <div className="border-t border-white/20 pt-2 flex justify-between font-bold text-base">
               <span>Final Premium</span>
-              <span className="text-[#F5C6B6]">{fmt(finalPremium)}</span>
+              <span className="text-[#F2715A]">{fmt(finalPremium)}</span>
             </div>
             <div className="flex justify-between text-xs text-white/60">
               <span>Per member / year</span>

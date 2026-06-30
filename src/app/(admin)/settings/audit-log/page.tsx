@@ -9,8 +9,8 @@ const MODULE_COLOR: Record<string, string> = {
   MEMBERS:      "bg-[#28A745]/10 text-[#28A745]",
   GROUPS:       "bg-[#FFC107]/10 text-[#856404]",
   BILLING:      "bg-[#6C757D]/10 text-[#6C757D]",
-  PROVIDERS:    "bg-[#F5C6B6]/50 text-[#a0522d]",
-  SETTINGS:     "bg-[#292A83]/10 text-[#292A83]",
+  PROVIDERS:    "bg-[#F2715A]/50 text-[#C04A39]",
+  SETTINGS:     "bg-[#0B1437]/10 text-[#0B1437]",
   ENDORSEMENTS: "bg-[#DC3545]/10 text-[#DC3545]",
 };
 

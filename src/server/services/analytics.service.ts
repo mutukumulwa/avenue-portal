@@ -1359,7 +1359,7 @@ export class AnalyticsService {
 
   static async getParityDashboard(tenantId: string) {
     // Internal vs external provider cost comparison (per spec §14)
-    // "Internal" = Avenue's own facilities (ProviderTier.OWN)
+    // "Internal" = Medvex's own facilities (ProviderTier.OWN)
     // "External" = all others
 
     const internalProviders = await prisma.provider.findMany({

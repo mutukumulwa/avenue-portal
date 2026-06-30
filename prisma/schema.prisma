@@ -12,11 +12,11 @@ model Tenant {
   name         String
   slug         String   @unique
   logoUrl      String?
-  primaryColor String   @default("#292A83")
-  accentColor  String   @default("#435BA1")
-  warmColor    String   @default("#F5C6B6")
-  fontHeading  String   @default("Quicksand")
-  fontBody     String   @default("Lato")
+  primaryColor String   @default("#000523")
+  accentColor  String   @default("#06B9AB")
+  warmColor    String   @default("#F2715A")
+  fontHeading  String   @default("Sora")
+  fontBody     String   @default("Hanken Grotesk")
   domain       String?  @unique
   config       Json     @default("{}")
   createdAt    DateTime @default(now())
