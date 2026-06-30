@@ -22,6 +22,25 @@ async function main() {
   })
   console.log(`✅ Tenant: ${tenant.name}`)
   const tenantId = tenant.id
+
+  // ── Default Client (multi-client TPA tenancy, G2.1) ──────────
+  // The operator's directly-administered book. Every seeded scheme is linked
+  // to it (sweep at the end of the seed) so no Group has a null clientId.
+  const defaultClient = await prisma.client.upsert({
+    where:  { operatorTenantId_slug: { operatorTenantId: tenant.id, slug: 'default' } },
+    update: {},
+    create: {
+      id: `cl_${tenant.id}`,
+      operatorTenantId: tenant.id,
+      type: 'INSURER',
+      name: `${tenant.name} — Default Client`,
+      slug: 'default',
+      currency: 'UGX',
+      status: 'ACTIVE',
+    },
+  })
+  console.log(`✅ Default client: ${defaultClient.name}`)
+
   // ═══════════════════════════════════════════════════════════
   // 1b. BENEFIT RIDERS & TAXES
   // ═══════════════════════════════════════════════════════════
@@ -3912,6 +3931,15 @@ async function main() {
   console.log('  • Pre-auth scenarios: auto-approved, human-review, surgical review, declined/exhausted')
   console.log('  • Wallet scenarios: pending callback, confirmed, failed, timed out, partial/deferred')
   console.log('  • Documents and notifications visible in the member portal')
+
+  // ── G2.1: link every seeded scheme to the default client ─────
+  // Idempotent sweep so no Group is left with a null clientId regardless of how
+  // many group.create sites exist above. Mirrors the production backfill.
+  const linked = await prisma.group.updateMany({
+    where: { tenantId: tenant.id, clientId: null },
+    data:  { clientId: defaultClient.id },
+  })
+  console.log(`✅ Linked ${linked.count} scheme(s) to default client`)
 }
 
 main()
