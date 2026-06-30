@@ -4,6 +4,7 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { ClaimsService } from "@/server/services/claims.service";
+import { ApprovalMatrixService } from "@/server/services/approval-matrix.service";
 import { CoContributionService } from "@/server/services/coContribution/coContribution.service";
 import { GLService } from "@/server/services/gl.service";
 import Decimal from "decimal.js";
@@ -34,32 +35,40 @@ export async function adjudicateClaimAction(formData: FormData) {
 
     const approvedAmount = action !== "DECLINED" ? Number(formData.get("approvedAmount") || 0) : 0;
 
-    // ── Approval matrix check ─────────────────────────────────────────────────
+    // ── Approval-matrix engine (G3.1) ─────────────────────────────────────────
+    // Route the claim-payment authorization through the matrix engine: it
+    // resolves the single governing rule (client-scoped, action-typed, amount
+    // band FX-normalised to base) and gates on the first required role. Replaces
+    // the prior ad-hoc band/role check (resolves AICARE_TODO V-02).
     if (action === "APPROVED" || action === "PARTIALLY_APPROVED") {
       const claim = await prisma.claim.findUnique({
         where: { id: claimId, tenantId },
-        select: { billedAmount: true, serviceType: true, benefitCategory: true },
+        select: {
+          serviceType: true,
+          benefitCategory: true,
+          adjudicatorId: true,
+          member: { select: { group: { select: { clientId: true } } } },
+        },
       });
       if (claim) {
-        const matrix = await prisma.approvalMatrix.findFirst({
-          where: {
-            tenantId,
-            isActive: true,
-            OR: [{ serviceType: claim.serviceType }, { serviceType: null }],
-            AND: [
-              { OR: [{ benefitCategory: claim.benefitCategory }, { benefitCategory: null }] },
-              { OR: [{ claimValueMin: null }, { claimValueMin: { lte: approvedAmount } }] },
-              { OR: [{ claimValueMax: null }, { claimValueMax: { gte: approvedAmount } }] },
-            ],
-          },
-          orderBy: { claimValueMin: "desc" }, // most specific rule wins
+        const resolved = await ApprovalMatrixService.resolve(tenantId, {
+          actionType: "CLAIM_PAYMENT",
+          clientId: claim.member?.group?.clientId ?? null,
+          amount: approvedAmount,
+          currency: "UGX",
+          serviceType: claim.serviceType,
+          benefitCategory: claim.benefitCategory,
         });
-        if (matrix) {
-          const roleHierarchy = ["SUPER_ADMIN", "UNDERWRITER", "MEDICAL_OFFICER", "CLAIMS_OFFICER", "FINANCE_OFFICER", "CUSTOMER_SERVICE"];
-          const userIdx   = roleHierarchy.indexOf(session.user.role as string);
-          const reqIdx    = roleHierarchy.indexOf(matrix.requiredRole);
-          if (userIdx > reqIdx) {
-            throw new Error(`Approval matrix: this claim (KES ${approvedAmount.toLocaleString()}) requires a ${matrix.requiredRole.replace(/_/g, " ")} or above. Your role (${session.user.role}) is not authorised to approve it.`);
+        if (resolved) {
+          const step = resolved.steps[0];
+          if (!ApprovalMatrixService.roleAuthorised(session.user.role, step.requiredRole)) {
+            throw new Error(
+              `Approval matrix: this claim (UGX ${approvedAmount.toLocaleString()}) requires ${step.requiredRole.replace(/_/g, " ")} or above. Your role (${session.user.role}) is not authorised to approve it.`,
+            );
+          }
+          // Segregation of duties: the approver must not be the claim's adjudicator/maker.
+          if (claim.adjudicatorId) {
+            ApprovalMatrixService.enforceSegregationOfDuties(claim.adjudicatorId, session.user.id);
           }
         }
       }
