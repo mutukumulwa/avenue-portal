@@ -33,14 +33,12 @@ meaningful step. Newest status at the top of each section.
 
 ### Current status
 > **Rebrand §D COMPLETE** (D-1…D-10). **G2.1 multi-client tenancy
-> SUBSTANTIALLY COMPLETE** (slices 1, 1b, 2, 4a, 4b, 5). `Client` payer
-> entity + isolation plumbing (`clientScope.ts`) + clients CRUD UI +
-> `Group.clientId` enforced NOT NULL across all 4 create paths via
-> `resolveSchemeClientId`. 11 isolation tests; suite 64/64; clients UI +
-> edit/deactivation verified in-browser. typecheck + brand guard green.
-> Deferred (by design): operator client-switcher (UX), incremental
-> per-router isolation (slice 2b, as models gain clientId), RBAC
-> per-assignment scope (slice 3).
+> SUBSTANTIALLY COMPLETE** (slices 1,1b,2,4a,4b,5). **G2.4 terminology engine
+> slices 1-2 done** (model + resolver). `Client` payer entity + isolation
+> (`clientScope.ts`) + clients CRUD UI + `Group.clientId` NOT NULL;
+> `TerminologyEntry`/`TerminologyApproval` + `terminology.service.ts`
+> resolver (CLIENT>LOCALE>HOUSE>SYSTEM) verified vs Postgres + 7 unit tests.
+> Suite 71/71; typecheck + brand guard green.
 
 ### ⚠️ Dev DB note
 The local dev DB holds **pre-rebrand data** (tenant "Avenue Healthcare", slug
@@ -51,22 +49,23 @@ client "Jubilee Insurance Uganda" was created during verification (harmless demo
 row). **Consider `npm run db:seed` to refresh to Medvex data** (now includes the
 default Client via slice 1b) — but that's destructive; do it deliberately.
 
-### Next concrete step  →  next Phase-0 backbone item
-G2.1 core is done (slices 1,1b,2,4a,4b,5). **Recommended next: G2.4 terminology
-engine** — deps satisfied (multi-client done), self-contained, unblocks G1.3.
-Then G3.1 approval matrix.
-
-**G2.4 terminology engine (plan §C-2 / AICARE_TODO T-01…T-08), multi-client:**
-- Data model: `TerminologyEntry` (scope SYSTEM|HOUSE|CLIENT|LOCALE, clientId?,
-  key, displayText, context, effective dates) + `TerminologyApproval` (maker-checker).
-- Service `terminology.service.ts`: `resolve(clientId, key, fallback)` with the
-  4-level fallback (system → house → client → locale); in-memory cache + Redis
-  invalidation (ioredis via `src/lib/queue.ts`).
-- API/UI: `terminology` tRPC router (list/upsert/approve/reject/preview) + admin
-  page with approval queue.
-- Frontend: `useTerm(key)` hook + `TermProvider`; sweep hard-coded
+### Next concrete step  →  finish **G2.4** then **G3.1**
+G2.4 **slices 1-2 done** (model + resolver, verified end-to-end). Remaining:
+- **Slice 3 — write/approval + router + UI:** add CRUD + maker-checker
+  transitions to `terminology.service.ts` (create draft → submit → approve/
+  reject; on approve, deactivate the prior active entry for the same
+  scope/client/locale/key — never-delete; call `invalidate(tenantId)`).
+  `terminology` tRPC router (list/upsert/submit/approve/reject/preview),
+  permission-gated. Admin page `/(admin)/settings/terminology` (list +
+  approval queue + editor).
+- **Slice 4 — frontend:** `useTerm(key)`/`TermProvider` (hydrate via
+  `resolveMany` for the current tenant+client+locale); sweep hard-coded
   policy/premium/insure/claim/endorsement strings (incremental).
-- Seed: a Medvex house dictionary; per-client overrides on demand.
+- **Slice 5 — seed:** a Medvex HOUSE dictionary (status APPROVED) so resolve()
+  returns real overrides out of the box.
+
+Then **G3.1 approval-matrix engine** (S0). NOTE its currency-normalised bands
+depend on FX (G3.5) — land `Currency`/`FxRate` schema first or stub normalise().
 
 **Remaining G2.1 (deferred, do when needed):** 4b-switcher (operator UX), 2b
 (incremental per-router isolation), 3 (RBAC per-assignment).
@@ -150,7 +149,7 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
 - ✅ **Slice 5 — `Group.clientId` NOT NULL.** `6e80ebe`: `resolveSchemeClientId`
   shared resolver wired into all 4 create paths + seed; column NOT NULL; FK
   RESTRICT. DB is_nullable=NO; tests 64/64.
-| G2.4 | Terminology engine (multi-client) (M, S1) | ⬜ |
+| G2.4 | Terminology engine (multi-client) (M, S1) | 🔄 slices 1-2 (model+resolver) done; 3-5 left |
 | G3.1 | Approval-matrix engine (L, S0) | ⬜ |
 | G4 (scaffold) | Offline SW (Serwist) + IndexedDB + sync skeleton | ⬜ |
 | G3.5 (schema) | Currency/FxRate + currency columns | ⬜ |
@@ -200,4 +199,10 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
 - **G2.1 slice 5** `6e80ebe`: `resolveSchemeClientId` shared resolver across all
   4 group.create paths + seed; `Group.clientId` NOT NULL; FK RESTRICT; 64/64.
 - **G2.1 multi-client tenancy substantially COMPLETE.**
-- **Next:** G2.4 terminology engine (see §1 next step), then G3.1 approval matrix.
+- **G2.4 slices 1-2** `a3ea874`: `TerminologyEntry`/`TerminologyApproval` models
+  (db push) + `terminology.service.ts` resolver (CLIENT>LOCALE>HOUSE>SYSTEM,
+  locale refinement, TTL cache) + 7 precedence unit tests. Verified end-to-end
+  vs Postgres (inserted HOUSE+CLIENT "policy" overrides → service query returns
+  them; cleaned up). Suite 71/71.
+- **Next:** G2.4 slice 3 (write/approval + router + admin UI), then 4 (useTerm
+  hook) + 5 (seed house dictionary); then G3.1 approval matrix.
