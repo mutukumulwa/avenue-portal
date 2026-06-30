@@ -41,6 +41,39 @@ async function main() {
   })
   console.log(`✅ Default client: ${defaultClient.name}`)
 
+  // ── Medvex HOUSE terminology dictionary (G2.4) ───────────────
+  // Seeded as APPROVED so resolve()/useTerm() return Medvex vocabulary out of
+  // the box. Canonical keys stay in code; clients can override per CLIENT scope.
+  const houseTerms: Array<{ key: string; displayText: string; context?: string }> = [
+    { key: 'policy', displayText: 'Scheme', context: 'Medvex administers schemes, not policies' },
+    { key: 'premium', displayText: 'Contribution' },
+    { key: 'insured', displayText: 'Member' },
+    { key: 'beneficiary', displayText: 'Dependant' },
+    { key: 'claim', displayText: 'Claim' },
+    { key: 'preauthorization', displayText: 'Pre-Authorization' },
+    { key: 'copayment', displayText: 'Co-Payment' },
+    { key: 'provider', displayText: 'Provider' },
+    { key: 'benefit', displayText: 'Benefit' },
+    { key: 'endorsement', displayText: 'Endorsement' },
+  ]
+  for (const t of houseTerms) {
+    await prisma.terminologyEntry.upsert({
+      where:  { id: `term_house_${t.key}` },
+      update: { displayText: t.displayText, status: 'APPROVED', isActive: true },
+      create: {
+        id: `term_house_${t.key}`,
+        tenantId: tenant.id,
+        scope: 'HOUSE',
+        key: t.key,
+        displayText: t.displayText,
+        context: t.context,
+        status: 'APPROVED',
+        isActive: true,
+      },
+    })
+  }
+  console.log(`✅ House terminology: ${houseTerms.length} terms`)
+
   // ═══════════════════════════════════════════════════════════
   // 1b. BENEFIT RIDERS & TAXES
   // ═══════════════════════════════════════════════════════════
