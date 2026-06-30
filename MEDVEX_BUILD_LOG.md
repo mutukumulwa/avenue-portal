@@ -32,13 +32,14 @@ meaningful step. Newest status at the top of each section.
   (Tech-debt: migrations history should eventually be re-baselined to the DB.)
 
 ### Current status
-> **Rebrand §D COMPLETE** (D-1…D-10). **G2.1 multi-client tenancy
-> SUBSTANTIALLY COMPLETE** (slices 1,1b,2,4a,4b,5). **G2.4 terminology engine
-> slices 1-2 done** (model + resolver). `Client` payer entity + isolation
-> (`clientScope.ts`) + clients CRUD UI + `Group.clientId` NOT NULL;
-> `TerminologyEntry`/`TerminologyApproval` + `terminology.service.ts`
-> resolver (CLIENT>LOCALE>HOUSE>SYSTEM) verified vs Postgres + 7 unit tests.
-> Suite 71/71; typecheck + brand guard green.
+> **Rebrand §D COMPLETE** (D-1…D-10). **G2.1 multi-client tenancy SUBSTANTIALLY
+> COMPLETE** (slices 1,1b,2,4a,4b,5). **G2.4 terminology engine slices 1-3 done**
+> (model + resolver + maker-checker workflow + tRPC router + admin UI).
+> Resolver (CLIENT>LOCALE>HOUSE>SYSTEM) + write path (SoD, never-delete
+> supersession) covered by 14 unit tests; admin workflow verified in-browser
+> incl. self-approve blocked by segregation of duties. Suite 78/78; typecheck +
+> brand guard green. Remaining G2.4: slice 4 (useTerm hook/TermProvider),
+> slice 5 (seed house dictionary).
 
 ### ⚠️ Dev DB note
 The local dev DB holds **pre-rebrand data** (tenant "Avenue Healthcare", slug
@@ -50,19 +51,16 @@ row). **Consider `npm run db:seed` to refresh to Medvex data** (now includes the
 default Client via slice 1b) — but that's destructive; do it deliberately.
 
 ### Next concrete step  →  finish **G2.4** then **G3.1**
-G2.4 **slices 1-2 done** (model + resolver, verified end-to-end). Remaining:
-- **Slice 3 — write/approval + router + UI:** add CRUD + maker-checker
-  transitions to `terminology.service.ts` (create draft → submit → approve/
-  reject; on approve, deactivate the prior active entry for the same
-  scope/client/locale/key — never-delete; call `invalidate(tenantId)`).
-  `terminology` tRPC router (list/upsert/submit/approve/reject/preview),
-  permission-gated. Admin page `/(admin)/settings/terminology` (list +
-  approval queue + editor).
-- **Slice 4 — frontend:** `useTerm(key)`/`TermProvider` (hydrate via
-  `resolveMany` for the current tenant+client+locale); sweep hard-coded
-  policy/premium/insure/claim/endorsement strings (incremental).
+G2.4 **slices 1-3 done** (model + resolver + maker-checker workflow + router +
+admin UI, all tested/verified). Remaining:
+- **Slice 4 — frontend consumption:** `TermProvider` (client context) +
+  `useTerm(key, fallback?)` hook. Server helper `getTermMap(tenantId, clientId?,
+  locale?)` (resolveMany over the tenant's approved keys) wired into the admin
+  layout so client components can read client-specific vocabulary. Then sweep
+  hard-coded policy/premium/insure/claim/endorsement strings (incremental).
 - **Slice 5 — seed:** a Medvex HOUSE dictionary (status APPROVED) so resolve()
-  returns real overrides out of the box.
+  returns real overrides out of the box. Add near the default-client creation
+  in `prisma/seed.ts` (upsert HOUSE entries, scope=HOUSE, status=APPROVED).
 
 Then **G3.1 approval-matrix engine** (S0). NOTE its currency-normalised bands
 depend on FX (G3.5) — land `Currency`/`FxRate` schema first or stub normalise().
@@ -149,7 +147,7 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
 - ✅ **Slice 5 — `Group.clientId` NOT NULL.** `6e80ebe`: `resolveSchemeClientId`
   shared resolver wired into all 4 create paths + seed; column NOT NULL; FK
   RESTRICT. DB is_nullable=NO; tests 64/64.
-| G2.4 | Terminology engine (multi-client) (M, S1) | 🔄 slices 1-2 (model+resolver) done; 3-5 left |
+| G2.4 | Terminology engine (multi-client) (M, S1) | 🔄 slices 1-3 (model+resolver+workflow+UI) done; 4-5 (hook+seed) left |
 | G3.1 | Approval-matrix engine (L, S0) | ⬜ |
 | G4 (scaffold) | Offline SW (Serwist) + IndexedDB + sync skeleton | ⬜ |
 | G3.5 (schema) | Currency/FxRate + currency columns | ⬜ |
@@ -204,5 +202,9 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
   locale refinement, TTL cache) + 7 precedence unit tests. Verified end-to-end
   vs Postgres (inserted HOUSE+CLIENT "policy" overrides → service query returns
   them; cleaned up). Suite 71/71.
-- **Next:** G2.4 slice 3 (write/approval + router + admin UI), then 4 (useTerm
-  hook) + 5 (seed house dictionary); then G3.1 approval matrix.
+- **G2.4 slice 3** `e0ed9d3`: maker-checker write path (list/createDraft/submit/
+  approve/reject) + `terminology` tRPC router + `/(admin)/settings/terminology`
+  admin UI (server actions + audit) + sidebar link + 7 write-path tests.
+  Verified in-browser: draft→submit→queue→self-approve BLOCKED by SoD. Suite 78/78.
+- **Next:** G2.4 slice 4 (useTerm hook/TermProvider) + 5 (seed house dictionary),
+  then G3.1 approval matrix.
