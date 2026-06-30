@@ -40,3 +40,6 @@ artifacts/next-dev-*.log
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Binary design-handoff bundle (kept on disk, not in git)
+*design-handoff*.zip
