@@ -32,29 +32,35 @@ meaningful step. Newest status at the top of each section.
   (Tech-debt: migrations history should eventually be re-baselined to the DB.)
 
 ### Current status
-> **Rebrand §D COMPLETE** (D-1…D-10). **G2.1 slices 1 & 2 done** — `Client`
-> entity exists + backfilled; client-isolation plumbing wired through
-> auth/tRPC; `clientScope.ts` helpers + groups enforcement + 11 isolation
-> tests (full suite 64/64). typecheck clean; brand guard green.
+> **Rebrand §D COMPLETE** (D-1…D-10). **G2.1 slices 1, 1b, 2, 4a done.**
+> `Client` entity + backfill + seed; client-isolation plumbing
+> (auth→tRPC) + `clientScope.ts` + groups enforcement + 11 isolation tests
+> (suite 64/64); `/(admin)/clients` management UI verified in-browser
+> end-to-end. typecheck clean; brand guard green.
+
+### ⚠️ Dev DB note
+The local dev DB holds **pre-rebrand data** (tenant "Avenue Healthcare", slug
+`avenue`, users `@avenue.co.ke`) — the Medvex seed was never run on it. My
+backfill still correctly created a default Client for it. For verification I set
+**admin@avenue.co.ke password = `Verify123!`** (original hash unknown). A test
+client "Jubilee Insurance Uganda" was created during verification (harmless demo
+row). **Consider `npm run db:seed` to refresh to Medvex data** (now includes the
+default Client via slice 1b) — but that's destructive; do it deliberately.
 
 ### Next concrete step  →  continue **G2.1** (remaining slices)
-Pick up at **slice 1b (seed)** or **slice 4 (clients UI + switcher)**:
-- **Slice 1b — seed:** update `prisma/seed.ts` + `seed-safaricom.ts` to create
-  a default `Client` (operatorTenantId, slug `default`, UGX) and set seeded
-  groups' `clientId`. Find where the operator Tenant + groups are created.
-  (A fresh `db:seed` currently leaves seeded groups' clientId null — harmless,
-  nullable, but incomplete.)
-- **Slice 4 — clients management:** `/(admin)/clients/` (list/create/edit using
-  the `Client` model), a `clients` tRPC router, and a **client switcher** in the
-  admin shell so operator users pick a client (drives `resolveWriteClientId` for
-  writes). Branding overrides surface via `TenantThemeInjector` (extend to
-  client overrides).
+- **Slice 4b — client switcher:** operator users (clientId null) pick an active
+  client in the admin shell; persist selection (cookie/session) and feed it to
+  `resolveWriteClientId` for writes. Also `/clients/[id]` detail/edit page +
+  client branding overrides via `TenantThemeInjector`.
 - **Slice 2b — incremental isolation:** apply `clientFilter`/`assertClientAccess`
-  to other client-scoped routers/services as they're touched (members, claims,
-  etc. gain `clientId` in later phases — scope at that point).
-- **Slice 3 — RBAC client scope:** per-assignment client scope on
-  `UserRoleAssignment` if confinement-via-`User.clientId` proves insufficient.
+  to other routers/services as each client-scoped model gains `clientId` in
+  later phases.
+- **Slice 3 — RBAC client scope:** per-assignment scope on `UserRoleAssignment`
+  if `User.clientId` confinement proves insufficient.
 - **Slice 5 — enforce `Group.clientId` NOT NULL** once every create path sets it.
+
+Then **G2.1 is substantially done** → move to next Phase-0 backbone item per
+plan §E: **G2.4 terminology engine** or **G3.1 approval-matrix engine**.
 
 > ⚠️ Schema changes go via **`db push`** (NOT migrate — see note above). Work in
 > small, independently-committable slices. Never leave schema half-applied at a cutoff.
@@ -116,9 +122,9 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
   all 7 schemes' `clientId` (0 orphans). typecheck clean.
   > NOTE: `ClientType` enum (CORPORATE|INDIVIDUAL) already existed for the
   > *scheme* type — did NOT reuse it; `PayerType` is the new payer-entity enum.
-- ⬜ **Slice 1b — seed.** Update `prisma/seed.ts` + `seed-safaricom.ts` to create
-  the default Client and link seeded groups (fresh `db:seed` currently leaves
-  groups with null clientId — harmless but incomplete).
+- ✅ **Slice 1b — seed.** `c01cfb8`: `seed.ts` creates default Client after
+  tenant upsert + end-of-seed updateMany links all schemes. seed-safaricom.ts
+  needs no change (read-only on existing tenant/groups).
 - ✅ **Slice 2 — tRPC isolation plumbing.** `cce…`/`f342403`: User.clientId;
   clientId threaded auth→session→context→protectedProcedure; `clientScope.ts`
   (clientFilter/assertClientAccess/resolveWriteClientId); GroupsService +
@@ -126,7 +132,11 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
 - ⬜ **Slice 2b — incremental isolation** across other routers/services (as each
   client-scoped model gains `clientId` in later phases).
 - ⬜ **Slice 3 — RBAC client scope** (per-assignment, if User.clientId insufficient).
-- ⬜ **Slice 4 — UI:** `/(admin)/clients/` management + `clients` router + client switcher.
+- ✅ **Slice 4a — clients UI.** `c37ba38`: `ClientsService` + `/(admin)/clients`
+  list + `/clients/new` create (server action + audit) + sidebar link.
+  Verified in-browser end-to-end (create → persist → audit → list).
+- ⬜ **Slice 4b — client switcher** (operator selects active client) + `/clients/[id]`
+  detail/edit + client branding overrides via TenantThemeInjector.
 - ⬜ **Slice 5 — enforce `Group.clientId` NOT NULL** once all paths set it.
 | G2.4 | Terminology engine (multi-client) (M, S1) | ⬜ |
 | G3.1 | Approval-matrix engine (L, S0) | ⬜ |
@@ -168,4 +178,9 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
   session/context/protectedProcedure) + `clientScope.ts` helpers + groups
   enforcement + 11 isolation tests (suite 64/64).
 - `c6d34d8`: tracked spec + gap plan; gitignored the 2.9M design-handoff zip.
-- **Next:** G2.1 slice 1b (seed) or slice 4 (clients UI + switcher).
+- **G2.1 slice 1b** `c01cfb8`: seed creates default Client + links schemes.
+- **G2.1 slice 4a** `c37ba38`: `ClientsService` + `/(admin)/clients` UI +
+  sidebar. Verified in-browser (login as admin@avenue.co.ke, list shows default
+  client w/ 7 schemes; created Jubilee Insurance Uganda → persisted + audited).
+  Noted dev DB is stale pre-rebrand data (see §1 Dev DB note).
+- **Next:** G2.1 slice 4b (client switcher) / 2b / 5, then G2.4 or G3.1.
