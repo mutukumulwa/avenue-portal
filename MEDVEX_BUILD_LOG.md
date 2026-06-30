@@ -32,11 +32,15 @@ meaningful step. Newest status at the top of each section.
   (Tech-debt: migrations history should eventually be re-baselined to the DB.)
 
 ### Current status
-> **Rebrand §D COMPLETE** (D-1…D-10). **G2.1 slices 1, 1b, 2, 4a done.**
-> `Client` entity + backfill + seed; client-isolation plumbing
-> (auth→tRPC) + `clientScope.ts` + groups enforcement + 11 isolation tests
-> (suite 64/64); `/(admin)/clients` management UI verified in-browser
-> end-to-end. typecheck clean; brand guard green.
+> **Rebrand §D COMPLETE** (D-1…D-10). **G2.1 multi-client tenancy
+> SUBSTANTIALLY COMPLETE** (slices 1, 1b, 2, 4a, 4b, 5). `Client` payer
+> entity + isolation plumbing (`clientScope.ts`) + clients CRUD UI +
+> `Group.clientId` enforced NOT NULL across all 4 create paths via
+> `resolveSchemeClientId`. 11 isolation tests; suite 64/64; clients UI +
+> edit/deactivation verified in-browser. typecheck + brand guard green.
+> Deferred (by design): operator client-switcher (UX), incremental
+> per-router isolation (slice 2b, as models gain clientId), RBAC
+> per-assignment scope (slice 3).
 
 ### ⚠️ Dev DB note
 The local dev DB holds **pre-rebrand data** (tenant "Avenue Healthcare", slug
@@ -47,20 +51,25 @@ client "Jubilee Insurance Uganda" was created during verification (harmless demo
 row). **Consider `npm run db:seed` to refresh to Medvex data** (now includes the
 default Client via slice 1b) — but that's destructive; do it deliberately.
 
-### Next concrete step  →  continue **G2.1** (remaining slices)
-- **Slice 4b — client switcher:** operator users (clientId null) pick an active
-  client in the admin shell; persist selection (cookie/session) and feed it to
-  `resolveWriteClientId` for writes. Also `/clients/[id]` detail/edit page +
-  client branding overrides via `TenantThemeInjector`.
-- **Slice 2b — incremental isolation:** apply `clientFilter`/`assertClientAccess`
-  to other routers/services as each client-scoped model gains `clientId` in
-  later phases.
-- **Slice 3 — RBAC client scope:** per-assignment scope on `UserRoleAssignment`
-  if `User.clientId` confinement proves insufficient.
-- **Slice 5 — enforce `Group.clientId` NOT NULL** once every create path sets it.
+### Next concrete step  →  next Phase-0 backbone item
+G2.1 core is done (slices 1,1b,2,4a,4b,5). **Recommended next: G2.4 terminology
+engine** — deps satisfied (multi-client done), self-contained, unblocks G1.3.
+Then G3.1 approval matrix.
 
-Then **G2.1 is substantially done** → move to next Phase-0 backbone item per
-plan §E: **G2.4 terminology engine** or **G3.1 approval-matrix engine**.
+**G2.4 terminology engine (plan §C-2 / AICARE_TODO T-01…T-08), multi-client:**
+- Data model: `TerminologyEntry` (scope SYSTEM|HOUSE|CLIENT|LOCALE, clientId?,
+  key, displayText, context, effective dates) + `TerminologyApproval` (maker-checker).
+- Service `terminology.service.ts`: `resolve(clientId, key, fallback)` with the
+  4-level fallback (system → house → client → locale); in-memory cache + Redis
+  invalidation (ioredis via `src/lib/queue.ts`).
+- API/UI: `terminology` tRPC router (list/upsert/approve/reject/preview) + admin
+  page with approval queue.
+- Frontend: `useTerm(key)` hook + `TermProvider`; sweep hard-coded
+  policy/premium/insure/claim/endorsement strings (incremental).
+- Seed: a Medvex house dictionary; per-client overrides on demand.
+
+**Remaining G2.1 (deferred, do when needed):** 4b-switcher (operator UX), 2b
+(incremental per-router isolation), 3 (RBAC per-assignment).
 
 > ⚠️ Schema changes go via **`db push`** (NOT migrate — see note above). Work in
 > small, independently-committable slices. Never leave schema half-applied at a cutoff.
@@ -135,9 +144,12 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
 - ✅ **Slice 4a — clients UI.** `c37ba38`: `ClientsService` + `/(admin)/clients`
   list + `/clients/new` create (server action + audit) + sidebar link.
   Verified in-browser end-to-end (create → persist → audit → list).
-- ⬜ **Slice 4b — client switcher** (operator selects active client) + `/clients/[id]`
-  detail/edit + client branding overrides via TenantThemeInjector.
-- ⬜ **Slice 5 — enforce `Group.clientId` NOT NULL** once all paths set it.
+- ✅ **Slice 4b — client detail + edit.** `98d749c`: `/clients/[id]` detail +
+  `/clients/[id]/edit` (update + never-delete deactivation). Verified in-browser.
+  (Operator client-*switcher* still deferred.)
+- ✅ **Slice 5 — `Group.clientId` NOT NULL.** `6e80ebe`: `resolveSchemeClientId`
+  shared resolver wired into all 4 create paths + seed; column NOT NULL; FK
+  RESTRICT. DB is_nullable=NO; tests 64/64.
 | G2.4 | Terminology engine (multi-client) (M, S1) | ⬜ |
 | G3.1 | Approval-matrix engine (L, S0) | ⬜ |
 | G4 (scaffold) | Offline SW (Serwist) + IndexedDB + sync skeleton | ⬜ |
@@ -183,4 +195,9 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
   sidebar. Verified in-browser (login as admin@avenue.co.ke, list shows default
   client w/ 7 schemes; created Jubilee Insurance Uganda → persisted + audited).
   Noted dev DB is stale pre-rebrand data (see §1 Dev DB note).
-- **Next:** G2.1 slice 4b (client switcher) / 2b / 5, then G2.4 or G3.1.
+- **G2.1 slice 4b** `98d749c`: client detail + edit pages; verified edit →
+  USD/SUSPENDED persisted with never-delete (isActive=false, effectiveTo set).
+- **G2.1 slice 5** `6e80ebe`: `resolveSchemeClientId` shared resolver across all
+  4 group.create paths + seed; `Group.clientId` NOT NULL; FK RESTRICT; 64/64.
+- **G2.1 multi-client tenancy substantially COMPLETE.**
+- **Next:** G2.4 terminology engine (see §1 next step), then G3.1 approval matrix.
