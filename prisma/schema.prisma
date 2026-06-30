@@ -263,11 +263,11 @@ model Group {
   id                        String              @id @default(cuid())
   tenantId                  String
   tenant                    Tenant              @relation(fields: [tenantId], references: [id])
-  // Client payer that owns this scheme (G2.1). Nullable during the multi-client
-  // rollout migration; backfilled to a default Client per tenant, then enforced
-  // as required in a later slice once every scheme has one.
-  clientId                  String?
-  client                    Client?             @relation(fields: [clientId], references: [id])
+  // Client payer that owns this scheme (G2.1). Required: every scheme belongs to
+  // exactly one client. All create paths resolve it via resolveSchemeClientId()
+  // (confined/selected client, else the operator tenant's default client).
+  clientId                  String
+  client                    Client              @relation(fields: [clientId], references: [id])
   name                      String
   industry                  String?
   registrationNumber        String?

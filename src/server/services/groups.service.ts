@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { GroupStatus, PaymentFrequency } from "@prisma/client";
+import { resolveSchemeClientId } from "./clientResolve";
 
 export class GroupsService {
   /**
@@ -9,22 +10,6 @@ export class GroupsService {
    */
   private static clientWhere(clientId?: string) {
     return clientId ? { clientId } : {};
-  }
-
-  /**
-   * Resolve the client a newly-created scheme belongs to. A confined/selected
-   * client wins; otherwise the scheme attaches to the tenant's default client
-   * (slug `default`) so the `clientId` column is always populated during the
-   * multi-client rollout (G2.1). The client switcher (slice 4) lets operator
-   * users pick a specific client instead of the default.
-   */
-  private static async resolveWriteClientId(tenantId: string, clientId?: string) {
-    if (clientId) return clientId;
-    const fallback = await prisma.client.findFirst({
-      where: { operatorTenantId: tenantId, slug: "default" },
-      select: { id: true },
-    });
-    return fallback?.id; // may be undefined if no default seeded — column stays null
   }
 
   /**
@@ -86,7 +71,7 @@ export class GroupsService {
     const renewalDate = new Date(effectiveDateObj);
     renewalDate.setFullYear(renewalDate.getFullYear() + 1);
 
-    const resolvedClientId = await this.resolveWriteClientId(tenantId, clientId);
+    const resolvedClientId = await resolveSchemeClientId(tenantId, clientId);
 
     return prisma.group.create({
       data: {

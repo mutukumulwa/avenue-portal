@@ -3,6 +3,7 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { redirect, notFound } from "next/navigation";
+import { resolveSchemeClientId } from "@/server/services/clientResolve";
 
 export async function sendQuotationAction(formData: FormData) {
   const session = await requireRole(ROLES.UNDERWRITING);
@@ -55,6 +56,7 @@ export async function acceptQuotationAction(formData: FormData) {
     const group = await prisma.group.create({
       data: {
         tenantId,
+        clientId: await resolveSchemeClientId(tenantId, session.user.clientId),
         name: q.prospectName,
         industry: q.prospectIndustry ?? undefined,
         contactPersonName: q.prospectContact ?? q.prospectName,

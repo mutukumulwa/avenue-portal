@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { AcceptanceMethod, FundingMode, MemberRelationship } from "@prisma/client";
 import { auditChainService } from "./audit-chain.service";
 import { blacklistService } from "./blacklist.service";
+import { resolveSchemeClientId } from "./clientResolve";
 import { iprsService } from "./integrations/iprs.service";
 import { pdfService } from "./pdf.service";
 import { renderQuotationHtml } from "../templates/pdf/quotation.template";
@@ -146,6 +147,7 @@ export const bindingService = {
       const group = await prisma.group.create({
         data: {
           tenantId,
+          clientId: await resolveSchemeClientId(tenantId),
           name: quotation.legalName ?? quotation.prospectName ?? groupNumber,
           industry: quotation.prospectIndustry ?? undefined,
           contactPersonName:  quotation.prospectContact ?? quotation.legalName ?? "—",

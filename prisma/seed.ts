@@ -392,7 +392,7 @@ async function main() {
   const safaricomExisting = await prisma.group.findFirst({ where: { tenantId: tenant.id, name: 'Safaricom PLC' } })
   const safaricom = safaricomExisting ?? await prisma.group.create({
     data: {
-      tenantId: tenant.id, name: 'Safaricom PLC', industry: 'Telecommunications',
+      tenantId: tenant.id, clientId: defaultClient.id, name: 'Safaricom PLC', industry: 'Telecommunications',
       registrationNumber: 'PVT-107227',
       contactPersonName: 'Emily Wambui', contactPersonPhone: '+254700100100', contactPersonEmail: 'hr@safaricom.co.ke',
       county: 'Nairobi', packageId: executivePkg.id, packageVersionId: executivePkg.versionId,
@@ -495,7 +495,7 @@ async function main() {
     }
     const grp = await prisma.group.create({
       data: {
-        tenantId: tenant.id, name: g.name, industry: g.industry,
+        tenantId: tenant.id, clientId: defaultClient.id, name: g.name, industry: g.industry,
         registrationNumber: `PVT-${Math.floor(100000+Math.random()*900000)}`,
         contactPersonName: g.contact, contactPersonPhone: g.phone, contactPersonEmail: g.email,
         county: g.county, packageId: pkg.id, packageVersionId: pkg.versionId,
@@ -2167,7 +2167,7 @@ async function main() {
       const indivExists = await prisma.group.findFirst({ where: { tenantId, clientType: 'INDIVIDUAL' } })
       if (!indivExists) {
         const indivGroup = await prisma.group.create({ data: {
-          tenantId, name: 'Patricia Wanjiru', clientType: 'INDIVIDUAL',
+          tenantId, clientId: defaultClient.id, name: 'Patricia Wanjiru', clientType: 'INDIVIDUAL',
           fundingMode: 'INSURED', registrationNumber: 'IND-00001',
           contactPersonName: 'Patricia Wanjiru', contactPersonPhone: '+254711000001', contactPersonEmail: 'patricia@email.com',
           packageId: executivePkg.id, packageVersionId: executivePkg.versionId,
@@ -3931,15 +3931,8 @@ async function main() {
   console.log('  • Pre-auth scenarios: auto-approved, human-review, surgical review, declined/exhausted')
   console.log('  • Wallet scenarios: pending callback, confirmed, failed, timed out, partial/deferred')
   console.log('  • Documents and notifications visible in the member portal')
-
-  // ── G2.1: link every seeded scheme to the default client ─────
-  // Idempotent sweep so no Group is left with a null clientId regardless of how
-  // many group.create sites exist above. Mirrors the production backfill.
-  const linked = await prisma.group.updateMany({
-    where: { tenantId: tenant.id, clientId: null },
-    data:  { clientId: defaultClient.id },
-  })
-  console.log(`✅ Linked ${linked.count} scheme(s) to default client`)
+  // G2.1: every group.create above sets clientId inline (required column);
+  // no post-hoc linking sweep needed.
 }
 
 main()

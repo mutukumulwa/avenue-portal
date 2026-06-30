@@ -4,6 +4,7 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { writeAudit } from "@/lib/audit";
+import { resolveSchemeClientId } from "@/server/services/clientResolve";
 
 export async function enrollIndividualClientAction(formData: FormData) {
   const session = await requireRole(ROLES.OPS);
@@ -37,6 +38,7 @@ export async function enrollIndividualClientAction(formData: FormData) {
   const group = await prisma.group.create({
     data: {
       tenantId,
+      clientId:           await resolveSchemeClientId(tenantId, session.user.clientId),
       name:               `${firstName} ${lastName}`,
       clientType:         "INDIVIDUAL",
       fundingMode:        fundingMode as never,
