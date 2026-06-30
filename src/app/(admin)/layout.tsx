@@ -2,6 +2,8 @@ import { getCachedSession } from "@/lib/auth";
 import { AdminSidebar } from "@/components/layouts/AdminSidebar";
 import { Breadcrumbs } from "@/components/layouts/Breadcrumbs";
 import { TenantThemeInjector } from "@/components/layouts/TenantThemeInjector";
+import { TermProvider } from "@/components/terminology/TermProvider";
+import { TerminologyService } from "@/server/services/terminology.service";
 import { measureAsync } from "@/lib/perf";
 import type { UserRole } from "@prisma/client";
 
@@ -20,8 +22,14 @@ export default async function AdminLayout({
       await requireRole(ROLES.ANY_STAFF); // will automatically redirect to auth or forbidden
     }
 
+    // Terminology map for the current client context (G2.4). Client components
+    // read it via useTerm(); empty when no dictionary is configured.
+    const termMap = session?.user?.tenantId
+      ? await TerminologyService.getMap(session.user.tenantId, session.user.clientId)
+      : {};
+
     return (
-      <>
+      <TermProvider value={termMap}>
         {session?.user?.tenantId && (
           <TenantThemeInjector tenantId={session.user.tenantId} />
         )}
@@ -32,7 +40,7 @@ export default async function AdminLayout({
             {children}
           </div>
         </div>
-      </>
+      </TermProvider>
     );
   });
 }

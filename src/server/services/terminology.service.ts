@@ -133,6 +133,25 @@ export class TerminologyService {
     );
   }
 
+  /**
+   * Build the full key→displayText map for a (client, locale) context — every
+   * key that has at least one applicable approved entry. Hydrates the frontend
+   * TermProvider (useTerm) so client components show client-specific vocabulary.
+   */
+  static async getMap(
+    tenantId: string,
+    clientId?: string | null,
+    locale?: string | null,
+  ): Promise<Record<string, string>> {
+    const entries = await this.load(tenantId);
+    const out: Record<string, string> = {};
+    for (const key of new Set(entries.map((e) => e.key))) {
+      const picked = this.pick(entries, key, clientId, locale);
+      if (picked) out[key] = picked;
+    }
+    return out;
+  }
+
   /** Resolve many keys with a single tenant load. Returns a key→text map. */
   static async resolveMany(opts: {
     tenantId: string;

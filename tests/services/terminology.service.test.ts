@@ -88,3 +88,28 @@ describe("TerminologyService.resolve — 4-level precedence (G2.4)", () => {
     ).toBe("Policy");
   });
 });
+
+describe("TerminologyService.getMap — context map for useTerm (G2.4)", () => {
+  beforeEach(() => {
+    mockEntries = [];
+    TerminologyService.invalidate(T);
+  });
+
+  it("returns each key resolved for the given client context", async () => {
+    mockEntries = [
+      entry({ scope: "HOUSE", key: "policy", displayText: "Cover" }),
+      entry({ scope: "CLIENT", clientId: "c1", key: "policy", displayText: "Membership" }),
+      entry({ scope: "HOUSE", key: "premium", displayText: "Contribution" }),
+    ];
+    expect(await TerminologyService.getMap(T, "c1")).toEqual({
+      policy: "Membership",
+      premium: "Contribution",
+    });
+    TerminologyService.invalidate(T);
+    // Operator context (no client) sees the HOUSE value for policy.
+    expect(await TerminologyService.getMap(T)).toEqual({
+      policy: "Cover",
+      premium: "Contribution",
+    });
+  });
+});
