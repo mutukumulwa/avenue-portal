@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { TerminologyScope } from "@prisma/client";
+import type { TerminologyScope, TerminologyStatus } from "@prisma/client";
 
 /**
  * Terminology engine (Medvex spec §2.4 / gap G2.4).
@@ -150,5 +150,154 @@ export class TerminologyService {
         key;
     }
     return out;
+  }
+
+  // ── Management / maker-checker write path ──────────────────────────────
+
+  /** List dictionary entries for the admin console, newest first. */
+  static async list(
+    tenantId: string,
+    filters?: {
+      scope?: TerminologyScope;
+      clientId?: string | null;
+      status?: TerminologyStatus;
+      key?: string;
+    },
+  ) {
+    return prisma.terminologyEntry.findMany({
+      where: {
+        tenantId,
+        ...(filters?.scope ? { scope: filters.scope } : {}),
+        ...(filters?.clientId !== undefined ? { clientId: filters.clientId } : {}),
+        ...(filters?.status ? { status: filters.status } : {}),
+        ...(filters?.key ? { key: { contains: filters.key, mode: "insensitive" } } : {}),
+      },
+      include: { client: { select: { id: true, name: true } } },
+      orderBy: [{ key: "asc" }, { createdAt: "desc" }],
+    });
+  }
+
+  /** Validate scope ↔ clientId/locale coupling. */
+  private static validateShape(input: {
+    scope: TerminologyScope;
+    clientId?: string | null;
+    locale?: string | null;
+  }) {
+    if (input.scope === "CLIENT" && !input.clientId) {
+      throw new Error("CLIENT-scoped terms require a clientId.");
+    }
+    if (input.scope === "LOCALE" && !input.locale) {
+      throw new Error("LOCALE-scoped terms require a locale.");
+    }
+    if ((input.scope === "SYSTEM" || input.scope === "HOUSE") && input.clientId) {
+      throw new Error(`${input.scope}-scoped terms cannot target a client.`);
+    }
+  }
+
+  /** Create a DRAFT entry (maker). */
+  static async createDraft(
+    tenantId: string,
+    data: {
+      scope: TerminologyScope;
+      clientId?: string | null;
+      locale?: string | null;
+      key: string;
+      displayText: string;
+      context?: string | null;
+    },
+    byUserId: string,
+  ) {
+    this.validateShape(data);
+    return prisma.terminologyEntry.create({
+      data: {
+        tenantId,
+        scope: data.scope,
+        clientId: data.clientId ?? null,
+        locale: data.locale ?? null,
+        key: data.key.trim(),
+        displayText: data.displayText,
+        context: data.context ?? null,
+        status: "DRAFT",
+        createdById: byUserId,
+      },
+    });
+  }
+
+  /** Submit a DRAFT/REJECTED entry for approval (maker). */
+  static async submit(tenantId: string, id: string, byUserId: string) {
+    const entry = await prisma.terminologyEntry.findFirst({ where: { id, tenantId } });
+    if (!entry) throw new Error("Terminology entry not found.");
+    if (entry.status !== "DRAFT" && entry.status !== "REJECTED") {
+      throw new Error("Only draft or rejected entries can be submitted.");
+    }
+    const [updated] = await prisma.$transaction([
+      prisma.terminologyEntry.update({
+        where: { id },
+        data: { status: "PENDING_APPROVAL" },
+      }),
+      prisma.terminologyApproval.create({
+        data: { tenantId, entryId: id, action: "SUBMITTED", byUserId },
+      }),
+    ]);
+    return updated;
+  }
+
+  /**
+   * Approve a PENDING entry (checker). Enforces segregation of duties
+   * (checker ≠ maker), supersedes the prior active entry for the same
+   * scope/client/locale/key (never-delete), and invalidates the cache.
+   */
+  static async approve(tenantId: string, id: string, byUserId: string, notes?: string) {
+    const entry = await prisma.terminologyEntry.findFirst({ where: { id, tenantId } });
+    if (!entry) throw new Error("Terminology entry not found.");
+    if (entry.status !== "PENDING_APPROVAL") {
+      throw new Error("Only entries pending approval can be approved.");
+    }
+    if (entry.createdById && entry.createdById === byUserId) {
+      throw new Error("Segregation of duties: the maker cannot approve their own entry.");
+    }
+
+    const now = new Date();
+    await prisma.$transaction([
+      // Supersede the currently-active approved entry for the same coordinates.
+      prisma.terminologyEntry.updateMany({
+        where: {
+          tenantId,
+          scope: entry.scope,
+          clientId: entry.clientId,
+          locale: entry.locale,
+          key: entry.key,
+          status: "APPROVED",
+          isActive: true,
+          id: { not: id },
+        },
+        data: { isActive: false, effectiveTo: now },
+      }),
+      prisma.terminologyEntry.update({
+        where: { id },
+        data: { status: "APPROVED", isActive: true, approvedById: byUserId, effectiveFrom: now },
+      }),
+      prisma.terminologyApproval.create({
+        data: { tenantId, entryId: id, action: "APPROVED", byUserId, notes },
+      }),
+    ]);
+    this.invalidate(tenantId);
+    return prisma.terminologyEntry.findUnique({ where: { id } });
+  }
+
+  /** Reject a PENDING entry (checker). */
+  static async reject(tenantId: string, id: string, byUserId: string, notes?: string) {
+    const entry = await prisma.terminologyEntry.findFirst({ where: { id, tenantId } });
+    if (!entry) throw new Error("Terminology entry not found.");
+    if (entry.status !== "PENDING_APPROVAL") {
+      throw new Error("Only entries pending approval can be rejected.");
+    }
+    const [updated] = await prisma.$transaction([
+      prisma.terminologyEntry.update({ where: { id }, data: { status: "REJECTED" } }),
+      prisma.terminologyApproval.create({
+        data: { tenantId, entryId: id, action: "REJECTED", byUserId, notes },
+      }),
+    ]);
+    return updated;
   }
 }

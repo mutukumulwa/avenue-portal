@@ -20,6 +20,7 @@ import { overridesRouter } from "./routers/overrides";
 import { auditChainRouter } from "./routers/auditChain";
 import { intakeRouter } from "./routers/intake";
 import { bindingRouter } from "./routers/binding";
+import { terminologyRouter } from "./routers/terminology";
 
 export const appRouter = createTRPCRouter({
   healthcheck: publicProcedure.query(() => {
@@ -46,6 +47,7 @@ export const appRouter = createTRPCRouter({
   auditChain: auditChainRouter,
   intake: intakeRouter,
   binding: bindingRouter,
+  terminology: terminologyRouter,
 });
 
 export type AppRouter = typeof appRouter;
