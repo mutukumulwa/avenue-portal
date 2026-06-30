@@ -1,0 +1,22 @@
+name: Brand guard
+
+# Fails CI if the legacy "avenue" brand name reappears in shipped
+# code/assets/seeds. See scripts/check-no-avenue.mjs and §D / D-10 of
+# MEDVEX_TPA_UGANDA_GAP_ANALYSIS_AND_PLAN.md.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  brand-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      # Pure-Node guard, no dependencies — no install step needed.
+      - name: Check for "avenue" references
+        run: node scripts/check-no-avenue.mjs
