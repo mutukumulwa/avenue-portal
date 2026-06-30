@@ -33,13 +33,12 @@ meaningful step. Newest status at the top of each section.
 
 ### Current status
 > **Rebrand §D COMPLETE** (D-1…D-10). **G2.1 multi-client tenancy SUBSTANTIALLY
-> COMPLETE** (slices 1,1b,2,4a,4b,5). **G2.4 terminology engine slices 1-3 done**
-> (model + resolver + maker-checker workflow + tRPC router + admin UI).
-> Resolver (CLIENT>LOCALE>HOUSE>SYSTEM) + write path (SoD, never-delete
-> supersession) covered by 14 unit tests; admin workflow verified in-browser
-> incl. self-approve blocked by segregation of duties. Suite 78/78; typecheck +
-> brand guard green. Remaining G2.4: slice 4 (useTerm hook/TermProvider),
-> slice 5 (seed house dictionary).
+> COMPLETE** (slices 1,1b,2,4a,4b,5). **G2.4 terminology engine COMPLETE** (all
+> 5 slices: model + resolver + maker-checker workflow + tRPC router + admin UI +
+> useTerm hook/TermProvider + seeded HOUSE dictionary). 15 terminology unit
+> tests; admin workflow + house dictionary verified in-browser. Suite 79/79;
+> typecheck + brand guard green.
+> **Now starting G3.1 approval-matrix engine.**
 
 ### ⚠️ Dev DB note
 The local dev DB holds **pre-rebrand data** (tenant "Avenue Healthcare", slug
@@ -50,20 +49,29 @@ client "Jubilee Insurance Uganda" was created during verification (harmless demo
 row). **Consider `npm run db:seed` to refresh to Medvex data** (now includes the
 default Client via slice 1b) — but that's destructive; do it deliberately.
 
-### Next concrete step  →  finish **G2.4** then **G3.1**
-G2.4 **slices 1-3 done** (model + resolver + maker-checker workflow + router +
-admin UI, all tested/verified). Remaining:
-- **Slice 4 — frontend consumption:** `TermProvider` (client context) +
-  `useTerm(key, fallback?)` hook. Server helper `getTermMap(tenantId, clientId?,
-  locale?)` (resolveMany over the tenant's approved keys) wired into the admin
-  layout so client components can read client-specific vocabulary. Then sweep
-  hard-coded policy/premium/insure/claim/endorsement strings (incremental).
-- **Slice 5 — seed:** a Medvex HOUSE dictionary (status APPROVED) so resolve()
-  returns real overrides out of the box. Add near the default-client creation
-  in `prisma/seed.ts` (upsert HOUSE entries, scope=HOUSE, status=APPROVED).
-
-Then **G3.1 approval-matrix engine** (S0). NOTE its currency-normalised bands
-depend on FX (G3.5) — land `Currency`/`FxRate` schema first or stub normalise().
+### Next concrete step  →  **G3.1 approval-matrix engine** (S0, plan §C-3)
+Redesign the thin `ApprovalMatrix` (tenant-scoped, claims-only, single-role,
+`requiresDual` bool) into a client-scoped, action-typed, currency-normalised,
+multi-level-sequential, SLA-timed, version-resolved engine with enforced SoD.
+Planned slices:
+- **Slice 1 — data model:** `ApprovalActionType` enum (CLAIM_PAYMENT, PREAUTH_GOP,
+  LIMIT_OVERRIDE, SCHEME_ACTIVATION, COMMISSION_CHANGE, ENDORSEMENT,
+  TARIFF_CHANGE, FUND_TOPUP, WRITEOFF_REFUND, …). Extend/redesign `ApprovalMatrix`
+  (clientId, schemeId?, actionType, amountBandMin/Max in **base currency UGX**,
+  currency, effective-dated/versioned) + `ApprovalStep` (level, requiredRole(s),
+  slaMinutes, escalationTargetRole) + runtime `ApprovalRequest`/`ApprovalDecision`
+  (resolved matrixVersionId). **Also land `Currency`/`FxRate` (G3.5 schema-only)**
+  for normalisation. db push (existing ApprovalMatrix is seeded-but-maybe-unused
+  — check `AICARE_TODO` V-02 / call-sites before mutating columns).
+- **Slice 2 — service:** `approval-matrix.service.ts` — `resolve(action, amount,
+  currency, clientId)` → exactly one path; `fx.normalise()` (UGX base; identity
+  until FxRate seeded); `enforceSegregationOfDuties()`; writes decisions to the
+  audit chain with resolved version id. Unit tests.
+- **Slice 3 — wire-in:** route one action (e.g. claim payment or override)
+  through the engine + tests (resolves V-02 "seeded but not enforced").
+- **Slice 4 — UI:** extend `/(admin)/settings/approval-matrix` to multi-level,
+  action-typed editor; rights-and-roles report shows approvable actions.
+- **Slice 5 — escalation:** extend `sla-breach.job.ts` to auto-escalate.
 
 **Remaining G2.1 (deferred, do when needed):** 4b-switcher (operator UX), 2b
 (incremental per-router isolation), 3 (RBAC per-assignment).
@@ -147,7 +155,7 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
 - ✅ **Slice 5 — `Group.clientId` NOT NULL.** `6e80ebe`: `resolveSchemeClientId`
   shared resolver wired into all 4 create paths + seed; column NOT NULL; FK
   RESTRICT. DB is_nullable=NO; tests 64/64.
-| G2.4 | Terminology engine (multi-client) (M, S1) | 🔄 slices 1-3 (model+resolver+workflow+UI) done; 4-5 (hook+seed) left |
+| G2.4 | Terminology engine (multi-client) (M, S1) | ✅ all 5 slices (model+resolver+workflow+UI+hook+seed) |
 | G3.1 | Approval-matrix engine (L, S0) | ⬜ |
 | G4 (scaffold) | Offline SW (Serwist) + IndexedDB + sync skeleton | ⬜ |
 | G3.5 (schema) | Currency/FxRate + currency columns | ⬜ |
@@ -206,5 +214,8 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
   approve/reject) + `terminology` tRPC router + `/(admin)/settings/terminology`
   admin UI (server actions + audit) + sidebar link + 7 write-path tests.
   Verified in-browser: draft→submit→queue→self-approve BLOCKED by SoD. Suite 78/78.
-- **Next:** G2.4 slice 4 (useTerm hook/TermProvider) + 5 (seed house dictionary),
-  then G3.1 approval matrix.
+- **G2.4 slice 4** `0ce8c94`: `getMap` + `TermProvider`/`useTerm` wired into the
+  admin layout (+ getMap test). **G2.4 slice 5** `b292c68`: seeded 10 APPROVED
+  HOUSE terms (policy→Scheme, premium→Contribution, …); verified in-browser
+  (ALL TERMS 10). **G2.4 COMPLETE.** Suite 79/79.
+- **Next:** G3.1 approval-matrix engine — slice 1 (data model + Currency/FxRate).
