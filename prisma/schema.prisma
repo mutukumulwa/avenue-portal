@@ -68,6 +68,8 @@ model Tenant {
   blacklistEntries               InternalBlacklist[]
   userRoleAssignments            UserRoleAssignment[]
   clients                        Client[]
+  terminologyEntries             TerminologyEntry[]
+  terminologyApprovals           TerminologyApproval[]
 }
 
 // ── Multi-client TPA tenancy (Medvex spec §2.1 / gap G2.1) ──────────────
@@ -124,13 +126,79 @@ model Client {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  groups Group[]
-  users  User[]
+  groups             Group[]
+  users              User[]
+  terminologyEntries TerminologyEntry[]
 
   @@unique([operatorTenantId, slug])
   @@index([operatorTenantId])
   @@index([operatorTenantId, status])
   @@index([parentClientId])
+}
+
+// ── Terminology engine (Medvex spec §2.4 / gap G2.4) ───────────────────
+// Each client presents its own vocabulary while enums stay canonical in code.
+// resolve(clientId, key) walks most-specific → least: CLIENT → LOCALE → HOUSE
+// → SYSTEM, with a code-level fallback last. Never-delete + maker-checker.
+enum TerminologyScope {
+  SYSTEM // canonical platform default
+  HOUSE // Medvex house vocabulary (operator-wide)
+  CLIENT // per-client override (highest precedence)
+  LOCALE // locale/language-specific
+}
+
+enum TerminologyStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+model TerminologyEntry {
+  id       String           @id @default(cuid())
+  tenantId String
+  tenant   Tenant           @relation(fields: [tenantId], references: [id])
+  scope    TerminologyScope
+  clientId String? // required when scope = CLIENT
+  client   Client?          @relation(fields: [clientId], references: [id])
+  locale   String? // e.g. "en-UG"; used for scope = LOCALE or locale-specific overrides
+
+  key         String // canonical term key, e.g. "policy", "premium", "claim"
+  displayText String // what to render in the UI for this key
+  context     String? // optional usage note / where it applies
+
+  status        TerminologyStatus @default(DRAFT)
+  isActive      Boolean           @default(true)
+  effectiveFrom DateTime          @default(now())
+  effectiveTo   DateTime?
+  createdById   String?
+  approvedById  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  approvals TerminologyApproval[]
+
+  @@index([tenantId, key])
+  @@index([tenantId, scope, key])
+  @@index([tenantId, status])
+  @@index([clientId])
+}
+
+model TerminologyApproval {
+  id       String           @id @default(cuid())
+  tenantId String
+  tenant   Tenant           @relation(fields: [tenantId], references: [id])
+  entryId  String
+  entry    TerminologyEntry @relation(fields: [entryId], references: [id])
+  action   String // SUBMITTED | APPROVED | REJECTED
+  byUserId String
+  notes    String?
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([entryId])
 }
 
 // ─── USERS & AUTH ────────────────────────────────────────
