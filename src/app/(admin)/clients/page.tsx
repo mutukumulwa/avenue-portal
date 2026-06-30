@@ -73,9 +73,9 @@ export default async function ClientsPage() {
               {clients.map((c) => (
                 <tr key={c.id} className="hover:bg-brand-bg-alt/50">
                   <td className="px-4 py-3">
-                    <div className="font-medium text-brand-text-heading">
+                    <Link href={`/clients/${c.id}`} className="font-medium text-brand-text-heading hover:text-brand-secondary">
                       {c.name}
-                    </div>
+                    </Link>
                     <div className="text-xs text-brand-text-muted">{c.slug}</div>
                   </td>
                   <td className="px-4 py-3 text-brand-text-body">
@@ -98,7 +98,9 @@ export default async function ClientsPage() {
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <ChevronRight className="ml-auto h-4 w-4 text-brand-text-muted" />
+                    <Link href={`/clients/${c.id}`} aria-label={`Open ${c.name}`}>
+                      <ChevronRight className="ml-auto h-4 w-4 text-brand-text-muted hover:text-brand-text-heading" />
+                    </Link>
                   </td>
                 </tr>
               ))}
