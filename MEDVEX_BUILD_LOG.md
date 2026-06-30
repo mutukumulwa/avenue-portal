@@ -32,26 +32,32 @@ meaningful step. Newest status at the top of each section.
   (Tech-debt: migrations history should eventually be re-baselined to the DB.)
 
 ### Current status
-> **Rebrand workstream (§D) is COMPLETE** (D-1…D-10), except deliberately
-> deferred external/low-priority items (see §3). `npm run brand:guard` passes —
-> zero "avenue" in src/, public/, prisma/. typecheck clean.
+> **Rebrand §D COMPLETE** (D-1…D-10). **G2.1 slices 1 & 2 done** — `Client`
+> entity exists + backfilled; client-isolation plumbing wired through
+> auth/tRPC; `clientScope.ts` helpers + groups enforcement + 11 isolation
+> tests (full suite 64/64). typecheck clean; brand guard green.
 
-### Next concrete step  →  begin **Phase 0 functional work**
-Per the plan §E, Phase 0 sequences **G2.1 (multi-client `Client` entity)** first
-as the backbone everything depends on. Recommended first slice:
-1. **Decision needed before G3.5:** AD-2 base currency (UGX vs USD) — ask user.
-2. **G2.1 schema slice:** add `Client` model (AD-1: keep `Tenant` as the Medvex
-   operator, add `Client` below it; type INSURER|HMO|EMPLOYER_SELF_FUNDED;
-   parentClientId for subsidiaries; currency; branding overrides; status;
-   effective dates). Add nullable `clientId` to `Group`. Write a data-migration
-   that creates a default `Client` per existing tenant and backfills
-   `Group.clientId`. Then `npm run db:migrate`, `db:generate`, `typecheck`.
-3. Then isolation enforcement in tRPC context + `protectedProcedure`, RBAC
-   client scope, `/(admin)/clients/` UI, client switcher. (Large — slice it.)
+### Next concrete step  →  continue **G2.1** (remaining slices)
+Pick up at **slice 1b (seed)** or **slice 4 (clients UI + switcher)**:
+- **Slice 1b — seed:** update `prisma/seed.ts` + `seed-safaricom.ts` to create
+  a default `Client` (operatorTenantId, slug `default`, UGX) and set seeded
+  groups' `clientId`. Find where the operator Tenant + groups are created.
+  (A fresh `db:seed` currently leaves seeded groups' clientId null — harmless,
+  nullable, but incomplete.)
+- **Slice 4 — clients management:** `/(admin)/clients/` (list/create/edit using
+  the `Client` model), a `clients` tRPC router, and a **client switcher** in the
+  admin shell so operator users pick a client (drives `resolveWriteClientId` for
+  writes). Branding overrides surface via `TenantThemeInjector` (extend to
+  client overrides).
+- **Slice 2b — incremental isolation:** apply `clientFilter`/`assertClientAccess`
+  to other client-scoped routers/services as they're touched (members, claims,
+  etc. gain `clientId` in later phases — scope at that point).
+- **Slice 3 — RBAC client scope:** per-assignment client scope on
+  `UserRoleAssignment` if confinement-via-`User.clientId` proves insufficient.
+- **Slice 5 — enforce `Group.clientId` NOT NULL** once every create path sets it.
 
-> ⚠️ G2.1 is XL and touches nearly every router/service. Work in small,
-> independently-committable slices (schema → migration → context → services →
-> UI). Never leave the schema mid-migration at a resource cutoff.
+> ⚠️ Schema changes go via **`db push`** (NOT migrate — see note above). Work in
+> small, independently-committable slices. Never leave schema half-applied at a cutoff.
 
 ### How to verify a slice is done
 - `npm run typecheck` passes; relevant `npx vitest run` passes.
@@ -113,11 +119,14 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
 - ⬜ **Slice 1b — seed.** Update `prisma/seed.ts` + `seed-safaricom.ts` to create
   the default Client and link seeded groups (fresh `db:seed` currently leaves
   groups with null clientId — harmless but incomplete).
-- ⬜ **Slice 2 — tRPC isolation.** Add `clientId`/client scope to
-  `src/server/trpc/context.ts` + `protectedProcedure`; row-level client checks
-  in services; cross-client audit-chain assertion.
-- ⬜ **Slice 3 — RBAC client scope** (Medvex ops span clients; client users confined).
-- ⬜ **Slice 4 — UI:** `/(admin)/clients/` management + client switcher.
+- ✅ **Slice 2 — tRPC isolation plumbing.** `cce…`/`f342403`: User.clientId;
+  clientId threaded auth→session→context→protectedProcedure; `clientScope.ts`
+  (clientFilter/assertClientAccess/resolveWriteClientId); GroupsService +
+  router + 5 callers client-scoped; 11 isolation tests (suite 64/64).
+- ⬜ **Slice 2b — incremental isolation** across other routers/services (as each
+  client-scoped model gains `clientId` in later phases).
+- ⬜ **Slice 3 — RBAC client scope** (per-assignment, if User.clientId insufficient).
+- ⬜ **Slice 4 — UI:** `/(admin)/clients/` management + `clients` router + client switcher.
 - ⬜ **Slice 5 — enforce `Group.clientId` NOT NULL** once all paths set it.
 | G2.4 | Terminology engine (multi-client) (M, S1) | ⬜ |
 | G3.1 | Approval-matrix engine (L, S0) | ⬜ |
@@ -150,5 +159,13 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
   `Avenue_Style_Guide.md`; scrubbed GEMINI.md; renamed knowledge.test.ts fixture
   (test passes 2/2).
 - **Rebrand §D complete.** brand:guard green, typecheck clean.
-- **Next:** Phase 0 functional — ask user AD-2 (base currency), then start G2.1
-  Client-entity schema slice.
+- AD-2 decided by user: **UGX** base + default.
+- **G2.1 slice 1** `3913e21`: `Client` model + `PayerType`/`ClientStatus` enums,
+  `Group.clientId`, `Tenant.clients`; applied via `db push`; backfill SQL → 1
+  default client/tenant, 7/7 groups linked. Found project uses **db push, not
+  migrate** (logged in §1).
+- **G2.1 slice 2** `f342403`: client-isolation plumbing (User.clientId, auth/
+  session/context/protectedProcedure) + `clientScope.ts` helpers + groups
+  enforcement + 11 isolation tests (suite 64/64).
+- `c6d34d8`: tracked spec + gap plan; gitignored the 2.9M design-handoff zip.
+- **Next:** G2.1 slice 1b (seed) or slice 4 (clients UI + switcher).
