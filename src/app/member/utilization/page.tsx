@@ -14,11 +14,11 @@ type SearchParams = {
 function formatMoney(value: number | null) {
   if (value === null) return "Private";
   if (value >= 1_000_000) return `KES ${(value / 1_000_000).toFixed(1)}M`;
-  return `KES ${Math.round(value).toLocaleString("en-KE")}`;
+  return `KES ${Math.round(value).toLocaleString("en-UG")}`;
 }
 
 function formatDateTime(value: Date) {
-  return new Date(value).toLocaleString("en-KE", {
+  return new Date(value).toLocaleString("en-UG", {
     day: "2-digit",
     month: "short",
     year: "numeric",

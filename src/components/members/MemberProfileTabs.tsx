@@ -77,10 +77,10 @@ const statusPill = (s: string) => {
   return map[s] ?? "bg-[#6C757D]/10 text-[#6C757D]";
 };
 
-const fmt = (n: number) => n.toLocaleString("en-KE");
-const fmtDate = (d: string) => new Date(d).toLocaleDateString("en-KE");
+const fmt = (n: number) => n.toLocaleString("en-UG");
+const fmtDate = (d: string) => new Date(d).toLocaleDateString("en-UG");
 const fmtDateTime = (d: string) =>
-  new Date(d).toLocaleString("en-KE", { dateStyle: "medium", timeStyle: "short" });
+  new Date(d).toLocaleString("en-UG", { dateStyle: "medium", timeStyle: "short" });
 
 // ─── Insurance Card ───────────────────────────────────────────────────────────
 
@@ -138,7 +138,7 @@ function InsuranceCard({ member }: { member: Member }) {
             <p className="text-[10px] text-white/70 uppercase mt-0.5">{member.relationship}</p>
             <div className="mt-2">
               <p className="text-[10px] text-white/60 uppercase tracking-widest mb-0.5">Valid Period</p>
-              <p className="text-xs font-bold text-white">{validFrom.toLocaleDateString("en-KE", { month: "short", year: "numeric" })} — {validTo.toLocaleDateString("en-KE", { month: "short", year: "numeric" })}</p>
+              <p className="text-xs font-bold text-white">{validFrom.toLocaleDateString("en-UG", { month: "short", year: "numeric" })} — {validTo.toLocaleDateString("en-UG", { month: "short", year: "numeric" })}</p>
               <p className="text-[10px] text-white/70 mt-0.5">{member.group.name}</p>
             </div>
           </div>

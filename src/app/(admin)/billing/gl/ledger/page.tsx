@@ -121,7 +121,7 @@ export default async function AccountLedgerPage({
               <p className={`text-2xl font-bold mt-1 ${
                 (ledger.lines.at(-1)?.balance ?? 0) < 0 ? "text-[#DC3545]" : "text-brand-indigo"
               }`}>
-                KES {(ledger.lines.at(-1)?.balance ?? openingBalance).toLocaleString("en-KE")}
+                KES {(ledger.lines.at(-1)?.balance ?? openingBalance).toLocaleString("en-UG")}
               </p>
               <p className="text-xs text-brand-text-muted mt-0.5">{ledger.lines.length} transaction{ledger.lines.length !== 1 ? "s" : ""}</p>
             </div>
@@ -144,13 +144,13 @@ export default async function AccountLedgerPage({
                 {/* Opening balance row */}
                 <tr className="bg-[#F8F9FA] text-brand-text-muted">
                   <td colSpan={6} className="px-5 py-2 text-xs font-semibold">Opening Balance</td>
-                  <td className="px-5 py-2 text-right text-xs font-bold">{openingBalance.toLocaleString("en-KE")}</td>
+                  <td className="px-5 py-2 text-right text-xs font-bold">{openingBalance.toLocaleString("en-UG")}</td>
                 </tr>
 
                 {ledger.lines.map((line, i) => (
                   <tr key={i} className="hover:bg-[#F8F9FA]">
                     <td className="px-5 py-2.5 text-brand-text-muted text-xs whitespace-nowrap">
-                      {new Date(line.journalEntry.entryDate).toLocaleDateString("en-KE")}
+                      {new Date(line.journalEntry.entryDate).toLocaleDateString("en-UG")}
                     </td>
                     <td className="px-5 py-2.5 font-mono text-xs text-brand-indigo">
                       {line.journalEntry.entryNumber}
@@ -167,13 +167,13 @@ export default async function AccountLedgerPage({
                       </span>
                     </td>
                     <td className="px-5 py-2.5 text-right font-mono">
-                      {line.debit > 0 ? line.debit.toLocaleString("en-KE") : "—"}
+                      {line.debit > 0 ? line.debit.toLocaleString("en-UG") : "—"}
                     </td>
                     <td className="px-5 py-2.5 text-right font-mono">
-                      {line.credit > 0 ? line.credit.toLocaleString("en-KE") : "—"}
+                      {line.credit > 0 ? line.credit.toLocaleString("en-UG") : "—"}
                     </td>
                     <td className={`px-5 py-2.5 text-right font-bold font-mono ${line.balance < 0 ? "text-[#DC3545]" : "text-brand-text-heading"}`}>
-                      {line.balance.toLocaleString("en-KE")}
+                      {line.balance.toLocaleString("en-UG")}
                     </td>
                   </tr>
                 ))}

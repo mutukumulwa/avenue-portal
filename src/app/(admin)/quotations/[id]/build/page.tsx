@@ -45,7 +45,7 @@ export default async function BuildQuotePage({ params }: { params: Promise<{ id:
   if (!quotation) notFound();
 
   const fmt = (n: number) =>
-    `KES ${Math.round(n).toLocaleString("en-KE", { minimumFractionDigits: 0 })}`;
+    `KES ${Math.round(n).toLocaleString("en-UG", { minimumFractionDigits: 0 })}`;
 
   const hasLineItems = quotation.lineItems.length > 0;
   const canIssue = quotation.status === "DRAFT" && hasLineItems;
@@ -178,7 +178,7 @@ export default async function BuildQuotePage({ params }: { params: Promise<{ id:
                   <div key={v.id} className="flex items-center justify-between text-xs">
                     <span className="text-brand-text-muted">v{v.versionNumber} — {v.status}</span>
                     <span className="text-brand-text-muted">
-                      {v.issuedAt ? new Date(v.issuedAt).toLocaleDateString("en-KE") : "—"}
+                      {v.issuedAt ? new Date(v.issuedAt).toLocaleDateString("en-UG") : "—"}
                     </span>
                   </div>
                 ))}
@@ -201,7 +201,7 @@ export default async function BuildQuotePage({ params }: { params: Promise<{ id:
                 {[
                   { label: "Total Contribution",   value: fmt(totalContribution),                               color: "text-brand-indigo" },
                   { label: "Per Life",              value: quotation.lives.length > 0 ? fmt(totalContribution / quotation.lives.length) : "—", color: "text-[#28A745]" },
-                  { label: "Valid Until",           value: quotation.validUntil ? new Date(quotation.validUntil).toLocaleDateString("en-KE") : "—", color: "text-[#856404]" },
+                  { label: "Valid Until",           value: quotation.validUntil ? new Date(quotation.validUntil).toLocaleDateString("en-UG") : "—", color: "text-[#856404]" },
                 ].map((k) => (
                   <div key={k.label} className="bg-white border border-[#EEEEEE] rounded-[8px] p-4 shadow-sm">
                     <p className="text-[11px] text-brand-text-muted font-bold uppercase">{k.label}</p>

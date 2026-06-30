@@ -57,7 +57,7 @@ async function fetchRowsForReport(
       return {
         title: TITLES[reportType],
         headers: ["Member No.", "Name", "Group", "Package", "Relationship", "Status", "Enrolled"],
-        rows: rows.map(r => [r.memberNumber, `${r.firstName} ${r.lastName}`, r.group.name, r.package.name, r.relationship, r.status, new Date(r.enrollmentDate).toLocaleDateString("en-KE")]),
+        rows: rows.map(r => [r.memberNumber, `${r.firstName} ${r.lastName}`, r.group.name, r.package.name, r.relationship, r.status, new Date(r.enrollmentDate).toLocaleDateString("en-UG")]),
       };
     }
     case "outstanding-bills": {
@@ -69,7 +69,7 @@ async function fetchRowsForReport(
       return {
         title: TITLES[reportType],
         headers: ["Invoice No.", "Group", "Balance (KES)", "Status", "Due Date"],
-        rows: rows.map(r => [r.invoiceNumber, r.group.name, Number(r.balance).toLocaleString("en-KE"), r.status, new Date(r.dueDate).toLocaleDateString("en-KE")]),
+        rows: rows.map(r => [r.invoiceNumber, r.group.name, Number(r.balance).toLocaleString("en-UG"), r.status, new Date(r.dueDate).toLocaleDateString("en-UG")]),
       };
     }
     default:
@@ -91,7 +91,7 @@ function buildReportHtml(title: string, headers: string[], rows: string[][], ten
 </head><body>
 <div style="background:#0B1437;color:white;padding:20px 28px;">
   <h1 style="font-family:'Sora',sans-serif;font-size:20px;font-weight:700;margin:0;">${tenant}</h1>
-  <p style="margin:4px 0 0;font-size:13px;opacity:.8;">${title} · Generated ${new Date().toLocaleDateString("en-KE")}</p>
+  <p style="margin:4px 0 0;font-size:13px;opacity:.8;">${title} · Generated ${new Date().toLocaleDateString("en-UG")}</p>
 </div>
 <div style="padding:20px 28px;">
   <table>

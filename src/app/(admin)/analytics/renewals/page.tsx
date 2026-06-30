@@ -109,7 +109,7 @@ export default async function RenewalPipelinePage({
                   <td className="px-5 py-3 text-brand-text-muted text-xs">{g.broker?.name ?? "—"}</td>
                   <td className="px-5 py-3 text-center font-mono">{g.activeMembers}</td>
                   <td className="px-5 py-3 text-brand-text-muted text-xs">
-                    {new Date(g.renewalDate).toLocaleDateString("en-KE")}
+                    {new Date(g.renewalDate).toLocaleDateString("en-UG")}
                   </td>
                   <td className="px-5 py-3 text-center">
                     <span className={urgencyColor(g.daysToRenewal)}>

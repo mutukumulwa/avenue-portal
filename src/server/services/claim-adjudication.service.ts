@@ -171,7 +171,7 @@ export const claimAdjudicationService = {
           rule:     "CONTRACTED_RATE_VARIANCE",
           score:    Math.min(100, Math.round(variancePct * 200)),
           severity: variancePct > 0.5 ? "HIGH" : "MEDIUM",
-          notes:    `Billed KES ${totalBilled.toLocaleString("en-KE")} vs contracted KES ${totalContracted.toLocaleString("en-KE")} (${(variancePct * 100).toFixed(1)}% over)`,
+          notes:    `Billed KES ${totalBilled.toLocaleString("en-UG")} vs contracted KES ${totalContracted.toLocaleString("en-UG")} (${(variancePct * 100).toFixed(1)}% over)`,
         },
       });
     }
@@ -328,7 +328,7 @@ export const claimAdjudicationService = {
           fromStatus: claim.status,
           toStatus:   claim.status,
           amount:     netAmount,
-          notes:      `Claim approved by adjudicator — KES ${netAmount.toLocaleString("en-KE")} payable`,
+          notes:      `Claim approved by adjudicator — KES ${netAmount.toLocaleString("en-UG")} payable`,
         },
       });
     });
@@ -341,7 +341,7 @@ export const claimAdjudicationService = {
       entityId:   claimId,
       payload:    { netAmount, claimNumber: claim.claimNumber },
       tenantId,
-      description: `Claim ${claim.claimNumber} approved — KES ${netAmount.toLocaleString("en-KE")}`,
+      description: `Claim ${claim.claimNumber} approved — KES ${netAmount.toLocaleString("en-UG")}`,
     });
   },
 
@@ -492,7 +492,7 @@ export const claimAdjudicationService = {
       entityId:   batch.id,
       payload:    { totalAmount, claimCount: claims.length, providerId, cycleMonth, cycleYear },
       tenantId,
-      description: `Settlement batch created for ${cycleMonth}/${cycleYear} — KES ${totalAmount.toLocaleString("en-KE")} across ${claims.length} claim(s)`,
+      description: `Settlement batch created for ${cycleMonth}/${cycleYear} — KES ${totalAmount.toLocaleString("en-UG")} across ${claims.length} claim(s)`,
     });
 
     return batch;
@@ -529,7 +529,7 @@ export const claimAdjudicationService = {
       entityId:   batchId,
       payload:    { totalAmount: Number(batch.totalAmount), checkerId },
       tenantId,
-      description: `Settlement batch approved — KES ${Number(batch.totalAmount).toLocaleString("en-KE")}`,
+      description: `Settlement batch approved — KES ${Number(batch.totalAmount).toLocaleString("en-UG")}`,
     });
 
     return updated;
@@ -557,7 +557,7 @@ export const claimAdjudicationService = {
       entityId: batchId,
       payload: { totalAmount: Number(batch.totalAmount), userId },
       tenantId,
-      description: `Settlement batch marked as SETTLED — KES ${Number(batch.totalAmount).toLocaleString("en-KE")}`,
+      description: `Settlement batch marked as SETTLED — KES ${Number(batch.totalAmount).toLocaleString("en-UG")}`,
     });
 
     return updated;

@@ -123,7 +123,7 @@ function DescriptionInput({ value, category, onChange, onSelectCpt }: Descriptio
                   </div>
                   {r.averageCost != null && (
                     <span className="shrink-0 text-xs font-semibold text-[#28A745]">
-                      KES {r.averageCost.toLocaleString("en-KE")}
+                      KES {r.averageCost.toLocaleString("en-UG")}
                     </span>
                   )}
                 </div>
@@ -351,7 +351,7 @@ export function ProcedureLineItems({ value, onChange, primaryIcdCode = "" }: Pro
                   <div className="col-span-1">
                     <label className="text-[10px] font-bold text-brand-text-muted uppercase block mb-0.5">Total</label>
                     <div className="border border-[#EEEEEE] rounded px-2 py-1 text-sm bg-[#F8F9FA] font-semibold text-brand-indigo whitespace-nowrap">
-                      {line.billedAmount.toLocaleString("en-KE")}
+                      {line.billedAmount.toLocaleString("en-UG")}
                     </div>
                   </div>
                 </div>
@@ -375,7 +375,7 @@ export function ProcedureLineItems({ value, onChange, primaryIcdCode = "" }: Pro
       {value.length > 0 && (
         <div className="flex justify-between items-center pt-3 border-t border-[#EEEEEE]">
           <span className="text-xs font-bold text-brand-text-muted uppercase">Total Billed Amount</span>
-          <span className="text-lg font-bold text-brand-indigo">KES {total.toLocaleString("en-KE")}</span>
+          <span className="text-lg font-bold text-brand-indigo">KES {total.toLocaleString("en-UG")}</span>
         </div>
       )}
 

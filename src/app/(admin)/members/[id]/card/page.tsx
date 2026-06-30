@@ -88,10 +88,10 @@ export default async function MemberCardPage({ params }: { params: Promise<{ id:
                     </span>
                   </td>
                   <td className="px-5 py-2.5 text-brand-text-muted text-xs">
-                    {card.issuedAt ? new Date(card.issuedAt).toLocaleDateString("en-KE") : "—"}
+                    {card.issuedAt ? new Date(card.issuedAt).toLocaleDateString("en-UG") : "—"}
                   </td>
                   <td className="px-5 py-2.5 text-brand-text-muted text-xs">
-                    {card.expiresAt ? new Date(card.expiresAt).toLocaleDateString("en-KE") : "—"}
+                    {card.expiresAt ? new Date(card.expiresAt).toLocaleDateString("en-UG") : "—"}
                   </td>
                 </tr>
               ))}

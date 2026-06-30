@@ -122,7 +122,7 @@ export class NotificationService {
         const result = await this.sendToMember(principal.id, `RENEWAL_REMINDER_${daysAhead}`, {
           firstName: principal.firstName,
           groupName: group.name,
-          renewalDate: group.renewalDate.toLocaleDateString("en-KE"),
+          renewalDate: group.renewalDate.toLocaleDateString("en-UG"),
           daysRemaining: String(daysAhead),
         });
         sent.push(result);

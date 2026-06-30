@@ -113,10 +113,10 @@ export function ProviderTariffsCard({
                 <td className="px-5 py-3 font-medium text-brand-text-heading">{t.serviceName}</td>
                 <td className="px-5 py-3 font-mono text-xs text-brand-text-muted">{t.cptCode ?? "—"}</td>
                 <td className="px-5 py-3 text-right font-semibold text-brand-text-heading">
-                  {Number(t.agreedRate).toLocaleString("en-KE")}
+                  {Number(t.agreedRate).toLocaleString("en-UG")}
                 </td>
                 <td className="px-5 py-3 text-brand-text-muted">
-                  {new Date(t.effectiveFrom).toLocaleDateString("en-KE")}
+                  {new Date(t.effectiveFrom).toLocaleDateString("en-UG")}
                 </td>
                 <td className="px-5 py-3">
                   <div className="flex gap-2.5 justify-end">

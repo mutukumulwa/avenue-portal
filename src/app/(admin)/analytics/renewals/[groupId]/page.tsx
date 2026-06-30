@@ -29,7 +29,7 @@ function numberParam(value: string | undefined, fallback: number) {
 function formatMoney(value: number) {
   if (Math.abs(value) >= 1_000_000) return `KES ${(value / 1_000_000).toFixed(1)}M`;
   if (Math.abs(value) >= 1_000) return `KES ${(value / 1_000).toFixed(0)}K`;
-  return `KES ${Math.round(value).toLocaleString("en-KE")}`;
+  return `KES ${Math.round(value).toLocaleString("en-UG")}`;
 }
 
 function formatPercent(value: number) {
@@ -37,7 +37,7 @@ function formatPercent(value: number) {
 }
 
 function formatDate(value: Date) {
-  return value.toLocaleDateString("en-KE", { day: "2-digit", month: "short", year: "numeric" });
+  return value.toLocaleDateString("en-UG", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 function daysUntil(value: Date) {
@@ -394,7 +394,7 @@ export default async function RenewalWorkspacePage({
             <input type="hidden" name="renewalAnalysisId" value={enrichedAnalysis.id} />
             <div>
               <label className="block text-xs font-semibold text-brand-text-muted mb-1">Scenario name</label>
-              <input name="scenarioName" type="text" placeholder={`Scenario ${new Date().toLocaleDateString("en-KE")}`}
+              <input name="scenarioName" type="text" placeholder={`Scenario ${new Date().toLocaleDateString("en-UG")}`}
                 className="border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-brand-indigo focus:outline-none w-52" />
             </div>
             <div>
@@ -425,7 +425,7 @@ export default async function RenewalWorkspacePage({
                   <p className="text-xs text-brand-text-muted mt-0.5">
                     Rate adj: {(Number(s.proposedRateAdj) * 100).toFixed(1)}% ·
                     Projected MLR: {(Number(s.projectedMlr) * 100).toFixed(1)}% ·
-                    Contribution: KES {Number(s.projectedContribution).toLocaleString("en-KE")}
+                    Contribution: KES {Number(s.projectedContribution).toLocaleString("en-UG")}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -466,7 +466,7 @@ export default async function RenewalWorkspacePage({
             <p className="text-xs text-brand-text-muted">Notice dispatched</p>
             <p className="font-semibold text-brand-text-heading mt-0.5">
               {groupStatus?.renewalNoticeDispatchedAt
-                ? new Date(groupStatus.renewalNoticeDispatchedAt).toLocaleDateString("en-KE")
+                ? new Date(groupStatus.renewalNoticeDispatchedAt).toLocaleDateString("en-UG")
                 : "Not yet"}
             </p>
           </div>

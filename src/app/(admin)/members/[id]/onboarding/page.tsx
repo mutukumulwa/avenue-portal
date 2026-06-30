@@ -119,7 +119,7 @@ export default async function MemberOnboardingPage({ params }: { params: Promise
                     </p>
                     {item.completedAt && (
                       <p className="text-[11px] text-brand-text-muted mt-0.5">
-                        {new Date(item.completedAt).toLocaleDateString("en-KE")}
+                        {new Date(item.completedAt).toLocaleDateString("en-UG")}
                       </p>
                     )}
                   </div>
@@ -214,7 +214,7 @@ export default async function MemberOnboardingPage({ params }: { params: Promise
                       </p>
                       <p className="text-xs text-brand-text-muted mt-0.5">
                         {CARD_STATUS_LABEL[card.status]}
-                        {card.issuedAt && ` · issued ${new Date(card.issuedAt).toLocaleDateString("en-KE")}`}
+                        {card.issuedAt && ` · issued ${new Date(card.issuedAt).toLocaleDateString("en-UG")}`}
                       </p>
                     </div>
                     {["ISSUED","DISPATCHED","DELIVERED"].includes(card.status) && (

@@ -205,8 +205,8 @@ export default async function ProviderDetailPage({ params }: { params: Promise<{
                   {share.member.firstName} {share.member.lastName} · {share.member.memberNumber}
                 </p>
                 <p className="mt-1 text-xs text-brand-text-muted">
-                  Shared {share.createdAt.toLocaleDateString("en-KE")}
-                  {share.expiresAt ? ` · expires ${share.expiresAt.toLocaleDateString("en-KE")}` : " · until revoked"}
+                  Shared {share.createdAt.toLocaleDateString("en-UG")}
+                  {share.expiresAt ? ` · expires ${share.expiresAt.toLocaleDateString("en-UG")}` : " · until revoked"}
                 </p>
 
                 {share.healthFile && (
@@ -238,7 +238,7 @@ export default async function ProviderDetailPage({ params }: { params: Promise<{
                       <div className="min-w-0">
                         <p className="font-bold text-brand-text-heading">{share.journalEntry.entryType.replace(/_/g, " ").toLowerCase()}</p>
                         <p className="mt-1 text-sm text-brand-text-body">
-                          Recorded {share.journalEntry.recordedAt.toLocaleDateString("en-KE")}
+                          Recorded {share.journalEntry.recordedAt.toLocaleDateString("en-UG")}
                         </p>
                       </div>
                     </div>
@@ -304,7 +304,7 @@ export default async function ProviderDetailPage({ params }: { params: Promise<{
                   <Link href={`/claims/${c.id}`} className="hover:text-brand-indigo transition-colors">{c.claimNumber}</Link>
                 </td>
                 <td className="px-5 py-3">{c.member.firstName} {c.member.lastName}</td>
-                <td className="px-5 py-3 text-right font-semibold">{Number(c.billedAmount).toLocaleString("en-KE")}</td>
+                <td className="px-5 py-3 text-right font-semibold">{Number(c.billedAmount).toLocaleString("en-UG")}</td>
                 <td className="px-5 py-3">
                   <span className={`px-2 py-0.5 text-[10px] font-bold uppercase rounded-full ${
                     c.status === "APPROVED" || c.status === "PAID" ? "bg-[#28A745]/10 text-[#28A745]" :
@@ -314,7 +314,7 @@ export default async function ProviderDetailPage({ params }: { params: Promise<{
                     {c.status.replace(/_/g, " ")}
                   </span>
                 </td>
-                <td className="px-5 py-3 text-brand-text-muted">{new Date(c.createdAt).toLocaleDateString("en-KE")}</td>
+                <td className="px-5 py-3 text-brand-text-muted">{new Date(c.createdAt).toLocaleDateString("en-UG")}</td>
               </tr>
             ))}
             {provider.claims.length === 0 && (

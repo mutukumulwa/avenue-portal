@@ -84,7 +84,7 @@ export default async function RateMatrixDetailPage({ params }: { params: Promise
     }
   }
 
-  const fmt = (n: number) => `KES ${Math.round(n).toLocaleString("en-KE")}`;
+  const fmt = (n: number) => `KES ${Math.round(n).toLocaleString("en-UG")}`;
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-5">

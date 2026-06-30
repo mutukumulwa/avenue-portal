@@ -5,7 +5,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PaymentInitiationForm } from "./PaymentInitiationForm";
 
-const currency = new Intl.NumberFormat("en-KE", {
+const currency = new Intl.NumberFormat("en-UG", {
   style: "currency",
   currency: "KES",
   maximumFractionDigits: 0,
@@ -13,7 +13,7 @@ const currency = new Intl.NumberFormat("en-KE", {
 
 function formatDate(value: Date | null) {
   if (!value) return "Pending";
-  return new Date(value).toLocaleDateString("en-KE", { day: "2-digit", month: "short", year: "numeric" });
+  return new Date(value).toLocaleDateString("en-UG", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 function statusTone(status: string) {
@@ -153,7 +153,7 @@ export default async function MemberWalletPage() {
                         <p className="text-sm font-bold">Awaiting callback</p>
                       </div>
                       <p className="mt-2 text-sm text-brand-text-muted">
-                        Checkout {item.latestPayment.checkoutRequestId} expires at {new Date(item.latestPayment.expiresAt).toLocaleTimeString("en-KE", { hour: "2-digit", minute: "2-digit" })}.
+                        Checkout {item.latestPayment.checkoutRequestId} expires at {new Date(item.latestPayment.expiresAt).toLocaleTimeString("en-UG", { hour: "2-digit", minute: "2-digit" })}.
                       </p>
                       <PaymentInitiationForm transactionId={item.id} defaultPhone={item.memberPhone ?? wallet.viewer.preferredPhone} disabled />
                     </div>

@@ -23,7 +23,7 @@ const MemberMap = dynamic(() => import("./MemberMap"), {
 
 function formatMoney(value: number) {
   if (value >= 1_000_000) return `KES ${(value / 1_000_000).toFixed(1)}M`;
-  return `KES ${Math.round(value).toLocaleString("en-KE")}`;
+  return `KES ${Math.round(value).toLocaleString("en-UG")}`;
 }
 
 function tierLabel(tier: string) {

@@ -150,7 +150,7 @@ export function ProviderContractsCard({
                   <p className="text-xs text-brand-text-muted mt-0.5">{c.title}</p>
                 </td>
                 <td className="px-5 py-3 text-brand-text-muted text-xs">
-                  {new Date(c.startDate).toLocaleDateString("en-KE")} → {new Date(c.endDate).toLocaleDateString("en-KE")}
+                  {new Date(c.startDate).toLocaleDateString("en-UG")} → {new Date(c.endDate).toLocaleDateString("en-UG")}
                   {display === "ACTIVE" && daysLeft <= 60 && (
                     <span className="block text-[10px] font-bold text-[#856404] mt-0.5">expires in {daysLeft}d</span>
                   )}

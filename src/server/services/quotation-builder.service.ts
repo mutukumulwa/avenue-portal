@@ -505,14 +505,14 @@ export const quotationBuilderService = {
 
     const html = renderQuotationHtml({
       quoteNumber: quotation.quoteNumber,
-      issuedDate: new Date().toLocaleDateString("en-KE"),
-      validUntil: quotation.validUntil ? new Date(quotation.validUntil).toLocaleDateString("en-KE") : "—",
+      issuedDate: new Date().toLocaleDateString("en-UG"),
+      validUntil: quotation.validUntil ? new Date(quotation.validUntil).toLocaleDateString("en-UG") : "—",
       tenantName: tenant?.name ?? "Medvex",
       tenantLogoUrl: tenant?.logoUrl ?? undefined,
       clientName: quotation.legalName ?? quotation.prospectName ?? "—",
       clientType: quotation.clientType ?? "CORPORATE",
       packageName: pkg?.name ?? "—",
-      requestedCoverStart: quotation.requestedCoverStart ? new Date(quotation.requestedCoverStart).toLocaleDateString("en-KE") : "—",
+      requestedCoverStart: quotation.requestedCoverStart ? new Date(quotation.requestedCoverStart).toLocaleDateString("en-UG") : "—",
       brokerName: quotation.broker?.name,
       lineItems: quotation.lineItems.map((l) => ({
         description: l.description,

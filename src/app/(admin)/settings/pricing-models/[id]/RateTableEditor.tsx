@@ -151,7 +151,7 @@ export function RateTableEditor({ pricingModelId, initialData }: { pricingModelI
                     <td className="p-3">{entry.maxAge}</td>
                     <td className="p-3">{entry.gender}</td>
                     <td className="p-3">{entry.familySize}</td>
-                    <td className="p-3 font-medium text-brand-text-heading">{Number(entry.baseRate).toLocaleString("en-KE")}</td>
+                    <td className="p-3 font-medium text-brand-text-heading">{Number(entry.baseRate).toLocaleString("en-UG")}</td>
                     <td className="p-3 text-right">
                       <button onClick={() => handleEdit(entry)} disabled={editingId !== null || isPending} className="text-brand-indigo p-1 hover:bg-blue-50 rounded text-xs font-bold mr-2 disabled:opacity-40">Edit</button>
                       <button onClick={() => handleDelete(entry)} disabled={isPending} className="text-red-500 p-1 hover:bg-red-50 rounded disabled:opacity-40"><Trash2 size={16} /></button>

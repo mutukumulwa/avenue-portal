@@ -329,7 +329,7 @@ export default async function AssessPage({ params }: { params: Promise<{ id: str
             <h2 className="font-semibold text-brand-text-heading text-xs uppercase tracking-wide">Submission Details</h2>
             {[
               { label: "Status",       value: quotation.status.replace(/_/g, " ") },
-              { label: "Cover start",  value: quotation.requestedCoverStart ? new Date(quotation.requestedCoverStart).toLocaleDateString("en-KE") : "—" },
+              { label: "Cover start",  value: quotation.requestedCoverStart ? new Date(quotation.requestedCoverStart).toLocaleDateString("en-UG") : "—" },
               { label: "Cover mode",   value: quotation.fundingMode === "SELF_FUNDED" ? "Fund Managed" : "Contribution Bearing" },
               { label: "Broker",       value: quotation.broker?.name ?? "Direct" },
               { label: "Assessor",     value: quotation.assessor ? `${quotation.assessor.firstName} ${quotation.assessor.lastName}` : "Unassigned" },

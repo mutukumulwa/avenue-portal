@@ -6,11 +6,11 @@ import { redirect } from "next/navigation";
 function formatMoney(value: number | null) {
   if (value === null) return "Private";
   if (value >= 1_000_000) return `KES ${(value / 1_000_000).toFixed(1)}M`;
-  return `KES ${Math.round(value).toLocaleString("en-KE")}`;
+  return `KES ${Math.round(value).toLocaleString("en-UG")}`;
 }
 
 function formatDate(value: Date) {
-  return new Date(value).toLocaleDateString("en-KE", {
+  return new Date(value).toLocaleDateString("en-UG", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -119,7 +119,7 @@ export default async function MemberBenefitsPage() {
 
               <div className="mt-3 flex items-center justify-between text-[13px] text-brand-text-muted">
                 <span>{pct}% used</span>
-                <span>{benefit.claimCount.toLocaleString("en-KE")} care event{benefit.claimCount === 1 ? "" : "s"}</span>
+                <span>{benefit.claimCount.toLocaleString("en-UG")} care event{benefit.claimCount === 1 ? "" : "s"}</span>
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2 text-[13px] text-brand-text-muted">

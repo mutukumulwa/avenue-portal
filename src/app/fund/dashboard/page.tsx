@@ -91,9 +91,9 @@ export default async function FundDashboardPage() {
       {/* Top-level KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Total Fund Balance",    value: `KES ${totalBalance.toLocaleString("en-KE")}`,    color: "text-[#28A745]",    icon: Wallet       },
-          { label: "Total Deposited",       value: `KES ${totalDeposited.toLocaleString("en-KE")}`,  color: "text-brand-indigo",icon: TrendingDown  },
-          { label: "Total Claims Paid",     value: `KES ${totalClaims.toLocaleString("en-KE")}`,    color: "text-[#DC3545]",    icon: TrendingDown  },
+          { label: "Total Fund Balance",    value: `KES ${totalBalance.toLocaleString("en-UG")}`,    color: "text-[#28A745]",    icon: Wallet       },
+          { label: "Total Deposited",       value: `KES ${totalDeposited.toLocaleString("en-UG")}`,  color: "text-brand-indigo",icon: TrendingDown  },
+          { label: "Total Claims Paid",     value: `KES ${totalClaims.toLocaleString("en-UG")}`,    color: "text-[#DC3545]",    icon: TrendingDown  },
           { label: "Low-Balance Alerts",    value: alertCount.toString(),                             color: alertCount > 0 ? "text-[#DC3545]" : "text-[#28A745]", icon: AlertTriangle },
         ].map(k => {
           const Icon = k.icon;
@@ -138,7 +138,7 @@ export default async function FundDashboardPage() {
                   <div>
                     <h2 className="font-bold text-brand-text-heading font-heading">{g.name}</h2>
                     <p className="text-xs text-brand-text-muted mt-0.5">
-                      {g.members.length} active members · Period: {new Date(acc.periodStartDate).toLocaleDateString("en-KE", { month: "short", year: "numeric" })} – {new Date(acc.periodEndDate).toLocaleDateString("en-KE", { month: "short", year: "numeric" })}
+                      {g.members.length} active members · Period: {new Date(acc.periodStartDate).toLocaleDateString("en-UG", { month: "short", year: "numeric" })} – {new Date(acc.periodEndDate).toLocaleDateString("en-UG", { month: "short", year: "numeric" })}
                     </p>
                   </div>
                 </div>
@@ -153,11 +153,11 @@ export default async function FundDashboardPage() {
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wide text-brand-text-muted mb-1">Current Balance</p>
                   <p className={`text-2xl font-bold font-mono ${isLow ? "text-[#DC3545]" : "text-[#28A745]"}`}>
-                    KES {balance.toLocaleString("en-KE")}
+                    KES {balance.toLocaleString("en-UG")}
                   </p>
                   {isLow && (
                     <p className="text-xs text-[#DC3545] mt-0.5">
-                      Below minimum (KES {minBalance.toLocaleString("en-KE")})
+                      Below minimum (KES {minBalance.toLocaleString("en-UG")})
                     </p>
                   )}
                 </div>
@@ -166,7 +166,7 @@ export default async function FundDashboardPage() {
                 <div>
                   <p className="text-xs font-bold uppercase tracking-wide text-brand-text-muted mb-1">Monthly Burn Rate</p>
                   <p className="text-lg font-bold text-brand-text-heading font-mono">
-                    KES {Math.round(monthly).toLocaleString("en-KE")}
+                    KES {Math.round(monthly).toLocaleString("en-UG")}
                   </p>
                   {days !== null && (
                     <p className={`text-xs mt-0.5 flex items-center gap-1 ${days < 30 ? "text-[#DC3545]" : days < 90 ? "text-[#856404]" : "text-[#28A745]"}`}>
@@ -186,8 +186,8 @@ export default async function FundDashboardPage() {
                     <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${utilPct}%` }} />
                   </div>
                   <div className="flex justify-between text-xs text-brand-text-muted mt-1">
-                    <span>KES {claimed.toLocaleString("en-KE")} paid</span>
-                    <span>KES {deposited.toLocaleString("en-KE")} deposited</span>
+                    <span>KES {claimed.toLocaleString("en-UG")} paid</span>
+                    <span>KES {deposited.toLocaleString("en-UG")} deposited</span>
                   </div>
                 </div>
               </div>
@@ -201,7 +201,7 @@ export default async function FundDashboardPage() {
                       <div key={i} className="flex justify-between text-xs text-brand-text-body">
                         <span className="truncate max-w-xs">{t.description}</span>
                         <span className={`font-mono font-semibold ml-4 ${["DEPOSIT","TOP_UP","REFUND"].includes(t.type) ? "text-[#28A745]" : "text-[#DC3545]"}`}>
-                          {["DEPOSIT","TOP_UP","REFUND"].includes(t.type) ? "+" : "−"}KES {t.amount.toLocaleString("en-KE")}
+                          {["DEPOSIT","TOP_UP","REFUND"].includes(t.type) ? "+" : "−"}KES {t.amount.toLocaleString("en-UG")}
                         </span>
                       </div>
                     ))}
@@ -245,10 +245,10 @@ export default async function FundDashboardPage() {
                   <td className="px-4 py-2.5 text-brand-text-muted">{c.member.group.name}</td>
                   <td className="px-4 py-2.5 text-brand-text-muted">{c.benefitCategory.replace(/_/g, " ")}</td>
                   <td className="px-4 py-2.5 text-right font-mono font-bold text-[#DC3545]">
-                    {Number(c.approvedAmount).toLocaleString("en-KE")}
+                    {Number(c.approvedAmount).toLocaleString("en-UG")}
                   </td>
                   <td className="px-4 py-2.5 text-brand-text-muted text-xs">
-                    {new Date(c.dateOfService).toLocaleDateString("en-KE")}
+                    {new Date(c.dateOfService).toLocaleDateString("en-UG")}
                   </td>
                 </tr>
               ))}

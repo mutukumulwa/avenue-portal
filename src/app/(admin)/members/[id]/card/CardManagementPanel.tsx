@@ -141,7 +141,7 @@ export function CardManagementPanel({ memberId, currentCardNumber, activityLogs 
                 <div className="mt-0.5">{ACTION_ICON[l.action] ?? <Clock size={13} className="text-brand-text-muted" />}</div>
                 <div className="flex-1">
                   <p className="text-brand-text-body">{l.description}</p>
-                  <p className="text-xs text-brand-text-muted mt-0.5">{new Date(l.createdAt).toLocaleString("en-KE")}</p>
+                  <p className="text-xs text-brand-text-muted mt-0.5">{new Date(l.createdAt).toLocaleString("en-UG")}</p>
                 </div>
               </div>
             ))}

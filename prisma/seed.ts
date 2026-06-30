@@ -2732,7 +2732,7 @@ async function main() {
             data: {
               tenantId,
               name: 'Medvex Corporate Sales Desk',
-              brokerCode: 'SRC-AVENUE-SALES',
+              brokerCode: 'SRC-MEDVEX-SALES',
               legalName: 'Medvex Corporate Sales Desk',
               brokerType: 'INDIVIDUAL_PRODUCER',
               intermediaryCategory: 'INTERNAL_SALES',

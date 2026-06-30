@@ -91,7 +91,7 @@ export default async function AuditLogPage({
             {logs.map(log => (
               <tr key={log.id} className="hover:bg-[#F8F9FA]">
                 <td className="px-5 py-3 text-xs text-brand-text-muted whitespace-nowrap font-mono">
-                  {new Date(log.createdAt).toLocaleString("en-KE", { dateStyle: "short", timeStyle: "medium" })}
+                  {new Date(log.createdAt).toLocaleString("en-UG", { dateStyle: "short", timeStyle: "medium" })}
                 </td>
                 <td className="px-5 py-3">
                   <p className="font-semibold text-brand-text-heading text-xs">{log.user.firstName} {log.user.lastName}</p>

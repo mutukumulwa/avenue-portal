@@ -71,8 +71,8 @@ export default async function FundClaimsPage({ params }: { params: Promise<{ gro
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: "Total Claims",         value: claims.length.toString(),             color: "text-brand-indigo" },
-          { label: "Paid from Fund (KES)", value: totalApproved.toLocaleString("en-KE"),color: "text-[#DC3545]"    },
-          { label: "Pending (KES)",        value: totalPending.toLocaleString("en-KE"), color: "text-[#856404]"    },
+          { label: "Paid from Fund (KES)", value: totalApproved.toLocaleString("en-UG"),color: "text-[#DC3545]"    },
+          { label: "Pending (KES)",        value: totalPending.toLocaleString("en-UG"), color: "text-[#856404]"    },
           { label: "Declined",             value: declined.toString(),                  color: "text-[#6C757D]"    },
         ].map(k => (
           <div key={k.label} className="bg-white border border-[#EEEEEE] rounded-[8px] p-4 shadow-sm">
@@ -120,13 +120,13 @@ export default async function FundClaimsPage({ params }: { params: Promise<{ gro
                   <td className="px-4 py-3 text-xs">{c.provider.name}</td>
                   <td className="px-4 py-3 text-xs">{c.benefitCategory.replace(/_/g, " ")}</td>
                   <td className="px-4 py-3 text-xs text-brand-text-muted">
-                    {new Date(c.dateOfService).toLocaleDateString("en-KE")}
+                    {new Date(c.dateOfService).toLocaleDateString("en-UG")}
                   </td>
                   <td className="px-4 py-3 text-right font-mono text-xs">
-                    {Number(c.billedAmount).toLocaleString("en-KE")}
+                    {Number(c.billedAmount).toLocaleString("en-UG")}
                   </td>
                   <td className="px-4 py-3 text-right font-mono text-xs font-semibold text-[#28A745]">
-                    {Number(c.approvedAmount) > 0 ? Number(c.approvedAmount).toLocaleString("en-KE") : "—"}
+                    {Number(c.approvedAmount) > 0 ? Number(c.approvedAmount).toLocaleString("en-UG") : "—"}
                   </td>
                   <td className="px-4 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${STATUS_COLOR[c.status] ?? "bg-[#6C757D]/10 text-[#6C757D]"}`}>
@@ -135,7 +135,7 @@ export default async function FundClaimsPage({ params }: { params: Promise<{ gro
                   </td>
                   <td className="px-4 py-3 text-xs">
                     {fundDeducted
-                      ? <span className="text-[#28A745] font-bold">✓ KES {c.fundTransactions.reduce((s, t) => s + Number(t.amount), 0).toLocaleString("en-KE")}</span>
+                      ? <span className="text-[#28A745] font-bold">✓ KES {c.fundTransactions.reduce((s, t) => s + Number(t.amount), 0).toLocaleString("en-UG")}</span>
                       : <span className="text-brand-text-muted">—</span>}
                   </td>
                 </tr>

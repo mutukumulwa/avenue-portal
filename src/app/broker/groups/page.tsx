@@ -51,7 +51,7 @@ export default async function BrokerGroupsPage() {
                 <td className="px-6 py-4 font-bold text-brand-text-heading">{g.name}</td>
                 <td className="px-6 py-4">{g.package.name}</td>
                 <td className="px-6 py-4 font-semibold">{g._count.members}</td>
-                <td className="px-6 py-4">{new Date(g.renewalDate).toLocaleDateString("en-KE")}</td>
+                <td className="px-6 py-4">{new Date(g.renewalDate).toLocaleDateString("en-UG")}</td>
                 <td className="px-6 py-4">
                   <span className={`px-3 py-1 text-[10px] font-bold uppercase rounded-full ${
                     g.status === "ACTIVE" ? "bg-[#28A745]/10 text-[#28A745]" : "bg-[#6C757D]/10 text-[#6C757D]"

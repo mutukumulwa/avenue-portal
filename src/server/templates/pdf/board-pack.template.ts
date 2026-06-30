@@ -86,7 +86,7 @@ export function renderBoardPackHtml(data: BoardPackData): string {
 <div class="header">
   <h1>${data.tenantName}</h1>
   <div class="sub">Monthly Board Pack — ${data.period}</div>
-  <div class="sub" style="margin-top:8px;opacity:0.6;">Generated ${new Date(data.generatedAt).toLocaleString("en-KE")}</div>
+  <div class="sub" style="margin-top:8px;opacity:0.6;">Generated ${new Date(data.generatedAt).toLocaleString("en-UG")}</div>
 </div>
 
 <div class="body">

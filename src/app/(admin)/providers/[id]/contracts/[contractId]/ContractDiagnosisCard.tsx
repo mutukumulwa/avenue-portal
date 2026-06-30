@@ -102,8 +102,8 @@ export function ContractDiagnosisCard({
               <tr key={t.id} className="hover:bg-[#F8F9FA]">
                 <td className="px-5 py-2.5 font-mono text-xs text-brand-text-muted">{t.icdCode}</td>
                 <td className="px-5 py-2.5 font-medium text-brand-text-heading">{t.diagnosisLabel}</td>
-                <td className="px-5 py-2.5 text-right font-semibold">{t.bundledRate != null ? t.bundledRate.toLocaleString("en-KE") : "—"}</td>
-                <td className="px-5 py-2.5 text-right font-semibold">{t.perDayRate != null ? `${t.perDayRate.toLocaleString("en-KE")}/day` : "—"}</td>
+                <td className="px-5 py-2.5 text-right font-semibold">{t.bundledRate != null ? t.bundledRate.toLocaleString("en-UG") : "—"}</td>
+                <td className="px-5 py-2.5 text-right font-semibold">{t.perDayRate != null ? `${t.perDayRate.toLocaleString("en-UG")}/day` : "—"}</td>
                 {editable && (
                   <td className="px-5 py-2.5">
                     <div className="flex gap-2.5 justify-end">

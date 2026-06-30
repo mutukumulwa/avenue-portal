@@ -998,7 +998,7 @@ model Package {
   id                 String        @id @default(cuid())
   tenantId           String
   tenant             Tenant        @relation(fields: [tenantId], references: [id])
-  name               String // "Avenue Essential"
+  name               String // "Medvex Essential"
   description        String?
   type               PackageType   @default(GROUP)
   annualLimit        Decimal // Overall annual limit in KES
@@ -1032,7 +1032,7 @@ model PackageVersion {
   effectiveFrom   DateTime
   effectiveTo     DateTime?
   benefits        BenefitConfig[]
-  facilityAccess  String[] // Provider IDs or "ALL_AVENUE" / "ALL_NETWORK"
+  facilityAccess  String[] // Provider IDs or "ALL_MEDVEX" / "ALL_NETWORK"
   pricingModelUrl String? // URL to uploaded pricing model (Excel/Python)
   pricingConfig   Json? // Structured pricing parameters
   createdAt       DateTime        @default(now())
@@ -1600,7 +1600,7 @@ enum ProviderType {
 }
 
 enum ProviderTier {
-  OWN // Avenue's own facilities
+  OWN // Medvex own facilities
   PARTNER // Contracted partner facilities
   PANEL // Wider panel
 }
@@ -2758,7 +2758,7 @@ enum CoContributionType {
 
 // Maps to Provider.tier: OWN → TIER_1, PARTNER/PANEL → TIER_2, unknown → TIER_3
 enum NetworkTier {
-  TIER_1 // Avenue own facilities
+  TIER_1 // Medvex own facilities
   TIER_2 // Contracted partner / panel
   TIER_3 // Out-of-network
 }

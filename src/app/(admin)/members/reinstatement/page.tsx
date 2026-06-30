@@ -49,10 +49,10 @@ export default async function ReinstatementQueuePage() {
                     <p className="text-brand-text-muted font-mono text-xs mt-0.5">{r.member.memberNumber}</p>
                   </td>
                   <td className="px-5 py-4">{r.member.group.name}</td>
-                  <td className="px-5 py-4">{new Date(r.lapsedDate).toLocaleDateString("en-KE")}</td>
+                  <td className="px-5 py-4">{new Date(r.lapsedDate).toLocaleDateString("en-UG")}</td>
                   <td className="px-5 py-4 font-semibold">{r.periodsCovered}</td>
                   <td className="px-5 py-4 font-semibold text-brand-indigo">{Number(r.catchUpAmount).toLocaleString()}</td>
-                  <td className="px-5 py-4 text-brand-text-muted">{new Date(r.requestDate).toLocaleDateString("en-KE")}</td>
+                  <td className="px-5 py-4 text-brand-text-muted">{new Date(r.requestDate).toLocaleDateString("en-UG")}</td>
                   <td className="px-5 py-4">
                     <ReinstatementDecisionPanel requestId={r.id} />
                   </td>

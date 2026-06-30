@@ -479,14 +479,14 @@ export const bindingService = {
     // Reuse quotation template structure for certificate
     const html = renderQuotationHtml({
       quoteNumber: member.memberNumber,
-      issuedDate: new Date().toLocaleDateString("en-KE"),
-      validUntil: member.coverEndDate ? new Date(member.coverEndDate).toLocaleDateString("en-KE") : "—",
+      issuedDate: new Date().toLocaleDateString("en-UG"),
+      validUntil: member.coverEndDate ? new Date(member.coverEndDate).toLocaleDateString("en-UG") : "—",
       tenantName: tenant?.name ?? "Medvex",
       tenantLogoUrl: tenant?.logoUrl ?? undefined,
       clientName: `${member.firstName} ${member.lastName}`,
       clientType: "INDIVIDUAL",
       packageName: member.package?.name ?? "—",
-      requestedCoverStart: member.coverStartDate ? new Date(member.coverStartDate).toLocaleDateString("en-KE") : "—",
+      requestedCoverStart: member.coverStartDate ? new Date(member.coverStartDate).toLocaleDateString("en-UG") : "—",
       lineItems: [],
       totalContribution: 0,
       memberCount: 1,

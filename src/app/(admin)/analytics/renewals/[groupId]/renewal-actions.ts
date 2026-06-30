@@ -20,7 +20,7 @@ export async function saveScenarioAction(formData: FormData) {
   const proposedCoContrib = formData.get("proposedCoContribAdj") ? Number(formData.get("proposedCoContribAdj")) / 100 : undefined;
 
   await renewalService.createScenario(renewalAnalysisId, session.user.tenantId, session.user.id, {
-    scenarioName: scenarioName || `Scenario ${new Date().toLocaleDateString("en-KE")}`,
+    scenarioName: scenarioName || `Scenario ${new Date().toLocaleDateString("en-UG")}`,
     proposedRateAdj,
     proposedCoContribAdj: proposedCoContrib,
   });

@@ -19,11 +19,11 @@ import Link from "next/link";
 
 function formatMoney(value: number) {
   if (value >= 1_000_000) return `KES ${(value / 1_000_000).toFixed(1)}M`;
-  return `KES ${Math.round(value).toLocaleString("en-KE")}`;
+  return `KES ${Math.round(value).toLocaleString("en-UG")}`;
 }
 
 function formatDate(value: Date) {
-  return new Date(value).toLocaleDateString("en-KE", {
+  return new Date(value).toLocaleDateString("en-UG", {
     day: "2-digit",
     month: "short",
     year: "numeric",

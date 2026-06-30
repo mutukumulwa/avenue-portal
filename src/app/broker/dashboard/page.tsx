@@ -88,7 +88,7 @@ export default async function BrokerDashboardPage() {
               <div key={g.id} className="px-5 py-3 flex items-center justify-between text-sm">
                 <div>
                   <p className="font-semibold text-brand-text-heading">{g.name}</p>
-                  <p className="text-xs text-brand-text-muted">{g._count.members} members · Renews {new Date(g.renewalDate).toLocaleDateString("en-KE")}</p>
+                  <p className="text-xs text-brand-text-muted">{g._count.members} members · Renews {new Date(g.renewalDate).toLocaleDateString("en-UG")}</p>
                 </div>
                 <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
                   g.status === "ACTIVE" ? "bg-[#28A745]/10 text-[#28A745]" : "bg-[#6C757D]/10 text-[#6C757D]"
@@ -112,7 +112,7 @@ export default async function BrokerDashboardPage() {
               <div key={entry.id} className="px-5 py-3 flex items-center justify-between text-sm">
                 <div>
                   <p className="font-semibold text-brand-text-heading">{entry.schedule?.scheduleName ?? "Pending schedule"}</p>
-                  <p className="text-xs text-brand-text-muted">{new Date(entry.earnedPeriodStart).toLocaleDateString("en-KE")} · {entry.state.replaceAll("_", " ")}</p>
+                  <p className="text-xs text-brand-text-muted">{new Date(entry.earnedPeriodStart).toLocaleDateString("en-UG")} · {entry.state.replaceAll("_", " ")}</p>
                 </div>
                 <span className="font-bold text-[#28A745]">{formatCurrency(entry.netPayable)}</span>
               </div>
@@ -135,7 +135,7 @@ export default async function BrokerDashboardPage() {
                 <div key={g.id} className="px-5 py-3 flex items-center justify-between text-sm">
                   <div>
                     <p className="font-semibold text-brand-text-heading">{g.name}</p>
-                    <p className="text-xs text-brand-text-muted">{new Date(g.renewalDate).toLocaleDateString("en-KE")}</p>
+                    <p className="text-xs text-brand-text-muted">{new Date(g.renewalDate).toLocaleDateString("en-UG")}</p>
                   </div>
                   <span className={`font-bold text-sm ${daysLeft <= 14 ? "text-[#DC3545]" : "text-[#FFC107]"}`}>
                     {daysLeft}d

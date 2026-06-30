@@ -68,19 +68,19 @@ export default async function BrokerQuotationDetailPage({ params }: { params: Pr
           <div>
             <p className="text-xs font-bold uppercase text-brand-text-muted">Lives</p>
             <p className="font-bold text-brand-text-heading mt-1">
-              {totalLives.toLocaleString("en-KE")} ({quotation.memberCount} principal, {quotation.dependentCount} dependant)
+              {totalLives.toLocaleString("en-UG")} ({quotation.memberCount} principal, {quotation.dependentCount} dependant)
             </p>
           </div>
           <div>
             <p className="text-xs font-bold uppercase text-brand-text-muted">Final Premium</p>
             <p className="font-bold text-brand-indigo mt-1">
-              KES {Number(quotation.finalPremium ?? 0).toLocaleString("en-KE")}
+              KES {Number(quotation.finalPremium ?? 0).toLocaleString("en-UG")}
             </p>
           </div>
           <div>
             <p className="text-xs font-bold uppercase text-brand-text-muted">Valid Until</p>
             <p className="font-bold text-brand-text-heading mt-1">
-              {quotation.validUntil ? new Date(quotation.validUntil).toLocaleDateString("en-KE") : "-"}
+              {quotation.validUntil ? new Date(quotation.validUntil).toLocaleDateString("en-UG") : "-"}
             </p>
           </div>
           <div>

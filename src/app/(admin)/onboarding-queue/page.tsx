@@ -121,7 +121,7 @@ export default async function OnboardingQueuePage({
                     </td>
                     <td className="px-5 py-3 text-brand-text-body">{m.group.name}</td>
                     <td className="px-5 py-3 text-brand-text-muted text-xs">
-                      {m.coverStartDate ? new Date(m.coverStartDate).toLocaleDateString("en-KE") : "—"}
+                      {m.coverStartDate ? new Date(m.coverStartDate).toLocaleDateString("en-UG") : "—"}
                     </td>
                     <td className="px-5 py-3">
                       <div className="flex flex-wrap gap-1">

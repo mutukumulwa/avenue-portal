@@ -32,7 +32,7 @@ function dateAliases(date: Date) {
   const iso = date.toISOString().slice(0, 10);
   return [
     iso,
-    date.toLocaleDateString("en-KE"),
+    date.toLocaleDateString("en-UG"),
     date.toLocaleDateString("en-GB"),
   ];
 }

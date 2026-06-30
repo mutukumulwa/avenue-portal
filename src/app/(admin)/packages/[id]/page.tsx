@@ -169,7 +169,7 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
               {pkg.versions.map(v => (
                 <tr key={v.id} className="hover:bg-[#F8F9FA]">
                   <td className="px-5 py-3 font-mono font-semibold text-brand-text-heading">v{v.versionNumber}</td>
-                  <td className="px-5 py-3">{new Date(v.effectiveFrom).toLocaleDateString("en-KE")}</td>
+                  <td className="px-5 py-3">{new Date(v.effectiveFrom).toLocaleDateString("en-UG")}</td>
                   <td className="px-5 py-3">{v.benefits.length} categories</td>
                   <td className="px-5 py-3">
                     {v.id === pkg.currentVersionId ? (

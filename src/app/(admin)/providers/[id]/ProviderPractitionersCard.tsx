@@ -119,7 +119,7 @@ function PractitionerRow({ link, providerId }: { link: Practitioner; providerId:
           {p.credentials.map(c => (
             <div key={c.id} className={`text-xs px-2 py-1 rounded flex items-center gap-1.5 ${statusColor(c.status)}`}>
               <span className="font-semibold">{c.documentType}</span>
-              <span>· expires {new Date(c.expiryDate).toLocaleDateString("en-KE")}</span>
+              <span>· expires {new Date(c.expiryDate).toLocaleDateString("en-UG")}</span>
             </div>
           ))}
         </div>

@@ -6,11 +6,11 @@ import { redirect } from "next/navigation";
 function formatMoney(value: number | null) {
   if (value === null) return "Private";
   if (value >= 1_000_000) return `KES ${(value / 1_000_000).toFixed(1)}M`;
-  return `KES ${Math.round(value).toLocaleString("en-KE")}`;
+  return `KES ${Math.round(value).toLocaleString("en-UG")}`;
 }
 
 function formatDate(value: Date) {
-  return new Date(value).toLocaleDateString("en-KE", {
+  return new Date(value).toLocaleDateString("en-UG", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -62,7 +62,7 @@ export default async function MemberDependentsPage() {
             <div className={`h-full rounded-full ${barTone(family.familySummary.usedPct)}`} style={{ width: `${familyUsedPct}%` }} />
           </div>
           <div className="mt-2 flex justify-between text-[13px] text-brand-text-muted">
-            <span>{family.familySummary.memberCount.toLocaleString("en-KE")} covered member(s)</span>
+            <span>{family.familySummary.memberCount.toLocaleString("en-UG")} covered member(s)</span>
             <span>{familyUsedPct}% used</span>
           </div>
         </div>

@@ -86,7 +86,7 @@ export default async function ContractWorkspacePage({
             {contract.contractNumber} — {contract.title}
           </h1>
           <p className="text-brand-text-body text-sm mt-0.5">
-            {contract.provider.name} · {contract.startDate.toLocaleDateString("en-KE")} → {contract.endDate.toLocaleDateString("en-KE")}
+            {contract.provider.name} · {contract.startDate.toLocaleDateString("en-UG")} → {contract.endDate.toLocaleDateString("en-UG")}
             {contract.predecessor && (
               <> · renews <Link className="text-brand-indigo hover:underline" href={`/providers/${providerId}/contracts/${contract.predecessor.id}`}>{contract.predecessor.contractNumber}</Link></>
             )}

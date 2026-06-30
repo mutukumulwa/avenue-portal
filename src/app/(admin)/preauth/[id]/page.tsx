@@ -19,7 +19,7 @@ function formatCategory(value: string) {
 
 function formatDate(value: Date | null) {
   if (!value) return "Not set";
-  return new Date(value).toLocaleDateString("en-KE", { day: "2-digit", month: "short", year: "numeric" });
+  return new Date(value).toLocaleDateString("en-UG", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 function formatBytes(value: number | null) {
@@ -302,7 +302,7 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
                 : "SLA active"}
             </p>
             <p className="text-xs text-brand-text-muted mt-0.5">
-              Deadline: {new Date(slaDeadline).toLocaleTimeString("en-KE", { hour: "2-digit", minute: "2-digit" })}
+              Deadline: {new Date(slaDeadline).toLocaleTimeString("en-UG", { hour: "2-digit", minute: "2-digit" })}
               {" · "}Type: {enriched?.slaType?.replace(/_/g," ") ?? "—"}
             </p>
           </div>
@@ -318,10 +318,10 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
           {benefitBalance && (
             <div className="grid grid-cols-4 gap-3 text-sm">
               {[
-                { label: "Annual Limit",   value: `KES ${Number(benefitBalance.limit).toLocaleString("en-KE")}`,     color: "text-brand-text-heading" },
-                { label: "Consumed",       value: `KES ${Number(benefitBalance.used).toLocaleString("en-KE")}`,      color: "text-[#DC3545]" },
-                { label: "Active Holds",   value: `KES ${Number(benefitBalance.held).toLocaleString("en-KE")}`,      color: "text-[#856404]" },
-                { label: "Available",      value: `KES ${Number(benefitBalance.remaining).toLocaleString("en-KE")}`, color: "text-[#28A745] font-bold" },
+                { label: "Annual Limit",   value: `KES ${Number(benefitBalance.limit).toLocaleString("en-UG")}`,     color: "text-brand-text-heading" },
+                { label: "Consumed",       value: `KES ${Number(benefitBalance.used).toLocaleString("en-UG")}`,      color: "text-[#DC3545]" },
+                { label: "Active Holds",   value: `KES ${Number(benefitBalance.held).toLocaleString("en-UG")}`,      color: "text-[#856404]" },
+                { label: "Available",      value: `KES ${Number(benefitBalance.remaining).toLocaleString("en-UG")}`, color: "text-[#28A745] font-bold" },
               ].map(({ label, value, color }) => (
                 <div key={label}>
                   <p className="text-xs text-brand-text-muted">{label}</p>
@@ -334,10 +334,10 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
             <div className="flex items-center justify-between bg-[#FFC107]/10 border border-[#FFC107]/30 rounded-[6px] p-3">
               <div>
                 <p className="text-sm font-semibold text-[#856404]">
-                  Pending Authorization Hold: KES {Number(hold.heldAmount).toLocaleString("en-KE")}
+                  Pending Authorization Hold: KES {Number(hold.heldAmount).toLocaleString("en-UG")}
                 </p>
                 <p className="text-xs text-brand-text-muted mt-0.5">
-                  Expires: {new Date(hold.expiresAt).toLocaleDateString("en-KE")}
+                  Expires: {new Date(hold.expiresAt).toLocaleDateString("en-UG")}
                   {" · "}Status: {hold.status}
                 </p>
               </div>
@@ -413,7 +413,7 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
             <input type="hidden" name="preAuthId" value={id} />
             <div className="flex-1">
               <input name="approvedAmount" type="number" required
-                placeholder={`Approved amount (est. KES ${Number(pa.estimatedCost).toLocaleString("en-KE")})`}
+                placeholder={`Approved amount (est. KES ${Number(pa.estimatedCost).toLocaleString("en-UG")})`}
                 defaultValue={Number(pa.estimatedCost)}
                 className="w-full border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm" />
             </div>

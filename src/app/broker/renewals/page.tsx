@@ -76,7 +76,7 @@ export default async function BrokerRenewalsPage() {
                   <td className="px-6 py-4">{g.package.name}</td>
                   <td className="px-6 py-4 font-semibold">{g._count.members}</td>
                   <td className="px-6 py-4 font-semibold">{annualPremium.toLocaleString()}</td>
-                  <td className="px-6 py-4">{new Date(g.renewalDate).toLocaleDateString("en-KE")}</td>
+                  <td className="px-6 py-4">{new Date(g.renewalDate).toLocaleDateString("en-UG")}</td>
                   <td className="px-6 py-4">
                     <span className={`px-3 py-1 text-[10px] font-bold uppercase rounded-full ${urgency.color}`}>
                       {urgency.label} ({urgency.days < 0 ? `${Math.abs(urgency.days)}d overdue` : `${urgency.days}d`})

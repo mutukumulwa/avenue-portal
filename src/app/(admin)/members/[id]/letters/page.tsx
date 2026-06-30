@@ -131,7 +131,7 @@ export default async function MemberLettersPage({ params }: { params: Promise<{ 
                 <div>
                   <p className="text-sm font-semibold text-brand-text-heading">{l.subject}</p>
                   <p className="text-xs text-brand-text-muted mt-0.5">
-                    {new Date(l.sentAt).toLocaleDateString("en-KE", { day: "2-digit", month: "short", year: "numeric" })}
+                    {new Date(l.sentAt).toLocaleDateString("en-UG", { day: "2-digit", month: "short", year: "numeric" })}
                   </p>
                 </div>
                 <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-[#28A745]/10 text-[#28A745]">

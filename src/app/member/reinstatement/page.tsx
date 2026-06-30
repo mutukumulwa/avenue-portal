@@ -81,7 +81,7 @@ export default async function MemberReinstatementPage() {
             <h2 className="font-bold text-brand-text-heading">Request Pending Review</h2>
           </div>
           <p className="text-sm text-brand-text-body">
-            Your reinstatement request was submitted on {new Date(pending.requestDate).toLocaleDateString("en-KE")}.
+            Your reinstatement request was submitted on {new Date(pending.requestDate).toLocaleDateString("en-UG")}.
             Estimated catch-up: <strong>KES {Number(pending.catchUpAmount).toLocaleString()}</strong> for {pending.periodsCovered} month(s).
             Your scheme administrator will review it shortly.
           </p>
@@ -110,7 +110,7 @@ export default async function MemberReinstatementPage() {
                     <span className="font-semibold text-brand-text-heading">{r.status.replace(/_/g, " ")}</span>
                   </div>
                   <p className="text-brand-text-muted mt-1">
-                    Requested {new Date(r.requestDate).toLocaleDateString("en-KE")} ·{" "}
+                    Requested {new Date(r.requestDate).toLocaleDateString("en-UG")} ·{" "}
                     {r.periodsCovered} month(s) · KES {Number(r.catchUpAmount).toLocaleString()}
                   </p>
                   {r.declineReason && (
@@ -118,7 +118,7 @@ export default async function MemberReinstatementPage() {
                   )}
                 </div>
                 {r.decidedAt && (
-                  <span className="text-xs text-brand-text-muted">{new Date(r.decidedAt).toLocaleDateString("en-KE")}</span>
+                  <span className="text-xs text-brand-text-muted">{new Date(r.decidedAt).toLocaleDateString("en-UG")}</span>
                 )}
               </div>
             ))}

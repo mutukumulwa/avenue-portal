@@ -90,7 +90,7 @@ export default function MemberMap({ position, providers }: { position: { lat: nu
               <p className="text-xs text-gray-500 m-0 mt-1">{p.type} - {Number(p.distance).toFixed(1)} km</p>
               {p.estimate && (
                 <p className="text-xs text-gray-700 m-0 mt-1">
-                  Est. KES {Math.round(p.estimate.estimatedCost).toLocaleString("en-KE")}
+                  Est. KES {Math.round(p.estimate.estimatedCost).toLocaleString("en-UG")}
                 </p>
               )}
               <a 

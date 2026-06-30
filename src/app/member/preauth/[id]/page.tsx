@@ -8,12 +8,12 @@ import { notFound } from "next/navigation";
 function formatMoney(value: number | null) {
   if (value === null) return "Pending";
   if (value >= 1_000_000) return `KES ${(value / 1_000_000).toFixed(1)}M`;
-  return `KES ${Math.round(value).toLocaleString("en-KE")}`;
+  return `KES ${Math.round(value).toLocaleString("en-UG")}`;
 }
 
 function formatDate(value: Date | null) {
   if (!value) return "Not set";
-  return new Date(value).toLocaleDateString("en-KE", { day: "2-digit", month: "short", year: "numeric" });
+  return new Date(value).toLocaleDateString("en-UG", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 function formatCategory(value: string) {

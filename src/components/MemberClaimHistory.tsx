@@ -94,7 +94,7 @@ export async function MemberClaimHistory({ memberId, limit = 5 }: Props) {
                 )}
               </p>
               <p className="text-[11px] text-brand-text-muted mt-0.5">
-                {new Date(c.dateOfService).toLocaleDateString("en-KE")} · {c.benefitCategory.replace(/_/g, " ")}
+                {new Date(c.dateOfService).toLocaleDateString("en-UG")} · {c.benefitCategory.replace(/_/g, " ")}
               </p>
             </div>
             <div className="text-right">

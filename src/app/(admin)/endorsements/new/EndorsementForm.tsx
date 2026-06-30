@@ -171,7 +171,7 @@ export function EndorsementForm({
               <div className="flex flex-col justify-end">
                 <p className={labelCls()}>Policy Renewal</p>
                 <p className="text-sm font-semibold text-brand-text-heading">
-                  {new Date(selectedGroup.renewalDate).toLocaleDateString("en-KE")}
+                  {new Date(selectedGroup.renewalDate).toLocaleDateString("en-UG")}
                 </p>
                 <p className="text-xs text-brand-text-muted">
                   Rate: KES {selectedGroup.contributionRate.toLocaleString()} / member / yr

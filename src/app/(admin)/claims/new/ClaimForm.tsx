@@ -309,7 +309,7 @@ export function ClaimForm({ members, providers }: { members: Member[]; providers
         {/* Summary pill when on last step */}
         {step === 3 && totalBilled > 0 && (
           <span className="text-sm font-bold text-brand-indigo bg-brand-indigo/10 px-4 py-2 rounded-full">
-            Total: KES {totalBilled.toLocaleString("en-KE")}
+            Total: KES {totalBilled.toLocaleString("en-UG")}
           </span>
         )}
 

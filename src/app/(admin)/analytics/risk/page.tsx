@@ -56,7 +56,7 @@ function formatPercent(value: number) {
 
 function formatDate(value: Date | null | undefined) {
   if (!value) return "No projection";
-  return value.toLocaleDateString("en-KE", { day: "2-digit", month: "short", year: "numeric" });
+  return value.toLocaleDateString("en-UG", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 function riskTone(tier: RiskTier) {

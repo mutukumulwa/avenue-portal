@@ -107,7 +107,7 @@ export default async function SettlementPage({
   const currentMonth = now.getMonth() + 1;
   const currentYear  = now.getFullYear();
 
-  const fmt = (n: number) => `KES ${Math.round(n).toLocaleString("en-KE")}`;
+  const fmt = (n: number) => `KES ${Math.round(n).toLocaleString("en-UG")}`;
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
@@ -141,7 +141,7 @@ export default async function SettlementPage({
             className="border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-brand-indigo focus:outline-none">
             {Array.from({ length: 12 }, (_, i) => (
               <option key={i + 1} value={i + 1}>
-                {new Date(2000, i).toLocaleString("en-KE", { month: "long" })}
+                {new Date(2000, i).toLocaleString("en-UG", { month: "long" })}
               </option>
             ))}
           </select>
@@ -195,7 +195,7 @@ export default async function SettlementPage({
                     {batch.provider.name}
                   </td>
                   <td className="px-5 py-3 text-brand-text-muted">
-                    {new Date(batch.cycleYear, batch.cycleMonth - 1).toLocaleString("en-KE", { month: "short", year: "numeric" })}
+                    {new Date(batch.cycleYear, batch.cycleMonth - 1).toLocaleString("en-UG", { month: "short", year: "numeric" })}
                   </td>
                   <td className="px-5 py-3 text-brand-text-muted">{batch.claimCount}</td>
                   <td className="px-5 py-3 font-semibold font-mono text-brand-text-heading">
@@ -207,7 +207,7 @@ export default async function SettlementPage({
                     </span>
                   </td>
                   <td className="px-5 py-3 text-brand-text-muted text-xs">
-                    {batch.settledAt ? new Date(batch.settledAt).toLocaleDateString("en-KE") : "—"}
+                    {batch.settledAt ? new Date(batch.settledAt).toLocaleDateString("en-UG") : "—"}
                   </td>
                   <td className="px-5 py-3">
                     {batch.status === "MAKER_SUBMITTED" && (

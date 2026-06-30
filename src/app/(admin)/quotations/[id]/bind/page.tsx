@@ -60,7 +60,7 @@ export default async function BindPage({ params }: { params: Promise<{ id: strin
   const isMaker   = hasMemberships && members[0].bindingMakerId === userId;
   const isChecker = !isMaker; // same user can't be both
 
-  const fmt = (n: number) => `KES ${Math.round(n).toLocaleString("en-KE")}`;
+  const fmt = (n: number) => `KES ${Math.round(n).toLocaleString("en-UG")}`;
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -109,7 +109,7 @@ export default async function BindPage({ params }: { params: Promise<{ id: strin
           </h2>
           {isAccepted && quotation.acceptance && (
             <span className="text-xs text-brand-text-muted">
-              Accepted {new Date(quotation.acceptance.acceptedAt).toLocaleDateString("en-KE")} by{" "}
+              Accepted {new Date(quotation.acceptance.acceptedAt).toLocaleDateString("en-UG")} by{" "}
               {quotation.acceptance.acceptedBy.firstName} {quotation.acceptance.acceptedBy.lastName}{" "}
               via <strong>{quotation.acceptance.method.replace("_", " ")}</strong>
             </span>
@@ -202,7 +202,7 @@ export default async function BindPage({ params }: { params: Promise<{ id: strin
                   <td className="px-4 py-2 font-semibold text-brand-text-heading">{m.firstName} {m.lastName}</td>
                   <td className="px-4 py-2 text-brand-text-muted capitalize">{m.relationship.toLowerCase()}</td>
                   <td className="px-4 py-2 text-brand-text-muted">
-                    {m.coverStartDate ? new Date(m.coverStartDate).toLocaleDateString("en-KE") : "—"}
+                    {m.coverStartDate ? new Date(m.coverStartDate).toLocaleDateString("en-UG") : "—"}
                   </td>
                   <td className="px-4 py-2">
                     <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-[#FFC107]/10 text-[#856404]">

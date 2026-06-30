@@ -8,12 +8,12 @@ import { VoiceNoteRecorder } from "./VoiceNoteRecorder";
 
 function formatDate(value: Date | null) {
   if (!value) return "Not recorded";
-  return new Date(value).toLocaleDateString("en-KE", { day: "2-digit", month: "short", year: "numeric" });
+  return new Date(value).toLocaleDateString("en-UG", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 function formatDateTime(value: Date | null) {
   if (!value) return "Not recorded";
-  return new Date(value).toLocaleString("en-KE", {
+  return new Date(value).toLocaleString("en-UG", {
     day: "2-digit",
     month: "short",
     year: "numeric",

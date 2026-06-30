@@ -148,7 +148,7 @@ export default async function OverrideQueuePage({
                         </span>
                       ) : (
                         <span className="text-xs text-brand-text-muted">
-                          {r.resolvedAt ? new Date(r.resolvedAt).toLocaleDateString("en-KE") : "—"}
+                          {r.resolvedAt ? new Date(r.resolvedAt).toLocaleDateString("en-UG") : "—"}
                         </span>
                       )}
                     </td>

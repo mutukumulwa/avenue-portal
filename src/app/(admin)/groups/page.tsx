@@ -134,7 +134,7 @@ export default async function GroupsPage({
                   </span>
                 </td>
                 <td className="px-6 py-4 text-brand-text-body">
-                  {new Date(group.renewalDate).toLocaleDateString("en-KE")}
+                  {new Date(group.renewalDate).toLocaleDateString("en-UG")}
                 </td>
                 <td className="px-6 py-4">
                   <span className={`px-3 py-1 text-[10px] font-bold uppercase rounded-full ${statusColor(group.status)}`}>

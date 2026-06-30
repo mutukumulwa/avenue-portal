@@ -98,7 +98,7 @@ async function getClaimsData(tenantId: string) {
     Number(r.billedAmount).toLocaleString(),
     r.approvedAmount ? Number(r.approvedAmount).toLocaleString() : "—",
     r.status.replace(/_/g, " "),
-    new Date(r.createdAt).toLocaleDateString("en-KE"),
+    new Date(r.createdAt).toLocaleDateString("en-UG"),
   ]);
   return { kpis, headers, data };
 }
@@ -131,7 +131,7 @@ async function getMembershipData(tenantId: string) {
     r.relationship,
     r.gender,
     r.status,
-    new Date(r.enrollmentDate).toLocaleDateString("en-KE"),
+    new Date(r.enrollmentDate).toLocaleDateString("en-UG"),
   ]);
   return { kpis, headers, data };
 }
@@ -165,7 +165,7 @@ async function getPreauthData(tenantId: string) {
     Number(r.estimatedCost).toLocaleString(),
     r.approvedAmount ? Number(r.approvedAmount).toLocaleString() : "—",
     r.status,
-    new Date(r.createdAt).toLocaleDateString("en-KE"),
+    new Date(r.createdAt).toLocaleDateString("en-UG"),
   ]);
   return { kpis, headers, data };
 }
@@ -227,7 +227,7 @@ async function getUtilizationData(tenantId: string) {
   const data = rows.map(r => {
     const limit = Number(r.benefitConfig.annualSubLimit);
     const used  = Number(r.amountUsed);
-    const period = `${new Date(r.periodStart).toLocaleDateString("en-KE", { month: "short", year: "numeric" })} – ${new Date(r.periodEnd).toLocaleDateString("en-KE", { month: "short", year: "numeric" })}`;
+    const period = `${new Date(r.periodStart).toLocaleDateString("en-UG", { month: "short", year: "numeric" })} – ${new Date(r.periodEnd).toLocaleDateString("en-UG", { month: "short", year: "numeric" })}`;
     return [
       r.member.memberNumber,
       `${r.member.firstName} ${r.member.lastName}`,
@@ -267,9 +267,9 @@ async function getEndorsementsData(tenantId: string) {
     r.group.name,
     r.type.replace(/_/g, " "),
     r.status,
-    new Date(r.effectiveDate).toLocaleDateString("en-KE"),
+    new Date(r.effectiveDate).toLocaleDateString("en-UG"),
     r.proratedAmount ? Number(r.proratedAmount).toLocaleString() : "—",
-    new Date(r.createdAt).toLocaleDateString("en-KE"),
+    new Date(r.createdAt).toLocaleDateString("en-UG"),
   ]);
   return { kpis, headers, data };
 }
@@ -301,8 +301,8 @@ async function getQuotationsData(tenantId: string) {
     r.memberCount?.toString() ?? "—",
     r.annualPremium ? Number(r.annualPremium).toLocaleString() : "—",
     r.status,
-    r.validUntil ? new Date(r.validUntil).toLocaleDateString("en-KE") : "—",
-    new Date(r.createdAt).toLocaleDateString("en-KE"),
+    r.validUntil ? new Date(r.validUntil).toLocaleDateString("en-UG") : "—",
+    new Date(r.createdAt).toLocaleDateString("en-UG"),
   ]);
   return { kpis, headers, data };
 }
@@ -404,7 +404,7 @@ async function getOutstandingBillsData(tenantId: string) {
       r.invoiceNumber,
       r.group.name,
       r.period,
-      due.toLocaleDateString("en-KE"),
+      due.toLocaleDateString("en-UG"),
       Number(r.totalAmount).toLocaleString(),
       Number(r.paidAmount).toLocaleString(),
       Number(r.balance).toLocaleString(),
@@ -442,7 +442,7 @@ async function getProviderStatementsData(tenantId: string): Promise<ReportResult
     r.claimNumber,
     `${r.member.firstName} ${r.member.lastName} (${r.member.memberNumber})`,
     r.benefitCategory.replace(/_/g, " "),
-    new Date(r.dateOfService).toLocaleDateString("en-KE"),
+    new Date(r.dateOfService).toLocaleDateString("en-UG"),
     Number(r.billedAmount).toLocaleString(),
     Number(r.approvedAmount).toLocaleString(),
     Number(r.paidAmount).toLocaleString(),
@@ -565,8 +565,8 @@ async function getAdmissionsData(tenantId: string) {
     `${r.member.firstName} ${r.member.lastName} (${r.member.memberNumber})`,
     r.member.group.name,
     r.provider.name,
-    r.admissionDate ? new Date(r.admissionDate).toLocaleDateString("en-KE") : "—",
-    r.dischargeDate ? new Date(r.dischargeDate).toLocaleDateString("en-KE") : "—",
+    r.admissionDate ? new Date(r.admissionDate).toLocaleDateString("en-UG") : "—",
+    r.dischargeDate ? new Date(r.dischargeDate).toLocaleDateString("en-UG") : "—",
     r.lengthOfStay?.toString() ?? "—",
     Number(r.billedAmount).toLocaleString(),
     r.status.replace(/_/g, " "),
@@ -605,7 +605,7 @@ async function getAdmissionVisitsData(tenantId: string) {
     `${r.member.firstName} ${r.member.lastName} (${r.member.memberNumber})`,
     r.member.group.name,
     r.provider.name,
-    new Date(r.dateOfService).toLocaleDateString("en-KE"),
+    new Date(r.dateOfService).toLocaleDateString("en-UG"),
     r.benefitCategory.replace(/_/g, " "),
     Number(r.billedAmount).toLocaleString(),
     r.status.replace(/_/g, " "),
@@ -731,7 +731,7 @@ async function getAgeingAnalysisData(tenantId: string) {
   const data = bucketed.map(r => [
     r.invoiceNumber,
     r.group.name,
-    new Date(r.dueDate).toLocaleDateString("en-KE"),
+    new Date(r.dueDate).toLocaleDateString("en-UG"),
     r.days.toString(),
     Number(r.balance).toLocaleString(),
     r.bucket,
@@ -766,8 +766,8 @@ async function getCommissionStatementsData(tenantId: string) {
     `${Number(r.commissionRate).toFixed(1)}%`,
     Number(r.commissionAmount).toLocaleString(),
     r.paymentStatus,
-    new Date(r.createdAt).toLocaleDateString("en-KE"),
-    r.paidAt ? new Date(r.paidAt).toLocaleDateString("en-KE") : "—",
+    new Date(r.createdAt).toLocaleDateString("en-UG"),
+    r.paidAt ? new Date(r.paidAt).toLocaleDateString("en-UG") : "—",
   ]);
   return { kpis, headers, data };
 }
@@ -832,8 +832,8 @@ async function getFundUtilisationData(tenantId: string) {
     Number(a.totalDeposited).toLocaleString(),
     Number(a.totalClaims).toLocaleString(),
     Number(a.totalAdminFees).toLocaleString(),
-    new Date(a.periodStartDate).toLocaleDateString("en-KE"),
-    new Date(a.periodEndDate).toLocaleDateString("en-KE"),
+    new Date(a.periodStartDate).toLocaleDateString("en-UG"),
+    new Date(a.periodEndDate).toLocaleDateString("en-UG"),
   ]);
   return { kpis, headers, data };
 }
@@ -874,7 +874,7 @@ async function getExclusionRejectedData(tenantId: string) {
     r.status.replace(/_/g, " "),
     r.declineReasonCode ?? "—",
     Number(r.billedAmount).toLocaleString(),
-    r.decidedAt ? new Date(r.decidedAt).toLocaleDateString("en-KE") : "—",
+    r.decidedAt ? new Date(r.decidedAt).toLocaleDateString("en-UG") : "—",
   ]);
   return { kpis, headers, data };
 }
@@ -946,8 +946,8 @@ async function getUserRightsRolesData(tenantId: string) {
     u.email,
     u.role.replace(/_/g, " "),
     u.isActive ? "Yes" : "No",
-    u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString("en-KE") : "Never",
-    new Date(u.createdAt).toLocaleDateString("en-KE"),
+    u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString("en-UG") : "Never",
+    new Date(u.createdAt).toLocaleDateString("en-UG"),
   ]);
   return { kpis, headers, data };
 }
@@ -1150,7 +1150,7 @@ async function getAnalyticsRenewalRecommendationsData(tenantId: string, scope?: 
       name: group?.name ?? "Unknown",
       intermediary: group?.broker?.name ?? "Direct",
       activeMembers: group?._count.members ?? 0,
-      renewalDate: new Date(a.renewalDate).toLocaleDateString("en-KE"),
+      renewalDate: new Date(a.renewalDate).toLocaleDateString("en-UG"),
       daysToRenewal,
       trailing12Mlr: Number(a.trailing12Mlr),
       targetMlr: Number(a.targetMlr),
@@ -1262,9 +1262,9 @@ async function getDebtorsCreditorsData(tenantId: string): Promise<ReportResult> 
   const debtorRows = invoices.map(i => [
     i.invoiceNumber,
     i.group.name,
-    `KES ${Number(i.balance).toLocaleString("en-KE")}`,
+    `KES ${Number(i.balance).toLocaleString("en-UG")}`,
     bucket(i.dueDate),
-    new Date(i.dueDate).toLocaleDateString("en-KE"),
+    new Date(i.dueDate).toLocaleDateString("en-UG"),
   ]);
 
   // Creditors: approved claims not yet in a settled batch (payable to providers)
@@ -1280,9 +1280,9 @@ async function getDebtorsCreditorsData(tenantId: string): Promise<ReportResult> 
   const creditorRows = unsettledClaims.map(c => [
     c.claimNumber,
     c.provider.name,
-    `KES ${Number(c.approvedAmount ?? 0).toLocaleString("en-KE")}`,
+    `KES ${Number(c.approvedAmount ?? 0).toLocaleString("en-UG")}`,
     "Provider Payable",
-    c.decidedAt ? new Date(c.decidedAt).toLocaleDateString("en-KE") : "—",
+    c.decidedAt ? new Date(c.decidedAt).toLocaleDateString("en-UG") : "—",
   ]);
 
   const totalDebtors   = invoices.reduce((s, i) => s + Number(i.balance), 0);
@@ -1290,9 +1290,9 @@ async function getDebtorsCreditorsData(tenantId: string): Promise<ReportResult> 
 
   return {
     kpis: [
-      { label: "Total Receivables (KES)", value: totalDebtors.toLocaleString("en-KE") },
-      { label: "Total Payables (KES)",    value: totalCreditors.toLocaleString("en-KE") },
-      { label: "Net Position (KES)",      value: (totalDebtors - totalCreditors).toLocaleString("en-KE") },
+      { label: "Total Receivables (KES)", value: totalDebtors.toLocaleString("en-UG") },
+      { label: "Total Payables (KES)",    value: totalCreditors.toLocaleString("en-UG") },
+      { label: "Net Position (KES)",      value: (totalDebtors - totalCreditors).toLocaleString("en-UG") },
       { label: "Unsettled Claim Batches", value: unsettledClaims.length.toString() },
     ],
     headers: ["Reference", "Counterparty", "Amount (KES)", "Type / Age Bucket", "Date"],
@@ -1320,13 +1320,13 @@ async function getFeesStatementData(tenantId: string): Promise<ReportResult> {
 
   const cardRows = cardFeeInvoices.map(i => [
     i.invoiceNumber, i.group.name, "Card Issuance",
-    `KES ${Number(i.totalAmount).toLocaleString("en-KE")}`,
-    new Date(i.createdAt).toLocaleDateString("en-KE"),
+    `KES ${Number(i.totalAmount).toLocaleString("en-UG")}`,
+    new Date(i.createdAt).toLocaleDateString("en-UG"),
   ]);
   const reinstateRows = reinstateFeeInvoices.map(i => [
     i.invoiceNumber, i.group.name, "Reinstatement",
-    `KES ${Number(i.totalAmount).toLocaleString("en-KE")}`,
-    new Date(i.createdAt).toLocaleDateString("en-KE"),
+    `KES ${Number(i.totalAmount).toLocaleString("en-UG")}`,
+    new Date(i.createdAt).toLocaleDateString("en-UG"),
   ]);
 
   const all = [...cardRows, ...reinstateRows];
@@ -1334,9 +1334,9 @@ async function getFeesStatementData(tenantId: string): Promise<ReportResult> {
 
   return {
     kpis: [
-      { label: "Card Fees",          value: `KES ${cardFeeInvoices.reduce((s, i) => s + Number(i.totalAmount), 0).toLocaleString("en-KE")}` },
-      { label: "Reinstatement Fees", value: `KES ${reinstateFeeInvoices.reduce((s, i) => s + Number(i.totalAmount), 0).toLocaleString("en-KE")}` },
-      { label: "Total Fees",         value: `KES ${total.toLocaleString("en-KE")}` },
+      { label: "Card Fees",          value: `KES ${cardFeeInvoices.reduce((s, i) => s + Number(i.totalAmount), 0).toLocaleString("en-UG")}` },
+      { label: "Reinstatement Fees", value: `KES ${reinstateFeeInvoices.reduce((s, i) => s + Number(i.totalAmount), 0).toLocaleString("en-UG")}` },
+      { label: "Total Fees",         value: `KES ${total.toLocaleString("en-UG")}` },
       { label: "Records",            value: all.length.toString() },
     ],
     headers: ["Invoice No.", "Scheme", "Fee Type", "Amount (KES)", "Date"],
@@ -1363,17 +1363,17 @@ async function getAdminFeeData(tenantId: string): Promise<ReportResult> {
   return {
     kpis: [
       { label: "Admin Fee Transactions", value: feeTransactions.length.toString() },
-      { label: "Total Admin Fees (KES)", value: `KES ${total.toLocaleString("en-KE")}` },
+      { label: "Total Admin Fees (KES)", value: `KES ${total.toLocaleString("en-UG")}` },
       { label: "Self-Funded Schemes",    value: new Set(feeTransactions.map(t => t.selfFundedAccount.group.name)).size.toString() },
-      { label: "Avg Fee (KES)",          value: feeTransactions.length > 0 ? `KES ${(total / feeTransactions.length).toLocaleString("en-KE")}` : "—" },
+      { label: "Avg Fee (KES)",          value: feeTransactions.length > 0 ? `KES ${(total / feeTransactions.length).toLocaleString("en-UG")}` : "—" },
     ],
     headers: ["Scheme", "Calc Method", "Fee Rate", "Amount (KES)", "Date", "Description"],
     data: feeTransactions.map(t => [
       t.selfFundedAccount.group.name,
       t.selfFundedAccount.group.adminFeeMethod ?? "—",
       t.selfFundedAccount.group.adminFeeRate ? `${Number(t.selfFundedAccount.group.adminFeeRate)}` : "—",
-      `KES ${Number(t.amount).toLocaleString("en-KE")}`,
-      new Date(t.postedAt).toLocaleDateString("en-KE"),
+      `KES ${Number(t.amount).toLocaleString("en-UG")}`,
+      new Date(t.postedAt).toLocaleDateString("en-UG"),
       t.description ?? "—",
     ]),
   };
@@ -1405,7 +1405,7 @@ async function getOrganicGrowthData(tenantId: string): Promise<ReportResult> {
   // Aggregate by month
   const byMonth: Record<string, { month: string; newCount: number; lapsed: number; cancelled: number }> = {};
   const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-  const monthLabel = (k: string) => new Date(k + "-01").toLocaleDateString("en-KE", { month: "short", year: "numeric" });
+  const monthLabel = (k: string) => new Date(k + "-01").toLocaleDateString("en-UG", { month: "short", year: "numeric" });
 
   for (const r of newMembers) {
     const k = monthKey(new Date(r.enrollmentDate));
@@ -1479,9 +1479,9 @@ async function getComparisonServicesData(tenantId: string): Promise<ReportResult
       const variance = avgContracted > 0 ? ((avgBilled - avgContracted) / avgContracted * 100).toFixed(1) + "%" : "—";
       return [
         code, v.desc.slice(0, 60),
-        `KES ${avgContracted > 0 ? Math.round(avgContracted).toLocaleString("en-KE") : "—"}`,
-        `KES ${Math.round(avgBilled).toLocaleString("en-KE")}`,
-        `KES ${avgApproved > 0 ? Math.round(avgApproved).toLocaleString("en-KE") : "—"}`,
+        `KES ${avgContracted > 0 ? Math.round(avgContracted).toLocaleString("en-UG") : "—"}`,
+        `KES ${Math.round(avgBilled).toLocaleString("en-UG")}`,
+        `KES ${avgApproved > 0 ? Math.round(avgApproved).toLocaleString("en-UG") : "—"}`,
         variance,
         v.billed.length.toString(),
       ];
@@ -1528,7 +1528,7 @@ async function getQuotationFunnelData(tenantId: string): Promise<ReportResult> {
       { label: "Total Quotations",   value: total.toString() },
       { label: "Accepted",           value: accepted.toString() },
       { label: "Conversion Rate",    value: convRate },
-      { label: "Pipeline Value (KES)", value: `KES ${Math.round(totalValue).toLocaleString("en-KE")}` },
+      { label: "Pipeline Value (KES)", value: `KES ${Math.round(totalValue).toLocaleString("en-UG")}` },
     ],
     headers: ["Quote No.", "Status", "Client Type", "Lives", "Premium (KES)", "Renewal", "Broker", "Date"],
     data: quotations.map(q => [
@@ -1536,10 +1536,10 @@ async function getQuotationFunnelData(tenantId: string): Promise<ReportResult> {
       q.status.replace(/_/g, " "),
       q.clientType ?? "—",
       q.memberCount.toString(),
-      q.finalPremium ? `KES ${Number(q.finalPremium).toLocaleString("en-KE")}` : "—",
+      q.finalPremium ? `KES ${Number(q.finalPremium).toLocaleString("en-UG")}` : "—",
       q.isRenewal ? "Yes" : "No",
       q.broker?.name ?? "Direct",
-      new Date(q.createdAt).toLocaleDateString("en-KE"),
+      new Date(q.createdAt).toLocaleDateString("en-UG"),
     ]),
   };
 }

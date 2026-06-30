@@ -114,7 +114,7 @@ export default async function OverrideDetailPage({ params }: { params: Promise<{
               : `SLA: ${slaMinutesLeft} minutes remaining`}
           </p>
           <span className="ml-auto text-xs text-brand-text-muted">
-            Deadline: {record.slaDeadlineAt.toLocaleTimeString("en-KE", { hour: "2-digit", minute: "2-digit" })}
+            Deadline: {record.slaDeadlineAt.toLocaleTimeString("en-UG", { hour: "2-digit", minute: "2-digit" })}
           </span>
         </div>
       )}
@@ -128,8 +128,8 @@ export default async function OverrideDetailPage({ params }: { params: Promise<{
             { label: "Checker",        value: record.checker ? `${record.checker.firstName} ${record.checker.lastName}` : "Awaiting approval" },
             { label: "Reason code",    value: (record.reasonCode as string).replace(/_/g, " ") },
             { label: "Required approver", value: requiredRoles.join(isDualApproval ? " + " : "") },
-            { label: "Requested at",   value: new Date(record.createdAt).toLocaleString("en-KE") },
-            { label: "Resolved at",    value: record.resolvedAt ? new Date(record.resolvedAt).toLocaleString("en-KE") : "—" },
+            { label: "Requested at",   value: new Date(record.createdAt).toLocaleString("en-UG") },
+            { label: "Resolved at",    value: record.resolvedAt ? new Date(record.resolvedAt).toLocaleString("en-UG") : "—" },
           ].map(({ label, value }) => (
             <div key={label}>
               <p className="text-xs text-brand-text-muted">{label}</p>
@@ -181,7 +181,7 @@ export default async function OverrideDetailPage({ params }: { params: Promise<{
                  h.status === "REJECTED" ? <XCircle size={11} className="text-[#DC3545]" /> :
                  <Clock size={11} className="text-[#856404]" />}
                 <span className="text-brand-text-body">{TYPE_LABEL[h.overrideType] ?? h.overrideType}</span>
-                <span className="text-brand-text-muted ml-auto">{new Date(h.createdAt).toLocaleDateString("en-KE")}</span>
+                <span className="text-brand-text-muted ml-auto">{new Date(h.createdAt).toLocaleDateString("en-UG")}</span>
                 <Link href={`/overrides/${h.id}`} className="text-brand-indigo hover:underline">→</Link>
               </div>
             ))}

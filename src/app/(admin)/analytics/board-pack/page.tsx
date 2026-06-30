@@ -75,7 +75,7 @@ export default async function BoardPackPage({
 
   const months = Array.from({ length: 12 }, (_, i) => ({
     value: i + 1,
-    label: new Date(2000, i).toLocaleString("en-KE", { month: "long" }),
+    label: new Date(2000, i).toLocaleString("en-UG", { month: "long" }),
   }));
 
   const years = [now.getFullYear(), now.getFullYear() - 1, now.getFullYear() - 2];
@@ -159,7 +159,7 @@ export default async function BoardPackPage({
                       {meta?.period ? String(meta.period) : "—"}
                     </p>
                     <p className="text-xs text-brand-text-muted mt-0.5">
-                      {new Date(h.createdAt).toLocaleString("en-KE")} ·{" "}
+                      {new Date(h.createdAt).toLocaleString("en-UG")} ·{" "}
                       {meta?.schemeCount ? `${String(meta.schemeCount)} schemes` : ""}
                     </p>
                   </div>

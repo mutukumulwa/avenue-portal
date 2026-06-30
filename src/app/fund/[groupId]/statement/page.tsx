@@ -85,10 +85,10 @@ export default async function FundStatementPage({ params }: { params: Promise<{ 
           <div className="text-right">
             <p className="text-xs font-bold uppercase text-brand-text-muted">Period</p>
             <p className="font-semibold text-brand-text-heading mt-0.5">
-              {new Date(acc.periodStartDate).toLocaleDateString("en-KE", { day: "numeric", month: "long", year: "numeric" })} –
+              {new Date(acc.periodStartDate).toLocaleDateString("en-UG", { day: "numeric", month: "long", year: "numeric" })} –
             </p>
             <p className="font-semibold text-brand-text-heading">
-              {new Date(acc.periodEndDate).toLocaleDateString("en-KE", { day: "numeric", month: "long", year: "numeric" })}
+              {new Date(acc.periodEndDate).toLocaleDateString("en-UG", { day: "numeric", month: "long", year: "numeric" })}
             </p>
           </div>
         </div>
@@ -105,7 +105,7 @@ export default async function FundStatementPage({ params }: { params: Promise<{ 
             <div key={r.label} className={`flex justify-between text-sm ${r.bold ? "font-bold border-t border-[#EEEEEE] pt-2 mt-2" : ""}`}>
               <span className={r.bold ? "text-brand-text-heading" : "text-brand-text-body"}>{r.label}</span>
               <span className={`font-mono ${r.color ?? (r.bold ? "text-brand-text-heading" : "text-brand-text-body")}`}>
-                {r.sign}KES {r.value.toLocaleString("en-KE")}
+                {r.sign}KES {r.value.toLocaleString("en-UG")}
               </span>
             </div>
           ))}
@@ -128,7 +128,7 @@ export default async function FundStatementPage({ params }: { params: Promise<{ 
               {catBreakdown.map(([cat, amt]) => (
                 <tr key={cat} className="hover:bg-[#F8F9FA]">
                   <td className="py-2.5 font-semibold text-brand-text-heading">{cat.replace(/_/g, " ")}</td>
-                  <td className="py-2.5 text-right font-mono text-[#DC3545] font-semibold">{amt.toLocaleString("en-KE")}</td>
+                  <td className="py-2.5 text-right font-mono text-[#DC3545] font-semibold">{amt.toLocaleString("en-UG")}</td>
                   <td className="py-2.5 text-right text-brand-text-muted">
                     {Number(acc.totalClaims) > 0 ? ((amt / Number(acc.totalClaims)) * 100).toFixed(1) : "0"}%
                   </td>
@@ -158,7 +158,7 @@ export default async function FundStatementPage({ params }: { params: Promise<{ 
           <tbody className="divide-y divide-[#EEEEEE]">
             {txns.map(t => (
               <tr key={t.id} className="hover:bg-[#F8F9FA]">
-                <td className="px-4 py-2.5 text-xs text-brand-text-muted">{new Date(t.postedAt).toLocaleDateString("en-KE")}</td>
+                <td className="px-4 py-2.5 text-xs text-brand-text-muted">{new Date(t.postedAt).toLocaleDateString("en-UG")}</td>
                 <td className="px-4 py-2.5">
                   <span className={`text-xs font-bold ${TXN_COLOR[t.type] ?? "text-brand-text-muted"}`}>
                     {t.type.replace(/_/g, " ")}
@@ -167,10 +167,10 @@ export default async function FundStatementPage({ params }: { params: Promise<{ 
                 <td className="px-4 py-2.5 text-xs text-brand-text-body">{t.description}</td>
                 <td className="px-4 py-2.5 font-mono text-xs text-brand-text-muted">{t.referenceNumber ?? "—"}</td>
                 <td className={`px-4 py-2.5 text-right font-mono font-semibold text-xs ${TXN_COLOR[t.type]}`}>
-                  {TXN_SIGN[t.type]}{Number(t.amount).toLocaleString("en-KE")}
+                  {TXN_SIGN[t.type]}{Number(t.amount).toLocaleString("en-UG")}
                 </td>
                 <td className="px-4 py-2.5 text-right font-mono text-xs text-brand-text-heading">
-                  {Number(t.balanceAfter).toLocaleString("en-KE")}
+                  {Number(t.balanceAfter).toLocaleString("en-UG")}
                 </td>
               </tr>
             ))}

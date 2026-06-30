@@ -56,7 +56,7 @@ function renderSummary(imported: ImportedClaim[], errors: ImportError[]) {
       <td><a href="/claims?search=${encodeURIComponent(item.claimNumber)}">${escapeHtml(item.claimNumber)}</a></td>
       <td>${escapeHtml(item.memberNumber)}</td>
       <td>${escapeHtml(item.providerName)}</td>
-      <td class="num">${item.billedAmount.toLocaleString("en-KE")}</td>
+      <td class="num">${item.billedAmount.toLocaleString("en-UG")}</td>
     </tr>
   `).join("");
 

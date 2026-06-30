@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { markAllMemberNotificationsReadAction, markMemberNotificationReadAction } from "./actions";
 
 function formatDate(value: Date) {
-  return new Date(value).toLocaleDateString("en-KE", { day: "2-digit", month: "short", year: "numeric" });
+  return new Date(value).toLocaleDateString("en-UG", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 function priorityTone(priority: string, unread: boolean) {

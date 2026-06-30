@@ -74,11 +74,11 @@ function buildResultsHtml(
       <td style="padding:7px 12px;font-size:12px;color:#6C757D;">${m.statementRow.date}</td>
       <td style="padding:7px 12px;font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;">${m.statementRow.description}</td>
       <td style="padding:7px 12px;font-size:11px;font-family:monospace;">${m.statementRow.reference || "—"}</td>
-      <td style="padding:7px 12px;text-align:right;font-family:monospace;font-size:12px;">KES ${m.statementRow.amount.toLocaleString("en-KE")}</td>
+      <td style="padding:7px 12px;text-align:right;font-family:monospace;font-size:12px;">KES ${m.statementRow.amount.toLocaleString("en-UG")}</td>
       <td style="padding:7px 12px;text-align:center;">${matchIcon(m.matchType)}</td>
       <td style="padding:7px 12px;font-size:12px;color:${matchColor(m.matchType)};">${m.groupName ?? "—"}<br/><span style="font-size:10px;font-family:monospace;">${m.matchedInvoiceNumber ?? ""}</span></td>
       <td style="padding:7px 12px;text-align:right;font-size:11px;color:${Math.abs(m.variance) > 1 ? "#DC3545" : "#28A745"};">
-        ${m.variance !== 0 ? `KES ${m.variance.toLocaleString("en-KE")}` : "—"}
+        ${m.variance !== 0 ? `KES ${m.variance.toLocaleString("en-UG")}` : "—"}
       </td>
       <td style="padding:7px 12px;">
         ${m.matchedInvoiceId ? `

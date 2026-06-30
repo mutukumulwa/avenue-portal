@@ -10,8 +10,12 @@ export const ROLE_PERMISSIONS = {
   MEMBER_USER: ["MEMBER_PORTAL_ONLY"],
 };
 
-export const KENYAN_COUNTIES = [
-  "Nairobi", "Mombasa", "Kisumu", "Nakuru", "Uasin Gishu", "Machakos", "Kiambu", "Kajiado", "Nyeri", "Makueni"
+// Major Ugandan districts (Medvex operates in Uganda). Replaces the legacy
+// Kenyan-county list (§D / D-8). Used as a geography reference / dropdown source.
+export const UGANDA_DISTRICTS = [
+  "Kampala", "Wakiso", "Mukono", "Jinja", "Mbarara", "Gulu", "Mbale",
+  "Masaka", "Lira", "Kabarole", "Arua", "Hoima", "Soroti", "Kasese",
+  "Entebbe", "Mityana",
 ];
 
 export const STATUS_COLORS = {

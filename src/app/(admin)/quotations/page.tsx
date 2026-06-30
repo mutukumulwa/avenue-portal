@@ -170,8 +170,8 @@ export default async function QuotationsPage({
                   </td>
                   <td className="px-6 py-4 text-brand-text-body">{q.broker?.name ?? "Direct"}</td>
                   <td className="px-6 py-4 font-semibold text-brand-text-heading">{q.memberCount + q.dependentCount}</td>
-                  <td className="px-6 py-4 font-semibold text-brand-indigo">{Number(q.finalPremium).toLocaleString("en-KE")}</td>
-                  <td className="px-6 py-4 text-brand-text-body">{q.validUntil ? new Date(q.validUntil).toLocaleDateString("en-KE") : "—"}</td>
+                  <td className="px-6 py-4 font-semibold text-brand-indigo">{Number(q.finalPremium).toLocaleString("en-UG")}</td>
+                  <td className="px-6 py-4 text-brand-text-body">{q.validUntil ? new Date(q.validUntil).toLocaleDateString("en-UG") : "—"}</td>
                   <td className="px-6 py-4">
                     <span className={`px-3 py-1 text-[10px] font-bold uppercase rounded-full ${STATUS_STYLE[q.status] ?? STATUS_STYLE.DRAFT}`}>
                       {STATUS_LABEL[q.status] ?? q.status}

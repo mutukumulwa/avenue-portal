@@ -112,7 +112,7 @@ export default async function BillingPage() {
                   <td className="px-6 py-4 font-semibold text-[#DC3545]">
                     {Number(inv.balance) > 0 ? Number(inv.balance).toLocaleString() : "—"}
                   </td>
-                  <td className="px-6 py-4">{new Date(inv.dueDate).toLocaleDateString("en-KE")}</td>
+                  <td className="px-6 py-4">{new Date(inv.dueDate).toLocaleDateString("en-UG")}</td>
                   <td className="px-6 py-4">
                     <span className={`px-3 py-1 text-[10px] font-bold uppercase rounded-full ${statusColor(inv.status)}`}>
                       {inv.status.replace(/_/g, " ")}
@@ -156,8 +156,8 @@ export default async function BillingPage() {
                         trainingLevy: Number(inv.trainingLevy),
                         phcf: Number(inv.phcf),
                         taxTotal: Number(inv.taxTotal),
-                        dueDate: new Date(inv.dueDate).toLocaleDateString("en-KE"),
-                        issuedDate: new Date(inv.createdAt).toLocaleDateString("en-KE"),
+                        dueDate: new Date(inv.dueDate).toLocaleDateString("en-UG"),
+                        issuedDate: new Date(inv.createdAt).toLocaleDateString("en-UG"),
                       }} />
                       <Link href={`/billing/gl/ledger?account=1100`} className="text-brand-indigo hover:text-brand-secondary font-semibold inline-flex items-center gap-1 text-sm">
                         <ArrowRight size={14} />
@@ -206,7 +206,7 @@ export default async function BillingPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4 font-mono text-sm">{p.referenceNumber ?? "—"}</td>
-                  <td className="px-6 py-4">{new Date(p.paymentDate).toLocaleDateString("en-KE")}</td>
+                  <td className="px-6 py-4">{new Date(p.paymentDate).toLocaleDateString("en-UG")}</td>
                 </tr>
               ))}
               {payments.length === 0 && (

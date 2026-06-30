@@ -51,7 +51,7 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
   const loadingAmt  = annualPremium * totalLoadingPct  / 100;
   const discountAmt = annualPremium * totalDiscountPct / 100;
 
-  const fmt = (n: number) => `KES ${Math.round(n).toLocaleString("en-KE")}`;
+  const fmt = (n: number) => `KES ${Math.round(n).toLocaleString("en-UG")}`;
   const canSend    = q.status === "DRAFT";
   const canAction  = q.status === "SENT";
   const canExpire  = q.status === "DRAFT" || q.status === "SENT";
@@ -170,7 +170,7 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
           { label: "Final Annual Premium", value: fmt(finalPremium), color: "text-brand-indigo", icon: <Calculator size={16} className="text-brand-indigo" /> },
           { label: "Rate per Member", value: fmt(ratePerMember), color: "text-[#28A745]", icon: <Users size={16} className="text-[#28A745]" /> },
           { label: "Total Lives Covered", value: totalLives.toLocaleString(), color: "text-[#17A2B8]", icon: <Users size={16} className="text-[#17A2B8]" /> },
-          { label: "Valid Until", value: q.validUntil ? new Date(q.validUntil).toLocaleDateString("en-KE") : "—", color: q.validUntil && new Date(q.validUntil) < new Date() ? "text-[#DC3545]" : "text-[#856404]", icon: <Calendar size={16} /> },
+          { label: "Valid Until", value: q.validUntil ? new Date(q.validUntil).toLocaleDateString("en-UG") : "—", color: q.validUntil && new Date(q.validUntil) < new Date() ? "text-[#DC3545]" : "text-[#856404]", icon: <Calendar size={16} /> },
         ].map(s => (
           <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-[8px] p-4 shadow-sm">
             <div className="flex justify-between items-center mb-1">

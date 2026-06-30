@@ -94,7 +94,7 @@ export default async function RateMatrixListPage() {
                   <td className="px-5 py-3 font-mono font-semibold text-brand-text-heading">{c.rateCardId}</td>
                   <td className="px-5 py-3 text-center text-brand-text-muted">{c._count._all}</td>
                   <td className="px-5 py-3 text-brand-text-muted text-xs">
-                    {c._min.effectiveFrom ? new Date(c._min.effectiveFrom).toLocaleDateString("en-KE") : "—"}
+                    {c._min.effectiveFrom ? new Date(c._min.effectiveFrom).toLocaleDateString("en-UG") : "—"}
                   </td>
                   <td className="px-5 py-3">
                     <Link href={`/packages/rate-matrix/${c.rateCardId}`}

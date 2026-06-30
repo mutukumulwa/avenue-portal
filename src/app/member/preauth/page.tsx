@@ -4,7 +4,7 @@ import { CalendarClock, ChevronRight, PlusCircle, ShieldCheck } from "lucide-rea
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-const currency = new Intl.NumberFormat("en-KE", {
+const currency = new Intl.NumberFormat("en-UG", {
   style: "currency",
   currency: "KES",
   maximumFractionDigits: 0,
@@ -126,7 +126,7 @@ export default async function MemberPreauthPage() {
                   )}
                   <p className="mt-1 text-xs text-brand-text-muted">
                     {preauth.expectedDateOfService
-                      ? new Date(preauth.expectedDateOfService).toLocaleDateString("en-KE")
+                      ? new Date(preauth.expectedDateOfService).toLocaleDateString("en-UG")
                       : "Date to be confirmed"}
                   </p>
                 </div>

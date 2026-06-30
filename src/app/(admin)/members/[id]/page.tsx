@@ -356,8 +356,8 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
                   {lapseRecord.catchupExpired ? "Catch-up window expired — re-assessment required" : "Lapsed — catch-up window open"}
                 </p>
                 <p className="text-xs text-brand-text-muted mt-0.5">
-                  Lapsed: {new Date(lapseRecord.lapseDate).toLocaleDateString("en-KE")} ·
-                  Catch-up deadline: {new Date(lapseRecord.catchupDeadline).toLocaleDateString("en-KE")}
+                  Lapsed: {new Date(lapseRecord.lapseDate).toLocaleDateString("en-UG")} ·
+                  Catch-up deadline: {new Date(lapseRecord.catchupDeadline).toLocaleDateString("en-UG")}
                 </p>
               </div>
             </div>
@@ -384,8 +384,8 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
             <XCircle size={14} className="text-[#6C757D]" />
             <p className="text-xs text-[#6C757D]">
               <strong>{cancellationRecord.isCoolingOff ? "Cooling-off cancellation" : "Standard cancellation"}</strong> ·
-              Effective {new Date(cancellationRecord.effectiveDate).toLocaleDateString("en-KE")} ·
-              Refund: KES {Number(cancellationRecord.refundAmount).toLocaleString("en-KE")}
+              Effective {new Date(cancellationRecord.effectiveDate).toLocaleDateString("en-UG")} ·
+              Refund: KES {Number(cancellationRecord.refundAmount).toLocaleString("en-UG")}
             </p>
           </div>
         )}
@@ -394,7 +394,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
             <AlertTriangle size={14} className="text-[#DC3545]" />
             <p className="text-xs text-[#DC3545]">
               <strong>Terminated: {terminationRecord.terminationType}</strong> ·
-              {new Date(terminationRecord.processedAt).toLocaleDateString("en-KE")} ·
+              {new Date(terminationRecord.processedAt).toLocaleDateString("en-UG")} ·
               {terminationRecord.reasonCode.replace(/_/g," ")}
               {terminationRecord.blacklisted && " · Blacklisted"}
             </p>

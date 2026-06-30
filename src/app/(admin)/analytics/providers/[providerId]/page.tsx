@@ -22,7 +22,7 @@ function formatPercent(value: number) {
 
 function formatDate(value: Date | null | undefined) {
   if (!value) return "—";
-  return new Date(value).toLocaleDateString("en-KE", { day: "2-digit", month: "short", year: "numeric" });
+  return new Date(value).toLocaleDateString("en-UG", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 function tierTone(tier: string | null) {

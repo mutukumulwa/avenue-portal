@@ -61,8 +61,8 @@ export default async function FraudCasePage({
     _count: { _all: true },
   });
 
-  const fmt    = (n: number) => `KES ${Math.round(n).toLocaleString("en-KE")}`;
-  const fmtDt  = (d: Date)   => new Date(d).toLocaleDateString("en-KE");
+  const fmt    = (n: number) => `KES ${Math.round(n).toLocaleString("en-UG")}`;
+  const fmtDt  = (d: Date)   => new Date(d).toLocaleDateString("en-UG");
 
   const scoreColor = alert.score >= 80 ? "#DC3545" : alert.score >= 60 ? "#FFC107" : "#28A745";
   const totalBilled = claim.claimLines.reduce((s, l) => s + Number(l.billedAmount), 0);

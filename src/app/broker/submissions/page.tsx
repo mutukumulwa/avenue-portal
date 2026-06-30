@@ -65,7 +65,7 @@ export default async function BrokerSubmissionsPage() {
                     {e.type.replace(/_/g, " ")}
                   </span>
                 </td>
-                <td className="px-6 py-4">{new Date(e.effectiveDate).toLocaleDateString("en-KE")}</td>
+                <td className="px-6 py-4">{new Date(e.effectiveDate).toLocaleDateString("en-UG")}</td>
                 <td className="px-6 py-4 font-semibold">
                   {e.proratedAmount ? Number(e.proratedAmount).toLocaleString() : "—"}
                 </td>

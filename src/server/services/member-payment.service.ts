@@ -232,7 +232,7 @@ export class MemberPaymentService {
       memberId: transaction.memberId,
       type: "PAYMENT_STATUS",
       title: "M-Pesa checkout requested",
-      body: `Confirm the M-Pesa prompt for KES ${Math.round(amountDue).toLocaleString("en-KE")}.`,
+      body: `Confirm the M-Pesa prompt for KES ${Math.round(amountDue).toLocaleString("en-UG")}.`,
       href: "/member/wallet",
       metadata: { paymentId: payment.id, checkoutRequestId: payment.checkoutRequestId },
     });
@@ -327,7 +327,7 @@ export class MemberPaymentService {
       type: "PAYMENT_STATUS",
       priority: "HIGH",
       title: "M-Pesa payment confirmed",
-      body: `Your payment of KES ${Math.round(amount).toLocaleString("en-KE")} has been confirmed.`,
+      body: `Your payment of KES ${Math.round(amount).toLocaleString("en-UG")} has been confirmed.`,
       href: "/member/wallet",
       metadata: { paymentId: payment.id, checkoutRequestId: payload.checkoutRequestId, mpesaReceipt: payload.mpesaReceipt },
     });

@@ -100,7 +100,7 @@ export default async function RepricingWorkbenchPage({
     : 0;
   const rateChange        = currentRate > 0 ? ((suggestedRate - currentRate) / currentRate) * 100 : 0;
 
-  const fmt = (n: number) => `KES ${Math.round(n).toLocaleString("en-KE")}`;
+  const fmt = (n: number) => `KES ${Math.round(n).toLocaleString("en-UG")}`;
   const lossRatioColor = lossRatio > 85 ? "text-[#DC3545]" : lossRatio > 70 ? "text-[#856404]" : "text-[#28A745]";
 
   return (

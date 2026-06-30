@@ -43,7 +43,7 @@ export default async function ComplaintDetailPage({
 
   if (!complaint) notFound();
 
-  const fmtDt = (d: Date) => new Date(d).toLocaleString("en-KE", { dateStyle: "medium", timeStyle: "short" });
+  const fmtDt = (d: Date) => new Date(d).toLocaleString("en-UG", { dateStyle: "medium", timeStyle: "short" });
 
   // Audit trail for this complaint
   const auditEntries = await prisma.auditLog.findMany({

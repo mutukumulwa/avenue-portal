@@ -180,14 +180,14 @@ export function ProviderDiagnosisTariffsCard({
                 <td className="px-5 py-3 font-mono text-xs font-bold text-brand-indigo">{t.icdCode}</td>
                 <td className="px-5 py-3 text-brand-text-heading">{t.diagnosisLabel}</td>
                 <td className="px-5 py-3 text-right font-semibold">
-                  {t.bundledRate != null ? Number(t.bundledRate).toLocaleString("en-KE") : <span className="text-brand-text-muted">—</span>}
+                  {t.bundledRate != null ? Number(t.bundledRate).toLocaleString("en-UG") : <span className="text-brand-text-muted">—</span>}
                 </td>
                 <td className="px-5 py-3 text-right font-semibold">
-                  {t.perDayRate != null ? Number(t.perDayRate).toLocaleString("en-KE") : <span className="text-brand-text-muted">—</span>}
+                  {t.perDayRate != null ? Number(t.perDayRate).toLocaleString("en-UG") : <span className="text-brand-text-muted">—</span>}
                 </td>
                 <td className="px-5 py-3 text-xs text-brand-text-muted">
-                  {new Date(t.effectiveFrom).toLocaleDateString("en-KE")}
-                  {t.effectiveTo && ` → ${new Date(t.effectiveTo).toLocaleDateString("en-KE")}`}
+                  {new Date(t.effectiveFrom).toLocaleDateString("en-UG")}
+                  {t.effectiveTo && ` → ${new Date(t.effectiveTo).toLocaleDateString("en-UG")}`}
                 </td>
                 <td className="px-5 py-3">
                   <div className="flex gap-2.5 justify-end">

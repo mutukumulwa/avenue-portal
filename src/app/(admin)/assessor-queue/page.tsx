@@ -117,7 +117,7 @@ export default async function AssessorQueuePage() {
                     <td className="px-5 py-3 text-brand-text-body">{q.broker?.name ?? "Direct"}</td>
                     <td className="px-5 py-3 text-brand-text-body">{q.memberCount + q.dependentCount}</td>
                     <td className="px-5 py-3 text-brand-text-body">
-                      {q.requestedCoverStart ? new Date(q.requestedCoverStart).toLocaleDateString("en-KE") : "—"}
+                      {q.requestedCoverStart ? new Date(q.requestedCoverStart).toLocaleDateString("en-UG") : "—"}
                     </td>
                     <td className="px-5 py-3">
                       <span className={`font-semibold text-xs flex items-center gap-1 ${sla.cls}`}>

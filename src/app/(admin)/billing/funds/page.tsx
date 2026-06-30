@@ -25,7 +25,7 @@ export default async function FundOverviewPage() {
   const fmt = (n: number) => {
     if (Math.abs(n) >= 1_000_000) return `KES ${(n / 1_000_000).toFixed(1)}M`;
     if (Math.abs(n) >= 1_000)     return `KES ${(n / 1_000).toFixed(0)}K`;
-    return `KES ${Math.round(n).toLocaleString("en-KE")}`;
+    return `KES ${Math.round(n).toLocaleString("en-UG")}`;
   };
 
   const totalBalance  = accounts.reduce((s, a) => s + Number(a.balance), 0);
@@ -145,7 +145,7 @@ export default async function FundOverviewPage() {
                     </span>
                   </td>
                   <td className="px-5 py-3 text-xs text-brand-text-muted">
-                    {new Date(a.group.renewalDate).toLocaleDateString("en-KE")}
+                    {new Date(a.group.renewalDate).toLocaleDateString("en-UG")}
                   </td>
                   <td className="px-5 py-3">
                     <Link href={`/fund/${a.group.id}`}

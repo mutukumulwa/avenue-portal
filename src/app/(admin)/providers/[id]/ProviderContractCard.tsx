@@ -55,10 +55,10 @@ export function ProviderContractCard(props: Props) {
             </span>
           </div>
           {[
-            { label: "Contract Start", value: props.contractStartDate ? new Date(props.contractStartDate).toLocaleDateString("en-KE") : "—" },
-            { label: "Contract End",   value: props.contractEndDate   ? new Date(props.contractEndDate).toLocaleDateString("en-KE")   : "—" },
+            { label: "Contract Start", value: props.contractStartDate ? new Date(props.contractStartDate).toLocaleDateString("en-UG") : "—" },
+            { label: "Contract End",   value: props.contractEndDate   ? new Date(props.contractEndDate).toLocaleDateString("en-UG")   : "—" },
             { label: "Payment Terms",  value: `Net ${props.paymentTermDays} days` },
-            { label: "Credit Limit",   value: props.creditLimit != null ? `KES ${Number(props.creditLimit).toLocaleString("en-KE")}` : "—" },
+            { label: "Credit Limit",   value: props.creditLimit != null ? `KES ${Number(props.creditLimit).toLocaleString("en-UG")}` : "—" },
           ].map(f => (
             <div key={f.label} className="flex justify-between">
               <span className="text-brand-text-muted">{f.label}</span>

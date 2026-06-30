@@ -187,7 +187,7 @@ export function ContractTariffsCard({
                 <tr key={t.id} className="hover:bg-[#F8F9FA]">
                   <td className="px-5 py-2.5 font-medium text-brand-text-heading">{t.serviceName}</td>
                   <td className="px-5 py-2.5 font-mono text-xs text-brand-text-muted">{t.cptCode ?? "—"}</td>
-                  <td className="px-5 py-2.5 text-right font-semibold text-brand-text-heading">{t.agreedRate.toLocaleString("en-KE")}</td>
+                  <td className="px-5 py-2.5 text-right font-semibold text-brand-text-heading">{t.agreedRate.toLocaleString("en-UG")}</td>
                   <td className="px-5 py-2.5 text-center">
                     {t.requiresPreauth ? (
                       <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[#856404] bg-[#FFC107]/20 px-2 py-0.5 rounded-full">

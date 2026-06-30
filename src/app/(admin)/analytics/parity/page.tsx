@@ -12,7 +12,7 @@ import Link from "next/link";
 function fmt(n: number) {
   if (n >= 1_000_000) return `KES ${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000)     return `KES ${(n / 1_000).toFixed(0)}K`;
-  return `KES ${Math.round(n).toLocaleString("en-KE")}`;
+  return `KES ${Math.round(n).toLocaleString("en-UG")}`;
 }
 
 const TIER_STYLE: Record<string, string> = {
@@ -83,7 +83,7 @@ export default async function ParityDashboardPage() {
             <h2 className={`font-bold text-sm font-heading ${color}`}>{label}</h2>
             <div className="grid grid-cols-2 gap-3 text-sm">
               {[
-                { l: "Encounters",          v: data.encounterCount.toLocaleString("en-KE") },
+                { l: "Encounters",          v: data.encounterCount.toLocaleString("en-UG") },
                 { l: "Total Cost",          v: fmt(data.totalCost) },
                 { l: "Benefit Paid",        v: fmt(data.benefitPaid) },
                 { l: "Avg Cost / Visit",    v: fmt(data.avgCostPerVisit) },
@@ -129,7 +129,7 @@ export default async function ParityDashboardPage() {
                       {p.tier}
                     </span>
                   </td>
-                  <td className="px-5 py-3 text-right font-mono text-xs">{p.encounterCount.toLocaleString("en-KE")}</td>
+                  <td className="px-5 py-3 text-right font-mono text-xs">{p.encounterCount.toLocaleString("en-UG")}</td>
                   <td className="px-5 py-3 text-right font-mono text-xs">{fmt(p.totalCost)}</td>
                   <td className="px-5 py-3 text-right font-mono text-xs">{fmt(p.avgCostPerVisit)}</td>
                   <td className={`px-5 py-3 text-right text-xs font-semibold ${variancePct > 0.15 ? "text-[#DC3545]" : variancePct > 0.05 ? "text-[#856404]" : "text-[#28A745]"}`}>

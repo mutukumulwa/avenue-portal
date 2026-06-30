@@ -20,7 +20,7 @@ function enumValue<T extends Record<string, string>>(source: T, value?: string) 
 }
 
 function formatDate(value: Date) {
-  return value.toLocaleDateString("en-KE", { day: "2-digit", month: "short", year: "numeric" });
+  return value.toLocaleDateString("en-UG", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 function formatMetric(value: number, metricKey?: string | null) {

@@ -96,7 +96,7 @@ export default async function SettingsPage() {
                       {u.role.replace(/_/g, " ")}
                     </span>
                   </td>
-                  <td className="px-5 py-3">{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString("en-KE") : "Never"}</td>
+                  <td className="px-5 py-3">{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString("en-UG") : "Never"}</td>
                   <td className="px-5 py-3">
                     <span className={`px-3 py-1 text-[10px] font-bold uppercase rounded-full ${u.isActive ? "bg-[#28A745]/10 text-[#28A745]" : "bg-[#DC3545]/10 text-[#DC3545]"}`}>
                       {u.isActive ? "Active" : "Inactive"}
@@ -186,7 +186,7 @@ export default async function SettingsPage() {
                 {cfg && (
                   <div className="text-xs text-brand-text-muted space-y-1 mb-3">
                     {cfg.apiBaseUrl && <div>URL: {cfg.apiBaseUrl}</div>}
-                    {cfg.lastSyncAt && <div>Last sync: {new Date(cfg.lastSyncAt).toLocaleString("en-KE")}</div>}
+                    {cfg.lastSyncAt && <div>Last sync: {new Date(cfg.lastSyncAt).toLocaleString("en-UG")}</div>}
                   </div>
                 )}
                 <form action={upsertIntegrationAction} className="space-y-2">

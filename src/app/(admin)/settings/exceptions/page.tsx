@@ -132,7 +132,7 @@ export default async function ExceptionsPage({
                   {ex.raisedBy.firstName} {ex.raisedBy.lastName}
                 </td>
                 <td className="px-5 py-3 text-brand-text-muted text-xs">
-                  {new Date(ex.createdAt).toLocaleDateString("en-KE")}
+                  {new Date(ex.createdAt).toLocaleDateString("en-UG")}
                 </td>
                 <td className="px-5 py-3">
                   <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold uppercase rounded-full ${
@@ -172,7 +172,7 @@ export default async function ExceptionsPage({
                   {ex.status !== "PENDING" && ex.resolvedBy && (
                     <p className="text-[10px] text-brand-text-muted">
                       {ex.resolvedBy.firstName} {ex.resolvedBy.lastName}
-                      <br />{ex.resolvedAt ? new Date(ex.resolvedAt).toLocaleDateString("en-KE") : ""}
+                      <br />{ex.resolvedAt ? new Date(ex.resolvedAt).toLocaleDateString("en-UG") : ""}
                     </p>
                   )}
                 </td>

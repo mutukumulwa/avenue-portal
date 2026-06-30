@@ -134,7 +134,7 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: "Active Members",          value: activeMembers,                      icon: Users,    color: "text-brand-indigo"  },
-          { label: "Annual Contribution (KES)", value: annualContribution.toLocaleString("en-KE"), icon: CreditCard, color: "text-[#28A745]" },
+          { label: "Annual Contribution (KES)", value: annualContribution.toLocaleString("en-UG"), icon: CreditCard, color: "text-[#28A745]" },
           { label: "Total Members",            value: group._count.members,              icon: Receipt,  color: "text-[#17A2B8]"      },
           { label: "Endorsements",             value: group._count.endorsements,         icon: FileText, color: "text-[#6C757D]"      },
         ].map(s => {
@@ -163,13 +163,13 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
             // When tiers exist each tier owns its package — don't show a misleading single package
             ...(!hasTiers ? [
               { label: "Package",                value: group.package.name },
-              { label: "Contribution (KES)",     value: Number(group.contributionRate).toLocaleString("en-KE") },
+              { label: "Contribution (KES)",     value: Number(group.contributionRate).toLocaleString("en-UG") },
             ] : [
               { label: "Benefit Structure",      value: `${group.benefitTiers.length} tier${group.benefitTiers.length !== 1 ? "s" : ""} — see below` },
             ]),
             { label: "Payment Frequency",  value: group.paymentFrequency },
-            { label: "Effective Date",     value: new Date(group.effectiveDate).toLocaleDateString("en-KE") },
-            { label: "Renewal Date",       value: new Date(group.renewalDate).toLocaleDateString("en-KE") },
+            { label: "Effective Date",     value: new Date(group.effectiveDate).toLocaleDateString("en-UG") },
+            { label: "Renewal Date",       value: new Date(group.renewalDate).toLocaleDateString("en-UG") },
             { label: "Broker",             value: group.broker?.name ?? "Direct" },
           ].map(f => (
             <div key={f.label} className="flex justify-between text-sm">
@@ -192,7 +192,7 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
                 <div>
                   <Link href={`/endorsements/${e.id}`}
                     className="font-semibold text-brand-indigo hover:underline font-mono text-xs">{e.endorsementNumber}</Link>
-                  <p className="text-xs text-brand-text-muted">{e.type.replace(/_/g, " ")} · {new Date(e.effectiveDate).toLocaleDateString("en-KE")}</p>
+                  <p className="text-xs text-brand-text-muted">{e.type.replace(/_/g, " ")} · {new Date(e.effectiveDate).toLocaleDateString("en-UG")}</p>
                 </div>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${statusColor(e.status)}`}>
                   {e.status}
@@ -301,8 +301,8 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
                 <td className="px-5 py-3 font-mono text-xs font-semibold text-brand-text-heading">{inv.invoiceNumber}</td>
                 <td className="px-5 py-3">{inv.period}</td>
                 <td className="px-5 py-3">{inv.memberCount}</td>
-                <td className="px-5 py-3 font-semibold">{Number(inv.totalAmount).toLocaleString("en-KE")}</td>
-                <td className="px-5 py-3">{new Date(inv.dueDate).toLocaleDateString("en-KE")}</td>
+                <td className="px-5 py-3 font-semibold">{Number(inv.totalAmount).toLocaleString("en-UG")}</td>
+                <td className="px-5 py-3">{new Date(inv.dueDate).toLocaleDateString("en-UG")}</td>
                 <td className="px-5 py-3">
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${invStatusColor(inv.status)}`}>
                     {inv.status.replace(/_/g, " ")}

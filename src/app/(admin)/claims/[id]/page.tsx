@@ -195,7 +195,7 @@ export default async function ClaimDetailPage({
             <p className="text-xs text-brand-text-muted mt-0.5">
               Unlisted services: {governingContract.unlistedServiceRule.replace(/_/g, " ").toLowerCase()}
               {governingContract.unlistedDiscountPct != null && ` (−${governingContract.unlistedDiscountPct}%)`}
-              {" · "}contract ends {new Date(governingContract.endDate).toLocaleDateString("en-KE")}
+              {" · "}contract ends {new Date(governingContract.endDate).toLocaleDateString("en-UG")}
             </p>
           </div>
         </div>
@@ -216,8 +216,8 @@ export default async function ClaimDetailPage({
           <div className="text-sm text-[#856404]">
             <p className="font-bold">
               {overbilledLines.length} line{overbilledLines.length > 1 ? "s" : ""} billed above contracted rate.
-              {" "}Contracted total: <span className="font-mono">KES {Math.round(contractedTotal).toLocaleString("en-KE")}</span>
-              {" "}vs billed: <span className="font-mono">KES {Number(claim.billedAmount).toLocaleString("en-KE")}</span>.
+              {" "}Contracted total: <span className="font-mono">KES {Math.round(contractedTotal).toLocaleString("en-UG")}</span>
+              {" "}vs billed: <span className="font-mono">KES {Number(claim.billedAmount).toLocaleString("en-UG")}</span>.
             </p>
             <p className="mt-0.5 text-xs">Consider approving the contracted total or raising an exception for overages.</p>
           </div>
@@ -230,9 +230,9 @@ export default async function ClaimDetailPage({
           <h3 className="font-bold text-brand-text-heading font-heading">Service Line Items</h3>
           <div className="flex items-center gap-4 text-sm font-bold">
             {overbilledLines.length > 0 && (
-              <span className="text-[#856404]">Contracted: KES {Math.round(contractedTotal).toLocaleString("en-KE")}</span>
+              <span className="text-[#856404]">Contracted: KES {Math.round(contractedTotal).toLocaleString("en-UG")}</span>
             )}
-            <span className="text-brand-indigo">Billed: KES {Number(claim.billedAmount).toLocaleString("en-KE")}</span>
+            <span className="text-brand-indigo">Billed: KES {Number(claim.billedAmount).toLocaleString("en-UG")}</span>
           </div>
         </div>
 
@@ -249,7 +249,7 @@ export default async function ClaimDetailPage({
                       <CatIcon size={11} /> {meta.label}
                     </span>
                     <span className="text-xs font-semibold text-brand-text-muted">
-                      KES {catTotal.toLocaleString("en-KE")}
+                      KES {catTotal.toLocaleString("en-UG")}
                     </span>
                   </div>
                   <table className="w-full text-sm">
@@ -274,12 +274,12 @@ export default async function ClaimDetailPage({
                             <td className="px-5 py-2.5 font-mono text-xs text-brand-text-muted">{(l as { cptCode?: string }).cptCode ?? "—"}</td>
                             <td className="px-5 py-2.5 text-right">{l.quantity}</td>
                             <td className={`px-5 py-2.5 text-right ${isOver ? "text-[#856404] font-semibold" : ""}`}>
-                              {Number(l.unitCost).toLocaleString("en-KE")}
+                              {Number(l.unitCost).toLocaleString("en-UG")}
                             </td>
                             <td className="px-5 py-2.5 text-right text-brand-text-muted">
                               {tv?.agreedRate !== null && tv?.agreedRate !== undefined ? (
                                 <span className="flex items-center justify-end gap-1">
-                                  {tv.agreedRate.toLocaleString("en-KE")}
+                                  {tv.agreedRate.toLocaleString("en-UG")}
                                   {tv.requiresPreauth && (
                                     <span className="text-[10px] font-bold text-[#856404] bg-[#FFC107]/20 px-1 rounded" title="Contract requires pre-authorization for this service">PA</span>
                                   )}
@@ -295,7 +295,7 @@ export default async function ClaimDetailPage({
                                 <span className="text-[10px] font-bold text-[#DC3545] bg-[#DC3545]/10 px-1.5 py-0.5 rounded" title="Contract does not pay unlisted services">NOT PAYABLE</span>
                               ) : tv?.ruleApplied === "UNLISTED_DISCOUNT" && tv.allowedUnit !== null ? (
                                 <span className="flex items-center justify-end gap-1">
-                                  {tv.allowedUnit.toLocaleString("en-KE")}
+                                  {tv.allowedUnit.toLocaleString("en-UG")}
                                   <span className="text-[10px] font-bold text-brand-indigo bg-brand-indigo/10 px-1 rounded" title="Unlisted service — contract discount off billed applied">unlisted</span>
                                 </span>
                               ) : tv?.ruleApplied === "UNLISTED_PAY_AS_BILLED" ? (
@@ -305,10 +305,10 @@ export default async function ClaimDetailPage({
                               )}
                             </td>
                             <td className={`px-5 py-2.5 text-right font-semibold ${isOver ? "text-[#DC3545]" : "text-brand-text-heading"}`}>
-                              {Number(l.billedAmount).toLocaleString("en-KE")}
+                              {Number(l.billedAmount).toLocaleString("en-UG")}
                             </td>
                             <td className="px-5 py-2.5 text-right font-semibold text-[#28A745]">
-                              {Number(l.approvedAmount) > 0 ? Number(l.approvedAmount).toLocaleString("en-KE") : "—"}
+                              {Number(l.approvedAmount) > 0 ? Number(l.approvedAmount).toLocaleString("en-UG") : "—"}
                             </td>
                           </tr>
                         );
@@ -489,7 +489,7 @@ export default async function ClaimDetailPage({
                   Approved Amount (KES)
                   {overbilledLines.length > 0 && (
                     <span className="ml-2 text-xs font-normal text-[#856404]">
-                      — contracted: {Math.round(contractedTotal).toLocaleString("en-KE")}
+                      — contracted: {Math.round(contractedTotal).toLocaleString("en-UG")}
                     </span>
                   )}
                 </label>
@@ -539,13 +539,13 @@ export default async function ClaimDetailPage({
               <div>
                 <p className="text-xs text-brand-text-muted">Billed amount</p>
                 <p className="font-semibold text-brand-text-heading mt-0.5">
-                  KES {Number(claim.billedAmount).toLocaleString("en-KE")}
+                  KES {Number(claim.billedAmount).toLocaleString("en-UG")}
                 </p>
               </div>
               <div>
                 <p className="text-xs text-brand-text-muted">Contracted rate</p>
                 <p className="font-semibold text-brand-text-heading mt-0.5">
-                  KES {Number(p9Claim.contractedRate).toLocaleString("en-KE")}
+                  KES {Number(p9Claim.contractedRate).toLocaleString("en-UG")}
                 </p>
               </div>
               <div>
@@ -599,7 +599,7 @@ export default async function ClaimDetailPage({
                     {line.cptCode && <p className="text-[10px] text-brand-text-muted">{line.cptCode}</p>}
                   </td>
                   <td className="px-4 py-2.5 text-right font-mono text-xs">
-                    {Number(line.billedAmount).toLocaleString("en-KE")}
+                    {Number(line.billedAmount).toLocaleString("en-UG")}
                   </td>
                   <td className="px-4 py-2.5">
                     {line.adjudicationDecision ? (
@@ -614,7 +614,7 @@ export default async function ClaimDetailPage({
                   </td>
                   <td className="px-4 py-2.5 text-right font-mono text-xs text-[#28A745]">
                     {line.adjudicationDecision
-                      ? Number(line.approvedAmount).toLocaleString("en-KE")
+                      ? Number(line.approvedAmount).toLocaleString("en-UG")
                       : "—"}
                   </td>
                   <td className="px-4 py-2.5">
@@ -659,7 +659,7 @@ export default async function ClaimDetailPage({
                 Outcome: {claim.status.replace(/_/g," ")}
               </span>
               <span className="text-brand-text-muted">
-                Net approved: <strong>KES {Number(claim.approvedAmount).toLocaleString("en-KE")}</strong>
+                Net approved: <strong>KES {Number(claim.approvedAmount).toLocaleString("en-UG")}</strong>
               </span>
             </div>
           )}
@@ -737,7 +737,7 @@ export default async function ClaimDetailPage({
             <div>
               <p className="text-xs text-brand-text-muted font-bold uppercase mb-1">Reimbursed at</p>
               <p className="font-semibold text-brand-text-heading">
-                {claim.reimbursedAt ? new Date(claim.reimbursedAt).toLocaleDateString("en-KE") : "—"}
+                {claim.reimbursedAt ? new Date(claim.reimbursedAt).toLocaleDateString("en-UG") : "—"}
               </p>
             </div>
           </div>
@@ -756,7 +756,7 @@ export default async function ClaimDetailPage({
                 <div>
                   <p className="text-xs text-brand-text-muted">Total paid by member</p>
                   <p className="font-semibold text-brand-text-heading mt-0.5">
-                    KES {Number(reimbRequest.totalPaidByMember).toLocaleString("en-KE")}
+                    KES {Number(reimbRequest.totalPaidByMember).toLocaleString("en-UG")}
                   </p>
                 </div>
                 <div>
@@ -803,7 +803,7 @@ export default async function ClaimDetailPage({
 
           {claim.reimbursedAt && (
             <p className="text-sm text-[#28A745] font-semibold flex items-center gap-2">
-              <CheckCircle2 size={14} /> Reimbursed on {new Date(claim.reimbursedAt).toLocaleDateString("en-KE")}
+              <CheckCircle2 size={14} /> Reimbursed on {new Date(claim.reimbursedAt).toLocaleDateString("en-UG")}
             </p>
           )}
         </div>

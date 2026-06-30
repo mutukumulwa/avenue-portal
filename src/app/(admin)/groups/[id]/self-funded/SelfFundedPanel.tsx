@@ -55,7 +55,7 @@ export function SelfFundedPanel({ groupId, account, minimumBalance }: Props) {
           <div>
             <p className="text-xs font-bold uppercase text-brand-text-muted">Fund Balance</p>
             <p className={`text-2xl font-bold font-mono ${isEmpty ? "text-[#DC3545]" : isLow ? "text-[#856404]" : "text-[#28A745]"}`}>
-              KES {balance.toLocaleString("en-KE")}
+              KES {balance.toLocaleString("en-UG")}
             </p>
             {isLow && <p className="text-xs text-[#856404] mt-0.5">Below minimum balance of KES {minimumBalance.toLocaleString()}</p>}
           </div>
@@ -134,7 +134,7 @@ export function SelfFundedPanel({ groupId, account, minimumBalance }: Props) {
             <tbody className="divide-y divide-[#EEEEEE]">
               {account.transactions.map(t => (
                 <tr key={t.id} className="hover:bg-[#F8F9FA]">
-                  <td className="px-4 py-2.5 text-brand-text-muted text-xs">{new Date(t.postedAt).toLocaleDateString("en-KE")}</td>
+                  <td className="px-4 py-2.5 text-brand-text-muted text-xs">{new Date(t.postedAt).toLocaleDateString("en-UG")}</td>
                   <td className="px-4 py-2.5">
                     <span className={`text-xs font-bold ${TYPE_COLOR[t.type] ?? "text-brand-text-muted"}`}>
                       {t.type.replace(/_/g, " ")}
@@ -143,10 +143,10 @@ export function SelfFundedPanel({ groupId, account, minimumBalance }: Props) {
                   <td className="px-4 py-2.5 text-brand-text-body text-xs">{t.description}</td>
                   <td className="px-4 py-2.5 font-mono text-xs text-brand-text-muted">{t.referenceNumber ?? "—"}</td>
                   <td className={`px-4 py-2.5 text-right font-mono font-semibold text-xs ${TYPE_COLOR[t.type]}`}>
-                    {TYPE_SIGN[t.type]}{Number(t.amount).toLocaleString("en-KE")}
+                    {TYPE_SIGN[t.type]}{Number(t.amount).toLocaleString("en-UG")}
                   </td>
                   <td className="px-4 py-2.5 text-right font-mono text-xs text-brand-text-heading">
-                    {Number(t.balanceAfter).toLocaleString("en-KE")}
+                    {Number(t.balanceAfter).toLocaleString("en-UG")}
                   </td>
                 </tr>
               ))}

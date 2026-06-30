@@ -30,7 +30,7 @@ export interface QuotationTemplateData {
 
 export function renderQuotationHtml(data: QuotationTemplateData): string {
   const fmt = (n: number) =>
-    `KES ${Math.round(n).toLocaleString("en-KE", { minimumFractionDigits: 0 })}`;
+    `KES ${Math.round(n).toLocaleString("en-UG", { minimumFractionDigits: 0 })}`;
 
   const lineRows = data.lineItems
     .map((l) => {

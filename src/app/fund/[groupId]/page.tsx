@@ -79,7 +79,7 @@ export default async function FundSchemePage({ params }: { params: Promise<{ gro
           <h1 className="text-2xl font-bold text-brand-text-heading font-heading">{group.name}</h1>
           <p className="text-brand-text-muted text-sm mt-0.5">
             Self-Funded Scheme · {group.members.length} active members ·
-            Period: {new Date(acc.periodStartDate).toLocaleDateString("en-KE", { month: "short", year: "numeric" })} – {new Date(acc.periodEndDate).toLocaleDateString("en-KE", { month: "short", year: "numeric" })}
+            Period: {new Date(acc.periodStartDate).toLocaleDateString("en-UG", { month: "short", year: "numeric" })} – {new Date(acc.periodEndDate).toLocaleDateString("en-UG", { month: "short", year: "numeric" })}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -102,11 +102,11 @@ export default async function FundSchemePage({ params }: { params: Promise<{ gro
             <div>
               <p className="text-xs font-bold uppercase text-brand-text-muted">Current Fund Balance</p>
               <p className={`text-3xl font-bold font-mono mt-0.5 ${isLow ? "text-[#DC3545]" : "text-[#28A745]"}`}>
-                KES {balance.toLocaleString("en-KE")}
+                KES {balance.toLocaleString("en-UG")}
               </p>
               {isLow && (
                 <p className="text-xs text-[#DC3545] mt-1">
-                  ⚠ Below minimum balance of KES {minBalance.toLocaleString("en-KE")} — top up required
+                  ⚠ Below minimum balance of KES {minBalance.toLocaleString("en-UG")} — top up required
                 </p>
               )}
             </div>
@@ -118,9 +118,9 @@ export default async function FundSchemePage({ params }: { params: Promise<{ gro
       {/* KPI row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Total Deposited",  value: `KES ${deposited.toLocaleString("en-KE")}`, icon: Wallet,       color: "text-brand-indigo" },
-          { label: "Claims Deducted",  value: `KES ${claimed.toLocaleString("en-KE")}`,   icon: TrendingDown, color: "text-[#DC3545]"    },
-          { label: "Admin Fees",       value: `KES ${fees.toLocaleString("en-KE")}`,      icon: FileText,     color: "text-[#856404]"    },
+          { label: "Total Deposited",  value: `KES ${deposited.toLocaleString("en-UG")}`, icon: Wallet,       color: "text-brand-indigo" },
+          { label: "Claims Deducted",  value: `KES ${claimed.toLocaleString("en-UG")}`,   icon: TrendingDown, color: "text-[#DC3545]"    },
+          { label: "Admin Fees",       value: `KES ${fees.toLocaleString("en-UG")}`,      icon: FileText,     color: "text-[#856404]"    },
           { label: "Active Lives",     value: group.members.length.toString(),             icon: Users,        color: "text-[#17A2B8]"    },
         ].map(k => {
           const Icon = k.icon;
@@ -150,7 +150,7 @@ export default async function FundSchemePage({ params }: { params: Promise<{ gro
                   <div key={cat}>
                     <div className="flex justify-between text-xs mb-1">
                       <span className="font-semibold text-brand-text-heading">{cat.replace(/_/g, " ")}</span>
-                      <span className="text-brand-text-muted font-mono">KES {amt.toLocaleString("en-KE")} ({pct.toFixed(1)}%)</span>
+                      <span className="text-brand-text-muted font-mono">KES {amt.toLocaleString("en-UG")} ({pct.toFixed(1)}%)</span>
                     </div>
                     <div className="h-1.5 bg-[#EEEEEE] rounded-full overflow-hidden">
                       <div className="h-full bg-brand-indigo rounded-full" style={{ width: `${pct}%` }} />
@@ -213,7 +213,7 @@ export default async function FundSchemePage({ params }: { params: Promise<{ gro
             <tbody className="divide-y divide-[#EEEEEE]">
               {acc.transactions.map(t => (
                 <tr key={t.id} className="hover:bg-[#F8F9FA]">
-                  <td className="px-4 py-2.5 text-xs text-brand-text-muted">{new Date(t.postedAt).toLocaleDateString("en-KE")}</td>
+                  <td className="px-4 py-2.5 text-xs text-brand-text-muted">{new Date(t.postedAt).toLocaleDateString("en-UG")}</td>
                   <td className="px-4 py-2.5">
                     <span className={`text-xs font-bold ${TXN_COLOR[t.type] ?? "text-brand-text-muted"}`}>
                       {t.type.replace(/_/g, " ")}
@@ -222,10 +222,10 @@ export default async function FundSchemePage({ params }: { params: Promise<{ gro
                   <td className="px-4 py-2.5 text-xs text-brand-text-body">{t.description}</td>
                   <td className="px-4 py-2.5 font-mono text-xs text-brand-text-muted">{t.referenceNumber ?? "—"}</td>
                   <td className={`px-4 py-2.5 text-right font-mono font-semibold text-xs ${TXN_COLOR[t.type]}`}>
-                    {TXN_SIGN[t.type]}{Number(t.amount).toLocaleString("en-KE")}
+                    {TXN_SIGN[t.type]}{Number(t.amount).toLocaleString("en-UG")}
                   </td>
                   <td className="px-4 py-2.5 text-right font-mono text-xs text-brand-text-heading">
-                    {Number(t.balanceAfter).toLocaleString("en-KE")}
+                    {Number(t.balanceAfter).toLocaleString("en-UG")}
                   </td>
                 </tr>
               ))}

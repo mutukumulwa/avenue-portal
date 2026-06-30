@@ -37,11 +37,11 @@ export default async function MemberProfilePage() {
   const readonlyFields = [
     { label: "Member Number",   value: member.memberNumber },
     { label: "National ID",     value: member.idNumber || "—" },
-    { label: "Date of Birth",   value: new Date(member.dateOfBirth).toLocaleDateString("en-KE", { dateStyle: "long" }) },
+    { label: "Date of Birth",   value: new Date(member.dateOfBirth).toLocaleDateString("en-UG", { dateStyle: "long" }) },
     { label: "Gender",          value: member.gender },
     { label: "Group / Employer",value: member.group.name },
     { label: "Package",         value: member.package.name },
-    { label: "Enrolled",        value: new Date(member.enrollmentDate).toLocaleDateString("en-KE", { dateStyle: "long" }) },
+    { label: "Enrolled",        value: new Date(member.enrollmentDate).toLocaleDateString("en-UG", { dateStyle: "long" }) },
     { label: "Status",          value: member.status.replace(/_/g, " ") },
   ];
 

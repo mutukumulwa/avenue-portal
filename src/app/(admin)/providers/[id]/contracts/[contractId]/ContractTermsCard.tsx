@@ -56,10 +56,10 @@ export function ContractTermsCard({ contract }: { contract: ContractTerms }) {
 
         <div className="grid md:grid-cols-2 gap-x-10 gap-y-3 text-sm">
           {[
-            { label: "Signed", value: contract.signedDate ? new Date(contract.signedDate).toLocaleDateString("en-KE") : "Not recorded" },
+            { label: "Signed", value: contract.signedDate ? new Date(contract.signedDate).toLocaleDateString("en-UG") : "Not recorded" },
             { label: "Auto-renew", value: contract.autoRenew ? "Yes" : "No" },
             { label: "Payment Terms", value: `Net ${contract.paymentTermDays} days` },
-            { label: "Credit Limit", value: contract.creditLimit != null ? `KES ${contract.creditLimit.toLocaleString("en-KE")}` : "Unlimited" },
+            { label: "Credit Limit", value: contract.creditLimit != null ? `KES ${contract.creditLimit.toLocaleString("en-UG")}` : "Unlimited" },
             { label: "Invoice Discount", value: contract.invoiceDiscountPct != null ? `${contract.invoiceDiscountPct}% off invoice total` : "—" },
             {
               label: "Unlisted Services",

@@ -66,8 +66,8 @@ export default async function HREndorsementDetailPage({ params }: { params: Prom
             { label: "Type", value: endorsement.type.replace(/_/g, " ") },
             { label: "Subject", value: endorsement.member ? `${endorsement.member.firstName} ${endorsement.member.lastName}` : "Group change" },
             { label: "Member No.", value: endorsement.member?.memberNumber ?? "-" },
-            { label: "Effective Date", value: new Date(endorsement.effectiveDate).toLocaleDateString("en-KE") },
-            { label: "Requested", value: new Date(endorsement.requestedDate).toLocaleDateString("en-KE") },
+            { label: "Effective Date", value: new Date(endorsement.effectiveDate).toLocaleDateString("en-UG") },
+            { label: "Requested", value: new Date(endorsement.requestedDate).toLocaleDateString("en-UG") },
           ].map((item) => (
             <div key={item.label} className="flex justify-between gap-4 text-sm py-1 border-b border-[#EEEEEE]/50 last:border-0">
               <span className="text-brand-text-muted">{item.label}</span>
@@ -79,7 +79,7 @@ export default async function HREndorsementDetailPage({ params }: { params: Prom
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-3">
           <h2 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2">Financial Impact</h2>
           <p className="text-3xl font-bold text-brand-indigo">
-            KES {Number(endorsement.proratedAmount ?? 0).toLocaleString("en-KE")}
+            KES {Number(endorsement.proratedAmount ?? 0).toLocaleString("en-UG")}
           </p>
           <p className="text-sm text-brand-text-muted">
             Positive amounts are debits. Negative amounts are credits against the group account.

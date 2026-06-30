@@ -7,7 +7,7 @@ export function cn(...inputs: ClassValue[]) {
 
 export function formatCurrency(amount: number | string | { toString(): string }) {
   const num = typeof amount === "string" ? parseFloat(amount) : Number(amount);
-  return new Intl.NumberFormat("en-KE", {
+  return new Intl.NumberFormat("en-UG", {
     style: "currency",
     currency: "KES",
     minimumFractionDigits: 0,
@@ -15,7 +15,7 @@ export function formatCurrency(amount: number | string | { toString(): string })
 }
 
 export function formatDate(date: Date | string) {
-  return new Intl.DateTimeFormat("en-KE", {
+  return new Intl.DateTimeFormat("en-UG", {
     year: "numeric",
     month: "short",
     day: "numeric",

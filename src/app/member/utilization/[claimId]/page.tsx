@@ -7,11 +7,11 @@ import { notFound } from "next/navigation";
 
 function formatMoney(value: number) {
   if (value >= 1_000_000) return `KES ${(value / 1_000_000).toFixed(1)}M`;
-  return `KES ${Math.round(value).toLocaleString("en-KE")}`;
+  return `KES ${Math.round(value).toLocaleString("en-UG")}`;
 }
 
 function formatDate(value: Date) {
-  return new Date(value).toLocaleDateString("en-KE", {
+  return new Date(value).toLocaleDateString("en-UG", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -121,7 +121,7 @@ export default async function MemberEncounterDetailPage({
                 <div>
                   <p className="font-semibold text-brand-text-heading">{service.description}</p>
                   <p className="text-[13px] text-brand-text-muted">
-                    {service.category.replace(/_/g, " ")} · Quantity {service.quantity.toLocaleString("en-KE")}
+                    {service.category.replace(/_/g, " ")} · Quantity {service.quantity.toLocaleString("en-UG")}
                   </p>
                 </div>
                 <div className="grid grid-cols-2 gap-4 text-sm sm:text-right">

@@ -82,7 +82,7 @@ export default async function EndorsementReviewPage({ params }: { params: Promis
                 {endorsement.status.replace(/_/g, " ")}
               </span>
               <span className="text-xs text-brand-text-muted">
-                Effective {new Date(endorsement.effectiveDate).toLocaleDateString("en-KE")}
+                Effective {new Date(endorsement.effectiveDate).toLocaleDateString("en-UG")}
               </span>
             </div>
           </div>
@@ -117,8 +117,8 @@ export default async function EndorsementReviewPage({ params }: { params: Promis
           {[
             { label: "Target Group", value: <Link href={`/groups/${endorsement.group.id}`} className="text-brand-indigo hover:underline font-semibold">{endorsement.group.name}</Link> },
             { label: "Change Type", value: endorsement.type.replace(/_/g, " ") },
-            { label: "Effective Date", value: new Date(endorsement.effectiveDate).toLocaleDateString("en-KE") },
-            { label: "Requested", value: new Date(endorsement.requestedDate).toLocaleDateString("en-KE") },
+            { label: "Effective Date", value: new Date(endorsement.effectiveDate).toLocaleDateString("en-UG") },
+            { label: "Requested", value: new Date(endorsement.requestedDate).toLocaleDateString("en-UG") },
             { label: "Affected Member", value: endorsement.member ? `${endorsement.member.firstName} ${endorsement.member.lastName}` : "Group-level" },
           ].map(f => (
             <div key={f.label} className="flex justify-between text-sm py-1 border-b border-[#EEEEEE]/50 last:border-0">
@@ -139,7 +139,7 @@ export default async function EndorsementReviewPage({ params }: { params: Promis
             <div className="bg-black/20 rounded-[8px] p-4 relative z-10">
               <p className="text-xs uppercase font-bold text-white/70 mb-1">Calculated Adjustment</p>
               <p className="text-3xl font-mono font-bold">
-                {isCredit ? "−" : "+"}KES {Math.abs(amount).toLocaleString("en-KE")}
+                {isCredit ? "−" : "+"}KES {Math.abs(amount).toLocaleString("en-UG")}
               </p>
               <p className="text-xs text-white/70 mt-1">
                 {isCredit ? "Credit — reduces next invoice" : "Debit — added to next invoice"}
@@ -204,10 +204,10 @@ export default async function EndorsementReviewPage({ params }: { params: Promis
               { label: "Days remaining", value: proRata.daysRemaining.toString() },
               { label: "Total days in period", value: proRata.totalDaysInPeriod.toString() },
               { label: "Pro-rata factor", value: `${(Number(proRata.prorataFactor) * 100).toFixed(2)}%` },
-              { label: "Prev contribution", value: `KES ${Number(proRata.previousContribution).toLocaleString("en-KE")}` },
-              { label: "New contribution",  value: `KES ${Number(proRata.newContribution).toLocaleString("en-KE")}` },
+              { label: "Prev contribution", value: `KES ${Number(proRata.previousContribution).toLocaleString("en-UG")}` },
+              { label: "New contribution",  value: `KES ${Number(proRata.newContribution).toLocaleString("en-UG")}` },
               { label: "Adjustment",        value: <strong className={proRata.adjustmentType === "CREDIT" ? "text-[#28A745]" : "text-[#C4500A]"}>
-                {proRata.adjustmentType === "CREDIT" ? "−" : "+"} KES {Math.abs(Number(proRata.adjustmentAmount)).toLocaleString("en-KE")}
+                {proRata.adjustmentType === "CREDIT" ? "−" : "+"} KES {Math.abs(Number(proRata.adjustmentAmount)).toLocaleString("en-UG")}
               </strong> },
             ].map(({ label, value }) => (
               <div key={label}>

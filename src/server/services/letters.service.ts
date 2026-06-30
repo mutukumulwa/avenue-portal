@@ -73,7 +73,7 @@ export const lettersService = {
     ]);
     if (!member) throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
 
-    const date           = new Date().toLocaleDateString("en-KE", { day: "2-digit", month: "long", year: "numeric" });
+    const date           = new Date().toLocaleDateString("en-UG", { day: "2-digit", month: "long", year: "numeric" });
     const refNumber      = `LTR-${member.memberNumber}-${Date.now().toString(36).toUpperCase()}`;
     const body           = buildLetterBody(letterType, member, { tenantName: tenant?.name ?? "Medvex", ...context });
     const generatorUser  = await prisma.user.findUnique({ where: { id: generatedById }, select: { firstName: true, lastName: true } });
