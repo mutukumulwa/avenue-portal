@@ -11,7 +11,7 @@ describe("secure check-in knowledge prompts", () => {
       dateOfBirth: new Date("1996-04-28T00:00:00.000Z"),
       phone: "+254700123456",
       email: "amina@example.com",
-      group: { name: "Avenue Staff" },
+      group: { name: "Medvex Staff" },
       dependents: [{ firstName: "Nia", lastName: "Otieno" }],
     });
 
@@ -19,7 +19,7 @@ describe("secure check-in knowledge prompts", () => {
     expect(prompts.map((p) => p.key)).toEqual(["full_name", "age", "group_name"]);
     expect(JSON.stringify(prompts)).not.toContain("Amina Otieno");
     expect(JSON.stringify(prompts)).not.toContain("30");
-    expect(JSON.stringify(prompts)).not.toContain("Avenue Staff");
+    expect(JSON.stringify(prompts)).not.toContain("Medvex Staff");
 
     vi.useRealTimers();
   });
@@ -31,7 +31,7 @@ describe("secure check-in knowledge prompts", () => {
       firstName: "Amina",
       lastName: "Otieno",
       dateOfBirth: new Date("1996-04-28T00:00:00.000Z"),
-      group: { name: "Avenue Staff" },
+      group: { name: "Medvex Staff" },
       dependents: [],
     };
 
@@ -39,7 +39,7 @@ describe("secure check-in knowledge prompts", () => {
       verifyKnowledgeAnswers(member, [
         { key: "full_name", answer: "Amina Otieno" },
         { key: "age", answer: "30" },
-        { key: "group_name", answer: "avenue staff" },
+        { key: "group_name", answer: "medvex staff" },
       ]).passed
     ).toBe(true);
 
@@ -47,7 +47,7 @@ describe("secure check-in knowledge prompts", () => {
       verifyKnowledgeAnswers(member, [
         { key: "full_name", answer: "Amina Otieno" },
         { key: "age", answer: "29" },
-        { key: "group_name", answer: "avenue staff" },
+        { key: "group_name", answer: "medvex staff" },
       ]).passed
     ).toBe(false);
 

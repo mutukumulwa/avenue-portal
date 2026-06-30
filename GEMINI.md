@@ -2,13 +2,13 @@
 
 ## Project
 
-AiCare — Health Membership Management Platform for Avenue Healthcare, Kenya.
+Medvex — Third Party Administrator (TPA) health-benefits platform, Uganda.
 
 ## Planning
 
 - Always use Plan Mode for any task touching more than 2 files
 - Before writing code, read `AICARE_ANTIGRAVITY_BUILD_SPEC.md` for the relevant module specification
-- Before styling any component, read `AVENUE_STYLE_GUIDE.md` for brand colors, fonts, and component patterns
+- Before styling any component, read `Medvex_Style_Guide.md` for brand colors, fonts, and component patterns
 - Break large features into subtasks: schema → service → router → UI → tests
 
 ## Code Generation
@@ -29,7 +29,7 @@ AiCare — Health Membership Management Platform for Avenue Healthcare, Kenya.
 ## Browser Testing
 
 - After building a UI feature, use the browser to navigate to it, take a screenshot, and verify it renders correctly
-- Check that Avenue brand colors are applied (indigo `#292A83`, body text `#848E9F`, pill buttons)
+- Check that Medvex brand colors are applied (ink `#0B1437`, teal accent `#06B9AB`, body text `#41505E`, pill buttons)
 - Verify tables are populated with seed data
 
 ## Docker
