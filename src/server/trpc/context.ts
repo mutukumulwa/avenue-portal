@@ -8,6 +8,9 @@ export const createContext = async () => {
     session,
     prisma,
     tenantId: session?.user?.tenantId,
+    // Client confinement (G2.1): set => user is confined to this one client;
+    // undefined => operator-level Medvex ops user who spans all clients.
+    clientId: session?.user?.clientId,
     user: session?.user,
   };
 };

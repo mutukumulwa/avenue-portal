@@ -53,6 +53,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 lastName: true,
                 role: true,
                 tenantId: true,
+                clientId: true,
                 groupId: true,
                 memberId: true,
               },
@@ -79,6 +80,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             name: `${user.firstName} ${user.lastName}`,
             role: user.role,
             tenantId: user.tenantId,
+            clientId: user.clientId ?? undefined,
             groupId: user.groupId ?? undefined,
             memberId: user.memberId ?? undefined,
             permissions,
@@ -93,6 +95,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.id = user.id!;
         token.role = user.role;
         token.tenantId = user.tenantId;
+        token.clientId = user.clientId;
         token.groupId = user.groupId;
         token.memberId = user.memberId;
         token.permissions = user.permissions;
@@ -104,6 +107,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.id = token.id as string;
         session.user.role = token.role as string | undefined;
         session.user.tenantId = token.tenantId as string;
+        session.user.clientId = token.clientId as string | undefined;
         session.user.groupId = token.groupId as string | undefined;
         session.user.memberId = token.memberId as string | undefined;
         session.user.permissions = token.permissions as string[] | undefined;

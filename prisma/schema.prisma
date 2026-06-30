@@ -125,6 +125,7 @@ model Client {
   updatedAt DateTime @updatedAt
 
   groups Group[]
+  users  User[]
 
   @@unique([operatorTenantId, slug])
   @@index([operatorTenantId])
@@ -151,6 +152,10 @@ model User {
   id           String    @id @default(cuid())
   tenantId     String
   tenant       Tenant    @relation(fields: [tenantId], references: [id])
+  // Client confinement (G2.1). null = operator-level Medvex ops user who spans
+  // every client in the tenant; set = user is confined to this one client.
+  clientId     String?
+  client       Client?   @relation(fields: [clientId], references: [id])
   email        String
   passwordHash String
   firstName    String
@@ -198,6 +203,7 @@ model User {
 
   @@unique([tenantId, email])
   @@index([tenantId])
+  @@index([clientId])
 }
 
 // ─── GROUPS / ORGANIZATIONS ─────────────────────────────

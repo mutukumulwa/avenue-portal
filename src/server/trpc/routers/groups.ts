@@ -4,13 +4,13 @@ import { GroupsService } from "../../services/groups.service";
 
 export const groupsRouter = createTRPCRouter({
   getAll: protectedProcedure.query(async ({ ctx }) => {
-    return GroupsService.getGroups(ctx.tenantId);
+    return GroupsService.getGroups(ctx.tenantId, ctx.clientId);
   }),
 
   getById: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      return GroupsService.getGroupById(ctx.tenantId, input.id);
+      return GroupsService.getGroupById(ctx.tenantId, input.id, ctx.clientId);
     }),
 
   create: protectedProcedure
@@ -27,6 +27,6 @@ export const groupsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      return GroupsService.createGroup(ctx.tenantId, input);
+      return GroupsService.createGroup(ctx.tenantId, input, ctx.clientId);
     }),
 });

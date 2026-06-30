@@ -28,6 +28,9 @@ const enforceUserIsAuthed = t.middleware(({ ctx, next }) => {
     ctx: {
       session: { ...ctx.session, user: ctx.session.user },
       tenantId: ctx.tenantId as string,
+      // Client confinement (G2.1): string => confined to one client;
+      // undefined => operator-level user spanning all clients in the tenant.
+      clientId: ctx.clientId as string | undefined,
     },
   });
 });

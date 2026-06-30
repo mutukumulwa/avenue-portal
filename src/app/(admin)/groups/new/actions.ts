@@ -24,7 +24,7 @@ export async function enrollGroupAction(formData: FormData) {
       effectiveDate: formData.get("effectiveDate") as string,
     };
 
-    const group = await GroupsService.createGroup(tenantId, data);
+    const group = await GroupsService.createGroup(tenantId, data, session.user.clientId);
 
     await writeAudit({
       userId: session.user.id,

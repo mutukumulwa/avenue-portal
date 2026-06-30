@@ -14,7 +14,7 @@ export default async function NewEndorsementPage({
   const tenantId = session.user.tenantId;
 
   const [groups, packages] = await Promise.all([
-    GroupsService.getGroups(tenantId),
+    GroupsService.getGroups(tenantId, session.user.clientId),
     prisma.package.findMany({
       where: { tenantId, status: "ACTIVE" },
       select: { id: true, name: true, annualLimit: true, contributionAmount: true },

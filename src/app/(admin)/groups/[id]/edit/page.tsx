@@ -9,7 +9,7 @@ export default async function GroupEditPage({ params }: { params: Promise<{ id: 
   const session = await requireRole(ROLES.OPS);
 
   const { id } = await params;
-  const group = await GroupsService.getGroupById(session.user.tenantId, id);
+  const group = await GroupsService.getGroupById(session.user.tenantId, id, session.user.clientId);
   if (!group) notFound();
 
   // Serialize for the client component

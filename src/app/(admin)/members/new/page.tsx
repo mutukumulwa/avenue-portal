@@ -7,7 +7,7 @@ import { MemberNewForm } from "./MemberNewForm";
 export default async function RegisterMemberPage() {
   const session = await requireRole(ROLES.OPS);
 
-  const groups = await GroupsService.getGroups(session.user.tenantId);
+  const groups = await GroupsService.getGroups(session.user.tenantId, session.user.clientId);
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">

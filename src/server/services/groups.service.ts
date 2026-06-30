@@ -3,11 +3,36 @@ import type { GroupStatus, PaymentFrequency } from "@prisma/client";
 
 export class GroupsService {
   /**
-   * Retrieves all groups for a given tenant
+   * Client-isolation filter (G2.1). When `clientId` is provided the caller is
+   * confined to that client; when omitted the caller is operator-level and
+   * spans every client in the tenant.
    */
-  static async getGroups(tenantId: string) {
+  private static clientWhere(clientId?: string) {
+    return clientId ? { clientId } : {};
+  }
+
+  /**
+   * Resolve the client a newly-created scheme belongs to. A confined/selected
+   * client wins; otherwise the scheme attaches to the tenant's default client
+   * (slug `default`) so the `clientId` column is always populated during the
+   * multi-client rollout (G2.1). The client switcher (slice 4) lets operator
+   * users pick a specific client instead of the default.
+   */
+  private static async resolveWriteClientId(tenantId: string, clientId?: string) {
+    if (clientId) return clientId;
+    const fallback = await prisma.client.findFirst({
+      where: { operatorTenantId: tenantId, slug: "default" },
+      select: { id: true },
+    });
+    return fallback?.id; // may be undefined if no default seeded — column stays null
+  }
+
+  /**
+   * Retrieves all groups for a given tenant (and client, when confined).
+   */
+  static async getGroups(tenantId: string, clientId?: string) {
     return prisma.group.findMany({
-      where: { tenantId },
+      where: { tenantId, ...this.clientWhere(clientId) },
       include: {
         package: true,
         _count: {
@@ -19,11 +44,11 @@ export class GroupsService {
   }
 
   /**
-   * Retrieves a specific group by ID
+   * Retrieves a specific group by ID, scoped to tenant (and client, when confined).
    */
-  static async getGroupById(tenantId: string, groupId: string) {
-    return prisma.group.findUnique({
-      where: { id: groupId, tenantId },
+  static async getGroupById(tenantId: string, groupId: string, clientId?: string) {
+    return prisma.group.findFirst({
+      where: { id: groupId, tenantId, ...this.clientWhere(clientId) },
       include: {
         package: true,
       },
@@ -42,7 +67,7 @@ export class GroupsService {
     contactPersonEmail: string;
     packageId: string;
     effectiveDate: string | Date;
-  }) {
+  }, clientId?: string) {
     const pkg = await prisma.package.findUnique({
       where: { id: data.packageId, tenantId },
       include: { currentVersion: true },
@@ -61,9 +86,12 @@ export class GroupsService {
     const renewalDate = new Date(effectiveDateObj);
     renewalDate.setFullYear(renewalDate.getFullYear() + 1);
 
+    const resolvedClientId = await this.resolveWriteClientId(tenantId, clientId);
+
     return prisma.group.create({
       data: {
         tenantId,
+        clientId: resolvedClientId,
         name: data.name,
         industry: data.industry,
         registrationNumber: data.registrationNumber,
@@ -97,12 +125,16 @@ export class GroupsService {
     renewalDate: string | Date;
     status: GroupStatus;
     notes?: string;
-  }) {
-    const group = await prisma.group.findUnique({ where: { id: groupId, tenantId } });
+  }, clientId?: string) {
+    // Scope the lookup to the caller's client when confined (G2.1) so a confined
+    // user cannot reach another client's scheme within the same tenant.
+    const group = await prisma.group.findFirst({
+      where: { id: groupId, tenantId, ...this.clientWhere(clientId) },
+    });
     if (!group) throw new Error("Group not found");
 
     return prisma.group.update({
-      where: { id: groupId, tenantId },
+      where: { id: groupId },
       data: {
         name: data.name,
         industry: data.industry || null,

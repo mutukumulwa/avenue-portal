@@ -27,7 +27,7 @@ export async function updateGroupAction(
       renewalDate:         formData.get("renewalDate")         as string,
       status:              formData.get("status")              as GroupStatus,
       notes:               formData.get("notes")              as string,
-    });
+    }, session.user.clientId);
   } catch (err) {
     return { error: (err as Error).message };
   }
