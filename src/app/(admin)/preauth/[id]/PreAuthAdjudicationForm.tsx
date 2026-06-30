@@ -4,8 +4,8 @@ import { useActionState, useState } from "react";
 import { CheckCircle2, XCircle, AlertCircle, ChevronDown, Stethoscope } from "lucide-react";
 import { adjudicatePreAuthAction, requestMedicalReviewAction } from "./actions";
 
-const inputCls = "w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-avenue-indigo transition-colors";
-const labelCls = "text-sm font-semibold text-avenue-text-heading block mb-1";
+const inputCls = "w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo transition-colors";
+const labelCls = "text-sm font-semibold text-brand-text-heading block mb-1";
 
 // Service types that require two-stage medical review before final approval
 const MEDICAL_REVIEW_TYPES = ["INPATIENT", "DAY_CASE", "EMERGENCY"];
@@ -43,11 +43,11 @@ export function PreAuthAdjudicationForm({ preauthId, estimatedCost, serviceType,
   if (needsMedicalReview) {
     return (
       <div className="bg-white border-2 border-[#17A2B8]/30 rounded-lg p-6 shadow-sm">
-        <h3 className="text-lg font-bold text-avenue-text-heading font-heading flex items-center gap-2 mb-3">
+        <h3 className="text-lg font-bold text-brand-text-heading font-heading flex items-center gap-2 mb-3">
           <Stethoscope size={20} className="text-[#17A2B8]" />
           Stage 1 — Medical Review Required
         </h3>
-        <p className="text-sm text-avenue-text-body mb-5">
+        <p className="text-sm text-brand-text-body mb-5">
           This is an <strong>{serviceType.replace(/_/g, " ").toLowerCase()}</strong> pre-authorization.
           It requires a clinical medical review before a final approval or decline decision can be made.
           Send it for medical review first, then a clinician will complete Stage 2.
@@ -63,7 +63,7 @@ export function PreAuthAdjudicationForm({ preauthId, estimatedCost, serviceType,
               Send for Medical Review
             </button>
           </form>
-          <p className="text-xs text-avenue-text-muted self-center">
+          <p className="text-xs text-brand-text-muted self-center">
             Status will change to <strong>Under Review</strong> and Stage 2 adjudication will become available.
           </p>
         </div>
@@ -72,13 +72,13 @@ export function PreAuthAdjudicationForm({ preauthId, estimatedCost, serviceType,
   }
 
   return (
-    <div className="bg-white border-2 border-avenue-indigo/20 rounded-lg p-6 shadow-sm">
-      <h3 className="text-lg font-bold text-avenue-text-heading font-heading flex items-center gap-2 mb-2">
-        <ChevronDown size={20} className="text-avenue-indigo" />
+    <div className="bg-white border-2 border-brand-indigo/20 rounded-lg p-6 shadow-sm">
+      <h3 className="text-lg font-bold text-brand-text-heading font-heading flex items-center gap-2 mb-2">
+        <ChevronDown size={20} className="text-brand-indigo" />
         {MEDICAL_REVIEW_TYPES.includes(serviceType) ? "Stage 2 — Final Adjudication" : "Adjudicate Pre-Authorization"}
       </h3>
       {MEDICAL_REVIEW_TYPES.includes(serviceType) && (
-        <p className="text-xs text-avenue-text-muted mb-4">
+        <p className="text-xs text-brand-text-muted mb-4">
           Medical review complete. Submit the final approval or decline decision below.
         </p>
       )}
@@ -111,7 +111,7 @@ export function PreAuthAdjudicationForm({ preauthId, estimatedCost, serviceType,
                   type="button"
                   onClick={() => setDecision(opt.id as typeof decision)}
                   className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border-2 text-sm font-semibold transition-colors ${
-                    active ? `${opt.ring} ${opt.color}` : "border-[#EEEEEE] text-avenue-text-muted hover:border-[#CCCCCC]"
+                    active ? `${opt.ring} ${opt.color}` : "border-[#EEEEEE] text-brand-text-muted hover:border-[#CCCCCC]"
                   }`}
                 >
                   <Icon size={16} className={active ? opt.color : "text-[#CCCCCC]"} />
@@ -140,7 +140,7 @@ export function PreAuthAdjudicationForm({ preauthId, estimatedCost, serviceType,
                 className={inputCls + (isPartial ? "" : " bg-[#F8F9FA] cursor-not-allowed")}
               />
               {!isPartial && (
-                <p className="text-[10px] text-avenue-text-muted mt-1">Full estimated amount will be approved.</p>
+                <p className="text-[10px] text-brand-text-muted mt-1">Full estimated amount will be approved.</p>
               )}
             </div>
             <div>

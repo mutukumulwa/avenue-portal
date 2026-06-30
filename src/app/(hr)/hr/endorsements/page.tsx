@@ -47,10 +47,10 @@ export default async function HREndorsementsPage(
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Endorsement Requests</h1>
-          <p className="text-avenue-text-body font-body mt-1">Track the status of your reported additions, terminations, and group changes.</p>
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Endorsement Requests</h1>
+          <p className="text-brand-text-body font-body mt-1">Track the status of your reported additions, terminations, and group changes.</p>
         </div>
-        <Link href="/hr/roster/new" className="px-5 py-2 bg-avenue-indigo text-white rounded-full text-sm font-semibold hover:bg-avenue-secondary transition-colors">
+        <Link href="/hr/roster/new" className="px-5 py-2 bg-brand-indigo text-white rounded-full text-sm font-semibold hover:bg-brand-secondary transition-colors">
           + New Endorsement
         </Link>
       </div>
@@ -64,7 +64,7 @@ export default async function HREndorsementsPage(
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm whitespace-nowrap">
             <thead>
-              <tr className="bg-white border-b border-[#EEEEEE] text-avenue-text-muted font-heading text-xs uppercase tracking-wider">
+              <tr className="bg-white border-b border-[#EEEEEE] text-brand-text-muted font-heading text-xs uppercase tracking-wider">
                 <th className="px-6 py-4 font-bold">Endorsement No.</th>
                 <th className="px-6 py-4 font-bold">Type</th>
                 <th className="px-6 py-4 font-bold">Subject</th>
@@ -77,26 +77,26 @@ export default async function HREndorsementsPage(
             <tbody className="divide-y divide-[#EEEEEE]">
               {endorsements.map((en) => (
                 <tr key={en.id} className="hover:bg-[#F8F9FA] transition-colors group">
-                  <td className="px-6 py-4 font-bold text-avenue-text-heading font-mono text-xs">
+                  <td className="px-6 py-4 font-bold text-brand-text-heading font-mono text-xs">
                      <div className="flex items-center">
-                        <FileText className="w-4 h-4 mr-2 text-avenue-indigo opacity-50" />
+                        <FileText className="w-4 h-4 mr-2 text-brand-indigo opacity-50" />
                         {en.endorsementNumber}
                      </div>
                   </td>
-                  <td className="px-6 py-4 font-semibold text-avenue-text-heading">
+                  <td className="px-6 py-4 font-semibold text-brand-text-heading">
                      {en.type.replace(/_/g, " ")}
                   </td>
-                  <td className="px-6 py-4 text-avenue-text-body">
+                  <td className="px-6 py-4 text-brand-text-body">
                      {en.member ? `${en.member.firstName} ${en.member.lastName}` : (
                         (en.changeDetails as Record<string, string>)?.firstName 
                            ? `${(en.changeDetails as Record<string, string>).firstName} ${(en.changeDetails as Record<string, string>).lastName}`
                            : "Group Change"
                      )}
                   </td>
-                  <td className="px-6 py-4 text-avenue-text-body">
+                  <td className="px-6 py-4 text-brand-text-body">
                      {new Date(en.effectiveDate).toLocaleDateString()}
                   </td>
-                  <td className="px-6 py-4 text-avenue-text-muted">
+                  <td className="px-6 py-4 text-brand-text-muted">
                      {new Date(en.requestedDate).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4">
@@ -105,7 +105,7 @@ export default async function HREndorsementsPage(
                      </span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <Link href={`/hr/endorsements/${en.id}`} className="text-avenue-indigo hover:text-avenue-secondary inline-flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                    <Link href={`/hr/endorsements/${en.id}`} className="text-brand-indigo hover:text-brand-secondary inline-flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
                       <Eye className="w-4 h-4 mr-1" />
                       <span className="text-xs font-bold">View</span>
                     </Link>
@@ -114,7 +114,7 @@ export default async function HREndorsementsPage(
               ))}
               {endorsements.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-avenue-text-body">
+                  <td colSpan={7} className="px-6 py-12 text-center text-brand-text-body">
                      No endorsement requests found matching your criteria.
                   </td>
                 </tr>

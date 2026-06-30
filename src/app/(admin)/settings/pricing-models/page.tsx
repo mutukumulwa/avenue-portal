@@ -33,8 +33,8 @@ export default async function PricingModelsPage({
 
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Pricing Models</h1>
-          <p className="text-avenue-text-body font-body mt-1">
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Pricing Models</h1>
+          <p className="text-brand-text-body font-body mt-1">
             Manage contribution rate tables and pricing algorithms.
           </p>
         </div>
@@ -46,10 +46,10 @@ export default async function PricingModelsPage({
           <Link
             key={model.id}
             href={`/settings/pricing-models/${model.id}`}
-            className="block border border-[#EEEEEE] rounded-lg p-5 bg-white hover:shadow-md hover:border-avenue-indigo/30 transition-all group"
+            className="block border border-[#EEEEEE] rounded-lg p-5 bg-white hover:shadow-md hover:border-brand-indigo/30 transition-all group"
           >
             <div className="flex justify-between items-start mb-3">
-              <div className="w-10 h-10 rounded bg-[#0B1437]/10 text-avenue-indigo flex items-center justify-center">
+              <div className="w-10 h-10 rounded bg-[#0B1437]/10 text-brand-indigo flex items-center justify-center">
                 <FileSpreadsheet size={20} />
               </div>
               <span className={`text-xs px-2 py-1 rounded font-bold ${model.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
@@ -57,28 +57,28 @@ export default async function PricingModelsPage({
               </span>
             </div>
             
-            <h3 className="font-bold text-lg text-avenue-text-heading group-hover:text-avenue-indigo transition-colors mb-1">
+            <h3 className="font-bold text-lg text-brand-text-heading group-hover:text-brand-indigo transition-colors mb-1">
               {model.name}
             </h3>
-            <p className="text-sm text-avenue-text-body mb-4 h-10 line-clamp-2">
+            <p className="text-sm text-brand-text-body mb-4 h-10 line-clamp-2">
               {model.description || `A ${model.type.toLowerCase().replace('_', ' ')} pricing model.`}
             </p>
 
             <div className="grid grid-cols-2 gap-4 border-t border-[#EEEEEE] pt-4 text-sm">
               <div>
-                <p className="text-avenue-text-muted text-xs uppercase font-bold tracking-wider mb-1">Rates</p>
-                <p className="font-medium text-avenue-text-heading">{model._count.rateTables} entries</p>
+                <p className="text-brand-text-muted text-xs uppercase font-bold tracking-wider mb-1">Rates</p>
+                <p className="font-medium text-brand-text-heading">{model._count.rateTables} entries</p>
               </div>
               <div>
-                <p className="text-avenue-text-muted text-xs uppercase font-bold tracking-wider mb-1">Usage</p>
-                <p className="font-medium text-avenue-text-heading">{model._count.quotations} quotes</p>
+                <p className="text-brand-text-muted text-xs uppercase font-bold tracking-wider mb-1">Usage</p>
+                <p className="font-medium text-brand-text-heading">{model._count.quotations} quotes</p>
               </div>
             </div>
           </Link>
         ))}
 
         {models.length === 0 && (
-          <div className="col-span-full py-12 text-center text-avenue-text-muted border-2 border-dashed border-[#EEEEEE] rounded-lg">
+          <div className="col-span-full py-12 text-center text-brand-text-muted border-2 border-dashed border-[#EEEEEE] rounded-lg">
             <Activity size={48} className="mx-auto mb-4 opacity-20" />
             <p>No pricing models found.</p>
           </div>

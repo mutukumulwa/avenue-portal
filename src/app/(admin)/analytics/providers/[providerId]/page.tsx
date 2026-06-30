@@ -26,7 +26,7 @@ function formatDate(value: Date | null | undefined) {
 }
 
 function tierTone(tier: string | null) {
-  if (tier === "OWN") return "bg-avenue-indigo/10 text-avenue-indigo";
+  if (tier === "OWN") return "bg-brand-indigo/10 text-brand-indigo";
   if (tier === "PANEL") return "bg-[#28A745]/10 text-[#28A745]";
   if (tier === "PARTNER") return "bg-[#17A2B8]/10 text-[#17A2B8]";
   return "bg-[#6C757D]/10 text-[#6C757D]";
@@ -41,15 +41,15 @@ function severityTone(severity: string) {
 function statusTone(status: string) {
   if (status === "APPROVED" || status === "PARTIALLY_APPROVED" || status === "PAID") return "text-[#28A745]";
   if (status === "DECLINED" || status === "VOID") return "text-[#DC3545]";
-  return "text-avenue-text-muted";
+  return "text-brand-text-muted";
 }
 
 function MetricCard({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
     <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
-      <p className="text-[13px] font-bold uppercase tracking-normal text-avenue-text-muted">{label}</p>
-      <p className="mt-2 text-2xl font-bold tabular-nums text-avenue-text-heading">{value}</p>
-      <p className="mt-2 text-[13px] leading-snug text-avenue-text-muted">{detail}</p>
+      <p className="text-[13px] font-bold uppercase tracking-normal text-brand-text-muted">{label}</p>
+      <p className="mt-2 text-2xl font-bold tabular-nums text-brand-text-heading">{value}</p>
+      <p className="mt-2 text-[13px] leading-snug text-brand-text-muted">{detail}</p>
     </div>
   );
 }
@@ -60,30 +60,30 @@ function ScorecardTrend({ trend }: { trend: ProviderDetail["scorecardTrend"] }) 
     <div className="rounded-[8px] border border-[#EEEEEE] bg-white shadow-sm">
       <div className="flex items-center justify-between border-b border-[#EEEEEE] px-5 py-4">
         <div>
-          <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Cost Trend</h2>
-          <p className="text-sm text-avenue-text-muted">Case-mix-adjusted cost and claim volume by period.</p>
+          <h2 className="font-heading text-lg font-bold text-brand-text-heading">Cost Trend</h2>
+          <p className="text-sm text-brand-text-muted">Case-mix-adjusted cost and claim volume by period.</p>
         </div>
-        <TrendingUp className="h-5 w-5 text-avenue-indigo" />
+        <TrendingUp className="h-5 w-5 text-brand-indigo" />
       </div>
       <div className="space-y-3 p-5">
         {trend.length === 0 && (
-          <p className="py-8 text-center text-sm text-avenue-text-muted">No scorecard history yet.</p>
+          <p className="py-8 text-center text-sm text-brand-text-muted">No scorecard history yet.</p>
         )}
         {trend.map((row) => (
           <div key={row.period} className="grid grid-cols-[64px_1fr_92px] items-center gap-3 text-[13px]">
-            <span className="font-semibold text-avenue-text-muted">{row.period}</span>
+            <span className="font-semibold text-brand-text-muted">{row.period}</span>
             <div className="space-y-1">
               <div className="h-2 rounded-full bg-[#E6E7E8]">
                 <div
-                  className="h-2 rounded-full bg-avenue-indigo"
+                  className="h-2 rounded-full bg-brand-indigo"
                   style={{ width: `${Math.max(3, (row.adjustedCost / max) * 100)}%` }}
                 />
               </div>
-              <p className="text-[11px] text-avenue-text-muted">
+              <p className="text-[11px] text-brand-text-muted">
                 {row.claimCount} claims · CMI {row.caseMixIndex.toFixed(2)} · {formatPercent(row.rejectionRate)} rejected
               </p>
             </div>
-            <span className="text-right font-bold tabular-nums text-avenue-text-heading">
+            <span className="text-right font-bold tabular-nums text-brand-text-heading">
               {formatMoney(row.adjustedCost)}
             </span>
           </div>
@@ -99,38 +99,38 @@ function PeerComparison({ peers }: { peers: ProviderDetail["peers"] }) {
     <div className="rounded-[8px] border border-[#EEEEEE] bg-white shadow-sm">
       <div className="flex items-center justify-between border-b border-[#EEEEEE] px-5 py-4">
         <div>
-          <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Peer Comparison</h2>
-          <p className="text-sm text-avenue-text-muted">Same tier, latest period. Ranked by adjusted cost.</p>
+          <h2 className="font-heading text-lg font-bold text-brand-text-heading">Peer Comparison</h2>
+          <p className="text-sm text-brand-text-muted">Same tier, latest period. Ranked by adjusted cost.</p>
         </div>
         <Activity className="h-5 w-5 text-[#17A2B8]" />
       </div>
       <div className="divide-y divide-[#EEEEEE]">
         {peers.length === 0 && (
-          <p className="px-5 py-8 text-center text-sm text-avenue-text-muted">No peer scorecard data yet.</p>
+          <p className="px-5 py-8 text-center text-sm text-brand-text-muted">No peer scorecard data yet.</p>
         )}
         {peers.map((peer, index) => (
           <div
             key={peer.providerId}
-            className={`px-5 py-3 ${peer.isCurrent ? "bg-avenue-indigo/5" : ""}`}
+            className={`px-5 py-3 ${peer.isCurrent ? "bg-brand-indigo/5" : ""}`}
           >
             <div className="mb-1 flex items-center justify-between gap-3">
               <div className="flex items-center gap-2 min-w-0">
-                <span className="shrink-0 text-[11px] font-bold text-avenue-text-muted">#{index + 1}</span>
-                <span className={`truncate text-[13px] font-semibold ${peer.isCurrent ? "text-avenue-indigo" : "text-avenue-text-heading"}`}>
+                <span className="shrink-0 text-[11px] font-bold text-brand-text-muted">#{index + 1}</span>
+                <span className={`truncate text-[13px] font-semibold ${peer.isCurrent ? "text-brand-indigo" : "text-brand-text-heading"}`}>
                   {peer.providerName}{peer.isCurrent ? " ← this provider" : ""}
                 </span>
               </div>
-              <span className="shrink-0 text-[13px] font-bold tabular-nums text-avenue-text-heading">
+              <span className="shrink-0 text-[13px] font-bold tabular-nums text-brand-text-heading">
                 {formatMoney(peer.adjustedCost)}
               </span>
             </div>
             <div className="h-1.5 rounded-full bg-[#E6E7E8]">
               <div
-                className={`h-1.5 rounded-full ${peer.isCurrent ? "bg-avenue-indigo" : "bg-[#6C757D]/40"}`}
+                className={`h-1.5 rounded-full ${peer.isCurrent ? "bg-brand-indigo" : "bg-[#6C757D]/40"}`}
                 style={{ width: `${Math.max(3, (peer.adjustedCost / max) * 100)}%` }}
               />
             </div>
-            <p className="mt-1 text-[11px] text-avenue-text-muted">
+            <p className="mt-1 text-[11px] text-brand-text-muted">
               {peer.claimCount} claims · CMI {peer.caseMixIndex.toFixed(2)} · {formatPercent(peer.rejectionRate)} rejected
             </p>
           </div>
@@ -158,14 +158,14 @@ function RankedPanel({
     <div className="rounded-[8px] border border-[#EEEEEE] bg-white shadow-sm">
       <div className="flex items-center justify-between border-b border-[#EEEEEE] px-5 py-4">
         <div>
-          <h2 className="font-heading text-lg font-bold text-avenue-text-heading">{title}</h2>
-          <p className="text-sm text-avenue-text-muted">{subtitle}</p>
+          <h2 className="font-heading text-lg font-bold text-brand-text-heading">{title}</h2>
+          <p className="text-sm text-brand-text-muted">{subtitle}</p>
         </div>
         {icon}
       </div>
       <div className="divide-y divide-[#EEEEEE]">
         {rows.length === 0 && (
-          <p className="px-5 py-8 text-center text-sm text-avenue-text-muted">No data yet.</p>
+          <p className="px-5 py-8 text-center text-sm text-brand-text-muted">No data yet.</p>
         )}
         {rows.map((row) => {
           const href = hrefFn?.(row.label) ?? row.href;
@@ -174,18 +174,18 @@ function RankedPanel({
               <div className="mb-2 flex items-center justify-between gap-4">
                 <div className="min-w-0">
                   {href ? (
-                    <Link href={href} className="truncate block font-semibold text-avenue-text-heading hover:text-avenue-indigo hover:underline">
+                    <Link href={href} className="truncate block font-semibold text-brand-text-heading hover:text-brand-indigo hover:underline">
                       {row.label}
                     </Link>
                   ) : (
-                    <p className="truncate font-semibold text-avenue-text-heading">{row.label}</p>
+                    <p className="truncate font-semibold text-brand-text-heading">{row.label}</p>
                   )}
-                  <p className="text-[13px] text-avenue-text-muted">{row.meta}</p>
+                  <p className="text-[13px] text-brand-text-muted">{row.meta}</p>
                 </div>
-                <p className="shrink-0 font-bold tabular-nums text-avenue-text-heading">{formatMoney(row.value)}</p>
+                <p className="shrink-0 font-bold tabular-nums text-brand-text-heading">{formatMoney(row.value)}</p>
               </div>
               <div className="h-2 rounded-full bg-[#E6E7E8]">
-                <div className="h-2 rounded-full bg-avenue-indigo" style={{ width: `${Math.max(3, (row.value / max) * 100)}%` }} />
+                <div className="h-2 rounded-full bg-brand-indigo" style={{ width: `${Math.max(3, (row.value / max) * 100)}%` }} />
               </div>
             </div>
           );
@@ -247,12 +247,12 @@ export default async function ProviderAnalyticsDetailPage({
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <Link href={backHref} className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-avenue-indigo hover:underline">
+          <Link href={backHref} className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-brand-indigo hover:underline">
             <ArrowLeft className="h-4 w-4" />
             {backLabel}
           </Link>
-          <h1 className="font-heading text-3xl font-bold text-avenue-text-heading">{detail.provider.name}</h1>
-          <p className="text-avenue-text-muted">
+          <h1 className="font-heading text-3xl font-bold text-brand-text-heading">{detail.provider.name}</h1>
+          <p className="text-brand-text-muted">
             {detail.provider.type?.replace(/_/g, " ")} ·{" "}
             {detail.provider.county ?? "County not set"} ·{" "}
             Contract {detail.provider.contractStatus}
@@ -296,17 +296,17 @@ export default async function ProviderAnalyticsDetailPage({
           <PeerComparison peers={detail.peers} />
           {/* Action links */}
           <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
-            <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Actions</h2>
+            <h2 className="font-heading text-lg font-bold text-brand-text-heading">Actions</h2>
             <div className="mt-3 grid gap-2">
-              <Link href={`/providers/${providerId}`} className="flex items-center gap-2 rounded-[8px] border border-[#EEEEEE] px-3 py-2 text-sm font-semibold text-avenue-text-heading hover:border-avenue-indigo hover:text-avenue-indigo">
+              <Link href={`/providers/${providerId}`} className="flex items-center gap-2 rounded-[8px] border border-[#EEEEEE] px-3 py-2 text-sm font-semibold text-brand-text-heading hover:border-brand-indigo hover:text-brand-indigo">
                 <Building className="h-4 w-4" />
                 Open provider record
               </Link>
-              <Link href={`/analytics/alerts?providerId=${providerId}`} className="flex items-center gap-2 rounded-[8px] border border-[#EEEEEE] px-3 py-2 text-sm font-semibold text-avenue-text-heading hover:border-avenue-indigo hover:text-avenue-indigo">
+              <Link href={`/analytics/alerts?providerId=${providerId}`} className="flex items-center gap-2 rounded-[8px] border border-[#EEEEEE] px-3 py-2 text-sm font-semibold text-brand-text-heading hover:border-brand-indigo hover:text-brand-indigo">
                 <AlertTriangle className="h-4 w-4" />
                 Provider alert inbox
               </Link>
-              <Link href="/reports/provider-statements" className="flex items-center gap-2 rounded-[8px] border border-[#EEEEEE] px-3 py-2 text-sm font-semibold text-avenue-text-heading hover:border-avenue-indigo hover:text-avenue-indigo">
+              <Link href="/reports/provider-statements" className="flex items-center gap-2 rounded-[8px] border border-[#EEEEEE] px-3 py-2 text-sm font-semibold text-brand-text-heading hover:border-brand-indigo hover:text-brand-indigo">
                 <FileText className="h-4 w-4" />
                 Provider statements
               </Link>
@@ -332,7 +332,7 @@ export default async function ProviderAnalyticsDetailPage({
         <RankedPanel
           title="Scheme Mix"
           subtitle="Groups sending volume to this provider."
-          icon={<Building className="h-5 w-5 text-avenue-indigo" />}
+          icon={<Building className="h-5 w-5 text-brand-indigo" />}
           rows={schemeRows}
         />
       </div>
@@ -342,8 +342,8 @@ export default async function ProviderAnalyticsDetailPage({
         <div className="rounded-[8px] border border-[#EEEEEE] bg-white shadow-sm">
           <div className="flex items-center justify-between border-b border-[#EEEEEE] px-5 py-4">
             <div>
-              <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Open Alerts</h2>
-              <p className="text-sm text-avenue-text-muted">Active analytics signals for this provider.</p>
+              <h2 className="font-heading text-lg font-bold text-brand-text-heading">Open Alerts</h2>
+              <p className="text-sm text-brand-text-muted">Active analytics signals for this provider.</p>
             </div>
             <AlertTriangle className="h-5 w-5 text-[#FFC107]" />
           </div>
@@ -354,12 +354,12 @@ export default async function ProviderAnalyticsDetailPage({
                   {alert.severity}
                 </span>
                 <div className="min-w-0">
-                  <p className="font-semibold text-avenue-text-heading">{alert.title}</p>
-                  <p className="text-[13px] leading-snug text-avenue-text-muted">{alert.message}</p>
+                  <p className="font-semibold text-brand-text-heading">{alert.title}</p>
+                  <p className="text-[13px] leading-snug text-brand-text-muted">{alert.message}</p>
                 </div>
                 <Link
                   href={`/analytics/alerts?providerId=${providerId}`}
-                  className="shrink-0 text-[13px] font-semibold text-avenue-indigo hover:underline"
+                  className="shrink-0 text-[13px] font-semibold text-brand-indigo hover:underline"
                 >
                   View
                 </Link>
@@ -373,21 +373,21 @@ export default async function ProviderAnalyticsDetailPage({
       <div className="rounded-[8px] border border-[#EEEEEE] bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-[#EEEEEE] px-5 py-4">
           <div>
-            <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Recent Claims</h2>
-            <p className="text-sm text-avenue-text-muted">Latest 10 claims processed at this provider.</p>
+            <h2 className="font-heading text-lg font-bold text-brand-text-heading">Recent Claims</h2>
+            <p className="text-sm text-brand-text-muted">Latest 10 claims processed at this provider.</p>
           </div>
-          <Receipt className="h-5 w-5 text-avenue-indigo" />
+          <Receipt className="h-5 w-5 text-brand-indigo" />
         </div>
         {!canViewNamedClaims ? (
-          <p className="px-5 py-8 text-center text-sm text-avenue-text-muted">
+          <p className="px-5 py-8 text-center text-sm text-brand-text-muted">
             Individual claim records are not available for your role. Use the Provider Statements report for aggregate data.
           </p>
         ) : detail.recentClaims.length === 0 ? (
-          <p className="px-5 py-8 text-center text-sm text-avenue-text-muted">No claims on record yet.</p>
+          <p className="px-5 py-8 text-center text-sm text-brand-text-muted">No claims on record yet.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[700px] text-left text-sm font-ui">
-              <thead className="border-b border-[#EEEEEE] bg-[#F8F9FA] text-[13px] uppercase tracking-normal text-avenue-text-muted">
+              <thead className="border-b border-[#EEEEEE] bg-[#F8F9FA] text-[13px] uppercase tracking-normal text-brand-text-muted">
                 <tr>
                   <th className="px-5 py-3 font-bold">Claim No.</th>
                   <th className="px-5 py-3 font-bold">Member</th>
@@ -402,13 +402,13 @@ export default async function ProviderAnalyticsDetailPage({
                 {detail.recentClaims.map((claim) => (
                   <tr key={claim.id} className="hover:bg-[#F8F9FA]">
                     <td className="px-5 py-3">
-                      <Link href={`/claims/${claim.id}`} className="font-semibold text-avenue-indigo hover:underline">
+                      <Link href={`/claims/${claim.id}`} className="font-semibold text-brand-indigo hover:underline">
                         {claim.claimNumber}
                       </Link>
                     </td>
-                    <td className="px-5 py-3 text-avenue-text-heading">{claim.memberName}</td>
-                    <td className="px-5 py-3 text-avenue-text-muted">{(claim.benefitCategory ?? "").replace(/_/g, " ") || "—"}</td>
-                    <td className="px-5 py-3 tabular-nums text-avenue-text-muted">{formatDate(claim.dateOfService)}</td>
+                    <td className="px-5 py-3 text-brand-text-heading">{claim.memberName}</td>
+                    <td className="px-5 py-3 text-brand-text-muted">{(claim.benefitCategory ?? "").replace(/_/g, " ") || "—"}</td>
+                    <td className="px-5 py-3 tabular-nums text-brand-text-muted">{formatDate(claim.dateOfService)}</td>
                     <td className="px-5 py-3 tabular-nums">{formatMoney(claim.billedAmount)}</td>
                     <td className="px-5 py-3 tabular-nums">{claim.approvedAmount > 0 ? formatMoney(claim.approvedAmount) : "—"}</td>
                     <td className={`px-5 py-3 text-[13px] font-semibold ${statusTone(claim.status)}`}>

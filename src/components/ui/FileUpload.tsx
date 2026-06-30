@@ -93,7 +93,7 @@ export function FileUpload({
 
   return (
     <div className="space-y-3">
-      <p className="text-xs font-bold text-avenue-text-muted uppercase">{label}</p>
+      <p className="text-xs font-bold text-brand-text-muted uppercase">{label}</p>
 
       {/* Drop zone */}
       <div
@@ -103,20 +103,20 @@ export function FileUpload({
         onClick={() => inputRef.current?.click()}
         className={`relative border-2 border-dashed rounded-lg px-6 py-8 flex flex-col items-center gap-2 cursor-pointer transition-colors
           ${dragging
-            ? "border-avenue-indigo bg-avenue-indigo/5"
-            : "border-[#EEEEEE] hover:border-avenue-indigo/50 hover:bg-[#F8F9FA]"
+            ? "border-brand-indigo bg-brand-indigo/5"
+            : "border-[#EEEEEE] hover:border-brand-indigo/50 hover:bg-[#F8F9FA]"
           }`}
       >
         {uploading ? (
-          <Loader2 size={28} className="text-avenue-indigo animate-spin" />
+          <Loader2 size={28} className="text-brand-indigo animate-spin" />
         ) : (
-          <Upload size={28} className="text-avenue-text-muted" />
+          <Upload size={28} className="text-brand-text-muted" />
         )}
         <div className="text-center">
-          <p className="text-sm font-semibold text-avenue-text-heading">
+          <p className="text-sm font-semibold text-brand-text-heading">
             {uploading ? "Uploading…" : "Drag & drop or click to select"}
           </p>
-          <p className="text-xs text-avenue-text-muted mt-0.5">PDF, Images, Word, Excel — max 10 MB</p>
+          <p className="text-xs text-brand-text-muted mt-0.5">PDF, Images, Word, Excel — max 10 MB</p>
         </div>
         <input
           ref={inputRef}
@@ -145,12 +145,12 @@ export function FileUpload({
           {uploaded.map((f) => (
             <div key={f.documentId} className="flex items-center gap-2 text-sm bg-[#28A745]/5 border border-[#28A745]/20 rounded-lg px-3 py-2">
               <CheckCircle size={14} className="text-[#28A745] shrink-0" />
-              <FileText size={14} className="text-avenue-text-muted shrink-0" />
+              <FileText size={14} className="text-brand-text-muted shrink-0" />
               <a
                 href={f.fileUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-avenue-indigo hover:underline truncate"
+                className="text-brand-indigo hover:underline truncate"
               >
                 {f.name}
               </a>

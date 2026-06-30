@@ -16,7 +16,7 @@ import { ClaimDocuments } from "./ClaimDocuments";
 import { CoContributionCollectionForm } from "./CoContributionCollectionForm";
 
 const LINE_CAT_META: Record<string, { label: string; color: string; Icon: React.ElementType }> = {
-  CONSULTATION: { label: "Consultation", color: "bg-avenue-indigo/10 text-avenue-indigo",  Icon: Stethoscope },
+  CONSULTATION: { label: "Consultation", color: "bg-brand-indigo/10 text-brand-indigo",  Icon: Stethoscope },
   LABORATORY:   { label: "Laboratory",   color: "bg-[#17A2B8]/10 text-[#17A2B8]",          Icon: FlaskConical },
   PHARMACY:     { label: "Pharmacy",     color: "bg-[#28A745]/10 text-[#28A745]",          Icon: Pill         },
   IMAGING:      { label: "Imaging",      color: "bg-[#FFC107]/10 text-[#856404]",          Icon: ScanLine     },
@@ -115,14 +115,14 @@ export default async function ClaimDetailPage({
       )}
 
       <div className="flex items-center space-x-4">
-        <Link href="/claims" className="text-avenue-text-body hover:text-avenue-text-heading transition-colors">
+        <Link href="/claims" className="text-brand-text-body hover:text-brand-text-heading transition-colors">
           <ArrowLeft size={24} />
         </Link>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">
             Claim {claim.claimNumber}
           </h1>
-          <p className="text-avenue-text-body font-body mt-1">Review details and adjudicate.</p>
+          <p className="text-brand-text-body font-body mt-1">Review details and adjudicate.</p>
         </div>
         <ExceptionModal claimId={claim.id} claimNumber={claim.claimNumber} />
         <span className={`px-4 py-2 text-xs font-bold uppercase rounded-full ${
@@ -137,62 +137,62 @@ export default async function ClaimDetailPage({
       {/* Overview cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm">
-          <p className="text-xs text-avenue-text-muted font-bold uppercase tracking-wide">Member</p>
-          <p className="text-lg font-bold text-avenue-text-heading mt-1">{claim.member.firstName} {claim.member.lastName}</p>
-          <p className="text-sm text-avenue-text-body">{claim.member.memberNumber}</p>
-          <p className="text-xs text-avenue-text-muted mt-2">Group: {claim.member.group.name}</p>
+          <p className="text-xs text-brand-text-muted font-bold uppercase tracking-wide">Member</p>
+          <p className="text-lg font-bold text-brand-text-heading mt-1">{claim.member.firstName} {claim.member.lastName}</p>
+          <p className="text-sm text-brand-text-body">{claim.member.memberNumber}</p>
+          <p className="text-xs text-brand-text-muted mt-2">Group: {claim.member.group.name}</p>
         </div>
         <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm">
-          <p className="text-xs text-avenue-text-muted font-bold uppercase tracking-wide">Provider</p>
-          <p className="text-lg font-bold text-avenue-text-heading mt-1">{claim.provider.name}</p>
-          <p className="text-sm text-avenue-text-body capitalize">{claim.provider.type.toLowerCase()} · {claim.provider.tier}</p>
+          <p className="text-xs text-brand-text-muted font-bold uppercase tracking-wide">Provider</p>
+          <p className="text-lg font-bold text-brand-text-heading mt-1">{claim.provider.name}</p>
+          <p className="text-sm text-brand-text-body capitalize">{claim.provider.type.toLowerCase()} · {claim.provider.tier}</p>
         </div>
         <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm">
-          <p className="text-xs text-avenue-text-muted font-bold uppercase tracking-wide">Financial Summary</p>
+          <p className="text-xs text-brand-text-muted font-bold uppercase tracking-wide">Financial Summary</p>
           <div className="mt-2 space-y-1 text-sm">
-            <div className="flex justify-between"><span className="text-avenue-text-body">Billed</span><span className="font-bold text-avenue-text-heading">KES {Number(claim.billedAmount).toLocaleString()}</span></div>
-            <div className="flex justify-between"><span className="text-avenue-text-body">Approved</span><span className="font-bold text-[#28A745]">KES {Number(claim.approvedAmount).toLocaleString()}</span></div>
-            <div className="flex justify-between"><span className="text-avenue-text-body">Copay</span><span className="font-semibold text-avenue-text-heading">KES {Number(claim.copayAmount).toLocaleString()}</span></div>
+            <div className="flex justify-between"><span className="text-brand-text-body">Billed</span><span className="font-bold text-brand-text-heading">KES {Number(claim.billedAmount).toLocaleString()}</span></div>
+            <div className="flex justify-between"><span className="text-brand-text-body">Approved</span><span className="font-bold text-[#28A745]">KES {Number(claim.approvedAmount).toLocaleString()}</span></div>
+            <div className="flex justify-between"><span className="text-brand-text-body">Copay</span><span className="font-semibold text-brand-text-heading">KES {Number(claim.copayAmount).toLocaleString()}</span></div>
           </div>
         </div>
       </div>
 
       {/* Diagnoses */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm">
-        <h3 className="text-sm font-bold text-avenue-text-heading uppercase tracking-wide mb-3 flex items-center gap-2">
-          <Info size={16} className="text-avenue-indigo" /> Diagnoses
+        <h3 className="text-sm font-bold text-brand-text-heading uppercase tracking-wide mb-3 flex items-center gap-2">
+          <Info size={16} className="text-brand-indigo" /> Diagnoses
         </h3>
         <div className="space-y-2">
           {diagnoses.map((d, i) => (
-            <div key={i} className={`flex items-center justify-between text-sm px-3 py-2 rounded-lg ${d.isPrimary ? "bg-avenue-indigo/5 border border-avenue-indigo/20" : "bg-[#F8F9FA]"}`}>
+            <div key={i} className={`flex items-center justify-between text-sm px-3 py-2 rounded-lg ${d.isPrimary ? "bg-brand-indigo/5 border border-brand-indigo/20" : "bg-[#F8F9FA]"}`}>
               <div className="flex items-center gap-2">
-                {d.isPrimary && <span className="text-[10px] font-bold uppercase bg-avenue-indigo text-white px-1.5 py-0.5 rounded-full">Primary</span>}
-                <span className="text-avenue-text-heading">{d.description}</span>
+                {d.isPrimary && <span className="text-[10px] font-bold uppercase bg-brand-indigo text-white px-1.5 py-0.5 rounded-full">Primary</span>}
+                <span className="text-brand-text-heading">{d.description}</span>
               </div>
               {(d.code ?? d.icdCode) && (
-                <span className="text-xs font-mono font-bold text-avenue-indigo bg-avenue-indigo/10 px-2 py-0.5 rounded">
+                <span className="text-xs font-mono font-bold text-brand-indigo bg-brand-indigo/10 px-2 py-0.5 rounded">
                   {d.code ?? d.icdCode}
                 </span>
               )}
             </div>
           ))}
-          {diagnoses.length === 0 && <p className="text-sm text-avenue-text-muted">No diagnoses recorded.</p>}
+          {diagnoses.length === 0 && <p className="text-sm text-brand-text-muted">No diagnoses recorded.</p>}
         </div>
       </div>
 
       {/* Governing contract banner */}
       {governingContract ? (
-        <div className="flex items-start gap-3 bg-avenue-indigo/5 border border-avenue-indigo/20 rounded-lg px-4 py-3 text-sm">
-          <FileSignature size={18} className="text-avenue-indigo shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 bg-brand-indigo/5 border border-brand-indigo/20 rounded-lg px-4 py-3 text-sm">
+          <FileSignature size={18} className="text-brand-indigo shrink-0 mt-0.5" />
           <div>
-            <p className="text-avenue-text-heading">
+            <p className="text-brand-text-heading">
               Adjudicating under{" "}
-              <Link href={`/providers/${claim.providerId}/contracts/${governingContract.id}`} className="font-bold text-avenue-indigo hover:underline">
+              <Link href={`/providers/${claim.providerId}/contracts/${governingContract.id}`} className="font-bold text-brand-indigo hover:underline">
                 {governingContract.contractNumber}
               </Link>{" "}
               — {governingContract.title}
             </p>
-            <p className="text-xs text-avenue-text-muted mt-0.5">
+            <p className="text-xs text-brand-text-muted mt-0.5">
               Unlisted services: {governingContract.unlistedServiceRule.replace(/_/g, " ").toLowerCase()}
               {governingContract.unlistedDiscountPct != null && ` (−${governingContract.unlistedDiscountPct}%)`}
               {" · "}contract ends {new Date(governingContract.endDate).toLocaleDateString("en-KE")}
@@ -227,12 +227,12 @@ export default async function ClaimDetailPage({
       {/* Service line items grouped by category */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-[#EEEEEE] flex items-center justify-between">
-          <h3 className="font-bold text-avenue-text-heading font-heading">Service Line Items</h3>
+          <h3 className="font-bold text-brand-text-heading font-heading">Service Line Items</h3>
           <div className="flex items-center gap-4 text-sm font-bold">
             {overbilledLines.length > 0 && (
               <span className="text-[#856404]">Contracted: KES {Math.round(contractedTotal).toLocaleString("en-KE")}</span>
             )}
-            <span className="text-avenue-indigo">Billed: KES {Number(claim.billedAmount).toLocaleString("en-KE")}</span>
+            <span className="text-brand-indigo">Billed: KES {Number(claim.billedAmount).toLocaleString("en-KE")}</span>
           </div>
         </div>
 
@@ -248,13 +248,13 @@ export default async function ClaimDetailPage({
                     <span className={`inline-flex items-center gap-1.5 text-xs font-bold uppercase px-2.5 py-1 rounded-full ${meta.color}`}>
                       <CatIcon size={11} /> {meta.label}
                     </span>
-                    <span className="text-xs font-semibold text-avenue-text-muted">
+                    <span className="text-xs font-semibold text-brand-text-muted">
                       KES {catTotal.toLocaleString("en-KE")}
                     </span>
                   </div>
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="text-[10px] font-bold uppercase text-avenue-text-muted border-b border-[#EEEEEE]">
+                      <tr className="text-[10px] font-bold uppercase text-brand-text-muted border-b border-[#EEEEEE]">
                         <th className="px-5 py-2 text-left">Description</th>
                         <th className="px-5 py-2 text-left">CPT</th>
                         <th className="px-5 py-2 text-right">Qty</th>
@@ -270,13 +270,13 @@ export default async function ClaimDetailPage({
                         const isOver = tv?.variance !== null && tv?.variance !== undefined && tv.variance > 0;
                         return (
                           <tr key={l.id} className={isOver ? "bg-[#FFF8E1]" : "hover:bg-[#F8F9FA]"}>
-                            <td className="px-5 py-2.5 text-avenue-text-heading">{l.description}</td>
-                            <td className="px-5 py-2.5 font-mono text-xs text-avenue-text-muted">{(l as { cptCode?: string }).cptCode ?? "—"}</td>
+                            <td className="px-5 py-2.5 text-brand-text-heading">{l.description}</td>
+                            <td className="px-5 py-2.5 font-mono text-xs text-brand-text-muted">{(l as { cptCode?: string }).cptCode ?? "—"}</td>
                             <td className="px-5 py-2.5 text-right">{l.quantity}</td>
                             <td className={`px-5 py-2.5 text-right ${isOver ? "text-[#856404] font-semibold" : ""}`}>
                               {Number(l.unitCost).toLocaleString("en-KE")}
                             </td>
-                            <td className="px-5 py-2.5 text-right text-avenue-text-muted">
+                            <td className="px-5 py-2.5 text-right text-brand-text-muted">
                               {tv?.agreedRate !== null && tv?.agreedRate !== undefined ? (
                                 <span className="flex items-center justify-end gap-1">
                                   {tv.agreedRate.toLocaleString("en-KE")}
@@ -296,15 +296,15 @@ export default async function ClaimDetailPage({
                               ) : tv?.ruleApplied === "UNLISTED_DISCOUNT" && tv.allowedUnit !== null ? (
                                 <span className="flex items-center justify-end gap-1">
                                   {tv.allowedUnit.toLocaleString("en-KE")}
-                                  <span className="text-[10px] font-bold text-avenue-indigo bg-avenue-indigo/10 px-1 rounded" title="Unlisted service — contract discount off billed applied">unlisted</span>
+                                  <span className="text-[10px] font-bold text-brand-indigo bg-brand-indigo/10 px-1 rounded" title="Unlisted service — contract discount off billed applied">unlisted</span>
                                 </span>
                               ) : tv?.ruleApplied === "UNLISTED_PAY_AS_BILLED" ? (
-                                <span className="text-[10px] font-bold text-avenue-text-muted bg-[#F8F9FA] px-1.5 py-0.5 rounded" title="Unlisted service — contract honours billed charges">as billed</span>
+                                <span className="text-[10px] font-bold text-brand-text-muted bg-[#F8F9FA] px-1.5 py-0.5 rounded" title="Unlisted service — contract honours billed charges">as billed</span>
                               ) : (
-                                <span className="text-avenue-text-muted/40" title="No contracted rate — reviewer judgement">—</span>
+                                <span className="text-brand-text-muted/40" title="No contracted rate — reviewer judgement">—</span>
                               )}
                             </td>
-                            <td className={`px-5 py-2.5 text-right font-semibold ${isOver ? "text-[#DC3545]" : "text-avenue-text-heading"}`}>
+                            <td className={`px-5 py-2.5 text-right font-semibold ${isOver ? "text-[#DC3545]" : "text-brand-text-heading"}`}>
                               {Number(l.billedAmount).toLocaleString("en-KE")}
                             </td>
                             <td className="px-5 py-2.5 text-right font-semibold text-[#28A745]">
@@ -320,14 +320,14 @@ export default async function ClaimDetailPage({
             })}
           </div>
         ) : (
-          <p className="px-5 py-8 text-sm text-avenue-text-muted text-center">No structured line items — legacy claim entry.</p>
+          <p className="px-5 py-8 text-sm text-brand-text-muted text-center">No structured line items — legacy claim entry.</p>
         )}
       </div>
 
       {/* Adjudication timeline */}
       {claim.adjudicationLogs.length > 0 && (
         <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm">
-          <h3 className="text-sm font-bold text-avenue-text-heading uppercase tracking-wide mb-4">Adjudication Timeline</h3>
+          <h3 className="text-sm font-bold text-brand-text-heading uppercase tracking-wide mb-4">Adjudication Timeline</h3>
           <div className="space-y-3">
             {claim.adjudicationLogs.map((log) => (
               <div key={log.id} className="flex items-start gap-3 text-sm">
@@ -337,9 +337,9 @@ export default async function ClaimDetailPage({
                    <Clock size={16} className="text-[#17A2B8]" />}
                 </div>
                 <div className="flex-1">
-                  <p className="font-bold text-avenue-text-heading">{log.action.replace(/_/g, " ")}</p>
-                  {log.notes && <p className="text-avenue-text-body mt-0.5">{log.notes}</p>}
-                  <p className="text-xs text-avenue-text-muted mt-1">{new Date(log.createdAt).toLocaleString()}</p>
+                  <p className="font-bold text-brand-text-heading">{log.action.replace(/_/g, " ")}</p>
+                  {log.notes && <p className="text-brand-text-body mt-0.5">{log.notes}</p>}
+                  <p className="text-xs text-brand-text-muted mt-1">{new Date(log.createdAt).toLocaleString()}</p>
                 </div>
               </div>
             ))}
@@ -350,7 +350,7 @@ export default async function ClaimDetailPage({
       {/* Exception log */}
       {claim.exceptionLogs.length > 0 && (
         <div id="exceptions" className="bg-white border border-[#FFC107]/40 rounded-lg p-5 shadow-sm">
-          <h3 className="text-sm font-bold text-avenue-text-heading uppercase tracking-wide mb-4 flex items-center gap-2">
+          <h3 className="text-sm font-bold text-brand-text-heading uppercase tracking-wide mb-4 flex items-center gap-2">
             <ShieldAlert size={16} className="text-[#856404]" /> Exception Register
           </h3>
           <div className="space-y-3">
@@ -366,16 +366,16 @@ export default async function ClaimDetailPage({
                     {log.status === "APPROVED" && <ShieldCheck  size={14} className="text-[#28A745] shrink-0 mt-0.5" />}
                     {log.status === "REJECTED" && <ShieldX      size={14} className="text-[#DC3545] shrink-0 mt-0.5" />}
                     <div>
-                      <p className="text-sm font-bold text-avenue-text-heading">
+                      <p className="text-sm font-bold text-brand-text-heading">
                         {log.exceptionCode.replace(/_/g, " ")}
                       </p>
-                      <p className="text-sm text-avenue-text-body mt-0.5">{log.reason}</p>
-                      {log.notes && <p className="text-xs text-avenue-text-muted mt-1">{log.notes}</p>}
-                      <p className="text-xs text-avenue-text-muted mt-1">
+                      <p className="text-sm text-brand-text-body mt-0.5">{log.reason}</p>
+                      {log.notes && <p className="text-xs text-brand-text-muted mt-1">{log.notes}</p>}
+                      <p className="text-xs text-brand-text-muted mt-1">
                         Raised by {log.raisedBy.firstName} {log.raisedBy.lastName} · {new Date(log.createdAt).toLocaleString()}
                       </p>
                       {log.resolutionNote && (
-                        <p className="text-xs text-avenue-text-muted mt-1">
+                        <p className="text-xs text-brand-text-muted mt-1">
                           Resolution: {log.resolutionNote}
                           {log.resolvedBy && ` — ${log.resolvedBy.firstName} ${log.resolvedBy.lastName}`}
                         </p>
@@ -424,8 +424,8 @@ export default async function ClaimDetailPage({
       {/* Co-contribution */}
       {coContribTx && (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm">
-          <h3 className="text-sm font-bold text-avenue-text-heading uppercase tracking-wide mb-1 flex items-center gap-2">
-            <Percent size={15} className="text-avenue-indigo" /> Member Co-Contribution
+          <h3 className="text-sm font-bold text-brand-text-heading uppercase tracking-wide mb-1 flex items-center gap-2">
+            <Percent size={15} className="text-brand-indigo" /> Member Co-Contribution
           </h3>
           <CoContributionCollectionForm transaction={coContribTx} />
         </div>
@@ -433,13 +433,13 @@ export default async function ClaimDetailPage({
 
       {/* Reimbursement payment details banner */}
       {(claim as { isReimbursement?: boolean }).isReimbursement && (
-        <div className="bg-[#EEF2FF] border border-avenue-indigo/20 rounded-lg p-4 text-sm space-y-1">
-          <p className="font-bold text-avenue-text-heading">Reimbursement Claim — pay member directly</p>
+        <div className="bg-[#EEF2FF] border border-brand-indigo/20 rounded-lg p-4 text-sm space-y-1">
+          <p className="font-bold text-brand-text-heading">Reimbursement Claim — pay member directly</p>
           {(claim as { reimbursementMpesaPhone?: string }).reimbursementMpesaPhone && (
-            <p className="text-avenue-text-body">M-Pesa: <span className="font-mono font-semibold">{(claim as { reimbursementMpesaPhone?: string }).reimbursementMpesaPhone}</span></p>
+            <p className="text-brand-text-body">M-Pesa: <span className="font-mono font-semibold">{(claim as { reimbursementMpesaPhone?: string }).reimbursementMpesaPhone}</span></p>
           )}
           {(claim as { reimbursementBankName?: string; reimbursementAccountNo?: string }).reimbursementBankName && (
-            <p className="text-avenue-text-body">
+            <p className="text-brand-text-body">
               Bank: <span className="font-semibold">{(claim as { reimbursementBankName?: string }).reimbursementBankName}</span>
               {" · Acc: "}<span className="font-mono">{(claim as { reimbursementAccountNo?: string }).reimbursementAccountNo}</span>
             </p>
@@ -450,8 +450,8 @@ export default async function ClaimDetailPage({
       {/* Mark as captured — data entry complete */}
       {canCapture && (
         <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm">
-          <p className="text-sm font-semibold text-avenue-text-heading mb-1">Data Entry Complete?</p>
-          <p className="text-xs text-avenue-text-muted mb-3">
+          <p className="text-sm font-semibold text-brand-text-heading mb-1">Data Entry Complete?</p>
+          <p className="text-xs text-brand-text-muted mb-3">
             Once all service lines and documents are captured, mark this claim as ready for adjudication.
           </p>
           <form action={adjudicateClaimAction}>
@@ -467,9 +467,9 @@ export default async function ClaimDetailPage({
 
       {/* Adjudication form */}
       {canAdjudicate && (
-        <div className="bg-white border-2 border-avenue-indigo/20 rounded-lg p-6 shadow-sm">
-          <h3 className="text-lg font-bold text-avenue-text-heading font-heading flex items-center gap-2 mb-4">
-            <AlertTriangle size={20} className="text-avenue-indigo" />
+        <div className="bg-white border-2 border-brand-indigo/20 rounded-lg p-6 shadow-sm">
+          <h3 className="text-lg font-bold text-brand-text-heading font-heading flex items-center gap-2 mb-4">
+            <AlertTriangle size={20} className="text-brand-indigo" />
             Adjudicate Claim
           </h3>
           <form action={adjudicateClaimAction} className="space-y-4">
@@ -477,15 +477,15 @@ export default async function ClaimDetailPage({
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-avenue-text-heading">Decision</label>
-                <select required name="action" className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-avenue-indigo transition-colors">
+                <label className="text-sm font-semibold text-brand-text-heading">Decision</label>
+                <select required name="action" className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-brand-indigo transition-colors">
                   <option value="APPROVED">Approve (Full)</option>
                   <option value="PARTIALLY_APPROVED">Partially Approve</option>
                   <option value="DECLINED">Decline</option>
                 </select>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-semibold text-avenue-text-heading">
+                <label className="text-sm font-semibold text-brand-text-heading">
                   Approved Amount (KES)
                   {overbilledLines.length > 0 && (
                     <span className="ml-2 text-xs font-normal text-[#856404]">
@@ -498,18 +498,18 @@ export default async function ClaimDetailPage({
                   type="number"
                   step="0.01"
                   defaultValue={overbilledLines.length > 0 ? Math.round(contractedTotal) : Number(claim.billedAmount)}
-                  className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-avenue-indigo transition-colors"
+                  className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-brand-indigo transition-colors"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-avenue-text-heading">Notes / Reason</label>
-              <textarea name="notes" rows={3} className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-avenue-indigo transition-colors resize-none" placeholder="Provide a reason for your decision..." />
+              <label className="text-sm font-semibold text-brand-text-heading">Notes / Reason</label>
+              <textarea name="notes" rows={3} className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-brand-indigo transition-colors resize-none" placeholder="Provide a reason for your decision..." />
             </div>
 
             <div className="flex justify-end pt-2">
-              <button type="submit" className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-8 py-3 rounded-full font-semibold transition-colors shadow-sm">
+              <button type="submit" className="bg-brand-indigo hover:bg-brand-secondary text-white px-8 py-3 rounded-full font-semibold transition-colors shadow-sm">
                 Submit Decision
               </button>
             </div>
@@ -521,14 +521,14 @@ export default async function ClaimDetailPage({
       {!claim.isReimbursement && (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-bold text-avenue-text-heading text-sm font-heading flex items-center gap-2">
-              <BarChart2 size={15} className="text-avenue-indigo" /> Contracted Rate Analysis
+            <h2 className="font-bold text-brand-text-heading text-sm font-heading flex items-center gap-2">
+              <BarChart2 size={15} className="text-brand-indigo" /> Contracted Rate Analysis
             </h2>
             {!p9Claim?.contractedRate && (
               <form action={computeVarianceAction}>
                 <input type="hidden" name="claimId" value={id} />
                 <button type="submit"
-                  className="text-xs font-semibold text-avenue-indigo border border-avenue-indigo/30 px-3 py-1 rounded-full hover:bg-avenue-indigo/5 transition-colors">
+                  className="text-xs font-semibold text-brand-indigo border border-brand-indigo/30 px-3 py-1 rounded-full hover:bg-brand-indigo/5 transition-colors">
                   Compute Variance
                 </button>
               </form>
@@ -537,19 +537,19 @@ export default async function ClaimDetailPage({
           {p9Claim?.contractedRate ? (
             <div className="grid grid-cols-3 gap-4 text-sm">
               <div>
-                <p className="text-xs text-avenue-text-muted">Billed amount</p>
-                <p className="font-semibold text-avenue-text-heading mt-0.5">
+                <p className="text-xs text-brand-text-muted">Billed amount</p>
+                <p className="font-semibold text-brand-text-heading mt-0.5">
                   KES {Number(claim.billedAmount).toLocaleString("en-KE")}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-avenue-text-muted">Contracted rate</p>
-                <p className="font-semibold text-avenue-text-heading mt-0.5">
+                <p className="text-xs text-brand-text-muted">Contracted rate</p>
+                <p className="font-semibold text-brand-text-heading mt-0.5">
                   KES {Number(p9Claim.contractedRate).toLocaleString("en-KE")}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-avenue-text-muted">Variance</p>
+                <p className="text-xs text-brand-text-muted">Variance</p>
                 <p className={`font-bold mt-0.5 ${hasHighVar ? "text-[#DC3545]" : "text-[#28A745]"}`}>
                   {variancePct !== null ? `${(variancePct * 100).toFixed(1)}%` : "—"}
                   {hasHighVar && <span className="text-[10px] ml-1 font-bold">⚠ FRAUD FLAG</span>}
@@ -557,7 +557,7 @@ export default async function ClaimDetailPage({
               </div>
             </div>
           ) : (
-            <p className="text-sm text-avenue-text-muted">Click &quot;Compute Variance&quot; to look up contracted tariff rates.</p>
+            <p className="text-sm text-brand-text-muted">Click &quot;Compute Variance&quot; to look up contracted tariff rates.</p>
           )}
         </div>
       )}
@@ -566,14 +566,14 @@ export default async function ClaimDetailPage({
       {canAdjudicate && claimLines.length > 0 && (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-[#EEEEEE] flex items-center justify-between">
-            <h2 className="font-bold text-avenue-text-heading text-sm font-heading flex items-center gap-2">
-              <Scale size={15} className="text-avenue-indigo" /> Line-by-Line Adjudication
+            <h2 className="font-bold text-brand-text-heading text-sm font-heading flex items-center gap-2">
+              <Scale size={15} className="text-brand-indigo" /> Line-by-Line Adjudication
             </h2>
             {canComputeOutcome && (
               <form action={computeOutcomeAction}>
                 <input type="hidden" name="claimId" value={id} />
                 <button type="submit"
-                  className="text-xs bg-avenue-indigo text-white px-4 py-1.5 rounded-full font-semibold hover:bg-avenue-secondary transition-colors">
+                  className="text-xs bg-brand-indigo text-white px-4 py-1.5 rounded-full font-semibold hover:bg-brand-secondary transition-colors">
                   Compute Outcome
                 </button>
               </form>
@@ -593,10 +593,10 @@ export default async function ClaimDetailPage({
             <tbody className="divide-y divide-[#EEEEEE]">
               {claimLines.map((line) => (
                 <tr key={line.id} className="hover:bg-[#F8F9FA]">
-                  <td className="px-4 py-2.5 text-avenue-text-muted text-xs font-mono">{line.lineNumber}</td>
+                  <td className="px-4 py-2.5 text-brand-text-muted text-xs font-mono">{line.lineNumber}</td>
                   <td className="px-4 py-2.5">
-                    <p className="font-semibold text-avenue-text-heading text-xs">{line.description}</p>
-                    {line.cptCode && <p className="text-[10px] text-avenue-text-muted">{line.cptCode}</p>}
+                    <p className="font-semibold text-brand-text-heading text-xs">{line.description}</p>
+                    {line.cptCode && <p className="text-[10px] text-brand-text-muted">{line.cptCode}</p>}
                   </td>
                   <td className="px-4 py-2.5 text-right font-mono text-xs">
                     {Number(line.billedAmount).toLocaleString("en-KE")}
@@ -610,7 +610,7 @@ export default async function ClaimDetailPage({
                       }`}>
                         {line.adjudicationDecision.replace(/_/g, " ")}
                       </span>
-                    ) : <span className="text-[10px] text-avenue-text-muted">Pending</span>}
+                    ) : <span className="text-[10px] text-brand-text-muted">Pending</span>}
                   </td>
                   <td className="px-4 py-2.5 text-right font-mono text-xs text-[#28A745]">
                     {line.adjudicationDecision
@@ -649,7 +649,7 @@ export default async function ClaimDetailPage({
       {/* ── Process 9: Finalize + senior approval + appeal ────── */}
       {(isOutcomeSet || canFinalize || needsSenior || canAppeal) && (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-4">
-          <h2 className="font-bold text-avenue-text-heading text-sm font-heading border-b border-[#EEEEEE] pb-2">
+          <h2 className="font-bold text-brand-text-heading text-sm font-heading border-b border-[#EEEEEE] pb-2">
             Adjudication Workflow
           </h2>
 
@@ -658,7 +658,7 @@ export default async function ClaimDetailPage({
               <span className={`font-bold text-lg ${claim.status === "APPROVED" ? "text-[#28A745]" : claim.status === "PARTIALLY_APPROVED" ? "text-[#17A2B8]" : "text-[#DC3545]"}`}>
                 Outcome: {claim.status.replace(/_/g," ")}
               </span>
-              <span className="text-avenue-text-muted">
+              <span className="text-brand-text-muted">
                 Net approved: <strong>KES {Number(claim.approvedAmount).toLocaleString("en-KE")}</strong>
               </span>
             </div>
@@ -683,7 +683,7 @@ export default async function ClaimDetailPage({
             <form action={approveClaimAction}>
               <input type="hidden" name="claimId" value={id} />
               <button type="submit"
-                className="bg-avenue-indigo text-white px-5 py-2 rounded-full text-sm font-semibold hover:bg-avenue-secondary transition-colors flex items-center gap-2">
+                className="bg-brand-indigo text-white px-5 py-2 rounded-full text-sm font-semibold hover:bg-brand-secondary transition-colors flex items-center gap-2">
                 <CheckCircle2 size={14} /> Finalize &amp; Queue for Settlement
               </button>
             </form>
@@ -693,9 +693,9 @@ export default async function ClaimDetailPage({
             <form action={initiateAppealAction} className="flex gap-2 items-center">
               <input type="hidden" name="claimId" value={id} />
               <input name="appealNotes" type="text" required placeholder="Appeal reason"
-                className="flex-1 border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-avenue-indigo focus:outline-none" />
+                className="flex-1 border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-brand-indigo focus:outline-none" />
               <button type="submit"
-                className="border border-avenue-indigo text-avenue-indigo px-4 py-2 rounded-full text-sm font-semibold hover:bg-avenue-indigo/5 transition-colors whitespace-nowrap">
+                className="border border-brand-indigo text-brand-indigo px-4 py-2 rounded-full text-sm font-semibold hover:bg-brand-indigo/5 transition-colors whitespace-nowrap">
                 Initiate Appeal
               </button>
             </form>
@@ -704,7 +704,7 @@ export default async function ClaimDetailPage({
           {p9Claim?.settlementBatchId && (
             <p className="text-sm text-[#28A745] font-semibold flex items-center gap-2">
               <CheckCircle2 size={14} /> Queued in settlement batch
-              <Link href="/settlement" className="text-avenue-indigo hover:underline font-normal text-xs ml-1">
+              <Link href="/settlement" className="text-brand-indigo hover:underline font-normal text-xs ml-1">
                 View →
               </Link>
             </p>
@@ -715,28 +715,28 @@ export default async function ClaimDetailPage({
       {/* ── Process 10: Reimbursement panel ──────────────────── */}
       {claim.isReimbursement && (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-6 space-y-5">
-          <h2 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-3 flex items-center gap-2">
-            <CheckCircle2 size={16} className="text-avenue-indigo" />
+          <h2 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-3 flex items-center gap-2">
+            <CheckCircle2 size={16} className="text-brand-indigo" />
             Reimbursement Details
           </h2>
 
           {/* Payment destination */}
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <p className="text-xs text-avenue-text-muted font-bold uppercase mb-1">Payout destination</p>
+              <p className="text-xs text-brand-text-muted font-bold uppercase mb-1">Payout destination</p>
               {claim.reimbursementMpesaPhone ? (
-                <p className="font-semibold text-avenue-text-heading">M-Pesa: {claim.reimbursementMpesaPhone}</p>
+                <p className="font-semibold text-brand-text-heading">M-Pesa: {claim.reimbursementMpesaPhone}</p>
               ) : claim.reimbursementBankName ? (
-                <p className="font-semibold text-avenue-text-heading">
+                <p className="font-semibold text-brand-text-heading">
                   {claim.reimbursementBankName} — {claim.reimbursementAccountNo ?? "—"}
                 </p>
               ) : (
-                <p className="text-avenue-text-muted italic">Not specified</p>
+                <p className="text-brand-text-muted italic">Not specified</p>
               )}
             </div>
             <div>
-              <p className="text-xs text-avenue-text-muted font-bold uppercase mb-1">Reimbursed at</p>
-              <p className="font-semibold text-avenue-text-heading">
+              <p className="text-xs text-brand-text-muted font-bold uppercase mb-1">Reimbursed at</p>
+              <p className="font-semibold text-brand-text-heading">
                 {claim.reimbursedAt ? new Date(claim.reimbursedAt).toLocaleDateString("en-KE") : "—"}
               </p>
             </div>
@@ -745,22 +745,22 @@ export default async function ClaimDetailPage({
           {/* Proof of payment */}
           {reimbRequest && (
             <div className="bg-[#F8F9FA] border border-[#EEEEEE] rounded-[8px] p-4 space-y-3">
-              <p className="text-xs font-bold uppercase text-avenue-text-muted">Proof of Payment</p>
+              <p className="text-xs font-bold uppercase text-brand-text-muted">Proof of Payment</p>
               <div className="grid grid-cols-3 gap-4 text-sm">
                 <div>
-                  <p className="text-xs text-avenue-text-muted">Proof type</p>
-                  <p className="font-semibold text-avenue-text-heading mt-0.5">
+                  <p className="text-xs text-brand-text-muted">Proof type</p>
+                  <p className="font-semibold text-brand-text-heading mt-0.5">
                     {reimbRequest.proofType.replace(/_/g, " ")}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-avenue-text-muted">Total paid by member</p>
-                  <p className="font-semibold text-avenue-text-heading mt-0.5">
+                  <p className="text-xs text-brand-text-muted">Total paid by member</p>
+                  <p className="font-semibold text-brand-text-heading mt-0.5">
                     KES {Number(reimbRequest.totalPaidByMember).toLocaleString("en-KE")}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-avenue-text-muted">Within 90-day window</p>
+                  <p className="text-xs text-brand-text-muted">Within 90-day window</p>
                   <p className={`font-semibold mt-0.5 ${reimbRequest.submittedWithinWindow ? "text-[#28A745]" : "text-[#DC3545]"}`}>
                     {reimbRequest.submittedWithinWindow ? "Yes" : "No — review required"}
                   </p>
@@ -781,7 +781,7 @@ export default async function ClaimDetailPage({
 
               {reimbRequest.proofFileUrl && (
                 <a href={reimbRequest.proofFileUrl} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-avenue-indigo hover:underline">
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-indigo hover:underline">
                   View proof document →
                 </a>
               )}
@@ -793,7 +793,7 @@ export default async function ClaimDetailPage({
             <form action={disburseReimbursementAction} className="flex items-center gap-3">
               <input type="hidden" name="claimId" value={id} />
               <input name="disbursementRef" type="text" required placeholder="Disbursement reference (e.g. bank TXN ID or M-Pesa code)"
-                className="flex-1 border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-avenue-indigo focus:outline-none" />
+                className="flex-1 border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-brand-indigo focus:outline-none" />
               <button type="submit"
                 className="bg-[#28A745] hover:bg-[#218838] text-white px-5 py-2 rounded-full text-sm font-semibold transition-colors whitespace-nowrap">
                 Disburse to Member

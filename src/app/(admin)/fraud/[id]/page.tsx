@@ -71,12 +71,12 @@ export default async function FraudCasePage({
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-start gap-3">
-        <Link href="/fraud" className="text-avenue-text-muted hover:text-avenue-indigo transition-colors mt-1">
+        <Link href="/fraud" className="text-brand-text-muted hover:text-brand-indigo transition-colors mt-1">
           <ArrowLeft size={20} />
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Fraud Case</h1>
+            <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Fraud Case</h1>
             <span className={`px-3 py-0.5 rounded-full text-xs font-bold uppercase ${SEVERITY_STYLE[alert.severity] ?? SEVERITY_STYLE.LOW}`}>
               {alert.severity}
             </span>
@@ -86,15 +86,15 @@ export default async function FraudCasePage({
               </span>
             )}
           </div>
-          <p className="text-avenue-text-muted text-sm mt-0.5">
-            Rule: <span className="font-semibold text-avenue-text-body">{alert.rule}</span>
+          <p className="text-brand-text-muted text-sm mt-0.5">
+            Rule: <span className="font-semibold text-brand-text-body">{alert.rule}</span>
             <span className="mx-2">·</span>
             Flagged {fmtDt(alert.createdAt)}
           </p>
         </div>
         {/* Score gauge */}
         <div className="text-center shrink-0">
-          <p className="text-[10px] font-bold uppercase text-avenue-text-muted mb-1">Risk Score</p>
+          <p className="text-[10px] font-bold uppercase text-brand-text-muted mb-1">Risk Score</p>
           <div className="relative w-14 h-14">
             <svg viewBox="0 0 36 36" className="w-14 h-14 -rotate-90">
               <circle cx="18" cy="18" r="15.9" fill="none" stroke="#EEEEEE" strokeWidth="3" />
@@ -122,7 +122,7 @@ export default async function FraudCasePage({
               <AlertTriangle size={15} className="text-[#856404] shrink-0 mt-0.5" />
               <div>
                 <p className="text-xs font-bold text-[#856404] uppercase mb-1">Alert Notes / Evidence</p>
-                <p className="text-sm text-avenue-text-body leading-relaxed">{alert.notes}</p>
+                <p className="text-sm text-brand-text-body leading-relaxed">{alert.notes}</p>
               </div>
             </div>
           )}
@@ -131,12 +131,12 @@ export default async function FraudCasePage({
           <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
             <div className="px-5 py-4 border-b border-[#EEEEEE] flex items-center justify-between">
               <div>
-                <p className="text-xs font-bold uppercase text-avenue-text-muted">Flagged Claim</p>
-                <p className="font-mono font-bold text-avenue-indigo text-lg mt-0.5">{claim.claimNumber}</p>
+                <p className="text-xs font-bold uppercase text-brand-text-muted">Flagged Claim</p>
+                <p className="font-mono font-bold text-brand-indigo text-lg mt-0.5">{claim.claimNumber}</p>
               </div>
               <Link
                 href={`/claims/${claim.id}`}
-                className="flex items-center gap-1.5 text-xs font-semibold text-avenue-indigo border border-avenue-indigo/30 hover:bg-avenue-indigo/5 px-3 py-1.5 rounded-full transition-colors"
+                className="flex items-center gap-1.5 text-xs font-semibold text-brand-indigo border border-brand-indigo/30 hover:bg-brand-indigo/5 px-3 py-1.5 rounded-full transition-colors"
               >
                 Open Claim <ExternalLink size={12} />
               </Link>
@@ -152,8 +152,8 @@ export default async function FraudCasePage({
                 { label: "Status",          value: claim.status.replace(/_/g, " ") },
               ].map(r => (
                 <div key={r.label} className="flex justify-between border-b border-[#F8F9FA] py-1 last:border-0">
-                  <span className="text-avenue-text-muted">{r.label}</span>
-                  <span className="font-semibold text-avenue-text-heading">{r.value}</span>
+                  <span className="text-brand-text-muted">{r.label}</span>
+                  <span className="font-semibold text-brand-text-heading">{r.value}</span>
                 </div>
               ))}
             </div>
@@ -161,10 +161,10 @@ export default async function FraudCasePage({
             {/* Diagnoses */}
             {diagnoses.length > 0 && (
               <div className="px-5 py-3 border-b border-[#EEEEEE]">
-                <p className="text-[10px] font-bold uppercase text-avenue-text-muted mb-2">Diagnoses</p>
+                <p className="text-[10px] font-bold uppercase text-brand-text-muted mb-2">Diagnoses</p>
                 <div className="flex flex-wrap gap-2">
                   {diagnoses.map((d, i) => (
-                    <span key={i} className={`text-xs px-2 py-0.5 rounded font-mono ${d.isPrimary ? "bg-avenue-indigo/10 text-avenue-indigo font-bold" : "bg-[#E6E7E8] text-[#6C757D]"}`}>
+                    <span key={i} className={`text-xs px-2 py-0.5 rounded font-mono ${d.isPrimary ? "bg-brand-indigo/10 text-brand-indigo font-bold" : "bg-[#E6E7E8] text-[#6C757D]"}`}>
                       {d.icdCode} — {d.description}
                     </span>
                   ))}
@@ -189,23 +189,23 @@ export default async function FraudCasePage({
                 <tbody className="divide-y divide-[#EEEEEE]">
                   {claim.claimLines.map(l => (
                     <tr key={l.id} className={l.isException ? "bg-[#FFF8E1]" : "hover:bg-[#F8F9FA]"}>
-                      <td className="px-5 py-2.5 text-avenue-text-muted text-xs">{l.lineNumber}</td>
-                      <td className="px-5 py-2.5 font-semibold text-avenue-text-heading">
+                      <td className="px-5 py-2.5 text-brand-text-muted text-xs">{l.lineNumber}</td>
+                      <td className="px-5 py-2.5 font-semibold text-brand-text-heading">
                         {l.description}
                         {l.isException && <span className="ml-2 text-[10px] bg-[#FFC107]/20 text-[#856404] px-1.5 py-0.5 rounded font-bold">EXCEPTION</span>}
                       </td>
-                      <td className="px-5 py-2.5 font-mono text-xs text-avenue-text-muted">{l.cptCode ?? "—"}</td>
-                      <td className="px-5 py-2.5 text-xs uppercase text-avenue-text-muted">{String(l.serviceCategory).replace(/_/g, " ")}</td>
+                      <td className="px-5 py-2.5 font-mono text-xs text-brand-text-muted">{l.cptCode ?? "—"}</td>
+                      <td className="px-5 py-2.5 text-xs uppercase text-brand-text-muted">{String(l.serviceCategory).replace(/_/g, " ")}</td>
                       <td className="px-5 py-2.5 text-right">{l.quantity}</td>
-                      <td className="px-5 py-2.5 text-right text-avenue-text-muted">{fmt(Number(l.unitCost))}</td>
-                      <td className="px-5 py-2.5 text-right font-bold text-avenue-text-heading">{fmt(Number(l.billedAmount))}</td>
+                      <td className="px-5 py-2.5 text-right text-brand-text-muted">{fmt(Number(l.unitCost))}</td>
+                      <td className="px-5 py-2.5 text-right font-bold text-brand-text-heading">{fmt(Number(l.billedAmount))}</td>
                     </tr>
                   ))}
                 </tbody>
                 <tfoot>
                   <tr className="border-t-2 border-[#EEEEEE] bg-[#F8F9FA]">
-                    <td colSpan={6} className="px-5 py-2.5 text-sm font-bold text-avenue-text-muted text-right">Total Billed</td>
-                    <td className="px-5 py-2.5 text-right font-bold text-avenue-indigo">{fmt(totalBilled)}</td>
+                    <td colSpan={6} className="px-5 py-2.5 text-sm font-bold text-brand-text-muted text-right">Total Billed</td>
+                    <td className="px-5 py-2.5 text-right font-bold text-brand-indigo">{fmt(totalBilled)}</td>
                   </tr>
                 </tfoot>
               </table>
@@ -216,7 +216,7 @@ export default async function FraudCasePage({
           {velocityClaims.length > 0 && (
             <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
               <div className="px-5 py-3 border-b border-[#EEEEEE]">
-                <p className="text-xs font-bold uppercase text-avenue-text-muted">
+                <p className="text-xs font-bold uppercase text-brand-text-muted">
                   Member&apos;s Other Claims at Same Provider (prior 90 days)
                 </p>
               </div>
@@ -233,11 +233,11 @@ export default async function FraudCasePage({
                 <tbody className="divide-y divide-[#EEEEEE]">
                   {velocityClaims.map(vc => (
                     <tr key={vc.claimNumber} className="hover:bg-[#F8F9FA]">
-                      <td className="px-5 py-2.5 font-mono text-xs font-semibold text-avenue-indigo">{vc.claimNumber}</td>
-                      <td className="px-5 py-2.5 text-xs uppercase text-avenue-text-muted">{vc.benefitCategory.replace(/_/g, " ")}</td>
-                      <td className="px-5 py-2.5 text-xs text-avenue-text-muted">{fmtDt(vc.dateOfService)}</td>
-                      <td className="px-5 py-2.5 text-right font-semibold text-avenue-text-heading">{fmt(Number(vc.billedAmount))}</td>
-                      <td className="px-5 py-2.5 text-xs uppercase text-avenue-text-muted">{vc.status.replace(/_/g, " ")}</td>
+                      <td className="px-5 py-2.5 font-mono text-xs font-semibold text-brand-indigo">{vc.claimNumber}</td>
+                      <td className="px-5 py-2.5 text-xs uppercase text-brand-text-muted">{vc.benefitCategory.replace(/_/g, " ")}</td>
+                      <td className="px-5 py-2.5 text-xs text-brand-text-muted">{fmtDt(vc.dateOfService)}</td>
+                      <td className="px-5 py-2.5 text-right font-semibold text-brand-text-heading">{fmt(Number(vc.billedAmount))}</td>
+                      <td className="px-5 py-2.5 text-xs uppercase text-brand-text-muted">{vc.status.replace(/_/g, " ")}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -250,12 +250,12 @@ export default async function FraudCasePage({
         <div className="space-y-5">
           <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm p-5 space-y-3">
             <div className="flex items-center gap-2">
-              <User size={14} className="text-avenue-text-muted" />
-              <p className="text-xs font-bold uppercase text-avenue-text-muted">Member</p>
+              <User size={14} className="text-brand-text-muted" />
+              <p className="text-xs font-bold uppercase text-brand-text-muted">Member</p>
             </div>
             <div>
-              <p className="font-bold text-avenue-text-heading">{member.firstName} {member.lastName}</p>
-              <p className="font-mono text-xs text-avenue-text-muted mt-0.5">{member.memberNumber}</p>
+              <p className="font-bold text-brand-text-heading">{member.firstName} {member.lastName}</p>
+              <p className="font-mono text-xs text-brand-text-muted mt-0.5">{member.memberNumber}</p>
             </div>
             <div className="space-y-1.5 text-sm">
               {[
@@ -264,14 +264,14 @@ export default async function FraudCasePage({
                 { label: "DOB",     value: fmtDt(member.dateOfBirth) },
               ].map(r => (
                 <div key={r.label} className="flex justify-between border-b border-[#F8F9FA] py-1 last:border-0">
-                  <span className="text-avenue-text-muted">{r.label}</span>
-                  <span className="font-semibold text-avenue-text-heading">{r.value}</span>
+                  <span className="text-brand-text-muted">{r.label}</span>
+                  <span className="font-semibold text-brand-text-heading">{r.value}</span>
                 </div>
               ))}
             </div>
             <Link
               href={`/members/${member.id}`}
-              className="text-xs text-avenue-indigo font-semibold hover:underline flex items-center gap-1"
+              className="text-xs text-brand-indigo font-semibold hover:underline flex items-center gap-1"
             >
               Full member profile <ExternalLink size={11} />
             </Link>
@@ -279,19 +279,19 @@ export default async function FraudCasePage({
 
           <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm p-5 space-y-3">
             <div className="flex items-center gap-2">
-              <Building2 size={14} className="text-avenue-text-muted" />
-              <p className="text-xs font-bold uppercase text-avenue-text-muted">Provider</p>
+              <Building2 size={14} className="text-brand-text-muted" />
+              <p className="text-xs font-bold uppercase text-brand-text-muted">Provider</p>
             </div>
             <div>
-              <p className="font-bold text-avenue-text-heading">{claim.provider.name}</p>
-              <p className="text-xs text-avenue-text-muted mt-0.5">{claim.provider.type} · {claim.provider.county}</p>
+              <p className="font-bold text-brand-text-heading">{claim.provider.name}</p>
+              <p className="text-xs text-brand-text-muted mt-0.5">{claim.provider.type} · {claim.provider.county}</p>
             </div>
           </div>
 
           <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm p-5 space-y-3">
             <div className="flex items-center gap-2">
-              <Calendar size={14} className="text-avenue-text-muted" />
-              <p className="text-xs font-bold uppercase text-avenue-text-muted">Member Claim History</p>
+              <Calendar size={14} className="text-brand-text-muted" />
+              <p className="text-xs font-bold uppercase text-brand-text-muted">Member Claim History</p>
             </div>
             <div className="space-y-1.5 text-sm">
               {[
@@ -300,8 +300,8 @@ export default async function FraudCasePage({
                 { label: "Claims at this provider (90d)", value: velocityClaims.length.toString() },
               ].map(r => (
                 <div key={r.label} className="flex justify-between border-b border-[#F8F9FA] py-1 last:border-0">
-                  <span className="text-avenue-text-muted text-xs">{r.label}</span>
-                  <span className="font-bold text-avenue-text-heading text-xs">{r.value}</span>
+                  <span className="text-brand-text-muted text-xs">{r.label}</span>
+                  <span className="font-bold text-brand-text-heading text-xs">{r.value}</span>
                 </div>
               ))}
             </div>
@@ -311,7 +311,7 @@ export default async function FraudCasePage({
 
       {/* Investigation / action panel */}
       <div className="space-y-3">
-        <h2 className="font-bold text-avenue-text-heading font-heading">Investigation Actions</h2>
+        <h2 className="font-bold text-brand-text-heading font-heading">Investigation Actions</h2>
         <FraudCaseActions
           alertId={alert.id}
           claimId={claim.id}

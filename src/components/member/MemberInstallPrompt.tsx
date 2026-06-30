@@ -85,14 +85,14 @@ export function MemberInstallPrompt() {
   if (!visible || (!installEvent && !manualHint)) return null;
 
   return (
-    <section className="mb-4 rounded-[8px] border border-avenue-indigo/15 bg-white p-4 shadow-sm md:hidden">
+    <section className="mb-4 rounded-[8px] border border-brand-indigo/15 bg-white p-4 shadow-sm md:hidden">
       <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-avenue-indigo/10 text-avenue-indigo">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-brand-indigo/10 text-brand-indigo">
           {installEvent ? <Download className="h-5 w-5" /> : <Share className="h-5 w-5" />}
         </div>
         <div className="min-w-0 flex-1">
-          <p className="font-heading font-bold text-avenue-text-heading">Add Medvex to your home screen</p>
-          <p className="mt-1 text-sm leading-relaxed text-avenue-text-muted">
+          <p className="font-heading font-bold text-brand-text-heading">Add Medvex to your home screen</p>
+          <p className="mt-1 text-sm leading-relaxed text-brand-text-muted">
             {installEvent
               ? "Install the member portal for faster access from your phone."
               : installInstructions()}
@@ -101,7 +101,7 @@ export function MemberInstallPrompt() {
             <button
               type="button"
               onClick={install}
-              className="mt-3 inline-flex items-center gap-2 rounded-[8px] bg-avenue-indigo px-3 py-2 text-sm font-semibold text-white"
+              className="mt-3 inline-flex items-center gap-2 rounded-[8px] bg-brand-indigo px-3 py-2 text-sm font-semibold text-white"
             >
               <Download className="h-4 w-4" />
               Install app
@@ -112,7 +112,7 @@ export function MemberInstallPrompt() {
           type="button"
           onClick={dismiss}
           aria-label="Dismiss install prompt"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] text-avenue-text-muted hover:bg-[#F8F9FA]"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] text-brand-text-muted hover:bg-[#F8F9FA]"
         >
           <X className="h-4 w-4" />
         </button>

@@ -40,18 +40,18 @@ export default async function EditPackagePage({ params }: { params: Promise<{ id
     }),
   ]);
 
-  const inputCls = "w-full border border-[#EEEEEE] rounded-[8px] px-3 py-2 text-sm text-avenue-text-heading focus:ring-2 focus:ring-avenue-indigo outline-none bg-white";
-  const labelCls = "block text-xs font-bold text-avenue-text-muted uppercase mb-1";
+  const inputCls = "w-full border border-[#EEEEEE] rounded-[8px] px-3 py-2 text-sm text-brand-text-heading focus:ring-2 focus:ring-brand-indigo outline-none bg-white";
+  const labelCls = "block text-xs font-bold text-brand-text-muted uppercase mb-1";
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <Link href={`/packages/${id}`} className="text-avenue-text-muted hover:text-avenue-indigo transition-colors">
+        <Link href={`/packages/${id}`} className="text-brand-text-muted hover:text-brand-indigo transition-colors">
           <ArrowLeft size={20} />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Edit Package</h1>
-          <p className="text-avenue-text-muted text-sm mt-0.5">{pkg.name}</p>
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Edit Package</h1>
+          <p className="text-brand-text-muted text-sm mt-0.5">{pkg.name}</p>
         </div>
       </div>
 
@@ -60,7 +60,7 @@ export default async function EditPackagePage({ params }: { params: Promise<{ id
 
         {/* Package details */}
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-4">
-          <h2 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2">
+          <h2 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2">
             Package Details
           </h2>
           <div className="grid md:grid-cols-2 gap-4">
@@ -115,8 +115,8 @@ export default async function EditPackagePage({ params }: { params: Promise<{ id
         {/* Benefit schedule */}
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-4">
           <div className="flex items-center justify-between border-b border-[#EEEEEE] pb-2">
-            <h2 className="font-bold text-avenue-text-heading font-heading">Benefit Schedule</h2>
-            <p className="text-xs text-avenue-text-muted">Editing current version (v{pkg.currentVersion?.versionNumber ?? 1})</p>
+            <h2 className="font-bold text-brand-text-heading font-heading">Benefit Schedule</h2>
+            <p className="text-xs text-brand-text-muted">Editing current version (v{pkg.currentVersion?.versionNumber ?? 1})</p>
           </div>
 
           <div className="overflow-x-auto">
@@ -135,12 +135,12 @@ export default async function EditPackagePage({ params }: { params: Promise<{ id
                   return (
                     <tr key={cat} className="hover:bg-[#F8F9FA]">
                       <td className="px-3 py-2.5">
-                        <label className="flex items-center gap-2 font-semibold text-avenue-text-heading">
+                        <label className="flex items-center gap-2 font-semibold text-brand-text-heading">
                           <input
                             type="checkbox"
                             name={`benefit_enabled_${cat}`}
                             defaultChecked={!!existing}
-                            className="accent-avenue-indigo"
+                            className="accent-brand-indigo"
                           />
                           {cat.replace(/_/g, " ")}
                         </label>
@@ -151,7 +151,7 @@ export default async function EditPackagePage({ params }: { params: Promise<{ id
                           type="number"
                           min="0"
                           defaultValue={existing ? Number(existing.annualSubLimit) : 0}
-                          className="w-32 border border-[#EEEEEE] rounded-[8px] px-2 py-1 text-sm focus:ring-2 focus:ring-avenue-indigo outline-none"
+                          className="w-32 border border-[#EEEEEE] rounded-[8px] px-2 py-1 text-sm focus:ring-2 focus:ring-brand-indigo outline-none"
                         />
                       </td>
                       <td className="px-3 py-2.5">
@@ -161,7 +161,7 @@ export default async function EditPackagePage({ params }: { params: Promise<{ id
                           min="0"
                           max="100"
                           defaultValue={existing ? Number(existing.copayPercentage) : 0}
-                          className="w-20 border border-[#EEEEEE] rounded-[8px] px-2 py-1 text-sm focus:ring-2 focus:ring-avenue-indigo outline-none"
+                          className="w-20 border border-[#EEEEEE] rounded-[8px] px-2 py-1 text-sm focus:ring-2 focus:ring-brand-indigo outline-none"
                         />
                       </td>
                       <td className="px-3 py-2.5">
@@ -170,7 +170,7 @@ export default async function EditPackagePage({ params }: { params: Promise<{ id
                           type="number"
                           min="0"
                           defaultValue={existing ? Number(existing.waitingPeriodDays) : 0}
-                          className="w-24 border border-[#EEEEEE] rounded-[8px] px-2 py-1 text-sm focus:ring-2 focus:ring-avenue-indigo outline-none"
+                          className="w-24 border border-[#EEEEEE] rounded-[8px] px-2 py-1 text-sm focus:ring-2 focus:ring-brand-indigo outline-none"
                         />
                       </td>
                     </tr>
@@ -222,11 +222,11 @@ export default async function EditPackagePage({ params }: { params: Promise<{ id
 
         <div className="flex justify-end gap-3">
           <Link href={`/packages/${id}`}
-            className="px-5 py-2.5 text-sm font-semibold text-avenue-text-muted hover:text-avenue-text-heading transition-colors">
+            className="px-5 py-2.5 text-sm font-semibold text-brand-text-muted hover:text-brand-text-heading transition-colors">
             Cancel
           </Link>
           <button type="submit"
-            className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-8 py-2.5 rounded-full font-bold text-sm transition-colors">
+            className="bg-brand-indigo hover:bg-brand-secondary text-white px-8 py-2.5 rounded-full font-bold text-sm transition-colors">
             Save Changes
           </button>
         </div>

@@ -17,10 +17,10 @@ export default async function BrokersPage() {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Brokers</h1>
-          <p className="text-avenue-text-body font-body mt-1">Manage broker partners and their commission structures.</p>
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Brokers</h1>
+          <p className="text-brand-text-body font-body mt-1">Manage broker partners and their commission structures.</p>
         </div>
-        <Link href="/brokers/new" className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors flex items-center space-x-2 shadow-sm">
+        <Link href="/brokers/new" className="bg-brand-indigo hover:bg-brand-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors flex items-center space-x-2 shadow-sm">
           <PlusCircle size={18} />
           <span>Add Broker</span>
         </Link>

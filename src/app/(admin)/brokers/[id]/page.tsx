@@ -85,8 +85,8 @@ function Badge({ status }: { status: string }) {
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex justify-between gap-4 text-sm">
-      <span className="text-avenue-text-muted">{label}</span>
-      <span className="font-semibold text-avenue-text-heading text-right">{value || "-"}</span>
+      <span className="text-brand-text-muted">{label}</span>
+      <span className="font-semibold text-brand-text-heading text-right">{value || "-"}</span>
     </div>
   );
 }
@@ -158,7 +158,7 @@ export default async function BrokerDetailPage({
   const expiringKyc = broker.kycDocuments.filter(doc => doc.expiresAt && doc.expiresAt <= kycExpiryCutoff).length;
 
   const kpis = [
-    { label: "Groups", value: broker._count.groups, color: "text-avenue-indigo", icon: Users },
+    { label: "Groups", value: broker._count.groups, color: "text-brand-indigo", icon: Users },
     { label: "Ledger Earned", value: formatCurrency(ledgerEarned), color: "text-[#28A745]", icon: Banknote },
     { label: "Payable", value: formatCurrency(ledgerPayable), color: "text-[#17A2B8]", icon: ReceiptText },
     { label: "Compliance Flags", value: complianceFlags.length, color: complianceFlags.length > 0 ? "text-[#DC3545]" : "text-[#28A745]", icon: ShieldCheck },
@@ -168,21 +168,21 @@ export default async function BrokerDetailPage({
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <Link href="/brokers" className="text-avenue-text-muted hover:text-avenue-indigo transition-colors mt-1">
+          <Link href="/brokers" className="text-brand-text-muted hover:text-brand-indigo transition-colors mt-1">
             <ArrowLeft size={20} />
           </Link>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">{broker.name}</h1>
+              <h1 className="text-2xl font-bold text-brand-text-heading font-heading">{broker.name}</h1>
               <Badge status={broker.status} />
               <Badge status={broker.intermediaryCategory} />
             </div>
-            <p className="text-avenue-text-body text-sm mt-1">
+            <p className="text-brand-text-body text-sm mt-1">
               {broker.brokerCode ?? "No source code"} · {label(broker.commissionBasis)} · {broker.requiresIraRegistration ? `IRA ${broker.licenseNumber ?? "not captured"}` : "IRA not required"} · {broker.contactPerson}
             </p>
           </div>
         </div>
-        <Link href={`/brokers/${broker.id}/edit`} className="inline-flex items-center gap-1.5 text-xs font-semibold text-avenue-indigo border border-avenue-indigo/30 hover:bg-avenue-indigo/5 px-3 py-1.5 rounded-full transition-colors">
+        <Link href={`/brokers/${broker.id}/edit`} className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-indigo border border-brand-indigo/30 hover:bg-brand-indigo/5 px-3 py-1.5 rounded-full transition-colors">
           <Pencil size={13} /> Edit
         </Link>
       </div>
@@ -192,7 +192,7 @@ export default async function BrokerDetailPage({
           const Icon = item.icon;
           return (
             <div key={item.label} className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm">
-              <p className="text-xs text-avenue-text-muted font-bold uppercase inline-flex items-center gap-1.5">
+              <p className="text-xs text-brand-text-muted font-bold uppercase inline-flex items-center gap-1.5">
                 <Icon size={13} /> {item.label}
               </p>
               <p className={`text-2xl font-bold mt-1 tabular-nums ${item.color}`}>{item.value}</p>
@@ -209,7 +209,7 @@ export default async function BrokerDetailPage({
               key={t.key}
               href={`/brokers/${broker.id}?tab=${t.key}`}
               className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-colors inline-flex items-center gap-1.5 whitespace-nowrap ${
-                activeTab === t.key ? "bg-white text-avenue-indigo shadow-sm" : "text-avenue-text-muted hover:text-avenue-text-heading"
+                activeTab === t.key ? "bg-white text-brand-indigo shadow-sm" : "text-brand-text-muted hover:text-brand-text-heading"
               }`}
             >
               <Icon size={14} /> {t.label}
@@ -222,7 +222,7 @@ export default async function BrokerDetailPage({
         <div className="space-y-6">
           <div className="grid lg:grid-cols-3 gap-6">
             <div className="bg-white border border-[#EEEEEE] rounded-lg p-6 shadow-sm space-y-3">
-              <h2 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2">Profile</h2>
+              <h2 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2">Profile</h2>
               <Field label="Legal Name" value={broker.legalName ?? broker.name} />
               <Field label="Trading Name" value={broker.tradingName} />
               <Field label="Category" value={label(broker.intermediaryCategory)} />
@@ -238,14 +238,14 @@ export default async function BrokerDetailPage({
               <Field label="Bank Ref" value={broker.bankAccountReference} />
               <Field label="M-Pesa Paybill" value={broker.mpesaPaybillNumber} />
               {broker.sourceDescription && (
-                <div className="pt-2 text-sm text-avenue-text-body">
+                <div className="pt-2 text-sm text-brand-text-body">
                   {broker.sourceDescription}
                 </div>
               )}
             </div>
 
             <div className="bg-white border border-[#EEEEEE] rounded-lg p-6 shadow-sm space-y-3">
-              <h2 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2">Compliance</h2>
+              <h2 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2">Compliance</h2>
               <Field label="IRA Required" value={broker.requiresIraRegistration ? "Yes" : "No"} />
               <Field label="IRA License" value={broker.licenseNumber} />
               <Field label="IRA Expiry" value={broker.iraExpiryDate ? formatDate(broker.iraExpiryDate) : "-"} />
@@ -257,41 +257,41 @@ export default async function BrokerDetailPage({
             </div>
 
             <div className="bg-white border border-[#EEEEEE] rounded-lg p-6 shadow-sm space-y-3">
-              <h2 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2">Hierarchy</h2>
+              <h2 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2">Hierarchy</h2>
               <Field
                 label="Parent"
-                value={broker.parent ? <Link href={`/brokers/${broker.parent.id}`} className="text-avenue-indigo hover:underline">{broker.parent.name}</Link> : "-"}
+                value={broker.parent ? <Link href={`/brokers/${broker.parent.id}`} className="text-brand-indigo hover:underline">{broker.parent.name}</Link> : "-"}
               />
               <Field label="Child Brokers" value={broker.children.length} />
               <div className="pt-2 space-y-2">
                 {broker.children.slice(0, 6).map(child => (
                   <Link key={child.id} href={`/brokers/${child.id}`} className="flex justify-between text-sm hover:bg-[#F8F9FA] rounded-md px-2 py-1">
-                    <span className="font-semibold text-avenue-indigo">{child.name}</span>
+                    <span className="font-semibold text-brand-indigo">{child.name}</span>
                     <Badge status={child.status} />
                   </Link>
                 ))}
-                {broker.children.length === 0 && <p className="text-sm text-avenue-text-body">No child sources linked.</p>}
+                {broker.children.length === 0 && <p className="text-sm text-brand-text-body">No child sources linked.</p>}
               </div>
             </div>
           </div>
 
           <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-[#EEEEEE] flex items-center justify-between gap-3">
-              <h2 className="font-bold text-avenue-text-heading font-heading">Compliance Flags</h2>
+              <h2 className="font-bold text-brand-text-heading font-heading">Compliance Flags</h2>
               <Badge status={complianceFlags.length > 0 ? `${complianceFlags.length} OPEN` : "CLEAR"} />
             </div>
             <div className="divide-y divide-[#EEEEEE]">
               {complianceFlags.map(flag => (
                 <div key={flag.code} className="px-6 py-4 flex items-start justify-between gap-4">
                   <div>
-                    <p className="font-semibold text-avenue-text-heading">{flag.title}</p>
-                    <p className="text-sm text-avenue-text-body mt-1">{flag.notes}</p>
-                    <p className="text-xs font-mono text-avenue-text-muted mt-1">{flag.code}</p>
+                    <p className="font-semibold text-brand-text-heading">{flag.title}</p>
+                    <p className="text-sm text-brand-text-body mt-1">{flag.notes}</p>
+                    <p className="text-xs font-mono text-brand-text-muted mt-1">{flag.code}</p>
                   </div>
                   <Badge status={flag.severity} />
                 </div>
               ))}
-              {complianceFlags.length === 0 && <p className="px-6 py-6 text-sm text-avenue-text-body">No business-source compliance flags detected.</p>}
+              {complianceFlags.length === 0 && <p className="px-6 py-6 text-sm text-brand-text-body">No business-source compliance flags detected.</p>}
             </div>
           </div>
         </div>
@@ -301,20 +301,20 @@ export default async function BrokerDetailPage({
         <div className="space-y-6">
           <ProducerForm brokerId={broker.id} groups={broker.groups.map(group => ({ id: group.id, name: group.name }))} />
           <TableShell title="Producers and Scheme Assignments" empty={broker.producers.length === 0} emptyText="No producers have been added for this broker.">
-            <thead><tr className="bg-[#F8F9FA] text-[10px] font-bold uppercase text-avenue-text-muted border-b border-[#EEEEEE]">
+            <thead><tr className="bg-[#F8F9FA] text-[10px] font-bold uppercase text-brand-text-muted border-b border-[#EEEEEE]">
               <th className="px-5 py-3 text-left">Producer</th><th className="px-5 py-3 text-left">Code</th><th className="px-5 py-3 text-left">Contact</th><th className="px-5 py-3 text-left">Schemes</th><th className="px-5 py-3 text-left">Effective</th><th className="px-5 py-3 text-left">Status</th><th className="px-5 py-3 text-right">Actions</th>
             </tr></thead>
             <tbody className="divide-y divide-[#EEEEEE] text-sm">
               {broker.producers.map(producer => (
                 <tr key={producer.id} className="hover:bg-[#F8F9FA] align-top">
                   <td className="px-5 py-3">
-                    <p className="font-semibold text-avenue-text-heading">{producer.producerName}</p>
-                    <p className="text-xs text-avenue-text-muted">IRA {producer.iraIndividualNumber ?? "not captured"}</p>
+                    <p className="font-semibold text-brand-text-heading">{producer.producerName}</p>
+                    <p className="text-xs text-brand-text-muted">IRA {producer.iraIndividualNumber ?? "not captured"}</p>
                   </td>
                   <td className="px-5 py-3 font-mono">{producer.producerCode}</td>
-                  <td className="px-5 py-3 text-avenue-text-body">{producer.email}<br /><span className="text-xs text-avenue-text-muted">{producer.phone}</span></td>
-                  <td className="px-5 py-3 text-avenue-text-body">{producer.groups.length ? producer.groups.map(g => g.name).join(", ") : "-"}</td>
-                  <td className="px-5 py-3 text-avenue-text-body">{formatDate(producer.effectiveFrom)} - {producer.effectiveTo ? formatDate(producer.effectiveTo) : "Open"}</td>
+                  <td className="px-5 py-3 text-brand-text-body">{producer.email}<br /><span className="text-xs text-brand-text-muted">{producer.phone}</span></td>
+                  <td className="px-5 py-3 text-brand-text-body">{producer.groups.length ? producer.groups.map(g => g.name).join(", ") : "-"}</td>
+                  <td className="px-5 py-3 text-brand-text-body">{formatDate(producer.effectiveFrom)} - {producer.effectiveTo ? formatDate(producer.effectiveTo) : "Open"}</td>
                   <td className="px-5 py-3"><Badge status={producer.status} /></td>
                   <td className="px-5 py-3">
                     <div className="flex justify-end">
@@ -340,21 +340,21 @@ export default async function BrokerDetailPage({
         <div className="space-y-6">
           <KycDocumentForm brokerId={broker.id} />
           <TableShell title="KYC Document Register" empty={broker.kycDocuments.length === 0} emptyText="No KYC documents have been recorded.">
-            <thead><tr className="bg-[#F8F9FA] text-[10px] font-bold uppercase text-avenue-text-muted border-b border-[#EEEEEE]">
+            <thead><tr className="bg-[#F8F9FA] text-[10px] font-bold uppercase text-brand-text-muted border-b border-[#EEEEEE]">
               <th className="px-5 py-3 text-left">Document</th><th className="px-5 py-3 text-left">File</th><th className="px-5 py-3 text-left">Uploaded</th><th className="px-5 py-3 text-left">Expires</th><th className="px-5 py-3 text-left">Status</th><th className="px-5 py-3 text-right">Actions</th>
             </tr></thead>
             <tbody className="divide-y divide-[#EEEEEE] text-sm">
               {broker.kycDocuments.map(doc => (
                 <tr key={doc.id} className="hover:bg-[#F8F9FA] align-top">
                   <td className="px-5 py-3">
-                    <p className="font-semibold text-avenue-text-heading">{doc.documentType.replaceAll("_", " ")}</p>
-                    {doc.notes && <p className="text-xs text-avenue-text-muted mt-1">{doc.notes}</p>}
+                    <p className="font-semibold text-brand-text-heading">{doc.documentType.replaceAll("_", " ")}</p>
+                    {doc.notes && <p className="text-xs text-brand-text-muted mt-1">{doc.notes}</p>}
                   </td>
                   <td className="px-5 py-3">
-                    <a href={doc.fileUri} className="text-avenue-indigo hover:underline" target="_blank" rel="noreferrer">{doc.fileName}</a>
+                    <a href={doc.fileUri} className="text-brand-indigo hover:underline" target="_blank" rel="noreferrer">{doc.fileName}</a>
                   </td>
-                  <td className="px-5 py-3 text-avenue-text-body">{formatDate(doc.uploadedAt)}</td>
-                  <td className="px-5 py-3 text-avenue-text-body">{doc.expiresAt ? formatDate(doc.expiresAt) : "-"}</td>
+                  <td className="px-5 py-3 text-brand-text-body">{formatDate(doc.uploadedAt)}</td>
+                  <td className="px-5 py-3 text-brand-text-body">{doc.expiresAt ? formatDate(doc.expiresAt) : "-"}</td>
                   <td className="px-5 py-3"><Badge status={doc.status} /></td>
                   <td className="px-5 py-3">
                     <div className="flex flex-col items-end gap-2">
@@ -366,14 +366,14 @@ export default async function BrokerDetailPage({
                             </button>
                           </form>
                           <form action={rejectBrokerKycDocumentAction.bind(null, broker.id, doc.id)} className="flex justify-end gap-2">
-                            <input name="notes" placeholder="Reason" className="w-36 border border-[#EEEEEE] rounded-full px-3 py-1.5 text-xs outline-none focus:border-avenue-indigo" />
+                            <input name="notes" placeholder="Reason" className="w-36 border border-[#EEEEEE] rounded-full px-3 py-1.5 text-xs outline-none focus:border-brand-indigo" />
                             <button className="px-3 py-1.5 rounded-full text-xs font-semibold text-[#DC3545] border border-[#DC3545]/30 hover:bg-[#DC3545]/5">
                               Reject
                             </button>
                           </form>
                         </>
                       ) : (
-                        <span className="text-xs text-avenue-text-muted">Reviewed</span>
+                        <span className="text-xs text-brand-text-muted">Reviewed</span>
                       )}
                     </div>
                   </td>
@@ -388,26 +388,26 @@ export default async function BrokerDetailPage({
         <div className="space-y-6">
           <ScheduleDraftForm brokerId={broker.id} groups={broker.groups.map(group => ({ id: group.id, name: group.name }))} />
           <TableShell title="Commission Schedules" empty={broker.commissionSchedules.length === 0} emptyText="No commission schedules have been configured.">
-            <thead><tr className="bg-[#F8F9FA] text-[10px] font-bold uppercase text-avenue-text-muted border-b border-[#EEEEEE]">
+            <thead><tr className="bg-[#F8F9FA] text-[10px] font-bold uppercase text-brand-text-muted border-b border-[#EEEEEE]">
               <th className="px-5 py-3 text-left">Schedule</th><th className="px-5 py-3 text-left">Type</th><th className="px-5 py-3 text-right">New Business</th><th className="px-5 py-3 text-right">Renewal</th><th className="px-5 py-3 text-left">Effective</th><th className="px-5 py-3 text-left">Status</th><th className="px-5 py-3 text-right">Actions</th>
             </tr></thead>
             <tbody className="divide-y divide-[#EEEEEE] text-sm">
               {broker.commissionSchedules.map(schedule => (
                 <tr key={schedule.id} className="hover:bg-[#F8F9FA]">
                   <td className="px-5 py-3">
-                    <p className="font-semibold text-avenue-text-heading">{schedule.scheduleName}</p>
-                    <p className="text-xs text-avenue-text-muted">{schedule.tiers.length} tier{schedule.tiers.length === 1 ? "" : "s"} · payout every {schedule.payoutCycleDays} days</p>
+                    <p className="font-semibold text-brand-text-heading">{schedule.scheduleName}</p>
+                    <p className="text-xs text-brand-text-muted">{schedule.tiers.length} tier{schedule.tiers.length === 1 ? "" : "s"} · payout every {schedule.payoutCycleDays} days</p>
                   </td>
-                  <td className="px-5 py-3 text-avenue-text-body">{schedule.scheduleType.replaceAll("_", " ")}</td>
+                  <td className="px-5 py-3 text-brand-text-body">{schedule.scheduleType.replaceAll("_", " ")}</td>
                   <td className="px-5 py-3 text-right font-semibold">{rate(schedule.newBusinessRate)}</td>
                   <td className="px-5 py-3 text-right font-semibold">{rate(schedule.renewalRate)}</td>
-                  <td className="px-5 py-3 text-avenue-text-body">{formatDate(schedule.effectiveFrom)} - {schedule.effectiveTo ? formatDate(schedule.effectiveTo) : "Open"}</td>
+                  <td className="px-5 py-3 text-brand-text-body">{formatDate(schedule.effectiveFrom)} - {schedule.effectiveTo ? formatDate(schedule.effectiveTo) : "Open"}</td>
                   <td className="px-5 py-3"><Badge status={schedule.status} /></td>
                   <td className="px-5 py-3">
                     <div className="flex justify-end gap-2">
                       {schedule.status === "DRAFT" && (
                         <form action={submitCommissionScheduleAction.bind(null, broker.id, schedule.id)}>
-                          <button className="px-3 py-1.5 rounded-full text-xs font-semibold text-avenue-indigo border border-avenue-indigo/30 hover:bg-avenue-indigo/5">
+                          <button className="px-3 py-1.5 rounded-full text-xs font-semibold text-brand-indigo border border-brand-indigo/30 hover:bg-brand-indigo/5">
                             Submit
                           </button>
                         </form>
@@ -426,7 +426,7 @@ export default async function BrokerDetailPage({
                           </form>
                         </>
                       )}
-                      {!["DRAFT", "PENDING_APPROVAL"].includes(schedule.status) && <span className="text-xs text-avenue-text-muted">No action</span>}
+                      {!["DRAFT", "PENDING_APPROVAL"].includes(schedule.status) && <span className="text-xs text-brand-text-muted">No action</span>}
                     </div>
                   </td>
                 </tr>
@@ -438,14 +438,14 @@ export default async function BrokerDetailPage({
 
       {activeTab === "ledger" && (
         <TableShell title="Commission Ledger" empty={broker.commissionLedger.length === 0} emptyText="No ledger entries have been generated.">
-          <thead><tr className="bg-[#F8F9FA] text-[10px] font-bold uppercase text-avenue-text-muted border-b border-[#EEEEEE]">
+          <thead><tr className="bg-[#F8F9FA] text-[10px] font-bold uppercase text-brand-text-muted border-b border-[#EEEEEE]">
             <th className="px-5 py-3 text-left">Period</th><th className="px-5 py-3 text-left">Schedule</th><th className="px-5 py-3 text-right">Gross</th><th className="px-5 py-3 text-right">WHT</th><th className="px-5 py-3 text-right">VAT</th><th className="px-5 py-3 text-right">Net</th><th className="px-5 py-3 text-left">State</th>
           </tr></thead>
           <tbody className="divide-y divide-[#EEEEEE] text-sm">
             {broker.commissionLedger.map(entry => (
               <tr key={entry.id} className="hover:bg-[#F8F9FA]">
-                <td className="px-5 py-3 font-mono text-avenue-text-heading">{formatDate(entry.earnedPeriodStart)}</td>
-                <td className="px-5 py-3 text-avenue-text-body">{entry.schedule?.scheduleName ?? "Pending schedule"}</td>
+                <td className="px-5 py-3 font-mono text-brand-text-heading">{formatDate(entry.earnedPeriodStart)}</td>
+                <td className="px-5 py-3 text-brand-text-body">{entry.schedule?.scheduleName ?? "Pending schedule"}</td>
                 <td className="px-5 py-3 text-right">{formatCurrency(entry.grossCommission)}</td>
                 <td className="px-5 py-3 text-right">{formatCurrency(entry.withholdingTax)}</td>
                 <td className="px-5 py-3 text-right">{formatCurrency(entry.vatAmount)}</td>
@@ -461,14 +461,14 @@ export default async function BrokerDetailPage({
         <div className="space-y-6">
           <PayoutBatchForm brokerId={broker.id} payableTotal={ledgerPayable} />
           <TableShell title="Payout Batches" empty={payoutBatches.length === 0} emptyText="No payout batches include this broker yet.">
-            <thead><tr className="bg-[#F8F9FA] text-[10px] font-bold uppercase text-avenue-text-muted border-b border-[#EEEEEE]">
+            <thead><tr className="bg-[#F8F9FA] text-[10px] font-bold uppercase text-brand-text-muted border-b border-[#EEEEEE]">
               <th className="px-5 py-3 text-left">Batch</th><th className="px-5 py-3 text-left">Date</th><th className="px-5 py-3 text-right">Broker Net</th><th className="px-5 py-3 text-right">Batch Net</th><th className="px-5 py-3 text-left">Status</th><th className="px-5 py-3 text-right">Actions</th>
             </tr></thead>
             <tbody className="divide-y divide-[#EEEEEE] text-sm">
               {payoutBatches.map(batch => (
                 <tr key={batch.id} className="hover:bg-[#F8F9FA] align-top">
-                  <td className="px-5 py-3 font-mono font-semibold text-avenue-text-heading">{batch.batchReference}</td>
-                  <td className="px-5 py-3 text-avenue-text-body">{formatDate(batch.batchDate)}</td>
+                  <td className="px-5 py-3 font-mono font-semibold text-brand-text-heading">{batch.batchReference}</td>
+                  <td className="px-5 py-3 text-brand-text-body">{formatDate(batch.batchDate)}</td>
                   <td className="px-5 py-3 text-right font-semibold">{formatCurrency(batch.entries.reduce((sum, entry) => sum + Number(entry.netPayable), 0))}</td>
                   <td className="px-5 py-3 text-right">{formatCurrency(batch.totalNet)}</td>
                   <td className="px-5 py-3"><Badge status={batch.status} /></td>
@@ -476,7 +476,7 @@ export default async function BrokerDetailPage({
                     <div className="flex flex-col items-end gap-2">
                       {batch.status === "DRAFT" && (
                         <form action={submitBrokerPayoutBatchAction.bind(null, broker.id, batch.id)}>
-                          <button className="px-3 py-1.5 rounded-full text-xs font-semibold text-avenue-indigo border border-avenue-indigo/30 hover:bg-avenue-indigo/5">
+                          <button className="px-3 py-1.5 rounded-full text-xs font-semibold text-brand-indigo border border-brand-indigo/30 hover:bg-brand-indigo/5">
                             Submit
                           </button>
                         </form>
@@ -490,13 +490,13 @@ export default async function BrokerDetailPage({
                       )}
                       {batch.status === "APPROVED" && (
                         <form action={completeBrokerPayoutBatchAction.bind(null, broker.id, batch.id)} className="flex justify-end gap-2">
-                          <input name="paymentReference" placeholder="Payment ref" className="w-36 border border-[#EEEEEE] rounded-full px-3 py-1.5 text-xs outline-none focus:border-avenue-indigo" />
+                          <input name="paymentReference" placeholder="Payment ref" className="w-36 border border-[#EEEEEE] rounded-full px-3 py-1.5 text-xs outline-none focus:border-brand-indigo" />
                           <button className="px-3 py-1.5 rounded-full text-xs font-semibold text-[#28A745] border border-[#28A745]/30 hover:bg-[#28A745]/5">
                             Complete
                           </button>
                         </form>
                       )}
-                      {!["DRAFT", "PENDING_APPROVAL", "APPROVED"].includes(batch.status) && <span className="text-xs text-avenue-text-muted">Closed</span>}
+                      {!["DRAFT", "PENDING_APPROVAL", "APPROVED"].includes(batch.status) && <span className="text-xs text-brand-text-muted">Closed</span>}
                     </div>
                   </td>
                 </tr>
@@ -509,23 +509,23 @@ export default async function BrokerDetailPage({
       {activeTab === "overview" && (
         <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-[#EEEEEE] flex items-center gap-2">
-            <GitBranch size={17} className="text-avenue-indigo" />
-            <h2 className="font-bold text-avenue-text-heading font-heading">Assigned Groups</h2>
+            <GitBranch size={17} className="text-brand-indigo" />
+            <h2 className="font-bold text-brand-text-heading font-heading">Assigned Groups</h2>
           </div>
           <div className="divide-y divide-[#EEEEEE]">
             {broker.groups.map(group => (
               <div key={group.id} className="px-6 py-3 flex items-center justify-between gap-4 text-sm">
                 <div>
-                  <Link href={`/groups/${group.id}`} className="font-semibold text-avenue-indigo hover:underline">{group.name}</Link>
-                  <p className="text-xs text-avenue-text-muted">{group.package.name}</p>
+                  <Link href={`/groups/${group.id}`} className="font-semibold text-brand-indigo hover:underline">{group.name}</Link>
+                  <p className="text-xs text-brand-text-muted">{group.package.name}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-semibold text-avenue-text-heading">{group._count.members} members</p>
-                  <p className="text-xs text-avenue-text-muted">{group.status}</p>
+                  <p className="font-semibold text-brand-text-heading">{group._count.members} members</p>
+                  <p className="text-xs text-brand-text-muted">{group.status}</p>
                 </div>
               </div>
             ))}
-            {broker.groups.length === 0 && <p className="px-6 py-6 text-sm text-avenue-text-body">No groups assigned.</p>}
+            {broker.groups.length === 0 && <p className="px-6 py-6 text-sm text-brand-text-body">No groups assigned.</p>}
           </div>
         </div>
       )}
@@ -547,11 +547,11 @@ function TableShell({
   return (
     <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
       <div className="px-6 py-4 border-b border-[#EEEEEE] flex items-center gap-2">
-        <BadgeCheck size={17} className="text-avenue-indigo" />
-        <h2 className="font-bold text-avenue-text-heading font-heading">{title}</h2>
+        <BadgeCheck size={17} className="text-brand-indigo" />
+        <h2 className="font-bold text-brand-text-heading font-heading">{title}</h2>
       </div>
       {empty ? (
-        <p className="px-6 py-8 text-sm text-avenue-text-body">{emptyText}</p>
+        <p className="px-6 py-8 text-sm text-brand-text-body">{emptyText}</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">{children}</table>
@@ -562,30 +562,30 @@ function TableShell({
 }
 
 function PayoutBatchForm({ brokerId, payableTotal }: { brokerId: string; payableTotal: number }) {
-  const input = "w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-avenue-indigo bg-white";
+  const input = "w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo bg-white";
 
   return (
     <form action={generateBrokerPayoutBatchAction.bind(null, brokerId)} className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm space-y-4">
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
         <div>
-          <h2 className="font-bold text-avenue-text-heading font-heading">Generate Payout Batch</h2>
-          <p className="text-sm text-avenue-text-body mt-1">Collect eligible earned/payable ledger entries into a draft payout batch.</p>
+          <h2 className="font-bold text-brand-text-heading font-heading">Generate Payout Batch</h2>
+          <p className="text-sm text-brand-text-body mt-1">Collect eligible earned/payable ledger entries into a draft payout batch.</p>
         </div>
         <div className="text-left md:text-right">
-          <p className="text-xs font-bold uppercase text-avenue-text-muted">Current Payable</p>
+          <p className="text-xs font-bold uppercase text-brand-text-muted">Current Payable</p>
           <p className="text-xl font-bold text-[#17A2B8] tabular-nums">{formatCurrency(payableTotal)}</p>
         </div>
       </div>
 
       <div className="grid md:grid-cols-3 gap-4">
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">As Of Date</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">As Of Date</span>
           <input name="asOfDate" type="date" defaultValue={new Date().toISOString().slice(0, 10)} className={input} />
         </label>
       </div>
 
       <div className="flex justify-end">
-        <button className="px-5 py-2 rounded-full bg-avenue-indigo text-white text-sm font-bold hover:bg-avenue-secondary">
+        <button className="px-5 py-2 rounded-full bg-brand-indigo text-white text-sm font-bold hover:bg-brand-secondary">
           Generate Batch
         </button>
       </div>
@@ -594,18 +594,18 @@ function PayoutBatchForm({ brokerId, payableTotal }: { brokerId: string; payable
 }
 
 function KycDocumentForm({ brokerId }: { brokerId: string }) {
-  const input = "w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-avenue-indigo bg-white";
+  const input = "w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo bg-white";
 
   return (
     <form action={recordBrokerKycDocumentAction.bind(null, brokerId)} className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm space-y-4">
       <div>
-        <h2 className="font-bold text-avenue-text-heading font-heading">Record KYC Document</h2>
-        <p className="text-sm text-avenue-text-body mt-1">Capture document metadata and a file reference for review.</p>
+        <h2 className="font-bold text-brand-text-heading font-heading">Record KYC Document</h2>
+        <p className="text-sm text-brand-text-body mt-1">Capture document metadata and a file reference for review.</p>
       </div>
 
       <div className="grid md:grid-cols-3 gap-4">
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Document Type</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Document Type</span>
           <select name="documentType" defaultValue="IRA_LICENSE" className={input}>
             <option value="IRA_LICENSE">IRA License</option>
             <option value="KRA_PIN_CERTIFICATE">KRA PIN Certificate</option>
@@ -620,25 +620,25 @@ function KycDocumentForm({ brokerId }: { brokerId: string }) {
           </select>
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">File Name</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">File Name</span>
           <input name="fileName" required placeholder="IRA license 2026.pdf" className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">File Reference</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">File Reference</span>
           <input name="fileUri" required placeholder="https://... or internal reference" className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Expires At</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Expires At</span>
           <input name="expiresAt" type="date" className={input} />
         </label>
         <label className="space-y-1 md:col-span-2">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Notes</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Notes</span>
           <input name="notes" placeholder="Optional review note" className={input} />
         </label>
       </div>
 
       <div className="flex justify-end">
-        <button className="px-5 py-2 rounded-full bg-avenue-indigo text-white text-sm font-bold hover:bg-avenue-secondary">
+        <button className="px-5 py-2 rounded-full bg-brand-indigo text-white text-sm font-bold hover:bg-brand-secondary">
           Record Document
         </button>
       </div>
@@ -647,67 +647,67 @@ function KycDocumentForm({ brokerId }: { brokerId: string }) {
 }
 
 function ProducerForm({ brokerId, groups }: { brokerId: string; groups: Array<{ id: string; name: string }> }) {
-  const input = "w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-avenue-indigo bg-white";
+  const input = "w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo bg-white";
 
   return (
     <form action={createBrokerProducerAction.bind(null, brokerId)} className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm space-y-4">
       <div>
-        <h2 className="font-bold text-avenue-text-heading font-heading">Add Producer</h2>
-        <p className="text-sm text-avenue-text-body mt-1">Create a producer or sub-agent and link them to assigned schemes.</p>
+        <h2 className="font-bold text-brand-text-heading font-heading">Add Producer</h2>
+        <p className="text-sm text-brand-text-body mt-1">Create a producer or sub-agent and link them to assigned schemes.</p>
       </div>
 
       <div className="grid md:grid-cols-3 gap-4">
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Producer Name</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Producer Name</span>
           <input name="producerName" required className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Producer Code</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Producer Code</span>
           <input name="producerCode" required className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">IRA Individual Number</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">IRA Individual Number</span>
           <input name="iraIndividualNumber" className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Email</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Email</span>
           <input name="email" type="email" required className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Phone</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Phone</span>
           <input name="phone" required className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Status</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Status</span>
           <select name="status" defaultValue="ACTIVE" className={input}>
             <option value="ACTIVE">Active</option>
             <option value="INACTIVE">Inactive</option>
           </select>
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Effective From</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Effective From</span>
           <input name="effectiveFrom" type="date" defaultValue={new Date().toISOString().slice(0, 10)} className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Effective To</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Effective To</span>
           <input name="effectiveTo" type="date" className={input} />
         </label>
         <fieldset className="md:col-span-3 border border-[#EEEEEE] rounded-md p-3">
-          <legend className="px-1 text-xs font-bold uppercase text-avenue-text-muted">Scheme Assignments</legend>
+          <legend className="px-1 text-xs font-bold uppercase text-brand-text-muted">Scheme Assignments</legend>
           <div className="grid md:grid-cols-3 gap-2 pt-1">
             {groups.map(group => (
-              <label key={group.id} className="flex items-center gap-2 text-sm text-avenue-text-body">
-                <input name="groupIds" value={group.id} type="checkbox" className="h-4 w-4 rounded border-[#EEEEEE] accent-avenue-indigo" />
+              <label key={group.id} className="flex items-center gap-2 text-sm text-brand-text-body">
+                <input name="groupIds" value={group.id} type="checkbox" className="h-4 w-4 rounded border-[#EEEEEE] accent-brand-indigo" />
                 {group.name}
               </label>
             ))}
-            {groups.length === 0 && <p className="text-sm text-avenue-text-body">Assign groups to this broker before linking producer schemes.</p>}
+            {groups.length === 0 && <p className="text-sm text-brand-text-body">Assign groups to this broker before linking producer schemes.</p>}
           </div>
         </fieldset>
       </div>
 
       <div className="flex justify-end">
-        <button className="px-5 py-2 rounded-full bg-avenue-indigo text-white text-sm font-bold hover:bg-avenue-secondary">
+        <button className="px-5 py-2 rounded-full bg-brand-indigo text-white text-sm font-bold hover:bg-brand-secondary">
           Add Producer
         </button>
       </div>
@@ -716,22 +716,22 @@ function ProducerForm({ brokerId, groups }: { brokerId: string; groups: Array<{ 
 }
 
 function ScheduleDraftForm({ brokerId, groups }: { brokerId: string; groups: Array<{ id: string; name: string }> }) {
-  const input = "w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-avenue-indigo bg-white";
+  const input = "w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo bg-white";
 
   return (
     <form action={createCommissionScheduleAction.bind(null, brokerId)} className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm space-y-4">
       <div>
-        <h2 className="font-bold text-avenue-text-heading font-heading">Create Schedule Draft</h2>
-        <p className="text-sm text-avenue-text-body mt-1">Drafts must be submitted and approved before they can drive commission ledger calculations.</p>
+        <h2 className="font-bold text-brand-text-heading font-heading">Create Schedule Draft</h2>
+        <p className="text-sm text-brand-text-body mt-1">Drafts must be submitted and approved before they can drive commission ledger calculations.</p>
       </div>
 
       <div className="grid md:grid-cols-3 gap-4">
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Schedule Name</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Schedule Name</span>
           <input name="scheduleName" required placeholder="2026 Corporate Standard" className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Type</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Type</span>
           <select name="scheduleType" defaultValue="FLAT_PERCENTAGE" className={input}>
             <option value="FLAT_PERCENTAGE">Flat Percentage</option>
             <option value="TIERED_VOLUME">Tiered Volume</option>
@@ -741,7 +741,7 @@ function ScheduleDraftForm({ brokerId, groups }: { brokerId: string; groups: Arr
           </select>
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Scheme Scope</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Scheme Scope</span>
           <select name="groupId" defaultValue="" className={input}>
             <option value="">All assigned groups</option>
             {groups.map(group => (
@@ -750,7 +750,7 @@ function ScheduleDraftForm({ brokerId, groups }: { brokerId: string; groups: Arr
           </select>
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Client Type</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Client Type</span>
           <select name="clientType" defaultValue="" className={input}>
             <option value="">All client types</option>
             <option value="CORPORATE">Corporate</option>
@@ -758,37 +758,37 @@ function ScheduleDraftForm({ brokerId, groups }: { brokerId: string; groups: Arr
           </select>
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">New Business %</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">New Business %</span>
           <input name="newBusinessRate" required type="number" min="0" max="100" step="0.01" defaultValue="10" className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Renewal %</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Renewal %</span>
           <input name="renewalRate" required type="number" min="0" max="100" step="0.01" defaultValue="5" className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Override %</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Override %</span>
           <input name="overrideRate" type="number" min="0" max="100" step="0.01" className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Gross Ceiling %</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Gross Ceiling %</span>
           <input name="grossCommissionCeiling" type="number" min="0" max="100" step="0.01" className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Payout Cycle Days</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Payout Cycle Days</span>
           <input name="payoutCycleDays" required type="number" min="1" step="1" defaultValue="30" className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Effective From</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Effective From</span>
           <input name="effectiveFrom" required type="date" defaultValue={new Date().toISOString().slice(0, 10)} className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Effective To</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Effective To</span>
           <input name="effectiveTo" type="date" className={input} />
         </label>
       </div>
 
       <div className="flex justify-end">
-        <button className="px-5 py-2 rounded-full bg-avenue-indigo text-white text-sm font-bold hover:bg-avenue-secondary">
+        <button className="px-5 py-2 rounded-full bg-brand-indigo text-white text-sm font-bold hover:bg-brand-secondary">
           Create Draft
         </button>
       </div>

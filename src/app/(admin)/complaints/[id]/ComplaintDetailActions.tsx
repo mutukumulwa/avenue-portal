@@ -31,7 +31,7 @@ export function ComplaintDetailActions({
             Complaint {status === "RESOLVED" ? "Resolved" : "Dismissed"}
           </p>
         </div>
-        {resolution && <p className="text-sm text-avenue-text-body leading-relaxed">{resolution}</p>}
+        {resolution && <p className="text-sm text-brand-text-body leading-relaxed">{resolution}</p>}
       </div>
     );
   }
@@ -42,9 +42,9 @@ export function ComplaintDetailActions({
         <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm">
           <div className="flex items-center gap-2 mb-2">
             <Search size={15} className="text-[#856404]" />
-            <h3 className="font-bold text-avenue-text-heading text-sm">Begin Investigation</h3>
+            <h3 className="font-bold text-brand-text-heading text-sm">Begin Investigation</h3>
           </div>
-          <p className="text-xs text-avenue-text-muted mb-3">
+          <p className="text-xs text-brand-text-muted mb-3">
             Move the complaint to INVESTIGATING to assign ownership and track progress.
           </p>
           <button
@@ -63,9 +63,9 @@ export function ComplaintDetailActions({
         <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm space-y-3">
           <div className="flex items-center gap-2">
             <CheckCircle2 size={15} className="text-[#28A745]" />
-            <h3 className="font-bold text-avenue-text-heading text-sm">Mark Resolved</h3>
+            <h3 className="font-bold text-brand-text-heading text-sm">Mark Resolved</h3>
           </div>
-          <p className="text-xs text-avenue-text-muted">Complaint has been investigated and a resolution reached.</p>
+          <p className="text-xs text-brand-text-muted">Complaint has been investigated and a resolution reached.</p>
           {resolveState?.error && <p className="text-xs text-[#DC3545] font-semibold">{resolveState.error}</p>}
           <form action={resolveAction} className="space-y-3">
             <textarea
@@ -73,7 +73,7 @@ export function ComplaintDetailActions({
               required
               rows={3}
               placeholder="Describe the resolution and outcome…"
-              className="w-full text-sm border border-[#EEEEEE] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#28A745] resize-none text-avenue-text-heading"
+              className="w-full text-sm border border-[#EEEEEE] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#28A745] resize-none text-brand-text-heading"
             />
             <button
               type="submit"
@@ -90,9 +90,9 @@ export function ComplaintDetailActions({
         <div className="bg-white border border-[#6C757D]/20 rounded-lg p-5 shadow-sm space-y-3">
           <div className="flex items-center gap-2">
             <XCircle size={15} className="text-[#6C757D]" />
-            <h3 className="font-bold text-avenue-text-heading text-sm">Dismiss</h3>
+            <h3 className="font-bold text-brand-text-heading text-sm">Dismiss</h3>
           </div>
-          <p className="text-xs text-avenue-text-muted">Complaint is unfounded or outside scope. Provide a reason.</p>
+          <p className="text-xs text-brand-text-muted">Complaint is unfounded or outside scope. Provide a reason.</p>
           {dismissState?.error && <p className="text-xs text-[#DC3545] font-semibold">{dismissState.error}</p>}
           <form action={dismissAction} className="space-y-3">
             <textarea
@@ -100,7 +100,7 @@ export function ComplaintDetailActions({
               required
               rows={3}
               placeholder="Reason for dismissal…"
-              className="w-full text-sm border border-[#EEEEEE] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#6C757D] resize-none text-avenue-text-heading"
+              className="w-full text-sm border border-[#EEEEEE] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#6C757D] resize-none text-brand-text-heading"
             />
             <button
               type="submit"

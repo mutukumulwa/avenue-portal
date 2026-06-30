@@ -77,21 +77,21 @@ export default async function ContractWorkspacePage({
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Link href={`/providers/${providerId}`} className="text-avenue-text-muted hover:text-avenue-indigo transition-colors">
+        <Link href={`/providers/${providerId}`} className="text-brand-text-muted hover:text-brand-indigo transition-colors">
           <ArrowLeft size={20} />
         </Link>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading flex items-center gap-2">
-            <FileSignature size={20} className="text-avenue-indigo" />
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading flex items-center gap-2">
+            <FileSignature size={20} className="text-brand-indigo" />
             {contract.contractNumber} — {contract.title}
           </h1>
-          <p className="text-avenue-text-body text-sm mt-0.5">
+          <p className="text-brand-text-body text-sm mt-0.5">
             {contract.provider.name} · {contract.startDate.toLocaleDateString("en-KE")} → {contract.endDate.toLocaleDateString("en-KE")}
             {contract.predecessor && (
-              <> · renews <Link className="text-avenue-indigo hover:underline" href={`/providers/${providerId}/contracts/${contract.predecessor.id}`}>{contract.predecessor.contractNumber}</Link></>
+              <> · renews <Link className="text-brand-indigo hover:underline" href={`/providers/${providerId}/contracts/${contract.predecessor.id}`}>{contract.predecessor.contractNumber}</Link></>
             )}
             {contract.supersededBy && (
-              <> · superseded by <Link className="text-avenue-indigo hover:underline" href={`/providers/${providerId}/contracts/${contract.supersededBy.id}`}>{contract.supersededBy.contractNumber}</Link></>
+              <> · superseded by <Link className="text-brand-indigo hover:underline" href={`/providers/${providerId}/contracts/${contract.supersededBy.id}`}>{contract.supersededBy.contractNumber}</Link></>
             )}
           </p>
         </div>

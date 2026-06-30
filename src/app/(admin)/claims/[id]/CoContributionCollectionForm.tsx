@@ -53,27 +53,27 @@ export function CoContributionCollectionForm({ transaction }: Props) {
       <div className="flex items-center justify-between">
         <div className="space-y-1 text-sm">
           <div className="flex gap-6">
-            <span className="text-avenue-text-muted">Member share</span>
-            <span className="font-bold text-avenue-text-heading font-mono">
+            <span className="text-brand-text-muted">Member share</span>
+            <span className="font-bold text-brand-text-heading font-mono">
               KES {finalAmount.toLocaleString("en-KE")}
             </span>
           </div>
           <div className="flex gap-6">
-            <span className="text-avenue-text-muted">Plan share</span>
+            <span className="text-brand-text-muted">Plan share</span>
             <span className="font-bold text-[#28A745] font-mono">
               KES {Number(transaction.planShare).toLocaleString("en-KE")}
             </span>
           </div>
           {Number(transaction.amountCollected ?? 0) > 0 && (
             <div className="flex gap-6">
-              <span className="text-avenue-text-muted">Collected</span>
+              <span className="text-brand-text-muted">Collected</span>
               <span className="font-bold text-[#17A2B8] font-mono">
                 KES {Number(transaction.amountCollected).toLocaleString("en-KE")}
               </span>
             </div>
           )}
           {transaction.capsApplied && (transaction.capsApplied as string[]).length > 0 && (
-            <p className="text-xs text-avenue-text-muted">
+            <p className="text-xs text-brand-text-muted">
               Caps applied: {(transaction.capsApplied as string[]).join(", ")}
             </p>
           )}
@@ -87,7 +87,7 @@ export function CoContributionCollectionForm({ transaction }: Props) {
             <>
               <button
                 onClick={() => setMode(mode === "collect" ? "idle" : "collect")}
-                className="text-xs font-bold px-3 py-1.5 rounded-full bg-avenue-indigo/10 text-avenue-indigo hover:bg-avenue-indigo/20 transition-colors"
+                className="text-xs font-bold px-3 py-1.5 rounded-full bg-brand-indigo/10 text-brand-indigo hover:bg-brand-indigo/20 transition-colors"
               >
                 Record Payment
               </button>
@@ -110,19 +110,19 @@ export function CoContributionCollectionForm({ transaction }: Props) {
         <form onSubmit={handleCollect} className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-[#F8F9FA] rounded-lg p-4">
           <input type="hidden" name="transactionId" value={transaction.id} />
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-avenue-text-muted uppercase">Amount (KES)</label>
+            <label className="text-xs font-semibold text-brand-text-muted uppercase">Amount (KES)</label>
             <input
               name="amountCollected"
               type="number"
               step="0.01"
               defaultValue={finalAmount}
               required
-              className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-avenue-indigo"
+              className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo"
             />
           </div>
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-avenue-text-muted uppercase">Payment Method</label>
-            <select name="paymentMethod" required className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-avenue-indigo">
+            <label className="text-xs font-semibold text-brand-text-muted uppercase">Payment Method</label>
+            <select name="paymentMethod" required className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo">
               <option value="CASH">Cash</option>
               <option value="MPESA">M-Pesa</option>
               <option value="CARD">Card</option>
@@ -131,17 +131,17 @@ export function CoContributionCollectionForm({ transaction }: Props) {
             </select>
           </div>
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-avenue-text-muted uppercase">M-Pesa Ref (optional)</label>
+            <label className="text-xs font-semibold text-brand-text-muted uppercase">M-Pesa Ref (optional)</label>
             <input
               name="mpesaRef"
               type="text"
               placeholder="e.g. QHX1234ABC"
-              className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-avenue-indigo"
+              className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo"
             />
           </div>
           <div className="md:col-span-3 flex justify-end gap-2">
             <button type="button" onClick={() => setMode("idle")} className="text-xs px-4 py-2 rounded-full border border-[#EEEEEE] hover:bg-[#EEEEEE] transition-colors">Cancel</button>
-            <button type="submit" disabled={isPending} className="text-xs font-bold px-5 py-2 rounded-full bg-avenue-indigo text-white hover:bg-avenue-secondary disabled:opacity-50 transition-colors">
+            <button type="submit" disabled={isPending} className="text-xs font-bold px-5 py-2 rounded-full bg-brand-indigo text-white hover:bg-brand-secondary disabled:opacity-50 transition-colors">
               {isPending ? "Saving…" : "Confirm Collection"}
             </button>
           </div>
@@ -152,7 +152,7 @@ export function CoContributionCollectionForm({ transaction }: Props) {
         <form onSubmit={handleWaive} className="bg-[#FFF8E1] border border-[#FFC107]/30 rounded-lg p-4 space-y-3">
           <input type="hidden" name="transactionId" value={transaction.id} />
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-avenue-text-muted uppercase">Waiver Reason (min 10 chars)</label>
+            <label className="text-xs font-semibold text-brand-text-muted uppercase">Waiver Reason (min 10 chars)</label>
             <textarea
               name="reason"
               required
@@ -163,7 +163,7 @@ export function CoContributionCollectionForm({ transaction }: Props) {
             />
           </div>
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-avenue-text-muted uppercase">Approved By (name or staff ID)</label>
+            <label className="text-xs font-semibold text-brand-text-muted uppercase">Approved By (name or staff ID)</label>
             <input
               name="approvedBy"
               type="text"

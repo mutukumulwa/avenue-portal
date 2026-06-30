@@ -4,8 +4,8 @@ import { useActionState } from "react";
 import { Save, AlertCircle } from "lucide-react";
 import { updateGroupAction } from "./actions";
 
-const inputCls = "w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo transition-colors";
-const labelCls = "text-xs font-bold text-avenue-text-muted uppercase block mb-1";
+const inputCls = "w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo transition-colors";
+const labelCls = "text-xs font-bold text-brand-text-muted uppercase block mb-1";
 
 interface Group {
   id: string;
@@ -42,7 +42,7 @@ export function GroupEditForm({ group }: { group: Group }) {
       <form action={action} className="space-y-6">
         {/* Organisation */}
         <div>
-          <h3 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Organisation</h3>
+          <h3 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Organisation</h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
               <label className={labelCls}>Group Name *</label>
@@ -69,7 +69,7 @@ export function GroupEditForm({ group }: { group: Group }) {
 
         {/* Contact */}
         <div>
-          <h3 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Contact Person</h3>
+          <h3 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Contact Person</h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
               <label className={labelCls}>Name *</label>
@@ -88,7 +88,7 @@ export function GroupEditForm({ group }: { group: Group }) {
 
         {/* Policy */}
         <div>
-          <h3 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Policy Details</h3>
+          <h3 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Policy Details</h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Status *</label>
@@ -128,7 +128,7 @@ export function GroupEditForm({ group }: { group: Group }) {
           <button
             type="submit"
             disabled={pending}
-            className="flex items-center gap-2 bg-avenue-indigo hover:bg-avenue-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 bg-brand-indigo hover:bg-brand-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save size={16} />
             {pending ? "Saving…" : "Save Changes"}

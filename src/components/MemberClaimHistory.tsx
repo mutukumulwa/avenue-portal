@@ -51,8 +51,8 @@ export async function MemberClaimHistory({ memberId, limit = 5 }: Props) {
   return (
     <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
       <div className="px-5 py-4 border-b border-[#EEEEEE] flex items-center gap-2">
-        <History size={15} className="text-avenue-indigo" />
-        <h3 className="font-bold text-avenue-text-heading text-sm font-heading">Member Claim History</h3>
+        <History size={15} className="text-brand-indigo" />
+        <h3 className="font-bold text-brand-text-heading text-sm font-heading">Member Claim History</h3>
       </div>
 
       {/* Benefit utilisation summary */}
@@ -65,14 +65,14 @@ export async function MemberClaimHistory({ memberId, limit = 5 }: Props) {
             const barColor = pct >= 90 ? "bg-[#DC3545]" : pct >= 70 ? "bg-[#FFC107]" : "bg-[#28A745]";
             return (
               <div key={i} className="space-y-1">
-                <p className="text-[10px] font-bold uppercase text-avenue-text-muted">{u.benefitConfig.category.replace(/_/g, " ")}</p>
-                <p className="text-xs font-semibold text-avenue-text-heading">
+                <p className="text-[10px] font-bold uppercase text-brand-text-muted">{u.benefitConfig.category.replace(/_/g, " ")}</p>
+                <p className="text-xs font-semibold text-brand-text-heading">
                   KES {used.toLocaleString()} / {limit.toLocaleString()}
                 </p>
                 <div className="h-1.5 bg-[#EEEEEE] rounded-full overflow-hidden">
                   <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
                 </div>
-                <p className="text-[10px] text-avenue-text-muted">
+                <p className="text-[10px] text-brand-text-muted">
                   KES {(limit - used).toLocaleString()} remaining
                 </p>
               </div>
@@ -86,30 +86,30 @@ export async function MemberClaimHistory({ memberId, limit = 5 }: Props) {
         {claims.map(c => (
           <div key={c.id} className="px-5 py-3 flex items-center justify-between text-sm">
             <div>
-              <p className="font-mono text-[10px] text-avenue-text-muted">{c.claimNumber}</p>
-              <p className="font-semibold text-avenue-text-heading mt-0.5">
+              <p className="font-mono text-[10px] text-brand-text-muted">{c.claimNumber}</p>
+              <p className="font-semibold text-brand-text-heading mt-0.5">
                 {c.provider.name}
                 {c.isReimbursement && (
                   <span className="ml-1.5 text-[10px] font-bold uppercase bg-[#17A2B8]/10 text-[#17A2B8] px-1.5 py-0.5 rounded">Reimbursement</span>
                 )}
               </p>
-              <p className="text-[11px] text-avenue-text-muted mt-0.5">
+              <p className="text-[11px] text-brand-text-muted mt-0.5">
                 {new Date(c.dateOfService).toLocaleDateString("en-KE")} · {c.benefitCategory.replace(/_/g, " ")}
               </p>
             </div>
             <div className="text-right">
-              <p className="font-bold text-avenue-text-heading font-mono">KES {Number(c.billedAmount).toLocaleString()}</p>
+              <p className="font-bold text-brand-text-heading font-mono">KES {Number(c.billedAmount).toLocaleString()}</p>
               {Number(c.approvedAmount) > 0 && (
                 <p className="text-[11px] text-[#28A745]">Approved: KES {Number(c.approvedAmount).toLocaleString()}</p>
               )}
-              <p className={`text-[10px] font-bold uppercase mt-0.5 ${STATUS_COLOR[c.status] ?? "text-avenue-text-muted"}`}>
+              <p className={`text-[10px] font-bold uppercase mt-0.5 ${STATUS_COLOR[c.status] ?? "text-brand-text-muted"}`}>
                 {c.status.replace(/_/g, " ")}
               </p>
             </div>
           </div>
         ))}
         {claims.length === 0 && (
-          <p className="px-5 py-4 text-sm text-avenue-text-muted">No prior claims on record.</p>
+          <p className="px-5 py-4 text-sm text-brand-text-muted">No prior claims on record.</p>
         )}
       </div>
     </div>

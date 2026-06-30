@@ -12,7 +12,7 @@ interface Portal {
 }
 
 const ALL_PORTALS: Portal[] = [
-  { label: "Admin",  href: "/dashboard",      basePath: "/__admin__", activeClass: "bg-avenue-indigo text-white",  dotClass: "bg-avenue-indigo"  },
+  { label: "Admin",  href: "/dashboard",      basePath: "/__admin__", activeClass: "bg-brand-indigo text-white",  dotClass: "bg-brand-indigo"  },
   { label: "Fund",   href: "/fund/dashboard",  basePath: "/fund",      activeClass: "bg-[#28A745] text-white",     dotClass: "bg-[#28A745]"      },
   { label: "Broker", href: "/broker/dashboard",basePath: "/broker",    activeClass: "bg-[#17A2B8] text-white",     dotClass: "bg-[#17A2B8]"      },
   { label: "HR",     href: "/hr/dashboard",    basePath: "/hr",        activeClass: "bg-[#856404] text-white",     dotClass: "bg-[#856404]"      },
@@ -51,7 +51,7 @@ export function PortalSwitcher({ userRole }: { userRole: string }) {
 
   return (
     <div className="mb-3">
-      <p className="text-[10px] font-bold uppercase tracking-widest text-avenue-text-muted mb-1.5 px-1">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-brand-text-muted mb-1.5 px-1">
         Switch Portal
       </p>
       <div className="flex flex-col gap-1">
@@ -64,7 +64,7 @@ export function PortalSwitcher({ userRole }: { userRole: string }) {
               className={`flex items-center gap-2 rounded-[6px] px-2.5 py-2 text-sm font-semibold transition-all ${
                 active
                   ? p.activeClass + " shadow-sm"
-                  : "text-avenue-text-body bg-[#F4F4F4] hover:bg-[#E8E8E8]"
+                  : "text-brand-text-body bg-[#F4F4F4] hover:bg-[#E8E8E8]"
               }`}
             >
               <span className={`h-2 w-2 rounded-full shrink-0 ${active ? "bg-white/70" : p.dotClass}`} />

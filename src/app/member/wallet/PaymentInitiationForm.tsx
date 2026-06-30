@@ -4,7 +4,7 @@ import { useActionState } from "react";
 import { Smartphone, WalletCards } from "lucide-react";
 import { initiateMpesaPaymentAction } from "./actions";
 
-const inputClass = "w-full rounded-[8px] border border-[#EEEEEE] bg-white px-3 py-2 text-sm outline-none focus:border-avenue-indigo";
+const inputClass = "w-full rounded-[8px] border border-[#EEEEEE] bg-white px-3 py-2 text-sm outline-none focus:border-brand-indigo";
 
 export function PaymentInitiationForm({
   transactionId,
@@ -21,7 +21,7 @@ export function PaymentInitiationForm({
     <form action={action} className="mt-4 space-y-3">
       <input type="hidden" name="transactionId" value={transactionId} />
       <label className="block space-y-1">
-        <span className="text-xs font-bold uppercase text-avenue-text-muted">M-Pesa phone</span>
+        <span className="text-xs font-bold uppercase text-brand-text-muted">M-Pesa phone</span>
         <input
           name="phoneNumber"
           defaultValue={defaultPhone ?? ""}
@@ -43,7 +43,7 @@ export function PaymentInitiationForm({
       <button
         type="submit"
         disabled={disabled || pending}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-[8px] bg-avenue-indigo px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-avenue-indigo-hover disabled:cursor-not-allowed disabled:opacity-60"
+        className="inline-flex w-full items-center justify-center gap-2 rounded-[8px] bg-brand-indigo px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-indigo-hover disabled:cursor-not-allowed disabled:opacity-60"
       >
         {pending ? <Smartphone className="h-4 w-4 animate-pulse" /> : <WalletCards className="h-4 w-4" />}
         {pending ? "Requesting checkout..." : disabled ? "Awaiting callback" : "Pay with M-Pesa"}

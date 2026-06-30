@@ -84,15 +84,15 @@ export default async function BoardPackPage({
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Link href="/analytics" className="text-avenue-text-muted hover:text-avenue-indigo transition-colors">
+        <Link href="/analytics" className="text-brand-text-muted hover:text-brand-indigo transition-colors">
           <ArrowLeft size={20} />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading flex items-center gap-2">
-            <FileText size={20} className="text-avenue-indigo" />
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading flex items-center gap-2">
+            <FileText size={20} className="text-brand-indigo" />
             Monthly Board Pack
           </h1>
-          <p className="text-avenue-text-muted text-sm mt-0.5">
+          <p className="text-brand-text-muted text-sm mt-0.5">
             Generate the board-ready monthly management report — portfolio MLR, scheme grid, top drivers, provider performance, compliance metrics.
           </p>
         </div>
@@ -100,45 +100,45 @@ export default async function BoardPackPage({
 
       {/* Generate form */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-4">
-        <h2 className="font-semibold text-avenue-text-heading text-sm">Generate Board Pack</h2>
+        <h2 className="font-semibold text-brand-text-heading text-sm">Generate Board Pack</h2>
         <form action={generateBoardPackAction} className="flex gap-3 flex-wrap items-end">
           <div>
-            <label className="block text-xs font-semibold text-avenue-text-muted mb-1">Month</label>
+            <label className="block text-xs font-semibold text-brand-text-muted mb-1">Month</label>
             <select name="month" defaultValue={selectedMonth}
-              className="border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-avenue-indigo focus:outline-none">
+              className="border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-brand-indigo focus:outline-none">
               {months.map((m) => (
                 <option key={m.value} value={m.value}>{m.label}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-avenue-text-muted mb-1">Year</label>
+            <label className="block text-xs font-semibold text-brand-text-muted mb-1">Year</label>
             <select name="year" defaultValue={selectedYear}
-              className="border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-avenue-indigo focus:outline-none">
+              className="border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-brand-indigo focus:outline-none">
               {years.map((y) => <option key={y} value={y}>{y}</option>)}
             </select>
           </div>
           <button type="submit"
-            className="bg-avenue-indigo text-white px-6 py-2 rounded-full text-sm font-semibold hover:bg-avenue-secondary transition-colors flex items-center gap-2">
+            className="bg-brand-indigo text-white px-6 py-2 rounded-full text-sm font-semibold hover:bg-brand-secondary transition-colors flex items-center gap-2">
             <Download size={14} /> Generate PDF
           </button>
         </form>
-        <p className="text-xs text-avenue-text-muted">
+        <p className="text-xs text-brand-text-muted">
           The PDF is rendered server-side using Puppeteer and includes Medvex&apos;s brand identity. Generation takes approximately 3–5 seconds.
         </p>
       </div>
 
       {/* Preview link for current month */}
-      <div className="bg-[#F8F9FF] border border-avenue-indigo/20 rounded-[8px] p-4 flex items-center justify-between">
+      <div className="bg-[#F8F9FF] border border-brand-indigo/20 rounded-[8px] p-4 flex items-center justify-between">
         <div>
-          <p className="text-sm font-semibold text-avenue-text-heading">Quick download — current month</p>
-          <p className="text-xs text-avenue-text-muted mt-0.5">
+          <p className="text-sm font-semibold text-brand-text-heading">Quick download — current month</p>
+          <p className="text-xs text-brand-text-muted mt-0.5">
             {months[now.getMonth()].label} {now.getFullYear()}
           </p>
         </div>
         <a href={`/api/analytics/board-pack?month=${now.getMonth() + 1}&year=${now.getFullYear()}`}
           target="_blank" rel="noopener noreferrer"
-          className="flex items-center gap-2 bg-avenue-indigo text-white px-4 py-1.5 rounded-full text-xs font-semibold hover:bg-avenue-secondary transition-colors">
+          className="flex items-center gap-2 bg-brand-indigo text-white px-4 py-1.5 rounded-full text-xs font-semibold hover:bg-brand-secondary transition-colors">
           <Download size={12} /> Download PDF
         </a>
       </div>
@@ -147,7 +147,7 @@ export default async function BoardPackPage({
       {history.length > 0 && (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-[#EEEEEE]">
-            <h2 className="font-semibold text-avenue-text-heading text-sm">Generation History</h2>
+            <h2 className="font-semibold text-brand-text-heading text-sm">Generation History</h2>
           </div>
           <div className="divide-y divide-[#EEEEEE]">
             {history.map((h) => {
@@ -155,10 +155,10 @@ export default async function BoardPackPage({
               return (
                 <div key={h.id} className="px-5 py-3 flex items-center justify-between">
                   <div>
-                    <p className="text-sm font-semibold text-avenue-text-heading">
+                    <p className="text-sm font-semibold text-brand-text-heading">
                       {meta?.period ? String(meta.period) : "—"}
                     </p>
-                    <p className="text-xs text-avenue-text-muted mt-0.5">
+                    <p className="text-xs text-brand-text-muted mt-0.5">
                       {new Date(h.createdAt).toLocaleString("en-KE")} ·{" "}
                       {meta?.schemeCount ? `${String(meta.schemeCount)} schemes` : ""}
                     </p>
@@ -166,7 +166,7 @@ export default async function BoardPackPage({
                   {!!meta?.period && (
                     <a href={`/api/analytics/board-pack?month=${String(meta.period).split("-")[1]}&year=${String(meta.period).split("-")[0]}`}
                       target="_blank" rel="noopener noreferrer"
-                      className="text-xs text-avenue-indigo font-semibold hover:underline flex items-center gap-1">
+                      className="text-xs text-brand-indigo font-semibold hover:underline flex items-center gap-1">
                       <Download size={11} /> Re-download
                     </a>
                   )}

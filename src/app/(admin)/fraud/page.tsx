@@ -48,13 +48,13 @@ export default async function FraudDashboardPage(props: {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Fraud Alert Desk</h1>
-          <p className="text-avenue-text-body text-sm mt-0.5">Heuristic flags raised during claim submission. Review and dismiss or escalate.</p>
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Fraud Alert Desk</h1>
+          <p className="text-brand-text-body text-sm mt-0.5">Heuristic flags raised during claim submission. Review and dismiss or escalate.</p>
         </div>
         <div className="flex gap-2">
           <Link
             href={showResolved ? "/fraud" : "/fraud?resolved=true"}
-            className="border border-[#EEEEEE] text-avenue-text-body px-4 py-2 rounded-full text-sm font-semibold hover:bg-[#F8F9FA] transition-colors"
+            className="border border-[#EEEEEE] text-brand-text-body px-4 py-2 rounded-full text-sm font-semibold hover:bg-[#F8F9FA] transition-colors"
           >
             {showResolved ? "View Open" : "View Resolved"}
           </Link>
@@ -72,7 +72,7 @@ export default async function FraudDashboardPage(props: {
           return (
             <div key={card.label} className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-bold uppercase text-avenue-text-muted">{card.label}</p>
+                <p className="text-xs font-bold uppercase text-brand-text-muted">{card.label}</p>
                 <Icon size={15} className={card.color} />
               </div>
               <p className={`text-2xl font-bold ${card.color}`}>{card.value}</p>
@@ -89,8 +89,8 @@ export default async function FraudDashboardPage(props: {
             href={`/fraud${showResolved ? "?resolved=true" : ""}${s ? (showResolved ? "&severity=" : "?severity=") + s : ""}`}
             className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
               severity === s || (!severity && !s)
-                ? "bg-avenue-indigo text-white border-avenue-indigo"
-                : "border-[#EEEEEE] text-avenue-text-muted hover:border-avenue-indigo"
+                ? "bg-brand-indigo text-white border-brand-indigo"
+                : "border-[#EEEEEE] text-brand-text-muted hover:border-brand-indigo"
             }`}
           >
             {s || "All"}
@@ -101,14 +101,14 @@ export default async function FraudDashboardPage(props: {
       {/* Alert table */}
       <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
         {alerts.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-avenue-text-muted gap-2">
+          <div className="flex flex-col items-center justify-center py-16 text-brand-text-muted gap-2">
             <ShieldCheck size={36} className="text-[#28A745]" />
             <p className="font-semibold">No {showResolved ? "resolved" : "open"} alerts{severity ? ` at ${severity} severity` : ""}.</p>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#EEEEEE] bg-[#F8F9FA] text-avenue-text-muted text-xs font-bold uppercase">
+              <tr className="border-b border-[#EEEEEE] bg-[#F8F9FA] text-brand-text-muted text-xs font-bold uppercase">
                 <th className="px-5 py-3 text-left">Claim</th>
                 <th className="px-5 py-3 text-left">Member</th>
                 <th className="px-5 py-3 text-left">Rule Triggered</th>
@@ -122,18 +122,18 @@ export default async function FraudDashboardPage(props: {
               {alerts.map(alert => (
                 <tr key={alert.id} className="hover:bg-[#F8F9FA] transition-colors">
                   <td className="px-5 py-3">
-                    <Link href={`/claims/${alert.claimId}`} className="font-mono text-xs text-avenue-indigo hover:underline font-bold">
+                    <Link href={`/claims/${alert.claimId}`} className="font-mono text-xs text-brand-indigo hover:underline font-bold">
                       {alert.claim.claimNumber}
                     </Link>
-                    <p className="text-[10px] text-avenue-text-muted mt-0.5">{alert.claim.provider.name}</p>
+                    <p className="text-[10px] text-brand-text-muted mt-0.5">{alert.claim.provider.name}</p>
                   </td>
                   <td className="px-5 py-3">
-                    <p className="font-semibold text-avenue-text-heading">{alert.claim.member.firstName} {alert.claim.member.lastName}</p>
-                    <p className="text-[10px] font-mono text-avenue-text-muted">{alert.claim.member.memberNumber}</p>
+                    <p className="font-semibold text-brand-text-heading">{alert.claim.member.firstName} {alert.claim.member.lastName}</p>
+                    <p className="text-[10px] font-mono text-brand-text-muted">{alert.claim.member.memberNumber}</p>
                   </td>
                   <td className="px-5 py-3">
-                    <p className="font-semibold text-avenue-text-heading">{alert.rule}</p>
-                    {alert.notes && <p className="text-[10px] text-avenue-text-muted mt-0.5 max-w-xs">{alert.notes}</p>}
+                    <p className="font-semibold text-brand-text-heading">{alert.rule}</p>
+                    {alert.notes && <p className="text-[10px] text-brand-text-muted mt-0.5 max-w-xs">{alert.notes}</p>}
                   </td>
                   <td className="px-5 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${severityBadge(alert.severity)}`}>
@@ -154,13 +154,13 @@ export default async function FraudDashboardPage(props: {
                       <span className="text-xs font-mono">{alert.score}</span>
                     </div>
                   </td>
-                  <td className="px-5 py-3 text-xs text-avenue-text-muted">
+                  <td className="px-5 py-3 text-xs text-brand-text-muted">
                     {new Date(alert.createdAt).toLocaleDateString()}
                   </td>
                   <td className="px-5 py-3 text-right">
                     <Link
                       href={`/fraud/${alert.id}`}
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-avenue-indigo hover:text-avenue-secondary transition-colors"
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-brand-indigo hover:text-brand-secondary transition-colors"
                     >
                       {alert.resolved ? (
                         <><ShieldCheck size={13} className="text-[#28A745]" /> View</>

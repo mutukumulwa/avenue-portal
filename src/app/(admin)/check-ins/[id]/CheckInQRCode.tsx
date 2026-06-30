@@ -8,7 +8,7 @@ export function CheckInQRCode({ value }: { value: string }) {
       <div className="mx-auto w-full max-w-44 rounded-md bg-white p-2">
         <QRCode value={value} size={160} className="h-auto w-full" />
       </div>
-      <p className="mt-3 break-all text-center text-[11px] text-avenue-text-muted">{value}</p>
+      <p className="mt-3 break-all text-center text-[11px] text-brand-text-muted">{value}</p>
     </div>
   );
 }

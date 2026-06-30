@@ -35,13 +35,13 @@ export function BrokersTable({ brokers }: { brokers: Broker[] }) {
     <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-[#EEEEEE]">
         <div className="relative max-w-sm">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-avenue-text-muted" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-text-muted" />
           <input
             type="text"
             value={q}
             onChange={e => setQ(e.target.value)}
             placeholder="Search by name, contact or IRA number…"
-            className="w-full pl-8 pr-3 py-2 text-sm border border-[#EEEEEE] rounded-lg focus:outline-none focus:border-avenue-indigo transition-colors"
+            className="w-full pl-8 pr-3 py-2 text-sm border border-[#EEEEEE] rounded-lg focus:outline-none focus:border-brand-indigo transition-colors"
           />
         </div>
       </div>
@@ -59,18 +59,18 @@ export function BrokersTable({ brokers }: { brokers: Broker[] }) {
               <th className="px-6 py-4">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#EEEEEE] text-avenue-text-body text-sm">
+          <tbody className="divide-y divide-[#EEEEEE] text-brand-text-body text-sm">
             {filtered.map(b => (
               <tr key={b.id} className="hover:bg-[#F8F9FA] transition-colors">
                 <td className="px-6 py-4">
                   <div className="flex flex-col">
-                    <span className="font-bold text-avenue-text-heading">{b.name}</span>
+                    <span className="font-bold text-brand-text-heading">{b.name}</span>
                     {b.licenseNumber && <span className="text-xs">IRA: {b.licenseNumber}</span>}
                   </div>
                 </td>
                 <td className="px-6 py-4">{b.contactPerson ?? "—"}</td>
                 <td className="px-6 py-4">{b.phone ?? "—"}</td>
-                <td className="px-6 py-4 font-semibold text-avenue-indigo">{b.groupCount}</td>
+                <td className="px-6 py-4 font-semibold text-brand-indigo">{b.groupCount}</td>
                 <td className="px-6 py-4">{b.firstYearCommissionPct}%</td>
                 <td className="px-6 py-4">{b.renewalCommissionPct}%</td>
                 <td className="px-6 py-4">
@@ -79,7 +79,7 @@ export function BrokersTable({ brokers }: { brokers: Broker[] }) {
                   </span>
                 </td>
                 <td className="px-6 py-4">
-                  <Link href={`/brokers/${b.id}`} className="text-avenue-indigo hover:text-avenue-secondary font-semibold inline-flex items-center gap-1">
+                  <Link href={`/brokers/${b.id}`} className="text-brand-indigo hover:text-brand-secondary font-semibold inline-flex items-center gap-1">
                     View <ArrowRight size={14} />
                   </Link>
                 </td>
@@ -87,7 +87,7 @@ export function BrokersTable({ brokers }: { brokers: Broker[] }) {
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-6 py-10 text-center text-avenue-text-body text-sm">
+                <td colSpan={8} className="px-6 py-10 text-center text-brand-text-body text-sm">
                   {q ? `No brokers matching "${q}".` : "No brokers found."}
                 </td>
               </tr>

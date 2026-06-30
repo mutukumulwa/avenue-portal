@@ -66,17 +66,17 @@ export function RateTableEditor({ pricingModelId, initialData }: { pricingModelI
 
   const cancelEdit = () => { setEditingId(null); setEditForm(null); setError(null); };
 
-  const inputCls = "w-full p-1.5 border border-gray-200 rounded text-sm focus:outline-none focus:border-avenue-indigo";
-  const selectCls = "p-1.5 border border-gray-200 rounded text-sm focus:outline-none focus:border-avenue-indigo";
+  const inputCls = "w-full p-1.5 border border-gray-200 rounded text-sm focus:outline-none focus:border-brand-indigo";
+  const selectCls = "p-1.5 border border-gray-200 rounded text-sm focus:outline-none focus:border-brand-indigo";
 
   return (
     <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm">
       <div className="p-4 border-b border-[#EEEEEE] flex justify-between items-center bg-[#F8F9FA] rounded-t-lg">
-        <h2 className="font-bold text-avenue-text-heading">Contribution Rate Matrix</h2>
+        <h2 className="font-bold text-brand-text-heading">Contribution Rate Matrix</h2>
         <button
           onClick={startNew}
           disabled={editingId !== null || isPending}
-          className="text-xs bg-avenue-indigo text-white px-3 py-1.5 rounded flex items-center gap-1 font-bold disabled:opacity-50"
+          className="text-xs bg-brand-indigo text-white px-3 py-1.5 rounded flex items-center gap-1 font-bold disabled:opacity-50"
         >
           <Plus size={14} /> Add Band
         </button>
@@ -87,8 +87,8 @@ export function RateTableEditor({ pricingModelId, initialData }: { pricingModelI
       )}
 
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm text-avenue-text-body">
-          <thead className="bg-[#F8F9FA] text-xs uppercase text-avenue-text-muted border-b border-[#EEEEEE]">
+        <table className="w-full text-left text-sm text-brand-text-body">
+          <thead className="bg-[#F8F9FA] text-xs uppercase text-brand-text-muted border-b border-[#EEEEEE]">
             <tr>
               <th className="p-3 font-bold">Min Age</th>
               <th className="p-3 font-bold">Max Age</th>
@@ -151,9 +151,9 @@ export function RateTableEditor({ pricingModelId, initialData }: { pricingModelI
                     <td className="p-3">{entry.maxAge}</td>
                     <td className="p-3">{entry.gender}</td>
                     <td className="p-3">{entry.familySize}</td>
-                    <td className="p-3 font-medium text-avenue-text-heading">{Number(entry.baseRate).toLocaleString("en-KE")}</td>
+                    <td className="p-3 font-medium text-brand-text-heading">{Number(entry.baseRate).toLocaleString("en-KE")}</td>
                     <td className="p-3 text-right">
-                      <button onClick={() => handleEdit(entry)} disabled={editingId !== null || isPending} className="text-avenue-indigo p-1 hover:bg-blue-50 rounded text-xs font-bold mr-2 disabled:opacity-40">Edit</button>
+                      <button onClick={() => handleEdit(entry)} disabled={editingId !== null || isPending} className="text-brand-indigo p-1 hover:bg-blue-50 rounded text-xs font-bold mr-2 disabled:opacity-40">Edit</button>
                       <button onClick={() => handleDelete(entry)} disabled={isPending} className="text-red-500 p-1 hover:bg-red-50 rounded disabled:opacity-40"><Trash2 size={16} /></button>
                     </td>
                   </>
@@ -163,7 +163,7 @@ export function RateTableEditor({ pricingModelId, initialData }: { pricingModelI
 
             {entries.length === 0 && editingId !== "new" && (
               <tr>
-                <td colSpan={6} className="p-8 text-center text-avenue-text-muted">
+                <td colSpan={6} className="p-8 text-center text-brand-text-muted">
                   No rate bands defined. Click &quot;Add Band&quot; to start building the matrix.
                 </td>
               </tr>

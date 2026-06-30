@@ -32,7 +32,7 @@ export function ExportPDFButton({ title, data, filename }: { title: string, data
     <button 
       onClick={handleExport}
       disabled={loading}
-      className="bg-white border border-[#EEEEEE] text-avenue-text-heading hover:bg-[#F8F9FA] px-4 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2 text-sm shadow-sm disabled:opacity-50"
+      className="bg-white border border-[#EEEEEE] text-brand-text-heading hover:bg-[#F8F9FA] px-4 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2 text-sm shadow-sm disabled:opacity-50"
     >
       <Download size={16} />
       <span>{loading ? "Generating..." : "Export PDF"}</span>

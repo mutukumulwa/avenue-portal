@@ -4,8 +4,8 @@ import { useState } from "react";
 import { updateContractTermsAction } from "../actions";
 import { FileText } from "lucide-react";
 
-const lbl = "text-[10px] font-bold text-avenue-text-muted uppercase block mb-1";
-const inp = "w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo transition-colors";
+const lbl = "text-[10px] font-bold text-brand-text-muted uppercase block mb-1";
+const inp = "w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo transition-colors";
 
 const RULE_LABELS: Record<string, string> = {
   PAY_AS_BILLED: "Pay as billed",
@@ -46,10 +46,10 @@ export function ContractTermsCard({ contract }: { contract: ContractTerms }) {
     return (
       <div className="bg-white border border-[#EEEEEE] rounded-lg p-6 shadow-sm">
         <div className="flex items-center justify-between border-b border-[#EEEEEE] pb-3 mb-4">
-          <h2 className="font-bold text-avenue-text-heading font-heading flex items-center gap-2">
-            <FileText size={15} className="text-avenue-indigo" /> Commercial Terms & Billing Rules
+          <h2 className="font-bold text-brand-text-heading font-heading flex items-center gap-2">
+            <FileText size={15} className="text-brand-indigo" /> Commercial Terms & Billing Rules
           </h2>
-          <button onClick={() => setEditing(true)} className="text-sm font-semibold text-avenue-indigo hover:text-avenue-secondary transition-colors">
+          <button onClick={() => setEditing(true)} className="text-sm font-semibold text-brand-indigo hover:text-brand-secondary transition-colors">
             Edit
           </button>
         </div>
@@ -67,28 +67,28 @@ export function ContractTermsCard({ contract }: { contract: ContractTerms }) {
             },
           ].map(f => (
             <div key={f.label} className="flex justify-between">
-              <span className="text-avenue-text-muted">{f.label}</span>
-              <span className="font-semibold text-avenue-text-heading text-right">{f.value}</span>
+              <span className="text-brand-text-muted">{f.label}</span>
+              <span className="font-semibold text-brand-text-heading text-right">{f.value}</span>
             </div>
           ))}
         </div>
 
-        <p className="mt-4 text-xs text-avenue-text-muted bg-[#F8F9FA] rounded-lg px-3 py-2">
+        <p className="mt-4 text-xs text-brand-text-muted bg-[#F8F9FA] rounded-lg px-3 py-2">
           {RULE_HELP[contract.unlistedServiceRule]}
         </p>
 
         {contract.documentUrl && (
           <p className="mt-3 text-sm">
-            <span className="text-avenue-text-muted">Signed document: </span>
-            <a href={contract.documentUrl} target="_blank" rel="noopener noreferrer" className="text-avenue-indigo font-semibold hover:underline">
+            <span className="text-brand-text-muted">Signed document: </span>
+            <a href={contract.documentUrl} target="_blank" rel="noopener noreferrer" className="text-brand-indigo font-semibold hover:underline">
               open agreement
             </a>
           </p>
         )}
         {contract.notes && (
           <div className="pt-3 mt-3 border-t border-[#EEEEEE]">
-            <p className="text-[10px] font-bold uppercase text-avenue-text-muted mb-1">Special Terms / Notes</p>
-            <p className="text-avenue-text-body text-sm leading-relaxed whitespace-pre-wrap">{contract.notes}</p>
+            <p className="text-[10px] font-bold uppercase text-brand-text-muted mb-1">Special Terms / Notes</p>
+            <p className="text-brand-text-body text-sm leading-relaxed whitespace-pre-wrap">{contract.notes}</p>
           </div>
         )}
       </div>
@@ -96,10 +96,10 @@ export function ContractTermsCard({ contract }: { contract: ContractTerms }) {
   }
 
   return (
-    <div className="bg-white border-2 border-avenue-indigo/20 rounded-lg p-6 shadow-sm">
+    <div className="bg-white border-2 border-brand-indigo/20 rounded-lg p-6 shadow-sm">
       <div className="flex items-center justify-between border-b border-[#EEEEEE] pb-3 mb-4">
-        <h2 className="font-bold text-avenue-text-heading font-heading">Edit Terms</h2>
-        <button onClick={() => setEditing(false)} className="text-sm text-avenue-text-muted hover:text-avenue-text-heading transition-colors">
+        <h2 className="font-bold text-brand-text-heading font-heading">Edit Terms</h2>
+        <button onClick={() => setEditing(false)} className="text-sm text-brand-text-muted hover:text-brand-text-heading transition-colors">
           Cancel
         </button>
       </div>
@@ -139,8 +139,8 @@ export function ContractTermsCard({ contract }: { contract: ContractTerms }) {
           </div>
         </div>
 
-        <div className="bg-avenue-indigo/5 rounded-lg p-4 space-y-3">
-          <p className="text-xs font-bold text-avenue-text-heading uppercase">Unlisted services — how are codes NOT on the schedule paid?</p>
+        <div className="bg-brand-indigo/5 rounded-lg p-4 space-y-3">
+          <p className="text-xs font-bold text-brand-text-heading uppercase">Unlisted services — how are codes NOT on the schedule paid?</p>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={lbl}>Rule *</label>
@@ -157,7 +157,7 @@ export function ContractTermsCard({ contract }: { contract: ContractTerms }) {
               </div>
             )}
           </div>
-          <p className="text-xs text-avenue-text-muted">{RULE_HELP[rule]}</p>
+          <p className="text-xs text-brand-text-muted">{RULE_HELP[rule]}</p>
         </div>
 
         <div className="grid grid-cols-2 gap-4 items-end">
@@ -165,8 +165,8 @@ export function ContractTermsCard({ contract }: { contract: ContractTerms }) {
             <label className={lbl}>Signed Document URL</label>
             <input type="url" name="documentUrl" defaultValue={contract.documentUrl ?? ""} className={inp} placeholder="https://…" />
           </div>
-          <label className="flex items-center gap-2 text-sm text-avenue-text-body pb-2">
-            <input type="checkbox" name="autoRenew" defaultChecked={contract.autoRenew} className="accent-avenue-indigo" />
+          <label className="flex items-center gap-2 text-sm text-brand-text-body pb-2">
+            <input type="checkbox" name="autoRenew" defaultChecked={contract.autoRenew} className="accent-brand-indigo" />
             Flag for auto-renewal at expiry
           </label>
         </div>
@@ -177,7 +177,7 @@ export function ContractTermsCard({ contract }: { contract: ContractTerms }) {
         </div>
 
         <div className="flex justify-end">
-          <button type="submit" className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-7 py-2.5 rounded-full font-semibold text-sm transition-colors shadow-sm">
+          <button type="submit" className="bg-brand-indigo hover:bg-brand-secondary text-white px-7 py-2.5 rounded-full font-semibold text-sm transition-colors shadow-sm">
             Save Terms
           </button>
         </div>

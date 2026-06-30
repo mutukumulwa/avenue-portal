@@ -27,7 +27,7 @@ export function FraudCaseActions({
         <ShieldCheck size={16} className="text-[#28A745] shrink-0" />
         <div>
           <p className="text-sm font-bold text-[#28A745]">Alert resolved</p>
-          {existingNotes && <p className="text-xs text-avenue-text-muted mt-0.5">{existingNotes}</p>}
+          {existingNotes && <p className="text-xs text-brand-text-muted mt-0.5">{existingNotes}</p>}
         </div>
       </div>
     );
@@ -39,9 +39,9 @@ export function FraudCaseActions({
       <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm space-y-3">
         <div className="flex items-center gap-2">
           <ShieldCheck size={16} className="text-[#28A745]" />
-          <h3 className="font-bold text-avenue-text-heading text-sm">Dismiss — False Positive</h3>
+          <h3 className="font-bold text-brand-text-heading text-sm">Dismiss — False Positive</h3>
         </div>
-        <p className="text-xs text-avenue-text-muted">
+        <p className="text-xs text-brand-text-muted">
           Mark this alert as a false positive. The claim will continue processing normally.
         </p>
         {dismissState?.error && (
@@ -53,7 +53,7 @@ export function FraudCaseActions({
             required
             rows={3}
             placeholder="Explain why this alert is a false positive…"
-            className="w-full text-sm border border-[#EEEEEE] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-avenue-indigo resize-none text-avenue-text-heading"
+            className="w-full text-sm border border-[#EEEEEE] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-indigo resize-none text-brand-text-heading"
           />
           <button
             type="submit"
@@ -70,9 +70,9 @@ export function FraudCaseActions({
       <div className="bg-white border border-[#DC3545]/20 rounded-lg p-5 shadow-sm space-y-3">
         <div className="flex items-center gap-2">
           <ArrowUpCircle size={16} className="text-[#DC3545]" />
-          <h3 className="font-bold text-avenue-text-heading text-sm">Escalate to Fraud Review</h3>
+          <h3 className="font-bold text-brand-text-heading text-sm">Escalate to Fraud Review</h3>
         </div>
-        <p className="text-xs text-avenue-text-muted">
+        <p className="text-xs text-brand-text-muted">
           Place the claim on hold and route it to formal fraud investigation. Payment will be blocked until resolved.
         </p>
         {escalateState?.error && (
@@ -84,7 +84,7 @@ export function FraudCaseActions({
             required
             rows={3}
             placeholder="Investigation notes — what supports escalation?…"
-            className="w-full text-sm border border-[#EEEEEE] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#DC3545] resize-none text-avenue-text-heading"
+            className="w-full text-sm border border-[#EEEEEE] rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#DC3545] resize-none text-brand-text-heading"
           />
           <div className="flex items-start gap-2 bg-[#FFF8E1] border border-[#FFC107]/30 rounded-lg px-3 py-2">
             <AlertTriangle size={13} className="text-[#856404] mt-0.5 shrink-0" />

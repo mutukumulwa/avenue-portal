@@ -41,8 +41,8 @@ export function ClaimDocuments({
 
   return (
     <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-4">
-      <h3 className="text-sm font-bold text-avenue-text-heading uppercase tracking-wide flex items-center gap-2">
-        <Paperclip size={16} className="text-avenue-indigo" /> Supporting Documents
+      <h3 className="text-sm font-bold text-brand-text-heading uppercase tracking-wide flex items-center gap-2">
+        <Paperclip size={16} className="text-brand-indigo" /> Supporting Documents
       </h3>
       <DocumentList documents={docs} />
       <div className="pt-2 border-t border-[#EEEEEE]">

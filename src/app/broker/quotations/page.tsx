@@ -14,7 +14,7 @@ export default async function BrokerQuotationsPage() {
   });
 
   if (!user?.brokerId) {
-    return <div className="p-6 text-center text-avenue-text-body">No broker profile linked.</div>;
+    return <div className="p-6 text-center text-brand-text-body">No broker profile linked.</div>;
   }
 
   const quotations = await prisma.quotation.findMany({
@@ -35,12 +35,12 @@ export default async function BrokerQuotationsPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold font-heading text-avenue-text-heading">My Quotations</h1>
-          <p className="text-avenue-text-muted mt-1">Quotations you have generated for prospects.</p>
+          <h1 className="text-2xl font-bold font-heading text-brand-text-heading">My Quotations</h1>
+          <p className="text-brand-text-muted mt-1">Quotations you have generated for prospects.</p>
         </div>
         <Link
           href="/broker/quotations/new"
-          className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors flex items-center space-x-2 shadow-sm"
+          className="bg-brand-indigo hover:bg-brand-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors flex items-center space-x-2 shadow-sm"
         >
           <Calculator size={18} />
           <span>New Quote</span>
@@ -60,13 +60,13 @@ export default async function BrokerQuotationsPage() {
               <th className="px-6 py-4">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#EEEEEE] text-avenue-text-body">
+          <tbody className="divide-y divide-[#EEEEEE] text-brand-text-body">
             {quotations.map((q) => (
               <tr key={q.id} className="hover:bg-[#F8F9FA]">
-                <td className="px-6 py-4 font-mono font-semibold text-avenue-text-heading">{q.quoteNumber}</td>
+                <td className="px-6 py-4 font-mono font-semibold text-brand-text-heading">{q.quoteNumber}</td>
                 <td className="px-6 py-4 font-semibold">{q.prospectName ?? "—"}</td>
                 <td className="px-6 py-4">{q.memberCount + q.dependentCount}</td>
-                <td className="px-6 py-4 font-semibold text-avenue-indigo">{Number(q.finalPremium).toLocaleString()}</td>
+                <td className="px-6 py-4 font-semibold text-brand-indigo">{Number(q.finalPremium).toLocaleString()}</td>
                 <td className="px-6 py-4">{q.validUntil ? new Date(q.validUntil).toLocaleDateString("en-KE") : "—"}</td>
                 <td className="px-6 py-4">
                   <span className={`px-3 py-1 text-[10px] font-bold uppercase rounded-full ${statusColor(q.status)}`}>
@@ -74,14 +74,14 @@ export default async function BrokerQuotationsPage() {
                   </span>
                 </td>
                 <td className="px-6 py-4">
-                  <Link href={`/broker/quotations/${q.id}`} className="text-avenue-indigo hover:text-avenue-secondary font-semibold inline-flex items-center gap-1">
+                  <Link href={`/broker/quotations/${q.id}`} className="text-brand-indigo hover:text-brand-secondary font-semibold inline-flex items-center gap-1">
                     View <ArrowRight size={14} />
                   </Link>
                 </td>
               </tr>
             ))}
             {quotations.length === 0 && (
-              <tr><td colSpan={7} className="px-6 py-12 text-center text-avenue-text-body">No quotations yet. Click &quot;New Quote&quot; to generate one.</td></tr>
+              <tr><td colSpan={7} className="px-6 py-12 text-center text-brand-text-body">No quotations yet. Click &quot;New Quote&quot; to generate one.</td></tr>
             )}
           </tbody>
         </table>

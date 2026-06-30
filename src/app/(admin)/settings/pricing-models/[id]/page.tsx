@@ -33,29 +33,29 @@ export default async function PricingModelDetailPage({ params }: { params: Promi
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
-      <Link href="/settings/pricing-models" className="inline-flex items-center text-sm font-bold text-avenue-text-muted hover:text-avenue-indigo transition-colors">
+      <Link href="/settings/pricing-models" className="inline-flex items-center text-sm font-bold text-brand-text-muted hover:text-brand-indigo transition-colors">
         <ChevronLeft size={16} className="mr-1" />
         Back to Pricing Models
       </Link>
 
       <div className="bg-white border border-[#EEEEEE] rounded-lg p-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded bg-[#0B1437]/10 text-avenue-indigo flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 rounded bg-[#0B1437]/10 text-brand-indigo flex items-center justify-center shrink-0">
             <FileSpreadsheet size={24} />
           </div>
           <div>
             <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">{model.name}</h1>
+              <h1 className="text-2xl font-bold text-brand-text-heading font-heading">{model.name}</h1>
               <span className={`text-xs px-2 py-1 rounded font-bold ${model.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>
                 {model.isActive ? 'ACTIVE' : 'INACTIVE'}
               </span>
             </div>
-            <p className="text-avenue-text-body font-body">
+            <p className="text-brand-text-body font-body">
               {model.description || `Type: ${model.type.replace('_', ' ')}`}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-3 text-sm text-avenue-text-muted">
+        <div className="flex items-center gap-3 text-sm text-brand-text-muted">
           <div className="flex items-center gap-1">
             <Settings size={16} />
             <span>Used in {model._count.quotations} quotes</span>
@@ -68,8 +68,8 @@ export default async function PricingModelDetailPage({ params }: { params: Promi
           <RateTableEditor pricingModelId={model.id} initialData={initialData} />
         ) : (
           <div className="bg-white border border-[#EEEEEE] rounded-lg p-8 text-center">
-            <h2 className="text-lg font-bold text-avenue-text-heading mb-2">Unsupported Editor Type</h2>
-            <p className="text-avenue-text-muted">
+            <h2 className="text-lg font-bold text-brand-text-heading mb-2">Unsupported Editor Type</h2>
+            <p className="text-brand-text-muted">
               Inline editing is currently only supported for AGE_BANDED models. 
               This model is of type {model.type}. Please use the legacy JSON parameters editor.
             </p>

@@ -83,13 +83,13 @@ export default async function MemberUtilizationPage({
   return (
     <div className="space-y-6 font-ui">
       <div>
-        <h1 className="font-heading text-2xl font-bold text-avenue-text-heading">Care History</h1>
-        <p className="mt-1 text-avenue-text-muted">Visits, approvals, payments, and your share of care costs.</p>
+        <h1 className="font-heading text-2xl font-bold text-brand-text-heading">Care History</h1>
+        <p className="mt-1 text-brand-text-muted">Visits, approvals, payments, and your share of care costs.</p>
       </div>
 
       <section className="grid gap-4 md:grid-cols-4">
         {[
-          { label: "Provider bills", value: formatMoney(history.summary.totalBilled), icon: ReceiptText, tone: "text-avenue-indigo" },
+          { label: "Provider bills", value: formatMoney(history.summary.totalBilled), icon: ReceiptText, tone: "text-brand-indigo" },
           { label: "Plan approved", value: formatMoney(history.summary.planApproved), icon: ShieldCheck, tone: "text-[#28A745]" },
           { label: "Plan paid", value: formatMoney(history.summary.planPaid), icon: HeartPulse, tone: "text-[#17A2B8]" },
           { label: "Your share", value: formatMoney(history.summary.memberShare), icon: WalletCards, tone: "text-[#856404]" },
@@ -98,7 +98,7 @@ export default async function MemberUtilizationPage({
           return (
             <div key={metric.label} className="rounded-[8px] border border-[#EEEEEE] bg-white p-4 shadow-sm">
               <Icon className={`h-5 w-5 ${metric.tone}`} />
-              <p className="mt-3 text-[13px] font-bold uppercase text-avenue-text-muted">{metric.label}</p>
+              <p className="mt-3 text-[13px] font-bold uppercase text-brand-text-muted">{metric.label}</p>
               <p className={`mt-1 text-xl font-bold tabular-nums ${metric.tone}`}>{metric.value}</p>
             </div>
           );
@@ -108,13 +108,13 @@ export default async function MemberUtilizationPage({
       <section className="rounded-[8px] border border-[#EEEEEE] bg-white p-4 shadow-sm">
         <div className="grid gap-3 lg:grid-cols-4">
           <div>
-            <p className="mb-2 text-[13px] font-bold uppercase text-avenue-text-muted">Period</p>
+            <p className="mb-2 text-[13px] font-bold uppercase text-brand-text-muted">Period</p>
             <div className="flex flex-wrap gap-2">
               {periods.map((period) => (
                 <Link
                   key={period.value}
                   href={queryLink(currentFilters, { period: period.value })}
-                  className={`rounded-full px-3 py-1.5 text-sm font-semibold ${history.filters.period === period.value ? "bg-avenue-indigo text-white" : "bg-[#F8F9FA] text-avenue-text-heading hover:text-avenue-indigo"}`}
+                  className={`rounded-full px-3 py-1.5 text-sm font-semibold ${history.filters.period === period.value ? "bg-brand-indigo text-white" : "bg-[#F8F9FA] text-brand-text-heading hover:text-brand-indigo"}`}
                 >
                   {period.label}
                 </Link>
@@ -122,16 +122,16 @@ export default async function MemberUtilizationPage({
             </div>
           </div>
           <div>
-            <p className="mb-2 text-[13px] font-bold uppercase text-avenue-text-muted">Member</p>
+            <p className="mb-2 text-[13px] font-bold uppercase text-brand-text-muted">Member</p>
             <div className="flex flex-wrap gap-2">
-              <Link href={queryLink(currentFilters, { memberId: "all" })} className={`rounded-full px-3 py-1.5 text-sm font-semibold ${history.filters.memberId === "all" ? "bg-avenue-indigo text-white" : "bg-[#F8F9FA] text-avenue-text-heading hover:text-avenue-indigo"}`}>
+              <Link href={queryLink(currentFilters, { memberId: "all" })} className={`rounded-full px-3 py-1.5 text-sm font-semibold ${history.filters.memberId === "all" ? "bg-brand-indigo text-white" : "bg-[#F8F9FA] text-brand-text-heading hover:text-brand-indigo"}`}>
                 All
               </Link>
               {history.familyOptions.map((member) => (
                 <Link
                   key={member.id}
                   href={queryLink(currentFilters, { memberId: member.id })}
-                  className={`rounded-full px-3 py-1.5 text-sm font-semibold ${history.filters.memberId === member.id ? "bg-avenue-indigo text-white" : "bg-[#F8F9FA] text-avenue-text-heading hover:text-avenue-indigo"}`}
+                  className={`rounded-full px-3 py-1.5 text-sm font-semibold ${history.filters.memberId === member.id ? "bg-brand-indigo text-white" : "bg-[#F8F9FA] text-brand-text-heading hover:text-brand-indigo"}`}
                 >
                   {member.name}
                 </Link>
@@ -139,13 +139,13 @@ export default async function MemberUtilizationPage({
             </div>
           </div>
           <div>
-            <p className="mb-2 text-[13px] font-bold uppercase text-avenue-text-muted">Status</p>
+            <p className="mb-2 text-[13px] font-bold uppercase text-brand-text-muted">Status</p>
             <div className="flex max-h-20 flex-wrap gap-1 overflow-y-auto">
               {statuses.map((status) => (
                 <Link
                   key={status}
                   href={queryLink(currentFilters, { status })}
-                  className={`rounded-full px-2 py-1 text-[12px] font-semibold ${history.filters.status === status ? "bg-avenue-indigo text-white" : "bg-[#F8F9FA] text-avenue-text-heading hover:text-avenue-indigo"}`}
+                  className={`rounded-full px-2 py-1 text-[12px] font-semibold ${history.filters.status === status ? "bg-brand-indigo text-white" : "bg-[#F8F9FA] text-brand-text-heading hover:text-brand-indigo"}`}
                 >
                   {status === "all" ? "All" : status.replace(/_/g, " ")}
                 </Link>
@@ -153,13 +153,13 @@ export default async function MemberUtilizationPage({
             </div>
           </div>
           <div>
-            <p className="mb-2 text-[13px] font-bold uppercase text-avenue-text-muted">Benefit</p>
+            <p className="mb-2 text-[13px] font-bold uppercase text-brand-text-muted">Benefit</p>
             <div className="flex max-h-20 flex-wrap gap-1 overflow-y-auto">
               {categories.map((category) => (
                 <Link
                   key={category}
                   href={queryLink(currentFilters, { benefitCategory: category })}
-                  className={`rounded-full px-2 py-1 text-[12px] font-semibold ${history.filters.benefitCategory === category ? "bg-avenue-indigo text-white" : "bg-[#F8F9FA] text-avenue-text-heading hover:text-avenue-indigo"}`}
+                  className={`rounded-full px-2 py-1 text-[12px] font-semibold ${history.filters.benefitCategory === category ? "bg-brand-indigo text-white" : "bg-[#F8F9FA] text-brand-text-heading hover:text-brand-indigo"}`}
                 >
                   {category === "all" ? "All" : category.replace(/_/g, " ")}
                 </Link>
@@ -170,8 +170,8 @@ export default async function MemberUtilizationPage({
       </section>
 
       {history.summary.privateEncounterCount > 0 && (
-        <div className="flex items-start gap-3 rounded-[8px] border border-[#EEEEEE] bg-white p-4 text-sm text-avenue-text-muted shadow-sm">
-          <EyeOff className="mt-0.5 h-5 w-5 text-avenue-indigo" />
+        <div className="flex items-start gap-3 rounded-[8px] border border-[#EEEEEE] bg-white p-4 text-sm text-brand-text-muted shadow-sm">
+          <EyeOff className="mt-0.5 h-5 w-5 text-brand-indigo" />
           <p>
             {history.summary.privateEncounterCount} family care event(s) are included in counts but hidden in detail because they are in sensitive categories.
           </p>
@@ -184,10 +184,10 @@ export default async function MemberUtilizationPage({
               <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-[0_8px_22px_rgba(0,0,0,0.08)] transition-colors hover:bg-[#F8F9FA]">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-[15px] font-bold uppercase leading-snug text-avenue-text-heading">
+                    <p className="text-[15px] font-bold uppercase leading-snug text-brand-text-heading">
                       {formatDateTime(encounter.dateOfService)} | {encounter.providerName}
                     </p>
-                    <p className="mt-2 text-[13px] text-avenue-text-muted">
+                    <p className="mt-2 text-[13px] text-brand-text-muted">
                       {encounter.memberName} · {encounter.serviceType.replace(/_/g, " ")}
                     </p>
                   </div>
@@ -195,7 +195,7 @@ export default async function MemberUtilizationPage({
                     <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${statusTone(encounter.status)}`}>
                       {encounter.status}
                     </span>
-                    {encounter.href && <ArrowRight className="h-5 w-5 text-avenue-indigo" />}
+                    {encounter.href && <ArrowRight className="h-5 w-5 text-brand-indigo" />}
                   </div>
                 </div>
 
@@ -205,25 +205,25 @@ export default async function MemberUtilizationPage({
 
                 <div className="mt-5 grid grid-cols-[1fr_auto] gap-4">
                   <div className="min-w-0">
-                    <p className="text-[13px] text-avenue-text-muted">Benefit</p>
-                    <p className="mt-1 text-base font-semibold leading-snug text-avenue-text-heading">
+                    <p className="text-[13px] text-brand-text-muted">Benefit</p>
+                    <p className="mt-1 text-base font-semibold leading-snug text-brand-text-heading">
                       {encounter.masked ? "Private family event" : encounter.benefitCategory.replace(/_/g, " ")}
                     </p>
-                    <p className="mt-2 font-mono text-[12px] text-avenue-text-muted">{encounter.claimNumber}</p>
+                    <p className="mt-2 font-mono text-[12px] text-brand-text-muted">{encounter.claimNumber}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-[13px] text-avenue-text-muted">Expenditure</p>
-                    <p className="mt-1 text-base font-bold tabular-nums text-avenue-text-heading">{formatMoney(encounter.billedAmount)}</p>
+                    <p className="text-[13px] text-brand-text-muted">Expenditure</p>
+                    <p className="mt-1 text-base font-bold tabular-nums text-brand-text-heading">{formatMoney(encounter.billedAmount)}</p>
                   </div>
                 </div>
 
                 <div className="mt-4 grid grid-cols-2 gap-3 border-t border-[#EEEEEE] pt-3 text-sm">
                   <div>
-                    <p className="text-[13px] text-avenue-text-muted">Plan approved</p>
+                    <p className="text-[13px] text-brand-text-muted">Plan approved</p>
                     <p className="font-bold tabular-nums text-[#1F7A34]">{formatMoney(encounter.planApprovedAmount)}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-[13px] text-avenue-text-muted">Your share</p>
+                    <p className="text-[13px] text-brand-text-muted">Your share</p>
                     <p className="font-bold tabular-nums text-[#856404]">{formatMoney(encounter.memberShare)}</p>
                   </div>
                 </div>
@@ -240,7 +240,7 @@ export default async function MemberUtilizationPage({
           })}
 
           {history.encounters.length === 0 && (
-            <div className="rounded-[8px] border border-[#EEEEEE] bg-white px-5 py-12 text-center text-sm text-avenue-text-muted shadow-sm">No care events match these filters.</div>
+            <div className="rounded-[8px] border border-[#EEEEEE] bg-white px-5 py-12 text-center text-sm text-brand-text-muted shadow-sm">No care events match these filters.</div>
           )}
       </section>
     </div>

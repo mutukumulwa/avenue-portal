@@ -24,7 +24,7 @@ export function AdminFeeButton({ groupId, alreadyInvoiced, adminFeeMethod }: Pro
   }
 
   if (!adminFeeMethod) {
-    return <p className="text-xs text-avenue-text-muted italic">Admin fee method not configured on this group.</p>;
+    return <p className="text-xs text-brand-text-muted italic">Admin fee method not configured on this group.</p>;
   }
 
   function handleGenerate() {
@@ -44,12 +44,12 @@ export function AdminFeeButton({ groupId, alreadyInvoiced, adminFeeMethod }: Pro
       <button
         onClick={handleGenerate}
         disabled={isPending}
-        className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold bg-avenue-indigo text-white hover:bg-avenue-secondary disabled:opacity-50 transition-colors"
+        className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold bg-brand-indigo text-white hover:bg-brand-secondary disabled:opacity-50 transition-colors"
       >
         <Receipt size={14} />
         {isPending ? "Generating…" : "Generate Admin Fee Invoice"}
       </button>
-      <p className="text-xs text-avenue-text-muted">
+      <p className="text-xs text-brand-text-muted">
         Method: {adminFeeMethod === "FLAT_PER_INSURED" ? "Flat per insured member" : "% of claims paid"}
       </p>
     </div>

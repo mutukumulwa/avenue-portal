@@ -38,12 +38,12 @@ export default async function HRSupportPage() {
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       <div className="flex justify-between items-center bg-white p-6 rounded-[8px] border border-[#EEEEEE] shadow-sm">
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Support Desk</h1>
-          <p className="text-avenue-text-body mt-1">Raise service queries directly with Medvex Operations.</p>
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Support Desk</h1>
+          <p className="text-brand-text-body mt-1">Raise service queries directly with Medvex Operations.</p>
         </div>
         <Link 
           href="/hr/support/new" 
-          className="flex items-center gap-2 bg-avenue-indigo text-white px-6 py-2.5 rounded-full font-bold hover:bg-avenue-secondary transition-colors"
+          className="flex items-center gap-2 bg-brand-indigo text-white px-6 py-2.5 rounded-full font-bold hover:bg-brand-secondary transition-colors"
         >
           <PlusCircle size={18} /> New Request
         </Link>
@@ -52,9 +52,9 @@ export default async function HRSupportPage() {
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
         {requests.length === 0 ? (
           <div className="text-center py-20">
-            <MessageSquareText size={48} className="mx-auto text-avenue-border mb-4" />
-            <h3 className="text-lg font-bold text-avenue-text-heading font-heading">No support requests</h3>
-            <p className="text-sm text-avenue-text-muted mt-2">You haven&apos;t opened any queries with Medvex yet.</p>
+            <MessageSquareText size={48} className="mx-auto text-brand-border mb-4" />
+            <h3 className="text-lg font-bold text-brand-text-heading font-heading">No support requests</h3>
+            <p className="text-sm text-brand-text-muted mt-2">You haven&apos;t opened any queries with Medvex yet.</p>
           </div>
         ) : (
           <div className="divide-y divide-[#EEEEEE]">
@@ -66,17 +66,17 @@ export default async function HRSupportPage() {
                       <span className={`text-[10px] uppercase font-bold px-2.5 py-1 rounded-full border ${getStatusColor(req.status)}`}>
                         {req.status.replace("_", " ")}
                       </span>
-                      <h3 className="font-bold text-avenue-text-heading">{req.subject}</h3>
+                      <h3 className="font-bold text-brand-text-heading">{req.subject}</h3>
                     </div>
-                    <p className="text-xs text-avenue-text-muted mt-1.5 flex items-center gap-3">
-                      <span>Category: <strong className="text-avenue-text-body">{req.category.replace("_", " ")}</strong></span>
+                    <p className="text-xs text-brand-text-muted mt-1.5 flex items-center gap-3">
+                      <span>Category: <strong className="text-brand-text-body">{req.category.replace("_", " ")}</strong></span>
                       <span>Priority: {getPriorityLabel(req.priority)}</span>
                       <span className="flex items-center gap-1"><Clock size={12} /> {new Date(req.createdAt).toLocaleDateString()}</span>
                     </p>
                   </div>
                 </div>
                 
-                <div className="bg-[#F8F9FA] border border-[#EEEEEE] rounded p-4 text-sm text-avenue-text-body whitespace-pre-wrap">
+                <div className="bg-[#F8F9FA] border border-[#EEEEEE] rounded p-4 text-sm text-brand-text-body whitespace-pre-wrap">
                   {req.body}
                 </div>
 

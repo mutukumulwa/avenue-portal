@@ -57,14 +57,14 @@ export default async function AssessPage({ params }: { params: Promise<{ id: str
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/quotations" className="text-avenue-text-muted hover:text-avenue-indigo transition-colors">
+          <Link href="/quotations" className="text-brand-text-muted hover:text-brand-indigo transition-colors">
             <ArrowLeft size={20} />
           </Link>
           <div>
-            <h1 className="text-xl font-bold text-avenue-text-heading font-heading">
+            <h1 className="text-xl font-bold text-brand-text-heading font-heading">
               Assessment — {quotation.quoteNumber}
             </h1>
-            <p className="text-sm text-avenue-text-muted mt-0.5">
+            <p className="text-sm text-brand-text-muted mt-0.5">
               {quotation.legalName ?? quotation.prospectName ?? "—"} ·{" "}
               {quotation.clientType} ·{" "}
               {quotation.headcount ? `${quotation.headcount} declared lives` : `${quotation.memberCount + quotation.dependentCount} added`}
@@ -86,7 +86,7 @@ export default async function AssessPage({ params }: { params: Promise<{ id: str
           <AlertTriangle size={18} className="text-[#C4500A] mt-0.5 shrink-0" />
           <div className="flex-1">
             <p className="font-semibold text-[#C4500A] text-sm">Awaiting senior assessment approval</p>
-            <p className="text-xs text-avenue-text-muted mt-1">This submission triggered an escalation threshold. A Senior Underwriter must approve before it can proceed to pricing.</p>
+            <p className="text-xs text-brand-text-muted mt-1">This submission triggered an escalation threshold. A Senior Underwriter must approve before it can proceed to pricing.</p>
           </div>
           <form action={approveSeniorAction}>
             <input type="hidden" name="quotationId" value={id} />
@@ -105,39 +105,39 @@ export default async function AssessPage({ params }: { params: Promise<{ id: str
           {/* Add life form (only when in editable stages) */}
           {canAddLives && (
             <details className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm">
-              <summary className="px-6 py-4 cursor-pointer font-semibold text-avenue-text-heading text-sm flex items-center gap-2 list-none">
-                <UserPlus size={16} className="text-avenue-indigo" />
+              <summary className="px-6 py-4 cursor-pointer font-semibold text-brand-text-heading text-sm flex items-center gap-2 list-none">
+                <UserPlus size={16} className="text-brand-indigo" />
                 Add Life
-                <ChevronDown size={14} className="ml-auto text-avenue-text-muted" />
+                <ChevronDown size={14} className="ml-auto text-brand-text-muted" />
               </summary>
               <div className="px-6 pb-5 border-t border-[#EEEEEE]">
                 <form action={addLifeAction} className="grid grid-cols-3 gap-3 mt-4">
                   <input type="hidden" name="quotationId" value={id} />
                   <div>
-                    <label className="block text-xs font-semibold text-avenue-text-muted mb-1">Role</label>
+                    <label className="block text-xs font-semibold text-brand-text-muted mb-1">Role</label>
                     <select name="role" className="w-full border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm">
                       <option value="PRINCIPAL">Principal</option>
                       <option value="DEPENDANT">Dependant</option>
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-avenue-text-muted mb-1">First Name</label>
+                    <label className="block text-xs font-semibold text-brand-text-muted mb-1">First Name</label>
                     <input name="firstName" required type="text" className="w-full border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm" />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-avenue-text-muted mb-1">Last Name</label>
+                    <label className="block text-xs font-semibold text-brand-text-muted mb-1">Last Name</label>
                     <input name="lastName" required type="text" className="w-full border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm" />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-avenue-text-muted mb-1">National ID</label>
+                    <label className="block text-xs font-semibold text-brand-text-muted mb-1">National ID</label>
                     <input name="nationalId" type="text" className="w-full border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm" />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-avenue-text-muted mb-1">Date of Birth</label>
+                    <label className="block text-xs font-semibold text-brand-text-muted mb-1">Date of Birth</label>
                     <input name="dateOfBirth" required type="date" className="w-full border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm" />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-avenue-text-muted mb-1">Gender</label>
+                    <label className="block text-xs font-semibold text-brand-text-muted mb-1">Gender</label>
                     <select name="gender" className="w-full border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm">
                       <option value="MALE">Male</option>
                       <option value="FEMALE">Female</option>
@@ -145,11 +145,11 @@ export default async function AssessPage({ params }: { params: Promise<{ id: str
                     </select>
                   </div>
                   <div className="col-span-3">
-                    <label className="block text-xs font-semibold text-avenue-text-muted mb-1">ICD-10 Codes (comma-separated)</label>
+                    <label className="block text-xs font-semibold text-brand-text-muted mb-1">ICD-10 Codes (comma-separated)</label>
                     <input name="icd10Codes" type="text" placeholder="E11.9, I10, ..." className="w-full border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm" />
                   </div>
                   <div className="col-span-3 flex justify-end">
-                    <button type="submit" className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-5 py-2 rounded-full text-sm font-semibold transition-colors">
+                    <button type="submit" className="bg-brand-indigo hover:bg-brand-secondary text-white px-5 py-2 rounded-full text-sm font-semibold transition-colors">
                       Add Life
                     </button>
                   </div>
@@ -173,12 +173,12 @@ export default async function AssessPage({ params }: { params: Promise<{ id: str
           {/* Lives table with per-life decision forms */}
           <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
             <div className="px-6 py-4 border-b border-[#EEEEEE] flex items-center justify-between">
-              <h2 className="font-semibold text-avenue-text-heading text-sm">Lives on Submission</h2>
-              <span className="text-xs text-avenue-text-muted">{quotation.lives.length} life{quotation.lives.length !== 1 ? "s" : ""}</span>
+              <h2 className="font-semibold text-brand-text-heading text-sm">Lives on Submission</h2>
+              <span className="text-xs text-brand-text-muted">{quotation.lives.length} life{quotation.lives.length !== 1 ? "s" : ""}</span>
             </div>
 
             {quotation.lives.length === 0 ? (
-              <p className="px-6 py-10 text-center text-avenue-text-muted text-sm">No lives added yet. Use the form above.</p>
+              <p className="px-6 py-10 text-center text-brand-text-muted text-sm">No lives added yet. Use the form above.</p>
             ) : (
               <div className="divide-y divide-[#EEEEEE]">
                 {quotation.lives.map((life) => {
@@ -190,13 +190,13 @@ export default async function AssessPage({ params }: { params: Promise<{ id: str
                     <div key={life.id} className="px-6 py-4 space-y-3">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                          <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${life.role === "PRINCIPAL" ? "bg-avenue-indigo/10 text-avenue-indigo" : "bg-[#6C757D]/10 text-[#6C757D]"}`}>
+                          <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${life.role === "PRINCIPAL" ? "bg-brand-indigo/10 text-brand-indigo" : "bg-[#6C757D]/10 text-[#6C757D]"}`}>
                             {life.role === "PRINCIPAL" ? "Principal" : "Dependant"}
                           </span>
-                          <span className="font-semibold text-avenue-text-heading text-sm">
+                          <span className="font-semibold text-brand-text-heading text-sm">
                             {life.firstName} {life.lastName}
                           </span>
-                          <span className="text-xs text-avenue-text-muted">
+                          <span className="text-xs text-brand-text-muted">
                             {life.gender} · {age}y · {life.nationalId ?? "No ID"}
                           </span>
                         </div>
@@ -220,14 +220,14 @@ export default async function AssessPage({ params }: { params: Promise<{ id: str
                       {/* Decision form (visible only in PENDING_ASSESSMENT) */}
                       {canRecordDecisions && (
                         <details className="text-xs">
-                          <summary className="cursor-pointer text-avenue-indigo font-semibold list-none hover:underline">
+                          <summary className="cursor-pointer text-brand-indigo font-semibold list-none hover:underline">
                             {decision ? "Edit decision" : "Record decision"}
                           </summary>
                           <form action={recordDecisionAction} className="mt-3 grid grid-cols-3 gap-2">
                             <input type="hidden" name="quotationId" value={id} />
                             <input type="hidden" name="quotationLifeId" value={life.id} />
                             <div>
-                              <label className="block font-semibold text-avenue-text-muted mb-1">Decision</label>
+                              <label className="block font-semibold text-brand-text-muted mb-1">Decision</label>
                               <select name="decision" defaultValue={decision?.decision ?? "STANDARD"}
                                 className="w-full border border-[#EEEEEE] rounded-[6px] px-2 py-1.5 text-xs">
                                 {["STANDARD","LOADED","EXCLUSION","WAITING_PERIOD","DECLINED"].map(d => (
@@ -236,35 +236,35 @@ export default async function AssessPage({ params }: { params: Promise<{ id: str
                               </select>
                             </div>
                             <div>
-                              <label className="block font-semibold text-avenue-text-muted mb-1">Loading ×</label>
+                              <label className="block font-semibold text-brand-text-muted mb-1">Loading ×</label>
                               <input name="loadingMultiplier" type="number" step="0.01" min="1.01" max="5.0"
                                 defaultValue={decision?.loadingMultiplier ? Number(decision.loadingMultiplier) : undefined}
                                 placeholder="e.g. 1.25"
                                 className="w-full border border-[#EEEEEE] rounded-[6px] px-2 py-1.5 text-xs" />
                             </div>
                             <div>
-                              <label className="block font-semibold text-avenue-text-muted mb-1">Waiting period (days)</label>
+                              <label className="block font-semibold text-brand-text-muted mb-1">Waiting period (days)</label>
                               <input name="waitingPeriodDays" type="number" min="1"
                                 defaultValue={decision?.waitingPeriodDays ?? undefined}
                                 placeholder="e.g. 365"
                                 className="w-full border border-[#EEEEEE] rounded-[6px] px-2 py-1.5 text-xs" />
                             </div>
                             <div className="col-span-2">
-                              <label className="block font-semibold text-avenue-text-muted mb-1">Excluded ICD-10 codes (comma-separated)</label>
+                              <label className="block font-semibold text-brand-text-muted mb-1">Excluded ICD-10 codes (comma-separated)</label>
                               <input name="excludedIcd10Codes" type="text"
                                 defaultValue={decision?.excludedIcd10Codes.join(", ") ?? ""}
                                 placeholder="E11.9, I10, ..."
                                 className="w-full border border-[#EEEEEE] rounded-[6px] px-2 py-1.5 text-xs" />
                             </div>
                             <div>
-                              <label className="block font-semibold text-avenue-text-muted mb-1">Reason code</label>
+                              <label className="block font-semibold text-brand-text-muted mb-1">Reason code</label>
                               <input name="reasonCode" type="text" required
                                 defaultValue={decision?.reasonCode ?? ""}
                                 placeholder="e.g. PRE_EXISTING"
                                 className="w-full border border-[#EEEEEE] rounded-[6px] px-2 py-1.5 text-xs" />
                             </div>
                             <div className="col-span-3 flex justify-end">
-                              <button type="submit" className="bg-avenue-indigo text-white px-4 py-1.5 rounded-full text-xs font-semibold hover:bg-avenue-secondary transition-colors">
+                              <button type="submit" className="bg-brand-indigo text-white px-4 py-1.5 rounded-full text-xs font-semibold hover:bg-brand-secondary transition-colors">
                                 Save decision
                               </button>
                             </div>
@@ -281,16 +281,16 @@ export default async function AssessPage({ params }: { params: Promise<{ id: str
           {/* Submit for pricing */}
           {canSubmitForPricing && (
             <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-6 space-y-4">
-              <h2 className="font-semibold text-avenue-text-heading text-sm">Submit for Pricing</h2>
+              <h2 className="font-semibold text-brand-text-heading text-sm">Submit for Pricing</h2>
               <form action={submitForPricingAction} className="grid grid-cols-2 gap-4">
                 <input type="hidden" name="quotationId" value={id} />
                 <div>
-                  <label className="block text-xs font-semibold text-avenue-text-muted mb-1">Projected gross contribution (KES)</label>
+                  <label className="block text-xs font-semibold text-brand-text-muted mb-1">Projected gross contribution (KES)</label>
                   <input name="projectedGrossKes" type="number" min={0} placeholder="e.g. 1200000"
                     className="w-full border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm" />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-avenue-text-muted mb-1">Scheme discount (%)</label>
+                  <label className="block text-xs font-semibold text-brand-text-muted mb-1">Scheme discount (%)</label>
                   <input name="schemeDiscountPct" type="number" min={0} max={100} step={0.5} placeholder="e.g. 5"
                     className="w-full border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm" />
                 </div>
@@ -306,7 +306,7 @@ export default async function AssessPage({ params }: { params: Promise<{ id: str
                     <form action={returnToSubmitterAction}>
                       <input type="hidden" name="quotationId" value={id} />
                       <input type="hidden" name="reason" value="Returned for additional information" />
-                      <button type="submit" className="text-avenue-text-muted border border-[#EEEEEE] hover:border-avenue-indigo px-4 py-2 rounded-full text-sm font-semibold transition-colors">
+                      <button type="submit" className="text-brand-text-muted border border-[#EEEEEE] hover:border-brand-indigo px-4 py-2 rounded-full text-sm font-semibold transition-colors">
                         Return to submitter
                       </button>
                     </form>
@@ -326,7 +326,7 @@ export default async function AssessPage({ params }: { params: Promise<{ id: str
         <div className="space-y-4">
           {/* Quotation meta */}
           <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-3 text-sm">
-            <h2 className="font-semibold text-avenue-text-heading text-xs uppercase tracking-wide">Submission Details</h2>
+            <h2 className="font-semibold text-brand-text-heading text-xs uppercase tracking-wide">Submission Details</h2>
             {[
               { label: "Status",       value: quotation.status.replace(/_/g, " ") },
               { label: "Cover start",  value: quotation.requestedCoverStart ? new Date(quotation.requestedCoverStart).toLocaleDateString("en-KE") : "—" },
@@ -335,8 +335,8 @@ export default async function AssessPage({ params }: { params: Promise<{ id: str
               { label: "Assessor",     value: quotation.assessor ? `${quotation.assessor.firstName} ${quotation.assessor.lastName}` : "Unassigned" },
             ].map(({ label, value }) => (
               <div key={label} className="flex justify-between">
-                <span className="text-avenue-text-muted">{label}</span>
-                <span className="font-semibold text-avenue-text-heading text-right">{value}</span>
+                <span className="text-brand-text-muted">{label}</span>
+                <span className="font-semibold text-brand-text-heading text-right">{value}</span>
               </div>
             ))}
           </div>
@@ -345,31 +345,31 @@ export default async function AssessPage({ params }: { params: Promise<{ id: str
           {quotation.riskProfile && (
             <>
               <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-3">
-                <h2 className="font-semibold text-avenue-text-heading text-xs uppercase tracking-wide">Age Distribution</h2>
+                <h2 className="font-semibold text-brand-text-heading text-xs uppercase tracking-wide">Age Distribution</h2>
                 {Object.entries(ageDistribution).map(([band, count]) => (
                   <div key={band} className="flex items-center gap-2 text-xs">
-                    <span className="w-10 text-avenue-text-muted">{band}</span>
+                    <span className="w-10 text-brand-text-muted">{band}</span>
                     <div className="flex-1 bg-[#EEEEEE] rounded-full h-1.5">
                       <div
-                        className="bg-avenue-indigo h-1.5 rounded-full"
+                        className="bg-brand-indigo h-1.5 rounded-full"
                         style={{ width: `${Math.min(100, (count / quotation.lives.length) * 100)}%` }}
                       />
                     </div>
-                    <span className="w-4 text-right text-avenue-text-muted">{count}</span>
+                    <span className="w-4 text-right text-brand-text-muted">{count}</span>
                   </div>
                 ))}
               </div>
 
               {Object.keys(icd10Summary).length > 0 && (
                 <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-2">
-                  <h2 className="font-semibold text-avenue-text-heading text-xs uppercase tracking-wide">ICD-10 Chapters</h2>
+                  <h2 className="font-semibold text-brand-text-heading text-xs uppercase tracking-wide">ICD-10 Chapters</h2>
                   {Object.entries(icd10Summary)
                     .sort(([, a], [, b]) => b - a)
                     .slice(0, 6)
                     .map(([chapter, count]) => (
                     <div key={chapter} className="flex justify-between text-xs">
-                      <span className="text-avenue-text-muted font-mono">{chapter}</span>
-                      <span className="font-semibold text-avenue-text-heading">{count} live{count !== 1 ? "s" : ""}</span>
+                      <span className="text-brand-text-muted font-mono">{chapter}</span>
+                      <span className="font-semibold text-brand-text-heading">{count} live{count !== 1 ? "s" : ""}</span>
                     </div>
                   ))}
                 </div>
@@ -380,7 +380,7 @@ export default async function AssessPage({ params }: { params: Promise<{ id: str
                   <p className="text-sm font-semibold text-[#DC3545]">
                     ⚠ {quotation.riskProfile.blacklistMatches} blacklist match{quotation.riskProfile.blacklistMatches !== 1 ? "es" : ""}
                   </p>
-                  <p className="text-xs text-avenue-text-muted mt-1">Review affected lives before proceeding.</p>
+                  <p className="text-xs text-brand-text-muted mt-1">Review affected lives before proceeding.</p>
                 </div>
               )}
             </>

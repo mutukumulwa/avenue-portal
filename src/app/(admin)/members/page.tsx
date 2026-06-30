@@ -70,19 +70,19 @@ export default async function MembersPage({
     <div className="p-6 max-w-7xl mx-auto space-y-4">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Member Registry</h1>
-          <p className="text-avenue-text-muted mt-1 text-sm">Manage enrolled principals and dependents.</p>
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Member Registry</h1>
+          <p className="text-brand-text-muted mt-1 text-sm">Manage enrolled principals and dependents.</p>
         </div>
         <div className="flex items-center gap-2">
           <Link
             href="/members/import"
-            className="flex items-center gap-2 px-5 py-2 rounded-full border border-avenue-indigo text-avenue-indigo text-sm font-semibold hover:bg-avenue-indigo hover:text-white transition-colors"
+            className="flex items-center gap-2 px-5 py-2 rounded-full border border-brand-indigo text-brand-indigo text-sm font-semibold hover:bg-brand-indigo hover:text-white transition-colors"
           >
             Bulk Import
           </Link>
           <Link
             href="/members/new"
-            className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors flex items-center gap-2 shadow-sm"
+            className="bg-brand-indigo hover:bg-brand-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors flex items-center gap-2 shadow-sm"
           >
             <PlusCircle size={18} />
             Add Member
@@ -115,31 +115,31 @@ export default async function MembersPage({
                 <th className="px-6 py-4">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#EEEEEE] text-avenue-text-body text-sm">
+            <tbody className="divide-y divide-[#EEEEEE] text-brand-text-body text-sm">
               {members.map(member => (
                 <tr key={member.id} className="hover:bg-[#F8F9FA] transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
-                      <div className="h-9 w-9 rounded-full bg-avenue-indigo/10 text-avenue-indigo flex items-center justify-center font-bold text-sm shrink-0">
+                      <div className="h-9 w-9 rounded-full bg-brand-indigo/10 text-brand-indigo flex items-center justify-center font-bold text-sm shrink-0">
                         {member.firstName[0]}{member.lastName[0]}
                       </div>
                       <div>
-                        <p className="font-bold text-avenue-text-heading">{member.firstName} {member.lastName}</p>
-                        <p className="text-xs text-avenue-text-muted">{member.email || member.phone || "—"}</p>
+                        <p className="font-bold text-brand-text-heading">{member.firstName} {member.lastName}</p>
+                        <p className="text-xs text-brand-text-muted">{member.email || member.phone || "—"}</p>
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 font-mono text-xs text-avenue-text-muted">{member.memberNumber}</td>
+                  <td className="px-6 py-4 font-mono text-xs text-brand-text-muted">{member.memberNumber}</td>
                   <td className="px-6 py-4">
                     <Link href={`/groups/${member.group.id}`}
-                      className="font-semibold text-avenue-text-heading hover:text-avenue-indigo transition-colors">
+                      className="font-semibold text-brand-text-heading hover:text-brand-indigo transition-colors">
                       {member.group.name}
                     </Link>
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 text-[10px] uppercase font-bold rounded-full ${
                       member.relationship === "PRINCIPAL"
-                        ? "bg-avenue-indigo/10 text-avenue-indigo"
+                        ? "bg-brand-indigo/10 text-brand-indigo"
                         : "bg-[#6C757D]/10 text-[#6C757D]"
                     }`}>
                       {member.relationship}
@@ -158,7 +158,7 @@ export default async function MembersPage({
                   </td>
                   <td className="px-6 py-4">
                     <Link href={`/members/${member.id}`}
-                      className="text-avenue-indigo hover:text-avenue-secondary font-semibold inline-flex items-center gap-1 text-xs">
+                      className="text-brand-indigo hover:text-brand-secondary font-semibold inline-flex items-center gap-1 text-xs">
                       <UserCircle2 size={15} /> Profile
                     </Link>
                   </td>
@@ -166,7 +166,7 @@ export default async function MembersPage({
               ))}
               {members.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-6 py-14 text-center text-avenue-text-muted">
+                  <td colSpan={6} className="px-6 py-14 text-center text-brand-text-muted">
                     <UserCircle2 size={32} className="mx-auto mb-3 opacity-30" />
                     {q || status || relationship
                       ? "No members match your search. Try adjusting the filters."

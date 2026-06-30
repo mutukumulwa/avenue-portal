@@ -12,7 +12,7 @@ export default async function BrokerRenewalsPage() {
   });
 
   if (!user?.brokerId) {
-    return <div className="p-6 text-center text-avenue-text-body">No broker profile linked.</div>;
+    return <div className="p-6 text-center text-brand-text-body">No broker profile linked.</div>;
   }
 
   const groups = await prisma.group.findMany({
@@ -37,8 +37,8 @@ export default async function BrokerRenewalsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold font-heading text-avenue-text-heading">Renewals</h1>
-        <p className="text-avenue-text-muted mt-1">Track upcoming policy renewals for your groups.</p>
+        <h1 className="text-2xl font-bold font-heading text-brand-text-heading">Renewals</h1>
+        <p className="text-brand-text-muted mt-1">Track upcoming policy renewals for your groups.</p>
       </div>
 
       <div className="grid grid-cols-3 gap-4">
@@ -48,7 +48,7 @@ export default async function BrokerRenewalsPage() {
           { label: "Overdue", count: groups.filter((g) => getUrgency(g.renewalDate).days < 0).length, color: "text-[#DC3545]" },
         ].map((s) => (
           <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm">
-            <p className="text-xs text-avenue-text-muted font-bold uppercase">{s.label}</p>
+            <p className="text-xs text-brand-text-muted font-bold uppercase">{s.label}</p>
             <p className={`text-2xl font-bold mt-1 ${s.color}`}>{s.count}</p>
           </div>
         ))}
@@ -66,13 +66,13 @@ export default async function BrokerRenewalsPage() {
               <th className="px-6 py-4">Urgency</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#EEEEEE] text-avenue-text-body">
+          <tbody className="divide-y divide-[#EEEEEE] text-brand-text-body">
             {groups.map((g) => {
               const urgency = getUrgency(g.renewalDate);
               const annualPremium = g._count.members * Number(g.package.contributionAmount);
               return (
                 <tr key={g.id} className="hover:bg-[#F8F9FA]">
-                  <td className="px-6 py-4 font-bold text-avenue-text-heading">{g.name}</td>
+                  <td className="px-6 py-4 font-bold text-brand-text-heading">{g.name}</td>
                   <td className="px-6 py-4">{g.package.name}</td>
                   <td className="px-6 py-4 font-semibold">{g._count.members}</td>
                   <td className="px-6 py-4 font-semibold">{annualPremium.toLocaleString()}</td>
@@ -86,7 +86,7 @@ export default async function BrokerRenewalsPage() {
               );
             })}
             {groups.length === 0 && (
-              <tr><td colSpan={6} className="px-6 py-12 text-center text-avenue-text-body">No groups found.</td></tr>
+              <tr><td colSpan={6} className="px-6 py-12 text-center text-brand-text-body">No groups found.</td></tr>
             )}
           </tbody>
         </table>

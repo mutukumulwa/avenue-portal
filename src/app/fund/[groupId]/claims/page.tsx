@@ -58,25 +58,25 @@ export default async function FundClaimsPage({ params }: { params: Promise<{ gro
   return (
     <div className="space-y-6 max-w-6xl">
       <div className="flex items-center gap-3">
-        <Link href={`/fund/${groupId}`} className="text-avenue-text-muted hover:text-avenue-indigo">
+        <Link href={`/fund/${groupId}`} className="text-brand-text-muted hover:text-brand-indigo">
           <ArrowLeft size={20} />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Claims — {group.name}</h1>
-          <p className="text-avenue-text-body text-sm mt-0.5">All claims submitted by members of this self-funded scheme.</p>
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Claims — {group.name}</h1>
+          <p className="text-brand-text-body text-sm mt-0.5">All claims submitted by members of this self-funded scheme.</p>
         </div>
       </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Total Claims",         value: claims.length.toString(),             color: "text-avenue-indigo" },
+          { label: "Total Claims",         value: claims.length.toString(),             color: "text-brand-indigo" },
           { label: "Paid from Fund (KES)", value: totalApproved.toLocaleString("en-KE"),color: "text-[#DC3545]"    },
           { label: "Pending (KES)",        value: totalPending.toLocaleString("en-KE"), color: "text-[#856404]"    },
           { label: "Declined",             value: declined.toString(),                  color: "text-[#6C757D]"    },
         ].map(k => (
           <div key={k.label} className="bg-white border border-[#EEEEEE] rounded-[8px] p-4 shadow-sm">
-            <p className="text-xs font-bold uppercase text-avenue-text-muted">{k.label}</p>
+            <p className="text-xs font-bold uppercase text-brand-text-muted">{k.label}</p>
             <p className={`text-xl font-bold mt-1 ${k.color}`}>{k.value}</p>
           </div>
         ))}
@@ -98,14 +98,14 @@ export default async function FundClaimsPage({ params }: { params: Promise<{ gro
               <th className="px-4 py-3 text-left">Fund Deducted</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#EEEEEE] text-avenue-text-body">
+          <tbody className="divide-y divide-[#EEEEEE] text-brand-text-body">
             {claims.map(c => {
               const isOnHold = heldCats.includes(c.benefitCategory);
               const fundDeducted = c.fundTransactions.length > 0;
               return (
                 <tr key={c.id} className={`hover:bg-[#F8F9FA] ${isOnHold ? "bg-[#FFF8E1]" : ""}`}>
                   <td className="px-4 py-3">
-                    <p className="font-mono text-xs text-avenue-indigo">{c.claimNumber}</p>
+                    <p className="font-mono text-xs text-brand-indigo">{c.claimNumber}</p>
                     {c.isReimbursement && (
                       <span className="text-[10px] font-bold text-[#17A2B8] uppercase">Reimburse</span>
                     )}
@@ -114,12 +114,12 @@ export default async function FundClaimsPage({ params }: { params: Promise<{ gro
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <p className="font-semibold text-avenue-text-heading">{c.member.firstName} {c.member.lastName}</p>
-                    <p className="text-xs text-avenue-text-muted font-mono">{c.member.memberNumber}</p>
+                    <p className="font-semibold text-brand-text-heading">{c.member.firstName} {c.member.lastName}</p>
+                    <p className="text-xs text-brand-text-muted font-mono">{c.member.memberNumber}</p>
                   </td>
                   <td className="px-4 py-3 text-xs">{c.provider.name}</td>
                   <td className="px-4 py-3 text-xs">{c.benefitCategory.replace(/_/g, " ")}</td>
-                  <td className="px-4 py-3 text-xs text-avenue-text-muted">
+                  <td className="px-4 py-3 text-xs text-brand-text-muted">
                     {new Date(c.dateOfService).toLocaleDateString("en-KE")}
                   </td>
                   <td className="px-4 py-3 text-right font-mono text-xs">
@@ -136,13 +136,13 @@ export default async function FundClaimsPage({ params }: { params: Promise<{ gro
                   <td className="px-4 py-3 text-xs">
                     {fundDeducted
                       ? <span className="text-[#28A745] font-bold">✓ KES {c.fundTransactions.reduce((s, t) => s + Number(t.amount), 0).toLocaleString("en-KE")}</span>
-                      : <span className="text-avenue-text-muted">—</span>}
+                      : <span className="text-brand-text-muted">—</span>}
                   </td>
                 </tr>
               );
             })}
             {claims.length === 0 && (
-              <tr><td colSpan={9} className="px-4 py-12 text-center text-avenue-text-muted">No claims for this scheme yet.</td></tr>
+              <tr><td colSpan={9} className="px-4 py-12 text-center text-brand-text-muted">No claims for this scheme yet.</td></tr>
             )}
           </tbody>
         </table>

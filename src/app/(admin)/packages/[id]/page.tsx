@@ -39,12 +39,12 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/packages" className="text-avenue-text-muted hover:text-avenue-indigo transition-colors">
+          <Link href="/packages" className="text-brand-text-muted hover:text-brand-indigo transition-colors">
             <ArrowLeft size={20} />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">{pkg.name}</h1>
-            <p className="text-avenue-text-body text-sm mt-0.5">{pkg.type} · {pkg.description ?? "No description"}</p>
+            <h1 className="text-2xl font-bold text-brand-text-heading font-heading">{pkg.name}</h1>
+            <p className="text-brand-text-body text-sm mt-0.5">{pkg.type} · {pkg.description ?? "No description"}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -52,7 +52,7 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
             {pkg.status}
           </span>
           <Link href={`/packages/${id}/edit`}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold bg-avenue-indigo hover:bg-avenue-secondary text-white transition-colors">
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold bg-brand-indigo hover:bg-brand-secondary text-white transition-colors">
             <Pencil size={14} /> Edit
           </Link>
         </div>
@@ -61,13 +61,13 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
       {/* KPI row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Annual Limit (KES)", value: Number(pkg.annualLimit).toLocaleString(), color: "text-avenue-indigo" },
+          { label: "Annual Limit (KES)", value: Number(pkg.annualLimit).toLocaleString(), color: "text-brand-indigo" },
           { label: "Contribution (KES/yr)", value: Number(pkg.contributionAmount).toLocaleString(), color: "text-[#28A745]" },
           { label: "Total Sub-Limit (KES)", value: totalSubLimit.toLocaleString(), color: "text-[#17A2B8]" },
           { label: "Benefit Categories", value: currentBenefits.length.toString(), color: "text-[#6C757D]" },
         ].map(s => (
           <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-[8px] p-4 shadow-sm">
-            <p className="text-xs text-avenue-text-muted font-bold uppercase">{s.label}</p>
+            <p className="text-xs text-brand-text-muted font-bold uppercase">{s.label}</p>
             <p className={`text-xl font-bold mt-1 ${s.color}`}>{s.value}</p>
           </div>
         ))}
@@ -76,7 +76,7 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
       <div className="grid md:grid-cols-2 gap-6">
         {/* Package details */}
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-3">
-          <h2 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2">Package Details</h2>
+          <h2 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2">Package Details</h2>
           {[
             { label: "Package Type", value: pkg.type },
             { label: "Min Age", value: `${pkg.minAge} yrs` },
@@ -86,14 +86,14 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
             { label: "Total Versions", value: pkg.versions.length.toString() },
           ].map(f => (
             <div key={f.label} className="flex justify-between text-sm">
-              <span className="text-avenue-text-muted">{f.label}</span>
-              <span className="font-semibold text-avenue-text-heading">{f.value}</span>
+              <span className="text-brand-text-muted">{f.label}</span>
+              <span className="font-semibold text-brand-text-heading">{f.value}</span>
             </div>
           ))}
 
           {(pkg.exclusions as string[]).length > 0 && (
             <div className="pt-2">
-              <p className="text-xs font-bold uppercase text-avenue-text-muted mb-2">Exclusions</p>
+              <p className="text-xs font-bold uppercase text-brand-text-muted mb-2">Exclusions</p>
               <div className="flex flex-wrap gap-1.5">
                 {(pkg.exclusions as string[]).map((ex, i) => (
                   <span key={i} className="bg-[#DC3545]/10 text-[#DC3545] text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">{ex}</span>
@@ -106,30 +106,30 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
         {/* Benefits */}
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm">
           <div className="flex justify-between items-center border-b border-[#EEEEEE] pb-2 mb-3">
-            <h2 className="font-bold text-avenue-text-heading font-heading">Benefit Schedule</h2>
-            <Shield size={15} className="text-avenue-indigo" />
+            <h2 className="font-bold text-brand-text-heading font-heading">Benefit Schedule</h2>
+            <Shield size={15} className="text-brand-indigo" />
           </div>
           <div className="space-y-3">
             {currentBenefits.map(b => (
               <div key={b.id} className="flex items-center justify-between text-sm py-1 border-b border-[#EEEEEE] last:border-0">
                 <div>
-                  <p className="font-semibold text-avenue-text-heading">{categoryLabel(b.category)}</p>
+                  <p className="font-semibold text-brand-text-heading">{categoryLabel(b.category)}</p>
                   <div className="flex gap-3 mt-0.5">
                     {Number(b.copayPercentage) > 0 && (
-                      <span className="text-[10px] text-avenue-text-muted">Co-pay: {Number(b.copayPercentage)}%</span>
+                      <span className="text-[10px] text-brand-text-muted">Co-pay: {Number(b.copayPercentage)}%</span>
                     )}
                     {b.waitingPeriodDays > 0 && (
-                      <span className="text-[10px] text-avenue-text-muted flex items-center gap-1">
+                      <span className="text-[10px] text-brand-text-muted flex items-center gap-1">
                         <Clock size={10} /> {b.waitingPeriodDays}d wait
                       </span>
                     )}
                   </div>
                 </div>
-                <span className="font-bold text-avenue-indigo text-sm">KES {Number(b.annualSubLimit).toLocaleString()}</span>
+                <span className="font-bold text-brand-indigo text-sm">KES {Number(b.annualSubLimit).toLocaleString()}</span>
               </div>
             ))}
             {currentBenefits.length === 0 && (
-              <p className="text-sm text-avenue-text-body">No benefits defined for current version.</p>
+              <p className="text-sm text-brand-text-body">No benefits defined for current version.</p>
             )}
           </div>
         </div>
@@ -138,8 +138,8 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
       {/* Co-Contribution Rules */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-[#EEEEEE] flex items-center gap-2">
-          <Percent size={15} className="text-avenue-indigo" />
-          <h2 className="font-bold text-avenue-text-heading font-heading">Co-Contribution Rules</h2>
+          <Percent size={15} className="text-brand-indigo" />
+          <h2 className="font-bold text-brand-text-heading font-heading">Co-Contribution Rules</h2>
         </div>
         <div className="p-5">
           <CoContributionRulesManager
@@ -154,7 +154,7 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
       {pkg.versions.length > 1 && (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-[#EEEEEE]">
-            <h2 className="font-bold text-avenue-text-heading font-heading">Version History</h2>
+            <h2 className="font-bold text-brand-text-heading font-heading">Version History</h2>
           </div>
           <table className="w-full text-left text-sm">
             <thead>
@@ -165,10 +165,10 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
                 <th className="px-5 py-3">Current</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#EEEEEE] text-avenue-text-body">
+            <tbody className="divide-y divide-[#EEEEEE] text-brand-text-body">
               {pkg.versions.map(v => (
                 <tr key={v.id} className="hover:bg-[#F8F9FA]">
-                  <td className="px-5 py-3 font-mono font-semibold text-avenue-text-heading">v{v.versionNumber}</td>
+                  <td className="px-5 py-3 font-mono font-semibold text-brand-text-heading">v{v.versionNumber}</td>
                   <td className="px-5 py-3">{new Date(v.effectiveFrom).toLocaleDateString("en-KE")}</td>
                   <td className="px-5 py-3">{v.benefits.length} categories</td>
                   <td className="px-5 py-3">
@@ -177,7 +177,7 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
                         <CheckCircle size={12} /> Current
                       </span>
                     ) : (
-                      <span className="text-avenue-text-muted text-xs">—</span>
+                      <span className="text-brand-text-muted text-xs">—</span>
                     )}
                   </td>
                 </tr>

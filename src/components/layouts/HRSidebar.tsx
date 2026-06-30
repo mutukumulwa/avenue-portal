@@ -58,12 +58,12 @@ function NavItemRow({ item, pathname }: { item: NavItem; pathname: string }) {
         href={item.href}
         className={`group flex items-center rounded-[8px] px-2 py-2 transition-colors ${
           isActive
-            ? "bg-avenue-indigo/10 text-avenue-indigo"
-            : "text-avenue-text-body hover:bg-avenue-bg-alt hover:text-avenue-indigo"
+            ? "bg-brand-indigo/10 text-brand-indigo"
+            : "text-brand-text-body hover:bg-brand-bg-alt hover:text-brand-indigo"
         }`}
       >
         <Icon className={`h-4 w-4 shrink-0 transition-colors ${
-          isActive ? "text-avenue-indigo" : "group-hover:text-avenue-indigo text-avenue-text-muted"
+          isActive ? "text-brand-indigo" : "group-hover:text-brand-indigo text-brand-text-muted"
         }`} />
         <span className="ml-2.5 text-sm font-semibold">{item.label}</span>
       </Link>
@@ -74,7 +74,7 @@ function NavItemRow({ item, pathname }: { item: NavItem; pathname: string }) {
 function NavGroupSection({ group, pathname }: { group: NavGroup; pathname: string }) {
   return (
     <div className="mb-4">
-      <div className="px-2 py-1.5 text-[10px] font-bold uppercase text-avenue-text-muted">
+      <div className="px-2 py-1.5 text-[10px] font-bold uppercase text-brand-text-muted">
         {group.label}
       </div>
       <ul className="space-y-0.5 mt-1">
@@ -94,10 +94,10 @@ export function HRSidebar({ groupName, userRole }: { groupName: string; userRole
       <div className="flex h-full flex-col overflow-y-auto px-3 py-4">
         {/* Logo */}
         <Link href="/hr/dashboard" className="mb-4 flex items-center pl-1 space-x-2">
-          <div className="h-8 w-8 bg-avenue-indigo rounded-full shrink-0" />
-          <span className="text-lg font-bold font-heading text-avenue-indigo leading-tight">
+          <div className="h-8 w-8 bg-brand-indigo rounded-full shrink-0" />
+          <span className="text-lg font-bold font-heading text-brand-indigo leading-tight">
             AiCare<br />
-            <span className="text-xs font-semibold text-avenue-text-muted font-body">{groupName}</span>
+            <span className="text-xs font-semibold text-brand-text-muted font-body">{groupName}</span>
           </span>
         </Link>
 
@@ -115,7 +115,7 @@ export function HRSidebar({ groupName, userRole }: { groupName: string; userRole
         <div className="pt-3 border-t border-[#EEEEEE] space-y-0.5">
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
-            className="w-full group flex items-center rounded-[8px] px-2 py-2 text-avenue-error hover:bg-red-50 transition-colors"
+            className="w-full group flex items-center rounded-[8px] px-2 py-2 text-brand-error hover:bg-red-50 transition-colors"
           >
             <LogOut className="h-4 w-4 shrink-0" />
             <span className="ml-2.5 text-sm font-semibold">Log out</span>

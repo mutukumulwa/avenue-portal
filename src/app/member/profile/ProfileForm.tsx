@@ -30,52 +30,52 @@ export function ProfileForm({ member }: { member: Member }) {
 
       <div className="grid sm:grid-cols-2 gap-4">
         <div>
-          <label className="block text-xs font-bold text-avenue-text-muted uppercase mb-1">First Name</label>
+          <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">First Name</label>
           <input
             type="text"
             value={member.firstName}
             disabled
-            className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2.5 text-sm bg-[#F8F9FA] text-avenue-text-muted cursor-not-allowed"
+            className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2.5 text-sm bg-[#F8F9FA] text-brand-text-muted cursor-not-allowed"
           />
-          <p className="text-[10px] text-avenue-text-muted mt-1">Contact Medvex to change your name.</p>
+          <p className="text-[10px] text-brand-text-muted mt-1">Contact Medvex to change your name.</p>
         </div>
         <div>
-          <label className="block text-xs font-bold text-avenue-text-muted uppercase mb-1">Last Name</label>
+          <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Last Name</label>
           <input
             type="text"
             value={member.lastName}
             disabled
-            className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2.5 text-sm bg-[#F8F9FA] text-avenue-text-muted cursor-not-allowed"
+            className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2.5 text-sm bg-[#F8F9FA] text-brand-text-muted cursor-not-allowed"
           />
         </div>
       </div>
 
       <div>
-        <label className="block text-xs font-bold text-avenue-text-muted uppercase mb-1">Phone Number</label>
+        <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Phone Number</label>
         <input
           name="phone"
           type="tel"
           defaultValue={member.phone ?? ""}
           placeholder="+254 7XX XXX XXX"
-          className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-avenue-indigo transition-colors"
+          className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-brand-indigo transition-colors"
         />
       </div>
 
       <div>
-        <label className="block text-xs font-bold text-avenue-text-muted uppercase mb-1">Email Address</label>
+        <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Email Address</label>
         <input
           name="email"
           type="email"
           defaultValue={member.email ?? ""}
           placeholder="you@example.com"
-          className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-avenue-indigo transition-colors"
+          className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-brand-indigo transition-colors"
         />
       </div>
 
       <button
         type="submit"
         disabled={isPending}
-        className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-6 py-2.5 rounded-full font-semibold text-sm transition-colors disabled:opacity-60"
+        className="bg-brand-indigo hover:bg-brand-secondary text-white px-6 py-2.5 rounded-full font-semibold text-sm transition-colors disabled:opacity-60"
       >
         {isPending ? "Saving…" : "Save Changes"}
       </button>

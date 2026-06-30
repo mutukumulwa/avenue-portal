@@ -26,19 +26,19 @@ export default async function BrokerGroupDetailPage({ params }: { params: Promis
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <Link href="/broker/groups" className="text-avenue-text-muted hover:text-avenue-indigo transition-colors"><ArrowLeft size={20} /></Link>
+        <Link href="/broker/groups" className="text-brand-text-muted hover:text-brand-indigo transition-colors"><ArrowLeft size={20} /></Link>
         <div>
-          <h1 className="text-2xl font-bold font-heading text-avenue-text-heading">{group.name}</h1>
-          <p className="text-sm text-avenue-text-muted mt-1">{group.package.name} · {group.status}</p>
+          <h1 className="text-2xl font-bold font-heading text-brand-text-heading">{group.name}</h1>
+          <p className="text-sm text-brand-text-muted mt-1">{group.package.name} · {group.status}</p>
         </div>
       </div>
       <div className="grid md:grid-cols-3 gap-4">
-        <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm"><p className="text-xs font-bold uppercase text-avenue-text-muted">Members</p><p className="text-2xl font-bold text-avenue-indigo">{group._count.members}</p></div>
-        <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm"><p className="text-xs font-bold uppercase text-avenue-text-muted">Endorsements</p><p className="text-2xl font-bold text-[#17A2B8]">{group._count.endorsements}</p></div>
-        <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm"><p className="text-xs font-bold uppercase text-avenue-text-muted">Annual Limit</p><p className="text-2xl font-bold text-[#28A745]">KES {Number(group.package.annualLimit).toLocaleString()}</p></div>
+        <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm"><p className="text-xs font-bold uppercase text-brand-text-muted">Members</p><p className="text-2xl font-bold text-brand-indigo">{group._count.members}</p></div>
+        <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm"><p className="text-xs font-bold uppercase text-brand-text-muted">Endorsements</p><p className="text-2xl font-bold text-[#17A2B8]">{group._count.endorsements}</p></div>
+        <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm"><p className="text-xs font-bold uppercase text-brand-text-muted">Annual Limit</p><p className="text-2xl font-bold text-[#28A745]">KES {Number(group.package.annualLimit).toLocaleString()}</p></div>
       </div>
       <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-[#EEEEEE]"><h2 className="font-bold text-avenue-text-heading">Active Members</h2></div>
+        <div className="px-5 py-4 border-b border-[#EEEEEE]"><h2 className="font-bold text-brand-text-heading">Active Members</h2></div>
         <table className="w-full text-sm">
           <tbody className="divide-y divide-[#EEEEEE]">
             {group.members.map(member => (

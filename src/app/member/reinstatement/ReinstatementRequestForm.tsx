@@ -22,7 +22,7 @@ export function ReinstatementRequestForm() {
       <button
         type="submit"
         disabled={pending}
-        className="w-full bg-avenue-indigo text-white py-2.5 rounded-full font-bold text-sm hover:bg-blue-800 transition-colors disabled:opacity-60"
+        className="w-full bg-brand-indigo text-white py-2.5 rounded-full font-bold text-sm hover:bg-blue-800 transition-colors disabled:opacity-60"
       >
         {pending ? "Submitting…" : "Submit Reinstatement Request"}
       </button>

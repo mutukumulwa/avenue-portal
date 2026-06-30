@@ -99,11 +99,11 @@ export function MemberCheckInCard({
   }
 
   return (
-    <div className={`rounded-lg border bg-white p-5 ${highlighted ? "border-avenue-indigo ring-2 ring-avenue-indigo/15" : "border-[#EEEEEE]"}`}>
-      <p className="text-xs font-bold uppercase text-avenue-text-muted">Pending check-in</p>
-      <h2 className="mt-1 font-bold text-avenue-text-heading">{notification.challenge.provider.name}</h2>
-      <p className="mt-1 text-sm text-avenue-text-muted">{notification.body}</p>
-      <p className="mt-2 text-xs text-avenue-text-muted">
+    <div className={`rounded-lg border bg-white p-5 ${highlighted ? "border-brand-indigo ring-2 ring-brand-indigo/15" : "border-[#EEEEEE]"}`}>
+      <p className="text-xs font-bold uppercase text-brand-text-muted">Pending check-in</p>
+      <h2 className="mt-1 font-bold text-brand-text-heading">{notification.challenge.provider.name}</h2>
+      <p className="mt-1 text-sm text-brand-text-muted">{notification.body}</p>
+      <p className="mt-2 text-xs text-brand-text-muted">
         Requested by {notification.challenge.initiatedBy.firstName} {notification.challenge.initiatedBy.lastName}. Expires at {notification.expiresAt.toLocaleTimeString()}.
       </p>
 
@@ -112,7 +112,7 @@ export function MemberCheckInCard({
           type="button"
           onClick={verifyBiometrically}
           disabled={biometricPending}
-          className="mt-4 inline-flex items-center gap-2 rounded-full bg-avenue-indigo px-5 py-2 text-sm font-bold text-white hover:bg-avenue-secondary disabled:opacity-50"
+          className="mt-4 inline-flex items-center gap-2 rounded-full bg-brand-indigo px-5 py-2 text-sm font-bold text-white hover:bg-brand-secondary disabled:opacity-50"
         >
           <Fingerprint className="h-4 w-4" />
           {biometricPending ? "Verifying..." : "Verify with biometrics"}
@@ -121,12 +121,12 @@ export function MemberCheckInCard({
 
       <form action={formAction} className="mt-4">
         <input type="hidden" name="challengeId" value={notification.challengeId} />
-        <button disabled={pending} className="rounded-full border border-[#DDDDDD] px-5 py-2 text-sm font-bold text-avenue-text-body hover:bg-avenue-bg-alt disabled:opacity-50">
+        <button disabled={pending} className="rounded-full border border-[#DDDDDD] px-5 py-2 text-sm font-bold text-brand-text-body hover:bg-brand-bg-alt disabled:opacity-50">
           {pending ? "Confirming..." : hasBiometricCredential ? "Use in-app fallback" : "I am at reception"}
         </button>
       </form>
-      {biometricError && <p className="mt-3 text-sm font-semibold text-avenue-error">{biometricError}</p>}
-      {state.error && <p className="mt-3 text-sm font-semibold text-avenue-error">{state.error}</p>}
+      {biometricError && <p className="mt-3 text-sm font-semibold text-brand-error">{biometricError}</p>}
+      {state.error && <p className="mt-3 text-sm font-semibold text-brand-error">{state.error}</p>}
     </div>
   );
 }

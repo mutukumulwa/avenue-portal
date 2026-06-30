@@ -14,7 +14,7 @@ export function DashboardCharts({ memberTrendData, relationshipData }: Dashboard
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
       {/* 12 Month Trend */}
       <div className="bg-white p-5 rounded-xl border border-[#EEEEEE] shadow-sm">
-        <h3 className="text-sm font-bold text-avenue-text-heading font-heading mb-4">Membership Trend (12 Months)</h3>
+        <h3 className="text-sm font-bold text-brand-text-heading font-heading mb-4">Membership Trend (12 Months)</h3>
         <div className="h-64">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={memberTrendData}>
@@ -32,7 +32,7 @@ export function DashboardCharts({ memberTrendData, relationshipData }: Dashboard
 
       {/* Relationship Composition */}
       <div className="bg-white p-5 rounded-xl border border-[#EEEEEE] shadow-sm">
-        <h3 className="text-sm font-bold text-avenue-text-heading font-heading mb-4">Membership Composition</h3>
+        <h3 className="text-sm font-bold text-brand-text-heading font-heading mb-4">Membership Composition</h3>
         <div className="h-64 flex flex-col items-center">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
@@ -57,7 +57,7 @@ export function DashboardCharts({ memberTrendData, relationshipData }: Dashboard
           </ResponsiveContainer>
           <div className="flex flex-wrap justify-center gap-4 mt-2">
             {relationshipData.map((entry, index) => (
-               <div key={entry.name} className="flex items-center text-xs text-avenue-text-muted font-semibold">
+               <div key={entry.name} className="flex items-center text-xs text-brand-text-muted font-semibold">
                  <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: COLORS[index % COLORS.length] }}></div>
                  <span>{entry.name} ({entry.value})</span>
                </div>

@@ -58,57 +58,57 @@ export default async function MemberLettersPage({ params }: { params: Promise<{ 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <Link href={`/members/${id}`} className="text-avenue-text-muted hover:text-avenue-indigo transition-colors">
+        <Link href={`/members/${id}`} className="text-brand-text-muted hover:text-brand-indigo transition-colors">
           <ArrowLeft size={20} />
         </Link>
         <div>
-          <h1 className="text-xl font-bold text-avenue-text-heading font-heading">
+          <h1 className="text-xl font-bold text-brand-text-heading font-heading">
             Letters — {member.firstName} {member.lastName}
           </h1>
-          <p className="text-sm text-avenue-text-muted mt-0.5">{member.memberNumber}</p>
+          <p className="text-sm text-brand-text-muted mt-0.5">{member.memberNumber}</p>
         </div>
       </div>
 
       {/* Generate letter form */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-4">
-        <h2 className="font-semibold text-avenue-text-heading text-sm flex items-center gap-2">
-          <FileText size={15} className="text-avenue-indigo" /> Generate Letter
+        <h2 className="font-semibold text-brand-text-heading text-sm flex items-center gap-2">
+          <FileText size={15} className="text-brand-indigo" /> Generate Letter
         </h2>
         <form action={generateLetterAction} className="space-y-4">
           <input type="hidden" name="memberId" value={id} />
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-avenue-text-muted mb-1">Letter Type</label>
+              <label className="block text-xs font-semibold text-brand-text-muted mb-1">Letter Type</label>
               <select name="letterType" required
-                className="w-full border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-avenue-indigo focus:outline-none">
+                className="w-full border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-brand-indigo focus:outline-none">
                 {LETTER_TYPES.map((t) => (
                   <option key={t.value} value={t.value}>{t.label} — {t.description}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-avenue-text-muted mb-1">Effective / Renewal Date (if applicable)</label>
+              <label className="block text-xs font-semibold text-brand-text-muted mb-1">Effective / Renewal Date (if applicable)</label>
               <input name="effectiveDate" type="date"
-                className="w-full border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-avenue-indigo focus:outline-none" />
+                className="w-full border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-brand-indigo focus:outline-none" />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-avenue-text-muted mb-1">Reason / Additional Context (optional)</label>
+            <label className="block text-xs font-semibold text-brand-text-muted mb-1">Reason / Additional Context (optional)</label>
             <input name="reason" type="text" placeholder="e.g. non-payment of contributions"
               className="w-full border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm" />
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-avenue-text-muted mb-1">Custom memo content (Custom Memo type only)</label>
+            <label className="block text-xs font-semibold text-brand-text-muted mb-1">Custom memo content (Custom Memo type only)</label>
             <textarea name="content" rows={3} placeholder="Enter the body of your custom memo here…"
               className="w-full border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm resize-none" />
           </div>
 
           <div className="flex justify-end">
             <button type="submit"
-              className="bg-avenue-indigo text-white px-5 py-2 rounded-full text-sm font-semibold hover:bg-avenue-secondary transition-colors flex items-center gap-2">
+              className="bg-brand-indigo text-white px-5 py-2 rounded-full text-sm font-semibold hover:bg-brand-secondary transition-colors flex items-center gap-2">
               <FileText size={14} /> Generate & Download
             </button>
           </div>
@@ -118,19 +118,19 @@ export default async function MemberLettersPage({ params }: { params: Promise<{ 
       {/* Letter history */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
         <div className="px-5 py-3 border-b border-[#EEEEEE] flex items-center gap-2">
-          <Mail size={15} className="text-avenue-text-muted" />
-          <h2 className="font-semibold text-avenue-text-heading text-sm">Letter History</h2>
-          <span className="ml-auto text-xs text-avenue-text-muted">{letters.length} letter{letters.length !== 1 ? "s" : ""}</span>
+          <Mail size={15} className="text-brand-text-muted" />
+          <h2 className="font-semibold text-brand-text-heading text-sm">Letter History</h2>
+          <span className="ml-auto text-xs text-brand-text-muted">{letters.length} letter{letters.length !== 1 ? "s" : ""}</span>
         </div>
         {letters.length === 0 ? (
-          <p className="px-5 py-8 text-center text-sm text-avenue-text-muted">No letters generated yet.</p>
+          <p className="px-5 py-8 text-center text-sm text-brand-text-muted">No letters generated yet.</p>
         ) : (
           <div className="divide-y divide-[#EEEEEE]">
             {letters.map((l) => (
               <div key={l.id} className="px-5 py-3 flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-semibold text-avenue-text-heading">{l.subject}</p>
-                  <p className="text-xs text-avenue-text-muted mt-0.5">
+                  <p className="text-sm font-semibold text-brand-text-heading">{l.subject}</p>
+                  <p className="text-xs text-brand-text-muted mt-0.5">
                     {new Date(l.sentAt).toLocaleDateString("en-KE", { day: "2-digit", month: "short", year: "numeric" })}
                   </p>
                 </div>

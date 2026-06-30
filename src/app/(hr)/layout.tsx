@@ -45,7 +45,7 @@ export default async function HRLayout({
         {session.user.tenantId && (
           <TenantThemeInjector tenantId={session.user.tenantId} />
         )}
-        <div className="flex min-h-screen bg-avenue-bg-alt/30">
+        <div className="flex min-h-screen bg-brand-bg-alt/30">
           <HRSidebar groupName={groupName} userRole={session.user.role as string} />
           <div className="flex-1 ml-60 p-8">
             <Breadcrumbs />

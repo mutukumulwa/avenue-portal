@@ -47,30 +47,30 @@ function dateInputValue(date: Date | null | undefined) {
 export function BrokerForm({ broker, parentBrokers = [] }: BrokerFormProps) {
   const action = broker ? updateBrokerAction.bind(null, broker.id) : createBrokerAction;
   const [state, formAction, pending] = useActionState(action, null);
-  const input = "w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-avenue-indigo bg-white";
+  const input = "w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo bg-white";
 
   return (
     <form action={formAction} className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-4">
       {state?.error && <p className="text-sm text-[#DC3545] bg-[#DC3545]/10 rounded-md px-3 py-2">{state.error}</p>}
       <div className="grid md:grid-cols-2 gap-4">
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Business Source Name</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Business Source Name</span>
           <input name="name" required defaultValue={broker?.name ?? ""} className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Source Code</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Source Code</span>
           <input name="brokerCode" defaultValue={broker?.brokerCode ?? ""} className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Legal Name</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Legal Name</span>
           <input name="legalName" defaultValue={broker?.legalName ?? ""} className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Trading Name</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Trading Name</span>
           <input name="tradingName" defaultValue={broker?.tradingName ?? ""} className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Hierarchy Type</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Hierarchy Type</span>
           <select name="brokerType" defaultValue={broker?.brokerType ?? "MASTER_BROKER"} className={input}>
             <option value="MASTER_BROKER">Master Broker</option>
             <option value="SUB_AGENT">Sub Agent</option>
@@ -80,7 +80,7 @@ export function BrokerForm({ broker, parentBrokers = [] }: BrokerFormProps) {
           </select>
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Intermediary Category</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Intermediary Category</span>
           <select name="intermediaryCategory" defaultValue={broker?.intermediaryCategory ?? "REGULATED_BROKER"} className={input}>
             <option value="REGULATED_BROKER">Regulated Broker</option>
             <option value="REGULATED_AGENT">Regulated Agent</option>
@@ -93,7 +93,7 @@ export function BrokerForm({ broker, parentBrokers = [] }: BrokerFormProps) {
           </select>
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Parent Source</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Parent Source</span>
           <select name="parentBrokerId" defaultValue={broker?.parentBrokerId ?? ""} className={input}>
             <option value="">None</option>
             {parentBrokers.map((parent) => (
@@ -104,19 +104,19 @@ export function BrokerForm({ broker, parentBrokers = [] }: BrokerFormProps) {
           </select>
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">IRA License</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">IRA License</span>
           <input name="licenseNumber" defaultValue={broker?.licenseNumber ?? ""} className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">IRA Expiry Date</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">IRA Expiry Date</span>
           <input name="iraExpiryDate" type="date" defaultValue={dateInputValue(broker?.iraExpiryDate)} className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">KRA PIN</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">KRA PIN</span>
           <input name="kraPin" defaultValue={broker?.kraPin ?? ""} className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Payout Basis</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Payout Basis</span>
           <select name="commissionBasis" defaultValue={broker?.commissionBasis ?? "COMMISSION"} className={input}>
             <option value="COMMISSION">Commission</option>
             <option value="REFERRAL_FEE">Referral Fee</option>
@@ -125,78 +125,78 @@ export function BrokerForm({ broker, parentBrokers = [] }: BrokerFormProps) {
           </select>
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Referral Fee Amount</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Referral Fee Amount</span>
           <input name="referralFeeAmount" type="number" min="0" step="0.01" defaultValue={broker?.referralFeeAmount ?? ""} className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Contact Person</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Contact Person</span>
           <input name="contactPerson" required defaultValue={broker?.contactPerson ?? ""} className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Email</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Email</span>
           <input name="email" type="email" required defaultValue={broker?.email ?? ""} className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Phone</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Phone</span>
           <input name="phone" required defaultValue={broker?.phone ?? ""} className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Address</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Address</span>
           <input name="address" defaultValue={broker?.address ?? ""} className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">VAT Number</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">VAT Number</span>
           <input name="vatNumber" defaultValue={broker?.vatNumber ?? ""} className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Bank Account Reference</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Bank Account Reference</span>
           <input name="bankAccountReference" defaultValue={broker?.bankAccountReference ?? ""} className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">M-Pesa Paybill</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">M-Pesa Paybill</span>
           <input name="mpesaPaybillNumber" defaultValue={broker?.mpesaPaybillNumber ?? ""} className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">First-Year Commission %</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">First-Year Commission %</span>
           <input name="firstYearCommissionPct" type="number" min="0" max="100" step="0.01" defaultValue={broker?.firstYearCommissionPct ?? 0} className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Renewal Commission %</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Renewal Commission %</span>
           <input name="renewalCommissionPct" type="number" min="0" max="100" step="0.01" defaultValue={broker?.renewalCommissionPct ?? 0} className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Flat Fee / Member</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Flat Fee / Member</span>
           <input name="flatFeePerMember" type="number" min="0" step="0.01" defaultValue={broker?.flatFeePerMember ?? ""} className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Effective From</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Effective From</span>
           <input name="effectiveFrom" type="date" defaultValue={dateInputValue(broker?.effectiveFrom) || dateInputValue(new Date())} className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Effective To</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Effective To</span>
           <input name="effectiveTo" type="date" defaultValue={dateInputValue(broker?.effectiveTo)} className={input} />
         </label>
         <label className="space-y-1">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Status</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Status</span>
           <select name="status" defaultValue={broker?.status ?? "ACTIVE"} className={input}>
             <option value="ACTIVE">Active</option>
             <option value="INACTIVE">Inactive</option>
           </select>
         </label>
-        <label className="flex items-center gap-2 pt-6 text-sm font-semibold text-avenue-text-heading">
-          <input name="vatRegistered" type="checkbox" defaultChecked={broker?.vatRegistered ?? false} className="h-4 w-4 rounded border-[#EEEEEE] accent-avenue-indigo" />
+        <label className="flex items-center gap-2 pt-6 text-sm font-semibold text-brand-text-heading">
+          <input name="vatRegistered" type="checkbox" defaultChecked={broker?.vatRegistered ?? false} className="h-4 w-4 rounded border-[#EEEEEE] accent-brand-indigo" />
           VAT registered
         </label>
-        <label className="flex items-center gap-2 pt-6 text-sm font-semibold text-avenue-text-heading">
-          <input name="requiresIraRegistration" type="checkbox" defaultChecked={broker?.requiresIraRegistration ?? true} className="h-4 w-4 rounded border-[#EEEEEE] accent-avenue-indigo" />
+        <label className="flex items-center gap-2 pt-6 text-sm font-semibold text-brand-text-heading">
+          <input name="requiresIraRegistration" type="checkbox" defaultChecked={broker?.requiresIraRegistration ?? true} className="h-4 w-4 rounded border-[#EEEEEE] accent-brand-indigo" />
           IRA registration required
         </label>
-        <label className="flex items-center gap-2 pt-6 text-sm font-semibold text-avenue-text-heading">
-          <input name="canReceiveCommission" type="checkbox" defaultChecked={broker?.canReceiveCommission ?? true} className="h-4 w-4 rounded border-[#EEEEEE] accent-avenue-indigo" />
+        <label className="flex items-center gap-2 pt-6 text-sm font-semibold text-brand-text-heading">
+          <input name="canReceiveCommission" type="checkbox" defaultChecked={broker?.canReceiveCommission ?? true} className="h-4 w-4 rounded border-[#EEEEEE] accent-brand-indigo" />
           Eligible for payout
         </label>
         <label className="space-y-1 md:col-span-2">
-          <span className="text-xs font-bold uppercase text-avenue-text-muted">Business Source Notes</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">Business Source Notes</span>
           <textarea name="sourceDescription" rows={3} defaultValue={broker?.sourceDescription ?? ""} className={input} />
         </label>
       </div>
@@ -204,7 +204,7 @@ export function BrokerForm({ broker, parentBrokers = [] }: BrokerFormProps) {
         <Link href={broker ? `/brokers/${broker.id}` : "/brokers"} className="px-5 py-2 rounded-full border border-[#EEEEEE] text-sm font-semibold hover:bg-[#F8F9FA]">
           Cancel
         </Link>
-        <button disabled={pending} className="px-5 py-2 rounded-full bg-avenue-indigo text-white text-sm font-bold hover:bg-avenue-secondary disabled:opacity-50">
+        <button disabled={pending} className="px-5 py-2 rounded-full bg-brand-indigo text-white text-sm font-bold hover:bg-brand-secondary disabled:opacity-50">
           {pending ? "Saving..." : broker ? "Save Source" : "Create Source"}
         </button>
       </div>

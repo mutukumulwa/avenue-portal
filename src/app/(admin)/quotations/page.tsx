@@ -98,20 +98,20 @@ export default async function QuotationsPage({
     <div className="p-6 max-w-7xl mx-auto space-y-4">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Quotations</h1>
-          <p className="text-avenue-text-muted mt-1 text-sm">Track and manage all quotations and the premium calculator.</p>
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Quotations</h1>
+          <p className="text-brand-text-muted mt-1 text-sm">Track and manage all quotations and the premium calculator.</p>
         </div>
         <div className="flex items-center gap-3">
           <Link
             href="/quotations/new"
-            className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-5 py-2 rounded-full font-semibold transition-colors flex items-center gap-2 shadow-sm text-sm"
+            className="bg-brand-indigo hover:bg-brand-secondary text-white px-5 py-2 rounded-full font-semibold transition-colors flex items-center gap-2 shadow-sm text-sm"
           >
             <Plus size={16} />
             New Intake
           </Link>
           <Link
             href="/quotations/calculator"
-            className="border border-avenue-indigo text-avenue-indigo hover:bg-avenue-indigo hover:text-white px-5 py-2 rounded-full font-semibold transition-colors flex items-center gap-2 text-sm"
+            className="border border-brand-indigo text-brand-indigo hover:bg-brand-indigo hover:text-white px-5 py-2 rounded-full font-semibold transition-colors flex items-center gap-2 text-sm"
           >
             <Calculator size={16} />
             Quick Quote
@@ -122,13 +122,13 @@ export default async function QuotationsPage({
       {/* Summary stats */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Total",            count: total,    color: "text-avenue-indigo" },
+          { label: "Total",            count: total,    color: "text-brand-indigo" },
           { label: "Accepted",         count: accepted, color: "text-[#28A745]"    },
           { label: "Pending",          count: pending,  color: "text-[#856404]"    },
           { label: "Declined/Expired", count: lost,     color: "text-[#DC3545]"    },
         ].map(s => (
           <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-[8px] p-4 shadow-sm">
-            <p className="text-xs text-avenue-text-muted font-bold uppercase">{s.label}</p>
+            <p className="text-xs text-brand-text-muted font-bold uppercase">{s.label}</p>
             <p className={`text-2xl font-bold mt-1 ${s.color}`}>{s.count}</p>
           </div>
         ))}
@@ -160,18 +160,18 @@ export default async function QuotationsPage({
                 <th className="px-6 py-4">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#EEEEEE] text-avenue-text-body">
+            <tbody className="divide-y divide-[#EEEEEE] text-brand-text-body">
               {quotations.map(q => (
                 <tr key={q.id} className="hover:bg-[#F8F9FA] transition-colors">
-                  <td className="px-6 py-4 font-mono text-xs font-semibold text-avenue-text-heading">{q.quoteNumber}</td>
+                  <td className="px-6 py-4 font-mono text-xs font-semibold text-brand-text-heading">{q.quoteNumber}</td>
                   <td className="px-6 py-4">
-                    <p className="font-bold text-avenue-text-heading">{q.group?.name ?? q.prospectName ?? "—"}</p>
-                    {q.prospectIndustry && <p className="text-xs text-avenue-text-muted">{q.prospectIndustry}</p>}
+                    <p className="font-bold text-brand-text-heading">{q.group?.name ?? q.prospectName ?? "—"}</p>
+                    {q.prospectIndustry && <p className="text-xs text-brand-text-muted">{q.prospectIndustry}</p>}
                   </td>
-                  <td className="px-6 py-4 text-avenue-text-body">{q.broker?.name ?? "Direct"}</td>
-                  <td className="px-6 py-4 font-semibold text-avenue-text-heading">{q.memberCount + q.dependentCount}</td>
-                  <td className="px-6 py-4 font-semibold text-avenue-indigo">{Number(q.finalPremium).toLocaleString("en-KE")}</td>
-                  <td className="px-6 py-4 text-avenue-text-body">{q.validUntil ? new Date(q.validUntil).toLocaleDateString("en-KE") : "—"}</td>
+                  <td className="px-6 py-4 text-brand-text-body">{q.broker?.name ?? "Direct"}</td>
+                  <td className="px-6 py-4 font-semibold text-brand-text-heading">{q.memberCount + q.dependentCount}</td>
+                  <td className="px-6 py-4 font-semibold text-brand-indigo">{Number(q.finalPremium).toLocaleString("en-KE")}</td>
+                  <td className="px-6 py-4 text-brand-text-body">{q.validUntil ? new Date(q.validUntil).toLocaleDateString("en-KE") : "—"}</td>
                   <td className="px-6 py-4">
                     <span className={`px-3 py-1 text-[10px] font-bold uppercase rounded-full ${STATUS_STYLE[q.status] ?? STATUS_STYLE.DRAFT}`}>
                       {STATUS_LABEL[q.status] ?? q.status}
@@ -185,7 +185,7 @@ export default async function QuotationsPage({
                       </Link>
                     ) : (
                       <Link href={`/quotations/${q.id}`}
-                        className="text-avenue-indigo hover:text-avenue-secondary font-semibold text-xs inline-flex items-center gap-1 transition-colors">
+                        className="text-brand-indigo hover:text-brand-secondary font-semibold text-xs inline-flex items-center gap-1 transition-colors">
                         View <ArrowRight size={13} />
                       </Link>
                     )}
@@ -194,7 +194,7 @@ export default async function QuotationsPage({
               ))}
               {quotations.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-6 py-14 text-center text-avenue-text-muted">
+                  <td colSpan={8} className="px-6 py-14 text-center text-brand-text-muted">
                     <FileText size={32} className="mx-auto mb-3 opacity-30" />
                     {q || status
                       ? "No quotations match your search."

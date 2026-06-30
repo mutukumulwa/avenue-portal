@@ -56,7 +56,7 @@ export function SearchFilterBar({ placeholder = "Search…", filters = [], resul
     });
   }
 
-  const inputCls = "border border-[#EEEEEE] rounded-[8px] bg-white text-sm text-avenue-text-heading placeholder-avenue-text-muted focus:outline-none focus:ring-2 focus:ring-avenue-indigo/40 focus:border-avenue-indigo transition-colors";
+  const inputCls = "border border-[#EEEEEE] rounded-[8px] bg-white text-sm text-brand-text-heading placeholder-brand-text-muted focus:outline-none focus:ring-2 focus:ring-brand-indigo/40 focus:border-brand-indigo transition-colors";
 
   return (
     <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm px-4 py-3">
@@ -65,7 +65,7 @@ export function SearchFilterBar({ placeholder = "Search…", filters = [], resul
         <div className="relative flex-1 min-w-[180px]">
           <Search
             size={15}
-            className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors ${isPending ? "text-avenue-indigo animate-pulse" : "text-avenue-text-muted"}`}
+            className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors ${isPending ? "text-brand-indigo animate-pulse" : "text-brand-text-muted"}`}
           />
           <input
             type="search"
@@ -95,7 +95,7 @@ export function SearchFilterBar({ placeholder = "Search…", filters = [], resul
         {hasFilters && (
           <button
             onClick={clear}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-avenue-text-muted hover:text-avenue-text-heading border border-[#EEEEEE] rounded-[8px] transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-brand-text-muted hover:text-brand-text-heading border border-[#EEEEEE] rounded-[8px] transition-colors"
           >
             <X size={13} /> Clear
           </button>
@@ -103,7 +103,7 @@ export function SearchFilterBar({ placeholder = "Search…", filters = [], resul
 
         {/* Result count */}
         {resultCount !== undefined && (
-          <span className="ml-auto text-xs text-avenue-text-muted whitespace-nowrap">
+          <span className="ml-auto text-xs text-brand-text-muted whitespace-nowrap">
             {isPending ? "Searching…" : (
               hasFilters
                 ? `${resultCount} of ${totalCount ?? resultCount} result${resultCount !== 1 ? "s" : ""}`
@@ -136,9 +136,9 @@ export function SearchFilterBar({ placeholder = "Search…", filters = [], resul
 
 function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
-    <span className="inline-flex items-center gap-1 bg-avenue-indigo/10 text-avenue-indigo text-xs font-semibold px-2.5 py-1 rounded-full">
+    <span className="inline-flex items-center gap-1 bg-brand-indigo/10 text-brand-indigo text-xs font-semibold px-2.5 py-1 rounded-full">
       {label}
-      <button onClick={onRemove} className="hover:text-avenue-secondary ml-0.5">
+      <button onClick={onRemove} className="hover:text-brand-secondary ml-0.5">
         <X size={11} />
       </button>
     </span>

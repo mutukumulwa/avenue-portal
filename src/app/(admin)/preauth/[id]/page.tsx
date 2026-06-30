@@ -73,19 +73,19 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <div className="flex items-center space-x-4">
-        <Link href="/preauth" className="text-avenue-text-body hover:text-avenue-text-heading transition-colors">
+        <Link href="/preauth" className="text-brand-text-body hover:text-brand-text-heading transition-colors">
           <ArrowLeft size={24} />
         </Link>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">
             Pre-Authorization {pa.preauthNumber}
           </h1>
-          <p className="text-avenue-text-body font-body mt-1">Review and decide on this pre-authorization request.</p>
+          <p className="text-brand-text-body font-body mt-1">Review and decide on this pre-authorization request.</p>
         </div>
         <span className={`px-4 py-2 text-xs font-bold uppercase rounded-full ${
           pa.status === "APPROVED" ? "bg-[#28A745]/10 text-[#28A745]" :
           pa.status === "DECLINED" ? "bg-[#DC3545]/10 text-[#DC3545]" :
-          pa.status === "CONVERTED_TO_CLAIM" ? "bg-avenue-indigo/10 text-avenue-indigo" :
+          pa.status === "CONVERTED_TO_CLAIM" ? "bg-brand-indigo/10 text-brand-indigo" :
           "bg-[#17A2B8]/10 text-[#17A2B8]"
         }`}>
           {pa.status.replace(/_/g, " ")}
@@ -94,25 +94,25 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm">
-          <p className="text-xs text-avenue-text-muted font-bold uppercase tracking-wide">Member</p>
-          <p className="text-lg font-bold text-avenue-text-heading mt-1">{pa.member.firstName} {pa.member.lastName}</p>
-          <p className="text-sm text-avenue-text-body">{pa.member.memberNumber}</p>
-          <p className="text-xs text-avenue-text-muted mt-2">Group: {pa.member.group.name}</p>
+          <p className="text-xs text-brand-text-muted font-bold uppercase tracking-wide">Member</p>
+          <p className="text-lg font-bold text-brand-text-heading mt-1">{pa.member.firstName} {pa.member.lastName}</p>
+          <p className="text-sm text-brand-text-body">{pa.member.memberNumber}</p>
+          <p className="text-xs text-brand-text-muted mt-2">Group: {pa.member.group.name}</p>
         </div>
         <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm">
-          <p className="text-xs text-avenue-text-muted font-bold uppercase tracking-wide">Provider</p>
-          <p className="text-lg font-bold text-avenue-text-heading mt-1">{pa.provider.name}</p>
-          <p className="text-sm text-avenue-text-body capitalize">{pa.provider.type.toLowerCase()} · {pa.provider.tier}</p>
+          <p className="text-xs text-brand-text-muted font-bold uppercase tracking-wide">Provider</p>
+          <p className="text-lg font-bold text-brand-text-heading mt-1">{pa.provider.name}</p>
+          <p className="text-sm text-brand-text-body capitalize">{pa.provider.type.toLowerCase()} · {pa.provider.tier}</p>
         </div>
         <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm">
-          <p className="text-xs text-avenue-text-muted font-bold uppercase tracking-wide">Financials</p>
+          <p className="text-xs text-brand-text-muted font-bold uppercase tracking-wide">Financials</p>
           <div className="mt-2 space-y-1 text-sm">
-            <div className="flex justify-between"><span className="text-avenue-text-body">Estimated Cost</span><span className="font-bold text-avenue-text-heading">KES {Number(pa.estimatedCost).toLocaleString()}</span></div>
+            <div className="flex justify-between"><span className="text-brand-text-body">Estimated Cost</span><span className="font-bold text-brand-text-heading">KES {Number(pa.estimatedCost).toLocaleString()}</span></div>
             {pa.approvedAmount && (
-              <div className="flex justify-between"><span className="text-avenue-text-body">Approved</span><span className="font-bold text-[#28A745]">KES {Number(pa.approvedAmount).toLocaleString()}</span></div>
+              <div className="flex justify-between"><span className="text-brand-text-body">Approved</span><span className="font-bold text-[#28A745]">KES {Number(pa.approvedAmount).toLocaleString()}</span></div>
             )}
             {pa.validUntil && (
-              <div className="flex justify-between"><span className="text-avenue-text-body">Valid Until</span><span className="font-semibold text-avenue-text-heading">{new Date(pa.validUntil).toLocaleDateString()}</span></div>
+              <div className="flex justify-between"><span className="text-brand-text-body">Valid Until</span><span className="font-semibold text-brand-text-heading">{new Date(pa.validUntil).toLocaleDateString()}</span></div>
             )}
           </div>
         </div>
@@ -120,27 +120,27 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm">
-          <h3 className="text-sm font-bold text-avenue-text-heading uppercase tracking-wide mb-3 flex items-center gap-2">
-            <Info size={16} className="text-avenue-indigo" /> Diagnoses
+          <h3 className="text-sm font-bold text-brand-text-heading uppercase tracking-wide mb-3 flex items-center gap-2">
+            <Info size={16} className="text-brand-indigo" /> Diagnoses
           </h3>
           <ul className="space-y-2">
             {Array.isArray(diagnoses) && diagnoses.map((d, i) => (
               <li key={i} className="flex justify-between items-start text-sm border-b border-[#EEEEEE] pb-2 last:border-0">
-                <span className="text-avenue-text-body">{d.description}</span>
+                <span className="text-brand-text-body">{d.description}</span>
                 {d.icdCode && <span className="text-xs font-mono bg-[#F8F9FA] px-2 py-1 rounded">{d.icdCode}</span>}
               </li>
             ))}
           </ul>
         </div>
         <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm">
-          <h3 className="text-sm font-bold text-avenue-text-heading uppercase tracking-wide mb-3 flex items-center gap-2">
-            <Info size={16} className="text-avenue-indigo" /> Planned Procedures
+          <h3 className="text-sm font-bold text-brand-text-heading uppercase tracking-wide mb-3 flex items-center gap-2">
+            <Info size={16} className="text-brand-indigo" /> Planned Procedures
           </h3>
           <ul className="space-y-2">
             {Array.isArray(procedures) && procedures.map((p, i) => (
               <li key={i} className="flex justify-between items-start text-sm border-b border-[#EEEEEE] pb-2 last:border-0">
-                <span className="text-avenue-text-body">{p.description}</span>
-                <span className="font-semibold text-avenue-text-heading">KES {(p.total ?? 0).toLocaleString()}</span>
+                <span className="text-brand-text-body">{p.description}</span>
+                <span className="font-semibold text-brand-text-heading">KES {(p.total ?? 0).toLocaleString()}</span>
               </li>
             ))}
           </ul>
@@ -149,8 +149,8 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
 
       {pa.clinicalNotes && (
         <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm">
-          <h3 className="text-sm font-bold text-avenue-text-heading uppercase tracking-wide mb-2">Clinical Notes</h3>
-          <p className="text-sm text-avenue-text-body whitespace-pre-wrap">{pa.clinicalNotes}</p>
+          <h3 className="text-sm font-bold text-brand-text-heading uppercase tracking-wide mb-2">Clinical Notes</h3>
+          <p className="text-sm text-brand-text-body whitespace-pre-wrap">{pa.clinicalNotes}</p>
         </div>
       )}
 
@@ -167,33 +167,33 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
       <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm">
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
-            <h3 className="text-sm font-bold text-avenue-text-heading uppercase tracking-wide">Member-shared Health Vault records</h3>
-            <p className="text-sm text-avenue-text-body mt-1">Only records explicitly shared by the member appear here.</p>
+            <h3 className="text-sm font-bold text-brand-text-heading uppercase tracking-wide">Member-shared Health Vault records</h3>
+            <p className="text-sm text-brand-text-body mt-1">Only records explicitly shared by the member appear here.</p>
           </div>
-          <span className="rounded-full bg-avenue-indigo/10 px-2.5 py-1 text-xs font-bold text-avenue-indigo">{healthShares.length}</span>
+          <span className="rounded-full bg-brand-indigo/10 px-2.5 py-1 text-xs font-bold text-brand-indigo">{healthShares.length}</span>
         </div>
         <div className="grid gap-3 md:grid-cols-2">
           {healthShares.map((share) => (
             <article key={share.id} className="rounded-lg border border-[#EEEEEE] p-4">
-              <p className="mb-3 text-xs font-semibold text-avenue-text-body">
+              <p className="mb-3 text-xs font-semibold text-brand-text-body">
                 Shared {formatDate(share.createdAt)}
                 {share.expiresAt ? ` · expires ${formatDate(share.expiresAt)}` : " · until revoked"}
               </p>
               {share.healthFile && (
                 <>
                   <div className="flex items-start gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-avenue-indigo/10 text-avenue-indigo">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-brand-indigo/10 text-brand-indigo">
                       <FileText className="h-4 w-4" />
                     </div>
                     <div className="min-w-0">
-                      <p className="font-bold text-avenue-text-heading">{share.healthFile.title}</p>
-                      <p className="mt-1 text-sm text-avenue-text-body">
+                      <p className="font-bold text-brand-text-heading">{share.healthFile.title}</p>
+                      <p className="mt-1 text-sm text-brand-text-body">
                         {formatCategory(share.healthFile.category)} · {formatBytes(share.healthFile.fileSize)} · {formatDate(share.healthFile.capturedAt)}
                       </p>
                     </div>
                   </div>
-                  {share.healthFile.notes && <p className="mt-3 text-sm text-avenue-text-body">{share.healthFile.notes}</p>}
-                  <Link href={share.healthFile.fileUrl} className="mt-3 inline-flex text-sm font-semibold text-avenue-indigo hover:underline">
+                  {share.healthFile.notes && <p className="mt-3 text-sm text-brand-text-body">{share.healthFile.notes}</p>}
+                  <Link href={share.healthFile.fileUrl} className="mt-3 inline-flex text-sm font-semibold text-brand-indigo hover:underline">
                     Open shared file
                   </Link>
                 </>
@@ -205,11 +205,11 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
                       <NotebookPen className="h-4 w-4" />
                     </div>
                     <div className="min-w-0">
-                      <p className="font-bold text-avenue-text-heading">{formatCategory(share.journalEntry.entryType)}</p>
-                      <p className="mt-1 text-sm text-avenue-text-body">{formatDate(share.journalEntry.recordedAt)}</p>
+                      <p className="font-bold text-brand-text-heading">{formatCategory(share.journalEntry.entryType)}</p>
+                      <p className="mt-1 text-sm text-brand-text-body">{formatDate(share.journalEntry.recordedAt)}</p>
                     </div>
                   </div>
-                  <p className="mt-3 text-sm text-avenue-text-body whitespace-pre-wrap">{share.journalEntry.noteText}</p>
+                  <p className="mt-3 text-sm text-brand-text-body whitespace-pre-wrap">{share.journalEntry.noteText}</p>
                   {share.journalEntry.audioUrl && (
                     <audio controls src={share.journalEntry.audioUrl} className="mt-3 w-full">
                       <track kind="captions" />
@@ -220,7 +220,7 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
             </article>
           ))}
           {healthShares.length === 0 && (
-            <div className="rounded-lg border border-dashed border-[#D6DCE5] p-6 text-center text-sm text-avenue-text-muted md:col-span-2">
+            <div className="rounded-lg border border-dashed border-[#D6DCE5] p-6 text-center text-sm text-brand-text-muted md:col-span-2">
               No Health Vault records have been shared for this pre-authorization.
             </div>
           )}
@@ -229,18 +229,18 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
 
       {/* Convert to claim CTA for approved preauths */}
       {canConvert && (
-        <div className="bg-avenue-indigo/5 border-2 border-avenue-indigo/20 rounded-lg p-6 shadow-sm">
+        <div className="bg-brand-indigo/5 border-2 border-brand-indigo/20 rounded-lg p-6 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-bold text-avenue-text-heading flex items-center gap-2">
-                <ArrowRightCircle size={20} className="text-avenue-indigo" />
+              <h3 className="text-lg font-bold text-brand-text-heading flex items-center gap-2">
+                <ArrowRightCircle size={20} className="text-brand-indigo" />
                 Convert to Claim
               </h3>
-              <p className="text-sm text-avenue-text-body mt-1">This pre-authorization is approved. Convert it to a claim for payment processing.</p>
+              <p className="text-sm text-brand-text-body mt-1">This pre-authorization is approved. Convert it to a claim for payment processing.</p>
             </div>
             <form action={convertToClaimAction}>
               <input type="hidden" name="preauthId" value={pa.id} />
-              <button type="submit" className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-6 py-2.5 rounded-full font-semibold transition-colors shadow-sm flex items-center gap-2">
+              <button type="submit" className="bg-brand-indigo hover:bg-brand-secondary text-white px-6 py-2.5 rounded-full font-semibold transition-colors shadow-sm flex items-center gap-2">
                 <ArrowRightCircle size={18} />
                 Convert to Claim
               </button>
@@ -265,17 +265,17 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
           <h3 className="flex items-center gap-2 text-sm font-bold text-[#DC3545] uppercase tracking-wide">
             <XCircle size={16} /> Declined
           </h3>
-          {pa.declineReasonCode && <p className="text-sm font-semibold text-avenue-text-heading mt-2">Reason: {pa.declineReasonCode.replace(/_/g, " ")}</p>}
-          {pa.declineNotes && <p className="text-sm text-avenue-text-body mt-1">{pa.declineNotes}</p>}
+          {pa.declineReasonCode && <p className="text-sm font-semibold text-brand-text-heading mt-2">Reason: {pa.declineReasonCode.replace(/_/g, " ")}</p>}
+          {pa.declineNotes && <p className="text-sm text-brand-text-body mt-1">{pa.declineNotes}</p>}
         </div>
       )}
 
       {pa.status === "CONVERTED_TO_CLAIM" && pa.claim && (
-        <div className="bg-avenue-indigo/5 border border-avenue-indigo/20 rounded-lg p-5">
-          <h3 className="flex items-center gap-2 text-sm font-bold text-avenue-indigo uppercase tracking-wide">
+        <div className="bg-brand-indigo/5 border border-brand-indigo/20 rounded-lg p-5">
+          <h3 className="flex items-center gap-2 text-sm font-bold text-brand-indigo uppercase tracking-wide">
             <CheckCircle2 size={16} /> Converted to Claim
           </h3>
-          <Link href={`/claims/${pa.claim.id}`} className="text-avenue-indigo hover:text-avenue-secondary font-semibold mt-2 inline-block">
+          <Link href={`/claims/${pa.claim.id}`} className="text-brand-indigo hover:text-brand-secondary font-semibold mt-2 inline-block">
             View Claim →
           </Link>
         </div>
@@ -301,7 +301,7 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
                 ? `SLA: ${slaMinutesLeft}m remaining`
                 : "SLA active"}
             </p>
-            <p className="text-xs text-avenue-text-muted mt-0.5">
+            <p className="text-xs text-brand-text-muted mt-0.5">
               Deadline: {new Date(slaDeadline).toLocaleTimeString("en-KE", { hour: "2-digit", minute: "2-digit" })}
               {" · "}Type: {enriched?.slaType?.replace(/_/g," ") ?? "—"}
             </p>
@@ -312,19 +312,19 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
       {/* ── Process 8: Benefit hold panel ───────────────────── */}
       {(hold || benefitBalance) && (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-4">
-          <h2 className="font-bold text-avenue-text-heading text-sm font-heading border-b border-[#EEEEEE] pb-2 flex items-center gap-2">
-            <Shield size={15} className="text-avenue-indigo" /> Benefit Balance &amp; Hold
+          <h2 className="font-bold text-brand-text-heading text-sm font-heading border-b border-[#EEEEEE] pb-2 flex items-center gap-2">
+            <Shield size={15} className="text-brand-indigo" /> Benefit Balance &amp; Hold
           </h2>
           {benefitBalance && (
             <div className="grid grid-cols-4 gap-3 text-sm">
               {[
-                { label: "Annual Limit",   value: `KES ${Number(benefitBalance.limit).toLocaleString("en-KE")}`,     color: "text-avenue-text-heading" },
+                { label: "Annual Limit",   value: `KES ${Number(benefitBalance.limit).toLocaleString("en-KE")}`,     color: "text-brand-text-heading" },
                 { label: "Consumed",       value: `KES ${Number(benefitBalance.used).toLocaleString("en-KE")}`,      color: "text-[#DC3545]" },
                 { label: "Active Holds",   value: `KES ${Number(benefitBalance.held).toLocaleString("en-KE")}`,      color: "text-[#856404]" },
                 { label: "Available",      value: `KES ${Number(benefitBalance.remaining).toLocaleString("en-KE")}`, color: "text-[#28A745] font-bold" },
               ].map(({ label, value, color }) => (
                 <div key={label}>
-                  <p className="text-xs text-avenue-text-muted">{label}</p>
+                  <p className="text-xs text-brand-text-muted">{label}</p>
                   <p className={`font-semibold mt-0.5 ${color}`}>{value}</p>
                 </div>
               ))}
@@ -336,7 +336,7 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
                 <p className="text-sm font-semibold text-[#856404]">
                   Pending Authorization Hold: KES {Number(hold.heldAmount).toLocaleString("en-KE")}
                 </p>
-                <p className="text-xs text-avenue-text-muted mt-0.5">
+                <p className="text-xs text-brand-text-muted mt-0.5">
                   Expires: {new Date(hold.expiresAt).toLocaleDateString("en-KE")}
                   {" · "}Status: {hold.status}
                 </p>
@@ -358,7 +358,7 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
       {/* ── Process 8: Auto-decision log ─────────────────────── */}
       {autoLog && autoLog.length > 0 && (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-3">
-          <h2 className="font-bold text-avenue-text-heading text-sm font-heading border-b border-[#EEEEEE] pb-2">
+          <h2 className="font-bold text-brand-text-heading text-sm font-heading border-b border-[#EEEEEE] pb-2">
             Auto-Decision Gate Log
           </h2>
           <div className="space-y-1.5">
@@ -370,8 +370,8 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
                   ? <XCircle size={13} className="text-[#DC3545] mt-0.5 shrink-0" />
                   : <AlertTriangle size={13} className="text-[#856404] mt-0.5 shrink-0" />}
                 <div>
-                  <span className="font-mono font-semibold text-avenue-text-heading">{gate.gate.replace(/_/g," ")}</span>
-                  {gate.reason && <span className="text-avenue-text-muted ml-2">{gate.reason}</span>}
+                  <span className="font-mono font-semibold text-brand-text-heading">{gate.gate.replace(/_/g," ")}</span>
+                  {gate.reason && <span className="text-brand-text-muted ml-2">{gate.reason}</span>}
                 </div>
               </div>
             ))}
@@ -383,9 +383,9 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
       {parentPreAuth && (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-4 flex items-center justify-between">
           <div className="flex items-center gap-2 text-sm">
-            <PlusCircle size={15} className="text-avenue-indigo" />
-            <span className="text-avenue-text-muted">Mid-treatment amendment of</span>
-            <Link href={`/preauth/${enriched?.parentPreAuthId}`} className="text-avenue-indigo font-semibold hover:underline">
+            <PlusCircle size={15} className="text-brand-indigo" />
+            <span className="text-brand-text-muted">Mid-treatment amendment of</span>
+            <Link href={`/preauth/${enriched?.parentPreAuthId}`} className="text-brand-indigo font-semibold hover:underline">
               {parentPreAuth.preauthNumber}
             </Link>
           </div>
@@ -396,12 +396,12 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
       {canAdjudicate && (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-bold text-avenue-text-heading text-sm font-heading">Human Review Actions</h2>
+            <h2 className="font-bold text-brand-text-heading text-sm font-heading">Human Review Actions</h2>
             {!autoLog && (
               <form action={runAutoDecisionAction}>
                 <input type="hidden" name="preAuthId" value={id} />
                 <button type="submit"
-                  className="text-xs font-semibold text-avenue-indigo border border-avenue-indigo/30 px-3 py-1 rounded-full hover:bg-avenue-indigo/5 transition-colors">
+                  className="text-xs font-semibold text-brand-indigo border border-brand-indigo/30 px-3 py-1 rounded-full hover:bg-brand-indigo/5 transition-colors">
                   Run Auto-Decision
                 </button>
               </form>
@@ -464,7 +464,7 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
       {pa.status === "APPROVED" && (
         <div className="text-center">
           <Link href={`/preauth/new?parentPreAuthId=${id}`}
-            className="text-xs text-avenue-indigo font-semibold hover:underline inline-flex items-center gap-1">
+            className="text-xs text-brand-indigo font-semibold hover:underline inline-flex items-center gap-1">
             <PlusCircle size={13} /> Create mid-treatment amendment
           </Link>
         </div>

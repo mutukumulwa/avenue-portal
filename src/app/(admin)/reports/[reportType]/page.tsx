@@ -1605,12 +1605,12 @@ export default async function ReportDetailPage({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/reports" className="text-avenue-text-muted hover:text-avenue-indigo transition-colors">
+          <Link href="/reports" className="text-brand-text-muted hover:text-brand-indigo transition-colors">
             <ArrowLeft size={20} />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">{title}</h1>
-            <p className="text-avenue-text-body text-sm mt-0.5">
+            <h1 className="text-2xl font-bold text-brand-text-heading font-heading">{title}</h1>
+            <p className="text-brand-text-body text-sm mt-0.5">
               Medvex · {data.length} record{data.length !== 1 ? "s" : ""}
             </p>
           </div>
@@ -1619,7 +1619,7 @@ export default async function ReportDetailPage({
           <div className="flex items-center gap-2">
             <a
               href={`/api/reports/${reportType}/export`}
-              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-avenue-indigo border border-avenue-indigo/30 rounded-full hover:bg-avenue-indigo hover:text-white transition-colors"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-brand-indigo border border-brand-indigo/30 rounded-full hover:bg-brand-indigo hover:text-white transition-colors"
             >
               <Download size={15} />
               Export CSV
@@ -1642,8 +1642,8 @@ export default async function ReportDetailPage({
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {kpis.map(k => (
             <div key={k.label} className="bg-white border border-[#EEEEEE] rounded-lg p-4 shadow-sm">
-              <p className="text-[13px] font-bold uppercase tracking-normal text-avenue-text-muted">{k.label}</p>
-              <p className="text-2xl font-bold text-avenue-indigo mt-1 tabular-nums">{k.value}</p>
+              <p className="text-[13px] font-bold uppercase tracking-normal text-brand-text-muted">{k.label}</p>
+              <p className="text-2xl font-bold text-brand-indigo mt-1 tabular-nums">{k.value}</p>
             </div>
           ))}
         </div>
@@ -1652,25 +1652,25 @@ export default async function ReportDetailPage({
       {/* Data table */}
       <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-[#EEEEEE]">
-          <h2 className="font-bold text-avenue-text-heading font-heading">Data</h2>
+          <h2 className="font-bold text-brand-text-heading font-heading">Data</h2>
         </div>
         {data.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left font-ui">
               <thead>
-                <tr className="bg-[#F8F9FA] border-b border-[#EEEEEE] text-[13px] uppercase tracking-normal text-avenue-text-muted">
+                <tr className="bg-[#F8F9FA] border-b border-[#EEEEEE] text-[13px] uppercase tracking-normal text-brand-text-muted">
                   {headers.map(h => (
                     <th key={h} className="px-4 py-3 whitespace-nowrap font-bold">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#EEEEEE] text-avenue-text-body">
+              <tbody className="divide-y divide-[#EEEEEE] text-brand-text-body">
                 {data.map((row, i) => (
                   <tr key={i} className="hover:bg-[#F8F9FA]">
                     {row.map((cell, j) => (
                       <td key={j} className="px-4 py-3 whitespace-nowrap text-xs">
                         {typeof cell === "object" ? (
-                          <Link href={cell.href} className="font-semibold text-avenue-indigo hover:underline">
+                          <Link href={cell.href} className="font-semibold text-brand-indigo hover:underline">
                             {cell.text}
                           </Link>
                         ) : cell}
@@ -1682,7 +1682,7 @@ export default async function ReportDetailPage({
             </table>
           </div>
         ) : (
-          <div className="px-6 py-12 text-center text-avenue-text-body text-sm">
+          <div className="px-6 py-12 text-center text-brand-text-body text-sm">
             No data found.
           </div>
         )}

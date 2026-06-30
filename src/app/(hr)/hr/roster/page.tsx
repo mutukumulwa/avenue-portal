@@ -53,20 +53,20 @@ export default async function RosterPage(
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Roster</h1>
-          <p className="text-avenue-text-body font-body mt-1">Manage your active members and dependants.</p>
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Roster</h1>
+          <p className="text-brand-text-body font-body mt-1">Manage your active members and dependants.</p>
         </div>
         
         <div className="flex items-center gap-3">
-          <Link href="/hr/roster/import" className="px-4 py-2 bg-white text-avenue-text-body border border-[#EEEEEE] rounded-full text-sm font-semibold hover:bg-[#F8F9FA] transition-colors flex items-center">
+          <Link href="/hr/roster/import" className="px-4 py-2 bg-white text-brand-text-body border border-[#EEEEEE] rounded-full text-sm font-semibold hover:bg-[#F8F9FA] transition-colors flex items-center">
              <FileSpreadsheet className="w-4 h-4 mr-2" />
              Bulk Import
           </Link>
-          <button className="px-4 py-2 bg-white text-avenue-text-body border border-[#EEEEEE] rounded-full text-sm font-semibold hover:bg-[#F8F9FA] transition-colors flex items-center">
+          <button className="px-4 py-2 bg-white text-brand-text-body border border-[#EEEEEE] rounded-full text-sm font-semibold hover:bg-[#F8F9FA] transition-colors flex items-center">
              <Download className="w-4 h-4 mr-2" />
              Export CSV
           </button>
-          <Link href="/hr/roster/new" className="px-5 py-2 bg-avenue-indigo text-white rounded-full text-sm font-semibold hover:bg-avenue-secondary transition-colors flex items-center shadow-md">
+          <Link href="/hr/roster/new" className="px-5 py-2 bg-brand-indigo text-white rounded-full text-sm font-semibold hover:bg-brand-secondary transition-colors flex items-center shadow-md">
             <Plus className="w-4 h-4 mr-2" />
             Add Member
           </Link>
@@ -76,8 +76,8 @@ export default async function RosterPage(
       <div className="bg-white border border-[#EEEEEE] rounded-2xl shadow-sm overflow-hidden flex flex-col">
         {/* Filters */}
         <div className="p-4 border-b border-[#EEEEEE] bg-[#F8F9FA] flex flex-col md:flex-row gap-4">
-          <form className="flex-1 flex items-center bg-white border border-[#EEEEEE] rounded-full px-4 py-2 focus-within:border-avenue-indigo transition-colors shadow-sm">
-            <Search className="w-4 h-4 text-avenue-text-muted mr-3 shrink-0" />
+          <form className="flex-1 flex items-center bg-white border border-[#EEEEEE] rounded-full px-4 py-2 focus-within:border-brand-indigo transition-colors shadow-sm">
+            <Search className="w-4 h-4 text-brand-text-muted mr-3 shrink-0" />
             <input 
               name="q"
               defaultValue={q}
@@ -96,7 +96,7 @@ export default async function RosterPage(
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm whitespace-nowrap">
             <thead>
-              <tr className="bg-white border-b border-[#EEEEEE] text-avenue-text-muted font-heading text-xs uppercase tracking-wider">
+              <tr className="bg-white border-b border-[#EEEEEE] text-brand-text-muted font-heading text-xs uppercase tracking-wider">
                 <th className="px-6 py-4 font-bold">Member</th>
                 <th className="px-6 py-4 font-bold">Member No.</th>
                 <th className="px-6 py-4 font-bold">Relationship</th>
@@ -110,8 +110,8 @@ export default async function RosterPage(
               {members.map((m) => (
                 <tr key={m.id} className="hover:bg-[#F8F9FA] transition-colors group">
                   <td className="px-6 py-4">
-                     <div className="font-bold text-avenue-text-heading">{m.firstName} {m.lastName}</div>
-                     <div className="text-xs text-avenue-text-muted mt-0.5">{m.phone || m.email || "No contact info"}</div>
+                     <div className="font-bold text-brand-text-heading">{m.firstName} {m.lastName}</div>
+                     <div className="text-xs text-brand-text-muted mt-0.5">{m.phone || m.email || "No contact info"}</div>
                   </td>
                   <td className="px-6 py-4 font-mono text-xs">{m.memberNumber}</td>
                   <td className="px-6 py-4">
@@ -120,10 +120,10 @@ export default async function RosterPage(
                      </span>
                   </td>
                   <td className="px-6 py-4">
-                     <div className="text-avenue-text-heading font-semibold">{m.package.name}</div>
-                     {m.benefitTier && <div className="text-xs text-avenue-indigo mt-0.5">{m.benefitTier.name}</div>}
+                     <div className="text-brand-text-heading font-semibold">{m.package.name}</div>
+                     {m.benefitTier && <div className="text-xs text-brand-indigo mt-0.5">{m.benefitTier.name}</div>}
                   </td>
-                  <td className="px-6 py-4 text-avenue-text-body">{new Date(m.enrollmentDate).toLocaleDateString()}</td>
+                  <td className="px-6 py-4 text-brand-text-body">{new Date(m.enrollmentDate).toLocaleDateString()}</td>
                   <td className="px-6 py-4">
                      <span className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full ${getStatusBadge(m.status)}`}>
                         {m.status.replace(/_/g, " ")}
@@ -132,7 +132,7 @@ export default async function RosterPage(
                   <td className="px-6 py-4 text-right">
                     <Link 
                        href={`/hr/roster/${m.id}`} 
-                       className="text-avenue-indigo hover:text-avenue-secondary inline-flex items-center opacity-0 group-hover:opacity-100 transition-opacity"
+                       className="text-brand-indigo hover:text-brand-secondary inline-flex items-center opacity-0 group-hover:opacity-100 transition-opacity"
                     >
                       <Eye className="w-4 h-4 mr-1" />
                       <span className="text-xs font-bold">View</span>
@@ -142,7 +142,7 @@ export default async function RosterPage(
               ))}
               {members.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-avenue-text-body">
+                  <td colSpan={7} className="px-6 py-12 text-center text-brand-text-body">
                      No members matching your filters.
                   </td>
                 </tr>

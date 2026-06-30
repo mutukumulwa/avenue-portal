@@ -29,12 +29,12 @@ export default async function MemberEditPage({ params }: { params: Promise<{ id:
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <Link href={`/members/${id}`} className="text-avenue-text-muted hover:text-avenue-indigo transition-colors">
+        <Link href={`/members/${id}`} className="text-brand-text-muted hover:text-brand-indigo transition-colors">
           <ArrowLeft size={20} />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Edit Member</h1>
-          <p className="text-avenue-text-body text-sm mt-0.5">{member.firstName} {member.lastName} · {member.memberNumber}</p>
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Edit Member</h1>
+          <p className="text-brand-text-body text-sm mt-0.5">{member.firstName} {member.lastName} · {member.memberNumber}</p>
         </div>
       </div>
       <MemberEditForm member={snap} />

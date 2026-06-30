@@ -63,37 +63,37 @@ export function MemberTransferPanel({ memberId, currentGroupId, currentTierId, g
           )}
           {otherTiers.length > 0 && (
             <button onClick={() => setMode("tier")}
-              className="flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-full border border-avenue-indigo/30 text-avenue-indigo hover:bg-avenue-indigo/5 transition-colors">
+              className="flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-full border border-brand-indigo/30 text-brand-indigo hover:bg-brand-indigo/5 transition-colors">
               <Layers size={13} /> Change Benefit Tier
             </button>
           )}
           {otherGroups.length === 0 && otherTiers.length === 0 && (
-            <p className="text-xs text-avenue-text-muted">No other groups or tiers available for transfer.</p>
+            <p className="text-xs text-brand-text-muted">No other groups or tiers available for transfer.</p>
           )}
         </div>
       )}
 
       {mode === "transfer" && (
         <form onSubmit={handleTransfer} className="bg-[#EFF6FF] border border-[#17A2B8]/20 rounded-lg p-4 space-y-3">
-          <p className="text-sm font-bold text-avenue-text-heading flex items-center gap-2">
+          <p className="text-sm font-bold text-brand-text-heading flex items-center gap-2">
             <ArrowRightLeft size={14} className="text-[#17A2B8]" /> Transfer to Another Scheme
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-avenue-text-muted uppercase">Destination Group</label>
-              <select name="toGroupId" required className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-avenue-indigo bg-white">
+              <label className="text-xs font-semibold text-brand-text-muted uppercase">Destination Group</label>
+              <select name="toGroupId" required className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo bg-white">
                 <option value="">Select group…</option>
                 {otherGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-avenue-text-muted uppercase">Effective Date</label>
-              <input name="effectiveDate" type="date" required className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-avenue-indigo bg-white" />
+              <label className="text-xs font-semibold text-brand-text-muted uppercase">Effective Date</label>
+              <input name="effectiveDate" type="date" required className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo bg-white" />
             </div>
           </div>
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-avenue-text-muted uppercase">Reason</label>
-            <input name="reason" type="text" placeholder="e.g. Employer change" className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-avenue-indigo bg-white" />
+            <label className="text-xs font-semibold text-brand-text-muted uppercase">Reason</label>
+            <input name="reason" type="text" placeholder="e.g. Employer change" className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo bg-white" />
           </div>
           <div className="flex justify-end gap-2">
             <button type="button" onClick={() => setMode("idle")} className="text-xs px-4 py-2 rounded-full border border-[#EEEEEE] hover:bg-[#EEEEEE] transition-colors">Cancel</button>
@@ -105,30 +105,30 @@ export function MemberTransferPanel({ memberId, currentGroupId, currentTierId, g
       )}
 
       {mode === "tier" && (
-        <form onSubmit={handleTier} className="bg-[#F8FAFF] border border-avenue-indigo/20 rounded-lg p-4 space-y-3">
-          <p className="text-sm font-bold text-avenue-text-heading flex items-center gap-2">
-            <Layers size={14} className="text-avenue-indigo" /> Change Benefit Tier
+        <form onSubmit={handleTier} className="bg-[#F8FAFF] border border-brand-indigo/20 rounded-lg p-4 space-y-3">
+          <p className="text-sm font-bold text-brand-text-heading flex items-center gap-2">
+            <Layers size={14} className="text-brand-indigo" /> Change Benefit Tier
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-avenue-text-muted uppercase">New Tier</label>
-              <select name="toBenefitTierId" required className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-avenue-indigo bg-white">
+              <label className="text-xs font-semibold text-brand-text-muted uppercase">New Tier</label>
+              <select name="toBenefitTierId" required className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo bg-white">
                 <option value="">Select tier…</option>
                 {otherTiers.map(t => <option key={t.id} value={t.id}>{t.name} ({t.packageName})</option>)}
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-avenue-text-muted uppercase">Effective Date</label>
-              <input name="effectiveDate" type="date" required className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-avenue-indigo bg-white" />
+              <label className="text-xs font-semibold text-brand-text-muted uppercase">Effective Date</label>
+              <input name="effectiveDate" type="date" required className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo bg-white" />
             </div>
           </div>
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-avenue-text-muted uppercase">Reason</label>
-            <input name="reason" type="text" placeholder="e.g. Promotion to manager grade" className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-avenue-indigo bg-white" />
+            <label className="text-xs font-semibold text-brand-text-muted uppercase">Reason</label>
+            <input name="reason" type="text" placeholder="e.g. Promotion to manager grade" className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo bg-white" />
           </div>
           <div className="flex justify-end gap-2">
             <button type="button" onClick={() => setMode("idle")} className="text-xs px-4 py-2 rounded-full border border-[#EEEEEE] hover:bg-[#EEEEEE] transition-colors">Cancel</button>
-            <button type="submit" disabled={isPending} className="text-xs font-bold px-5 py-2 rounded-full bg-avenue-indigo text-white hover:bg-avenue-secondary disabled:opacity-50 transition-colors">
+            <button type="submit" disabled={isPending} className="text-xs font-bold px-5 py-2 rounded-full bg-brand-indigo text-white hover:bg-brand-secondary disabled:opacity-50 transition-colors">
               {isPending ? "Saving…" : "Confirm Tier Change"}
             </button>
           </div>

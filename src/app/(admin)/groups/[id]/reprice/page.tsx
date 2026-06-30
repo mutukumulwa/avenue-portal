@@ -106,16 +106,16 @@ export default async function RepricingWorkbenchPage({
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <Link href={`/groups/${id}`} className="text-avenue-text-muted hover:text-avenue-indigo transition-colors">
+        <Link href={`/groups/${id}`} className="text-brand-text-muted hover:text-brand-indigo transition-colors">
           <ArrowLeft size={20} />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Renewal Repricing Workbench</h1>
-          <p className="text-avenue-text-body text-sm mt-0.5">{group.name} — Prior 12-month actuarial analysis</p>
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Renewal Repricing Workbench</h1>
+          <p className="text-brand-text-body text-sm mt-0.5">{group.name} — Prior 12-month actuarial analysis</p>
         </div>
         <Link
           href={`/quotations/calculator`}
-          className="ml-auto flex items-center gap-2 px-5 py-2 bg-avenue-indigo text-white rounded-full text-sm font-semibold hover:bg-avenue-secondary transition-colors"
+          className="ml-auto flex items-center gap-2 px-5 py-2 bg-brand-indigo text-white rounded-full text-sm font-semibold hover:bg-brand-secondary transition-colors"
         >
           <RefreshCw size={14} /> Start Renewal Quote
         </Link>
@@ -130,9 +130,9 @@ export default async function RepricingWorkbenchPage({
           { label: "Loss Ratio",                value: `${lossRatio.toFixed(1)}%`,             sub: lossRatio > 85 ? "High — recommend repricing" : lossRatio > 70 ? "Watch" : "Healthy", color: lossRatioColor },
         ].map((k) => (
           <div key={k.label} className="bg-white border border-[#EEEEEE] rounded-lg p-4 shadow-sm">
-            <p className="text-xs font-bold text-avenue-text-muted uppercase">{k.label}</p>
-            <p className={`text-2xl font-bold mt-1 ${k.color ?? "text-avenue-indigo"}`}>{k.value}</p>
-            <p className="text-xs text-avenue-text-muted mt-0.5">{k.sub}</p>
+            <p className="text-xs font-bold text-brand-text-muted uppercase">{k.label}</p>
+            <p className={`text-2xl font-bold mt-1 ${k.color ?? "text-brand-indigo"}`}>{k.value}</p>
+            <p className="text-xs text-brand-text-muted mt-0.5">{k.sub}</p>
           </div>
         ))}
       </div>
@@ -140,7 +140,7 @@ export default async function RepricingWorkbenchPage({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Suggested repricing */}
         <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm space-y-4">
-          <h2 className="font-bold text-avenue-text-heading font-heading">Suggested Renewal Rate</h2>
+          <h2 className="font-bold text-brand-text-heading font-heading">Suggested Renewal Rate</h2>
           <div className="space-y-2 text-sm">
             {[
               { label: "Base claims per life",          value: fmt(baseRatePerLife) },
@@ -150,17 +150,17 @@ export default async function RepricingWorkbenchPage({
               { label: "Current rate per life/yr",       value: currentRate > 0 ? fmt(currentRate) : "—" },
             ].map((r) => (
               <div key={r.label} className="flex justify-between border-b border-[#F8F9FA] pb-1">
-                <span className="text-avenue-text-muted">{r.label}</span>
-                <span className="font-semibold text-avenue-text-heading">{r.value}</span>
+                <span className="text-brand-text-muted">{r.label}</span>
+                <span className="font-semibold text-brand-text-heading">{r.value}</span>
               </div>
             ))}
           </div>
           <div className={`rounded-lg p-4 ${rateChange > 15 ? "bg-[#DC3545]/5 border border-[#DC3545]/20" : rateChange > 0 ? "bg-[#FFC107]/10 border border-[#FFC107]/30" : "bg-[#28A745]/5 border border-[#28A745]/20"}`}>
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs font-bold text-avenue-text-muted uppercase">Suggested Rate / Life / Year</p>
-                <p className="text-3xl font-bold text-avenue-indigo mt-1">{fmt(suggestedRate)}</p>
-                <p className="text-xs text-avenue-text-muted mt-0.5">Annual group total: {fmt(suggestedAnnual)}</p>
+                <p className="text-xs font-bold text-brand-text-muted uppercase">Suggested Rate / Life / Year</p>
+                <p className="text-3xl font-bold text-brand-indigo mt-1">{fmt(suggestedRate)}</p>
+                <p className="text-xs text-brand-text-muted mt-0.5">Annual group total: {fmt(suggestedAnnual)}</p>
               </div>
               <div className="text-right">
                 {rateChange >= 0
@@ -183,7 +183,7 @@ export default async function RepricingWorkbenchPage({
 
         {/* Claims by category */}
         <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm space-y-4">
-          <h2 className="font-bold text-avenue-text-heading font-heading">Claims by Benefit Category</h2>
+          <h2 className="font-bold text-brand-text-heading font-heading">Claims by Benefit Category</h2>
           {topCategories.length > 0 ? (
             <div className="space-y-3">
               {topCategories.map(([cat, amount]) => {
@@ -191,12 +191,12 @@ export default async function RepricingWorkbenchPage({
                 return (
                   <div key={cat}>
                     <div className="flex justify-between text-sm mb-1">
-                      <span className="font-semibold text-avenue-text-heading">{cat.replace(/_/g, " ")}</span>
-                      <span className="text-avenue-text-muted">{fmt(amount)} ({pct.toFixed(1)}%)</span>
+                      <span className="font-semibold text-brand-text-heading">{cat.replace(/_/g, " ")}</span>
+                      <span className="text-brand-text-muted">{fmt(amount)} ({pct.toFixed(1)}%)</span>
                     </div>
                     <div className="h-2 bg-[#F8F9FA] rounded-full overflow-hidden">
                       <div
-                        className="h-full bg-avenue-indigo rounded-full"
+                        className="h-full bg-brand-indigo rounded-full"
                         style={{ width: `${Math.min(100, pct)}%` }}
                       />
                     </div>
@@ -205,13 +205,13 @@ export default async function RepricingWorkbenchPage({
               })}
             </div>
           ) : (
-            <p className="text-sm text-avenue-text-muted">No approved claims in the prior 12 months.</p>
+            <p className="text-sm text-brand-text-muted">No approved claims in the prior 12 months.</p>
           )}
 
           {/* Monthly trend */}
           {monthlyTrend.length > 0 && (
             <div className="pt-4 border-t border-[#EEEEEE]">
-              <p className="text-xs font-bold text-avenue-text-muted uppercase mb-3">Monthly Claims Trend</p>
+              <p className="text-xs font-bold text-brand-text-muted uppercase mb-3">Monthly Claims Trend</p>
               <div className="flex items-end gap-1 h-20">
                 {monthlyTrend.map(({ month, amount }) => {
                   const max = Math.max(...monthlyTrend.map((m) => m.amount));
@@ -219,10 +219,10 @@ export default async function RepricingWorkbenchPage({
                   return (
                     <div key={month} className="flex-1 flex flex-col items-center gap-1" title={`${month}: ${fmt(amount)}`}>
                       <div
-                        className="w-full bg-avenue-indigo/70 rounded-t"
+                        className="w-full bg-brand-indigo/70 rounded-t"
                         style={{ height: `${h}%` }}
                       />
-                      <span className="text-[8px] text-avenue-text-muted rotate-45 origin-left">
+                      <span className="text-[8px] text-brand-text-muted rotate-45 origin-left">
                         {month.slice(5)}
                       </span>
                     </div>
@@ -237,8 +237,8 @@ export default async function RepricingWorkbenchPage({
       {/* Benefit redesign suggestions */}
       {lossRatio > 70 && (
         <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm">
-          <h2 className="font-bold text-avenue-text-heading font-heading mb-3">Benefit Redesign Recommendations</h2>
-          <ul className="space-y-2 text-sm text-avenue-text-body">
+          <h2 className="font-bold text-brand-text-heading font-heading mb-3">Benefit Redesign Recommendations</h2>
+          <ul className="space-y-2 text-sm text-brand-text-body">
             {lossRatio > 85 && (
               <>
                 <li className="flex items-start gap-2"><span className="text-[#DC3545] font-bold shrink-0">•</span> Introduce or increase inpatient copay (10–20%) to manage high-cost admissions.</li>
@@ -250,7 +250,7 @@ export default async function RepricingWorkbenchPage({
                 {topCategories[0][0].replace(/_/g, " ")} accounts for over 40% of claims — consider a per-visit sub-limit or preferred provider network restriction.
               </li>
             )}
-            <li className="flex items-start gap-2"><span className="text-avenue-indigo font-bold shrink-0">•</span> Consider wellness benefits (dental check-ups, eye tests) to encourage early detection and reduce future inpatient spend.</li>
+            <li className="flex items-start gap-2"><span className="text-brand-indigo font-bold shrink-0">•</span> Consider wellness benefits (dental check-ups, eye tests) to encourage early detection and reduce future inpatient spend.</li>
           </ul>
         </div>
       )}

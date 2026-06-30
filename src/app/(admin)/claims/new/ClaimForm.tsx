@@ -41,8 +41,8 @@ const STEPS = [
   { label: "Services & Billing",icon: FileText  },
 ];
 
-const inputCls = "w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo transition-colors";
-const labelCls = "text-xs font-bold text-avenue-text-muted uppercase block mb-1";
+const inputCls = "w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo transition-colors";
+const labelCls = "text-xs font-bold text-brand-text-muted uppercase block mb-1";
 
 export function ClaimForm({ members, providers }: { members: Member[]; providers: Provider[] }) {
   const [step, setStep]       = useState(0);
@@ -127,12 +127,12 @@ export function ClaimForm({ members, providers }: { members: Member[]; providers
               <div className={`flex items-center gap-1.5 ${i === step ? "" : "opacity-60"}`}>
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
                   i < step  ? "bg-[#28A745] text-white" :
-                  i === step ? "bg-avenue-indigo text-white" :
+                  i === step ? "bg-brand-indigo text-white" :
                   "bg-[#E6E7E8] text-[#6C757D]"
                 }`}>
                   {i < step ? "✓" : <Icon size={14} />}
                 </div>
-                <span className={`text-xs font-semibold hidden sm:block ${i === step ? "text-avenue-indigo" : "text-avenue-text-muted"}`}>
+                <span className={`text-xs font-semibold hidden sm:block ${i === step ? "text-brand-indigo" : "text-brand-text-muted"}`}>
                   {s.label}
                 </span>
               </div>
@@ -150,7 +150,7 @@ export function ClaimForm({ members, providers }: { members: Member[]; providers
         {/* ── Step 1: Member & Provider ── */}
         {step === 0 && (
           <div className="space-y-5">
-            <h2 className="font-bold text-avenue-text-heading font-heading">Step 1 — Member &amp; Provider</h2>
+            <h2 className="font-bold text-brand-text-heading font-heading">Step 1 — Member &amp; Provider</h2>
 
             <div>
               <label className={labelCls}>Member *</label>
@@ -165,10 +165,10 @@ export function ClaimForm({ members, providers }: { members: Member[]; providers
                 }))}
               />
               {selectedMember && (
-                <div className="mt-2 p-3 bg-avenue-indigo/5 rounded-lg text-xs grid grid-cols-3 gap-2">
-                  <div><span className="text-avenue-text-muted">Group:</span> <strong>{selectedMember.group}</strong></div>
-                  <div><span className="text-avenue-text-muted">Package:</span> <strong>{selectedMember.package}</strong></div>
-                  <div><span className="text-avenue-text-muted">No.:</span> <strong className="font-mono">{selectedMember.memberNumber}</strong></div>
+                <div className="mt-2 p-3 bg-brand-indigo/5 rounded-lg text-xs grid grid-cols-3 gap-2">
+                  <div><span className="text-brand-text-muted">Group:</span> <strong>{selectedMember.group}</strong></div>
+                  <div><span className="text-brand-text-muted">Package:</span> <strong>{selectedMember.package}</strong></div>
+                  <div><span className="text-brand-text-muted">No.:</span> <strong className="font-mono">{selectedMember.memberNumber}</strong></div>
                 </div>
               )}
             </div>
@@ -187,9 +187,9 @@ export function ClaimForm({ members, providers }: { members: Member[]; providers
               />
               {selectedProvider && (
                 <div className="mt-2 p-3 bg-[#F8F9FA] rounded-lg text-xs grid grid-cols-3 gap-2">
-                  <div><span className="text-avenue-text-muted">Type:</span> <strong>{selectedProvider.type}</strong></div>
-                  <div><span className="text-avenue-text-muted">Tier:</span> <strong>{selectedProvider.tier}</strong></div>
-                  <div><span className="text-avenue-text-muted">County:</span> <strong>{selectedProvider.county || "—"}</strong></div>
+                  <div><span className="text-brand-text-muted">Type:</span> <strong>{selectedProvider.type}</strong></div>
+                  <div><span className="text-brand-text-muted">Tier:</span> <strong>{selectedProvider.tier}</strong></div>
+                  <div><span className="text-brand-text-muted">County:</span> <strong>{selectedProvider.county || "—"}</strong></div>
                 </div>
               )}
             </div>
@@ -199,7 +199,7 @@ export function ClaimForm({ members, providers }: { members: Member[]; providers
         {/* ── Step 2: Encounter Details ── */}
         {step === 1 && (
           <div className="space-y-5">
-            <h2 className="font-bold text-avenue-text-heading font-heading">Step 2 — Encounter Details</h2>
+            <h2 className="font-bold text-brand-text-heading font-heading">Step 2 — Encounter Details</h2>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -241,7 +241,7 @@ export function ClaimForm({ members, providers }: { members: Member[]; providers
                   <input type="date" value={dischargeDate} onChange={e => setDischargeDate(e.target.value)} className={inputCls} />
                 </div>
                 {admissionDate && dischargeDate && (
-                  <div className="col-span-2 text-xs text-avenue-text-muted bg-[#F8F9FA] px-3 py-2 rounded-lg">
+                  <div className="col-span-2 text-xs text-brand-text-muted bg-[#F8F9FA] px-3 py-2 rounded-lg">
                     Length of stay: <strong>
                       {Math.max(0, Math.ceil((new Date(dischargeDate).getTime() - new Date(admissionDate).getTime()) / 86400000))} day(s)
                     </strong>
@@ -256,8 +256,8 @@ export function ClaimForm({ members, providers }: { members: Member[]; providers
         {step === 2 && (
           <div className="space-y-4">
             <div>
-              <h2 className="font-bold text-avenue-text-heading font-heading">Step 3 — Diagnoses</h2>
-              <p className="text-xs text-avenue-text-muted mt-0.5">Search ICD-10 codes. The first added is the primary diagnosis. Click the radio dot to change primary.</p>
+              <h2 className="font-bold text-brand-text-heading font-heading">Step 3 — Diagnoses</h2>
+              <p className="text-xs text-brand-text-muted mt-0.5">Search ICD-10 codes. The first added is the primary diagnosis. Click the radio dot to change primary.</p>
             </div>
             <DiagnosisSearch value={diagnoses} onChange={setDiagnoses} />
             {diagnoses.length === 0 && (
@@ -270,17 +270,17 @@ export function ClaimForm({ members, providers }: { members: Member[]; providers
         {step === 3 && (
           <div className="space-y-4">
             <div>
-              <h2 className="font-bold text-avenue-text-heading font-heading">Step 4 — Services &amp; Billing</h2>
-              <p className="text-xs text-avenue-text-muted mt-0.5">
+              <h2 className="font-bold text-brand-text-heading font-heading">Step 4 — Services &amp; Billing</h2>
+              <p className="text-xs text-brand-text-muted mt-0.5">
                 Add each service as a separate line. Search CPT codes to auto-fill descriptions and standard charges.
-                Primary diagnosis: <strong className="font-mono text-avenue-indigo">{primaryIcdCode || "—"}</strong>
+                Primary diagnosis: <strong className="font-mono text-brand-indigo">{primaryIcdCode || "—"}</strong>
               </p>
             </div>
 
             {/* Diagnosis summary */}
             <div className="flex flex-wrap gap-1.5">
               {diagnoses.map(d => (
-                <span key={d.code} className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${d.isPrimary ? "bg-avenue-indigo text-white" : "bg-[#E6E7E8] text-[#6C757D]"}`}>
+                <span key={d.code} className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${d.isPrimary ? "bg-brand-indigo text-white" : "bg-[#E6E7E8] text-[#6C757D]"}`}>
                   {d.code} — {d.description}
                 </span>
               ))}
@@ -301,14 +301,14 @@ export function ClaimForm({ members, providers }: { members: Member[]; providers
           type="button"
           onClick={() => setStep(s => Math.max(0, s - 1))}
           disabled={step === 0}
-          className="flex items-center gap-2 px-5 py-2 rounded-full border border-[#EEEEEE] text-avenue-text-body hover:border-avenue-indigo hover:text-avenue-indigo transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 px-5 py-2 rounded-full border border-[#EEEEEE] text-brand-text-body hover:border-brand-indigo hover:text-brand-indigo transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <ChevronLeft size={16} /> Back
         </button>
 
         {/* Summary pill when on last step */}
         {step === 3 && totalBilled > 0 && (
-          <span className="text-sm font-bold text-avenue-indigo bg-avenue-indigo/10 px-4 py-2 rounded-full">
+          <span className="text-sm font-bold text-brand-indigo bg-brand-indigo/10 px-4 py-2 rounded-full">
             Total: KES {totalBilled.toLocaleString("en-KE")}
           </span>
         )}
@@ -318,7 +318,7 @@ export function ClaimForm({ members, providers }: { members: Member[]; providers
             type="button"
             onClick={() => setStep(s => s + 1)}
             disabled={!canNext[step]}
-            className="flex items-center gap-2 px-6 py-2 rounded-full bg-avenue-indigo text-white font-semibold hover:bg-avenue-secondary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-6 py-2 rounded-full bg-brand-indigo text-white font-semibold hover:bg-brand-secondary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
             Next <ChevronRight size={16} />
           </button>

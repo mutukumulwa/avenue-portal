@@ -45,17 +45,17 @@ export default async function MemberCardPage({ params }: { params: Promise<{ id:
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <Link href={`/members/${id}`} className="text-avenue-text-muted hover:text-avenue-indigo transition-colors">
+        <Link href={`/members/${id}`} className="text-brand-text-muted hover:text-brand-indigo transition-colors">
           <ArrowLeft size={20} />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">
             Cards — {member.firstName} {member.lastName}
           </h1>
-          <p className="text-avenue-text-body text-sm mt-0.5 font-mono">{member.memberNumber}</p>
+          <p className="text-brand-text-body text-sm mt-0.5 font-mono">{member.memberNumber}</p>
         </div>
         <Link href={`/members/${id}/onboarding`}
-          className="ml-auto text-xs font-semibold text-avenue-indigo border border-avenue-indigo/30 hover:bg-avenue-indigo/5 px-3 py-1.5 rounded-full transition-colors">
+          className="ml-auto text-xs font-semibold text-brand-indigo border border-brand-indigo/30 hover:bg-brand-indigo/5 px-3 py-1.5 rounded-full transition-colors">
           Onboarding →
         </Link>
       </div>
@@ -64,8 +64,8 @@ export default async function MemberCardPage({ params }: { params: Promise<{ id:
       {membershipCards.length > 0 && (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
           <div className="px-5 py-3 border-b border-[#EEEEEE] flex items-center gap-2">
-            <CreditCard size={15} className="text-avenue-indigo" />
-            <h2 className="font-semibold text-avenue-text-heading text-sm">Card Register</h2>
+            <CreditCard size={15} className="text-brand-indigo" />
+            <h2 className="font-semibold text-brand-text-heading text-sm">Card Register</h2>
           </div>
           <table className="w-full text-sm text-left">
             <thead>
@@ -80,17 +80,17 @@ export default async function MemberCardPage({ params }: { params: Promise<{ id:
             <tbody className="divide-y divide-[#EEEEEE]">
               {membershipCards.map((card) => (
                 <tr key={card.id} className={`hover:bg-[#F8F9FA] ${!card.isActive ? "opacity-50" : ""}`}>
-                  <td className="px-5 py-2.5 font-semibold text-avenue-text-heading">{card.cardType}</td>
-                  <td className="px-5 py-2.5 font-mono text-xs text-avenue-text-muted">{card.cardNumber ?? "—"}</td>
+                  <td className="px-5 py-2.5 font-semibold text-brand-text-heading">{card.cardType}</td>
+                  <td className="px-5 py-2.5 font-mono text-xs text-brand-text-muted">{card.cardNumber ?? "—"}</td>
                   <td className="px-5 py-2.5">
                     <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${CARD_STATUS_STYLE[card.status] ?? ""}`}>
                       {card.status.replace(/_/g, " ")}
                     </span>
                   </td>
-                  <td className="px-5 py-2.5 text-avenue-text-muted text-xs">
+                  <td className="px-5 py-2.5 text-brand-text-muted text-xs">
                     {card.issuedAt ? new Date(card.issuedAt).toLocaleDateString("en-KE") : "—"}
                   </td>
-                  <td className="px-5 py-2.5 text-avenue-text-muted text-xs">
+                  <td className="px-5 py-2.5 text-brand-text-muted text-xs">
                     {card.expiresAt ? new Date(card.expiresAt).toLocaleDateString("en-KE") : "—"}
                   </td>
                 </tr>

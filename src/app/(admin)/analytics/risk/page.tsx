@@ -90,7 +90,7 @@ function MetricCards({ data }: { data: RiskData }) {
       value: data.summary.total.toLocaleString(),
       detail: "Members in current scope",
       icon: UserRound,
-      tone: "bg-avenue-indigo/10 text-avenue-indigo",
+      tone: "bg-brand-indigo/10 text-brand-indigo",
     },
     {
       label: "High / Critical",
@@ -123,9 +123,9 @@ function MetricCards({ data }: { data: RiskData }) {
           <div key={card.label} className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <p className="text-[13px] font-bold uppercase tracking-normal text-avenue-text-muted">{card.label}</p>
-                <p className="mt-2 text-2xl font-bold tabular-nums text-avenue-text-heading">{card.value}</p>
-                <p className="mt-2 text-[13px] leading-snug text-avenue-text-muted">{card.detail}</p>
+                <p className="text-[13px] font-bold uppercase tracking-normal text-brand-text-muted">{card.label}</p>
+                <p className="mt-2 text-2xl font-bold tabular-nums text-brand-text-heading">{card.value}</p>
+                <p className="mt-2 text-[13px] leading-snug text-brand-text-muted">{card.detail}</p>
               </div>
               <span className={`rounded-[8px] p-2 ${card.tone}`}>
                 <Icon className="h-5 w-5" />
@@ -141,15 +141,15 @@ function MetricCards({ data }: { data: RiskData }) {
 function Filters({ params, data }: { params: SearchParams; data: RiskData }) {
   return (
     <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-4 shadow-sm">
-      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-avenue-text-heading">
-        <Filter className="h-4 w-4 text-avenue-indigo" />
+      <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-brand-text-heading">
+        <Filter className="h-4 w-4 text-brand-indigo" />
         Filter risk profiles
       </div>
 
       <div className="mb-4 flex flex-wrap gap-2">
         <Link
           href={filterHref(params, { tier: undefined })}
-          className={`rounded-full px-3 py-1 text-[13px] font-bold ${!params.tier ? "bg-avenue-indigo text-white" : "bg-avenue-bg-alt text-avenue-text-heading hover:text-avenue-indigo"}`}
+          className={`rounded-full px-3 py-1 text-[13px] font-bold ${!params.tier ? "bg-brand-indigo text-white" : "bg-brand-bg-alt text-brand-text-heading hover:text-brand-indigo"}`}
         >
           All tiers
         </Link>
@@ -157,7 +157,7 @@ function Filters({ params, data }: { params: SearchParams; data: RiskData }) {
           <Link
             key={tier}
             href={filterHref(params, { tier: params.tier === tier ? undefined : tier })}
-            className={`rounded-full px-3 py-1 text-[13px] font-bold ${params.tier === tier ? riskTone(tier) : "bg-avenue-bg-alt text-avenue-text-heading hover:text-avenue-indigo"}`}
+            className={`rounded-full px-3 py-1 text-[13px] font-bold ${params.tier === tier ? riskTone(tier) : "bg-brand-bg-alt text-brand-text-heading hover:text-brand-indigo"}`}
           >
             {tier}
           </Link>
@@ -169,7 +169,7 @@ function Filters({ params, data }: { params: SearchParams; data: RiskData }) {
         <select
           name="groupId"
           defaultValue={params.groupId ?? ""}
-          className="h-10 rounded-[8px] border border-[#EEEEEE] bg-white px-3 text-sm text-avenue-text-heading outline-none focus:border-avenue-indigo"
+          className="h-10 rounded-[8px] border border-[#EEEEEE] bg-white px-3 text-sm text-brand-text-heading outline-none focus:border-brand-indigo"
         >
           <option value="">All schemes</option>
           {data.groups.map((group) => (
@@ -179,7 +179,7 @@ function Filters({ params, data }: { params: SearchParams; data: RiskData }) {
         <select
           name="chronicTag"
           defaultValue={params.chronicTag ?? ""}
-          className="h-10 rounded-[8px] border border-[#EEEEEE] bg-white px-3 text-sm text-avenue-text-heading outline-none focus:border-avenue-indigo"
+          className="h-10 rounded-[8px] border border-[#EEEEEE] bg-white px-3 text-sm text-brand-text-heading outline-none focus:border-brand-indigo"
         >
           <option value="">All chronic tags</option>
           {data.tagCounts.map((tag) => (
@@ -189,7 +189,7 @@ function Filters({ params, data }: { params: SearchParams; data: RiskData }) {
         <select
           name="minUtilization"
           defaultValue={params.minUtilization ?? ""}
-          className="h-10 rounded-[8px] border border-[#EEEEEE] bg-white px-3 text-sm text-avenue-text-heading outline-none focus:border-avenue-indigo"
+          className="h-10 rounded-[8px] border border-[#EEEEEE] bg-white px-3 text-sm text-brand-text-heading outline-none focus:border-brand-indigo"
         >
           <option value="">Any cap use</option>
           <option value="0.55">55%+</option>
@@ -199,14 +199,14 @@ function Filters({ params, data }: { params: SearchParams; data: RiskData }) {
         <select
           name="projectedWithin"
           defaultValue={params.projectedWithin ?? ""}
-          className="h-10 rounded-[8px] border border-[#EEEEEE] bg-white px-3 text-sm text-avenue-text-heading outline-none focus:border-avenue-indigo"
+          className="h-10 rounded-[8px] border border-[#EEEEEE] bg-white px-3 text-sm text-brand-text-heading outline-none focus:border-brand-indigo"
         >
           <option value="">Any projection</option>
           <option value="30">Next 30 days</option>
           <option value="60">Next 60 days</option>
           <option value="90">Next 90 days</option>
         </select>
-        <button className="inline-flex h-10 items-center justify-center gap-2 rounded-[8px] bg-avenue-indigo px-4 text-sm font-semibold text-white hover:bg-avenue-indigo/90">
+        <button className="inline-flex h-10 items-center justify-center gap-2 rounded-[8px] bg-brand-indigo px-4 text-sm font-semibold text-white hover:bg-brand-indigo/90">
           <Filter className="h-4 w-4" />
           Apply
         </button>
@@ -219,18 +219,18 @@ function TagPanel({ data, params }: { data: RiskData; params: SearchParams }) {
   return (
     <div className="rounded-[8px] border border-[#EEEEEE] bg-white shadow-sm">
       <div className="border-b border-[#EEEEEE] px-5 py-4">
-        <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Risk Drivers</h2>
-        <p className="text-sm text-avenue-text-muted">Most common chronic tags in the current access scope.</p>
+        <h2 className="font-heading text-lg font-bold text-brand-text-heading">Risk Drivers</h2>
+        <p className="text-sm text-brand-text-muted">Most common chronic tags in the current access scope.</p>
       </div>
       <div className="flex flex-wrap gap-2 p-5">
         {data.tagCounts.length === 0 && (
-          <p className="text-sm text-avenue-text-muted">No chronic tags are available for this scope.</p>
+          <p className="text-sm text-brand-text-muted">No chronic tags are available for this scope.</p>
         )}
         {data.tagCounts.map((tag) => (
           <Link
             key={tag.tag}
             href={filterHref(params, { chronicTag: params.chronicTag === tag.tag ? undefined : tag.tag })}
-            className={`rounded-full px-3 py-1 text-[13px] font-bold ${params.chronicTag === tag.tag ? "bg-avenue-indigo text-white" : "bg-avenue-bg-alt text-avenue-text-heading hover:text-avenue-indigo"}`}
+            className={`rounded-full px-3 py-1 text-[13px] font-bold ${params.chronicTag === tag.tag ? "bg-brand-indigo text-white" : "bg-brand-bg-alt text-brand-text-heading hover:text-brand-indigo"}`}
           >
             {tag.tag} · {tag.count}
           </Link>
@@ -250,22 +250,22 @@ function RiskRow({ profile, canViewNamedMembers }: { profile: RiskProfile; canVi
       <div className="min-w-0">
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <span className={`rounded-full px-2 py-1 text-[13px] font-bold ${riskTone(profile.riskTier)}`}>{profile.riskTier}</span>
-          <span className="rounded-full bg-avenue-bg-alt px-2 py-1 text-[13px] font-semibold text-avenue-text-muted">{reference}</span>
+          <span className="rounded-full bg-brand-bg-alt px-2 py-1 text-[13px] font-semibold text-brand-text-muted">{reference}</span>
         </div>
         {canViewNamedMembers ? (
-          <Link href={`/members/${profile.memberId}`} className="font-heading text-lg font-bold text-avenue-text-heading hover:text-avenue-indigo">
+          <Link href={`/members/${profile.memberId}`} className="font-heading text-lg font-bold text-brand-text-heading hover:text-brand-indigo">
             {displayName}
           </Link>
         ) : (
-          <h3 className="font-heading text-lg font-bold text-avenue-text-heading">{displayName}</h3>
+          <h3 className="font-heading text-lg font-bold text-brand-text-heading">{displayName}</h3>
         )}
-        <p className="mt-1 text-sm text-avenue-text-muted">
+        <p className="mt-1 text-sm text-brand-text-muted">
           {profile.groupName} · {profile.relationship?.replace(/_/g, " ") ?? "Member"} · {profile.packageName ?? "Package unavailable"}
           {profile.benefitTierName ? ` · ${profile.benefitTierName}` : ""}
         </p>
         <div className="mt-3 flex flex-wrap gap-2">
           {profile.chronicTags.length === 0 && (
-            <span className="rounded-full bg-avenue-bg-alt px-2 py-1 text-[13px] font-semibold text-avenue-text-muted">No chronic tags</span>
+            <span className="rounded-full bg-brand-bg-alt px-2 py-1 text-[13px] font-semibold text-brand-text-muted">No chronic tags</span>
           )}
           {profile.chronicTags.map((tag) => (
             <span key={tag} className="rounded-full bg-[#17A2B8]/10 px-2 py-1 text-[13px] font-semibold text-[#17A2B8]">{tag}</span>
@@ -276,8 +276,8 @@ function RiskRow({ profile, canViewNamedMembers }: { profile: RiskProfile; canVi
       <div className="space-y-3">
         <div>
           <div className="mb-1 flex items-center justify-between text-[13px]">
-            <span className="font-semibold text-avenue-text-muted">Utilization to cap</span>
-            <span className="font-bold tabular-nums text-avenue-text-heading">{formatPercent(profile.utilizationToCap)}</span>
+            <span className="font-semibold text-brand-text-muted">Utilization to cap</span>
+            <span className="font-bold tabular-nums text-brand-text-heading">{formatPercent(profile.utilizationToCap)}</span>
           </div>
           <div className="h-2 rounded-full bg-[#E6E7E8]">
             <div className={`h-2 rounded-full ${utilizationTone(profile.utilizationToCap)}`} style={{ width: `${capWidth}%` }} />
@@ -285,21 +285,21 @@ function RiskRow({ profile, canViewNamedMembers }: { profile: RiskProfile; canVi
         </div>
         <div className="grid grid-cols-2 gap-3 text-[13px]">
           <div>
-            <p className="text-avenue-text-muted">Risk score</p>
-            <p className="font-bold tabular-nums text-avenue-text-heading">{formatPercent(profile.riskScore)}</p>
+            <p className="text-brand-text-muted">Risk score</p>
+            <p className="font-bold tabular-nums text-brand-text-heading">{formatPercent(profile.riskScore)}</p>
           </div>
           <div>
-            <p className="text-avenue-text-muted">Claims</p>
-            <p className="font-bold tabular-nums text-avenue-text-heading">{profile.trailing12ClaimCount.toLocaleString()}</p>
+            <p className="text-brand-text-muted">Claims</p>
+            <p className="font-bold tabular-nums text-brand-text-heading">{profile.trailing12ClaimCount.toLocaleString()}</p>
           </div>
         </div>
       </div>
 
       <div className="rounded-[8px] bg-[#F8F9FA] p-3 text-[13px]">
-        <p className="font-semibold text-avenue-text-muted">Projected exceed</p>
-        <p className="mt-1 font-bold text-avenue-text-heading">{formatDate(profile.projectedExceedDate)}</p>
-        <p className="mt-3 font-semibold text-avenue-text-muted">Trailing 12 cost</p>
-        <p className="mt-1 font-bold tabular-nums text-avenue-text-heading">{formatMoney(profile.trailing12ClaimCost)}</p>
+        <p className="font-semibold text-brand-text-muted">Projected exceed</p>
+        <p className="mt-1 font-bold text-brand-text-heading">{formatDate(profile.projectedExceedDate)}</p>
+        <p className="mt-3 font-semibold text-brand-text-muted">Trailing 12 cost</p>
+        <p className="mt-1 font-bold tabular-nums text-brand-text-heading">{formatMoney(profile.trailing12ClaimCost)}</p>
       </div>
     </div>
   );
@@ -331,17 +331,17 @@ export default async function MemberRiskWorkbenchPage({
   return (
     <div className="space-y-6 font-ui">
       <div>
-        <Link href="/analytics" className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-avenue-indigo hover:underline">
+        <Link href="/analytics" className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-brand-indigo hover:underline">
           <ArrowLeft className="h-4 w-4" />
           Back to analytics
         </Link>
         <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2 text-sm font-semibold text-avenue-indigo">
+          <div className="flex items-center gap-2 text-sm font-semibold text-brand-indigo">
             <HeartPulse className="h-4 w-4" />
             Strategic Purchasing
           </div>
-          <h1 className="font-heading text-3xl font-bold text-avenue-text-heading">Member Risk Workbench</h1>
-          <p className="text-avenue-text-muted">Risk-tiered member profiles, chronic drivers, cap pressure, and follow-through links.</p>
+          <h1 className="font-heading text-3xl font-bold text-brand-text-heading">Member Risk Workbench</h1>
+          <p className="text-brand-text-muted">Risk-tiered member profiles, chronic drivers, cap pressure, and follow-through links.</p>
         </div>
       </div>
 
@@ -352,18 +352,18 @@ export default async function MemberRiskWorkbenchPage({
       <div className="rounded-[8px] border border-[#EEEEEE] bg-white shadow-sm">
         <div className="flex items-center justify-between gap-3 border-b border-[#EEEEEE] px-5 py-4">
           <div>
-            <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Risk Profile List</h2>
-            <p className="text-sm text-avenue-text-muted">{data.profiles.length.toLocaleString()} of {data.summary.total.toLocaleString()} profiles match the current filter.</p>
+            <h2 className="font-heading text-lg font-bold text-brand-text-heading">Risk Profile List</h2>
+            <p className="text-sm text-brand-text-muted">{data.profiles.length.toLocaleString()} of {data.summary.total.toLocaleString()} profiles match the current filter.</p>
           </div>
           {(params.tier || params.groupId || params.chronicTag || params.minUtilization || params.projectedWithin) && (
-            <Link href="/analytics/risk" className="shrink-0 text-sm font-semibold text-avenue-indigo hover:underline">
+            <Link href="/analytics/risk" className="shrink-0 text-sm font-semibold text-brand-indigo hover:underline">
               Clear filters
             </Link>
           )}
         </div>
         <div className="divide-y divide-[#EEEEEE]">
           {data.profiles.length === 0 && (
-            <p className="px-5 py-10 text-center text-sm text-avenue-text-muted">No member risk profiles match this filter.</p>
+            <p className="px-5 py-10 text-center text-sm text-brand-text-muted">No member risk profiles match this filter.</p>
           )}
           {data.profiles.map((profile) => (
             <RiskRow key={profile.id} profile={profile} canViewNamedMembers={canViewNamedMembers} />
@@ -374,10 +374,10 @@ export default async function MemberRiskWorkbenchPage({
       {/* ── Process 14: Bulk care management enrolment ─────── */}
       {data.profiles.length > 0 && (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-4">
-          <h2 className="font-bold text-avenue-text-heading text-sm font-heading flex items-center gap-2">
-            <Users size={15} className="text-avenue-indigo" /> Bulk Enrol in Care Management
+          <h2 className="font-bold text-brand-text-heading text-sm font-heading flex items-center gap-2">
+            <Users size={15} className="text-brand-indigo" /> Bulk Enrol in Care Management
           </h2>
-          <p className="text-xs text-avenue-text-muted">
+          <p className="text-xs text-brand-text-muted">
             Enrol all <strong>{data.profiles.length}</strong> member{data.profiles.length !== 1 ? "s" : ""} matching the current
             filter into a care management programme. This records a health journal note on each member visible to
             their clinical team.
@@ -393,11 +393,11 @@ export default async function MemberRiskWorkbenchPage({
               type="text"
               required
               placeholder="Programme name (e.g. Diabetes Care, Hypertension Management)"
-              className="flex-1 min-w-64 border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-avenue-indigo focus:outline-none"
+              className="flex-1 min-w-64 border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-brand-indigo focus:outline-none"
             />
             <button
               type="submit"
-              className="bg-avenue-indigo text-white px-5 py-2 rounded-full text-sm font-semibold hover:bg-avenue-secondary transition-colors flex items-center gap-2 whitespace-nowrap"
+              className="bg-brand-indigo text-white px-5 py-2 rounded-full text-sm font-semibold hover:bg-brand-secondary transition-colors flex items-center gap-2 whitespace-nowrap"
             >
               <Users size={14} /> Enrol {data.profiles.length} Member{data.profiles.length !== 1 ? "s" : ""}
             </button>

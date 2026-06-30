@@ -2,42 +2,42 @@
 
 @theme {
   /* ── Medvex brand identity ──────────────────────────────────
-     Token NAMES are retained as `avenue-*` for now so the ~3,800
-     existing class usages keep working; only the VALUES are
-     repointed to the Medvex palette. The neutral `brand-*` rename
-     is a separate workstream (see §D of the gap-analysis plan).
+     Neutral `brand-*` token names (renamed from the legacy
+     `avenue-*` names — §D / D-7). Names are deliberately neutral so
+     a future rebrand only touches VALUES, never the ~3,800 class
+     usages. Values are the Medvex palette.
      Palette source: "Medvex Design Language" handoff.            */
 
   /* Primary = Ink navy (buttons, headings, links) */
-  --color-avenue-indigo: #0b1437;
-  --color-avenue-indigo-hover: #142150;
+  --color-brand-indigo: #0b1437;
+  --color-brand-indigo-hover: #142150;
   /* Secondary = teal-dark signal (hover targets across the app) */
-  --color-avenue-secondary: #058a80;
+  --color-brand-secondary: #058a80;
   /* Warm = Medvex coral (sparing, human touches) */
-  --color-avenue-pink: #f2715a;
+  --color-brand-pink: #f2715a;
 
   /* Brand core (available for new Medvex components) */
-  --color-avenue-navy: #000523;
-  --color-avenue-navy-700: #142150;
-  --color-avenue-teal: #06b9ab;
-  --color-avenue-teal-tint: #e4f7f5;
-  --color-avenue-coral: #f2715a;
+  --color-brand-navy: #000523;
+  --color-brand-navy-700: #142150;
+  --color-brand-teal: #06b9ab;
+  --color-brand-teal-tint: #e4f7f5;
+  --color-brand-coral: #f2715a;
 
   /* Neutrals */
-  --color-avenue-text-heading: #0b1437; /* Ink */
-  --color-avenue-text-body: #41505e;
-  --color-avenue-text-muted: #5a6b7b; /* Slate */
-  --color-avenue-bg: #ffffff; /* Surface */
-  --color-avenue-bg-alt: #eef2f4; /* Mist */
-  --color-avenue-border: #e2e8ec;
-  --color-avenue-border-subtle: #e6edf0;
-  --color-avenue-divider: #e1e7ea;
+  --color-brand-text-heading: #0b1437; /* Ink */
+  --color-brand-text-body: #41505e;
+  --color-brand-text-muted: #5a6b7b; /* Slate */
+  --color-brand-bg: #ffffff; /* Surface */
+  --color-brand-bg-alt: #eef2f4; /* Mist */
+  --color-brand-border: #e2e8ec;
+  --color-brand-border-subtle: #e6edf0;
+  --color-brand-divider: #e1e7ea;
 
   /* Functional (Medvex status palette) */
-  --color-avenue-success: #0f8a5f; /* Approved */
-  --color-avenue-error: #c04a39; /* Denied */
-  --color-avenue-info: #0b8077; /* In review */
-  --color-avenue-whatsapp: #25d366;
+  --color-brand-success: #0f8a5f; /* Approved */
+  --color-brand-error: #c04a39; /* Denied */
+  --color-brand-info: #0b8077; /* In review */
+  --color-brand-whatsapp: #25d366;
 
   /* Typography — Sora (display) + Hanken Grotesk (body/UI) */
   --font-heading: var(--font-sora), "Poppins", system-ui, sans-serif;
@@ -61,7 +61,7 @@
 }
 
 body {
-  color: var(--color-avenue-text-body);
+  color: var(--color-brand-text-body);
   background: var(--background);
   font-family: var(--font-body);
   font-synthesis: none;
@@ -71,7 +71,7 @@ body {
 }
 
 h1, h2, h3, h4, h5, h6 {
-  color: var(--color-avenue-text-heading);
+  color: var(--color-brand-text-heading);
   font-family: var(--font-heading);
   font-weight: 700;
 }

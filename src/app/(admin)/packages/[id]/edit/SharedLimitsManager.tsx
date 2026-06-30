@@ -64,18 +64,18 @@ export function SharedLimitsManager({
   return (
     <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-4 mt-6">
       <div className="flex items-center justify-between border-b border-[#EEEEEE] pb-2">
-        <h2 className="font-bold text-avenue-text-heading font-heading">Shared Limits</h2>
+        <h2 className="font-bold text-brand-text-heading font-heading">Shared Limits</h2>
         <button
           type="button"
           onClick={() => { setAdding(true); setForm(initialForm); }}
           disabled={adding || availableBenefits.length < 2}
-          className="text-xs bg-[#0B1437]/10 text-avenue-indigo px-3 py-1.5 rounded flex items-center gap-1 font-bold disabled:opacity-50"
+          className="text-xs bg-[#0B1437]/10 text-brand-indigo px-3 py-1.5 rounded flex items-center gap-1 font-bold disabled:opacity-50"
         >
           <Plus size={14} /> Add Shared Limit
         </button>
       </div>
 
-      <p className="text-xs text-avenue-text-muted">
+      <p className="text-xs text-brand-text-muted">
         Shared limits apply an aggregate cap across multiple benefit categories. Claims will be rejected once the combined usage exceeds this limit.
       </p>
 
@@ -141,7 +141,7 @@ export function SharedLimitsManager({
             <button type="button" onClick={() => setAdding(false)} className="px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-200 rounded flex items-center gap-1">
               <X size={14} /> Cancel
             </button>
-            <button type="submit" disabled={creating} className="px-3 py-1.5 text-sm bg-avenue-indigo text-white rounded font-bold hover:bg-blue-800 flex items-center gap-1 disabled:opacity-60">
+            <button type="submit" disabled={creating} className="px-3 py-1.5 text-sm bg-brand-indigo text-white rounded font-bold hover:bg-blue-800 flex items-center gap-1 disabled:opacity-60">
               <Save size={14} /> {creating ? "Saving…" : "Save Group"}
             </button>
           </div>
@@ -153,7 +153,7 @@ export function SharedLimitsManager({
           {initialLimits.map(sl => (
             <div key={sl.id} className="border border-gray-200 rounded p-4 flex justify-between items-start">
               <div>
-                <h3 className="font-bold text-avenue-text-heading">{sl.name}</h3>
+                <h3 className="font-bold text-brand-text-heading">{sl.name}</h3>
                 <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
                   <span className="font-semibold text-gray-700">KES {sl.limitAmount.toLocaleString()}</span>
                   <span>•</span>

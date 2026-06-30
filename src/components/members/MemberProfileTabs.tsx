@@ -167,10 +167,10 @@ function OverviewTab({ member, age }: { member: Member; age: number }) {
 
         {/* Quick actions */}
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-4 shadow-sm">
-          <p className="text-xs font-bold uppercase text-avenue-text-muted mb-3">Quick Actions</p>
+          <p className="text-xs font-bold uppercase text-brand-text-muted mb-3">Quick Actions</p>
           <div className="grid grid-cols-2 gap-2">
             {[
-              { label: "New Claim", href: `/claims/new?memberId=${member.id}`, color: "bg-avenue-indigo" },
+              { label: "New Claim", href: `/claims/new?memberId=${member.id}`, color: "bg-brand-indigo" },
               { label: "New Pre-Auth", href: `/preauth/new?memberId=${member.id}`, color: "bg-[#17A2B8]" },
               { label: "New Endorsement", href: `/endorsements/new?memberId=${member.id}`, color: "bg-[#6C757D]" },
               { label: "Add Dependent", href: `/members/new?principalId=${member.id}`, color: "bg-[#28A745]" },
@@ -186,7 +186,7 @@ function OverviewTab({ member, age }: { member: Member; age: number }) {
 
       {/* Member details */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-2.5">
-        <h3 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2">Personal Information</h3>
+        <h3 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2">Personal Information</h3>
         {[
           { label: "Date of Birth", value: `${fmtDate(member.dateOfBirth)} (Age ${age})` },
           { label: "Gender", value: member.gender },
@@ -196,14 +196,14 @@ function OverviewTab({ member, age }: { member: Member; age: number }) {
           { label: "Relationship", value: member.relationship },
         ].map(f => (
           <div key={f.label} className="flex justify-between text-sm py-1 border-b border-[#EEEEEE]/50 last:border-0">
-            <span className="text-avenue-text-muted">{f.label}</span>
-            <span className="font-semibold text-avenue-text-heading">{f.value}</span>
+            <span className="text-brand-text-muted">{f.label}</span>
+            <span className="font-semibold text-brand-text-heading">{f.value}</span>
           </div>
         ))}
 
-        <h3 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2 pt-2">Policy Details</h3>
+        <h3 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2 pt-2">Policy Details</h3>
         {[
-          { label: "Group", value: <Link href={`/groups/${member.group.id}`} className="text-avenue-indigo hover:underline font-semibold">{member.group.name}</Link> },
+          { label: "Group", value: <Link href={`/groups/${member.group.id}`} className="text-brand-indigo hover:underline font-semibold">{member.group.name}</Link> },
           { label: "Package", value: member.package.name },
           { label: "Enrolled", value: fmtDate(member.enrollmentDate) },
           { label: "Activated", value: member.activationDate ? fmtDate(member.activationDate) : "Pending" },
@@ -211,8 +211,8 @@ function OverviewTab({ member, age }: { member: Member; age: number }) {
           { label: "SMART Card No.", value: member.smartCardNumber ?? "—" },
         ].map(f => (
           <div key={f.label} className="flex justify-between text-sm py-1 border-b border-[#EEEEEE]/50 last:border-0">
-            <span className="text-avenue-text-muted">{f.label}</span>
-            <span className="font-semibold text-avenue-text-heading">{f.value}</span>
+            <span className="text-brand-text-muted">{f.label}</span>
+            <span className="font-semibold text-brand-text-heading">{f.value}</span>
           </div>
         ))}
       </div>
@@ -235,8 +235,8 @@ function BenefitsTab({ member }: { member: Member }) {
       {/* Overall utilisation */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm">
         <div className="flex justify-between items-end mb-2">
-          <p className="text-sm font-bold text-avenue-text-heading">Overall Utilisation</p>
-          <p className="text-sm font-semibold text-avenue-text-muted">
+          <p className="text-sm font-bold text-brand-text-heading">Overall Utilisation</p>
+          <p className="text-sm font-semibold text-brand-text-muted">
             KES {fmt(totalUsed)} / {fmt(totalLimit)}
           </p>
         </div>
@@ -246,7 +246,7 @@ function BenefitsTab({ member }: { member: Member }) {
             style={{ width: `${overallPct}%` }}
           />
         </div>
-        <div className="flex justify-between mt-2 text-xs text-avenue-text-muted">
+        <div className="flex justify-between mt-2 text-xs text-brand-text-muted">
           <span>{overallPct.toFixed(1)}% utilised</span>
           <span>KES {fmt(Math.max(0, totalLimit - totalUsed))} remaining</span>
         </div>
@@ -266,7 +266,7 @@ function BenefitsTab({ member }: { member: Member }) {
               <th className="px-5 py-3 w-36">Utilisation</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#EEEEEE] text-avenue-text-body">
+          <tbody className="divide-y divide-[#EEEEEE] text-brand-text-body">
             {benefits.map(b => {
               const usage = usageMap.get(b.category);
               const used = usage ? usage.amountUsed : 0;
@@ -274,7 +274,7 @@ function BenefitsTab({ member }: { member: Member }) {
               const pct = limit > 0 ? Math.min(100, (used / limit) * 100) : 0;
               return (
                 <tr key={b.id} className="hover:bg-[#F8F9FA]">
-                  <td className="px-5 py-3 font-semibold text-avenue-text-heading">
+                  <td className="px-5 py-3 font-semibold text-brand-text-heading">
                     {b.category.replace(/_/g, " ")}
                   </td>
                   <td className="px-5 py-3">KES {fmt(limit)}</td>
@@ -289,12 +289,12 @@ function BenefitsTab({ member }: { member: Member }) {
                   </td>
                   <td className="px-5 py-3">
                     {b.waitingPeriodDays > 0 ? (
-                      <span className="flex items-center gap-1 text-avenue-text-muted text-xs">
+                      <span className="flex items-center gap-1 text-brand-text-muted text-xs">
                         <Clock size={10} /> {b.waitingPeriodDays}d
                       </span>
                     ) : "—"}
                   </td>
-                  <td className="px-5 py-3 font-semibold text-avenue-text-heading">
+                  <td className="px-5 py-3 font-semibold text-brand-text-heading">
                     {used > 0 ? `KES ${fmt(used)}` : "—"}
                   </td>
                   <td className={`px-5 py-3 font-semibold ${pct >= 90 ? "text-[#DC3545]" : "text-[#28A745]"}`}>
@@ -308,14 +308,14 @@ function BenefitsTab({ member }: { member: Member }) {
                           style={{ width: `${pct}%` }}
                         />
                       </div>
-                      <span className="text-[10px] text-avenue-text-muted w-10 text-right">{pct.toFixed(0)}%</span>
+                      <span className="text-[10px] text-brand-text-muted w-10 text-right">{pct.toFixed(0)}%</span>
                     </div>
                   </td>
                 </tr>
               );
             })}
             {benefits.length === 0 && (
-              <tr><td colSpan={7} className="px-5 py-8 text-center text-avenue-text-body">No benefits defined for this package.</td></tr>
+              <tr><td colSpan={7} className="px-5 py-8 text-center text-brand-text-body">No benefits defined for this package.</td></tr>
             )}
           </tbody>
         </table>
@@ -332,7 +332,7 @@ function DependantsTab({ member }: { member: Member }) {
       <div className="flex justify-end">
         <Link
           href={`/members/new?principalId=${member.id}&groupId=${member.group.id}`}
-          className="bg-avenue-indigo text-white text-sm font-bold px-5 py-2 rounded-full hover:bg-avenue-secondary transition-colors flex items-center gap-2"
+          className="bg-brand-indigo text-white text-sm font-bold px-5 py-2 rounded-full hover:bg-brand-secondary transition-colors flex items-center gap-2"
         >
           <Plus size={15} /> Add Dependent
         </Link>
@@ -350,12 +350,12 @@ function DependantsTab({ member }: { member: Member }) {
               <th className="px-5 py-3">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#EEEEEE] text-avenue-text-body">
+          <tbody className="divide-y divide-[#EEEEEE] text-brand-text-body">
             {member.dependents.map(d => {
               const dAge = Math.floor((new Date().getTime() - new Date(d.dateOfBirth).getTime()) / (1000 * 3600 * 24 * 365.25));
               return (
                 <tr key={d.id} className="hover:bg-[#F8F9FA]">
-                  <td className="px-5 py-3 font-semibold text-avenue-text-heading">
+                  <td className="px-5 py-3 font-semibold text-brand-text-heading">
                     {d.firstName} {d.lastName}
                   </td>
                   <td className="px-5 py-3 font-mono text-xs">{d.memberNumber}</td>
@@ -364,14 +364,14 @@ function DependantsTab({ member }: { member: Member }) {
                       {d.relationship}
                     </span>
                   </td>
-                  <td className="px-5 py-3 text-sm">{fmtDate(d.dateOfBirth)} <span className="text-avenue-text-muted text-xs">({dAge} yrs)</span></td>
+                  <td className="px-5 py-3 text-sm">{fmtDate(d.dateOfBirth)} <span className="text-brand-text-muted text-xs">({dAge} yrs)</span></td>
                   <td className="px-5 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${statusPill(d.status)}`}>
                       {d.status.replace(/_/g, " ")}
                     </span>
                   </td>
                   <td className="px-5 py-3">
-                    <Link href={`/members/${d.id}`} className="text-avenue-indigo text-xs font-semibold hover:underline flex items-center gap-1">
+                    <Link href={`/members/${d.id}`} className="text-brand-indigo text-xs font-semibold hover:underline flex items-center gap-1">
                       View profile <ChevronRight size={12} />
                     </Link>
                   </td>
@@ -382,8 +382,8 @@ function DependantsTab({ member }: { member: Member }) {
               <tr>
                 <td colSpan={6} className="px-5 py-10 text-center">
                   <Users size={32} className="mx-auto mb-2 text-[#EEEEEE]" />
-                  <p className="text-avenue-text-body text-sm">No dependants enrolled.</p>
-                  <Link href={`/members/new?principalId=${member.id}`} className="text-avenue-indigo text-sm font-semibold hover:underline mt-1 inline-block">
+                  <p className="text-brand-text-body text-sm">No dependants enrolled.</p>
+                  <Link href={`/members/new?principalId=${member.id}`} className="text-brand-indigo text-sm font-semibold hover:underline mt-1 inline-block">
                     + Add first dependent
                   </Link>
                 </td>
@@ -405,12 +405,12 @@ function ClaimsTab({ member }: { member: Member }) {
       <div className="flex gap-2">
         {(["claims", "preauths"] as const).map(v => (
           <button key={v} onClick={() => setView(v)}
-            className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase transition-colors ${view === v ? "bg-avenue-indigo text-white" : "bg-[#E6E7E8] text-[#6C757D] hover:bg-avenue-indigo/10"}`}>
+            className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase transition-colors ${view === v ? "bg-brand-indigo text-white" : "bg-[#E6E7E8] text-[#6C757D] hover:bg-brand-indigo/10"}`}>
             {v === "claims" ? `Claims (${member.claims.length})` : `Pre-Auths (${member.preauths.length})`}
           </button>
         ))}
         <Link href={view === "claims" ? `/claims/new?memberId=${member.id}` : `/preauth/new?memberId=${member.id}`}
-          className="ml-auto bg-avenue-indigo text-white text-xs font-bold px-4 py-1.5 rounded-full hover:bg-avenue-secondary transition-colors flex items-center gap-1">
+          className="ml-auto bg-brand-indigo text-white text-xs font-bold px-4 py-1.5 rounded-full hover:bg-brand-secondary transition-colors flex items-center gap-1">
           <Plus size={13} /> New {view === "claims" ? "Claim" : "Pre-Auth"}
         </Link>
       </div>
@@ -430,25 +430,25 @@ function ClaimsTab({ member }: { member: Member }) {
                 <th className="px-5 py-3"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#EEEEEE] text-avenue-text-body">
+            <tbody className="divide-y divide-[#EEEEEE] text-brand-text-body">
               {member.claims.map(c => (
                 <tr key={c.id} className="hover:bg-[#F8F9FA]">
-                  <td className="px-5 py-3 font-mono text-xs font-semibold text-avenue-text-heading">{c.claimNumber}</td>
+                  <td className="px-5 py-3 font-mono text-xs font-semibold text-brand-text-heading">{c.claimNumber}</td>
                   <td className="px-5 py-3">{c.provider.name}</td>
-                  <td className="px-5 py-3 text-xs uppercase font-bold text-avenue-text-muted">{c.serviceType.replace(/_/g, " ")}</td>
+                  <td className="px-5 py-3 text-xs uppercase font-bold text-brand-text-muted">{c.serviceType.replace(/_/g, " ")}</td>
                   <td className="px-5 py-3 font-semibold">KES {fmt(c.billedAmount)}</td>
                   <td className="px-5 py-3 text-[#28A745] font-semibold">{c.approvedAmount > 0 ? `KES ${fmt(c.approvedAmount)}` : "—"}</td>
-                  <td className="px-5 py-3 text-xs text-avenue-text-muted">{fmtDate(c.createdAt)}</td>
+                  <td className="px-5 py-3 text-xs text-brand-text-muted">{fmtDate(c.createdAt)}</td>
                   <td className="px-5 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${statusPill(c.status)}`}>{c.status.replace(/_/g, " ")}</span>
                   </td>
                   <td className="px-5 py-3">
-                    <Link href={`/claims/${c.id}`} className="text-avenue-indigo text-xs font-semibold hover:underline">Review</Link>
+                    <Link href={`/claims/${c.id}`} className="text-brand-indigo text-xs font-semibold hover:underline">Review</Link>
                   </td>
                 </tr>
               ))}
               {member.claims.length === 0 && (
-                <tr><td colSpan={8} className="px-5 py-8 text-center text-avenue-text-body">No claims on record.</td></tr>
+                <tr><td colSpan={8} className="px-5 py-8 text-center text-brand-text-body">No claims on record.</td></tr>
               )}
             </tbody>
           </table>
@@ -469,24 +469,24 @@ function ClaimsTab({ member }: { member: Member }) {
                 <th className="px-5 py-3"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#EEEEEE] text-avenue-text-body">
+            <tbody className="divide-y divide-[#EEEEEE] text-brand-text-body">
               {member.preauths.map(p => (
                 <tr key={p.id} className="hover:bg-[#F8F9FA]">
-                  <td className="px-5 py-3 font-mono text-xs font-semibold text-avenue-text-heading">{p.preauthNumber}</td>
+                  <td className="px-5 py-3 font-mono text-xs font-semibold text-brand-text-heading">{p.preauthNumber}</td>
                   <td className="px-5 py-3">{p.provider.name}</td>
                   <td className="px-5 py-3 font-semibold">KES {fmt(p.estimatedCost)}</td>
                   <td className="px-5 py-3 text-[#28A745] font-semibold">{p.approvedAmount ? `KES ${fmt(p.approvedAmount)}` : "—"}</td>
-                  <td className="px-5 py-3 text-xs text-avenue-text-muted">{fmtDate(p.createdAt)}</td>
+                  <td className="px-5 py-3 text-xs text-brand-text-muted">{fmtDate(p.createdAt)}</td>
                   <td className="px-5 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${statusPill(p.status)}`}>{p.status.replace(/_/g, " ")}</span>
                   </td>
                   <td className="px-5 py-3">
-                    <Link href={`/preauth/${p.id}`} className="text-avenue-indigo text-xs font-semibold hover:underline">Review</Link>
+                    <Link href={`/preauth/${p.id}`} className="text-brand-indigo text-xs font-semibold hover:underline">Review</Link>
                   </td>
                 </tr>
               ))}
               {member.preauths.length === 0 && (
-                <tr><td colSpan={7} className="px-5 py-8 text-center text-avenue-text-body">No pre-authorizations.</td></tr>
+                <tr><td colSpan={7} className="px-5 py-8 text-center text-brand-text-body">No pre-authorizations.</td></tr>
               )}
             </tbody>
           </table>
@@ -503,7 +503,7 @@ function ActivityTab({ logs }: { logs: ActivityEntry[] }) {
     if (action.includes("APPROVED") || action.includes("PAID")) return <CheckCircle size={14} className="text-[#28A745]" />;
     if (action.includes("DECLINED") || action.includes("TERMINATED")) return <XCircle size={14} className="text-[#DC3545]" />;
     if (action.includes("SUSPEND") || action.includes("OVERDUE")) return <AlertTriangle size={14} className="text-[#FFC107]" />;
-    return <Activity size={14} className="text-avenue-indigo" />;
+    return <Activity size={14} className="text-brand-indigo" />;
   };
 
   return (
@@ -511,7 +511,7 @@ function ActivityTab({ logs }: { logs: ActivityEntry[] }) {
       {logs.length === 0 ? (
         <div className="px-5 py-10 text-center">
           <Activity size={32} className="mx-auto mb-2 text-[#EEEEEE]" />
-          <p className="text-avenue-text-body text-sm">No activity recorded yet.</p>
+          <p className="text-brand-text-body text-sm">No activity recorded yet.</p>
         </div>
       ) : (
         <div className="divide-y divide-[#EEEEEE]">
@@ -525,8 +525,8 @@ function ActivityTab({ logs }: { logs: ActivityEntry[] }) {
               </div>
               <div className="pb-4 flex-1">
                 <div className="flex justify-between items-start">
-                  <p className="text-sm font-semibold text-avenue-text-heading">{log.description}</p>
-                  <p className="text-[10px] text-avenue-text-muted whitespace-nowrap ml-4">{fmtDateTime(log.createdAt)}</p>
+                  <p className="text-sm font-semibold text-brand-text-heading">{log.description}</p>
+                  <p className="text-[10px] text-brand-text-muted whitespace-nowrap ml-4">{fmtDateTime(log.createdAt)}</p>
                 </div>
                 <span className="text-[10px] font-bold uppercase bg-[#E6E7E8] text-[#6C757D] px-2 py-0.5 rounded mt-1 inline-block">
                   {log.action.replace(/_/g, " ")}
@@ -555,7 +555,7 @@ function CorrespondenceTab({ member, correspondence }: { member: Member; corresp
       CLAIM_UPDATE: "bg-[#17A2B8]/10 text-[#17A2B8]",
       RENEWAL_REMINDER: "bg-[#FFC107]/10 text-[#856404]",
       SUSPENSION_NOTICE: "bg-[#DC3545]/10 text-[#DC3545]",
-      PREAUTH_STATUS: "bg-avenue-indigo/10 text-avenue-indigo",
+      PREAUTH_STATUS: "bg-brand-indigo/10 text-brand-indigo",
       CARD_ISSUED: "bg-[#6C757D]/10 text-[#6C757D]",
     };
     return map[t] ?? "bg-[#6C757D]/10 text-[#6C757D]";
@@ -586,7 +586,7 @@ function CorrespondenceTab({ member, correspondence }: { member: Member; corresp
       <div className="flex justify-end">
         <button
           onClick={() => setShowForm(v => !v)}
-          className="bg-avenue-indigo text-white text-xs font-bold px-5 py-2 rounded-full hover:bg-avenue-secondary transition-colors flex items-center gap-2"
+          className="bg-brand-indigo text-white text-xs font-bold px-5 py-2 rounded-full hover:bg-brand-secondary transition-colors flex items-center gap-2"
         >
           <Send size={13} /> Log Correspondence
         </button>
@@ -599,20 +599,20 @@ function CorrespondenceTab({ member, correspondence }: { member: Member; corresp
       )}
 
       {showForm && (
-        <form onSubmit={handleSend} className="bg-white border border-avenue-indigo/30 rounded-[8px] p-5 shadow-sm space-y-4">
-          <p className="font-bold text-avenue-text-heading font-heading text-sm">Log New Correspondence</p>
+        <form onSubmit={handleSend} className="bg-white border border-brand-indigo/30 rounded-[8px] p-5 shadow-sm space-y-4">
+          <p className="font-bold text-brand-text-heading font-heading text-sm">Log New Correspondence</p>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <label className="text-xs font-bold text-avenue-text-muted uppercase">Type</label>
-              <select name="type" required className="w-full border border-[#EEEEEE] rounded-[8px] px-3 py-2 text-sm text-avenue-text-heading focus:ring-2 focus:ring-avenue-indigo outline-none">
+              <label className="text-xs font-bold text-brand-text-muted uppercase">Type</label>
+              <select name="type" required className="w-full border border-[#EEEEEE] rounded-[8px] px-3 py-2 text-sm text-brand-text-heading focus:ring-2 focus:ring-brand-indigo outline-none">
                 {["WELCOME","CARD_ISSUED","CLAIM_UPDATE","RENEWAL_REMINDER","SUSPENSION_NOTICE","PREAUTH_STATUS","GENERAL"].map(t => (
                   <option key={t} value={t}>{t.replace(/_/g, " ")}</option>
                 ))}
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-bold text-avenue-text-muted uppercase">Channel</label>
-              <select name="channel" required className="w-full border border-[#EEEEEE] rounded-[8px] px-3 py-2 text-sm text-avenue-text-heading focus:ring-2 focus:ring-avenue-indigo outline-none">
+              <label className="text-xs font-bold text-brand-text-muted uppercase">Channel</label>
+              <select name="channel" required className="w-full border border-[#EEEEEE] rounded-[8px] px-3 py-2 text-sm text-brand-text-heading focus:ring-2 focus:ring-brand-indigo outline-none">
                 <option value="EMAIL">Email</option>
                 <option value="SMS">SMS</option>
                 <option value="BOTH">Both</option>
@@ -620,22 +620,22 @@ function CorrespondenceTab({ member, correspondence }: { member: Member; corresp
             </div>
           </div>
           <div className="space-y-1">
-            <label className="text-xs font-bold text-avenue-text-muted uppercase">Subject</label>
+            <label className="text-xs font-bold text-brand-text-muted uppercase">Subject</label>
             <input name="subject" type="text" placeholder="Email subject (optional for SMS)"
-              className="w-full border border-[#EEEEEE] rounded-[8px] px-3 py-2 text-sm text-avenue-text-heading focus:ring-2 focus:ring-avenue-indigo outline-none" />
+              className="w-full border border-[#EEEEEE] rounded-[8px] px-3 py-2 text-sm text-brand-text-heading focus:ring-2 focus:ring-brand-indigo outline-none" />
           </div>
           <div className="space-y-1">
-            <label className="text-xs font-bold text-avenue-text-muted uppercase">Message / Notes</label>
+            <label className="text-xs font-bold text-brand-text-muted uppercase">Message / Notes</label>
             <textarea name="body" rows={3} required placeholder="Enter message content or internal notes..."
-              className="w-full border border-[#EEEEEE] rounded-[8px] px-3 py-2 text-sm text-avenue-text-heading focus:ring-2 focus:ring-avenue-indigo outline-none resize-none" />
+              className="w-full border border-[#EEEEEE] rounded-[8px] px-3 py-2 text-sm text-brand-text-heading focus:ring-2 focus:ring-brand-indigo outline-none resize-none" />
           </div>
           <div className="flex gap-3 justify-end">
             <button type="button" onClick={() => setShowForm(false)}
-              className="px-4 py-2 text-xs font-bold text-avenue-text-muted hover:text-avenue-text-heading transition-colors">
+              className="px-4 py-2 text-xs font-bold text-brand-text-muted hover:text-brand-text-heading transition-colors">
               Cancel
             </button>
             <button type="submit" disabled={sending}
-              className="bg-avenue-indigo text-white text-xs font-bold px-5 py-2 rounded-full hover:bg-avenue-secondary transition-colors disabled:opacity-60 flex items-center gap-2">
+              className="bg-brand-indigo text-white text-xs font-bold px-5 py-2 rounded-full hover:bg-brand-secondary transition-colors disabled:opacity-60 flex items-center gap-2">
               <Send size={12} /> {sending ? "Sending…" : "Log & Send"}
             </button>
           </div>
@@ -646,7 +646,7 @@ function CorrespondenceTab({ member, correspondence }: { member: Member; corresp
         {correspondence.length === 0 ? (
           <div className="px-5 py-10 text-center">
             <MessageSquare size={32} className="mx-auto mb-2 text-[#EEEEEE]" />
-            <p className="text-avenue-text-body text-sm">No correspondence recorded.</p>
+            <p className="text-brand-text-body text-sm">No correspondence recorded.</p>
           </div>
         ) : (
           <div className="divide-y divide-[#EEEEEE]">
@@ -657,17 +657,17 @@ function CorrespondenceTab({ member, correspondence }: { member: Member; corresp
                     <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${typeColor(c.type)}`}>
                       {c.type.replace(/_/g, " ")}
                     </span>
-                    <span className="text-[10px] font-bold uppercase text-avenue-text-muted flex items-center gap-1 bg-[#E6E7E8] px-2 py-0.5 rounded-full">
+                    <span className="text-[10px] font-bold uppercase text-brand-text-muted flex items-center gap-1 bg-[#E6E7E8] px-2 py-0.5 rounded-full">
                       {channelIcon(c.channel)} {c.channel}
                     </span>
                     <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${c.status === "SENT" ? "text-[#28A745]" : c.status === "FAILED" ? "text-[#DC3545]" : "text-[#6C757D]"}`}>
                       {c.status}
                     </span>
                   </div>
-                  <p className="text-[10px] text-avenue-text-muted whitespace-nowrap ml-4">{fmtDateTime(c.sentAt)}</p>
+                  <p className="text-[10px] text-brand-text-muted whitespace-nowrap ml-4">{fmtDateTime(c.sentAt)}</p>
                 </div>
-                {c.subject && <p className="text-sm font-semibold text-avenue-text-heading mt-2">{c.subject}</p>}
-                {c.body && <p className="text-xs text-avenue-text-body mt-1 leading-relaxed">{c.body}</p>}
+                {c.subject && <p className="text-sm font-semibold text-brand-text-heading mt-2">{c.subject}</p>}
+                {c.body && <p className="text-xs text-brand-text-body mt-1 leading-relaxed">{c.body}</p>}
               </div>
             ))}
           </div>
@@ -698,11 +698,11 @@ function CardTab({ member }: { member: Member }) {
             {isIssued ? "SMART Card Issued" : "No SMART Card Issued"}
           </p>
           {isIssued ? (
-            <p className="text-avenue-text-muted text-xs mt-0.5">
-              Card number: <span className="font-mono font-bold text-avenue-text-heading">{member.smartCardNumber}</span>
+            <p className="text-brand-text-muted text-xs mt-0.5">
+              Card number: <span className="font-mono font-bold text-brand-text-heading">{member.smartCardNumber}</span>
             </p>
           ) : (
-            <p className="text-avenue-text-muted text-xs mt-0.5">
+            <p className="text-brand-text-muted text-xs mt-0.5">
               Use the form below to issue a SMART card to this member.
             </p>
           )}
@@ -712,7 +712,7 @@ function CardTab({ member }: { member: Member }) {
       <div className="grid md:grid-cols-2 gap-6">
         {/* Issue / re-issue form */}
         <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm space-y-4">
-          <h3 className="font-bold text-avenue-text-heading font-heading flex items-center gap-2">
+          <h3 className="font-bold text-brand-text-heading font-heading flex items-center gap-2">
             {isIssued ? <RefreshCw size={15} /> : <CreditCard size={15} />}
             {isIssued ? "Re-issue Card" : "Issue Card"}
           </h3>
@@ -730,7 +730,7 @@ function CardTab({ member }: { member: Member }) {
 
           <form action={formAction} className="space-y-4">
             <div className="space-y-1">
-              <label className="text-xs font-bold text-avenue-text-muted uppercase">
+              <label className="text-xs font-bold text-brand-text-muted uppercase">
                 SMART Card Number
               </label>
               <input
@@ -739,9 +739,9 @@ function CardTab({ member }: { member: Member }) {
                 required
                 defaultValue={member.smartCardNumber ?? ""}
                 placeholder="e.g. SC-2025-00001"
-                className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm text-avenue-text-heading font-mono focus:ring-2 focus:ring-avenue-indigo outline-none"
+                className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm text-brand-text-heading font-mono focus:ring-2 focus:ring-brand-indigo outline-none"
               />
-              <p className="text-[11px] text-avenue-text-muted">
+              <p className="text-[11px] text-brand-text-muted">
                 Enter the physical SMART card number printed on the card.
               </p>
             </div>
@@ -749,7 +749,7 @@ function CardTab({ member }: { member: Member }) {
             <button
               type="submit"
               disabled={pending}
-              className="w-full bg-avenue-indigo text-white font-bold text-sm py-2.5 rounded-full hover:bg-avenue-secondary transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+              className="w-full bg-brand-indigo text-white font-bold text-sm py-2.5 rounded-full hover:bg-brand-secondary transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
             >
               <CreditCard size={14} />
               {pending ? "Saving…" : isIssued ? "Re-issue Card" : "Issue Card"}
@@ -759,22 +759,22 @@ function CardTab({ member }: { member: Member }) {
 
         {/* Issuance history */}
         <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm space-y-3">
-          <h3 className="font-bold text-avenue-text-heading font-heading">Issuance History</h3>
+          <h3 className="font-bold text-brand-text-heading font-heading">Issuance History</h3>
           {cardHistory.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <CreditCard size={28} className="text-[#EEEEEE] mb-2" />
-              <p className="text-sm text-avenue-text-muted">No card issuance events recorded.</p>
+              <p className="text-sm text-brand-text-muted">No card issuance events recorded.</p>
             </div>
           ) : (
             <div className="divide-y divide-[#EEEEEE]">
               {cardHistory.map(log => (
                 <div key={log.id} className="py-3 flex items-start gap-3">
-                  <div className="rounded-full bg-avenue-indigo/10 p-1.5 shrink-0 mt-0.5">
-                    <CreditCard size={12} className="text-avenue-indigo" />
+                  <div className="rounded-full bg-brand-indigo/10 p-1.5 shrink-0 mt-0.5">
+                    <CreditCard size={12} className="text-brand-indigo" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm text-avenue-text-body leading-snug">{log.description}</p>
-                    <p className="text-[11px] text-avenue-text-muted mt-1">{fmtDateTime(log.createdAt)}</p>
+                    <p className="text-sm text-brand-text-body leading-snug">{log.description}</p>
+                    <p className="text-[11px] text-brand-text-muted mt-1">{fmtDateTime(log.createdAt)}</p>
                   </div>
                 </div>
               ))}
@@ -817,14 +817,14 @@ export function MemberProfileTabs({ member, age }: { member: Member; age: number
                 onClick={() => setActiveTab(tab.id)}
                 className={`flex items-center gap-2 px-5 py-3.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
                   active
-                    ? "border-avenue-indigo text-avenue-indigo"
-                    : "border-transparent text-avenue-text-muted hover:text-avenue-text-heading hover:border-[#EEEEEE]"
+                    ? "border-brand-indigo text-brand-indigo"
+                    : "border-transparent text-brand-text-muted hover:text-brand-text-heading hover:border-[#EEEEEE]"
                 }`}
               >
                 <Icon size={15} />
                 {tab.label}
                 {tab.id === "dependants" && member.dependents.length > 0 && (
-                  <span className="bg-avenue-indigo text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                  <span className="bg-brand-indigo text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
                     {member.dependents.length}
                   </span>
                 )}

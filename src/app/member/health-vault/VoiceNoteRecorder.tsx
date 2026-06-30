@@ -89,8 +89,8 @@ export function VoiceNoteRecorder() {
 
   return (
     <section className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
-      <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Record a voice note</h2>
-      <p className="mt-1 text-sm text-avenue-text-muted">
+      <h2 className="font-heading text-lg font-bold text-brand-text-heading">Record a voice note</h2>
+      <p className="mt-1 text-sm text-brand-text-muted">
         Save a private audio note for symptoms, questions, or context before a visit. Transcription is not enabled yet.
       </p>
 
@@ -100,7 +100,7 @@ export function VoiceNoteRecorder() {
             type="button"
             onClick={startRecording}
             disabled={pending}
-            className="inline-flex items-center gap-2 rounded-[8px] bg-avenue-indigo px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-avenue-indigo-hover disabled:opacity-50"
+            className="inline-flex items-center gap-2 rounded-[8px] bg-brand-indigo px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-indigo-hover disabled:opacity-50"
           >
             <Mic className="h-4 w-4" />
             Start recording
@@ -109,7 +109,7 @@ export function VoiceNoteRecorder() {
           <button
             type="button"
             onClick={stopRecording}
-            className="inline-flex items-center gap-2 rounded-[8px] bg-avenue-error px-4 py-2 text-sm font-semibold text-white shadow-sm"
+            className="inline-flex items-center gap-2 rounded-[8px] bg-brand-error px-4 py-2 text-sm font-semibold text-white shadow-sm"
           >
             <Square className="h-4 w-4" />
             Stop
@@ -119,7 +119,7 @@ export function VoiceNoteRecorder() {
           type="button"
           onClick={saveRecording}
           disabled={!audioBlob || pending || recording}
-          className="inline-flex items-center gap-2 rounded-[8px] border border-[#D6DCE5] px-4 py-2 text-sm font-semibold text-avenue-text-heading hover:bg-[#F8F9FA] disabled:opacity-50"
+          className="inline-flex items-center gap-2 rounded-[8px] border border-[#D6DCE5] px-4 py-2 text-sm font-semibold text-brand-text-heading hover:bg-[#F8F9FA] disabled:opacity-50"
         >
           <Upload className="h-4 w-4" />
           {pending ? "Saving..." : "Save voice note"}
@@ -148,7 +148,7 @@ export function VoiceNoteRecorder() {
         />
       </div>
 
-      {error && <p className="mt-3 rounded-[8px] bg-red-50 px-3 py-2 text-sm font-semibold text-avenue-error">{error}</p>}
+      {error && <p className="mt-3 rounded-[8px] bg-red-50 px-3 py-2 text-sm font-semibold text-brand-error">{error}</p>}
       {saved && <p className="mt-3 rounded-[8px] bg-[#28A745]/10 px-3 py-2 text-sm font-semibold text-[#1F7A34]">Voice note saved.</p>}
     </section>
   );

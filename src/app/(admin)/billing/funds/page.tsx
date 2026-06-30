@@ -51,11 +51,11 @@ export default async function FundOverviewPage() {
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-avenue-text-heading font-heading flex items-center gap-2">
-          <Droplets size={22} className="text-avenue-indigo" />
+        <h1 className="text-2xl font-bold text-brand-text-heading font-heading flex items-center gap-2">
+          <Droplets size={22} className="text-brand-indigo" />
           Self-Funded Schemes — Fund Overview
         </h1>
-        <p className="text-avenue-text-muted text-sm mt-1">
+        <p className="text-brand-text-muted text-sm mt-1">
           Cross-scheme fund health dashboard for all self-funded clients.
         </p>
       </div>
@@ -63,13 +63,13 @@ export default async function FundOverviewPage() {
       {/* KPI strip */}
       <div className="grid grid-cols-4 gap-3">
         {[
-          { label: "Total Fund Balance",  value: fmt(totalBalance),   color: totalBalance < 0 ? "text-[#DC3545]" : "text-avenue-indigo" },
-          { label: "Total Deposited",     value: fmt(totalDeposited), color: "text-avenue-text-heading" },
+          { label: "Total Fund Balance",  value: fmt(totalBalance),   color: totalBalance < 0 ? "text-[#DC3545]" : "text-brand-indigo" },
+          { label: "Total Deposited",     value: fmt(totalDeposited), color: "text-brand-text-heading" },
           { label: "Total Claims Paid",   value: fmt(totalClaims),    color: "text-[#DC3545]" },
           { label: "Schemes Needing Attention", value: `${critical + low}`, color: critical + low > 0 ? "text-[#856404] font-bold" : "text-[#28A745]" },
         ].map(({ label, value, color }) => (
           <div key={label} className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-4">
-            <p className="text-xs text-avenue-text-muted">{label}</p>
+            <p className="text-xs text-brand-text-muted">{label}</p>
             <p className={`text-xl font-bold font-heading mt-1 ${color}`}>{value}</p>
           </div>
         ))}
@@ -123,12 +123,12 @@ export default async function FundOverviewPage() {
               const status = balanceStatus(a);
               return (
                 <tr key={a.id} className="hover:bg-[#F8F9FA]">
-                  <td className="px-5 py-3 font-semibold text-avenue-text-heading">{a.group.name}</td>
-                  <td className="px-5 py-3 text-center font-mono text-avenue-text-muted">{a.group._count.members}</td>
-                  <td className={`px-5 py-3 text-right font-mono font-semibold ${Number(a.balance) <= 0 ? "text-[#DC3545]" : "text-avenue-text-heading"}`}>
+                  <td className="px-5 py-3 font-semibold text-brand-text-heading">{a.group.name}</td>
+                  <td className="px-5 py-3 text-center font-mono text-brand-text-muted">{a.group._count.members}</td>
+                  <td className={`px-5 py-3 text-right font-mono font-semibold ${Number(a.balance) <= 0 ? "text-[#DC3545]" : "text-brand-text-heading"}`}>
                     {fmt(Number(a.balance))}
                   </td>
-                  <td className="px-5 py-3 text-right font-mono text-avenue-text-muted">{fmt(Number(a.totalDeposited))}</td>
+                  <td className="px-5 py-3 text-right font-mono text-brand-text-muted">{fmt(Number(a.totalDeposited))}</td>
                   <td className="px-5 py-3 text-right font-mono text-[#DC3545]">{fmt(Number(a.totalClaims))}</td>
                   <td className="px-5 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
@@ -136,7 +136,7 @@ export default async function FundOverviewPage() {
                         <div className={`h-1.5 rounded-full ${utilisation > 0.8 ? "bg-[#DC3545]" : utilisation > 0.6 ? "bg-[#FFC107]" : "bg-[#28A745]"}`}
                           style={{ width: `${Math.min(100, utilisation * 100).toFixed(0)}%` }} />
                       </div>
-                      <span className="text-xs text-avenue-text-muted w-10 text-right">{(utilisation * 100).toFixed(0)}%</span>
+                      <span className="text-xs text-brand-text-muted w-10 text-right">{(utilisation * 100).toFixed(0)}%</span>
                     </div>
                   </td>
                   <td className="px-5 py-3">
@@ -144,12 +144,12 @@ export default async function FundOverviewPage() {
                       {status.label}
                     </span>
                   </td>
-                  <td className="px-5 py-3 text-xs text-avenue-text-muted">
+                  <td className="px-5 py-3 text-xs text-brand-text-muted">
                     {new Date(a.group.renewalDate).toLocaleDateString("en-KE")}
                   </td>
                   <td className="px-5 py-3">
                     <Link href={`/fund/${a.group.id}`}
-                      className="text-avenue-indigo hover:text-avenue-secondary font-semibold text-xs">
+                      className="text-brand-indigo hover:text-brand-secondary font-semibold text-xs">
                       Manage →
                     </Link>
                   </td>
@@ -157,7 +157,7 @@ export default async function FundOverviewPage() {
               );
             })}
             {accounts.length === 0 && (
-              <tr><td colSpan={9} className="px-5 py-8 text-center text-avenue-text-muted text-sm">No self-funded schemes found.</td></tr>
+              <tr><td colSpan={9} className="px-5 py-8 text-center text-brand-text-muted text-sm">No self-funded schemes found.</td></tr>
             )}
           </tbody>
         </table>

@@ -32,7 +32,7 @@ function currency(v: number) {
 export function ClaimsTrendChart({ data }: { data: MonthlyRow[] }) {
   return (
     <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5">
-      <h2 className="font-bold text-avenue-text-heading font-heading mb-4">Claims Volume — Last 12 Months</h2>
+      <h2 className="font-bold text-brand-text-heading font-heading mb-4">Claims Volume — Last 12 Months</h2>
       <ClientOnly>
         <ResponsiveContainer width="100%" height={220}>
           <BarChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
@@ -54,7 +54,7 @@ export function ClaimsTrendChart({ data }: { data: MonthlyRow[] }) {
 export function PremiumVsClaimsChart({ data }: { data: MonthlyRow[] }) {
   return (
     <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5">
-      <h2 className="font-bold text-avenue-text-heading font-heading mb-4">Premium Billed vs Claims Approved (KES)</h2>
+      <h2 className="font-bold text-brand-text-heading font-heading mb-4">Premium Billed vs Claims Approved (KES)</h2>
       <ClientOnly>
         <ResponsiveContainer width="100%" height={220}>
           <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
@@ -82,7 +82,7 @@ export function LossRatioGauge({ lossRatio }: { lossRatio: number }) {
 
   return (
     <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 flex flex-col items-center justify-center gap-2">
-      <h2 className="font-bold text-avenue-text-heading font-heading self-start">Loss Ratio</h2>
+      <h2 className="font-bold text-brand-text-heading font-heading self-start">Loss Ratio</h2>
       <div className="relative flex items-center justify-center mt-2">
         <svg width={140} height={80} viewBox="0 0 140 80">
           {/* Background arc */}
@@ -102,7 +102,7 @@ export function LossRatioGauge({ lossRatio }: { lossRatio: number }) {
           <span className="text-[10px] font-bold uppercase" style={{ color }}>{label}</span>
         </div>
       </div>
-      <p className="text-[10px] text-avenue-text-muted text-center mt-1">
+      <p className="text-[10px] text-brand-text-muted text-center mt-1">
         Claims approved ÷ premium billed (all time)
       </p>
     </div>

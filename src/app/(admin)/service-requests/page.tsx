@@ -43,8 +43,8 @@ export default async function AdminServiceRequestsPage() {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex justify-between items-center bg-white p-6 rounded-[8px] border border-[#EEEEEE] shadow-sm">
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Service Requests Queue</h1>
-          <p className="text-avenue-text-body mt-1">Manage and resolve HR support queries from corporate groups.</p>
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Service Requests Queue</h1>
+          <p className="text-brand-text-body mt-1">Manage and resolve HR support queries from corporate groups.</p>
         </div>
         <div className="bg-[#FFC107]/20 text-[#856404] px-4 py-2 rounded-full font-bold flex items-center gap-2">
           <Clock size={18} /> {openCount} Open Queries
@@ -70,10 +70,10 @@ export default async function AdminServiceRequestsPage() {
                 <tr key={req.id} className="hover:bg-[#F8F9FA] transition-colors group cursor-pointer relative">
                   <td className="px-6 py-4">
                     <Link href={`/service-requests/${req.id}`} className="absolute inset-0 z-10" />
-                    <p className="font-bold text-avenue-text-heading">{req.group.name}</p>
-                    <p className="text-xs text-avenue-text-muted mt-0.5">By {req.submittedBy.firstName} {req.submittedBy.lastName}</p>
+                    <p className="font-bold text-brand-text-heading">{req.group.name}</p>
+                    <p className="text-xs text-brand-text-muted mt-0.5">By {req.submittedBy.firstName} {req.submittedBy.lastName}</p>
                   </td>
-                  <td className="px-6 py-4 font-semibold text-avenue-text-heading truncate max-w-xs">{req.subject}</td>
+                  <td className="px-6 py-4 font-semibold text-brand-text-heading truncate max-w-xs">{req.subject}</td>
                   <td className="px-6 py-4 text-xs font-bold text-[#6C757D]">{req.category.replace("_", " ")}</td>
                   <td className="px-6 py-4 text-xs">{getPriorityLabel(req.priority)}</td>
                   <td className="px-6 py-4">
@@ -81,7 +81,7 @@ export default async function AdminServiceRequestsPage() {
                       {req.status.replace("_", " ")}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-right text-avenue-text-muted text-xs">
+                  <td className="px-6 py-4 text-right text-brand-text-muted text-xs">
                     {daysOld === 0 ? "Today" : `${daysOld} days`}
                   </td>
                 </tr>
@@ -90,7 +90,7 @@ export default async function AdminServiceRequestsPage() {
             
             {requests.length === 0 && (
               <tr>
-                <td colSpan={6} className="text-center py-10 text-avenue-text-muted">
+                <td colSpan={6} className="text-center py-10 text-brand-text-muted">
                   <CheckCircle size={40} className="mx-auto mb-3 text-[#28A745]/50" />
                   No service requests found. Inbox zero!
                 </td>

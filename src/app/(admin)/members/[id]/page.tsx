@@ -230,7 +230,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/members" className="text-avenue-text-muted hover:text-avenue-indigo transition-colors shrink-0">
+          <Link href="/members" className="text-brand-text-muted hover:text-brand-indigo transition-colors shrink-0">
             <ArrowLeft size={20} />
           </Link>
           <div className="bg-white p-1.5 rounded-lg border border-[#EEEEEE] shadow-sm shrink-0 hidden md:block">
@@ -240,10 +240,10 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
             />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">
+            <h1 className="text-2xl font-bold text-brand-text-heading font-heading">
               {member.firstName} {member.otherNames ? member.otherNames + " " : ""}{member.lastName}
             </h1>
-            <p className="text-avenue-text-body text-sm mt-0.5 font-mono">{member.memberNumber}</p>
+            <p className="text-brand-text-body text-sm mt-0.5 font-mono">{member.memberNumber}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -267,7 +267,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
           </Link>
           <Link
             href={`/members/${id}/edit`}
-            className="flex items-center gap-1.5 text-xs font-semibold text-avenue-indigo border border-avenue-indigo/30 hover:bg-avenue-indigo/5 px-3 py-1.5 rounded-full transition-colors"
+            className="flex items-center gap-1.5 text-xs font-semibold text-brand-indigo border border-brand-indigo/30 hover:bg-brand-indigo/5 px-3 py-1.5 rounded-full transition-colors"
           >
             <Pencil size={13} /> Edit
           </Link>
@@ -280,13 +280,13 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
       {/* KPI summary bar */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Annual Limit (KES)", value: totalLimit.toLocaleString(), color: "text-avenue-indigo" },
+          { label: "Annual Limit (KES)", value: totalLimit.toLocaleString(), color: "text-brand-indigo" },
           { label: "Utilised (KES)", value: totalUsed.toLocaleString(), color: "text-[#FFC107]" },
           { label: "Remaining (KES)", value: Math.max(0, totalLimit - totalUsed).toLocaleString(), color: "text-[#28A745]" },
           { label: "Total Claims", value: member.claims.length.toString(), color: "text-[#17A2B8]" },
         ].map(s => (
           <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-[8px] p-4 shadow-sm">
-            <p className="text-xs text-avenue-text-muted font-bold uppercase">{s.label}</p>
+            <p className="text-xs text-brand-text-muted font-bold uppercase">{s.label}</p>
             <p className={`text-xl font-bold mt-1 ${s.color}`}>{s.value}</p>
           </div>
         ))}
@@ -294,7 +294,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
 
       {/* Transfer / tier-change panel */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm">
-        <h3 className="text-sm font-bold text-avenue-text-heading mb-3">Transfers &amp; Tier Changes</h3>
+        <h3 className="text-sm font-bold text-brand-text-heading mb-3">Transfers &amp; Tier Changes</h3>
         <MemberTransferPanel
           memberId={member.id}
           currentGroupId={member.groupId}
@@ -342,7 +342,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
 
       {/* ── Process 12: Lifecycle management panel ────────────── */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-5">
-        <h2 className="font-bold text-avenue-text-heading font-heading text-sm border-b border-[#EEEEEE] pb-2">
+        <h2 className="font-bold text-brand-text-heading font-heading text-sm border-b border-[#EEEEEE] pb-2">
           Lifecycle Management
         </h2>
 
@@ -355,7 +355,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
                 <p className={`font-semibold text-sm ${lapseRecord.catchupExpired ? "text-[#DC3545]" : "text-[#856404]"}`}>
                   {lapseRecord.catchupExpired ? "Catch-up window expired — re-assessment required" : "Lapsed — catch-up window open"}
                 </p>
-                <p className="text-xs text-avenue-text-muted mt-0.5">
+                <p className="text-xs text-brand-text-muted mt-0.5">
                   Lapsed: {new Date(lapseRecord.lapseDate).toLocaleDateString("en-KE")} ·
                   Catch-up deadline: {new Date(lapseRecord.catchupDeadline).toLocaleDateString("en-KE")}
                 </p>
@@ -371,7 +371,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
               </form>
             ) : (
               <Link href={`/quotations/new?groupId=${member.group.id}`}
-                className="inline-block bg-avenue-indigo text-white px-4 py-1.5 rounded-full text-xs font-semibold hover:bg-avenue-secondary transition-colors">
+                className="inline-block bg-brand-indigo text-white px-4 py-1.5 rounded-full text-xs font-semibold hover:bg-brand-secondary transition-colors">
                 Start New Assessment
               </Link>
             )}
@@ -404,7 +404,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
         {/* Action buttons for ACTIVE members */}
         {member.status === "ACTIVE" && (
           <div className="space-y-3">
-            <p className="text-xs font-bold uppercase text-avenue-text-muted tracking-wide">Actions</p>
+            <p className="text-xs font-bold uppercase text-brand-text-muted tracking-wide">Actions</p>
             <div className="flex flex-wrap gap-2">
               {/* Cooling-off cancellation */}
               <form action={initiateCoolingOffCancellationAction}>
@@ -436,7 +436,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
             <form action={recordDeathAction} className="flex gap-2 items-center">
               <input type="hidden" name="memberId" value={id} />
               <input name="proofDocUrl" type="url" required placeholder="Proof of death document URL"
-                className="flex-1 border border-[#EEEEEE] rounded-[6px] px-3 py-1.5 text-xs focus:ring-1 focus:ring-avenue-indigo focus:outline-none" />
+                className="flex-1 border border-[#EEEEEE] rounded-[6px] px-3 py-1.5 text-xs focus:ring-1 focus:ring-brand-indigo focus:outline-none" />
               <button type="submit"
                 className="border border-[#DC3545] text-[#DC3545] px-3 py-1.5 rounded-full text-xs font-semibold hover:bg-[#DC3545]/10 transition-colors whitespace-nowrap">
                 Record Death
@@ -449,7 +449,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
               <form action={terminateForBreachAction} className="flex gap-2 items-center">
                 <input type="hidden" name="memberId" value={id} />
                 <select name="reasonCode" required
-                  className="border border-[#EEEEEE] rounded-[6px] px-2 py-1.5 text-xs focus:ring-1 focus:ring-avenue-indigo focus:outline-none">
+                  className="border border-[#EEEEEE] rounded-[6px] px-2 py-1.5 text-xs focus:ring-1 focus:ring-brand-indigo focus:outline-none">
                   <option value="">Select reason…</option>
                   <option value="MISREPRESENTATION">Misrepresentation</option>
                   <option value="TERMS_BREACH">Terms breach</option>
@@ -465,7 +465,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
               <form action={terminateForFraudAction} className="flex gap-2 items-center">
                 <input type="hidden" name="memberId" value={id} />
                 <select name="reasonCode" required
-                  className="border border-[#EEEEEE] rounded-[6px] px-2 py-1.5 text-xs focus:ring-1 focus:ring-avenue-indigo focus:outline-none">
+                  className="border border-[#EEEEEE] rounded-[6px] px-2 py-1.5 text-xs focus:ring-1 focus:ring-brand-indigo focus:outline-none">
                   <option value="">Select fraud type…</option>
                   <option value="CLAIM_FRAUD">Claim fraud confirmed</option>
                   <option value="IDENTITY_FRAUD">Identity fraud</option>
@@ -484,7 +484,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
 
         {/* Reinstatement link for LAPSED members already showing catch-up UI above */}
         {!["ACTIVE","LAPSED"].includes(member.status) && !lapseRecord && !cancellationRecord && !terminationRecord && (
-          <p className="text-xs text-avenue-text-muted italic">No active lifecycle event recorded.</p>
+          <p className="text-xs text-brand-text-muted italic">No active lifecycle event recorded.</p>
         )}
       </div>
     </div>

@@ -12,18 +12,18 @@ export default async function HRMemberImportPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/hr/roster" className="text-avenue-text-muted hover:text-avenue-indigo transition-colors">
+          <Link href="/hr/roster" className="text-brand-text-muted hover:text-brand-indigo transition-colors">
             <ArrowLeft size={20} />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Bulk Add Endorsements</h1>
-            <p className="text-avenue-text-body text-sm mt-0.5">Submit multiple addition requests using a CSV file.</p>
+            <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Bulk Add Endorsements</h1>
+            <p className="text-brand-text-body text-sm mt-0.5">Submit multiple addition requests using a CSV file.</p>
           </div>
         </div>
         <a
           href="/member-import-template.csv"
           download
-          className="flex items-center gap-2 border border-avenue-indigo text-avenue-indigo px-4 py-2 rounded-full text-sm font-semibold hover:bg-avenue-indigo hover:text-white transition-colors"
+          className="flex items-center gap-2 border border-brand-indigo text-brand-indigo px-4 py-2 rounded-full text-sm font-semibold hover:bg-brand-indigo hover:text-white transition-colors"
         >
           <Download size={15} /> Download Template
         </a>
@@ -31,21 +31,21 @@ export default async function HRMemberImportPage() {
 
       {/* Instructions */}
       <div className="bg-[#F8F9FA] border border-[#EEEEEE] rounded-lg p-5 space-y-4">
-        <div className="flex items-center gap-2 text-avenue-indigo">
+        <div className="flex items-center gap-2 text-brand-indigo">
           <Info size={16} />
           <h2 className="font-bold text-sm">How to fill in the CSV</h2>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-5 text-sm text-avenue-text-body">
+        <div className="grid md:grid-cols-2 gap-5 text-sm text-brand-text-body">
           <div className="space-y-3">
             <div>
-              <p className="font-bold text-avenue-text-heading text-xs uppercase tracking-wide mb-1">Column guide</p>
+              <p className="font-bold text-brand-text-heading text-xs uppercase tracking-wide mb-1">Column guide</p>
               <table className="w-full text-xs border-collapse">
                 <thead>
                   <tr className="bg-white border border-[#EEEEEE]">
-                    <th className="px-3 py-1.5 text-left font-bold text-avenue-text-muted">Column</th>
-                    <th className="px-3 py-1.5 text-left font-bold text-avenue-text-muted">Required?</th>
-                    <th className="px-3 py-1.5 text-left font-bold text-avenue-text-muted">Notes</th>
+                    <th className="px-3 py-1.5 text-left font-bold text-brand-text-muted">Column</th>
+                    <th className="px-3 py-1.5 text-left font-bold text-brand-text-muted">Required?</th>
+                    <th className="px-3 py-1.5 text-left font-bold text-brand-text-muted">Notes</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#EEEEEE]">
@@ -62,9 +62,9 @@ export default async function HRMemberImportPage() {
                     ["isExample",          "—",   "Delete all rows where this is &quot;true&quot;"],
                   ].map(([col, req, note]) => (
                     <tr key={col} className="bg-white">
-                      <td className="px-3 py-1.5 font-mono text-avenue-indigo">{col}</td>
+                      <td className="px-3 py-1.5 font-mono text-brand-indigo">{col}</td>
                       <td className="px-3 py-1.5">{req}</td>
-                      <td className="px-3 py-1.5 text-avenue-text-muted">{note}</td>
+                      <td className="px-3 py-1.5 text-brand-text-muted">{note}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -74,8 +74,8 @@ export default async function HRMemberImportPage() {
 
           <div className="space-y-3">
             <div>
-              <p className="font-bold text-avenue-text-heading text-xs uppercase tracking-wide mb-1">What is &quot;relationship&quot;?</p>
-              <p className="text-xs text-avenue-text-body mb-2">
+              <p className="font-bold text-brand-text-heading text-xs uppercase tracking-wide mb-1">What is &quot;relationship&quot;?</p>
+              <p className="text-xs text-brand-text-body mb-2">
                 Every member must have a relationship to the main insured person on the policy (the <strong>PRINCIPAL</strong>).
               </p>
               <table className="w-full text-xs border-collapse">
@@ -87,8 +87,8 @@ export default async function HRMemberImportPage() {
                     ["PARENT",    "A parent of the principal covered under the policy."],
                   ].map(([val, desc]) => (
                     <tr key={val} className="bg-white border border-[#EEEEEE]">
-                      <td className="px-3 py-2 font-mono font-bold text-avenue-indigo whitespace-nowrap">{val}</td>
-                      <td className="px-3 py-2 text-avenue-text-body">{desc}</td>
+                      <td className="px-3 py-2 font-mono font-bold text-brand-indigo whitespace-nowrap">{val}</td>
+                      <td className="px-3 py-2 text-brand-text-body">{desc}</td>
                     </tr>
                   ))}
                 </tbody>

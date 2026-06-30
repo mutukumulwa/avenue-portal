@@ -60,18 +60,18 @@ export function ProviderEligibilityManager({
   return (
     <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-4 mt-6">
       <div className="flex items-center justify-between border-b border-[#EEEEEE] pb-2">
-        <h2 className="font-bold text-avenue-text-heading font-heading">Provider Eligibility</h2>
+        <h2 className="font-bold text-brand-text-heading font-heading">Provider Eligibility</h2>
         <button
           type="button"
           onClick={() => { setAdding(true); }}
           disabled={adding}
-          className="text-xs bg-[#0B1437]/10 text-avenue-indigo px-3 py-1.5 rounded flex items-center gap-1 font-bold disabled:opacity-50"
+          className="text-xs bg-[#0B1437]/10 text-brand-indigo px-3 py-1.5 rounded flex items-center gap-1 font-bold disabled:opacity-50"
         >
           <Plus size={14} /> Add Rule
         </button>
       </div>
 
-      <p className="text-xs text-avenue-text-muted">
+      <p className="text-xs text-brand-text-muted">
         INCLUDE rules whitelist specific providers or tiers. EXCLUDE rules block them. If no INCLUDE rules exist, all active providers are allowed (subject to EXCLUDE rules).
       </p>
 
@@ -93,11 +93,11 @@ export function ProviderEligibilityManager({
               <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Target</label>
               <div className="flex gap-2">
                 <button type="button" onClick={() => setRuleType("provider")}
-                  className={`flex-1 py-1.5 text-xs rounded font-bold border transition-colors ${ruleType === "provider" ? "bg-avenue-indigo text-white border-avenue-indigo" : "border-gray-200 text-gray-500"}`}>
+                  className={`flex-1 py-1.5 text-xs rounded font-bold border transition-colors ${ruleType === "provider" ? "bg-brand-indigo text-white border-brand-indigo" : "border-gray-200 text-gray-500"}`}>
                   Specific Provider
                 </button>
                 <button type="button" onClick={() => setRuleType("tier")}
-                  className={`flex-1 py-1.5 text-xs rounded font-bold border transition-colors ${ruleType === "tier" ? "bg-avenue-indigo text-white border-avenue-indigo" : "border-gray-200 text-gray-500"}`}>
+                  className={`flex-1 py-1.5 text-xs rounded font-bold border transition-colors ${ruleType === "tier" ? "bg-brand-indigo text-white border-brand-indigo" : "border-gray-200 text-gray-500"}`}>
                   Provider Tier
                 </button>
               </div>
@@ -128,7 +128,7 @@ export function ProviderEligibilityManager({
               <X size={14} /> Cancel
             </button>
             <button type="submit" disabled={creating}
-              className="px-3 py-1.5 text-sm bg-avenue-indigo text-white rounded font-bold hover:bg-blue-800 disabled:opacity-60">
+              className="px-3 py-1.5 text-sm bg-brand-indigo text-white rounded font-bold hover:bg-blue-800 disabled:opacity-60">
               {creating ? "Saving…" : "Save Rule"}
             </button>
           </div>
@@ -142,7 +142,7 @@ export function ProviderEligibilityManager({
             <div key={r.id} className="flex items-center justify-between bg-[#28A745]/5 border border-[#28A745]/20 rounded px-3 py-2">
               <div className="flex items-center gap-2 text-sm">
                 <ShieldCheck size={14} className="text-[#28A745]" />
-                <span className="font-semibold text-avenue-text-heading">{ruleLabel(r)}</span>
+                <span className="font-semibold text-brand-text-heading">{ruleLabel(r)}</span>
               </div>
               <button type="button" onClick={() => handleDelete(r.id)} disabled={isPending}
                 className="text-red-400 hover:bg-red-50 p-1.5 rounded disabled:opacity-40">
@@ -160,7 +160,7 @@ export function ProviderEligibilityManager({
             <div key={r.id} className="flex items-center justify-between bg-[#DC3545]/5 border border-[#DC3545]/20 rounded px-3 py-2">
               <div className="flex items-center gap-2 text-sm">
                 <ShieldOff size={14} className="text-[#DC3545]" />
-                <span className="font-semibold text-avenue-text-heading">{ruleLabel(r)}</span>
+                <span className="font-semibold text-brand-text-heading">{ruleLabel(r)}</span>
               </div>
               <button type="button" onClick={() => handleDelete(r.id)} disabled={isPending}
                 className="text-red-400 hover:bg-red-50 p-1.5 rounded disabled:opacity-40">

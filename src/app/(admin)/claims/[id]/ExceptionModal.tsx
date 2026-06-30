@@ -14,8 +14,8 @@ const EXCEPTION_CODES = [
   { value: "OTHER",                 label: "Other"                         },
 ];
 
-const inp = "w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo transition-colors";
-const lbl = "text-xs font-bold text-avenue-text-muted uppercase block mb-1";
+const inp = "w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo transition-colors";
+const lbl = "text-xs font-bold text-brand-text-muted uppercase block mb-1";
 
 export function ExceptionModal({
   claimId,
@@ -43,9 +43,9 @@ export function ExceptionModal({
             <div className="flex items-center justify-between px-6 py-4 border-b border-[#EEEEEE] bg-[#FFC107]/10">
               <div className="flex items-center gap-2">
                 <AlertTriangle size={18} className="text-[#856404]" />
-                <h2 className="font-bold text-avenue-text-heading font-heading">Flag Manual Exception</h2>
+                <h2 className="font-bold text-brand-text-heading font-heading">Flag Manual Exception</h2>
               </div>
-              <button onClick={() => setOpen(false)} className="text-avenue-text-muted hover:text-avenue-text-heading transition-colors">
+              <button onClick={() => setOpen(false)} className="text-brand-text-muted hover:text-brand-text-heading transition-colors">
                 <X size={18} />
               </button>
             </div>
@@ -98,7 +98,7 @@ export function ExceptionModal({
                 <button
                   type="button"
                   onClick={() => setOpen(false)}
-                  className="px-5 py-2.5 rounded-full border border-[#EEEEEE] text-avenue-text-muted hover:border-avenue-indigo text-sm font-semibold transition-colors"
+                  className="px-5 py-2.5 rounded-full border border-[#EEEEEE] text-brand-text-muted hover:border-brand-indigo text-sm font-semibold transition-colors"
                 >
                   Cancel
                 </button>

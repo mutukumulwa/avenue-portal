@@ -27,7 +27,7 @@ export function FraudAlertActions({
   return (
     <div className="flex items-center justify-end gap-2">
       {isPending ? (
-        <Loader2 size={14} className="animate-spin text-avenue-text-muted" />
+        <Loader2 size={14} className="animate-spin text-brand-text-muted" />
       ) : (
         <>
           <button

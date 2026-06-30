@@ -109,8 +109,8 @@ function SubItems({ items, pathname }: { items: SubItem[]; pathname: string }) {
               href={item.href}
               className={`flex items-center rounded-[6px] px-2 py-1.5 text-xs font-semibold transition-colors ${
                 active
-                  ? "bg-avenue-indigo/10 text-avenue-indigo"
-                  : "text-avenue-text-muted hover:text-avenue-indigo hover:bg-avenue-bg-alt"
+                  ? "bg-brand-indigo/10 text-brand-indigo"
+                  : "text-brand-text-muted hover:text-brand-indigo hover:bg-brand-bg-alt"
               }`}
             >
               {item.label}
@@ -134,12 +134,12 @@ function NavItemRow({ item, pathname }: { item: NavItem; pathname: string }) {
           href={item.href}
           className={`group flex items-center rounded-[8px] px-2 py-2 transition-colors ${
             isActive
-              ? "bg-avenue-indigo/10 text-avenue-indigo"
-              : "text-avenue-text-body hover:bg-avenue-bg-alt hover:text-avenue-indigo"
+              ? "bg-brand-indigo/10 text-brand-indigo"
+              : "text-brand-text-body hover:bg-brand-bg-alt hover:text-brand-indigo"
           }`}
         >
           <Icon className={`h-4 w-4 shrink-0 transition-colors ${
-            isActive ? "text-avenue-indigo" : "group-hover:text-avenue-indigo text-avenue-text-muted"
+            isActive ? "text-brand-indigo" : "group-hover:text-brand-indigo text-brand-text-muted"
           }`} />
           <span className="ml-2.5 text-sm font-semibold">{item.label}</span>
         </Link>
@@ -161,7 +161,7 @@ function NavGroupSection({ group, pathname }: { group: NavGroup; pathname: strin
     <div>
       <button
         onClick={() => setOpen(v => !v)}
-        className="w-full flex items-center justify-between px-2 py-1.5 text-[10px] font-bold uppercase text-avenue-text-muted hover:text-avenue-text-heading transition-colors"
+        className="w-full flex items-center justify-between px-2 py-1.5 text-[10px] font-bold uppercase text-brand-text-muted hover:text-brand-text-heading transition-colors"
         style={{ letterSpacing: 0 }}
       >
         {group.label}
@@ -200,10 +200,10 @@ export function AdminSidebar({ userRole }: { userRole: UserRole | null }) {
       <div className="flex h-full flex-col overflow-y-auto px-3 py-4">
         {/* Logo */}
         <Link href="/dashboard" className="mb-5 flex items-center pl-1 space-x-2">
-          <div className="h-8 w-8 bg-avenue-indigo rounded-full shrink-0" />
-          <span className="text-lg font-bold font-heading text-avenue-indigo leading-tight" style={{ letterSpacing: 0 }}>
+          <div className="h-8 w-8 bg-brand-indigo rounded-full shrink-0" />
+          <span className="text-lg font-bold font-heading text-brand-indigo leading-tight" style={{ letterSpacing: 0 }}>
             AiCare<br />
-            <span className="text-xs font-semibold text-avenue-text-muted font-body">Medvex</span>
+            <span className="text-xs font-semibold text-brand-text-muted font-body">Medvex</span>
           </span>
         </Link>
 
@@ -225,11 +225,11 @@ export function AdminSidebar({ userRole }: { userRole: UserRole | null }) {
                 href="/settings"
                 className={`group flex items-center rounded-[8px] px-2 py-2 transition-colors ${
                   setupActive
-                    ? "bg-avenue-indigo/10 text-avenue-indigo"
-                    : "text-avenue-text-body hover:bg-avenue-bg-alt hover:text-avenue-indigo"
+                    ? "bg-brand-indigo/10 text-brand-indigo"
+                    : "text-brand-text-body hover:bg-brand-bg-alt hover:text-brand-indigo"
                 }`}
               >
-                <Settings className={`h-4 w-4 shrink-0 ${setupActive ? "text-avenue-indigo" : "text-avenue-text-muted group-hover:text-avenue-indigo"}`} />
+                <Settings className={`h-4 w-4 shrink-0 ${setupActive ? "text-brand-indigo" : "text-brand-text-muted group-hover:text-brand-indigo"}`} />
                 <span className="ml-2.5 text-sm font-semibold">Setup</span>
               </Link>
               {setupActive && (
@@ -239,7 +239,7 @@ export function AdminSidebar({ userRole }: { userRole: UserRole | null }) {
           )}
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
-            className="w-full group flex items-center rounded-[8px] px-2 py-2 text-avenue-error hover:bg-red-50 transition-colors"
+            className="w-full group flex items-center rounded-[8px] px-2 py-2 text-brand-error hover:bg-red-50 transition-colors"
           >
             <LogOut className="h-4 w-4 shrink-0" />
             <span className="ml-2.5 text-sm font-semibold">Log out</span>

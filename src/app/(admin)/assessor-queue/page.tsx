@@ -62,19 +62,19 @@ export default async function AssessorQueuePage() {
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Assessor Queue</h1>
-        <p className="text-avenue-text-muted text-sm mt-1">Submissions assigned for underwriting assessment</p>
+        <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Assessor Queue</h1>
+        <p className="text-brand-text-muted text-sm mt-1">Submissions assigned for underwriting assessment</p>
       </div>
 
       {/* Summary counters */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "My Queue",         count: myItems.length,     color: "text-avenue-indigo" },
+          { label: "My Queue",         count: myItems.length,     color: "text-brand-indigo" },
           { label: "Pending Senior",   count: pendingSenior.length, color: "text-[#C4500A]"  },
           { label: "Unallocated",      count: unallocated.length,  color: "text-[#856404]"   },
         ].map(s => (
           <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-[8px] p-4 shadow-sm">
-            <p className="text-xs text-avenue-text-muted font-bold uppercase">{s.label}</p>
+            <p className="text-xs text-brand-text-muted font-bold uppercase">{s.label}</p>
             <p className={`text-2xl font-bold mt-1 ${s.color}`}>{s.count}</p>
           </div>
         ))}
@@ -83,10 +83,10 @@ export default async function AssessorQueuePage() {
       {/* My queue */}
       <section className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-[#EEEEEE]">
-          <h2 className="font-semibold text-avenue-text-heading text-sm">My Assigned Submissions</h2>
+          <h2 className="font-semibold text-brand-text-heading text-sm">My Assigned Submissions</h2>
         </div>
         {myItems.length === 0 ? (
-          <p className="px-6 py-10 text-center text-avenue-text-muted text-sm">
+          <p className="px-6 py-10 text-center text-brand-text-muted text-sm">
             <Clock size={28} className="mx-auto mb-2 opacity-30" />
             No submissions assigned to you
           </p>
@@ -109,14 +109,14 @@ export default async function AssessorQueuePage() {
                 const sla = slaLabel(item.slaDeadlineAt, item.slaBreached);
                 return (
                   <tr key={item.id} className="hover:bg-[#F8F9FA] transition-colors">
-                    <td className="px-5 py-3 font-mono text-xs font-semibold text-avenue-text-heading">{q.quoteNumber}</td>
+                    <td className="px-5 py-3 font-mono text-xs font-semibold text-brand-text-heading">{q.quoteNumber}</td>
                     <td className="px-5 py-3">
-                      <p className="font-semibold text-avenue-text-heading">{q.legalName ?? q.prospectName ?? "—"}</p>
-                      <p className="text-xs text-avenue-text-muted">{q.clientType} · {q.headcount ?? (q.memberCount + q.dependentCount)} lives</p>
+                      <p className="font-semibold text-brand-text-heading">{q.legalName ?? q.prospectName ?? "—"}</p>
+                      <p className="text-xs text-brand-text-muted">{q.clientType} · {q.headcount ?? (q.memberCount + q.dependentCount)} lives</p>
                     </td>
-                    <td className="px-5 py-3 text-avenue-text-body">{q.broker?.name ?? "Direct"}</td>
-                    <td className="px-5 py-3 text-avenue-text-body">{q.memberCount + q.dependentCount}</td>
-                    <td className="px-5 py-3 text-avenue-text-body">
+                    <td className="px-5 py-3 text-brand-text-body">{q.broker?.name ?? "Direct"}</td>
+                    <td className="px-5 py-3 text-brand-text-body">{q.memberCount + q.dependentCount}</td>
+                    <td className="px-5 py-3 text-brand-text-body">
                       {q.requestedCoverStart ? new Date(q.requestedCoverStart).toLocaleDateString("en-KE") : "—"}
                     </td>
                     <td className="px-5 py-3">
@@ -127,7 +127,7 @@ export default async function AssessorQueuePage() {
                     </td>
                     <td className="px-5 py-3">
                       <Link href={`/quotations/${q.id}/assess`}
-                        className="text-avenue-indigo hover:text-avenue-secondary font-semibold text-xs inline-flex items-center gap-1">
+                        className="text-brand-indigo hover:text-brand-secondary font-semibold text-xs inline-flex items-center gap-1">
                         Assess <ArrowRight size={13} />
                       </Link>
                     </td>
@@ -151,9 +151,9 @@ export default async function AssessorQueuePage() {
             <tbody className="divide-y divide-[#EEEEEE]">
               {pendingSenior.map(q => (
                 <tr key={q.id} className="hover:bg-[#FFF8F5] transition-colors">
-                  <td className="px-5 py-3 font-mono text-xs font-semibold text-avenue-text-heading">{q.quoteNumber}</td>
-                  <td className="px-5 py-3 font-semibold text-avenue-text-heading">{q.legalName ?? q.prospectName ?? "—"}</td>
-                  <td className="px-5 py-3 text-avenue-text-body">{q.broker?.name ?? "Direct"}</td>
+                  <td className="px-5 py-3 font-mono text-xs font-semibold text-brand-text-heading">{q.quoteNumber}</td>
+                  <td className="px-5 py-3 font-semibold text-brand-text-heading">{q.legalName ?? q.prospectName ?? "—"}</td>
+                  <td className="px-5 py-3 text-brand-text-body">{q.broker?.name ?? "Direct"}</td>
                   <td className="px-5 py-3 text-right">
                     <Link href={`/quotations/${q.id}/assess`}
                       className="text-[#C4500A] hover:text-[#FD7E14] font-semibold text-xs inline-flex items-center gap-1">
@@ -171,19 +171,19 @@ export default async function AssessorQueuePage() {
       {unallocated.length > 0 && (
         <section className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-[#EEEEEE]">
-            <h2 className="font-semibold text-avenue-text-heading text-sm">Unallocated — Pending Assignment</h2>
-            <p className="text-xs text-avenue-text-muted mt-0.5">Allocation job runs every 10 minutes</p>
+            <h2 className="font-semibold text-brand-text-heading text-sm">Unallocated — Pending Assignment</h2>
+            <p className="text-xs text-brand-text-muted mt-0.5">Allocation job runs every 10 minutes</p>
           </div>
           <table className="w-full text-sm text-left">
             <tbody className="divide-y divide-[#EEEEEE]">
               {unallocated.map(q => (
                 <tr key={q.id} className="hover:bg-[#F8F9FA] transition-colors">
-                  <td className="px-5 py-3 font-mono text-xs font-semibold text-avenue-text-heading">{q.quoteNumber}</td>
-                  <td className="px-5 py-3 font-semibold text-avenue-text-heading">{q.legalName ?? q.prospectName ?? "—"}</td>
-                  <td className="px-5 py-3 text-avenue-text-muted">{q.broker?.name ?? "Direct"}</td>
+                  <td className="px-5 py-3 font-mono text-xs font-semibold text-brand-text-heading">{q.quoteNumber}</td>
+                  <td className="px-5 py-3 font-semibold text-brand-text-heading">{q.legalName ?? q.prospectName ?? "—"}</td>
+                  <td className="px-5 py-3 text-brand-text-muted">{q.broker?.name ?? "Direct"}</td>
                   <td className="px-5 py-3 text-right">
                     <Link href={`/quotations/${q.id}/assess`}
-                      className="text-avenue-indigo hover:text-avenue-secondary font-semibold text-xs inline-flex items-center gap-1">
+                      className="text-brand-indigo hover:text-brand-secondary font-semibold text-xs inline-flex items-center gap-1">
                       Open <ArrowRight size={13} />
                     </Link>
                   </td>

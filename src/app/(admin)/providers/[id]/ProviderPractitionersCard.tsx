@@ -63,7 +63,7 @@ function AddCredentialForm({ practitionerId, providerId, onDone }: { practitione
       {state?.error && <p className="col-span-3 text-xs text-red-600">{state.error}</p>}
       <div className="col-span-3 flex gap-2 justify-end">
         <button type="button" onClick={onDone} className="text-xs text-gray-500 hover:underline">Cancel</button>
-        <button type="submit" disabled={pending} className="px-3 py-1 text-xs bg-avenue-indigo text-white rounded font-bold flex items-center gap-1 disabled:opacity-60">
+        <button type="submit" disabled={pending} className="px-3 py-1 text-xs bg-brand-indigo text-white rounded font-bold flex items-center gap-1 disabled:opacity-60">
           <Save size={12} /> {pending ? "Saving…" : "Save Credential"}
         </button>
       </div>
@@ -92,16 +92,16 @@ function PractitionerRow({ link, providerId }: { link: Practitioner; providerId:
     <div className={`border rounded-lg p-4 ${hasExpired ? "border-[#DC3545]/30 bg-[#DC3545]/5" : "border-[#EEEEEE] bg-white"}`}>
       <div className="flex justify-between items-start gap-3">
         <div className="flex items-start gap-3">
-          <div className="w-9 h-9 rounded-full bg-avenue-indigo/10 text-avenue-indigo flex items-center justify-center font-bold text-sm shrink-0">
+          <div className="w-9 h-9 rounded-full bg-brand-indigo/10 text-brand-indigo flex items-center justify-center font-bold text-sm shrink-0">
             {p.firstName[0]}{p.lastName[0]}
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-avenue-text-heading">{p.firstName} {p.lastName}</span>
-              {link.isPrimary && <span className="text-[10px] bg-avenue-indigo/10 text-avenue-indigo px-2 py-0.5 rounded-full font-bold">PRIMARY</span>}
+              <span className="font-semibold text-brand-text-heading">{p.firstName} {p.lastName}</span>
+              {link.isPrimary && <span className="text-[10px] bg-brand-indigo/10 text-brand-indigo px-2 py-0.5 rounded-full font-bold">PRIMARY</span>}
               {hasExpired && <AlertTriangle size={14} className="text-[#DC3545]" />}
             </div>
-            <p className="text-xs text-avenue-text-muted mt-0.5">{p.licenseType} · {p.licenseNumber}</p>
+            <p className="text-xs text-brand-text-muted mt-0.5">{p.licenseType} · {p.licenseNumber}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -164,17 +164,17 @@ export function ProviderPractitionersCard({
     <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm">
       <div className="flex items-center justify-between px-5 py-4 border-b border-[#EEEEEE]">
         <div className="flex items-center gap-2">
-          <UserCheck size={18} className="text-avenue-indigo" />
-          <h2 className="font-bold text-avenue-text-heading font-heading">Practitioners</h2>
-          <span className="text-xs bg-[#EEEEEE] text-avenue-text-muted px-2 py-0.5 rounded-full font-bold">{practitioners.length}</span>
+          <UserCheck size={18} className="text-brand-indigo" />
+          <h2 className="font-bold text-brand-text-heading font-heading">Practitioners</h2>
+          <span className="text-xs bg-[#EEEEEE] text-brand-text-muted px-2 py-0.5 rounded-full font-bold">{practitioners.length}</span>
         </div>
         <div className="flex gap-2">
           <button onClick={() => setAdding(adding === "existing" ? null : "existing")} disabled={adding !== null}
-            className="text-xs px-3 py-1.5 border border-avenue-indigo text-avenue-indigo rounded font-bold hover:bg-avenue-indigo hover:text-white transition-colors disabled:opacity-50">
+            className="text-xs px-3 py-1.5 border border-brand-indigo text-brand-indigo rounded font-bold hover:bg-brand-indigo hover:text-white transition-colors disabled:opacity-50">
             Link Existing
           </button>
           <button onClick={() => setAdding(adding === "new" ? null : "new")} disabled={adding !== null}
-            className="text-xs px-3 py-1.5 bg-avenue-indigo text-white rounded font-bold hover:bg-blue-800 transition-colors disabled:opacity-50 flex items-center gap-1">
+            className="text-xs px-3 py-1.5 bg-brand-indigo text-white rounded font-bold hover:bg-blue-800 transition-colors disabled:opacity-50 flex items-center gap-1">
             <Plus size={13} /> New Practitioner
           </button>
         </div>
@@ -205,7 +205,7 @@ export function ProviderPractitionersCard({
             {newState?.error && <p className="text-xs text-red-600">{newState.error}</p>}
             <div className="flex gap-2 justify-end">
               <button type="button" onClick={() => setAdding(null)} className="text-sm text-gray-500 hover:underline flex items-center gap-1"><X size={14} /> Cancel</button>
-              <button type="submit" disabled={creatingNew} className="px-4 py-1.5 text-sm bg-avenue-indigo text-white rounded font-bold disabled:opacity-60">
+              <button type="submit" disabled={creatingNew} className="px-4 py-1.5 text-sm bg-brand-indigo text-white rounded font-bold disabled:opacity-60">
                 {creatingNew ? "Creating…" : "Create & Link"}
               </button>
             </div>
@@ -222,7 +222,7 @@ export function ProviderPractitionersCard({
             {linkState?.error && <p className="text-xs text-red-600">{linkState.error}</p>}
             <div className="flex gap-2 justify-end">
               <button type="button" onClick={() => setAdding(null)} className="text-sm text-gray-500 hover:underline flex items-center gap-1"><X size={14} /> Cancel</button>
-              <button type="submit" disabled={linking} className="px-4 py-1.5 text-sm bg-avenue-indigo text-white rounded font-bold disabled:opacity-60">
+              <button type="submit" disabled={linking} className="px-4 py-1.5 text-sm bg-brand-indigo text-white rounded font-bold disabled:opacity-60">
                 {linking ? "Linking…" : "Link Practitioner"}
               </button>
             </div>
@@ -234,7 +234,7 @@ export function ProviderPractitionersCard({
         ))}
 
         {practitioners.length === 0 && adding === null && (
-          <div className="text-center py-8 border-2 border-dashed border-[#EEEEEE] rounded-lg text-avenue-text-muted">
+          <div className="text-center py-8 border-2 border-dashed border-[#EEEEEE] rounded-lg text-brand-text-muted">
             <UserCheck size={32} className="mx-auto mb-2 opacity-30" />
             <p className="text-sm">No practitioners linked to this facility yet.</p>
           </div>

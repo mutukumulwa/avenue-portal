@@ -43,16 +43,16 @@ export default async function MemberEncounterDetailPage({
   return (
     <div className="space-y-6 font-ui">
       <div>
-        <Link href="/member/utilization" className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-avenue-indigo hover:underline">
+        <Link href="/member/utilization" className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-brand-indigo hover:underline">
           <ArrowLeft className="h-4 w-4" /> Back to care history
         </Link>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h1 className="font-heading text-2xl font-bold text-avenue-text-heading">Care Cost Detail</h1>
-            <p className="mt-1 text-avenue-text-muted">
+            <h1 className="font-heading text-2xl font-bold text-brand-text-heading">Care Cost Detail</h1>
+            <p className="mt-1 text-brand-text-muted">
               {detail.provider.name} · {detail.serviceType.replace(/_/g, " ")} · {formatDate(detail.dateOfService)}
             </p>
-            <p className="mt-2 font-mono text-[13px] text-avenue-text-muted">{detail.claimNumber}</p>
+            <p className="mt-2 font-mono text-[13px] text-brand-text-muted">{detail.claimNumber}</p>
           </div>
           <span className={`w-fit rounded-full px-3 py-1 text-[13px] font-bold ${statusTone(detail.status)}`}>
             {detail.status}
@@ -62,7 +62,7 @@ export default async function MemberEncounterDetailPage({
 
       <section className="grid gap-4 md:grid-cols-4">
         {[
-          { label: "Provider bill", value: formatMoney(detail.amounts.billed), icon: ReceiptText, tone: "text-avenue-indigo" },
+          { label: "Provider bill", value: formatMoney(detail.amounts.billed), icon: ReceiptText, tone: "text-brand-indigo" },
           { label: "Plan approved", value: formatMoney(detail.amounts.planApproved), icon: HeartPulse, tone: "text-[#28A745]" },
           { label: "Plan paid", value: formatMoney(detail.amounts.planPaid), icon: FileText, tone: "text-[#17A2B8]" },
           { label: "Your share", value: formatMoney(detail.amounts.memberShare), icon: WalletCards, tone: "text-[#856404]" },
@@ -71,7 +71,7 @@ export default async function MemberEncounterDetailPage({
           return (
             <div key={metric.label} className="rounded-[8px] border border-[#EEEEEE] bg-white p-4 shadow-sm">
               <Icon className={`h-5 w-5 ${metric.tone}`} />
-              <p className="mt-3 text-[13px] font-bold uppercase text-avenue-text-muted">{metric.label}</p>
+              <p className="mt-3 text-[13px] font-bold uppercase text-brand-text-muted">{metric.label}</p>
               <p className={`mt-1 text-xl font-bold tabular-nums ${metric.tone}`}>{metric.value}</p>
             </div>
           );
@@ -80,8 +80,8 @@ export default async function MemberEncounterDetailPage({
 
       {memberShareOutstanding > 0 && (
         <section className="rounded-[8px] border border-[#FFC107]/40 bg-[#FFC107]/10 p-4">
-          <p className="font-bold text-avenue-text-heading">Member share still pending</p>
-          <p className="mt-1 text-sm text-avenue-text-muted">
+          <p className="font-bold text-brand-text-heading">Member share still pending</p>
+          <p className="mt-1 text-sm text-brand-text-muted">
             {formatMoney(memberShareOutstanding)} is still awaiting collection or payment confirmation.
           </p>
         </section>
@@ -90,20 +90,20 @@ export default async function MemberEncounterDetailPage({
       <section className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
         <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center gap-2">
-            <Building2 className="h-5 w-5 text-avenue-indigo" />
-            <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Care provider</h2>
+            <Building2 className="h-5 w-5 text-brand-indigo" />
+            <h2 className="font-heading text-lg font-bold text-brand-text-heading">Care provider</h2>
           </div>
           <div className="space-y-3 text-sm">
             <div>
-              <p className="text-[13px] text-avenue-text-muted">Provider</p>
-              <p className="font-semibold text-avenue-text-heading">{detail.provider.name}</p>
+              <p className="text-[13px] text-brand-text-muted">Provider</p>
+              <p className="font-semibold text-brand-text-heading">{detail.provider.name}</p>
             </div>
             <div>
-              <p className="text-[13px] text-avenue-text-muted">Type</p>
-              <p className="font-semibold text-avenue-text-heading">{detail.provider.type.replace(/_/g, " ")}</p>
+              <p className="text-[13px] text-brand-text-muted">Type</p>
+              <p className="font-semibold text-brand-text-heading">{detail.provider.type.replace(/_/g, " ")}</p>
             </div>
             {detail.provider.phone && (
-              <a href={`tel:${detail.provider.phone}`} className="inline-flex items-center gap-2 font-semibold text-avenue-indigo hover:underline">
+              <a href={`tel:${detail.provider.phone}`} className="inline-flex items-center gap-2 font-semibold text-brand-indigo hover:underline">
                 <Phone className="h-4 w-4" /> {detail.provider.phone}
               </a>
             )}
@@ -112,39 +112,39 @@ export default async function MemberEncounterDetailPage({
 
         <div className="rounded-[8px] border border-[#EEEEEE] bg-white shadow-sm">
           <div className="border-b border-[#EEEEEE] px-5 py-4">
-            <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Services included</h2>
-            <p className="text-sm text-avenue-text-muted">Simplified service costs from this care event.</p>
+            <h2 className="font-heading text-lg font-bold text-brand-text-heading">Services included</h2>
+            <p className="text-sm text-brand-text-muted">Simplified service costs from this care event.</p>
           </div>
           <div className="divide-y divide-[#EEEEEE]">
             {detail.services.map((service) => (
               <div key={service.id} className="grid gap-3 px-5 py-4 sm:grid-cols-[1fr_auto] sm:items-center">
                 <div>
-                  <p className="font-semibold text-avenue-text-heading">{service.description}</p>
-                  <p className="text-[13px] text-avenue-text-muted">
+                  <p className="font-semibold text-brand-text-heading">{service.description}</p>
+                  <p className="text-[13px] text-brand-text-muted">
                     {service.category.replace(/_/g, " ")} · Quantity {service.quantity.toLocaleString("en-KE")}
                   </p>
                 </div>
                 <div className="grid grid-cols-2 gap-4 text-sm sm:text-right">
                   <div>
-                    <p className="text-[13px] text-avenue-text-muted">Bill</p>
-                    <p className="font-bold tabular-nums text-avenue-text-heading">{formatMoney(service.billedAmount)}</p>
+                    <p className="text-[13px] text-brand-text-muted">Bill</p>
+                    <p className="font-bold tabular-nums text-brand-text-heading">{formatMoney(service.billedAmount)}</p>
                   </div>
                   <div>
-                    <p className="text-[13px] text-avenue-text-muted">Plan approved</p>
+                    <p className="text-[13px] text-brand-text-muted">Plan approved</p>
                     <p className="font-bold tabular-nums text-[#28A745]">{formatMoney(service.planApprovedAmount)}</p>
                   </div>
                 </div>
               </div>
             ))}
             {detail.services.length === 0 && (
-              <p className="px-5 py-8 text-center text-sm text-avenue-text-muted">No service line detail is available for this care event.</p>
+              <p className="px-5 py-8 text-center text-sm text-brand-text-muted">No service line detail is available for this care event.</p>
             )}
           </div>
         </div>
       </section>
 
       <section className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
-        <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Documents</h2>
+        <h2 className="font-heading text-lg font-bold text-brand-text-heading">Documents</h2>
         <DocumentList documents={detail.documents} />
       </section>
     </div>

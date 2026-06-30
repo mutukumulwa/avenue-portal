@@ -106,21 +106,21 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/groups" className="text-avenue-text-muted hover:text-avenue-indigo transition-colors">
+          <Link href="/groups" className="text-brand-text-muted hover:text-brand-indigo transition-colors">
             <ArrowLeft size={20} />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">{group.name}</h1>
-            <p className="text-avenue-text-body text-sm mt-0.5">
+            <h1 className="text-2xl font-bold text-brand-text-heading font-heading">{group.name}</h1>
+            <p className="text-brand-text-body text-sm mt-0.5">
               {group.industry ?? "—"} · {group.county ?? "—"}
-              {hasTiers && <span className="ml-2 text-avenue-indigo font-semibold">· {group.benefitTiers.length} benefit tiers</span>}
+              {hasTiers && <span className="ml-2 text-brand-indigo font-semibold">· {group.benefitTiers.length} benefit tiers</span>}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-3">
           <Link
             href={`/groups/${id}/edit`}
-            className="flex items-center gap-1.5 text-xs font-semibold text-avenue-indigo border border-avenue-indigo/30 hover:bg-avenue-indigo/5 px-3 py-1.5 rounded-full transition-colors"
+            className="flex items-center gap-1.5 text-xs font-semibold text-brand-indigo border border-brand-indigo/30 hover:bg-brand-indigo/5 px-3 py-1.5 rounded-full transition-colors"
           >
             <Pencil size={13} /> Edit
           </Link>
@@ -133,7 +133,7 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
       {/* KPI cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Active Members",          value: activeMembers,                      icon: Users,    color: "text-avenue-indigo"  },
+          { label: "Active Members",          value: activeMembers,                      icon: Users,    color: "text-brand-indigo"  },
           { label: "Annual Contribution (KES)", value: annualContribution.toLocaleString("en-KE"), icon: CreditCard, color: "text-[#28A745]" },
           { label: "Total Members",            value: group._count.members,              icon: Receipt,  color: "text-[#17A2B8]"      },
           { label: "Endorsements",             value: group._count.endorsements,         icon: FileText, color: "text-[#6C757D]"      },
@@ -142,7 +142,7 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
           return (
             <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-[8px] p-4 shadow-sm">
               <div className="flex items-center justify-between mb-1">
-                <p className="text-xs text-avenue-text-muted font-bold uppercase">{s.label}</p>
+                <p className="text-xs text-brand-text-muted font-bold uppercase">{s.label}</p>
                 <Icon size={15} className={s.color} />
               </div>
               <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
@@ -154,7 +154,7 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
       <div className="grid md:grid-cols-2 gap-6">
         {/* Group details */}
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-3">
-          <h2 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2">Group Details</h2>
+          <h2 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2">Group Details</h2>
           {[
             { label: "Registration No.",   value: group.registrationNumber ?? "—" },
             { label: "Contact Person",     value: group.contactPersonName },
@@ -173,8 +173,8 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
             { label: "Broker",             value: group.broker?.name ?? "Direct" },
           ].map(f => (
             <div key={f.label} className="flex justify-between text-sm">
-              <span className="text-avenue-text-muted">{f.label}</span>
-              <span className="font-semibold text-avenue-text-heading">{f.value}</span>
+              <span className="text-brand-text-muted">{f.label}</span>
+              <span className="font-semibold text-brand-text-heading">{f.value}</span>
             </div>
           ))}
         </div>
@@ -182,24 +182,24 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
         {/* Recent endorsements */}
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm">
           <div className="flex justify-between items-center border-b border-[#EEEEEE] pb-2 mb-3">
-            <h2 className="font-bold text-avenue-text-heading font-heading">Recent Endorsements</h2>
+            <h2 className="font-bold text-brand-text-heading font-heading">Recent Endorsements</h2>
             <Link href={`/endorsements/new?groupId=${group.id}`}
-              className="text-avenue-indigo text-xs font-semibold hover:underline">+ New</Link>
+              className="text-brand-indigo text-xs font-semibold hover:underline">+ New</Link>
           </div>
           <div className="space-y-2">
             {group.endorsements.map(e => (
               <div key={e.id} className="flex justify-between items-center text-sm py-1">
                 <div>
                   <Link href={`/endorsements/${e.id}`}
-                    className="font-semibold text-avenue-indigo hover:underline font-mono text-xs">{e.endorsementNumber}</Link>
-                  <p className="text-xs text-avenue-text-muted">{e.type.replace(/_/g, " ")} · {new Date(e.effectiveDate).toLocaleDateString("en-KE")}</p>
+                    className="font-semibold text-brand-indigo hover:underline font-mono text-xs">{e.endorsementNumber}</Link>
+                  <p className="text-xs text-brand-text-muted">{e.type.replace(/_/g, " ")} · {new Date(e.effectiveDate).toLocaleDateString("en-KE")}</p>
                 </div>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${statusColor(e.status)}`}>
                   {e.status}
                 </span>
               </div>
             ))}
-            {group.endorsements.length === 0 && <p className="text-sm text-avenue-text-body">No endorsements yet.</p>}
+            {group.endorsements.length === 0 && <p className="text-sm text-brand-text-body">No endorsements yet.</p>}
           </div>
         </div>
       </div>
@@ -220,10 +220,10 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
       {/* Members table */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-[#EEEEEE] flex justify-between items-center">
-          <h2 className="font-bold text-avenue-text-heading font-heading">Members ({group._count.members})</h2>
+          <h2 className="font-bold text-brand-text-heading font-heading">Members ({group._count.members})</h2>
           <div className="flex items-center gap-3">
-            <Link href="/members/import" className="text-avenue-text-muted text-sm font-semibold hover:text-avenue-indigo">Bulk Import</Link>
-            <Link href="/members/new" className="text-avenue-indigo text-sm font-semibold hover:underline">+ Add Member</Link>
+            <Link href="/members/import" className="text-brand-text-muted text-sm font-semibold hover:text-brand-indigo">Bulk Import</Link>
+            <Link href="/members/new" className="text-brand-indigo text-sm font-semibold hover:underline">+ Add Member</Link>
           </div>
         </div>
         <table className="w-full text-left border-collapse text-sm">
@@ -239,10 +239,10 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
               <th className="px-5 py-3">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#EEEEEE] text-avenue-text-body">
+          <tbody className="divide-y divide-[#EEEEEE] text-brand-text-body">
             {group.members.map(m => (
               <tr key={m.id} className="hover:bg-[#F8F9FA]">
-                <td className="px-5 py-3 font-semibold text-avenue-text-heading">{m.firstName} {m.lastName}</td>
+                <td className="px-5 py-3 font-semibold text-brand-text-heading">{m.firstName} {m.lastName}</td>
                 <td className="px-5 py-3 font-mono text-xs">{m.memberNumber}</td>
                 <td className="px-5 py-3">
                   <span className="bg-[#E6E7E8] text-[#6C757D] px-2 py-0.5 rounded text-[10px] font-bold uppercase">
@@ -252,15 +252,15 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
                 {hasTiers && (
                   <td className="px-5 py-3">
                     {m.benefitTier ? (
-                      <span className="bg-avenue-indigo/10 text-avenue-indigo text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
+                      <span className="bg-brand-indigo/10 text-brand-indigo text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
                         {m.benefitTier.name}
                       </span>
                     ) : (
-                      <span className="text-avenue-text-muted text-xs">Default</span>
+                      <span className="text-brand-text-muted text-xs">Default</span>
                     )}
                   </td>
                 )}
-                <td className="px-5 py-3 text-xs text-avenue-text-muted">{m.package.name}</td>
+                <td className="px-5 py-3 text-xs text-brand-text-muted">{m.package.name}</td>
                 <td className="px-5 py-3">{age(m.dateOfBirth)}</td>
                 <td className="px-5 py-3">
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${statusColor(m.status)}`}>
@@ -268,12 +268,12 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
                   </span>
                 </td>
                 <td className="px-5 py-3">
-                  <Link href={`/members/${m.id}`} className="text-avenue-indigo hover:underline font-semibold text-xs">View</Link>
+                  <Link href={`/members/${m.id}`} className="text-brand-indigo hover:underline font-semibold text-xs">View</Link>
                 </td>
               </tr>
             ))}
             {group.members.length === 0 && (
-              <tr><td colSpan={hasTiers ? 8 : 7} className="px-5 py-8 text-center text-avenue-text-body">No members enrolled.</td></tr>
+              <tr><td colSpan={hasTiers ? 8 : 7} className="px-5 py-8 text-center text-brand-text-body">No members enrolled.</td></tr>
             )}
           </tbody>
         </table>
@@ -282,7 +282,7 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
       {/* Invoices */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-[#EEEEEE]">
-          <h2 className="font-bold text-avenue-text-heading font-heading">Invoice History</h2>
+          <h2 className="font-bold text-brand-text-heading font-heading">Invoice History</h2>
         </div>
         <table className="w-full text-left border-collapse text-sm">
           <thead>
@@ -295,10 +295,10 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
               <th className="px-5 py-3">Status</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#EEEEEE] text-avenue-text-body">
+          <tbody className="divide-y divide-[#EEEEEE] text-brand-text-body">
             {group.invoices.map(inv => (
               <tr key={inv.id} className="hover:bg-[#F8F9FA]">
-                <td className="px-5 py-3 font-mono text-xs font-semibold text-avenue-text-heading">{inv.invoiceNumber}</td>
+                <td className="px-5 py-3 font-mono text-xs font-semibold text-brand-text-heading">{inv.invoiceNumber}</td>
                 <td className="px-5 py-3">{inv.period}</td>
                 <td className="px-5 py-3">{inv.memberCount}</td>
                 <td className="px-5 py-3 font-semibold">{Number(inv.totalAmount).toLocaleString("en-KE")}</td>
@@ -311,7 +311,7 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
               </tr>
             ))}
             {group.invoices.length === 0 && (
-              <tr><td colSpan={6} className="px-5 py-8 text-center text-avenue-text-body">No invoices.</td></tr>
+              <tr><td colSpan={6} className="px-5 py-8 text-center text-brand-text-body">No invoices.</td></tr>
             )}
           </tbody>
         </table>
@@ -321,8 +321,8 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
       {group.fundingMode === "SELF_FUNDED" && (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-[#EEEEEE] flex items-center gap-2">
-            <Wallet size={15} className="text-avenue-indigo" />
-            <h2 className="font-bold text-avenue-text-heading font-heading">Self-Funded Account</h2>
+            <Wallet size={15} className="text-brand-indigo" />
+            <h2 className="font-bold text-brand-text-heading font-heading">Self-Funded Account</h2>
           </div>
           <div className="p-5">
             <SelfFundedPanel

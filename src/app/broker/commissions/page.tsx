@@ -44,7 +44,7 @@ export default async function BrokerCommissionsPage() {
   });
 
   if (!user?.brokerId) {
-    return <div className="p-6 text-center text-avenue-text-body">No broker profile linked.</div>;
+    return <div className="p-6 text-center text-brand-text-body">No broker profile linked.</div>;
   }
 
   const ledger = await prisma.commissionLedgerEntry.findMany({
@@ -80,18 +80,18 @@ export default async function BrokerCommissionsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold font-heading text-avenue-text-heading">Commissions</h1>
-        <p className="text-avenue-text-muted mt-1">Your commission ledger, payout batches, and payment status.</p>
+        <h1 className="text-2xl font-bold font-heading text-brand-text-heading">Commissions</h1>
+        <p className="text-brand-text-muted mt-1">Your commission ledger, payout batches, and payment status.</p>
       </div>
 
       <div className="grid md:grid-cols-3 gap-4">
         {[
-          { label: "Gross Earned", value: formatCurrency(totalEarned), color: "text-avenue-indigo" },
+          { label: "Gross Earned", value: formatCurrency(totalEarned), color: "text-brand-indigo" },
           { label: "Paid Net", value: formatCurrency(totalPaid), color: "text-[#28A745]" },
           { label: "Payable Net", value: formatCurrency(totalPayable), color: "text-[#FFC107]" },
         ].map((s) => (
           <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm">
-            <p className="text-xs text-avenue-text-muted font-bold uppercase">{s.label}</p>
+            <p className="text-xs text-brand-text-muted font-bold uppercase">{s.label}</p>
             <p className={`text-2xl font-bold mt-1 tabular-nums ${s.color}`}>{s.value}</p>
           </div>
         ))}
@@ -99,12 +99,12 @@ export default async function BrokerCommissionsPage() {
 
       <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-[#EEEEEE]">
-          <h2 className="font-bold text-avenue-text-heading font-heading">Ledger</h2>
+          <h2 className="font-bold text-brand-text-heading font-heading">Ledger</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-sm">
             <thead>
-              <tr className="bg-[#F8F9FA] text-[10px] font-bold uppercase text-avenue-text-muted border-b border-[#EEEEEE]">
+              <tr className="bg-[#F8F9FA] text-[10px] font-bold uppercase text-brand-text-muted border-b border-[#EEEEEE]">
                 <th className="px-6 py-3">Period</th>
                 <th className="px-6 py-3">Scheme</th>
                 <th className="px-6 py-3">Schedule</th>
@@ -116,10 +116,10 @@ export default async function BrokerCommissionsPage() {
                 <th className="px-6 py-3">Batch</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#EEEEEE] text-avenue-text-body">
+            <tbody className="divide-y divide-[#EEEEEE] text-brand-text-body">
               {ledger.map((entry) => (
                 <tr key={entry.id} className="hover:bg-[#F8F9FA]">
-                  <td className="px-6 py-4 font-mono font-semibold text-avenue-text-heading">{formatDate(entry.earnedPeriodStart)}</td>
+                  <td className="px-6 py-4 font-mono font-semibold text-brand-text-heading">{formatDate(entry.earnedPeriodStart)}</td>
                   <td className="px-6 py-4">{groupNameById.get(entry.groupId) ?? "Scheme"}</td>
                   <td className="px-6 py-4">{entry.schedule?.scheduleName ?? "Pending schedule"}</td>
                   <td className="px-6 py-4 text-right">{formatCurrency(entry.grossCommission)}</td>
@@ -131,7 +131,7 @@ export default async function BrokerCommissionsPage() {
                 </tr>
               ))}
               {ledger.length === 0 && (
-                <tr><td colSpan={9} className="px-6 py-12 text-center text-avenue-text-body">No commission ledger entries yet.</td></tr>
+                <tr><td colSpan={9} className="px-6 py-12 text-center text-brand-text-body">No commission ledger entries yet.</td></tr>
               )}
             </tbody>
           </table>
@@ -140,29 +140,29 @@ export default async function BrokerCommissionsPage() {
 
       <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-[#EEEEEE]">
-          <h2 className="font-bold text-avenue-text-heading font-heading">Payout Batches</h2>
+          <h2 className="font-bold text-brand-text-heading font-heading">Payout Batches</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-sm">
             <thead>
-              <tr className="bg-[#F8F9FA] text-[10px] font-bold uppercase text-avenue-text-muted border-b border-[#EEEEEE]">
+              <tr className="bg-[#F8F9FA] text-[10px] font-bold uppercase text-brand-text-muted border-b border-[#EEEEEE]">
                 <th className="px-6 py-3">Batch</th>
                 <th className="px-6 py-3">Date</th>
                 <th className="px-6 py-3 text-right">Net Payable</th>
                 <th className="px-6 py-3">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#EEEEEE] text-avenue-text-body">
+            <tbody className="divide-y divide-[#EEEEEE] text-brand-text-body">
               {payoutBatches.map((batch) => (
                 <tr key={batch.id} className="hover:bg-[#F8F9FA]">
-                  <td className="px-6 py-4 font-mono font-semibold text-avenue-text-heading">{batch.batchReference}</td>
+                  <td className="px-6 py-4 font-mono font-semibold text-brand-text-heading">{batch.batchReference}</td>
                   <td className="px-6 py-4">{formatDate(batch.batchDate)}</td>
                   <td className="px-6 py-4 text-right font-semibold">{formatCurrency(batch.entries.reduce((sum, entry) => sum + Number(entry.netPayable), 0))}</td>
                   <td className="px-6 py-4"><Badge status={batch.status} /></td>
                 </tr>
               ))}
               {payoutBatches.length === 0 && (
-                <tr><td colSpan={4} className="px-6 py-10 text-center text-avenue-text-body">No payout batches yet.</td></tr>
+                <tr><td colSpan={4} className="px-6 py-10 text-center text-brand-text-body">No payout batches yet.</td></tr>
               )}
             </tbody>
           </table>

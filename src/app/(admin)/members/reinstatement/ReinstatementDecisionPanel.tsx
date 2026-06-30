@@ -36,7 +36,7 @@ export function ReinstatementDecisionPanel({ requestId }: { requestId: string })
       <form action={approveAction} className="flex flex-col gap-2 pt-1">
         <input type="hidden" name="requestId" value={requestId} />
         {approveState?.error && <p className="text-xs text-[#DC3545]">{approveState.error}</p>}
-        <label className="flex items-center gap-2 text-xs text-avenue-text-body">
+        <label className="flex items-center gap-2 text-xs text-brand-text-body">
           <input type="checkbox" name="resetWaitingPeriod" />
           Reset waiting period from today
         </label>
@@ -45,7 +45,7 @@ export function ReinstatementDecisionPanel({ requestId }: { requestId: string })
             className="px-3 py-1.5 text-xs font-bold bg-[#28A745] text-white rounded-full disabled:opacity-60">
             {approving ? "Approving…" : "Confirm Approve"}
           </button>
-          <button type="button" onClick={() => setMode("idle")} className="text-xs text-avenue-text-muted hover:underline">Cancel</button>
+          <button type="button" onClick={() => setMode("idle")} className="text-xs text-brand-text-muted hover:underline">Cancel</button>
         </div>
       </form>
     );
@@ -57,14 +57,14 @@ export function ReinstatementDecisionPanel({ requestId }: { requestId: string })
       {declineState?.error && <p className="text-xs text-[#DC3545]">{declineState.error}</p>}
       <input
         name="declineReason" required placeholder="Reason for declining…"
-        className="border border-[#EEEEEE] rounded px-2 py-1 text-xs focus:outline-none focus:border-avenue-indigo"
+        className="border border-[#EEEEEE] rounded px-2 py-1 text-xs focus:outline-none focus:border-brand-indigo"
       />
       <div className="flex gap-2">
         <button type="submit" disabled={declining}
           className="px-3 py-1.5 text-xs font-bold bg-[#DC3545] text-white rounded-full disabled:opacity-60">
           {declining ? "Declining…" : "Confirm Decline"}
         </button>
-        <button type="button" onClick={() => setMode("idle")} className="text-xs text-avenue-text-muted hover:underline">Cancel</button>
+        <button type="button" onClick={() => setMode("idle")} className="text-xs text-brand-text-muted hover:underline">Cancel</button>
       </div>
     </form>
   );

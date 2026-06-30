@@ -4,8 +4,8 @@ import { useActionState } from "react";
 import { addMemberAction } from "./actions";
 import { Save, AlertCircle, AlertTriangle } from "lucide-react";
 
-const inputCls = "w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo transition-colors";
-const labelCls = "text-xs font-bold text-avenue-text-muted uppercase block mb-1";
+const inputCls = "w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo transition-colors";
+const labelCls = "text-xs font-bold text-brand-text-muted uppercase block mb-1";
 
 interface Props {
   groups: { id: string; name: string }[];
@@ -40,7 +40,7 @@ export function MemberNewForm({ groups }: Props) {
       <form action={action} className="space-y-6">
         {/* Group & Relationship */}
         <div>
-          <h3 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Policy & Group</h3>
+          <h3 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Policy & Group</h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Group *</label>
@@ -63,7 +63,7 @@ export function MemberNewForm({ groups }: Props) {
 
         {/* Personal Information */}
         <div>
-          <h3 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Personal Information</h3>
+          <h3 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Personal Information</h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>First Name *</label>
@@ -88,14 +88,14 @@ export function MemberNewForm({ groups }: Props) {
             <div className="col-span-2">
               <label className={labelCls}>National ID / Passport</label>
               <input name="idNumber" type="text" placeholder="e.g. 12345678" className={inputCls} />
-              <p className="text-[10px] text-avenue-text-muted mt-1">Used for duplicate detection — must be unique across all members.</p>
+              <p className="text-[10px] text-brand-text-muted mt-1">Used for duplicate detection — must be unique across all members.</p>
             </div>
           </div>
         </div>
 
         {/* Contact */}
         <div>
-          <h3 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Contact Information <span className="font-normal text-avenue-text-muted">(optional)</span></h3>
+          <h3 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Contact Information <span className="font-normal text-brand-text-muted">(optional)</span></h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Phone Number</label>
@@ -112,7 +112,7 @@ export function MemberNewForm({ groups }: Props) {
           <button
             type="submit"
             disabled={pending}
-            className="flex items-center gap-2 bg-avenue-indigo hover:bg-avenue-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 bg-brand-indigo hover:bg-brand-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save size={16} />
             {pending ? "Registering…" : "Register Member"}

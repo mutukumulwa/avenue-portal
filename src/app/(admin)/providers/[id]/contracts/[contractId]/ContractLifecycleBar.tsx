@@ -5,8 +5,8 @@ import { contractLifecycleAction, renewContractAction } from "../actions";
 import { Play, Pause, XCircle, RefreshCw, Undo2 } from "lucide-react";
 
 const btn = "flex items-center gap-1.5 px-4 py-2 rounded-full text-xs font-bold transition-colors";
-const inp = "border border-[#EEEEEE] rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:border-avenue-indigo";
-const lbl = "text-[10px] font-bold uppercase text-avenue-text-muted block mb-1";
+const inp = "border border-[#EEEEEE] rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:border-brand-indigo";
+const lbl = "text-[10px] font-bold uppercase text-brand-text-muted block mb-1";
 
 export function ContractLifecycleBar({
   contractId,
@@ -34,7 +34,7 @@ export function ContractLifecycleBar({
   return (
     <div className="bg-white border border-[#EEEEEE] rounded-lg p-4 shadow-sm">
       <div className="flex flex-wrap items-center gap-3">
-        <span className="text-[10px] font-bold uppercase text-avenue-text-muted mr-1">Lifecycle</span>
+        <span className="text-[10px] font-bold uppercase text-brand-text-muted mr-1">Lifecycle</span>
 
         {status === "DRAFT" && !isPastEnd && (
           <form action={contractLifecycleAction}>
@@ -83,14 +83,14 @@ export function ContractLifecycleBar({
           <form action={contractLifecycleAction}>
             <input type="hidden" name="contractId" value={contractId} />
             <input type="hidden" name="transition" value="REOPEN" />
-            <button type="submit" className={`${btn} border border-[#EEEEEE] text-avenue-text-muted hover:border-avenue-indigo`}>
+            <button type="submit" className={`${btn} border border-[#EEEEEE] text-brand-text-muted hover:border-brand-indigo`}>
               <Undo2 size={12} /> Reopen as Draft
             </button>
           </form>
         )}
 
         {!alreadyRenewed && (
-          <button onClick={() => setRenewing(r => !r)} className={`${btn} border border-avenue-indigo text-avenue-indigo hover:bg-avenue-indigo/5 ml-auto`}>
+          <button onClick={() => setRenewing(r => !r)} className={`${btn} border border-brand-indigo text-brand-indigo hover:bg-brand-indigo/5 ml-auto`}>
             <RefreshCw size={12} /> {renewing ? "Cancel Renewal" : "Renew Contract"}
           </button>
         )}
@@ -111,10 +111,10 @@ export function ContractLifecycleBar({
             <label className={lbl}>Rate Uplift %</label>
             <input type="number" name="upliftPct" step="0.1" defaultValue={0} className={inp} placeholder="e.g. 5" />
           </div>
-          <button type="submit" className="bg-avenue-indigo text-white px-4 py-2 rounded-full text-xs font-bold hover:bg-avenue-secondary transition-colors">
+          <button type="submit" className="bg-brand-indigo text-white px-4 py-2 rounded-full text-xs font-bold hover:bg-brand-secondary transition-colors">
             Create Renewal Draft
           </button>
-          <p className="col-span-4 text-xs text-avenue-text-muted">
+          <p className="col-span-4 text-xs text-brand-text-muted">
             Clones the full schedule, exclusions and terms into a new DRAFT contract with the uplift applied to every rate. The new contract must be reviewed and activated before it takes effect.
           </p>
         </form>

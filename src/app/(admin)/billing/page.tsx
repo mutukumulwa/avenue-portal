@@ -53,13 +53,13 @@ export default async function BillingPage() {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Billing & Finance</h1>
-          <p className="text-avenue-text-body font-body mt-1">Manage invoices, payments, and collections.</p>
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Billing & Finance</h1>
+          <p className="text-brand-text-body font-body mt-1">Manage invoices, payments, and collections.</p>
         </div>
         <div className="flex items-center gap-3">
           <Link
             href="/billing/gl"
-            className="flex items-center gap-2 px-5 py-2 rounded-full border border-avenue-indigo text-avenue-indigo text-sm font-semibold hover:bg-avenue-indigo hover:text-white transition-colors"
+            className="flex items-center gap-2 px-5 py-2 rounded-full border border-brand-indigo text-brand-indigo text-sm font-semibold hover:bg-brand-indigo hover:text-white transition-colors"
           >
             <BookOpen size={15} /> General Ledger
           </Link>
@@ -70,12 +70,12 @@ export default async function BillingPage() {
       {/* Summary */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Total Billed (KES)", value: totalBilled.toLocaleString(), color: "text-avenue-indigo" },
+          { label: "Total Billed (KES)", value: totalBilled.toLocaleString(), color: "text-brand-indigo" },
           { label: "Total Collected (KES)", value: totalCollected.toLocaleString(), color: "text-[#28A745]" },
           { label: "Outstanding (KES)", value: totalOutstanding.toLocaleString(), color: "text-[#DC3545]" },
         ].map((s) => (
           <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm">
-            <p className="text-xs text-avenue-text-muted font-bold uppercase">{s.label}</p>
+            <p className="text-xs text-brand-text-muted font-bold uppercase">{s.label}</p>
             <p className={`text-2xl font-bold mt-1 ${s.color}`}>{s.value}</p>
           </div>
         ))}
@@ -84,7 +84,7 @@ export default async function BillingPage() {
       {/* Invoices Table */}
       <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-[#EEEEEE]">
-          <h2 className="font-bold text-avenue-text-heading font-heading">Invoices</h2>
+          <h2 className="font-bold text-brand-text-heading font-heading">Invoices</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -101,11 +101,11 @@ export default async function BillingPage() {
                 <th className="px-6 py-4">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#EEEEEE] text-avenue-text-body text-sm">
+            <tbody className="divide-y divide-[#EEEEEE] text-brand-text-body text-sm">
               {invoices.map((inv) => (
                 <tr key={inv.id} className="hover:bg-[#F8F9FA] transition-colors">
-                  <td className="px-6 py-4 font-mono text-avenue-text-heading font-semibold">{inv.invoiceNumber}</td>
-                  <td className="px-6 py-4 font-medium text-avenue-text-heading">{inv.group.name}</td>
+                  <td className="px-6 py-4 font-mono text-brand-text-heading font-semibold">{inv.invoiceNumber}</td>
+                  <td className="px-6 py-4 font-medium text-brand-text-heading">{inv.group.name}</td>
                   <td className="px-6 py-4">{inv.period}</td>
                   <td className="px-6 py-4">{inv.memberCount}</td>
                   <td className="px-6 py-4 font-semibold">{Number(inv.totalAmount).toLocaleString()}</td>
@@ -123,7 +123,7 @@ export default async function BillingPage() {
                       {inv.status === "DRAFT" && (
                         <form action={sendInvoiceAction}>
                           <input type="hidden" name="invoiceId" value={inv.id} />
-                          <button type="submit" className="text-xs font-bold px-3 py-1.5 rounded-full bg-avenue-indigo/10 text-avenue-indigo hover:bg-avenue-indigo hover:text-white transition-colors">
+                          <button type="submit" className="text-xs font-bold px-3 py-1.5 rounded-full bg-brand-indigo/10 text-brand-indigo hover:bg-brand-indigo hover:text-white transition-colors">
                             Send
                           </button>
                         </form>
@@ -138,7 +138,7 @@ export default async function BillingPage() {
                             type="number"
                             step="0.01"
                             defaultValue={Number(inv.balance)}
-                            className="w-24 border border-[#EEEEEE] rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-avenue-indigo"
+                            className="w-24 border border-[#EEEEEE] rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-brand-indigo"
                           />
                           <button type="submit" className="text-xs font-bold px-3 py-1.5 rounded-full bg-[#28A745]/10 text-[#28A745] hover:bg-[#28A745] hover:text-white transition-colors">
                             Pay
@@ -159,7 +159,7 @@ export default async function BillingPage() {
                         dueDate: new Date(inv.dueDate).toLocaleDateString("en-KE"),
                         issuedDate: new Date(inv.createdAt).toLocaleDateString("en-KE"),
                       }} />
-                      <Link href={`/billing/gl/ledger?account=1100`} className="text-avenue-indigo hover:text-avenue-secondary font-semibold inline-flex items-center gap-1 text-sm">
+                      <Link href={`/billing/gl/ledger?account=1100`} className="text-brand-indigo hover:text-brand-secondary font-semibold inline-flex items-center gap-1 text-sm">
                         <ArrowRight size={14} />
                       </Link>
                     </div>
@@ -168,7 +168,7 @@ export default async function BillingPage() {
               ))}
               {invoices.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="px-6 py-12 text-center text-avenue-text-body">
+                  <td colSpan={9} className="px-6 py-12 text-center text-brand-text-body">
                     <Receipt size={32} className="mx-auto mb-3 text-[#DCDCDC]" />
                     No invoices found.
                   </td>
@@ -182,7 +182,7 @@ export default async function BillingPage() {
       {/* Recent Payments */}
       <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
         <div className="px-6 py-4 border-b border-[#EEEEEE]">
-          <h2 className="font-bold text-avenue-text-heading font-heading">Recent Payments</h2>
+          <h2 className="font-bold text-brand-text-heading font-heading">Recent Payments</h2>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -195,10 +195,10 @@ export default async function BillingPage() {
                 <th className="px-6 py-4">Date</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#EEEEEE] text-avenue-text-body text-sm">
+            <tbody className="divide-y divide-[#EEEEEE] text-brand-text-body text-sm">
               {payments.map((p) => (
                 <tr key={p.id} className="hover:bg-[#F8F9FA] transition-colors">
-                  <td className="px-6 py-4 font-medium text-avenue-text-heading">{p.group.name}</td>
+                  <td className="px-6 py-4 font-medium text-brand-text-heading">{p.group.name}</td>
                   <td className="px-6 py-4 font-semibold text-[#28A745]">{Number(p.amount).toLocaleString()}</td>
                   <td className="px-6 py-4">
                     <span className="bg-[#E6E7E8] text-[#6C757D] px-2 py-1 rounded text-xs font-bold">
@@ -211,7 +211,7 @@ export default async function BillingPage() {
               ))}
               {payments.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-8 text-center text-avenue-text-body">No payments recorded.</td>
+                  <td colSpan={5} className="px-6 py-8 text-center text-brand-text-body">No payments recorded.</td>
                 </tr>
               )}
             </tbody>

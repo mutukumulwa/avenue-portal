@@ -49,7 +49,7 @@ function ShareWithPreAuthForm({
 }) {
   if (preauthTargets.length === 0) {
     return (
-      <p className="mt-3 rounded-[8px] bg-[#F8F9FA] px-3 py-2 text-xs text-avenue-text-muted">
+      <p className="mt-3 rounded-[8px] bg-[#F8F9FA] px-3 py-2 text-xs text-brand-text-muted">
         Create or open a pre-authorization request before sharing this with a reviewer.
       </p>
     );
@@ -71,7 +71,7 @@ function ShareWithPreAuthForm({
         <option value="720">30 days</option>
         <option value="none">Until revoked</option>
       </select>
-      <button type="submit" className="inline-flex items-center justify-center gap-2 rounded-[8px] bg-avenue-indigo px-3 py-2 text-sm font-semibold text-white">
+      <button type="submit" className="inline-flex items-center justify-center gap-2 rounded-[8px] bg-brand-indigo px-3 py-2 text-sm font-semibold text-white">
         <Share2 className="h-4 w-4" />
         Share
       </button>
@@ -90,7 +90,7 @@ function ShareWithProviderForm({
 }) {
   if (providerTargets.length === 0) {
     return (
-      <p className="mt-2 rounded-[8px] bg-[#F8F9FA] px-3 py-2 text-xs text-avenue-text-muted">
+      <p className="mt-2 rounded-[8px] bg-[#F8F9FA] px-3 py-2 text-xs text-brand-text-muted">
         No active providers are available for direct sharing.
       </p>
     );
@@ -114,7 +114,7 @@ function ShareWithProviderForm({
           <option value="none">Until revoked</option>
         </select>
       </div>
-      <button type="submit" className="inline-flex items-center justify-center gap-2 rounded-[8px] border border-[#D6DCE5] px-3 py-2 text-sm font-semibold text-avenue-text-heading hover:bg-[#F8F9FA]">
+      <button type="submit" className="inline-flex items-center justify-center gap-2 rounded-[8px] border border-[#D6DCE5] px-3 py-2 text-sm font-semibold text-brand-text-heading hover:bg-[#F8F9FA]">
         <Share2 className="h-4 w-4" />
         Share with provider
       </button>
@@ -170,49 +170,49 @@ export default async function MemberHealthVaultPage() {
   return (
     <div className="space-y-6 font-ui">
       <div>
-        <p className="text-xs font-bold uppercase text-avenue-text-muted">Private member workspace</p>
-        <h1 className="mt-1 font-heading text-2xl font-bold text-avenue-text-heading">Health Vault</h1>
-        <p className="mt-1 max-w-2xl text-sm leading-relaxed text-avenue-text-muted">
+        <p className="text-xs font-bold uppercase text-brand-text-muted">Private member workspace</p>
+        <h1 className="mt-1 font-heading text-2xl font-bold text-brand-text-heading">Health Vault</h1>
+        <p className="mt-1 max-w-2xl text-sm leading-relaxed text-brand-text-muted">
           Keep lab results, prescriptions, vitals, and health notes together. Records stay private until sharing is explicitly enabled.
         </p>
       </div>
 
       <section className="grid gap-3 md:grid-cols-3">
         <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-4 shadow-sm">
-          <FileText className="h-5 w-5 text-avenue-indigo" />
-          <p className="mt-3 text-xs font-bold uppercase text-avenue-text-muted">Health files</p>
-          <p className="mt-1 text-2xl font-bold tabular-nums text-avenue-text-heading">{vault.summary.fileCount}</p>
+          <FileText className="h-5 w-5 text-brand-indigo" />
+          <p className="mt-3 text-xs font-bold uppercase text-brand-text-muted">Health files</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums text-brand-text-heading">{vault.summary.fileCount}</p>
         </div>
         <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-4 shadow-sm">
           <HeartPulse className="h-5 w-5 text-[#28A745]" />
-          <p className="mt-3 text-xs font-bold uppercase text-avenue-text-muted">Last vitals</p>
-          <p className="mt-1 text-lg font-bold text-avenue-text-heading">{formatDate(vault.summary.lastVitalAt)}</p>
+          <p className="mt-3 text-xs font-bold uppercase text-brand-text-muted">Last vitals</p>
+          <p className="mt-1 text-lg font-bold text-brand-text-heading">{formatDate(vault.summary.lastVitalAt)}</p>
         </div>
         <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-4 shadow-sm">
           <NotebookPen className="h-5 w-5 text-[#17A2B8]" />
-          <p className="mt-3 text-xs font-bold uppercase text-avenue-text-muted">Journal notes</p>
-          <p className="mt-1 text-2xl font-bold tabular-nums text-avenue-text-heading">{vault.summary.journalCount}</p>
+          <p className="mt-3 text-xs font-bold uppercase text-brand-text-muted">Journal notes</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums text-brand-text-heading">{vault.summary.journalCount}</p>
         </div>
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[0.95fr_1.05fr]">
         <form action={uploadHealthFileAction} className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-[8px] bg-avenue-indigo/10 text-avenue-indigo">
+            <div className="flex h-10 w-10 items-center justify-center rounded-[8px] bg-brand-indigo/10 text-brand-indigo">
               <Upload className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Upload a health file</h2>
-              <p className="text-sm text-avenue-text-muted">PDF, image, or Word document up to 10 MB.</p>
+              <h2 className="font-heading text-lg font-bold text-brand-text-heading">Upload a health file</h2>
+              <p className="text-sm text-brand-text-muted">PDF, image, or Word document up to 10 MB.</p>
             </div>
           </div>
 
           <div className="mt-5 grid gap-3">
-            <label className="grid gap-1 text-sm font-semibold text-avenue-text-heading">
+            <label className="grid gap-1 text-sm font-semibold text-brand-text-heading">
               Title
               <input name="title" className="rounded-[8px] border border-[#D6DCE5] px-3 py-2 font-normal" placeholder="March lab results" />
             </label>
-            <label className="grid gap-1 text-sm font-semibold text-avenue-text-heading">
+            <label className="grid gap-1 text-sm font-semibold text-brand-text-heading">
               Category
               <select name="category" className="rounded-[8px] border border-[#D6DCE5] px-3 py-2 font-normal">
                 <option value="LAB_RESULT">Lab result</option>
@@ -224,50 +224,50 @@ export default async function MemberHealthVaultPage() {
                 <option value="OTHER">Other</option>
               </select>
             </label>
-            <label className="grid gap-1 text-sm font-semibold text-avenue-text-heading">
+            <label className="grid gap-1 text-sm font-semibold text-brand-text-heading">
               Date on document
               <input name="capturedAt" type="date" className="rounded-[8px] border border-[#D6DCE5] px-3 py-2 font-normal" />
             </label>
-            <label className="grid gap-1 text-sm font-semibold text-avenue-text-heading">
+            <label className="grid gap-1 text-sm font-semibold text-brand-text-heading">
               File
               <input name="file" type="file" accept=".pdf,image/*,.doc,.docx" required className="rounded-[8px] border border-[#D6DCE5] px-3 py-2 font-normal" />
             </label>
-            <label className="grid gap-1 text-sm font-semibold text-avenue-text-heading">
+            <label className="grid gap-1 text-sm font-semibold text-brand-text-heading">
               Notes
               <textarea name="notes" rows={3} className="rounded-[8px] border border-[#D6DCE5] px-3 py-2 font-normal" placeholder="Optional context for a future doctor visit" />
             </label>
           </div>
-          <button type="submit" className="mt-4 inline-flex items-center gap-2 rounded-[8px] bg-avenue-indigo px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-avenue-indigo-hover">
+          <button type="submit" className="mt-4 inline-flex items-center gap-2 rounded-[8px] bg-brand-indigo px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-indigo-hover">
             <Upload className="h-4 w-4" />
             Save file
           </button>
         </form>
 
         <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
-          <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Latest vitals</h2>
+          <h2 className="font-heading text-lg font-bold text-brand-text-heading">Latest vitals</h2>
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
             <div className="rounded-[8px] bg-[#F8F9FA] p-3">
-              <p className="text-xs font-bold uppercase text-avenue-text-muted">BP</p>
-              <p className="mt-1 font-bold tabular-nums text-avenue-text-heading">
+              <p className="text-xs font-bold uppercase text-brand-text-muted">BP</p>
+              <p className="mt-1 font-bold tabular-nums text-brand-text-heading">
                 {latestVital?.systolicBp && latestVital?.diastolicBp ? `${latestVital.systolicBp}/${latestVital.diastolicBp}` : "—"}
               </p>
             </div>
             <div className="rounded-[8px] bg-[#F8F9FA] p-3">
-              <p className="text-xs font-bold uppercase text-avenue-text-muted">Heart rate</p>
-              <p className="mt-1 font-bold tabular-nums text-avenue-text-heading">{formatVital(latestVital?.heartRate ?? null, " bpm")}</p>
+              <p className="text-xs font-bold uppercase text-brand-text-muted">Heart rate</p>
+              <p className="mt-1 font-bold tabular-nums text-brand-text-heading">{formatVital(latestVital?.heartRate ?? null, " bpm")}</p>
             </div>
             <div className="rounded-[8px] bg-[#F8F9FA] p-3">
-              <p className="text-xs font-bold uppercase text-avenue-text-muted">Temp</p>
-              <p className="mt-1 font-bold tabular-nums text-avenue-text-heading">{formatVital(latestVital?.temperatureC ?? null, "°C")}</p>
+              <p className="text-xs font-bold uppercase text-brand-text-muted">Temp</p>
+              <p className="mt-1 font-bold tabular-nums text-brand-text-heading">{formatVital(latestVital?.temperatureC ?? null, "°C")}</p>
             </div>
             <div className="rounded-[8px] bg-[#F8F9FA] p-3">
-              <p className="text-xs font-bold uppercase text-avenue-text-muted">SpO2</p>
-              <p className="mt-1 font-bold tabular-nums text-avenue-text-heading">{formatVital(latestVital?.oxygenSaturation ?? null, "%")}</p>
+              <p className="text-xs font-bold uppercase text-brand-text-muted">SpO2</p>
+              <p className="mt-1 font-bold tabular-nums text-brand-text-heading">{formatVital(latestVital?.oxygenSaturation ?? null, "%")}</p>
             </div>
           </div>
 
           <form action={addVitalEntryAction} className="mt-5 grid gap-3">
-            <label className="grid gap-1 text-sm font-semibold text-avenue-text-heading">
+            <label className="grid gap-1 text-sm font-semibold text-brand-text-heading">
               Recorded at
               <input name="recordedAt" type="datetime-local" className="rounded-[8px] border border-[#D6DCE5] px-3 py-2 font-normal" />
             </label>
@@ -281,7 +281,7 @@ export default async function MemberHealthVaultPage() {
               <input name="bloodSugar" type="number" step="0.1" min="0" max="50" placeholder="Sugar" className="rounded-[8px] border border-[#D6DCE5] px-3 py-2 sm:col-span-2" />
             </div>
             <textarea name="notes" rows={2} placeholder="Optional notes" className="rounded-[8px] border border-[#D6DCE5] px-3 py-2" />
-            <button type="submit" className="inline-flex w-fit items-center gap-2 rounded-[8px] bg-avenue-indigo px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-avenue-indigo-hover">
+            <button type="submit" className="inline-flex w-fit items-center gap-2 rounded-[8px] bg-brand-indigo px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-indigo-hover">
               <Activity className="h-4 w-4" />
               Save vitals
             </button>
@@ -292,8 +292,8 @@ export default async function MemberHealthVaultPage() {
       <section className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="space-y-4">
           <form action={addJournalEntryAction} className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
-            <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Add a health note</h2>
-            <p className="mt-1 text-sm text-avenue-text-muted">Capture symptoms, medication notes, and questions for a future doctor visit.</p>
+            <h2 className="font-heading text-lg font-bold text-brand-text-heading">Add a health note</h2>
+            <p className="mt-1 text-sm text-brand-text-muted">Capture symptoms, medication notes, and questions for a future doctor visit.</p>
             <div className="mt-4 grid gap-3">
               <select name="entryType" className="rounded-[8px] border border-[#D6DCE5] px-3 py-2">
                 <option value="NOTE">General note</option>
@@ -304,7 +304,7 @@ export default async function MemberHealthVaultPage() {
               <textarea name="noteText" rows={5} required className="rounded-[8px] border border-[#D6DCE5] px-3 py-2" placeholder="What changed, what you felt, or what you want to ask at the next visit" />
               <input name="tags" className="rounded-[8px] border border-[#D6DCE5] px-3 py-2" placeholder="Tags, separated by commas" />
             </div>
-            <button type="submit" className="mt-4 inline-flex items-center gap-2 rounded-[8px] bg-avenue-indigo px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-avenue-indigo-hover">
+            <button type="submit" className="mt-4 inline-flex items-center gap-2 rounded-[8px] bg-brand-indigo px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-indigo-hover">
               <NotebookPen className="h-4 w-4" />
               Save note
             </button>
@@ -315,34 +315,34 @@ export default async function MemberHealthVaultPage() {
 
         <div className="space-y-4">
           <section className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
-            <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Recent files</h2>
+            <h2 className="font-heading text-lg font-bold text-brand-text-heading">Recent files</h2>
             <div className="mt-4 space-y-3">
               {vault.files.slice(0, 5).map((file) => (
                 <article key={file.id} className="rounded-[8px] border border-[#EEEEEE] p-3">
-                  <Link href={file.fileUrl} className="block hover:text-avenue-indigo">
-                    <p className="font-bold text-avenue-text-heading">{file.title}</p>
-                    <p className="mt-1 text-sm text-avenue-text-muted">{formatCategory(file.category)} · {formatBytes(file.fileSize)} · {formatDate(file.capturedAt ?? file.createdAt)}</p>
-                    {file.notes && <p className="mt-2 text-sm text-avenue-text-muted">{file.notes}</p>}
+                  <Link href={file.fileUrl} className="block hover:text-brand-indigo">
+                    <p className="font-bold text-brand-text-heading">{file.title}</p>
+                    <p className="mt-1 text-sm text-brand-text-muted">{formatCategory(file.category)} · {formatBytes(file.fileSize)} · {formatDate(file.capturedAt ?? file.createdAt)}</p>
+                    {file.notes && <p className="mt-2 text-sm text-brand-text-muted">{file.notes}</p>}
                   </Link>
                   <ActiveShares shares={file.shares} preauthTargets={vault.preauthTargets} providerTargets={vault.providerTargets} />
                   <ShareWithPreAuthForm preauthTargets={vault.preauthTargets} healthFileId={file.id} />
                   <ShareWithProviderForm providerTargets={vault.providerTargets} healthFileId={file.id} />
                 </article>
               ))}
-              {vault.files.length === 0 && <p className="py-6 text-center text-sm text-avenue-text-muted">No health files yet.</p>}
+              {vault.files.length === 0 && <p className="py-6 text-center text-sm text-brand-text-muted">No health files yet.</p>}
             </div>
           </section>
 
           <section className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
-            <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Recent notes</h2>
+            <h2 className="font-heading text-lg font-bold text-brand-text-heading">Recent notes</h2>
             <div className="mt-4 space-y-3">
               {vault.journalEntries.slice(0, 5).map((entry) => (
                 <article key={entry.id} className="rounded-[8px] border border-[#EEEEEE] p-3">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="rounded-full bg-avenue-indigo/10 px-2 py-0.5 text-[11px] font-bold uppercase text-avenue-indigo">{formatCategory(entry.entryType)}</span>
-                    <span className="text-xs text-avenue-text-muted">{formatDateTime(entry.recordedAt)}</span>
+                    <span className="rounded-full bg-brand-indigo/10 px-2 py-0.5 text-[11px] font-bold uppercase text-brand-indigo">{formatCategory(entry.entryType)}</span>
+                    <span className="text-xs text-brand-text-muted">{formatDateTime(entry.recordedAt)}</span>
                   </div>
-                  <p className="mt-2 text-sm leading-relaxed text-avenue-text-heading">{entry.noteText}</p>
+                  <p className="mt-2 text-sm leading-relaxed text-brand-text-heading">{entry.noteText}</p>
                   {entry.audioUrl && (
                     <audio controls src={entry.audioUrl} className="mt-3 w-full">
                       <track kind="captions" />
@@ -351,7 +351,7 @@ export default async function MemberHealthVaultPage() {
                   {entry.tags.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1">
                       {entry.tags.map((tag) => (
-                        <span key={tag} className="rounded-full bg-[#F8F9FA] px-2 py-0.5 text-[11px] text-avenue-text-muted">{tag}</span>
+                        <span key={tag} className="rounded-full bg-[#F8F9FA] px-2 py-0.5 text-[11px] text-brand-text-muted">{tag}</span>
                       ))}
                     </div>
                   )}
@@ -360,7 +360,7 @@ export default async function MemberHealthVaultPage() {
                   <ShareWithProviderForm providerTargets={vault.providerTargets} journalEntryId={entry.id} />
                 </article>
               ))}
-              {vault.journalEntries.length === 0 && <p className="py-6 text-center text-sm text-avenue-text-muted">No journal notes yet.</p>}
+              {vault.journalEntries.length === 0 && <p className="py-6 text-center text-sm text-brand-text-muted">No journal notes yet.</p>}
             </div>
           </section>
         </div>

@@ -45,8 +45,8 @@ export function MemberNav() {
     <nav className="bg-white border-b border-[#EEEEEE] sticky top-0 z-40">
       <div className="max-w-5xl mx-auto px-4 flex items-center justify-between h-14">
         <Link href="/member/dashboard" className="flex items-center space-x-2">
-          <div className="h-7 w-7 bg-avenue-indigo rounded-full" />
-          <span className="font-bold font-heading text-avenue-indigo text-lg">Medvex</span>
+          <div className="h-7 w-7 bg-brand-indigo rounded-full" />
+          <span className="font-bold font-heading text-brand-indigo text-lg">Medvex</span>
         </Link>
         <div className="hidden md:flex items-center gap-1">
           {NAV_ITEMS.map((item) => {
@@ -58,8 +58,8 @@ export function MemberNav() {
                 href={item.href}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold transition-colors ${
                   active
-                    ? "bg-avenue-indigo/10 text-avenue-indigo"
-                    : "text-avenue-text-body hover:bg-avenue-bg-alt hover:text-avenue-indigo"
+                    ? "bg-brand-indigo/10 text-brand-indigo"
+                    : "text-brand-text-body hover:bg-brand-bg-alt hover:text-brand-indigo"
                 }`}
               >
                 <Icon size={15} />
@@ -69,7 +69,7 @@ export function MemberNav() {
           })}
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold text-avenue-error hover:bg-red-50 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold text-brand-error hover:bg-red-50 transition-colors"
           >
             <LogOut size={15} />
             Logout
@@ -77,7 +77,7 @@ export function MemberNav() {
         </div>
       </div>
       <div className="md:hidden border-t border-[#EEEEEE] bg-white">
-        <div className="flex items-center justify-between px-4 pb-1 pt-2 text-[11px] font-semibold text-avenue-text-muted">
+        <div className="flex items-center justify-between px-4 pb-1 pt-2 text-[11px] font-semibold text-brand-text-muted">
           <span>Member tools</span>
           <span>Swipe for more</span>
         </div>
@@ -94,8 +94,8 @@ export function MemberNav() {
                   href={item.href}
                   className={`flex min-h-12 w-[76px] flex-col items-center justify-center gap-1 rounded-[8px] px-2 py-1 text-center transition-colors ${
                     active
-                      ? "bg-avenue-indigo/10 text-avenue-indigo"
-                      : "text-avenue-text-body hover:bg-avenue-bg-alt hover:text-avenue-indigo"
+                      ? "bg-brand-indigo/10 text-brand-indigo"
+                      : "text-brand-text-body hover:bg-brand-bg-alt hover:text-brand-indigo"
                   }`}
                 >
                   <Icon size={18} />
@@ -105,7 +105,7 @@ export function MemberNav() {
             })}
             <button
               onClick={() => signOut({ callbackUrl: "/login" })}
-              className="flex min-h-12 w-[76px] flex-col items-center justify-center gap-1 rounded-[8px] px-2 py-1 text-center text-avenue-error transition-colors hover:bg-red-50"
+              className="flex min-h-12 w-[76px] flex-col items-center justify-center gap-1 rounded-[8px] px-2 py-1 text-center text-brand-error transition-colors hover:bg-red-50"
             >
               <LogOut size={18} />
               <span className="max-w-full truncate text-[10px] font-semibold leading-tight">Logout</span>

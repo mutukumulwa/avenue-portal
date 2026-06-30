@@ -105,16 +105,16 @@ export function Breadcrumbs() {
   if (crumbs.length <= 1) return null;
 
   return (
-    <nav className="flex items-center gap-1 text-xs text-avenue-text-muted mb-4">
+    <nav className="flex items-center gap-1 text-xs text-brand-text-muted mb-4">
       {crumbs.map((crumb, i) => {
         const isLast = i === crumbs.length - 1;
         return (
           <span key={crumb.href} className="flex items-center gap-1">
             {i > 0 && <ChevronRight size={11} className="text-[#CCCCCC]" />}
             {isLast ? (
-              <span className="font-semibold text-avenue-text-heading">{crumb.label}</span>
+              <span className="font-semibold text-brand-text-heading">{crumb.label}</span>
             ) : (
-              <Link href={crumb.href} className="hover:text-avenue-indigo transition-colors font-medium">
+              <Link href={crumb.href} className="hover:text-brand-indigo transition-colors font-medium">
                 {crumb.label}
               </Link>
             )}

@@ -52,18 +52,18 @@ function LoginForm() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-avenue-bg-alt/50 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-brand-bg-alt/50 px-4">
       <div className="w-full max-w-md">
         <div className="flex justify-center mb-8">
           <div className="flex items-center space-x-3">
-            <div className="h-12 w-12 bg-avenue-indigo rounded-full" />
-            <h1 className="text-3xl font-bold font-heading text-avenue-indigo">
+            <div className="h-12 w-12 bg-brand-indigo rounded-full" />
+            <h1 className="text-3xl font-bold font-heading text-brand-indigo">
               AiCare Platform
             </h1>
           </div>
         </div>
 
-        <Card className="shadow-lg border-t-4 border-t-avenue-indigo">
+        <Card className="shadow-lg border-t-4 border-t-brand-indigo">
           <CardHeader className="space-y-2 text-center">
             <CardTitle className="text-2xl">Sign In</CardTitle>
             <CardDescription>
@@ -80,16 +80,16 @@ function LoginForm() {
               )}
 
               <div className="space-y-1.5">
-                <label className="text-sm font-bold text-avenue-text-heading">Email Address</label>
+                <label className="text-sm font-bold text-brand-text-heading">Email Address</label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-avenue-text-muted">
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-brand-text-muted">
                     <Mail className="h-5 w-5" />
                   </div>
                   <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="bg-white border border-[#EEEEEE] text-avenue-text-heading text-sm rounded-[8px] focus:ring-2 focus:ring-avenue-indigo focus:border-avenue-indigo block w-full pl-10 p-2.5 outline-none transition-all"
+                    className="bg-white border border-[#EEEEEE] text-brand-text-heading text-sm rounded-[8px] focus:ring-2 focus:ring-brand-indigo focus:border-brand-indigo block w-full pl-10 p-2.5 outline-none transition-all"
                     placeholder="name@medvex.co.ug"
                     required
                   />
@@ -97,16 +97,16 @@ function LoginForm() {
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-sm font-bold text-avenue-text-heading">Password</label>
+                <label className="text-sm font-bold text-brand-text-heading">Password</label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-avenue-text-muted">
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-brand-text-muted">
                     <Lock className="h-5 w-5" />
                   </div>
                   <input
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="bg-white border border-[#EEEEEE] text-avenue-text-heading text-sm rounded-[8px] focus:ring-2 focus:ring-avenue-indigo focus:border-avenue-indigo block w-full pl-10 p-2.5 outline-none transition-all"
+                    className="bg-white border border-[#EEEEEE] text-brand-text-heading text-sm rounded-[8px] focus:ring-2 focus:ring-brand-indigo focus:border-brand-indigo block w-full pl-10 p-2.5 outline-none transition-all"
                     placeholder="••••••••"
                     required
                   />
@@ -116,12 +116,12 @@ function LoginForm() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-avenue-indigo hover:bg-avenue-secondary text-white font-bold py-3 rounded-full transition-colors disabled:opacity-60 disabled:cursor-not-allowed mt-2"
+                className="w-full bg-brand-indigo hover:bg-brand-secondary text-white font-bold py-3 rounded-full transition-colors disabled:opacity-60 disabled:cursor-not-allowed mt-2"
               >
                 {loading ? "Signing in…" : "Sign In"}
               </button>
 
-              <p className="text-center text-xs text-avenue-text-muted pt-1">
+              <p className="text-center text-xs text-brand-text-muted pt-1">
                 Admin: admin@medvex.co.ug · HR: emily.wambui@safaricom.co.ke
                 <br />Broker: broker@kaib.co.ke · Member: member@medvex.co.ug
                 <br />Password: <span className="font-mono">MedvexAdmin2024!</span>
@@ -136,7 +136,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-avenue-bg-alt/50" />}>
+    <Suspense fallback={<div className="min-h-screen bg-brand-bg-alt/50" />}>
       <LoginForm />
     </Suspense>
   );

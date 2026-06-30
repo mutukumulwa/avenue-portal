@@ -25,7 +25,7 @@ export function NewInvoiceModal({ groups }: { groups: Group[] }) {
     <>
       <button
         onClick={() => setOpen(true)}
-        className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors flex items-center gap-2 shadow-sm"
+        className="bg-brand-indigo hover:bg-brand-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors flex items-center gap-2 shadow-sm"
       >
         + New Invoice
       </button>
@@ -35,12 +35,12 @@ export function NewInvoiceModal({ groups }: { groups: Group[] }) {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 relative">
             <button
               onClick={() => setOpen(false)}
-              className="absolute top-4 right-4 text-avenue-text-muted hover:text-avenue-text-heading"
+              className="absolute top-4 right-4 text-brand-text-muted hover:text-brand-text-heading"
             >
               <X size={18} />
             </button>
 
-            <h2 className="text-lg font-bold text-avenue-text-heading font-heading mb-4">New Invoice</h2>
+            <h2 className="text-lg font-bold text-brand-text-heading font-heading mb-4">New Invoice</h2>
 
             {state?.error && (
               <div className="mb-4 px-4 py-2.5 bg-[#DC3545]/10 text-[#DC3545] text-sm rounded-lg">
@@ -50,8 +50,8 @@ export function NewInvoiceModal({ groups }: { groups: Group[] }) {
 
             <form action={action} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-avenue-text-muted uppercase mb-1">Group</label>
-                <select name="groupId" required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo bg-white">
+                <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Group</label>
+                <select name="groupId" required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo bg-white">
                   <option value="">Select group…</option>
                   {groups.map(g => (
                     <option key={g.id} value={g.id}>{g.name}</option>
@@ -60,33 +60,33 @@ export function NewInvoiceModal({ groups }: { groups: Group[] }) {
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-avenue-text-muted uppercase mb-1">Period (YYYY-MM)</label>
-                  <input name="period" type="month" defaultValue={defaults.period} required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo" />
+                  <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Period (YYYY-MM)</label>
+                  <input name="period" type="month" defaultValue={defaults.period} required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-avenue-text-muted uppercase mb-1">Due Date</label>
-                  <input name="dueDate" type="date" defaultValue={defaults.dueDate} required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo" />
+                  <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Due Date</label>
+                  <input name="dueDate" type="date" defaultValue={defaults.dueDate} required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-avenue-text-muted uppercase mb-1">Member Count</label>
-                  <input name="memberCount" type="number" min="1" required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo" />
+                  <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Member Count</label>
+                  <input name="memberCount" type="number" min="1" required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-avenue-text-muted uppercase mb-1">Rate / Member (KES)</label>
-                  <input name="ratePerMember" type="number" min="0" step="0.01" required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo" />
+                  <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Rate / Member (KES)</label>
+                  <input name="ratePerMember" type="number" min="0" step="0.01" required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo" />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-avenue-text-muted uppercase mb-1">Notes (optional)</label>
-                <textarea name="notes" rows={2} className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo resize-none" />
+                <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Notes (optional)</label>
+                <textarea name="notes" rows={2} className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo resize-none" />
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setOpen(false)} className="px-4 py-2 text-sm text-avenue-text-body border border-[#EEEEEE] rounded-full hover:bg-[#F8F9FA] transition-colors">
+                <button type="button" onClick={() => setOpen(false)} className="px-4 py-2 text-sm text-brand-text-body border border-[#EEEEEE] rounded-full hover:bg-[#F8F9FA] transition-colors">
                   Cancel
                 </button>
-                <button type="submit" disabled={pending} className="px-5 py-2 text-sm font-semibold bg-avenue-indigo hover:bg-avenue-secondary text-white rounded-full transition-colors disabled:opacity-60">
+                <button type="submit" disabled={pending} className="px-5 py-2 text-sm font-semibold bg-brand-indigo hover:bg-brand-secondary text-white rounded-full transition-colors disabled:opacity-60">
                   {pending ? "Creating…" : "Create Draft"}
                 </button>
               </div>

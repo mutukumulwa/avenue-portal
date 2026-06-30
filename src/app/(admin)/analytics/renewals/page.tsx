@@ -8,7 +8,7 @@ const STATUS_STYLE: Record<string, string> = {
   NOT_STARTED:  "bg-[#6C757D]/10 text-[#6C757D]",
   IN_PROGRESS:  "bg-[#17A2B8]/10 text-[#17A2B8]",
   QUOTE_ISSUED: "bg-[#FFC107]/10 text-[#856404]",
-  NEGOTIATING:  "bg-avenue-indigo/10 text-avenue-indigo",
+  NEGOTIATING:  "bg-brand-indigo/10 text-brand-indigo",
   BOUND:        "bg-[#28A745]/10 text-[#28A745]",
   LAPSED:       "bg-[#DC3545]/10 text-[#DC3545]",
   CANCELLED:    "bg-[#6C757D]/10 text-[#6C757D]",
@@ -19,7 +19,7 @@ function urgencyColor(days: number): string {
   if (days <= 7)  return "text-[#DC3545] font-bold";
   if (days <= 30) return "text-[#856404] font-semibold";
   if (days <= 60) return "text-[#17A2B8]";
-  return "text-avenue-text-muted";
+  return "text-brand-text-muted";
 }
 
 export default async function RenewalPipelinePage({
@@ -44,8 +44,8 @@ export default async function RenewalPipelinePage({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Renewal Pipeline</h1>
-          <p className="text-avenue-text-muted text-sm mt-1">
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Renewal Pipeline</h1>
+          <p className="text-brand-text-muted text-sm mt-1">
             {pipeline.length} scheme{pipeline.length !== 1 ? "s" : ""} renewing within {daysAhead} days
           </p>
         </div>
@@ -54,8 +54,8 @@ export default async function RenewalPipelinePage({
             <Link key={d} href={`?daysAhead=${d}`}
               className={`px-4 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
                 daysAhead === d
-                  ? "bg-avenue-indigo text-white border-avenue-indigo"
-                  : "border-[#EEEEEE] text-avenue-text-muted hover:border-avenue-indigo hover:text-avenue-indigo"
+                  ? "bg-brand-indigo text-white border-brand-indigo"
+                  : "border-[#EEEEEE] text-brand-text-muted hover:border-brand-indigo hover:text-brand-indigo"
               }`}>
               {d}d
             </Link>
@@ -69,13 +69,13 @@ export default async function RenewalPipelinePage({
           { label: "Critical (≤7d)", count: critical.length,  color: "text-[#DC3545]", icon: <AlertTriangle size={14} /> },
           { label: "Warning (≤30d)", count: warning.length,   color: "text-[#856404]", icon: <Clock size={14} /> },
           { label: "Attention (≤60d)",count: attention.length, color: "text-[#17A2B8]", icon: <Clock size={14} /> },
-          { label: "Upcoming (>60d)", count: upcoming.length, color: "text-avenue-text-muted", icon: <CheckCircle2 size={14} /> },
+          { label: "Upcoming (>60d)", count: upcoming.length, color: "text-brand-text-muted", icon: <CheckCircle2 size={14} /> },
         ].map(({ label, count, color, icon }) => (
           <div key={label} className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-4 flex items-center gap-3">
             <span className={color}>{icon}</span>
             <div>
               <p className={`text-2xl font-bold font-heading ${color}`}>{count}</p>
-              <p className="text-[11px] text-avenue-text-muted mt-0.5">{label}</p>
+              <p className="text-[11px] text-brand-text-muted mt-0.5">{label}</p>
             </div>
           </div>
         ))}
@@ -85,7 +85,7 @@ export default async function RenewalPipelinePage({
       {pipeline.length === 0 ? (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-12 text-center">
           <CheckCircle2 size={32} className="mx-auto mb-3 text-[#28A745] opacity-40" />
-          <p className="text-avenue-text-muted text-sm">No schemes due for renewal within {daysAhead} days.</p>
+          <p className="text-brand-text-muted text-sm">No schemes due for renewal within {daysAhead} days.</p>
         </div>
       ) : (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
@@ -105,10 +105,10 @@ export default async function RenewalPipelinePage({
             <tbody className="divide-y divide-[#EEEEEE]">
               {pipeline.map((g) => (
                 <tr key={g.id} className="hover:bg-[#F8F9FA] transition-colors">
-                  <td className="px-5 py-3 font-semibold text-avenue-text-heading">{g.name}</td>
-                  <td className="px-5 py-3 text-avenue-text-muted text-xs">{g.broker?.name ?? "—"}</td>
+                  <td className="px-5 py-3 font-semibold text-brand-text-heading">{g.name}</td>
+                  <td className="px-5 py-3 text-brand-text-muted text-xs">{g.broker?.name ?? "—"}</td>
                   <td className="px-5 py-3 text-center font-mono">{g.activeMembers}</td>
-                  <td className="px-5 py-3 text-avenue-text-muted text-xs">
+                  <td className="px-5 py-3 text-brand-text-muted text-xs">
                     {new Date(g.renewalDate).toLocaleDateString("en-KE")}
                   </td>
                   <td className="px-5 py-3 text-center">
@@ -124,11 +124,11 @@ export default async function RenewalPipelinePage({
                   <td className="px-5 py-3">
                     {g.noticeDispatched
                       ? <CheckCircle2 size={14} className="text-[#28A745]" />
-                      : <Clock size={14} className="text-avenue-text-muted opacity-50" />}
+                      : <Clock size={14} className="text-brand-text-muted opacity-50" />}
                   </td>
                   <td className="px-5 py-3">
                     <Link href={`/analytics/renewals/${g.id}`}
-                      className="text-avenue-indigo hover:text-avenue-secondary font-semibold text-xs inline-flex items-center gap-1">
+                      className="text-brand-indigo hover:text-brand-secondary font-semibold text-xs inline-flex items-center gap-1">
                       Workspace <ArrowRight size={12} />
                     </Link>
                   </td>

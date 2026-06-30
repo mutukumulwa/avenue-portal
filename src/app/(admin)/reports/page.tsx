@@ -76,15 +76,15 @@ export default async function ReportsPage() {
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Reports</h1>
-        <p className="text-avenue-text-body font-body mt-1">
+        <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Reports</h1>
+        <p className="text-brand-text-body font-body mt-1">
           {REPORT_GROUPS.reduce((s, g) => s + g.reports.length, 0)} reports across {REPORT_GROUPS.length} categories. All reports export to CSV.
         </p>
       </div>
 
       {REPORT_GROUPS.map(group => (
         <div key={group.label} className="space-y-3">
-          <h2 className="text-xs font-bold uppercase tracking-widest text-avenue-text-muted border-b border-[#EEEEEE] pb-2">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-brand-text-muted border-b border-[#EEEEEE] pb-2">
             {group.label}
           </h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -94,15 +94,15 @@ export default async function ReportsPage() {
                 <Link
                   key={r.id}
                   href={`/reports/${r.id}`}
-                  className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm hover:shadow-md hover:border-avenue-indigo/30 transition-all group"
+                  className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm hover:shadow-md hover:border-brand-indigo/30 transition-all group"
                 >
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center mb-3 ${r.color}`}>
                     <Icon size={20} />
                   </div>
-                  <h3 className="font-bold text-avenue-text-heading font-heading group-hover:text-avenue-indigo transition-colors">
+                  <h3 className="font-bold text-brand-text-heading font-heading group-hover:text-brand-indigo transition-colors">
                     {r.title}
                   </h3>
-                  <p className="text-sm text-avenue-text-body mt-1">{r.description}</p>
+                  <p className="text-sm text-brand-text-body mt-1">{r.description}</p>
                 </Link>
               );
             })}

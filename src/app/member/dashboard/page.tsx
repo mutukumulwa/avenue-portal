@@ -56,7 +56,7 @@ export default async function MemberDashboardPage() {
 
   if (!dashboard) {
     return (
-      <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-8 text-center text-avenue-text-body shadow-sm">
+      <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-8 text-center text-brand-text-body shadow-sm">
         No member profile linked to your account. Please contact support.
       </div>
     );
@@ -77,7 +77,7 @@ export default async function MemberDashboardPage() {
         <div className="rounded-[8px] border border-[#DC3545]/30 bg-[#DC3545]/10 p-4 flex items-center justify-between gap-4">
           <div>
             <p className="font-bold text-[#DC3545] text-sm">Your membership is lapsed</p>
-            <p className="text-sm text-avenue-text-body mt-0.5">Benefits are suspended. Request reinstatement to resume cover.</p>
+            <p className="text-sm text-brand-text-body mt-0.5">Benefits are suspended. Request reinstatement to resume cover.</p>
           </div>
           <a
             href="/member/reinstatement"
@@ -88,7 +88,7 @@ export default async function MemberDashboardPage() {
         </div>
       )}
       <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-        <div className="rounded-[8px] bg-avenue-indigo p-5 text-white shadow-sm">
+        <div className="rounded-[8px] bg-brand-indigo p-5 text-white shadow-sm">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <p className="text-[13px] font-bold uppercase opacity-80">Medvex Member</p>
@@ -120,15 +120,15 @@ export default async function MemberDashboardPage() {
         <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-[13px] font-bold uppercase text-avenue-text-muted">Annual cover balance</p>
-              <p className="mt-1 text-3xl font-bold tabular-nums text-avenue-text-heading">
+              <p className="text-[13px] font-bold uppercase text-brand-text-muted">Annual cover balance</p>
+              <p className="mt-1 text-3xl font-bold tabular-nums text-brand-text-heading">
                 {formatMoney(dashboard.summary.totalRemaining)}
               </p>
-              <p className="mt-1 text-sm text-avenue-text-muted">
+              <p className="mt-1 text-sm text-brand-text-muted">
                 Remaining of {formatMoney(dashboard.summary.totalLimit)} annual cover this membership year
               </p>
             </div>
-            <Shield className="h-8 w-8 text-avenue-indigo" />
+            <Shield className="h-8 w-8 text-brand-indigo" />
           </div>
           <div className="mt-5 h-2 overflow-hidden rounded-full bg-[#E6E7E8]">
             <div
@@ -136,7 +136,7 @@ export default async function MemberDashboardPage() {
               style={{ width: `${usedPercent}%` }}
             />
           </div>
-          <div className="mt-2 flex justify-between text-[13px] text-avenue-text-muted">
+          <div className="mt-2 flex justify-between text-[13px] text-brand-text-muted">
             <span>{formatMoney(dashboard.summary.totalUsed)} used against annual cover</span>
             <span>{usedPercent}% used</span>
           </div>
@@ -149,13 +149,13 @@ export default async function MemberDashboardPage() {
             <div className="flex items-start gap-3">
               <CreditCard className="mt-0.5 h-5 w-5 text-[#856404]" />
               <div>
-                <p className="font-bold text-avenue-text-heading">Member share pending</p>
-                <p className="text-sm text-avenue-text-muted">
+                <p className="font-bold text-brand-text-heading">Member share pending</p>
+                <p className="text-sm text-brand-text-muted">
                   {formatMoney(dashboard.summary.outstandingMemberShare)} is awaiting collection or payment confirmation.
                 </p>
               </div>
             </div>
-            <Link href="/member/utilization" className="inline-flex items-center justify-center gap-2 rounded-[8px] bg-white px-3 py-2 text-sm font-semibold text-avenue-indigo shadow-sm hover:underline">
+            <Link href="/member/utilization" className="inline-flex items-center justify-center gap-2 rounded-[8px] bg-white px-3 py-2 text-sm font-semibold text-brand-indigo shadow-sm hover:underline">
               Review costs <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -166,10 +166,10 @@ export default async function MemberDashboardPage() {
         <section className="rounded-[8px] border border-[#EEEEEE] bg-white shadow-sm">
           <div className="flex items-center justify-between border-b border-[#EEEEEE] px-5 py-4">
             <div>
-              <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Notifications</h2>
-              <p className="text-sm text-avenue-text-muted">Recent approvals, payments, and member updates.</p>
+              <h2 className="font-heading text-lg font-bold text-brand-text-heading">Notifications</h2>
+              <p className="text-sm text-brand-text-muted">Recent approvals, payments, and member updates.</p>
             </div>
-            <Link href="/member/notifications" className="inline-flex items-center gap-2 text-sm font-semibold text-avenue-indigo hover:underline">
+            <Link href="/member/notifications" className="inline-flex items-center gap-2 text-sm font-semibold text-brand-indigo hover:underline">
               View all <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -180,12 +180,12 @@ export default async function MemberDashboardPage() {
                 href={notification.href ?? "/member/notifications"}
                 className="grid grid-cols-[auto_1fr_auto] items-center gap-3 px-5 py-4 hover:bg-[#F8F9FA]"
               >
-                <div className="flex h-9 w-9 items-center justify-center rounded-[8px] bg-avenue-indigo/10 text-avenue-indigo">
+                <div className="flex h-9 w-9 items-center justify-center rounded-[8px] bg-brand-indigo/10 text-brand-indigo">
                   <Bell className="h-4 w-4" />
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate font-semibold text-avenue-text-heading">{notification.title}</p>
-                  <p className="truncate text-[13px] text-avenue-text-muted">{notification.body}</p>
+                  <p className="truncate font-semibold text-brand-text-heading">{notification.title}</p>
+                  <p className="truncate text-[13px] text-brand-text-muted">{notification.body}</p>
                 </div>
                 {notification.readAt === null && (
                   <span className="rounded-full bg-[#28A745]/10 px-2 py-0.5 text-[10px] font-bold uppercase text-[#1F7A34]">
@@ -202,7 +202,7 @@ export default async function MemberDashboardPage() {
         {quickActions.map((action) => {
           const Icon = action.icon;
           return (
-            <Link key={action.href} href={action.href} className="rounded-[8px] border border-[#EEEEEE] bg-white p-4 shadow-sm transition-colors hover:border-avenue-indigo/40 hover:text-avenue-indigo">
+            <Link key={action.href} href={action.href} className="rounded-[8px] border border-[#EEEEEE] bg-white p-4 shadow-sm transition-colors hover:border-brand-indigo/40 hover:text-brand-indigo">
               <Icon className="h-5 w-5" />
               <p className="mt-3 text-sm font-bold">{action.label}</p>
             </Link>
@@ -214,10 +214,10 @@ export default async function MemberDashboardPage() {
         <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
-              <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Benefit pressure</h2>
-              <p className="text-sm text-avenue-text-muted">Category sublimits can sit inside the annual cover.</p>
+              <h2 className="font-heading text-lg font-bold text-brand-text-heading">Benefit pressure</h2>
+              <p className="text-sm text-brand-text-muted">Category sublimits can sit inside the annual cover.</p>
             </div>
-            <Link href="/member/benefits" className="text-sm font-semibold text-avenue-indigo hover:underline">
+            <Link href="/member/benefits" className="text-sm font-semibold text-brand-indigo hover:underline">
               View all
             </Link>
           </div>
@@ -225,20 +225,20 @@ export default async function MemberDashboardPage() {
             {dashboard.pressureBenefits.map((benefit) => (
               <div key={benefit.id}>
                 <div className="mb-1 flex items-center justify-between gap-3 text-sm">
-                  <span className="font-semibold text-avenue-text-heading">{benefit.name}</span>
-                  <span className="tabular-nums text-avenue-text-muted">{Math.round(benefit.usedPct * 100)}%</span>
+                  <span className="font-semibold text-brand-text-heading">{benefit.name}</span>
+                  <span className="tabular-nums text-brand-text-muted">{Math.round(benefit.usedPct * 100)}%</span>
                 </div>
                 <div className="h-2 overflow-hidden rounded-full bg-[#E6E7E8]">
                   <div className={`h-full rounded-full ${pressureTone(benefit.pace)}`} style={{ width: `${Math.round(benefit.usedPct * 100)}%` }} />
                 </div>
-                <div className="mt-1 flex justify-between text-[13px] text-avenue-text-muted">
+                <div className="mt-1 flex justify-between text-[13px] text-brand-text-muted">
                   <span>{benefit.pace}</span>
                   <span>{formatMoney(benefit.remaining)} left</span>
                 </div>
               </div>
             ))}
             {dashboard.pressureBenefits.length === 0 && (
-              <p className="py-8 text-center text-sm text-avenue-text-muted">Your benefit schedule is not configured yet.</p>
+              <p className="py-8 text-center text-sm text-brand-text-muted">Your benefit schedule is not configured yet.</p>
             )}
           </div>
         </div>
@@ -246,23 +246,23 @@ export default async function MemberDashboardPage() {
         <div className="rounded-[8px] border border-[#EEEEEE] bg-white shadow-sm">
           <div className="flex items-center justify-between border-b border-[#EEEEEE] px-5 py-4">
             <div>
-              <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Recent activity</h2>
-              <p className="text-sm text-avenue-text-muted">Care visits, pre-authorizations, and member-share updates.</p>
+              <h2 className="font-heading text-lg font-bold text-brand-text-heading">Recent activity</h2>
+              <p className="text-sm text-brand-text-muted">Care visits, pre-authorizations, and member-share updates.</p>
             </div>
-            <History className="h-5 w-5 text-avenue-indigo" />
+            <History className="h-5 w-5 text-brand-indigo" />
           </div>
           <div className="divide-y divide-[#EEEEEE]">
             {dashboard.recentActivity.map((activity) => (
               <Link key={activity.id} href={activity.href} className="grid grid-cols-[auto_1fr_auto] items-center gap-3 px-5 py-4 hover:bg-[#F8F9FA]">
-                <div className="flex h-9 w-9 items-center justify-center rounded-[8px] bg-avenue-indigo/10 text-avenue-indigo">
+                <div className="flex h-9 w-9 items-center justify-center rounded-[8px] bg-brand-indigo/10 text-brand-indigo">
                   {activity.type === "PREAUTH" ? <Stethoscope className="h-4 w-4" /> : activity.type === "MEMBER_SHARE" ? <CreditCard className="h-4 w-4" /> : <HeartPulse className="h-4 w-4" />}
                 </div>
                 <div className="min-w-0">
-                  <p className="truncate font-semibold text-avenue-text-heading">{activity.title}</p>
-                  <p className="truncate text-[13px] text-avenue-text-muted">{activity.description} · {formatDate(activity.date)}</p>
+                  <p className="truncate font-semibold text-brand-text-heading">{activity.title}</p>
+                  <p className="truncate text-[13px] text-brand-text-muted">{activity.description} · {formatDate(activity.date)}</p>
                 </div>
                 <div className="text-right">
-                  <p className="font-bold tabular-nums text-avenue-text-heading">{formatMoney(activity.amount)}</p>
+                  <p className="font-bold tabular-nums text-brand-text-heading">{formatMoney(activity.amount)}</p>
                   <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[12px] font-bold ${statusTone(activity.status)}`}>
                     {activity.status}
                   </span>
@@ -270,7 +270,7 @@ export default async function MemberDashboardPage() {
               </Link>
             ))}
             {dashboard.recentActivity.length === 0 && (
-              <p className="px-5 py-8 text-center text-sm text-avenue-text-muted">No activity has been recorded yet.</p>
+              <p className="px-5 py-8 text-center text-sm text-brand-text-muted">No activity has been recorded yet.</p>
             )}
           </div>
         </div>
@@ -278,24 +278,24 @@ export default async function MemberDashboardPage() {
 
       <section className="grid gap-4 md:grid-cols-3">
         <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
-          <Users className="h-5 w-5 text-avenue-indigo" />
-          <p className="mt-3 text-[13px] font-bold uppercase text-avenue-text-muted">Family covered</p>
-          <p className="mt-1 text-2xl font-bold tabular-nums text-avenue-text-heading">
+          <Users className="h-5 w-5 text-brand-indigo" />
+          <p className="mt-3 text-[13px] font-bold uppercase text-brand-text-muted">Family covered</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums text-brand-text-heading">
             {dashboard.summary.activeDependentCount + 1}
           </p>
-          <p className="mt-1 text-sm text-avenue-text-muted">Including you and active dependants.</p>
+          <p className="mt-1 text-sm text-brand-text-muted">Including you and active dependants.</p>
         </div>
         <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
           <CalendarClock className="h-5 w-5 text-[#17A2B8]" />
-          <p className="mt-3 text-[13px] font-bold uppercase text-avenue-text-muted">Membership year</p>
-          <p className="mt-1 text-lg font-bold text-avenue-text-heading">{formatDate(dashboard.period.periodStart)}</p>
-          <p className="mt-1 text-sm text-avenue-text-muted">Runs until {formatDate(dashboard.period.periodEnd)}.</p>
+          <p className="mt-3 text-[13px] font-bold uppercase text-brand-text-muted">Membership year</p>
+          <p className="mt-1 text-lg font-bold text-brand-text-heading">{formatDate(dashboard.period.periodStart)}</p>
+          <p className="mt-1 text-sm text-brand-text-muted">Runs until {formatDate(dashboard.period.periodEnd)}.</p>
         </div>
         <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
           <BadgeCheck className="h-5 w-5 text-[#28A745]" />
-          <p className="mt-3 text-[13px] font-bold uppercase text-avenue-text-muted">Next best action</p>
-          <p className="mt-1 text-lg font-bold text-avenue-text-heading">Keep your digital card ready</p>
-          <p className="mt-1 text-sm text-avenue-text-muted">Use check-in when you arrive at an Medvex or partner facility.</p>
+          <p className="mt-3 text-[13px] font-bold uppercase text-brand-text-muted">Next best action</p>
+          <p className="mt-1 text-lg font-bold text-brand-text-heading">Keep your digital card ready</p>
+          <p className="mt-1 text-sm text-brand-text-muted">Use check-in when you arrive at an Medvex or partner facility.</p>
         </div>
       </section>
 

@@ -8,7 +8,7 @@ const STATUS_STYLE: Record<string, string> = {
   PENDING:          "bg-[#6C757D]/10 text-[#6C757D]",
   MAKER_SUBMITTED:  "bg-[#FFC107]/10 text-[#856404]",
   CHECKER_APPROVED: "bg-[#28A745]/10 text-[#28A745]",
-  SETTLED:          "bg-avenue-indigo/10 text-avenue-indigo",
+  SETTLED:          "bg-brand-indigo/10 text-brand-indigo",
   REJECTED:         "bg-[#DC3545]/10 text-[#DC3545]",
 };
 
@@ -123,22 +123,22 @@ export default async function SettlementPage({
 
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Provider Settlements</h1>
-          <p className="text-avenue-text-muted text-sm mt-1">Batch settlement of approved claims to providers</p>
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Provider Settlements</h1>
+          <p className="text-brand-text-muted text-sm mt-1">Batch settlement of approved claims to providers</p>
         </div>
       </div>
 
       {/* Create new batch */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-4">
-        <h2 className="font-semibold text-avenue-text-heading text-sm">Create Settlement Batch</h2>
+        <h2 className="font-semibold text-brand-text-heading text-sm">Create Settlement Batch</h2>
         <form action={createSettlementBatchAction} className="flex gap-3 flex-wrap">
           <select name="providerId" required
-            className="border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm min-w-48 focus:ring-1 focus:ring-avenue-indigo focus:outline-none">
+            className="border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm min-w-48 focus:ring-1 focus:ring-brand-indigo focus:outline-none">
             <option value="">Select provider…</option>
             {providers.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
           </select>
           <select name="cycleMonth" defaultValue={currentMonth}
-            className="border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-avenue-indigo focus:outline-none">
+            className="border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-brand-indigo focus:outline-none">
             {Array.from({ length: 12 }, (_, i) => (
               <option key={i + 1} value={i + 1}>
                 {new Date(2000, i).toLocaleString("en-KE", { month: "long" })}
@@ -146,9 +146,9 @@ export default async function SettlementPage({
             ))}
           </select>
           <input name="cycleYear" type="number" defaultValue={currentYear} min={2020} max={2030}
-            className="border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm w-24 focus:ring-1 focus:ring-avenue-indigo focus:outline-none" />
+            className="border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm w-24 focus:ring-1 focus:ring-brand-indigo focus:outline-none" />
           <button type="submit"
-            className="bg-avenue-indigo text-white px-5 py-2 rounded-full text-sm font-semibold hover:bg-avenue-secondary transition-colors flex items-center gap-2">
+            className="bg-brand-indigo text-white px-5 py-2 rounded-full text-sm font-semibold hover:bg-brand-secondary transition-colors flex items-center gap-2">
             <DollarSign size={14} /> Create Batch
           </button>
         </form>
@@ -160,8 +160,8 @@ export default async function SettlementPage({
           <Link key={s} href={s ? `?status=${s}` : "/settlement"}
             className={`px-4 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
               (status ?? "") === s
-                ? "bg-avenue-indigo text-white border-avenue-indigo"
-                : "border-[#EEEEEE] text-avenue-text-muted hover:border-avenue-indigo hover:text-avenue-indigo"
+                ? "bg-brand-indigo text-white border-brand-indigo"
+                : "border-[#EEEEEE] text-brand-text-muted hover:border-brand-indigo hover:text-brand-indigo"
             }`}>
             {s ? s.replace(/_/g, " ") : "All"} ({s === "" ? batches.length : batches.filter((b) => b.status === s).length})
           </Link>
@@ -171,8 +171,8 @@ export default async function SettlementPage({
       {/* Batch list */}
       {batches.length === 0 ? (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-12 text-center">
-          <CheckCircle2 size={32} className="mx-auto mb-3 text-avenue-text-muted opacity-30" />
-          <p className="text-avenue-text-muted text-sm">No settlement batches found.</p>
+          <CheckCircle2 size={32} className="mx-auto mb-3 text-brand-text-muted opacity-30" />
+          <p className="text-brand-text-muted text-sm">No settlement batches found.</p>
         </div>
       ) : (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
@@ -191,14 +191,14 @@ export default async function SettlementPage({
             <tbody className="divide-y divide-[#EEEEEE]">
               {batches.map((batch) => (
                 <tr key={batch.id} className="hover:bg-[#F8F9FA]">
-                  <td className="px-5 py-3 font-semibold text-avenue-text-heading">
+                  <td className="px-5 py-3 font-semibold text-brand-text-heading">
                     {batch.provider.name}
                   </td>
-                  <td className="px-5 py-3 text-avenue-text-muted">
+                  <td className="px-5 py-3 text-brand-text-muted">
                     {new Date(batch.cycleYear, batch.cycleMonth - 1).toLocaleString("en-KE", { month: "short", year: "numeric" })}
                   </td>
-                  <td className="px-5 py-3 text-avenue-text-muted">{batch.claimCount}</td>
-                  <td className="px-5 py-3 font-semibold font-mono text-avenue-text-heading">
+                  <td className="px-5 py-3 text-brand-text-muted">{batch.claimCount}</td>
+                  <td className="px-5 py-3 font-semibold font-mono text-brand-text-heading">
                     {fmt(Number(batch.totalAmount))}
                   </td>
                   <td className="px-5 py-3">
@@ -206,7 +206,7 @@ export default async function SettlementPage({
                       {batch.status.replace(/_/g, " ")}
                     </span>
                   </td>
-                  <td className="px-5 py-3 text-avenue-text-muted text-xs">
+                  <td className="px-5 py-3 text-brand-text-muted text-xs">
                     {batch.settledAt ? new Date(batch.settledAt).toLocaleDateString("en-KE") : "—"}
                   </td>
                   <td className="px-5 py-3">
@@ -223,13 +223,13 @@ export default async function SettlementPage({
                       <form action={markSettlementBatchPaidAction}>
                         <input type="hidden" name="batchId" value={batch.id} />
                         <button type="submit"
-                          className="text-xs font-semibold text-avenue-indigo border border-avenue-indigo/30 px-3 py-1 rounded-full hover:bg-avenue-indigo/10 transition-colors flex items-center gap-1">
+                          className="text-xs font-semibold text-brand-indigo border border-brand-indigo/30 px-3 py-1 rounded-full hover:bg-brand-indigo/10 transition-colors flex items-center gap-1">
                           <DollarSign size={11} /> Mark Paid
                         </button>
                       </form>
                     )}
                     {batch.status === "SETTLED" && (
-                      <span className="text-[10px] text-avenue-indigo flex items-center gap-1">
+                      <span className="text-[10px] text-brand-indigo flex items-center gap-1">
                         <CheckCircle2 size={11} /> Settled
                       </span>
                     )}

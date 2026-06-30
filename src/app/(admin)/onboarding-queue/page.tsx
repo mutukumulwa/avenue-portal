@@ -70,19 +70,19 @@ export default async function OnboardingQueuePage({
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Onboarding Queue</h1>
-        <p className="text-avenue-text-muted text-sm mt-1">Members with outstanding onboarding items</p>
+        <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Onboarding Queue</h1>
+        <p className="text-brand-text-muted text-sm mt-1">Members with outstanding onboarding items</p>
       </div>
 
       {/* Gap type filters */}
       <div className="flex flex-wrap gap-2">
         <Link href="/onboarding-queue"
-          className={`px-4 py-1.5 rounded-full text-xs font-semibold border transition-colors ${!gap ? "bg-avenue-indigo text-white border-avenue-indigo" : "border-[#EEEEEE] text-avenue-text-muted hover:border-avenue-indigo hover:text-avenue-indigo"}`}>
+          className={`px-4 py-1.5 rounded-full text-xs font-semibold border transition-colors ${!gap ? "bg-brand-indigo text-white border-brand-indigo" : "border-[#EEEEEE] text-brand-text-muted hover:border-brand-indigo hover:text-brand-indigo"}`}>
           All ({memberIds.length})
         </Link>
         {Object.entries(gapCounts).sort(([,a],[,b]) => b - a).map(([type, count]) => (
           <Link key={type} href={`/onboarding-queue?gap=${type}`}
-            className={`px-4 py-1.5 rounded-full text-xs font-semibold border transition-colors ${gap === type ? "bg-avenue-indigo text-white border-avenue-indigo" : "border-[#EEEEEE] text-avenue-text-muted hover:border-avenue-indigo hover:text-avenue-indigo"}`}>
+            className={`px-4 py-1.5 rounded-full text-xs font-semibold border transition-colors ${gap === type ? "bg-brand-indigo text-white border-brand-indigo" : "border-[#EEEEEE] text-brand-text-muted hover:border-brand-indigo hover:text-brand-indigo"}`}>
             {ITEM_LABEL[type] ?? type} ({count})
           </Link>
         ))}
@@ -91,7 +91,7 @@ export default async function OnboardingQueuePage({
       {members.length === 0 ? (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-12 text-center">
           <CheckCircle size={32} className="mx-auto mb-3 text-[#28A745] opacity-50" />
-          <p className="text-avenue-text-muted text-sm">All members have completed onboarding{gap ? ` for this gap type` : ""}.</p>
+          <p className="text-brand-text-muted text-sm">All members have completed onboarding{gap ? ` for this gap type` : ""}.</p>
         </div>
       ) : (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
@@ -116,11 +116,11 @@ export default async function OnboardingQueuePage({
                 return (
                   <tr key={m.id} className="hover:bg-[#F8F9FA] transition-colors">
                     <td className="px-5 py-3">
-                      <p className="font-semibold text-avenue-text-heading">{m.firstName} {m.lastName}</p>
-                      <p className="text-[11px] font-mono text-avenue-indigo">{m.memberNumber}</p>
+                      <p className="font-semibold text-brand-text-heading">{m.firstName} {m.lastName}</p>
+                      <p className="text-[11px] font-mono text-brand-indigo">{m.memberNumber}</p>
                     </td>
-                    <td className="px-5 py-3 text-avenue-text-body">{m.group.name}</td>
-                    <td className="px-5 py-3 text-avenue-text-muted text-xs">
+                    <td className="px-5 py-3 text-brand-text-body">{m.group.name}</td>
+                    <td className="px-5 py-3 text-brand-text-muted text-xs">
                       {m.coverStartDate ? new Date(m.coverStartDate).toLocaleDateString("en-KE") : "—"}
                     </td>
                     <td className="px-5 py-3">
@@ -142,12 +142,12 @@ export default async function OnboardingQueuePage({
                             style={{ width: `${totalCount > 0 ? (completedCount / totalCount) * 100 : 0}%` }}
                           />
                         </div>
-                        <span className="text-[11px] text-avenue-text-muted">{completedCount}/{totalCount}</span>
+                        <span className="text-[11px] text-brand-text-muted">{completedCount}/{totalCount}</span>
                       </div>
                     </td>
                     <td className="px-5 py-3">
                       <Link href={`/members/${m.id}/onboarding`}
-                        className="text-avenue-indigo hover:text-avenue-secondary font-semibold text-xs inline-flex items-center gap-1">
+                        className="text-brand-indigo hover:text-brand-secondary font-semibold text-xs inline-flex items-center gap-1">
                         Onboard <ArrowRight size={13} />
                       </Link>
                     </td>

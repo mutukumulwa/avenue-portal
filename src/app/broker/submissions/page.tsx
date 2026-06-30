@@ -14,7 +14,7 @@ export default async function BrokerSubmissionsPage() {
   });
 
   if (!user?.brokerId) {
-    return <div className="p-6 text-center text-avenue-text-body">No broker profile linked.</div>;
+    return <div className="p-6 text-center text-brand-text-body">No broker profile linked.</div>;
   }
 
   const endorsements = await prisma.endorsement.findMany({
@@ -37,8 +37,8 @@ export default async function BrokerSubmissionsPage() {
     <div className="space-y-6">
       <div>
         <div>
-          <h1 className="text-2xl font-bold font-heading text-avenue-text-heading">Endorsement Submissions</h1>
-          <p className="text-avenue-text-muted mt-1">Endorsements submitted for your groups.</p>
+          <h1 className="text-2xl font-bold font-heading text-brand-text-heading">Endorsement Submissions</h1>
+          <p className="text-brand-text-muted mt-1">Endorsements submitted for your groups.</p>
         </div>
       </div>
 
@@ -55,10 +55,10 @@ export default async function BrokerSubmissionsPage() {
               <th className="px-6 py-4">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#EEEEEE] text-avenue-text-body">
+          <tbody className="divide-y divide-[#EEEEEE] text-brand-text-body">
             {endorsements.map((e) => (
               <tr key={e.id} className="hover:bg-[#F8F9FA]">
-                <td className="px-6 py-4 font-mono font-semibold text-avenue-text-heading">{e.endorsementNumber}</td>
+                <td className="px-6 py-4 font-mono font-semibold text-brand-text-heading">{e.endorsementNumber}</td>
                 <td className="px-6 py-4">{e.group.name}</td>
                 <td className="px-6 py-4">
                   <span className="bg-[#E6E7E8] text-[#6C757D] px-2 py-1 rounded text-xs font-bold">
@@ -75,14 +75,14 @@ export default async function BrokerSubmissionsPage() {
                   </span>
                 </td>
                 <td className="px-6 py-4">
-                  <Link href={`/broker/submissions/${e.id}`} className="text-avenue-indigo hover:text-avenue-secondary font-semibold inline-flex items-center gap-1">
+                  <Link href={`/broker/submissions/${e.id}`} className="text-brand-indigo hover:text-brand-secondary font-semibold inline-flex items-center gap-1">
                     View <ArrowRight size={14} />
                   </Link>
                 </td>
               </tr>
             ))}
             {endorsements.length === 0 && (
-              <tr><td colSpan={7} className="px-6 py-12 text-center text-avenue-text-body">No submissions found.</td></tr>
+              <tr><td colSpan={7} className="px-6 py-12 text-center text-brand-text-body">No submissions found.</td></tr>
             )}
           </tbody>
         </table>

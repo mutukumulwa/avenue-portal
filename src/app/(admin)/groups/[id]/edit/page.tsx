@@ -33,12 +33,12 @@ export default async function GroupEditPage({ params }: { params: Promise<{ id: 
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <Link href={`/groups/${id}`} className="text-avenue-text-muted hover:text-avenue-indigo transition-colors">
+        <Link href={`/groups/${id}`} className="text-brand-text-muted hover:text-brand-indigo transition-colors">
           <ArrowLeft size={20} />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Edit Group</h1>
-          <p className="text-avenue-text-body text-sm mt-0.5">{group.name}</p>
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Edit Group</h1>
+          <p className="text-brand-text-body text-sm mt-0.5">{group.name}</p>
         </div>
       </div>
       <GroupEditForm group={serialized} />

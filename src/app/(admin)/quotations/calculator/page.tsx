@@ -78,7 +78,7 @@ export default function QuotationCalculatorPage() {
 
   const fmt = (n: number) => `KES ${Math.round(n).toLocaleString()}`;
 
-  const inputCls = "w-full border border-[#EEEEEE] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-avenue-indigo";
+  const inputCls = "w-full border border-[#EEEEEE] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-brand-indigo";
 
   async function handleGenerate() {
     setLoading(true);
@@ -101,10 +101,10 @@ export default function QuotationCalculatorPage() {
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <Calculator size={24} className="text-avenue-indigo" />
+        <Calculator size={24} className="text-brand-indigo" />
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Contribution Calculator</h1>
-          <p className="text-avenue-text-body font-body mt-0.5">Generate a quotation in 5 steps.</p>
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Contribution Calculator</h1>
+          <p className="text-brand-text-body font-body mt-0.5">Generate a quotation in 5 steps.</p>
         </div>
       </div>
 
@@ -113,11 +113,11 @@ export default function QuotationCalculatorPage() {
         {STEPS.map((s, i) => (
           <div key={s} className="flex items-center gap-1 flex-1">
             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-              i < step ? "bg-[#28A745] text-white" : i === step ? "bg-avenue-indigo text-white" : "bg-[#E6E7E8] text-[#6C757D]"
+              i < step ? "bg-[#28A745] text-white" : i === step ? "bg-brand-indigo text-white" : "bg-[#E6E7E8] text-[#6C757D]"
             }`}>
               {i < step ? "✓" : i + 1}
             </div>
-            <span className={`text-xs font-semibold flex-1 hidden sm:block ${i === step ? "text-avenue-indigo" : "text-avenue-text-muted"}`}>{s}</span>
+            <span className={`text-xs font-semibold flex-1 hidden sm:block ${i === step ? "text-brand-indigo" : "text-brand-text-muted"}`}>{s}</span>
             {i < STEPS.length - 1 && <div className="h-px bg-[#EEEEEE] flex-1 hidden sm:block" />}
           </div>
         ))}
@@ -128,7 +128,7 @@ export default function QuotationCalculatorPage() {
         {/* Step 1: Group Info */}
         {step === 0 && (
           <div className="space-y-4">
-            <h2 className="font-bold text-avenue-text-heading font-heading">Step 1 — Prospect Information</h2>
+            <h2 className="font-bold text-brand-text-heading font-heading">Step 1 — Prospect Information</h2>
             <input
               placeholder="Company / Prospect Name *"
               value={form.prospectName}
@@ -154,31 +154,31 @@ export default function QuotationCalculatorPage() {
         {/* Step 2: Census & Age Bands */}
         {step === 1 && (
           <div className="space-y-5">
-            <h2 className="font-bold text-avenue-text-heading font-heading">Step 2 — Member Census &amp; Age Bands</h2>
+            <h2 className="font-bold text-brand-text-heading font-heading">Step 2 — Member Census &amp; Age Bands</h2>
 
             {/* Pricing mode toggle */}
             <div className="flex items-center gap-3 p-3 bg-[#F8F9FA] rounded-lg">
               <button
                 type="button"
                 onClick={() => setForm((f) => ({ ...f, useAgeBands: false }))}
-                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${!form.useAgeBands ? "bg-avenue-indigo text-white" : "text-avenue-text-muted hover:bg-[#EEEEEE]"}`}
+                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${!form.useAgeBands ? "bg-brand-indigo text-white" : "text-brand-text-muted hover:bg-[#EEEEEE]"}`}
               >
                 Flat Rate
               </button>
               <button
                 type="button"
                 onClick={() => setForm((f) => ({ ...f, useAgeBands: true }))}
-                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${form.useAgeBands ? "bg-avenue-indigo text-white" : "text-avenue-text-muted hover:bg-[#EEEEEE]"}`}
+                className={`px-4 py-1.5 rounded-full text-sm font-semibold transition-colors ${form.useAgeBands ? "bg-brand-indigo text-white" : "text-brand-text-muted hover:bg-[#EEEEEE]"}`}
               >
                 Age-Banded
               </button>
-              <span className="text-xs text-avenue-text-muted">Select pricing mode</span>
+              <span className="text-xs text-brand-text-muted">Select pricing mode</span>
             </div>
 
             {!form.useAgeBands ? (
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-xs font-bold text-avenue-text-muted uppercase block mb-1">Principal Members</label>
+                  <label className="text-xs font-bold text-brand-text-muted uppercase block mb-1">Principal Members</label>
                   <input
                     type="number" min={1}
                     value={form.memberCount || ""}
@@ -187,7 +187,7 @@ export default function QuotationCalculatorPage() {
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-avenue-text-muted uppercase block mb-1">Dependents</label>
+                  <label className="text-xs font-bold text-brand-text-muted uppercase block mb-1">Dependents</label>
                   <input
                     type="number" min={0}
                     value={form.dependentCount || ""}
@@ -196,17 +196,17 @@ export default function QuotationCalculatorPage() {
                   />
                 </div>
                 <div className="col-span-2 bg-[#F8F9FA] rounded-lg p-4 text-sm">
-                  <p className="text-avenue-text-muted">Total lives to be covered:</p>
-                  <p className="text-2xl font-bold text-avenue-indigo mt-1">{form.memberCount + form.dependentCount}</p>
+                  <p className="text-brand-text-muted">Total lives to be covered:</p>
+                  <p className="text-2xl font-bold text-brand-indigo mt-1">{form.memberCount + form.dependentCount}</p>
                 </div>
               </div>
             ) : (
               <div className="space-y-3">
-                <p className="text-xs text-avenue-text-muted">Enter the number of members per age band. The base rate is multiplied by each band&apos;s age factor to produce a blended contribution.</p>
+                <p className="text-xs text-brand-text-muted">Enter the number of members per age band. The base rate is multiplied by each band&apos;s age factor to produce a blended contribution.</p>
                 <div className="overflow-hidden rounded-lg border border-[#EEEEEE]">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="bg-[#F8F9FA] text-xs font-bold text-avenue-text-muted uppercase">
+                      <tr className="bg-[#F8F9FA] text-xs font-bold text-brand-text-muted uppercase">
                         <th className="px-4 py-2 text-left">Age Band</th>
                         <th className="px-4 py-2 text-right">Age Factor</th>
                         <th className="px-4 py-2 text-right">No. of Lives</th>
@@ -215,8 +215,8 @@ export default function QuotationCalculatorPage() {
                     <tbody className="divide-y divide-[#EEEEEE]">
                       {AGE_BANDS.map((band) => (
                         <tr key={band.key}>
-                          <td className="px-4 py-2 font-medium text-avenue-text-heading">{band.label}</td>
-                          <td className="px-4 py-2 text-right text-avenue-text-muted font-mono">{band.factor.toFixed(2)}×</td>
+                          <td className="px-4 py-2 font-medium text-brand-text-heading">{band.label}</td>
+                          <td className="px-4 py-2 text-right text-brand-text-muted font-mono">{band.factor.toFixed(2)}×</td>
                           <td className="px-4 py-2 text-right">
                             <input
                               type="number" min={0}
@@ -225,7 +225,7 @@ export default function QuotationCalculatorPage() {
                                 ...f,
                                 ageBandCounts: { ...f.ageBandCounts, [band.key]: parseInt(e.target.value) || 0 },
                               }))}
-                              className="w-24 border border-[#EEEEEE] rounded px-2 py-1 text-right text-sm focus:outline-none focus:border-avenue-indigo"
+                              className="w-24 border border-[#EEEEEE] rounded px-2 py-1 text-right text-sm focus:outline-none focus:border-brand-indigo"
                               placeholder="0"
                             />
                           </td>
@@ -233,14 +233,14 @@ export default function QuotationCalculatorPage() {
                       ))}
                     </tbody>
                     <tfoot>
-                      <tr className="bg-avenue-indigo/5 font-bold">
-                        <td className="px-4 py-2 text-avenue-indigo" colSpan={2}>Total Lives</td>
-                        <td className="px-4 py-2 text-right text-avenue-indigo">{totalBandedLives}</td>
+                      <tr className="bg-brand-indigo/5 font-bold">
+                        <td className="px-4 py-2 text-brand-indigo" colSpan={2}>Total Lives</td>
+                        <td className="px-4 py-2 text-right text-brand-indigo">{totalBandedLives}</td>
                       </tr>
                     </tfoot>
                   </table>
                 </div>
-                <p className="text-xs text-avenue-text-muted">Age factors applied to base rate. Blended contribution previewed in Step 4.</p>
+                <p className="text-xs text-brand-text-muted">Age factors applied to base rate. Blended contribution previewed in Step 4.</p>
               </div>
             )}
           </div>
@@ -249,7 +249,7 @@ export default function QuotationCalculatorPage() {
         {/* Step 3: Package */}
         {step === 2 && (
           <div className="space-y-4">
-            <h2 className="font-bold text-avenue-text-heading font-heading">Step 3 — Package Selection</h2>
+            <h2 className="font-bold text-brand-text-heading font-heading">Step 3 — Package Selection</h2>
             <div className="space-y-3">
               {DEFAULT_PACKAGES.map((pkg, idx) => (
                 <button
@@ -257,16 +257,16 @@ export default function QuotationCalculatorPage() {
                   onClick={() => setForm((f) => ({ ...f, selectedIdx: idx }))}
                   className={`w-full text-left p-4 rounded-lg border-2 transition-colors ${
                     form.selectedIdx === idx
-                      ? "border-avenue-indigo bg-avenue-indigo/5"
-                      : "border-[#EEEEEE] hover:border-avenue-indigo/40"
+                      ? "border-brand-indigo bg-brand-indigo/5"
+                      : "border-[#EEEEEE] hover:border-brand-indigo/40"
                   }`}
                 >
                   <div className="flex justify-between items-start">
                     <div>
-                      <p className="font-bold text-avenue-text-heading">{pkg.name}</p>
-                      <p className="text-xs text-avenue-text-muted mt-0.5">Annual limit: KES {pkg.annualLimit.toLocaleString()}</p>
+                      <p className="font-bold text-brand-text-heading">{pkg.name}</p>
+                      <p className="text-xs text-brand-text-muted mt-0.5">Annual limit: KES {pkg.annualLimit.toLocaleString()}</p>
                     </div>
-                    <p className="font-bold text-avenue-indigo">KES {pkg.ratePerMember.toLocaleString()} / member</p>
+                    <p className="font-bold text-brand-indigo">KES {pkg.ratePerMember.toLocaleString()} / member</p>
                   </div>
                 </button>
               ))}
@@ -277,19 +277,19 @@ export default function QuotationCalculatorPage() {
         {/* Step 4: Pricing */}
         {step === 3 && (
           <div className="space-y-5">
-            <h2 className="font-bold text-avenue-text-heading font-heading">Step 4 — Pricing</h2>
+            <h2 className="font-bold text-brand-text-heading font-heading">Step 4 — Pricing</h2>
 
             <div className="bg-[#F8F9FA] rounded-lg p-4 space-y-1 text-sm">
-              <div className="flex justify-between"><span className="text-avenue-text-muted">Base Rate / Member</span><span className="font-semibold">{fmt(selectedPkg?.ratePerMember ?? 0)}</span></div>
-              <div className="flex justify-between"><span className="text-avenue-text-muted">Pricing Mode</span><span className="font-semibold">{form.useAgeBands ? "Age-Banded" : "Flat Rate"}</span></div>
-              <div className="flex justify-between"><span className="text-avenue-text-muted">Total Lives</span><span className="font-semibold">{totalLives}</span></div>
+              <div className="flex justify-between"><span className="text-brand-text-muted">Base Rate / Member</span><span className="font-semibold">{fmt(selectedPkg?.ratePerMember ?? 0)}</span></div>
+              <div className="flex justify-between"><span className="text-brand-text-muted">Pricing Mode</span><span className="font-semibold">{form.useAgeBands ? "Age-Banded" : "Flat Rate"}</span></div>
+              <div className="flex justify-between"><span className="text-brand-text-muted">Total Lives</span><span className="font-semibold">{totalLives}</span></div>
               {form.useAgeBands && (
                 <div className="mt-2 pt-2 border-t border-[#EEEEEE] space-y-1">
                   {AGE_BANDS.filter((b) => (form.ageBandCounts[b.key] ?? 0) > 0).map((b) => {
                     const count = form.ageBandCounts[b.key] ?? 0;
                     const bandPremium = count * baseRate * b.factor;
                     return (
-                      <div key={b.key} className="flex justify-between text-avenue-text-muted">
+                      <div key={b.key} className="flex justify-between text-brand-text-muted">
                         <span>{b.label} ({count} × {b.factor.toFixed(2)}×)</span>
                         <span>{fmt(bandPremium)}</span>
                       </div>
@@ -297,11 +297,11 @@ export default function QuotationCalculatorPage() {
                   })}
                 </div>
               )}
-              <div className="flex justify-between font-bold border-t border-[#EEEEEE] pt-2 mt-1"><span>Base Annual Contribution</span><span className="text-avenue-indigo">{fmt(baseAnnualPremium)}</span></div>
+              <div className="flex justify-between font-bold border-t border-[#EEEEEE] pt-2 mt-1"><span>Base Annual Contribution</span><span className="text-brand-indigo">{fmt(baseAnnualPremium)}</span></div>
             </div>
 
             <div>
-              <p className="text-xs font-bold text-avenue-text-muted uppercase mb-2">Loadings (+)</p>
+              <p className="text-xs font-bold text-brand-text-muted uppercase mb-2">Loadings (+)</p>
               {LOADINGS.map((l) => (
                 <div key={l.key} className="flex items-center gap-3 mb-2">
                   <label className="flex-1 text-sm">{l.label}</label>
@@ -310,17 +310,17 @@ export default function QuotationCalculatorPage() {
                       type="number" min={0} max={50}
                       value={form.loadings[l.key] ?? ""}
                       onChange={(e) => setForm((f) => ({ ...f, loadings: { ...f.loadings, [l.key]: parseFloat(e.target.value) || 0 } }))}
-                      className="w-20 border border-[#EEEEEE] rounded px-2 py-1.5 text-sm text-right focus:outline-none focus:border-avenue-indigo"
+                      className="w-20 border border-[#EEEEEE] rounded px-2 py-1.5 text-sm text-right focus:outline-none focus:border-brand-indigo"
                       placeholder="0"
                     />
-                    <span className="text-avenue-text-muted text-sm">%</span>
+                    <span className="text-brand-text-muted text-sm">%</span>
                   </div>
                 </div>
               ))}
             </div>
 
             <div>
-              <p className="text-xs font-bold text-avenue-text-muted uppercase mb-2">Discounts (−)</p>
+              <p className="text-xs font-bold text-brand-text-muted uppercase mb-2">Discounts (−)</p>
               {DISCOUNTS.map((d) => (
                 <div key={d.key} className="flex items-center gap-3 mb-2">
                   <label className="flex-1 text-sm">{d.label}</label>
@@ -329,24 +329,24 @@ export default function QuotationCalculatorPage() {
                       type="number" min={0} max={30}
                       value={form.discounts[d.key] ?? ""}
                       onChange={(e) => setForm((f) => ({ ...f, discounts: { ...f.discounts, [d.key]: parseFloat(e.target.value) || 0 } }))}
-                      className="w-20 border border-[#EEEEEE] rounded px-2 py-1.5 text-sm text-right focus:outline-none focus:border-avenue-indigo"
+                      className="w-20 border border-[#EEEEEE] rounded px-2 py-1.5 text-sm text-right focus:outline-none focus:border-brand-indigo"
                       placeholder="0"
                     />
-                    <span className="text-avenue-text-muted text-sm">%</span>
+                    <span className="text-brand-text-muted text-sm">%</span>
                   </div>
                 </div>
               ))}
             </div>
 
-            <div className="bg-avenue-indigo/5 border border-avenue-indigo/20 rounded-lg p-4 space-y-2 text-sm">
-              <div className="flex justify-between"><span className="text-avenue-text-muted">Base Contribution</span><span>{fmt(baseAnnualPremium)}</span></div>
+            <div className="bg-brand-indigo/5 border border-brand-indigo/20 rounded-lg p-4 space-y-2 text-sm">
+              <div className="flex justify-between"><span className="text-brand-text-muted">Base Contribution</span><span>{fmt(baseAnnualPremium)}</span></div>
               {totalLoadingPct > 0 && <div className="flex justify-between text-orange-600"><span>+ Loadings ({totalLoadingPct}%)</span><span>+ {fmt(baseAnnualPremium * totalLoadingPct / 100)}</span></div>}
               {totalDiscountPct > 0 && <div className="flex justify-between text-[#28A745]"><span>− Discounts ({totalDiscountPct}%)</span><span>− {fmt(baseAnnualPremium * totalDiscountPct / 100)}</span></div>}
-              <div className="flex justify-between font-bold text-base border-t border-avenue-indigo/20 pt-2">
-                <span className="text-avenue-indigo">Final Annual Contribution</span>
-                <span className="text-avenue-indigo">{fmt(finalPremium)}</span>
+              <div className="flex justify-between font-bold text-base border-t border-brand-indigo/20 pt-2">
+                <span className="text-brand-indigo">Final Annual Contribution</span>
+                <span className="text-brand-indigo">{fmt(finalPremium)}</span>
               </div>
-              <div className="flex justify-between text-avenue-text-muted">
+              <div className="flex justify-between text-brand-text-muted">
                 <span>Rate per Member</span>
                 <span>{fmt(ratePerMember)}</span>
               </div>
@@ -357,7 +357,7 @@ export default function QuotationCalculatorPage() {
         {/* Step 5: Generate */}
         {step === 4 && (
           <div className="space-y-5">
-            <h2 className="font-bold text-avenue-text-heading font-heading">Step 5 — Review & Generate</h2>
+            <h2 className="font-bold text-brand-text-heading font-heading">Step 5 — Review & Generate</h2>
             <div className="space-y-2 text-sm">
               {[
                 { label: "Prospect / Group",                value: form.prospectName || "—" },
@@ -371,8 +371,8 @@ export default function QuotationCalculatorPage() {
                 { label: "Valid for",                        value: "30 days from generation" },
               ].map((f) => (
                 <div key={f.label} className="flex justify-between border-b border-[#F8F9FA] pb-2">
-                  <span className="text-avenue-text-muted">{f.label}</span>
-                  <span className="font-semibold text-avenue-text-heading">{f.value}</span>
+                  <span className="text-brand-text-muted">{f.label}</span>
+                  <span className="font-semibold text-brand-text-heading">{f.value}</span>
                 </div>
               ))}
             </div>
@@ -386,12 +386,12 @@ export default function QuotationCalculatorPage() {
             <button
               onClick={handleGenerate}
               disabled={loading || !form.prospectName || form.memberCount < 1}
-              className="w-full bg-avenue-indigo hover:bg-avenue-secondary text-white py-3 rounded-full font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-brand-indigo hover:bg-brand-secondary text-white py-3 rounded-full font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? "Generating…" : "Generate Quotation"}
             </button>
             {(!form.prospectName || form.memberCount < 1) && (
-              <p className="text-xs text-avenue-text-muted text-center">Prospect name and at least 1 member required.</p>
+              <p className="text-xs text-brand-text-muted text-center">Prospect name and at least 1 member required.</p>
             )}
           </div>
         )}
@@ -402,14 +402,14 @@ export default function QuotationCalculatorPage() {
         <button
           onClick={() => setStep((s) => Math.max(0, s - 1))}
           disabled={step === 0}
-          className="flex items-center gap-2 px-5 py-2 rounded-full border border-[#EEEEEE] text-avenue-text-body hover:border-avenue-indigo hover:text-avenue-indigo transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex items-center gap-2 px-5 py-2 rounded-full border border-[#EEEEEE] text-brand-text-body hover:border-brand-indigo hover:text-brand-indigo transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <ChevronLeft size={16} /> Back
         </button>
         {step < STEPS.length - 1 && (
           <button
             onClick={() => setStep((s) => Math.min(STEPS.length - 1, s + 1))}
-            className="flex items-center gap-2 px-6 py-2 rounded-full bg-avenue-indigo text-white hover:bg-avenue-secondary transition-colors font-semibold"
+            className="flex items-center gap-2 px-6 py-2 rounded-full bg-brand-indigo text-white hover:bg-brand-secondary transition-colors font-semibold"
           >
             Next <ChevronRight size={16} />
           </button>

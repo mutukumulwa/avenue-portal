@@ -44,8 +44,8 @@ export default async function FundSchemePage({ params }: { params: Promise<{ gro
   if (!acc) {
     return (
       <div className="space-y-4">
-        <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">{group.name}</h1>
-        <p className="text-avenue-text-muted">No fund account initialised yet. Record the first deposit to create the account.</p>
+        <h1 className="text-2xl font-bold text-brand-text-heading font-heading">{group.name}</h1>
+        <p className="text-brand-text-muted">No fund account initialised yet. Record the first deposit to create the account.</p>
         <DepositForm groupId={groupId} />
       </div>
     );
@@ -76,19 +76,19 @@ export default async function FundSchemePage({ params }: { params: Promise<{ gro
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">{group.name}</h1>
-          <p className="text-avenue-text-muted text-sm mt-0.5">
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">{group.name}</h1>
+          <p className="text-brand-text-muted text-sm mt-0.5">
             Self-Funded Scheme · {group.members.length} active members ·
             Period: {new Date(acc.periodStartDate).toLocaleDateString("en-KE", { month: "short", year: "numeric" })} – {new Date(acc.periodEndDate).toLocaleDateString("en-KE", { month: "short", year: "numeric" })}
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Link href={`/fund/${groupId}/claims`}
-            className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border border-avenue-indigo/30 text-avenue-indigo hover:bg-avenue-indigo/5">
+            className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border border-brand-indigo/30 text-brand-indigo hover:bg-brand-indigo/5">
             <FileText size={12} /> Claims
           </Link>
           <Link href={`/fund/${groupId}/statement`}
-            className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border border-avenue-indigo/30 text-avenue-indigo hover:bg-avenue-indigo/5">
+            className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-full border border-brand-indigo/30 text-brand-indigo hover:bg-brand-indigo/5">
             <BarChart2 size={12} /> Statement
           </Link>
         </div>
@@ -100,7 +100,7 @@ export default async function FundSchemePage({ params }: { params: Promise<{ gro
           <div className="flex items-center gap-3">
             <Wallet size={24} className={isLow ? "text-[#DC3545]" : "text-[#28A745]"} />
             <div>
-              <p className="text-xs font-bold uppercase text-avenue-text-muted">Current Fund Balance</p>
+              <p className="text-xs font-bold uppercase text-brand-text-muted">Current Fund Balance</p>
               <p className={`text-3xl font-bold font-mono mt-0.5 ${isLow ? "text-[#DC3545]" : "text-[#28A745]"}`}>
                 KES {balance.toLocaleString("en-KE")}
               </p>
@@ -118,7 +118,7 @@ export default async function FundSchemePage({ params }: { params: Promise<{ gro
       {/* KPI row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Total Deposited",  value: `KES ${deposited.toLocaleString("en-KE")}`, icon: Wallet,       color: "text-avenue-indigo" },
+          { label: "Total Deposited",  value: `KES ${deposited.toLocaleString("en-KE")}`, icon: Wallet,       color: "text-brand-indigo" },
           { label: "Claims Deducted",  value: `KES ${claimed.toLocaleString("en-KE")}`,   icon: TrendingDown, color: "text-[#DC3545]"    },
           { label: "Admin Fees",       value: `KES ${fees.toLocaleString("en-KE")}`,      icon: FileText,     color: "text-[#856404]"    },
           { label: "Active Lives",     value: group.members.length.toString(),             icon: Users,        color: "text-[#17A2B8]"    },
@@ -128,7 +128,7 @@ export default async function FundSchemePage({ params }: { params: Promise<{ gro
             <div key={k.label} className="bg-white border border-[#EEEEEE] rounded-[8px] p-4 shadow-sm">
               <div className="flex items-center gap-2 mb-1">
                 <Icon size={14} className={k.color} />
-                <p className="text-xs font-bold uppercase text-avenue-text-muted">{k.label}</p>
+                <p className="text-xs font-bold uppercase text-brand-text-muted">{k.label}</p>
               </div>
               <p className={`text-xl font-bold font-mono ${k.color}`}>{k.value}</p>
             </div>
@@ -139,9 +139,9 @@ export default async function FundSchemePage({ params }: { params: Promise<{ gro
       <div className="grid md:grid-cols-2 gap-6">
         {/* Category breakdown */}
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm">
-          <h3 className="font-bold text-avenue-text-heading text-sm mb-4">Claims by Benefit Category</h3>
+          <h3 className="font-bold text-brand-text-heading text-sm mb-4">Claims by Benefit Category</h3>
           {categoryBreakdown.length === 0 ? (
-            <p className="text-sm text-avenue-text-muted">No claims deducted yet.</p>
+            <p className="text-sm text-brand-text-muted">No claims deducted yet.</p>
           ) : (
             <div className="space-y-3">
               {categoryBreakdown.map(([cat, amt]) => {
@@ -149,11 +149,11 @@ export default async function FundSchemePage({ params }: { params: Promise<{ gro
                 return (
                   <div key={cat}>
                     <div className="flex justify-between text-xs mb-1">
-                      <span className="font-semibold text-avenue-text-heading">{cat.replace(/_/g, " ")}</span>
-                      <span className="text-avenue-text-muted font-mono">KES {amt.toLocaleString("en-KE")} ({pct.toFixed(1)}%)</span>
+                      <span className="font-semibold text-brand-text-heading">{cat.replace(/_/g, " ")}</span>
+                      <span className="text-brand-text-muted font-mono">KES {amt.toLocaleString("en-KE")} ({pct.toFixed(1)}%)</span>
                     </div>
                     <div className="h-1.5 bg-[#EEEEEE] rounded-full overflow-hidden">
-                      <div className="h-full bg-avenue-indigo rounded-full" style={{ width: `${pct}%` }} />
+                      <div className="h-full bg-brand-indigo rounded-full" style={{ width: `${pct}%` }} />
                     </div>
                   </div>
                 );
@@ -166,9 +166,9 @@ export default async function FundSchemePage({ params }: { params: Promise<{ gro
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-3">
           <div className="flex items-center gap-2">
             <PauseCircle size={15} className="text-[#DC3545]" />
-            <h3 className="font-bold text-avenue-text-heading text-sm">Category Hold Manager</h3>
+            <h3 className="font-bold text-brand-text-heading text-sm">Category Hold Manager</h3>
           </div>
-          <p className="text-xs text-avenue-text-muted">
+          <p className="text-xs text-brand-text-muted">
             Hold a category to pause new claim approvals from this fund for that benefit type.
             Red = currently on hold. Claims already approved are not affected.
           </p>
@@ -183,7 +183,7 @@ export default async function FundSchemePage({ params }: { params: Promise<{ gro
 
       {/* Admin fee invoicing */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-3">
-        <h3 className="font-bold text-avenue-text-heading text-sm">Period-End Admin Fee</h3>
+        <h3 className="font-bold text-brand-text-heading text-sm">Period-End Admin Fee</h3>
         <AdminFeeButton
           groupId={groupId}
           alreadyInvoiced={!!acc.adminFeeInvoiceId}
@@ -194,14 +194,14 @@ export default async function FundSchemePage({ params }: { params: Promise<{ gro
       {/* Full ledger */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-[#EEEEEE]">
-          <h3 className="font-bold text-avenue-text-heading text-sm">Fund Ledger</h3>
+          <h3 className="font-bold text-brand-text-heading text-sm">Fund Ledger</h3>
         </div>
         {acc.transactions.length === 0 ? (
-          <p className="px-5 py-8 text-sm text-avenue-text-muted text-center">No transactions yet.</p>
+          <p className="px-5 py-8 text-sm text-brand-text-muted text-center">No transactions yet.</p>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-[#F8F9FA] text-[10px] font-bold uppercase text-avenue-text-muted border-b border-[#EEEEEE]">
+              <tr className="bg-[#F8F9FA] text-[10px] font-bold uppercase text-brand-text-muted border-b border-[#EEEEEE]">
                 <th className="px-4 py-2 text-left">Date</th>
                 <th className="px-4 py-2 text-left">Type</th>
                 <th className="px-4 py-2 text-left">Description</th>
@@ -213,18 +213,18 @@ export default async function FundSchemePage({ params }: { params: Promise<{ gro
             <tbody className="divide-y divide-[#EEEEEE]">
               {acc.transactions.map(t => (
                 <tr key={t.id} className="hover:bg-[#F8F9FA]">
-                  <td className="px-4 py-2.5 text-xs text-avenue-text-muted">{new Date(t.postedAt).toLocaleDateString("en-KE")}</td>
+                  <td className="px-4 py-2.5 text-xs text-brand-text-muted">{new Date(t.postedAt).toLocaleDateString("en-KE")}</td>
                   <td className="px-4 py-2.5">
-                    <span className={`text-xs font-bold ${TXN_COLOR[t.type] ?? "text-avenue-text-muted"}`}>
+                    <span className={`text-xs font-bold ${TXN_COLOR[t.type] ?? "text-brand-text-muted"}`}>
                       {t.type.replace(/_/g, " ")}
                     </span>
                   </td>
-                  <td className="px-4 py-2.5 text-xs text-avenue-text-body">{t.description}</td>
-                  <td className="px-4 py-2.5 font-mono text-xs text-avenue-text-muted">{t.referenceNumber ?? "—"}</td>
+                  <td className="px-4 py-2.5 text-xs text-brand-text-body">{t.description}</td>
+                  <td className="px-4 py-2.5 font-mono text-xs text-brand-text-muted">{t.referenceNumber ?? "—"}</td>
                   <td className={`px-4 py-2.5 text-right font-mono font-semibold text-xs ${TXN_COLOR[t.type]}`}>
                     {TXN_SIGN[t.type]}{Number(t.amount).toLocaleString("en-KE")}
                   </td>
-                  <td className="px-4 py-2.5 text-right font-mono text-xs text-avenue-text-heading">
+                  <td className="px-4 py-2.5 text-right font-mono text-xs text-brand-text-heading">
                     {Number(t.balanceAfter).toLocaleString("en-KE")}
                   </td>
                 </tr>

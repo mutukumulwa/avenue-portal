@@ -56,12 +56,12 @@ export default async function ComplaintDetailPage({
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-start gap-3">
-        <Link href="/complaints" className="text-avenue-text-muted hover:text-avenue-indigo transition-colors mt-1">
+        <Link href="/complaints" className="text-brand-text-muted hover:text-brand-indigo transition-colors mt-1">
           <ArrowLeft size={20} />
         </Link>
         <div className="flex-1">
           <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-xl font-bold text-avenue-text-heading font-heading leading-snug">
+            <h1 className="text-xl font-bold text-brand-text-heading font-heading leading-snug">
               {complaint.subject}
             </h1>
           </div>
@@ -72,7 +72,7 @@ export default async function ComplaintDetailPage({
             <span className="bg-[#E6E7E8] text-[#6C757D] px-2.5 py-0.5 rounded text-[10px] font-bold uppercase">
               {TYPE_LABELS[complaint.type] ?? complaint.type}
             </span>
-            <span className="text-xs text-avenue-text-muted">Submitted {fmtDt(complaint.createdAt)}</span>
+            <span className="text-xs text-brand-text-muted">Submitted {fmtDt(complaint.createdAt)}</span>
           </div>
         </div>
       </div>
@@ -84,19 +84,19 @@ export default async function ComplaintDetailPage({
           {/* Description */}
           <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm p-5">
             <div className="flex items-center gap-2 mb-3">
-              <MessageSquareWarning size={15} className="text-avenue-text-muted" />
-              <p className="text-xs font-bold uppercase text-avenue-text-muted">Complaint Description</p>
+              <MessageSquareWarning size={15} className="text-brand-text-muted" />
+              <p className="text-xs font-bold uppercase text-brand-text-muted">Complaint Description</p>
             </div>
-            <p className="text-sm text-avenue-text-body leading-relaxed whitespace-pre-wrap">{complaint.description}</p>
+            <p className="text-sm text-brand-text-body leading-relaxed whitespace-pre-wrap">{complaint.description}</p>
           </div>
 
           {/* Resolution (if closed) */}
           {complaint.resolution && (
             <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm p-5">
-              <p className="text-xs font-bold uppercase text-avenue-text-muted mb-2">Resolution / Outcome</p>
-              <p className="text-sm text-avenue-text-body leading-relaxed whitespace-pre-wrap">{complaint.resolution}</p>
+              <p className="text-xs font-bold uppercase text-brand-text-muted mb-2">Resolution / Outcome</p>
+              <p className="text-sm text-brand-text-body leading-relaxed whitespace-pre-wrap">{complaint.resolution}</p>
               {complaint.resolvedAt && (
-                <p className="text-xs text-avenue-text-muted mt-2">Closed {fmtDt(complaint.resolvedAt)}</p>
+                <p className="text-xs text-brand-text-muted mt-2">Closed {fmtDt(complaint.resolvedAt)}</p>
               )}
             </div>
           )}
@@ -111,14 +111,14 @@ export default async function ComplaintDetailPage({
           {/* Audit trail */}
           {auditEntries.length > 0 && (
             <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm p-5">
-              <p className="text-xs font-bold uppercase text-avenue-text-muted mb-3">Activity</p>
+              <p className="text-xs font-bold uppercase text-brand-text-muted mb-3">Activity</p>
               <div className="space-y-3">
                 {auditEntries.map(e => (
                   <div key={e.id} className="flex items-start gap-3">
-                    <div className="w-1.5 h-1.5 rounded-full bg-avenue-indigo mt-1.5 shrink-0" />
+                    <div className="w-1.5 h-1.5 rounded-full bg-brand-indigo mt-1.5 shrink-0" />
                     <div>
-                      <p className="text-sm text-avenue-text-body">{e.description}</p>
-                      <p className="text-[11px] text-avenue-text-muted mt-0.5">{fmtDt(e.createdAt)}</p>
+                      <p className="text-sm text-brand-text-body">{e.description}</p>
+                      <p className="text-[11px] text-brand-text-muted mt-0.5">{fmtDt(e.createdAt)}</p>
                     </div>
                   </div>
                 ))}
@@ -132,14 +132,14 @@ export default async function ComplaintDetailPage({
           {complaint.member ? (
             <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm p-5 space-y-3">
               <div className="flex items-center gap-2">
-                <User size={14} className="text-avenue-text-muted" />
-                <p className="text-xs font-bold uppercase text-avenue-text-muted">Member</p>
+                <User size={14} className="text-brand-text-muted" />
+                <p className="text-xs font-bold uppercase text-brand-text-muted">Member</p>
               </div>
               <div>
-                <p className="font-bold text-avenue-text-heading">
+                <p className="font-bold text-brand-text-heading">
                   {complaint.member.firstName} {complaint.member.lastName}
                 </p>
-                <p className="font-mono text-xs text-avenue-text-muted mt-0.5">
+                <p className="font-mono text-xs text-brand-text-muted mt-0.5">
                   {complaint.member.memberNumber}
                 </p>
               </div>
@@ -151,27 +151,27 @@ export default async function ComplaintDetailPage({
                   { label: "Email",  value: complaint.member.email ?? "—" },
                 ].map(r => (
                   <div key={r.label} className="flex justify-between border-b border-[#F8F9FA] py-1 last:border-0 gap-2">
-                    <span className="text-avenue-text-muted text-xs shrink-0">{r.label}</span>
-                    <span className="font-semibold text-avenue-text-heading text-xs text-right truncate">{r.value}</span>
+                    <span className="text-brand-text-muted text-xs shrink-0">{r.label}</span>
+                    <span className="font-semibold text-brand-text-heading text-xs text-right truncate">{r.value}</span>
                   </div>
                 ))}
               </div>
               <Link
                 href={`/members/${complaint.member.id}`}
-                className="text-xs text-avenue-indigo font-semibold hover:underline flex items-center gap-1"
+                className="text-xs text-brand-indigo font-semibold hover:underline flex items-center gap-1"
               >
                 Full profile <ExternalLink size={11} />
               </Link>
             </div>
           ) : (
             <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm p-5">
-              <p className="text-xs font-bold uppercase text-avenue-text-muted mb-1">Member</p>
-              <p className="text-sm text-avenue-text-muted italic">No member linked — anonymous complaint</p>
+              <p className="text-xs font-bold uppercase text-brand-text-muted mb-1">Member</p>
+              <p className="text-sm text-brand-text-muted italic">No member linked — anonymous complaint</p>
             </div>
           )}
 
           <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm p-5 space-y-2 text-sm">
-            <p className="text-xs font-bold uppercase text-avenue-text-muted">Details</p>
+            <p className="text-xs font-bold uppercase text-brand-text-muted">Details</p>
             {[
               { label: "Type",      value: TYPE_LABELS[complaint.type] ?? complaint.type },
               { label: "Submitted", value: fmtDt(complaint.createdAt) },
@@ -179,8 +179,8 @@ export default async function ComplaintDetailPage({
               ...(complaint.resolvedAt ? [{ label: "Closed", value: fmtDt(complaint.resolvedAt) }] : []),
             ].map(r => (
               <div key={r.label} className="flex justify-between border-b border-[#F8F9FA] py-1 last:border-0 gap-2">
-                <span className="text-avenue-text-muted text-xs shrink-0">{r.label}</span>
-                <span className="font-semibold text-avenue-text-heading text-xs text-right">{r.value}</span>
+                <span className="text-brand-text-muted text-xs shrink-0">{r.label}</span>
+                <span className="font-semibold text-brand-text-heading text-xs text-right">{r.value}</span>
               </div>
             ))}
           </div>

@@ -66,20 +66,20 @@ export default async function GroupsPage({
     <div className="p-6 max-w-7xl mx-auto space-y-4">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Corporate Groups</h1>
-          <p className="text-avenue-text-muted mt-1 text-sm">Manage enrolled organizations and their packages.</p>
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Corporate Groups</h1>
+          <p className="text-brand-text-muted mt-1 text-sm">Manage enrolled organizations and their packages.</p>
         </div>
         <div className="flex items-center gap-2">
           <Link
             href="/groups/new/individual"
-            className="border border-avenue-indigo text-avenue-indigo hover:bg-avenue-indigo/5 px-5 py-2 rounded-full font-semibold transition-colors flex items-center gap-2 text-sm"
+            className="border border-brand-indigo text-brand-indigo hover:bg-brand-indigo/5 px-5 py-2 rounded-full font-semibold transition-colors flex items-center gap-2 text-sm"
           >
             <PlusCircle size={16} />
             Individual Client
           </Link>
           <Link
             href="/groups/new"
-            className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors flex items-center gap-2 shadow-sm"
+            className="bg-brand-indigo hover:bg-brand-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors flex items-center gap-2 shadow-sm"
           >
             <PlusCircle size={18} />
             Enroll Group
@@ -111,29 +111,29 @@ export default async function GroupsPage({
               <th className="px-6 py-4">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#EEEEEE] text-avenue-text-body">
+          <tbody className="divide-y divide-[#EEEEEE] text-brand-text-body">
             {groups.map(group => (
               <tr key={group.id} className="hover:bg-[#F8F9FA] transition-colors">
                 <td className="px-6 py-4">
                   <Link href={`/groups/${group.id}`} className="group block">
-                    <span className="font-bold text-avenue-text-heading group-hover:text-avenue-indigo transition-colors">
+                    <span className="font-bold text-brand-text-heading group-hover:text-brand-indigo transition-colors">
                       {group.name}
                     </span>
-                    <span className="text-xs text-avenue-text-muted block">{group.industry ?? "—"}</span>
+                    <span className="text-xs text-brand-text-muted block">{group.industry ?? "—"}</span>
                   </Link>
                 </td>
                 <td className="px-6 py-4">
-                  <span className="font-medium text-avenue-text-heading">{group.contactPersonName}</span>
-                  <span className="text-xs text-avenue-text-muted block">{group.contactPersonEmail}</span>
+                  <span className="font-medium text-brand-text-heading">{group.contactPersonName}</span>
+                  <span className="text-xs text-brand-text-muted block">{group.contactPersonEmail}</span>
                 </td>
-                <td className="px-6 py-4 font-semibold text-avenue-text-heading">{group.package.name}</td>
+                <td className="px-6 py-4 font-semibold text-brand-text-heading">{group.package.name}</td>
                 <td className="px-6 py-4">
-                  <span className="flex items-center gap-1.5 text-avenue-text-heading font-semibold">
-                    <Users size={13} className="text-avenue-text-muted" />
+                  <span className="flex items-center gap-1.5 text-brand-text-heading font-semibold">
+                    <Users size={13} className="text-brand-text-muted" />
                     {group._count.members}
                   </span>
                 </td>
-                <td className="px-6 py-4 text-avenue-text-body">
+                <td className="px-6 py-4 text-brand-text-body">
                   {new Date(group.renewalDate).toLocaleDateString("en-KE")}
                 </td>
                 <td className="px-6 py-4">
@@ -144,7 +144,7 @@ export default async function GroupsPage({
                 <td className="px-6 py-4">
                   <Link
                     href={`/groups/${group.id}`}
-                    className="text-avenue-indigo hover:text-avenue-secondary font-semibold text-xs inline-flex items-center gap-1 transition-colors"
+                    className="text-brand-indigo hover:text-brand-secondary font-semibold text-xs inline-flex items-center gap-1 transition-colors"
                   >
                     View <ChevronRight size={13} />
                   </Link>
@@ -153,7 +153,7 @@ export default async function GroupsPage({
             ))}
             {groups.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-6 py-14 text-center text-avenue-text-muted">
+                <td colSpan={7} className="px-6 py-14 text-center text-brand-text-muted">
                   <Building2 size={32} className="mx-auto mb-3 opacity-30" />
                   {q || status
                     ? "No groups match your search. Try adjusting the filters."

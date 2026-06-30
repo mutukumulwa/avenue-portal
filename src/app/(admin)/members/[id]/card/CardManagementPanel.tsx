@@ -45,7 +45,7 @@ export function CardManagementPanel({ memberId, currentCardNumber, activityLogs 
       <div className={`flex items-center gap-4 p-5 rounded-[8px] border shadow-sm ${currentCardNumber ? "bg-[#28A745]/5 border-[#28A745]/20" : "bg-[#FFF8E1] border-[#FFC107]/30"}`}>
         <CreditCard size={32} className={currentCardNumber ? "text-[#28A745]" : "text-[#856404]"} />
         <div>
-          <p className="text-xs font-bold uppercase text-avenue-text-muted">Current Card Number</p>
+          <p className="text-xs font-bold uppercase text-brand-text-muted">Current Card Number</p>
           {currentCardNumber
             ? <p className="text-xl font-bold font-mono text-[#28A745] mt-0.5">{currentCardNumber}</p>
             : <p className="text-sm text-[#856404] font-semibold mt-0.5">No card issued yet</p>}
@@ -69,7 +69,7 @@ export function CardManagementPanel({ memberId, currentCardNumber, activityLogs 
       {mode === "idle" && (
         <div className="flex gap-2 flex-wrap">
           <button onClick={() => setMode("issue")}
-            className="flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-full bg-avenue-indigo text-white hover:bg-avenue-secondary transition-colors">
+            className="flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-full bg-brand-indigo text-white hover:bg-brand-secondary transition-colors">
             <CreditCard size={13} /> {currentCardNumber ? "Re-issue Card" : "Issue Card"}
           </button>
           {currentCardNumber && (
@@ -83,17 +83,17 @@ export function CardManagementPanel({ memberId, currentCardNumber, activityLogs 
 
       {/* Issue / Re-issue form */}
       {mode === "issue" && (
-        <form action={issueAction} className="bg-[#F8FAFF] border border-avenue-indigo/20 rounded-lg p-4 space-y-3">
-          <p className="text-sm font-bold text-avenue-text-heading">{currentCardNumber ? "Re-issue Card" : "Issue New Card"}</p>
+        <form action={issueAction} className="bg-[#F8FAFF] border border-brand-indigo/20 rounded-lg p-4 space-y-3">
+          <p className="text-sm font-bold text-brand-text-heading">{currentCardNumber ? "Re-issue Card" : "Issue New Card"}</p>
           {issueState?.error && <p className="text-xs text-[#DC3545]">{issueState.error}</p>}
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-avenue-text-muted uppercase">New Card Number</label>
+            <label className="text-xs font-semibold text-brand-text-muted uppercase">New Card Number</label>
             <input name="cardNumber" type="text" required placeholder="e.g. AV-2025-00123"
-              className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-avenue-indigo bg-white" />
+              className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo bg-white" />
           </div>
           <div className="flex justify-end gap-2">
             <button type="button" onClick={() => setMode("idle")} className="text-xs px-4 py-2 rounded-full border border-[#EEEEEE] hover:bg-[#EEEEEE] transition-colors">Cancel</button>
-            <button type="submit" className="text-xs font-bold px-5 py-2 rounded-full bg-avenue-indigo text-white hover:bg-avenue-secondary transition-colors">
+            <button type="submit" className="text-xs font-bold px-5 py-2 rounded-full bg-brand-indigo text-white hover:bg-brand-secondary transition-colors">
               Confirm Issuance
             </button>
           </div>
@@ -103,7 +103,7 @@ export function CardManagementPanel({ memberId, currentCardNumber, activityLogs 
       {/* Replacement request form */}
       {mode === "replace" && (
         <form onSubmit={handleReplace} className="bg-[#FFF8E1] border border-[#FFC107]/30 rounded-lg p-4 space-y-3">
-          <p className="text-sm font-bold text-avenue-text-heading flex items-center gap-2">
+          <p className="text-sm font-bold text-brand-text-heading flex items-center gap-2">
             <AlertTriangle size={14} className="text-[#856404]" /> Report Lost / Damaged Card
           </p>
           <p className="text-xs text-[#856404]">
@@ -112,7 +112,7 @@ export function CardManagementPanel({ memberId, currentCardNumber, activityLogs 
           </p>
           {replaceError && <p className="text-xs text-[#DC3545]">{replaceError}</p>}
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-avenue-text-muted uppercase">Reason</label>
+            <label className="text-xs font-semibold text-brand-text-muted uppercase">Reason</label>
             <select name="reason" className="w-full border border-[#FFC107]/30 rounded-md px-3 py-2 text-sm outline-none focus:border-[#FFC107] bg-white">
               <option value="Lost card">Lost card</option>
               <option value="Damaged card">Damaged card</option>
@@ -133,15 +133,15 @@ export function CardManagementPanel({ memberId, currentCardNumber, activityLogs 
       {activityLogs.length > 0 && (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
           <div className="px-4 py-3 border-b border-[#EEEEEE]">
-            <p className="text-xs font-bold uppercase text-avenue-text-muted">Card History</p>
+            <p className="text-xs font-bold uppercase text-brand-text-muted">Card History</p>
           </div>
           <div className="divide-y divide-[#EEEEEE]">
             {activityLogs.map(l => (
               <div key={l.id} className="flex items-start gap-3 px-4 py-3 text-sm">
-                <div className="mt-0.5">{ACTION_ICON[l.action] ?? <Clock size={13} className="text-avenue-text-muted" />}</div>
+                <div className="mt-0.5">{ACTION_ICON[l.action] ?? <Clock size={13} className="text-brand-text-muted" />}</div>
                 <div className="flex-1">
-                  <p className="text-avenue-text-body">{l.description}</p>
-                  <p className="text-xs text-avenue-text-muted mt-0.5">{new Date(l.createdAt).toLocaleString("en-KE")}</p>
+                  <p className="text-brand-text-body">{l.description}</p>
+                  <p className="text-xs text-brand-text-muted mt-0.5">{new Date(l.createdAt).toLocaleString("en-KE")}</p>
                 </div>
               </div>
             ))}

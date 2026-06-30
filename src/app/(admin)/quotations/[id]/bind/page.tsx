@@ -13,8 +13,8 @@ import { SubmitButton } from "@/components/ui/SubmitButton";
 
 const STEP_STYLE = {
   done:    "bg-[#28A745]/10 border-[#28A745]/30 text-[#28A745]",
-  active:  "bg-avenue-indigo/10 border-avenue-indigo/30 text-avenue-indigo",
-  blocked: "bg-[#F8F9FA] border-[#EEEEEE] text-avenue-text-muted",
+  active:  "bg-brand-indigo/10 border-brand-indigo/30 text-brand-indigo",
+  blocked: "bg-[#F8F9FA] border-[#EEEEEE] text-brand-text-muted",
 };
 
 export default async function BindPage({ params }: { params: Promise<{ id: string }> }) {
@@ -66,14 +66,14 @@ export default async function BindPage({ params }: { params: Promise<{ id: strin
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Link href={`/quotations/${id}`} className="text-avenue-text-muted hover:text-avenue-indigo transition-colors">
+        <Link href={`/quotations/${id}`} className="text-brand-text-muted hover:text-brand-indigo transition-colors">
           <ArrowLeft size={20} />
         </Link>
         <div>
-          <h1 className="text-xl font-bold text-avenue-text-heading font-heading">
+          <h1 className="text-xl font-bold text-brand-text-heading font-heading">
             Binding — {quotation.quoteNumber}
           </h1>
-          <p className="text-sm text-avenue-text-muted mt-0.5">
+          <p className="text-sm text-brand-text-muted mt-0.5">
             {quotation.legalName ?? quotation.prospectName ?? "—"} · status: {quotation.status}
           </p>
         </div>
@@ -103,12 +103,12 @@ export default async function BindPage({ params }: { params: Promise<{ id: strin
       {/* ── Step 1: Acceptance ─────────────────────────────────────── */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-avenue-text-heading text-sm flex items-center gap-2">
-            {isAccepted ? <CheckCircle size={16} className="text-[#28A745]" /> : <Clock size={16} className="text-avenue-text-muted" />}
+          <h2 className="font-semibold text-brand-text-heading text-sm flex items-center gap-2">
+            {isAccepted ? <CheckCircle size={16} className="text-[#28A745]" /> : <Clock size={16} className="text-brand-text-muted" />}
             Step 1 — Quote Acceptance
           </h2>
           {isAccepted && quotation.acceptance && (
-            <span className="text-xs text-avenue-text-muted">
+            <span className="text-xs text-brand-text-muted">
               Accepted {new Date(quotation.acceptance.acceptedAt).toLocaleDateString("en-KE")} by{" "}
               {quotation.acceptance.acceptedBy.firstName} {quotation.acceptance.acceptedBy.lastName}{" "}
               via <strong>{quotation.acceptance.method.replace("_", " ")}</strong>
@@ -121,9 +121,9 @@ export default async function BindPage({ params }: { params: Promise<{ id: strin
             <input type="hidden" name="quotationId" value={id} />
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-xs font-semibold text-avenue-text-muted mb-1">Method of acceptance</label>
+                <label className="block text-xs font-semibold text-brand-text-muted mb-1">Method of acceptance</label>
                 <select name="method"
-                  className="w-full border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-avenue-indigo focus:outline-none">
+                  className="w-full border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-brand-indigo focus:outline-none">
                   <option value="PORTAL_CLICK">Portal click</option>
                   <option value="EMAIL_REPLY">Email reply</option>
                   <option value="SIGNED_LETTER">Signed letter (upload required)</option>
@@ -131,14 +131,14 @@ export default async function BindPage({ params }: { params: Promise<{ id: strin
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-avenue-text-muted mb-1">Document URL (signed letter)</label>
+                <label className="block text-xs font-semibold text-brand-text-muted mb-1">Document URL (signed letter)</label>
                 <input name="documentUrl" type="url" placeholder="https://…"
                   className="w-full border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm" />
               </div>
             </div>
             <div className="flex justify-end">
               <SubmitButton
-                className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-5 py-2 rounded-full text-sm font-semibold transition-colors">
+                className="bg-brand-indigo hover:bg-brand-secondary text-white px-5 py-2 rounded-full text-sm font-semibold transition-colors">
                 Record Acceptance
               </SubmitButton>
             </div>
@@ -146,9 +146,9 @@ export default async function BindPage({ params }: { params: Promise<{ id: strin
         )}
 
         {!isAccepted && quotation.status !== "SENT" && (
-          <p className="text-sm text-avenue-text-muted">
+          <p className="text-sm text-brand-text-muted">
             Quotation must be in <strong>SENT</strong> status. Current status: <strong>{quotation.status}</strong>.{" "}
-            <Link href={`/quotations/${id}/build`} className="text-avenue-indigo hover:underline">Build and issue the quotation first.</Link>
+            <Link href={`/quotations/${id}/build`} className="text-brand-indigo hover:underline">Build and issue the quotation first.</Link>
           </p>
         )}
       </div>
@@ -156,8 +156,8 @@ export default async function BindPage({ params }: { params: Promise<{ id: strin
       {/* ── Step 2: Create memberships ─────────────────────────────── */}
       <div className={`bg-white border rounded-[8px] shadow-sm p-5 space-y-4 ${!isAccepted ? "opacity-50 pointer-events-none" : "border-[#EEEEEE]"}`}>
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-avenue-text-heading text-sm flex items-center gap-2">
-            {hasMemberships ? <CheckCircle size={16} className="text-[#28A745]" /> : <Users size={16} className="text-avenue-text-muted" />}
+          <h2 className="font-semibold text-brand-text-heading text-sm flex items-center gap-2">
+            {hasMemberships ? <CheckCircle size={16} className="text-[#28A745]" /> : <Users size={16} className="text-brand-text-muted" />}
             Step 2 — Create Membership Records
           </h2>
           {hasMemberships && (
@@ -167,14 +167,14 @@ export default async function BindPage({ params }: { params: Promise<{ id: strin
 
         {!hasMemberships && isAccepted && (
           <div className="space-y-3">
-            <p className="text-sm text-avenue-text-muted">
+            <p className="text-sm text-brand-text-muted">
               This will create <strong>{quotation.memberCount + quotation.dependentCount}</strong> member record(s) in{" "}
               <span className="font-mono text-xs bg-[#FFC107]/10 text-[#856404] px-1.5 py-0.5 rounded">PENDING_ACTIVATION</span>{" "}
               carrying over all underwriting decisions, exclusions, and waiting periods.
             </p>
             <form action={createMembershipsAction}>
               <input type="hidden" name="quotationId" value={id} />
-              <SubmitButton className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-5 py-2 rounded-full text-sm font-semibold transition-colors">
+              <SubmitButton className="bg-brand-indigo hover:bg-brand-secondary text-white px-5 py-2 rounded-full text-sm font-semibold transition-colors">
                 Create Memberships
               </SubmitButton>
             </form>
@@ -196,12 +196,12 @@ export default async function BindPage({ params }: { params: Promise<{ id: strin
             <tbody className="divide-y divide-[#EEEEEE]">
               {members.map((m) => (
                 <tr key={m.id} className="hover:bg-[#F8F9FA]">
-                  <td className="px-4 py-2 font-mono text-xs font-semibold text-avenue-indigo">
+                  <td className="px-4 py-2 font-mono text-xs font-semibold text-brand-indigo">
                     <Link href={`/members/${m.id}`} className="hover:underline">{m.memberNumber}</Link>
                   </td>
-                  <td className="px-4 py-2 font-semibold text-avenue-text-heading">{m.firstName} {m.lastName}</td>
-                  <td className="px-4 py-2 text-avenue-text-muted capitalize">{m.relationship.toLowerCase()}</td>
-                  <td className="px-4 py-2 text-avenue-text-muted">
+                  <td className="px-4 py-2 font-semibold text-brand-text-heading">{m.firstName} {m.lastName}</td>
+                  <td className="px-4 py-2 text-brand-text-muted capitalize">{m.relationship.toLowerCase()}</td>
+                  <td className="px-4 py-2 text-brand-text-muted">
                     {m.coverStartDate ? new Date(m.coverStartDate).toLocaleDateString("en-KE") : "—"}
                   </td>
                   <td className="px-4 py-2">
@@ -209,7 +209,7 @@ export default async function BindPage({ params }: { params: Promise<{ id: strin
                       {m.status.replace(/_/g, " ")}
                     </span>
                   </td>
-                  <td className="px-4 py-2 text-xs text-avenue-text-muted">
+                  <td className="px-4 py-2 text-xs text-brand-text-muted">
                     {m.bindingCheckerId
                       ? <span className="text-[#28A745] font-semibold">✓ Approved</span>
                       : m.bindingMakerId
@@ -226,8 +226,8 @@ export default async function BindPage({ params }: { params: Promise<{ id: strin
       {/* ── Step 3: Approve binder ─────────────────────────────────── */}
       <div className={`bg-white border rounded-[8px] shadow-sm p-5 space-y-4 ${!hasMemberships ? "opacity-50 pointer-events-none" : "border-[#EEEEEE]"}`}>
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-avenue-text-heading text-sm flex items-center gap-2">
-            {binderApproved ? <CheckCircle size={16} className="text-[#28A745]" /> : <FileText size={16} className="text-avenue-text-muted" />}
+          <h2 className="font-semibold text-brand-text-heading text-sm flex items-center gap-2">
+            {binderApproved ? <CheckCircle size={16} className="text-[#28A745]" /> : <FileText size={16} className="text-brand-text-muted" />}
             Step 3 — Binder Approval (Maker-Checker)
           </h2>
         </div>
@@ -244,7 +244,7 @@ export default async function BindPage({ params }: { params: Promise<{ id: strin
               </div>
             ) : (
               <div className="space-y-2">
-                <p className="text-sm text-avenue-text-muted">
+                <p className="text-sm text-brand-text-muted">
                   Review and approve the binder to make memberships eligible for activation on cover start date.
                   You are acting as the <strong>checker</strong>.
                 </p>
@@ -270,12 +270,12 @@ export default async function BindPage({ params }: { params: Promise<{ id: strin
       {/* ── Step 4: Debit note ─────────────────────────────────────── */}
       <div className={`bg-white border rounded-[8px] shadow-sm p-5 space-y-4 ${!binderApproved ? "opacity-50 pointer-events-none" : "border-[#EEEEEE]"}`}>
         <div className="flex items-center justify-between">
-          <h2 className="font-semibold text-avenue-text-heading text-sm flex items-center gap-2">
-            {debitNotePosted ? <CheckCircle size={16} className="text-[#28A745]" /> : <FileText size={16} className="text-avenue-text-muted" />}
+          <h2 className="font-semibold text-brand-text-heading text-sm flex items-center gap-2">
+            {debitNotePosted ? <CheckCircle size={16} className="text-[#28A745]" /> : <FileText size={16} className="text-brand-text-muted" />}
             Step 4 — Post Debit Note
           </h2>
           {invoice && (
-            <span className="text-xs text-avenue-text-muted">
+            <span className="text-xs text-brand-text-muted">
               {invoice.invoiceNumber} · {fmt(Number(invoice.totalAmount))} · {invoice.status}
             </span>
           )}
@@ -283,14 +283,14 @@ export default async function BindPage({ params }: { params: Promise<{ id: strin
 
         {binderApproved && !debitNotePosted && (
           <div className="space-y-2">
-            <p className="text-sm text-avenue-text-muted">
+            <p className="text-sm text-brand-text-muted">
               Post the first-year debit note for{" "}
               <strong>{fmt(Number(quotation.finalPremium ?? 0))}</strong>.
             </p>
             <form action={postDebitNoteAction}>
               <input type="hidden" name="quotationId" value={id} />
               <SubmitButton
-                className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-5 py-2 rounded-full text-sm font-semibold transition-colors">
+                className="bg-brand-indigo hover:bg-brand-secondary text-white px-5 py-2 rounded-full text-sm font-semibold transition-colors">
                 Post Debit Note
               </SubmitButton>
             </form>
@@ -300,7 +300,7 @@ export default async function BindPage({ params }: { params: Promise<{ id: strin
         {debitNotePosted && (
           <p className="text-sm text-[#28A745] font-semibold flex items-center gap-2">
             <CheckCircle size={15} /> Debit note posted.{" "}
-            <Link href={`/billing`} className="text-avenue-indigo hover:underline font-normal">View in Billing</Link>
+            <Link href={`/billing`} className="text-brand-indigo hover:underline font-normal">View in Billing</Link>
           </p>
         )}
       </div>

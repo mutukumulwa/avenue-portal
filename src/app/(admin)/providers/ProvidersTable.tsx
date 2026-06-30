@@ -43,13 +43,13 @@ export function ProvidersTable({ providers }: { providers: Provider[] }) {
     <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
       <div className="px-5 py-3 border-b border-[#EEEEEE]">
         <div className="relative max-w-sm">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-avenue-text-muted" />
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-text-muted" />
           <input
             type="text"
             value={q}
             onChange={e => setQ(e.target.value)}
             placeholder="Search by name, type, tier or county…"
-            className="w-full pl-8 pr-3 py-2 text-sm border border-[#EEEEEE] rounded-lg focus:outline-none focus:border-avenue-indigo transition-colors"
+            className="w-full pl-8 pr-3 py-2 text-sm border border-[#EEEEEE] rounded-lg focus:outline-none focus:border-brand-indigo transition-colors"
           />
         </div>
       </div>
@@ -66,12 +66,12 @@ export function ProvidersTable({ providers }: { providers: Provider[] }) {
               <th className="px-6 py-4">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#EEEEEE] text-avenue-text-body text-sm">
+          <tbody className="divide-y divide-[#EEEEEE] text-brand-text-body text-sm">
             {filtered.map(p => (
               <tr key={p.id} className="hover:bg-[#F8F9FA] transition-colors">
                 <td className="px-6 py-4">
                   <div className="flex flex-col">
-                    <span className="font-bold text-avenue-text-heading">{p.name}</span>
+                    <span className="font-bold text-brand-text-heading">{p.name}</span>
                     {p.phone && <span className="text-xs">{p.phone}</span>}
                   </div>
                 </td>
@@ -87,7 +87,7 @@ export function ProvidersTable({ providers }: { providers: Provider[] }) {
                 </td>
                 <td className="px-6 py-4 font-semibold">{p.claimCount}</td>
                 <td className="px-6 py-4">
-                  <Link href={`/providers/${p.id}`} className="text-avenue-indigo hover:text-avenue-secondary font-semibold inline-flex items-center gap-1">
+                  <Link href={`/providers/${p.id}`} className="text-brand-indigo hover:text-brand-secondary font-semibold inline-flex items-center gap-1">
                     View <ArrowRight size={14} />
                   </Link>
                 </td>
@@ -95,7 +95,7 @@ export function ProvidersTable({ providers }: { providers: Provider[] }) {
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-6 py-10 text-center text-avenue-text-body text-sm">
+                <td colSpan={7} className="px-6 py-10 text-center text-brand-text-body text-sm">
                   {q ? `No providers matching "${q}".` : "No providers found."}
                 </td>
               </tr>

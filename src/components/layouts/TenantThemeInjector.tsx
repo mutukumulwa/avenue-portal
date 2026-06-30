@@ -36,15 +36,15 @@ export async function TenantThemeInjector({ tenantId }: { tenantId: string }) {
   const vars: string[] = [];
 
   if (tenant.primaryColor && tenant.primaryColor !== "#000523") {
-    vars.push(`  --color-avenue-indigo: ${tenant.primaryColor};`);
+    vars.push(`  --color-brand-indigo: ${tenant.primaryColor};`);
     // Derive a slightly lighter secondary tone if nothing explicit
-    vars.push(`  --color-avenue-secondary: ${tenant.accentColor || tenant.primaryColor};`);
+    vars.push(`  --color-brand-secondary: ${tenant.accentColor || tenant.primaryColor};`);
   }
   if (tenant.accentColor && tenant.accentColor !== "#06B9AB") {
-    vars.push(`  --color-avenue-indigo-hover: ${tenant.accentColor};`);
+    vars.push(`  --color-brand-indigo-hover: ${tenant.accentColor};`);
   }
   if (tenant.warmColor && tenant.warmColor !== "#F2715A") {
-    vars.push(`  --color-avenue-pink: ${tenant.warmColor};`);
+    vars.push(`  --color-brand-pink: ${tenant.warmColor};`);
   }
   if (tenant.fontHeading && tenant.fontHeading !== "Sora") {
     vars.push(`  --font-heading: "${tenant.fontHeading}", sans-serif;`);

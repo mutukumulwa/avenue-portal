@@ -6,8 +6,8 @@ import type { ActionState } from "@/app/(hr)/hr/roster/new/types";
 import { Send, AlertCircle, CheckCircle } from "lucide-react";
 import Link from "next/link";
 
-const inputCls = "w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo transition-colors";
-const labelCls = "text-xs font-bold text-avenue-text-muted uppercase block mb-1";
+const inputCls = "w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo transition-colors";
+const labelCls = "text-xs font-bold text-brand-text-muted uppercase block mb-1";
 
 export function HRAddMemberForm() {
   const [state, action, pending] = useActionState<ActionState, FormData>(addMemberEndorsementAction, null);
@@ -18,13 +18,13 @@ export function HRAddMemberForm() {
         <div className="w-16 h-16 bg-[#28A745]/10 rounded-full flex items-center justify-center mx-auto mb-4">
           <CheckCircle className="w-8 h-8 text-[#28A745]" />
         </div>
-        <h2 className="text-xl font-bold text-avenue-text-heading font-heading mb-2">Request Submitted</h2>
-        <p className="text-sm text-avenue-text-body mb-6">
+        <h2 className="text-xl font-bold text-brand-text-heading font-heading mb-2">Request Submitted</h2>
+        <p className="text-sm text-brand-text-body mb-6">
           Your endorsement request <strong>{state.endorsementNumber}</strong> has been successfully submitted to Medvex for processing.
         </p>
         <Link 
           href="/hr/endorsements" 
-          className="inline-block px-6 py-2.5 bg-avenue-indigo text-white font-semibold rounded-full hover:bg-avenue-secondary transition-colors"
+          className="inline-block px-6 py-2.5 bg-brand-indigo text-white font-semibold rounded-full hover:bg-brand-secondary transition-colors"
         >
           Track Endorsements
         </Link>
@@ -44,7 +44,7 @@ export function HRAddMemberForm() {
       <form action={action} className="space-y-6">
         {/* Relationship */}
         <div>
-          <h3 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Relationship</h3>
+          <h3 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Relationship</h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Role *</label>
@@ -58,14 +58,14 @@ export function HRAddMemberForm() {
             <div>
               <label className={labelCls}>Effective Date *</label>
               <input required name="effectiveDate" type="date" className={inputCls} />
-              <p className="text-[10px] text-avenue-text-muted mt-1">When this coverage should begin.</p>
+              <p className="text-[10px] text-brand-text-muted mt-1">When this coverage should begin.</p>
             </div>
           </div>
         </div>
 
         {/* Personal Information */}
         <div>
-          <h3 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Personal Information</h3>
+          <h3 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Personal Information</h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>First Name *</label>
@@ -90,14 +90,14 @@ export function HRAddMemberForm() {
             <div className="col-span-2">
               <label className={labelCls}>National ID / Passport</label>
               <input name="idNumber" type="text" placeholder="e.g. 12345678" className={inputCls} />
-              <p className="text-[10px] text-avenue-text-muted mt-1">If the dependant is a child without an ID, leave this blank.</p>
+              <p className="text-[10px] text-brand-text-muted mt-1">If the dependant is a child without an ID, leave this blank.</p>
             </div>
           </div>
         </div>
 
         {/* Contact */}
         <div>
-          <h3 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Contact Information <span className="font-normal text-avenue-text-muted">(optional)</span></h3>
+          <h3 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Contact Information <span className="font-normal text-brand-text-muted">(optional)</span></h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Phone Number</label>
@@ -114,7 +114,7 @@ export function HRAddMemberForm() {
           <button
             type="submit"
             disabled={pending}
-            className="flex items-center gap-2 bg-avenue-indigo hover:bg-avenue-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 bg-brand-indigo hover:bg-brand-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Send size={16} />
             {pending ? "Submitting Request…" : "Submit Addition Request"}

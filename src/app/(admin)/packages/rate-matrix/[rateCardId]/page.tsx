@@ -91,42 +91,42 @@ export default async function RateMatrixDetailPage({ params }: { params: Promise
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/packages/rate-matrix" className="text-avenue-text-muted hover:text-avenue-indigo transition-colors">
+          <Link href="/packages/rate-matrix" className="text-brand-text-muted hover:text-brand-indigo transition-colors">
             <ArrowLeft size={20} />
           </Link>
           <div>
-            <h1 className="text-xl font-bold text-avenue-text-heading font-heading font-mono">{rateCardId}</h1>
-            <p className="text-avenue-text-muted text-sm mt-0.5">{cells.length} cells · {bands.length} benefit limit bands</p>
+            <h1 className="text-xl font-bold text-brand-text-heading font-heading font-mono">{rateCardId}</h1>
+            <p className="text-brand-text-muted text-sm mt-0.5">{cells.length} cells · {bands.length} benefit limit bands</p>
           </div>
         </div>
       </div>
 
       {/* Add new benefit limit band row */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-4">
-        <h2 className="font-semibold text-avenue-text-heading text-sm mb-3">Add Benefit Limit Band</h2>
+        <h2 className="font-semibold text-brand-text-heading text-sm mb-3">Add Benefit Limit Band</h2>
         <form action={addRowAction} className="flex gap-3 items-end">
           <input type="hidden" name="rateCardId" value={rateCardId} />
           <div>
-            <label className="block text-xs font-semibold text-avenue-text-muted mb-1">Limit Band (KES)</label>
+            <label className="block text-xs font-semibold text-brand-text-muted mb-1">Limit Band (KES)</label>
             <input name="limitBand" type="text" required placeholder="e.g. 1000000"
-              className="border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm font-mono w-36 focus:ring-1 focus:ring-avenue-indigo focus:outline-none" />
+              className="border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm font-mono w-36 focus:ring-1 focus:ring-brand-indigo focus:outline-none" />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-avenue-text-muted mb-1">Effective From</label>
+            <label className="block text-xs font-semibold text-brand-text-muted mb-1">Effective From</label>
             <input name="effectiveFrom" type="date" defaultValue={new Date().toISOString().split("T")[0]}
-              className="border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-avenue-indigo focus:outline-none" />
+              className="border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-brand-indigo focus:outline-none" />
           </div>
           <button type="submit"
-            className="bg-avenue-indigo text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-avenue-secondary transition-colors flex items-center gap-1.5">
+            className="bg-brand-indigo text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-brand-secondary transition-colors flex items-center gap-1.5">
             <Plus size={14} /> Add Band
           </button>
         </form>
-        <p className="text-xs text-avenue-text-muted mt-2">Creates a row for all 9 family sizes at KES 0. Fill in amounts below.</p>
+        <p className="text-xs text-brand-text-muted mt-2">Creates a row for all 9 family sizes at KES 0. Fill in amounts below.</p>
       </div>
 
       {/* Matrix table */}
       {bands.length === 0 ? (
-        <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-10 text-center text-avenue-text-muted text-sm">
+        <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-10 text-center text-brand-text-muted text-sm">
           Add a benefit limit band above to start building the matrix.
         </div>
       ) : (
@@ -136,14 +136,14 @@ export default async function RateMatrixDetailPage({ params }: { params: Promise
               <tr className="bg-[#E6E7E8] border-b border-[#EEEEEE]">
                 <th className="px-4 py-3 text-xs font-semibold text-[#6C757D]">Limit Band (KES)</th>
                 {FAMILY_SIZES.map((fs) => (
-                  <th key={fs} className="px-3 py-3 text-xs font-semibold text-avenue-indigo text-center">{fs}</th>
+                  <th key={fs} className="px-3 py-3 text-xs font-semibold text-brand-indigo text-center">{fs}</th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-[#EEEEEE]">
               {bands.map((band) => (
                 <tr key={band} className="hover:bg-[#F8F9FA]">
-                  <td className="px-4 py-2.5 font-mono text-sm font-semibold text-avenue-text-heading">
+                  <td className="px-4 py-2.5 font-mono text-sm font-semibold text-brand-text-heading">
                     {fmt(Number(band))}
                   </td>
                   {FAMILY_SIZES.map((fs) => {
@@ -159,9 +159,9 @@ export default async function RateMatrixDetailPage({ params }: { params: Promise
                             <input type="hidden" name="effectiveFrom" value={cell.effectiveFrom.toISOString().split("T")[0]} />
                             <input name="amount" type="number" min="0" step="100"
                               defaultValue={Number(cell.contributionAmount)}
-                              className={`w-24 border rounded px-2 py-1 text-xs text-right font-mono focus:ring-1 focus:ring-avenue-indigo focus:outline-none ${!cell.isActive ? "border-[#FFC107]/60 bg-[#FFF8E1]" : "border-[#EEEEEE]"}`}
+                              className={`w-24 border rounded px-2 py-1 text-xs text-right font-mono focus:ring-1 focus:ring-brand-indigo focus:outline-none ${!cell.isActive ? "border-[#FFC107]/60 bg-[#FFF8E1]" : "border-[#EEEEEE]"}`}
                             />
-                            <button type="submit" className="text-avenue-indigo hover:text-avenue-secondary transition-colors" title="Save">
+                            <button type="submit" className="text-brand-indigo hover:text-brand-secondary transition-colors" title="Save">
                               <Save size={12} />
                             </button>
                           </form>
@@ -187,7 +187,7 @@ export default async function RateMatrixDetailPage({ params }: { params: Promise
           </table>
         </div>
       )}
-      <p className="text-xs text-avenue-text-muted">
+      <p className="text-xs text-brand-text-muted">
         Yellow cells are inactive (amount = 0 or not confirmed). Click <Save size={10} className="inline" /> to save individual cells.
         This matrix is referenced when building quotations with <strong>FAMILY_MATRIX</strong> pricing mode.
       </p>

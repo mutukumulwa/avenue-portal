@@ -53,7 +53,7 @@ export function SelfFundedPanel({ groupId, account, minimumBalance }: Props) {
         <div className="flex items-center gap-3">
           <Wallet size={20} className={isEmpty ? "text-[#DC3545]" : isLow ? "text-[#856404]" : "text-[#28A745]"} />
           <div>
-            <p className="text-xs font-bold uppercase text-avenue-text-muted">Fund Balance</p>
+            <p className="text-xs font-bold uppercase text-brand-text-muted">Fund Balance</p>
             <p className={`text-2xl font-bold font-mono ${isEmpty ? "text-[#DC3545]" : isLow ? "text-[#856404]" : "text-[#28A745]"}`}>
               KES {balance.toLocaleString("en-KE")}
             </p>
@@ -72,44 +72,44 @@ export function SelfFundedPanel({ groupId, account, minimumBalance }: Props) {
 
       {/* Deposit / Top-up form */}
       {showForm ? (
-        <form onSubmit={handleDeposit} className="bg-[#F8FAFF] border border-avenue-indigo/20 rounded-lg p-4 space-y-3">
-          <p className="text-sm font-bold text-avenue-text-heading">Record Fund Receipt</p>
+        <form onSubmit={handleDeposit} className="bg-[#F8FAFF] border border-brand-indigo/20 rounded-lg p-4 space-y-3">
+          <p className="text-sm font-bold text-brand-text-heading">Record Fund Receipt</p>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-avenue-text-muted uppercase">Type</label>
-              <select name="type" className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-avenue-indigo bg-white">
+              <label className="text-xs font-semibold text-brand-text-muted uppercase">Type</label>
+              <select name="type" className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo bg-white">
                 <option value="DEPOSIT">Initial Deposit</option>
                 <option value="TOP_UP">Top-Up</option>
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-avenue-text-muted uppercase">Amount (KES)</label>
+              <label className="text-xs font-semibold text-brand-text-muted uppercase">Amount (KES)</label>
               <input name="amount" type="number" min="1" step="0.01" required
-                className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-avenue-indigo bg-white" />
+                className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo bg-white" />
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-avenue-text-muted uppercase">Cheque / EFT / M-Pesa Ref</label>
+              <label className="text-xs font-semibold text-brand-text-muted uppercase">Cheque / EFT / M-Pesa Ref</label>
               <input name="referenceNumber" type="text" placeholder="optional"
-                className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-avenue-indigo bg-white" />
+                className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo bg-white" />
             </div>
           </div>
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-avenue-text-muted uppercase">Notes</label>
+            <label className="text-xs font-semibold text-brand-text-muted uppercase">Notes</label>
             <input name="description" type="text" placeholder="e.g. Q2 top-up from client"
-              className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-avenue-indigo bg-white" />
+              className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo bg-white" />
           </div>
           <div className="flex justify-end gap-2">
             <button type="button" onClick={() => setShowForm(false)}
               className="text-xs px-4 py-2 rounded-full border border-[#EEEEEE] hover:bg-[#EEEEEE] transition-colors">Cancel</button>
             <button type="submit" disabled={isPending}
-              className="text-xs font-bold px-5 py-2 rounded-full bg-avenue-indigo text-white hover:bg-avenue-secondary disabled:opacity-50 transition-colors">
+              className="text-xs font-bold px-5 py-2 rounded-full bg-brand-indigo text-white hover:bg-brand-secondary disabled:opacity-50 transition-colors">
               {isPending ? "Recording…" : "Record Receipt"}
             </button>
           </div>
         </form>
       ) : (
         <button onClick={() => setShowForm(true)}
-          className="flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-full border-2 border-dashed border-avenue-indigo/30 text-avenue-indigo hover:bg-avenue-indigo/5 transition-colors">
+          className="flex items-center gap-1.5 text-xs font-bold px-4 py-2 rounded-full border-2 border-dashed border-brand-indigo/30 text-brand-indigo hover:bg-brand-indigo/5 transition-colors">
           <PlusCircle size={13} /> Record Deposit / Top-Up
         </button>
       )}
@@ -118,11 +118,11 @@ export function SelfFundedPanel({ groupId, account, minimumBalance }: Props) {
       {account && account.transactions.length > 0 && (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
           <div className="px-4 py-3 border-b border-[#EEEEEE]">
-            <p className="text-xs font-bold uppercase text-avenue-text-muted">Fund Ledger</p>
+            <p className="text-xs font-bold uppercase text-brand-text-muted">Fund Ledger</p>
           </div>
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-[#F8F9FA] text-[10px] font-bold uppercase text-avenue-text-muted border-b border-[#EEEEEE]">
+              <tr className="bg-[#F8F9FA] text-[10px] font-bold uppercase text-brand-text-muted border-b border-[#EEEEEE]">
                 <th className="px-4 py-2 text-left">Date</th>
                 <th className="px-4 py-2 text-left">Type</th>
                 <th className="px-4 py-2 text-left">Description</th>
@@ -134,18 +134,18 @@ export function SelfFundedPanel({ groupId, account, minimumBalance }: Props) {
             <tbody className="divide-y divide-[#EEEEEE]">
               {account.transactions.map(t => (
                 <tr key={t.id} className="hover:bg-[#F8F9FA]">
-                  <td className="px-4 py-2.5 text-avenue-text-muted text-xs">{new Date(t.postedAt).toLocaleDateString("en-KE")}</td>
+                  <td className="px-4 py-2.5 text-brand-text-muted text-xs">{new Date(t.postedAt).toLocaleDateString("en-KE")}</td>
                   <td className="px-4 py-2.5">
-                    <span className={`text-xs font-bold ${TYPE_COLOR[t.type] ?? "text-avenue-text-muted"}`}>
+                    <span className={`text-xs font-bold ${TYPE_COLOR[t.type] ?? "text-brand-text-muted"}`}>
                       {t.type.replace(/_/g, " ")}
                     </span>
                   </td>
-                  <td className="px-4 py-2.5 text-avenue-text-body text-xs">{t.description}</td>
-                  <td className="px-4 py-2.5 font-mono text-xs text-avenue-text-muted">{t.referenceNumber ?? "—"}</td>
+                  <td className="px-4 py-2.5 text-brand-text-body text-xs">{t.description}</td>
+                  <td className="px-4 py-2.5 font-mono text-xs text-brand-text-muted">{t.referenceNumber ?? "—"}</td>
                   <td className={`px-4 py-2.5 text-right font-mono font-semibold text-xs ${TYPE_COLOR[t.type]}`}>
                     {TYPE_SIGN[t.type]}{Number(t.amount).toLocaleString("en-KE")}
                   </td>
-                  <td className="px-4 py-2.5 text-right font-mono text-xs text-avenue-text-heading">
+                  <td className="px-4 py-2.5 text-right font-mono text-xs text-brand-text-heading">
                     {Number(t.balanceAfter).toLocaleString("en-KE")}
                   </td>
                 </tr>
@@ -156,7 +156,7 @@ export function SelfFundedPanel({ groupId, account, minimumBalance }: Props) {
       )}
 
       {account && account.transactions.length === 0 && (
-        <p className="text-sm text-avenue-text-muted">No fund transactions recorded yet.</p>
+        <p className="text-sm text-brand-text-muted">No fund transactions recorded yet.</p>
       )}
     </div>
   );

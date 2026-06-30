@@ -36,9 +36,9 @@ function severityTone(severity: string) {
 function MetricCard({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
     <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
-      <p className="text-[13px] font-bold uppercase tracking-normal text-avenue-text-muted">{label}</p>
-      <p className="mt-2 text-2xl font-bold tabular-nums text-avenue-text-heading">{value}</p>
-      <p className="mt-2 text-[13px] leading-snug text-avenue-text-muted">{detail}</p>
+      <p className="text-[13px] font-bold uppercase tracking-normal text-brand-text-muted">{label}</p>
+      <p className="mt-2 text-2xl font-bold tabular-nums text-brand-text-heading">{value}</p>
+      <p className="mt-2 text-[13px] leading-snug text-brand-text-muted">{detail}</p>
     </div>
   );
 }
@@ -49,21 +49,21 @@ function TrendPanel({ trend }: { trend: SchemeDetail["trend"] }) {
     <div className="rounded-[8px] border border-[#EEEEEE] bg-white shadow-sm">
       <div className="flex items-center justify-between border-b border-[#EEEEEE] px-5 py-4">
         <div>
-          <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Contribution vs Claims</h2>
-          <p className="text-sm text-avenue-text-muted">Monthly movement from the analytics snapshot table.</p>
+          <h2 className="font-heading text-lg font-bold text-brand-text-heading">Contribution vs Claims</h2>
+          <p className="text-sm text-brand-text-muted">Monthly movement from the analytics snapshot table.</p>
         </div>
-        <LineChart className="h-5 w-5 text-avenue-indigo" />
+        <LineChart className="h-5 w-5 text-brand-indigo" />
       </div>
       <div className="space-y-3 p-5">
         {trend.length === 0 && (
-          <p className="py-8 text-center text-sm text-avenue-text-muted">No snapshot trend has been generated for this scheme yet.</p>
+          <p className="py-8 text-center text-sm text-brand-text-muted">No snapshot trend has been generated for this scheme yet.</p>
         )}
         {trend.slice(-12).map((row) => (
           <div key={row.period} className="grid grid-cols-[64px_1fr_92px] items-center gap-3 text-[13px]">
-            <span className="font-semibold text-avenue-text-muted">{row.period}</span>
+            <span className="font-semibold text-brand-text-muted">{row.period}</span>
             <div className="space-y-1">
               <div className="h-2 rounded-full bg-[#E6E7E8]">
-                <div className="h-2 rounded-full bg-avenue-indigo" style={{ width: `${Math.max(3, (row.contribution / max) * 100)}%` }} />
+                <div className="h-2 rounded-full bg-brand-indigo" style={{ width: `${Math.max(3, (row.contribution / max) * 100)}%` }} />
               </div>
               <div className="h-2 rounded-full bg-[#E6E7E8]">
                 <div className="h-2 rounded-full bg-[#DC3545]" style={{ width: `${Math.max(3, (row.claims / max) * 100)}%` }} />
@@ -95,32 +95,32 @@ function RankedList({
     <div className="rounded-[8px] border border-[#EEEEEE] bg-white shadow-sm">
       <div className="flex items-center justify-between border-b border-[#EEEEEE] px-5 py-4">
         <div>
-          <h2 className="font-heading text-lg font-bold text-avenue-text-heading">{title}</h2>
-          <p className="text-sm text-avenue-text-muted">{subtitle}</p>
+          <h2 className="font-heading text-lg font-bold text-brand-text-heading">{title}</h2>
+          <p className="text-sm text-brand-text-muted">{subtitle}</p>
         </div>
         {icon}
       </div>
       <div className="divide-y divide-[#EEEEEE]">
         {rows.length === 0 && (
-          <p className="px-5 py-8 text-center text-sm text-avenue-text-muted">No rows yet.</p>
+          <p className="px-5 py-8 text-center text-sm text-brand-text-muted">No rows yet.</p>
         )}
         {rows.map((row) => (
           <div key={row.label} className="px-5 py-4">
             <div className="mb-2 flex items-center justify-between gap-4">
               <div className="min-w-0">
                 {row.href ? (
-                  <Link href={row.href} className="truncate block font-semibold text-avenue-text-heading hover:text-avenue-indigo hover:underline">
+                  <Link href={row.href} className="truncate block font-semibold text-brand-text-heading hover:text-brand-indigo hover:underline">
                     {row.label}
                   </Link>
                 ) : (
-                  <p className="truncate font-semibold text-avenue-text-heading">{row.label}</p>
+                  <p className="truncate font-semibold text-brand-text-heading">{row.label}</p>
                 )}
-                <p className="text-[13px] text-avenue-text-muted">{row.meta}</p>
+                <p className="text-[13px] text-brand-text-muted">{row.meta}</p>
               </div>
-              <p className="font-bold tabular-nums text-avenue-text-heading">{formatMoney(row.value)}</p>
+              <p className="font-bold tabular-nums text-brand-text-heading">{formatMoney(row.value)}</p>
             </div>
             <div className="h-2 rounded-full bg-[#E6E7E8]">
-              <div className="h-2 rounded-full bg-avenue-indigo" style={{ width: `${Math.max(3, (row.value / max) * 100)}%` }} />
+              <div className="h-2 rounded-full bg-brand-indigo" style={{ width: `${Math.max(3, (row.value / max) * 100)}%` }} />
             </div>
           </div>
         ))}
@@ -176,13 +176,13 @@ export default async function SchemeAnalyticsDetailPage({
         <div className="min-w-0">
           <Link
             href={from === "report" ? "/reports" : "/analytics"}
-            className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-avenue-indigo hover:underline"
+            className="mb-3 inline-flex items-center gap-2 text-sm font-semibold text-brand-indigo hover:underline"
           >
             <ArrowLeft className="h-4 w-4" />
             {from === "report" ? "Back to reports" : "Back to analytics"}
           </Link>
-          <h1 className="font-heading text-3xl font-bold text-avenue-text-heading">{detail.group.name}</h1>
-          <p className="text-avenue-text-muted">
+          <h1 className="font-heading text-3xl font-bold text-brand-text-heading">{detail.group.name}</h1>
+          <p className="text-brand-text-muted">
             {detail.group.industry ?? "Corporate scheme"} · {detail.group.packageName} · {detail.group.intermediaryName ?? "Direct"}
           </p>
         </div>
@@ -203,22 +203,22 @@ export default async function SchemeAnalyticsDetailPage({
           <TrendPanel trend={detail.trend} />
         </div>
         <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
-          <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Action Workspace</h2>
-          <p className="mt-1 text-sm text-avenue-text-muted">Use these links to move from insight to operational follow-up.</p>
+          <h2 className="font-heading text-lg font-bold text-brand-text-heading">Action Workspace</h2>
+          <p className="mt-1 text-sm text-brand-text-muted">Use these links to move from insight to operational follow-up.</p>
           <div className="mt-4 grid gap-2">
-            <Link href={`/groups/${detail.group.id}`} className="flex items-center gap-2 rounded-[8px] border border-[#EEEEEE] px-3 py-2 text-sm font-semibold text-avenue-text-heading hover:border-avenue-indigo hover:text-avenue-indigo">
+            <Link href={`/groups/${detail.group.id}`} className="flex items-center gap-2 rounded-[8px] border border-[#EEEEEE] px-3 py-2 text-sm font-semibold text-brand-text-heading hover:border-brand-indigo hover:text-brand-indigo">
               <Building2 className="h-4 w-4" />
               Open group record
             </Link>
-            <Link href={`/groups/${detail.group.id}/reprice`} className="flex items-center gap-2 rounded-[8px] border border-[#EEEEEE] px-3 py-2 text-sm font-semibold text-avenue-text-heading hover:border-avenue-indigo hover:text-avenue-indigo">
+            <Link href={`/groups/${detail.group.id}/reprice`} className="flex items-center gap-2 rounded-[8px] border border-[#EEEEEE] px-3 py-2 text-sm font-semibold text-brand-text-heading hover:border-brand-indigo hover:text-brand-indigo">
               <RefreshCw className="h-4 w-4" />
               Review repricing
             </Link>
-            <Link href="/reports" className="flex items-center gap-2 rounded-[8px] border border-[#EEEEEE] px-3 py-2 text-sm font-semibold text-avenue-text-heading hover:border-avenue-indigo hover:text-avenue-indigo">
+            <Link href="/reports" className="flex items-center gap-2 rounded-[8px] border border-[#EEEEEE] px-3 py-2 text-sm font-semibold text-brand-text-heading hover:border-brand-indigo hover:text-brand-indigo">
               <FileText className="h-4 w-4" />
               Open reports
             </Link>
-            <Link href={`/analytics/alerts?groupId=${detail.group.id}`} className="flex items-center gap-2 rounded-[8px] border border-[#EEEEEE] px-3 py-2 text-sm font-semibold text-avenue-text-heading hover:border-avenue-indigo hover:text-avenue-indigo">
+            <Link href={`/analytics/alerts?groupId=${detail.group.id}`} className="flex items-center gap-2 rounded-[8px] border border-[#EEEEEE] px-3 py-2 text-sm font-semibold text-brand-text-heading hover:border-brand-indigo hover:text-brand-indigo">
               <AlertTriangle className="h-4 w-4" />
               Open alert inbox
             </Link>
@@ -229,31 +229,31 @@ export default async function SchemeAnalyticsDetailPage({
       <div className="grid gap-4 xl:grid-cols-3">
         <RankedList title="Disease Drivers" subtitle="Top ICD families by gross cost." icon={<Stethoscope className="h-5 w-5 text-[#DC3545]" />} rows={icdRows} />
         <RankedList title="Benefit Mix" subtitle="Cost by benefit category." icon={<Receipt className="h-5 w-5 text-[#17A2B8]" />} rows={categoryRows} />
-        <RankedList title="Provider Mix" subtitle="Providers driving scheme cost." icon={<Building2 className="h-5 w-5 text-avenue-indigo" />} rows={providerRows} />
+        <RankedList title="Provider Mix" subtitle="Providers driving scheme cost." icon={<Building2 className="h-5 w-5 text-brand-indigo" />} rows={providerRows} />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <div className="rounded-[8px] border border-[#EEEEEE] bg-white shadow-sm">
           <div className="flex items-center justify-between gap-4 border-b border-[#EEEEEE] px-5 py-4">
             <div>
-              <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Current Alerts</h2>
-              <p className="text-sm text-avenue-text-muted">Open and acknowledged alerts scoped to this scheme.</p>
+              <h2 className="font-heading text-lg font-bold text-brand-text-heading">Current Alerts</h2>
+              <p className="text-sm text-brand-text-muted">Open and acknowledged alerts scoped to this scheme.</p>
             </div>
-            <Link href={`/analytics/alerts?groupId=${detail.group.id}`} className="text-sm font-semibold text-avenue-indigo hover:underline">
+            <Link href={`/analytics/alerts?groupId=${detail.group.id}`} className="text-sm font-semibold text-brand-indigo hover:underline">
               Manage
             </Link>
           </div>
           <div className="divide-y divide-[#EEEEEE]">
             {detail.alerts.length === 0 && (
-              <p className="px-5 py-8 text-center text-sm text-avenue-text-muted">No active alerts for this scheme.</p>
+              <p className="px-5 py-8 text-center text-sm text-brand-text-muted">No active alerts for this scheme.</p>
             )}
             {detail.alerts.map((alert) => (
               <Link key={alert.id} href={`/analytics/alerts?groupId=${detail.group.id}`} className="block px-5 py-4 hover:bg-[#F8F9FA]">
                 <div className="mb-2 flex items-center justify-between gap-3">
-                  <p className="font-semibold text-avenue-text-heading">{alert.title}</p>
+                  <p className="font-semibold text-brand-text-heading">{alert.title}</p>
                   <span className={`rounded-full px-2 py-1 text-[13px] font-bold ${severityTone(alert.severity)}`}>{alert.severity}</span>
                 </div>
-                <p className="text-sm text-avenue-text-muted">{alert.message}</p>
+                <p className="text-sm text-brand-text-muted">{alert.message}</p>
               </Link>
             ))}
           </div>
@@ -261,31 +261,31 @@ export default async function SchemeAnalyticsDetailPage({
 
         <div className="rounded-[8px] border border-[#EEEEEE] bg-white shadow-sm">
           <div className="border-b border-[#EEEEEE] px-5 py-4">
-            <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Recent Claims</h2>
-            <p className="text-sm text-avenue-text-muted">Latest 10 claims for this scheme.</p>
+            <h2 className="font-heading text-lg font-bold text-brand-text-heading">Recent Claims</h2>
+            <p className="text-sm text-brand-text-muted">Latest 10 claims for this scheme.</p>
           </div>
           {canViewNamedClaims ? (
             <div className="divide-y divide-[#EEEEEE]">
               {detail.recentClaims.length === 0 && (
-                <p className="px-5 py-8 text-center text-sm text-avenue-text-muted">No claims on record yet.</p>
+                <p className="px-5 py-8 text-center text-sm text-brand-text-muted">No claims on record yet.</p>
               )}
               {detail.recentClaims.map((claim) => (
                 <Link key={claim.id} href={`/claims/${claim.id}`} className="block px-5 py-4 hover:bg-[#F8F9FA]">
                   <div className="flex items-center justify-between gap-4">
                     <div className="min-w-0">
-                      <p className="font-semibold text-avenue-text-heading">{claim.claimNumber}</p>
-                      <p className="truncate text-[13px] text-avenue-text-muted">{claim.memberName} · {claim.providerName}</p>
+                      <p className="font-semibold text-brand-text-heading">{claim.claimNumber}</p>
+                      <p className="truncate text-[13px] text-brand-text-muted">{claim.memberName} · {claim.providerName}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold tabular-nums text-avenue-text-heading">{formatMoney(claim.approvedAmount)}</p>
-                      <p className="text-[13px] text-avenue-text-muted">{claim.status.replace(/_/g, " ")}</p>
+                      <p className="font-bold tabular-nums text-brand-text-heading">{formatMoney(claim.approvedAmount)}</p>
+                      <p className="text-[13px] text-brand-text-muted">{claim.status.replace(/_/g, " ")}</p>
                     </div>
                   </div>
                 </Link>
               ))}
             </div>
           ) : (
-            <p className="px-5 py-8 text-center text-sm text-avenue-text-muted">
+            <p className="px-5 py-8 text-center text-sm text-brand-text-muted">
               Individual claim records are not available for your role. Use the Claims report for aggregate data.
             </p>
           )}
@@ -296,10 +296,10 @@ export default async function SchemeAnalyticsDetailPage({
         <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between gap-4">
             <div>
-              <h2 className="font-heading text-lg font-bold text-avenue-text-heading">Renewal Recommendation</h2>
-              <p className="text-sm text-avenue-text-muted">Deterministic pricing signal from the renewal analysis table.</p>
+              <h2 className="font-heading text-lg font-bold text-brand-text-heading">Renewal Recommendation</h2>
+              <p className="text-sm text-brand-text-muted">Deterministic pricing signal from the renewal analysis table.</p>
             </div>
-            <BarChart3 className="h-5 w-5 text-avenue-indigo" />
+            <BarChart3 className="h-5 w-5 text-brand-indigo" />
           </div>
           <div className="grid gap-4 md:grid-cols-4">
             <MetricCard label="Trailing MLR" value={formatPercent(detail.renewalAnalysis.trailing12Mlr)} detail={`Target ${formatPercent(detail.renewalAnalysis.targetMlr)}`} />
@@ -307,7 +307,7 @@ export default async function SchemeAnalyticsDetailPage({
             <MetricCard label="Recommended Contribution" value={formatMoney(detail.renewalAnalysis.recommendedContribution)} detail="Before actuarial/product review" />
             <MetricCard label="Adjustment" value={formatPercent(detail.renewalAnalysis.recommendedAdjustmentPct)} detail="Indicative pricing movement" />
           </div>
-          <Link href={`/analytics/renewals/${detail.group.id}?from=scheme`} className="mt-4 inline-flex items-center gap-2 rounded-[8px] bg-avenue-indigo px-4 py-2 text-sm font-semibold text-white hover:bg-avenue-indigo/90">
+          <Link href={`/analytics/renewals/${detail.group.id}?from=scheme`} className="mt-4 inline-flex items-center gap-2 rounded-[8px] bg-brand-indigo px-4 py-2 text-sm font-semibold text-white hover:bg-brand-indigo/90">
             <RefreshCw className="h-4 w-4" />
             Open renewal workspace
           </Link>

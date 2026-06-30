@@ -5,8 +5,8 @@ import Link from "next/link";
 import { createContractAction } from "./contracts/actions";
 import { FileSignature, Plus, AlertTriangle } from "lucide-react";
 
-const lbl = "text-[10px] font-bold text-avenue-text-muted uppercase block mb-1";
-const inp = "w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo transition-colors";
+const lbl = "text-[10px] font-bold text-brand-text-muted uppercase block mb-1";
+const inp = "w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo transition-colors";
 
 const STATUS_STYLES: Record<string, string> = {
   DRAFT: "bg-[#FFC107]/10 text-[#856404]",
@@ -52,16 +52,16 @@ export function ProviderContractsCard({
     <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
       <div className="px-6 py-4 border-b border-[#EEEEEE] flex justify-between items-center">
         <div>
-          <h2 className="font-bold text-avenue-text-heading font-heading flex items-center gap-2">
-            <FileSignature size={15} className="text-avenue-indigo" /> Contracts
+          <h2 className="font-bold text-brand-text-heading font-heading flex items-center gap-2">
+            <FileSignature size={15} className="text-brand-indigo" /> Contracts
           </h2>
-          <p className="text-xs text-avenue-text-muted mt-0.5">
+          <p className="text-xs text-brand-text-muted mt-0.5">
             The active agreement governs rates, exclusions and billing rules during claim adjudication.
           </p>
         </div>
         <button
           onClick={() => setCreating(c => !c)}
-          className="flex items-center gap-1 text-avenue-indigo text-sm font-semibold hover:text-avenue-secondary transition-colors"
+          className="flex items-center gap-1 text-brand-indigo text-sm font-semibold hover:text-brand-secondary transition-colors"
         >
           <Plus size={14} /> {creating ? "Cancel" : "New Contract"}
         </button>
@@ -75,7 +75,7 @@ export function ProviderContractsCard({
       )}
 
       {creating && (
-        <form action={createContractAction} className="px-6 py-5 bg-avenue-indigo/5 border-b border-[#EEEEEE] space-y-4">
+        <form action={createContractAction} className="px-6 py-5 bg-brand-indigo/5 border-b border-[#EEEEEE] space-y-4">
           <input type="hidden" name="providerId" value={providerId} />
           <div className="grid grid-cols-3 gap-4">
             <div className="col-span-3">
@@ -114,11 +114,11 @@ export function ProviderContractsCard({
               <input type="number" name="invoiceDiscountPct" step="0.1" min={0} max={100} className={inp} placeholder="Optional" />
             </div>
           </div>
-          <p className="text-xs text-avenue-text-muted">
+          <p className="text-xs text-brand-text-muted">
             The contract is created as a <strong>DRAFT</strong>. Load the rate schedule and exclusions in the contract workspace, then activate it.
           </p>
           <div className="flex justify-end">
-            <button type="submit" className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-6 py-2.5 rounded-full font-semibold text-sm transition-colors shadow-sm">
+            <button type="submit" className="bg-brand-indigo hover:bg-brand-secondary text-white px-6 py-2.5 rounded-full font-semibold text-sm transition-colors shadow-sm">
               Create Draft & Open Workspace
             </button>
           </div>
@@ -127,7 +127,7 @@ export function ProviderContractsCard({
 
       <table className="w-full text-sm">
         <thead>
-          <tr className="bg-[#F8F9FA] text-[10px] font-bold uppercase text-avenue-text-muted border-b border-[#EEEEEE]">
+          <tr className="bg-[#F8F9FA] text-[10px] font-bold uppercase text-brand-text-muted border-b border-[#EEEEEE]">
             <th className="px-5 py-2.5 text-left">Contract</th>
             <th className="px-5 py-2.5 text-left">Period</th>
             <th className="px-5 py-2.5 text-center">Tariff Lines</th>
@@ -144,12 +144,12 @@ export function ProviderContractsCard({
             return (
               <tr key={c.id} className="hover:bg-[#F8F9FA]">
                 <td className="px-5 py-3">
-                  <Link href={`/providers/${providerId}/contracts/${c.id}`} className="font-semibold text-avenue-indigo hover:underline">
+                  <Link href={`/providers/${providerId}/contracts/${c.id}`} className="font-semibold text-brand-indigo hover:underline">
                     {c.contractNumber}
                   </Link>
-                  <p className="text-xs text-avenue-text-muted mt-0.5">{c.title}</p>
+                  <p className="text-xs text-brand-text-muted mt-0.5">{c.title}</p>
                 </td>
-                <td className="px-5 py-3 text-avenue-text-muted text-xs">
+                <td className="px-5 py-3 text-brand-text-muted text-xs">
                   {new Date(c.startDate).toLocaleDateString("en-KE")} → {new Date(c.endDate).toLocaleDateString("en-KE")}
                   {display === "ACTIVE" && daysLeft <= 60 && (
                     <span className="block text-[10px] font-bold text-[#856404] mt-0.5">expires in {daysLeft}d</span>
@@ -157,7 +157,7 @@ export function ProviderContractsCard({
                 </td>
                 <td className="px-5 py-3 text-center font-semibold">{c.tariffCount}</td>
                 <td className="px-5 py-3 text-center font-semibold">{c.exclusionCount}</td>
-                <td className="px-5 py-3 text-xs text-avenue-text-muted">{RULE_LABELS[c.unlistedServiceRule] ?? "—"}</td>
+                <td className="px-5 py-3 text-xs text-brand-text-muted">{RULE_LABELS[c.unlistedServiceRule] ?? "—"}</td>
                 <td className="px-5 py-3">
                   <span className={`px-2.5 py-0.5 text-[10px] font-bold uppercase rounded-full ${STATUS_STYLES[display] ?? STATUS_STYLES.DRAFT}`}>
                     {display}
@@ -168,7 +168,7 @@ export function ProviderContractsCard({
           })}
           {contracts.length === 0 && !creating && (
             <tr>
-              <td colSpan={6} className="px-5 py-8 text-center text-sm text-avenue-text-muted">
+              <td colSpan={6} className="px-5 py-8 text-center text-sm text-brand-text-muted">
                 No contracts on file for this provider yet.
               </td>
             </tr>

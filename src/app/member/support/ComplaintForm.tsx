@@ -19,10 +19,10 @@ export function ComplaintForm() {
     return (
       <div className="flex flex-col items-center gap-3 py-6 text-center">
         <CheckCircle size={36} className="text-[#28A745]" />
-        <p className="font-bold text-avenue-text-heading">Grievance submitted</p>
-        <p className="text-sm text-avenue-text-muted">
+        <p className="font-bold text-brand-text-heading">Grievance submitted</p>
+        <p className="text-sm text-brand-text-muted">
           Your reference number is{" "}
-          <span className="font-mono font-bold text-avenue-indigo">{result.reference}</span>.
+          <span className="font-mono font-bold text-brand-indigo">{result.reference}</span>.
           Our team will respond within 2 business days.
         </p>
       </div>
@@ -38,11 +38,11 @@ export function ComplaintForm() {
       )}
 
       <div>
-        <label className="block text-xs font-bold text-avenue-text-muted uppercase mb-1">Category</label>
+        <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Category</label>
         <select
           name="type"
           required
-          className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-avenue-indigo bg-white"
+          className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-brand-indigo bg-white"
         >
           <option value="">Select category…</option>
           {COMPLAINT_TYPES.map(t => (
@@ -52,32 +52,32 @@ export function ComplaintForm() {
       </div>
 
       <div>
-        <label className="block text-xs font-bold text-avenue-text-muted uppercase mb-1">Subject</label>
+        <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Subject</label>
         <input
           name="subject"
           type="text"
           required
           maxLength={120}
           placeholder="Brief summary of your grievance"
-          className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-avenue-indigo"
+          className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-brand-indigo"
         />
       </div>
 
       <div>
-        <label className="block text-xs font-bold text-avenue-text-muted uppercase mb-1">Details</label>
+        <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Details</label>
         <textarea
           name="description"
           required
           rows={4}
           placeholder="Describe the issue, including dates, facility names, or staff involved where relevant…"
-          className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-avenue-indigo resize-none"
+          className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-brand-indigo resize-none"
         />
       </div>
 
       <button
         type="submit"
         disabled={isPending}
-        className="w-full bg-avenue-indigo hover:bg-avenue-secondary text-white py-2.5 rounded-full font-semibold text-sm transition-colors disabled:opacity-60"
+        className="w-full bg-brand-indigo hover:bg-brand-secondary text-white py-2.5 rounded-full font-semibold text-sm transition-colors disabled:opacity-60"
       >
         {isPending ? "Submitting…" : "Submit Grievance"}
       </button>

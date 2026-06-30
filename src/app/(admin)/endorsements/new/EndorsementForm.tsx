@@ -41,9 +41,9 @@ const HAS_PRORATA = new Set<EndorsementType>([
 ]);
 
 function inputCls() {
-  return "w-full border border-[#EEEEEE] rounded-[8px] px-3 py-2 text-sm text-avenue-text-heading focus:ring-2 focus:ring-avenue-indigo focus:border-avenue-indigo outline-none transition-all bg-white";
+  return "w-full border border-[#EEEEEE] rounded-[8px] px-3 py-2 text-sm text-brand-text-heading focus:ring-2 focus:ring-brand-indigo focus:border-brand-indigo outline-none transition-all bg-white";
 }
-function labelCls() { return "block text-xs font-bold text-avenue-text-muted uppercase mb-1"; }
+function labelCls() { return "block text-xs font-bold text-brand-text-muted uppercase mb-1"; }
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <div><label className={labelCls()}>{label}</label>{children}</div>;
 }
@@ -90,25 +90,25 @@ export function EndorsementForm({
     UNDER_REVIEW: "bg-[#FFC107]/10 text-[#856404]",
     APPROVED:     "bg-[#28A745]/10 text-[#28A745]",
     REJECTED:     "bg-[#DC3545]/10 text-[#DC3545]",
-    APPLIED:      "bg-avenue-indigo/10 text-avenue-indigo",
+    APPLIED:      "bg-brand-indigo/10 text-brand-indigo",
     CANCELLED:    "bg-[#6C757D]/10 text-[#6C757D]",
   };
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <Link href="/endorsements" className="text-avenue-text-muted hover:text-avenue-indigo transition-colors">
+        <Link href="/endorsements" className="text-brand-text-muted hover:text-brand-indigo transition-colors">
           <ArrowLeft size={20} />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">New Endorsement</h1>
-          <p className="text-avenue-text-muted text-sm mt-0.5">Submit a mid-term policy change for review and pro-rata calculation.</p>
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">New Endorsement</h1>
+          <p className="text-brand-text-muted text-sm mt-0.5">Submit a mid-term policy change for review and pro-rata calculation.</p>
         </div>
       </div>
 
       {/* Status legend */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-4 shadow-sm">
-        <p className="text-xs font-bold text-avenue-text-muted uppercase mb-2">Endorsement Status Flow</p>
+        <p className="text-xs font-bold text-brand-text-muted uppercase mb-2">Endorsement Status Flow</p>
         <div className="flex flex-wrap gap-2">
           {Object.entries(statusColors).map(([s, cls]) => (
             <span key={s} className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${cls}`}>
@@ -116,7 +116,7 @@ export function EndorsementForm({
             </span>
           ))}
         </div>
-        <p className="text-[11px] text-avenue-text-muted mt-2">
+        <p className="text-[11px] text-brand-text-muted mt-2">
           DRAFT → SUBMITTED → UNDER REVIEW → APPROVED → APPLIED &nbsp;|&nbsp; Can be REJECTED or CANCELLED at any point.
         </p>
       </div>
@@ -124,7 +124,7 @@ export function EndorsementForm({
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* ── Scope ─────────────────────────────────────── */}
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-4">
-          <h2 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2">
+          <h2 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2">
             Endorsement Scope
           </h2>
           <div className="grid md:grid-cols-2 gap-4">
@@ -170,10 +170,10 @@ export function EndorsementForm({
             {selectedGroup && (
               <div className="flex flex-col justify-end">
                 <p className={labelCls()}>Policy Renewal</p>
-                <p className="text-sm font-semibold text-avenue-text-heading">
+                <p className="text-sm font-semibold text-brand-text-heading">
                   {new Date(selectedGroup.renewalDate).toLocaleDateString("en-KE")}
                 </p>
-                <p className="text-xs text-avenue-text-muted">
+                <p className="text-xs text-brand-text-muted">
                   Rate: KES {selectedGroup.contributionRate.toLocaleString()} / member / yr
                 </p>
               </div>
@@ -186,14 +186,14 @@ export function EndorsementForm({
           <div className={`rounded-[8px] p-4 border flex items-start gap-3 ${
             proRata.isCredit
               ? "bg-[#28A745]/5 border-[#28A745]/20"
-              : "bg-avenue-indigo/5 border-avenue-indigo/20"
+              : "bg-brand-indigo/5 border-brand-indigo/20"
           }`}>
-            <Calculator size={18} className={proRata.isCredit ? "text-[#28A745] mt-0.5" : "text-avenue-indigo mt-0.5"} />
+            <Calculator size={18} className={proRata.isCredit ? "text-[#28A745] mt-0.5" : "text-brand-indigo mt-0.5"} />
             <div>
-              <p className="text-sm font-bold text-avenue-text-heading">
+              <p className="text-sm font-bold text-brand-text-heading">
                 Pro-Rata {proRata.isCredit ? "Credit" : "Charge"}: KES {proRata.amount.toLocaleString()}
               </p>
-              <p className="text-xs text-avenue-text-muted mt-0.5">
+              <p className="text-xs text-brand-text-muted mt-0.5">
                 {proRata.daysRemaining} days remaining × KES {(selectedGroup!.contributionRate / 365).toFixed(2)}/day.
                 {proRata.isCredit ? " This amount will be credited to the group's next invoice." : " This amount will be added to the group's next invoice."}
               </p>
@@ -204,7 +204,7 @@ export function EndorsementForm({
         {/* ── Type-specific fields ───────────────────────── */}
         {(type === "MEMBER_ADDITION") && (
           <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-4">
-            <h2 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2">
+            <h2 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2">
               New Member Details
             </h2>
             <div className="grid md:grid-cols-2 gap-4">
@@ -234,7 +234,7 @@ export function EndorsementForm({
 
         {(type === "MEMBER_DELETION") && (
           <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-4">
-            <h2 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2">
+            <h2 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2">
               Member Exit Details
             </h2>
             <div className="grid md:grid-cols-2 gap-4">
@@ -270,7 +270,7 @@ export function EndorsementForm({
 
         {(type === "DEPENDENT_ADDITION") && (
           <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-4">
-            <h2 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2">
+            <h2 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2">
               Dependent Addition Details
             </h2>
             <div className="grid md:grid-cols-2 gap-4">
@@ -303,7 +303,7 @@ export function EndorsementForm({
 
         {(type === "DEPENDENT_DELETION") && (
           <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-4">
-            <h2 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2">
+            <h2 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2">
               Dependent Removal Details
             </h2>
             <div className="grid md:grid-cols-2 gap-4">
@@ -337,13 +337,13 @@ export function EndorsementForm({
 
         {(type === "PACKAGE_UPGRADE" || type === "PACKAGE_DOWNGRADE") && (
           <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-4">
-            <h2 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2">
+            <h2 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2">
               Package Change Details
             </h2>
             {selectedGroup && (
               <div className="bg-[#F8F9FA] rounded-[8px] p-3 text-sm">
-                <p className="text-avenue-text-muted text-xs font-bold uppercase mb-1">Current Package</p>
-                <p className="font-semibold text-avenue-text-heading">Rate: KES {selectedGroup.contributionRate.toLocaleString()} / member / yr</p>
+                <p className="text-brand-text-muted text-xs font-bold uppercase mb-1">Current Package</p>
+                <p className="font-semibold text-brand-text-heading">Rate: KES {selectedGroup.contributionRate.toLocaleString()} / member / yr</p>
               </div>
             )}
             <div className="grid md:grid-cols-2 gap-4">
@@ -366,7 +366,7 @@ export function EndorsementForm({
 
         {type === "BENEFIT_MODIFICATION" && (
           <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-4">
-            <h2 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2">
+            <h2 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2">
               Benefit Modification Details
             </h2>
             <div className="grid md:grid-cols-2 gap-4">
@@ -397,7 +397,7 @@ export function EndorsementForm({
 
         {type === "GROUP_DATA_CHANGE" && (
           <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-4">
-            <h2 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2">
+            <h2 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2">
               Updated Group Details
             </h2>
             <div className="grid md:grid-cols-2 gap-4">
@@ -427,7 +427,7 @@ export function EndorsementForm({
 
         {type === "SALARY_CHANGE" && (
           <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-4">
-            <h2 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2">
+            <h2 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2">
               Salary / Contribution Change
             </h2>
             <div className="grid md:grid-cols-2 gap-4">
@@ -454,7 +454,7 @@ export function EndorsementForm({
 
         {type === "CORRECTION" && (
           <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-4">
-            <h2 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2">
+            <h2 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2">
               Correction Details
             </h2>
             <div className="flex items-start gap-2 bg-[#FFC107]/10 border border-[#FFC107]/30 rounded-[8px] p-3">
@@ -490,7 +490,7 @@ export function EndorsementForm({
 
         {/* ── Notes ────────────────────────────────────── */}
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-3">
-          <h2 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2">
+          <h2 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2">
             Additional Notes
           </h2>
           <textarea
@@ -503,13 +503,13 @@ export function EndorsementForm({
 
         <div className="flex justify-end gap-3">
           <Link href="/endorsements"
-            className="px-5 py-2.5 text-sm font-semibold text-avenue-text-muted hover:text-avenue-text-heading transition-colors">
+            className="px-5 py-2.5 text-sm font-semibold text-brand-text-muted hover:text-brand-text-heading transition-colors">
             Cancel
           </Link>
           <button
             type="submit"
             disabled={submitting}
-            className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-8 py-2.5 rounded-full font-bold text-sm transition-colors flex items-center gap-2 disabled:opacity-60"
+            className="bg-brand-indigo hover:bg-brand-secondary text-white px-8 py-2.5 rounded-full font-bold text-sm transition-colors flex items-center gap-2 disabled:opacity-60"
           >
             <Save size={15} />
             {submitting ? "Submitting…" : "Submit for Review"}

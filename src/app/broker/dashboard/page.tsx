@@ -32,7 +32,7 @@ export default async function BrokerDashboardPage() {
 
   if (!broker) {
     return (
-      <div className="p-6 text-center text-avenue-text-body">
+      <div className="p-6 text-center text-brand-text-body">
         <p>No broker profile linked to your account. Please contact the administrator.</p>
       </div>
     );
@@ -53,13 +53,13 @@ export default async function BrokerDashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold font-heading text-avenue-text-heading">Welcome, {broker.name}</h1>
-        <p className="text-avenue-text-muted mt-1">Your broker dashboard overview.</p>
+        <h1 className="text-3xl font-bold font-heading text-brand-text-heading">Welcome, {broker.name}</h1>
+        <p className="text-brand-text-muted mt-1">Your broker dashboard overview.</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {[
-          { label: "Active Groups", value: broker.groups.length, icon: Building2, color: "text-avenue-indigo" },
+          { label: "Active Groups", value: broker.groups.length, icon: Building2, color: "text-brand-indigo" },
           { label: "Total Members", value: totalMembers, icon: Users, color: "text-[#28A745]" },
           { label: "Payable Commissions", value: formatCurrency(payableCommissions), icon: DollarSign, color: "text-[#FFC107]" },
           { label: "Renewals Due (60 days)", value: renewalSoon.length, icon: RefreshCw, color: "text-[#DC3545]" },
@@ -68,7 +68,7 @@ export default async function BrokerDashboardPage() {
           return (
             <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm font-ui">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-xs text-avenue-text-muted font-bold uppercase tracking-wide">{s.label}</p>
+                <p className="text-xs text-brand-text-muted font-bold uppercase tracking-wide">{s.label}</p>
                 <Icon className={`h-4 w-4 ${s.color}`} />
               </div>
               <p className={`text-2xl font-bold tabular-nums ${s.color}`}>{s.value}</p>
@@ -81,14 +81,14 @@ export default async function BrokerDashboardPage() {
         {/* Groups */}
         <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-[#EEEEEE]">
-            <h2 className="font-bold text-avenue-text-heading font-heading">My Groups</h2>
+            <h2 className="font-bold text-brand-text-heading font-heading">My Groups</h2>
           </div>
           <div className="divide-y divide-[#EEEEEE]">
             {broker.groups.slice(0, 5).map((g) => (
               <div key={g.id} className="px-5 py-3 flex items-center justify-between text-sm">
                 <div>
-                  <p className="font-semibold text-avenue-text-heading">{g.name}</p>
-                  <p className="text-xs text-avenue-text-muted">{g._count.members} members · Renews {new Date(g.renewalDate).toLocaleDateString("en-KE")}</p>
+                  <p className="font-semibold text-brand-text-heading">{g.name}</p>
+                  <p className="text-xs text-brand-text-muted">{g._count.members} members · Renews {new Date(g.renewalDate).toLocaleDateString("en-KE")}</p>
                 </div>
                 <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase ${
                   g.status === "ACTIVE" ? "bg-[#28A745]/10 text-[#28A745]" : "bg-[#6C757D]/10 text-[#6C757D]"
@@ -96,7 +96,7 @@ export default async function BrokerDashboardPage() {
               </div>
             ))}
             {broker.groups.length === 0 && (
-              <div className="px-5 py-8 text-center text-avenue-text-body text-sm">No groups assigned.</div>
+              <div className="px-5 py-8 text-center text-brand-text-body text-sm">No groups assigned.</div>
             )}
           </div>
         </div>
@@ -104,21 +104,21 @@ export default async function BrokerDashboardPage() {
         {/* Commission snapshot */}
         <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-[#EEEEEE] flex items-center justify-between">
-            <h2 className="font-bold text-avenue-text-heading font-heading">Commission Snapshot</h2>
-            <p className="text-xs text-avenue-text-muted">Paid {formatCurrency(paidCommissions)}</p>
+            <h2 className="font-bold text-brand-text-heading font-heading">Commission Snapshot</h2>
+            <p className="text-xs text-brand-text-muted">Paid {formatCurrency(paidCommissions)}</p>
           </div>
           <div className="divide-y divide-[#EEEEEE]">
             {broker.commissionLedger.slice(0, 5).map((entry) => (
               <div key={entry.id} className="px-5 py-3 flex items-center justify-between text-sm">
                 <div>
-                  <p className="font-semibold text-avenue-text-heading">{entry.schedule?.scheduleName ?? "Pending schedule"}</p>
-                  <p className="text-xs text-avenue-text-muted">{new Date(entry.earnedPeriodStart).toLocaleDateString("en-KE")} · {entry.state.replaceAll("_", " ")}</p>
+                  <p className="font-semibold text-brand-text-heading">{entry.schedule?.scheduleName ?? "Pending schedule"}</p>
+                  <p className="text-xs text-brand-text-muted">{new Date(entry.earnedPeriodStart).toLocaleDateString("en-KE")} · {entry.state.replaceAll("_", " ")}</p>
                 </div>
                 <span className="font-bold text-[#28A745]">{formatCurrency(entry.netPayable)}</span>
               </div>
             ))}
             {broker.commissionLedger.length === 0 && (
-              <div className="px-5 py-8 text-center text-avenue-text-body text-sm">No commission ledger entries yet.</div>
+              <div className="px-5 py-8 text-center text-brand-text-body text-sm">No commission ledger entries yet.</div>
             )}
           </div>
         </div>
@@ -126,7 +126,7 @@ export default async function BrokerDashboardPage() {
         {/* Renewals coming up */}
         <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-[#EEEEEE]">
-            <h2 className="font-bold text-avenue-text-heading font-heading">Upcoming Renewals</h2>
+            <h2 className="font-bold text-brand-text-heading font-heading">Upcoming Renewals</h2>
           </div>
           <div className="divide-y divide-[#EEEEEE]">
             {renewalSoon.slice(0, 5).map((g) => {
@@ -134,8 +134,8 @@ export default async function BrokerDashboardPage() {
               return (
                 <div key={g.id} className="px-5 py-3 flex items-center justify-between text-sm">
                   <div>
-                    <p className="font-semibold text-avenue-text-heading">{g.name}</p>
-                    <p className="text-xs text-avenue-text-muted">{new Date(g.renewalDate).toLocaleDateString("en-KE")}</p>
+                    <p className="font-semibold text-brand-text-heading">{g.name}</p>
+                    <p className="text-xs text-brand-text-muted">{new Date(g.renewalDate).toLocaleDateString("en-KE")}</p>
                   </div>
                   <span className={`font-bold text-sm ${daysLeft <= 14 ? "text-[#DC3545]" : "text-[#FFC107]"}`}>
                     {daysLeft}d
@@ -144,7 +144,7 @@ export default async function BrokerDashboardPage() {
               );
             })}
             {renewalSoon.length === 0 && (
-              <div className="px-5 py-8 text-center text-avenue-text-body text-sm">No renewals due in 60 days.</div>
+              <div className="px-5 py-8 text-center text-brand-text-body text-sm">No renewals due in 60 days.</div>
             )}
           </div>
         </div>

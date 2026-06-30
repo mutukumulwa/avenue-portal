@@ -4,8 +4,8 @@ import { useState } from "react";
 import { upsertContractDiagnosisTariffAction, deleteContractDiagnosisTariffAction } from "../actions";
 import { Pencil, Trash2, Plus } from "lucide-react";
 
-const inp = "border border-[#EEEEEE] rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:border-avenue-indigo w-full";
-const lbl = "text-[10px] font-bold uppercase text-avenue-text-muted block mb-1";
+const inp = "border border-[#EEEEEE] rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:border-brand-indigo w-full";
+const lbl = "text-[10px] font-bold uppercase text-brand-text-muted block mb-1";
 
 export interface ContractDiagnosisRow {
   id: string;
@@ -20,7 +20,7 @@ function DiagnosisForm({ contractId, tariff, onDone }: { contractId: string; tar
   return (
     <form
       action={async fd => { await upsertContractDiagnosisTariffAction(fd); onDone(); }}
-      className="grid grid-cols-6 gap-3 px-5 py-4 bg-avenue-indigo/5 border-b border-[#EEEEEE] items-end"
+      className="grid grid-cols-6 gap-3 px-5 py-4 bg-brand-indigo/5 border-b border-[#EEEEEE] items-end"
     >
       <input type="hidden" name="contractId" value={contractId} />
       {tariff && <input type="hidden" name="diagTariffId" value={tariff.id} />}
@@ -41,10 +41,10 @@ function DiagnosisForm({ contractId, tariff, onDone }: { contractId: string; tar
         <input name="perDayRate" type="number" step="0.01" defaultValue={tariff?.perDayRate ?? ""} className={inp} placeholder="Per day" />
       </div>
       <div className="flex gap-2">
-        <button type="submit" className="bg-avenue-indigo text-white px-4 py-2 rounded-full text-xs font-bold hover:bg-avenue-secondary flex-1 transition-colors">
+        <button type="submit" className="bg-brand-indigo text-white px-4 py-2 rounded-full text-xs font-bold hover:bg-brand-secondary flex-1 transition-colors">
           Save
         </button>
-        <button type="button" onClick={onDone} className="border border-[#EEEEEE] px-3 py-2 rounded-full text-xs font-semibold text-avenue-text-muted hover:border-avenue-indigo transition-colors">
+        <button type="button" onClick={onDone} className="border border-[#EEEEEE] px-3 py-2 rounded-full text-xs font-semibold text-brand-text-muted hover:border-brand-indigo transition-colors">
           Cancel
         </button>
       </div>
@@ -68,11 +68,11 @@ export function ContractDiagnosisCard({
     <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
       <div className="px-6 py-4 border-b border-[#EEEEEE] flex justify-between items-center">
         <div>
-          <h2 className="font-bold text-avenue-text-heading font-heading">Case & Per-Diem Rates</h2>
-          <p className="text-xs text-avenue-text-muted mt-0.5">Diagnosis-bundled episode rates and inpatient per-diems (DRG-style).</p>
+          <h2 className="font-bold text-brand-text-heading font-heading">Case & Per-Diem Rates</h2>
+          <p className="text-xs text-brand-text-muted mt-0.5">Diagnosis-bundled episode rates and inpatient per-diems (DRG-style).</p>
         </div>
         {editable && (
-          <button onClick={() => { setAdding(true); setEditingId(null); }} className="flex items-center gap-1 text-avenue-indigo text-sm font-semibold hover:text-avenue-secondary transition-colors">
+          <button onClick={() => { setAdding(true); setEditingId(null); }} className="flex items-center gap-1 text-brand-indigo text-sm font-semibold hover:text-brand-secondary transition-colors">
             <Plus size={14} /> Add Rate
           </button>
         )}
@@ -82,7 +82,7 @@ export function ContractDiagnosisCard({
 
       <table className="w-full text-sm">
         <thead>
-          <tr className="bg-[#F8F9FA] text-[10px] font-bold uppercase text-avenue-text-muted border-b border-[#EEEEEE]">
+          <tr className="bg-[#F8F9FA] text-[10px] font-bold uppercase text-brand-text-muted border-b border-[#EEEEEE]">
             <th className="px-5 py-2.5 text-left">ICD-10</th>
             <th className="px-5 py-2.5 text-left">Diagnosis</th>
             <th className="px-5 py-2.5 text-right">Case Rate</th>
@@ -100,20 +100,20 @@ export function ContractDiagnosisCard({
               </tr>
             ) : (
               <tr key={t.id} className="hover:bg-[#F8F9FA]">
-                <td className="px-5 py-2.5 font-mono text-xs text-avenue-text-muted">{t.icdCode}</td>
-                <td className="px-5 py-2.5 font-medium text-avenue-text-heading">{t.diagnosisLabel}</td>
+                <td className="px-5 py-2.5 font-mono text-xs text-brand-text-muted">{t.icdCode}</td>
+                <td className="px-5 py-2.5 font-medium text-brand-text-heading">{t.diagnosisLabel}</td>
                 <td className="px-5 py-2.5 text-right font-semibold">{t.bundledRate != null ? t.bundledRate.toLocaleString("en-KE") : "—"}</td>
                 <td className="px-5 py-2.5 text-right font-semibold">{t.perDayRate != null ? `${t.perDayRate.toLocaleString("en-KE")}/day` : "—"}</td>
                 {editable && (
                   <td className="px-5 py-2.5">
                     <div className="flex gap-2.5 justify-end">
-                      <button onClick={() => { setEditingId(t.id); setAdding(false); }} className="text-avenue-text-muted hover:text-avenue-indigo transition-colors" title="Edit">
+                      <button onClick={() => { setEditingId(t.id); setAdding(false); }} className="text-brand-text-muted hover:text-brand-indigo transition-colors" title="Edit">
                         <Pencil size={13} />
                       </button>
                       <form action={deleteContractDiagnosisTariffAction}>
                         <input type="hidden" name="tariffId" value={t.id} />
                         <input type="hidden" name="contractId" value={contractId} />
-                        <button type="submit" className="text-avenue-text-muted hover:text-[#DC3545] transition-colors" title="Remove">
+                        <button type="submit" className="text-brand-text-muted hover:text-[#DC3545] transition-colors" title="Remove">
                           <Trash2 size={13} />
                         </button>
                       </form>
@@ -125,7 +125,7 @@ export function ContractDiagnosisCard({
           )}
           {tariffs.length === 0 && !adding && (
             <tr>
-              <td colSpan={editable ? 5 : 4} className="px-5 py-8 text-center text-sm text-avenue-text-muted">
+              <td colSpan={editable ? 5 : 4} className="px-5 py-8 text-center text-sm text-brand-text-muted">
                 No bundled rates. Use these for fixed-price episodes (e.g. normal delivery, caesarean) or inpatient per-diems.
               </td>
             </tr>

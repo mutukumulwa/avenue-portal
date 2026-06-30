@@ -25,20 +25,20 @@ export default async function ClaimsPage() {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Claims</h1>
-          <p className="text-avenue-text-body font-body mt-1">Review and adjudicate medical insurance claims.</p>
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Claims</h1>
+          <p className="text-brand-text-body font-body mt-1">Review and adjudicate medical insurance claims.</p>
         </div>
         <div className="flex items-center gap-2">
           <Link
             href="/claims/new/reimbursement"
-            className="border border-avenue-indigo text-avenue-indigo hover:bg-avenue-indigo/5 px-5 py-2 rounded-full font-semibold transition-colors flex items-center gap-2 text-sm"
+            className="border border-brand-indigo text-brand-indigo hover:bg-brand-indigo/5 px-5 py-2 rounded-full font-semibold transition-colors flex items-center gap-2 text-sm"
           >
             <PlusCircle size={16} />
             Reimbursement
           </Link>
           <Link
             href="/claims/new"
-            className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors flex items-center gap-2 shadow-sm"
+            className="bg-brand-indigo hover:bg-brand-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors flex items-center gap-2 shadow-sm"
           >
             <PlusCircle size={18} />
             <span>New Claim</span>
@@ -49,14 +49,14 @@ export default async function ClaimsPage() {
       {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Total", count: claims.length, color: "bg-avenue-indigo" },
+          { label: "Total", count: claims.length, color: "bg-brand-indigo" },
           { label: "Awaiting Capture", count: claims.filter(c => ["INCURRED", "RECEIVED"].includes(c.status)).length, color: "bg-[#6C757D]" },
           { label: "In Review", count: claims.filter(c => ["CAPTURED", "UNDER_REVIEW"].includes(c.status)).length, color: "bg-[#17A2B8]" },
           { label: "Approved", count: claims.filter(c => ["APPROVED", "PARTIALLY_APPROVED"].includes(c.status)).length, color: "bg-[#28A745]" },
         ].map((s) => (
           <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-lg p-4 shadow-sm">
-            <p className="text-xs text-avenue-text-muted font-bold uppercase">{s.label}</p>
-            <p className="text-2xl font-bold text-avenue-text-heading mt-1">{s.count}</p>
+            <p className="text-xs text-brand-text-muted font-bold uppercase">{s.label}</p>
+            <p className="text-2xl font-bold text-brand-text-heading mt-1">{s.count}</p>
             <div className={`h-1 w-12 rounded ${s.color} mt-2`} />
           </div>
         ))}
@@ -77,10 +77,10 @@ export default async function ClaimsPage() {
                 <th className="px-6 py-4">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#EEEEEE] text-avenue-text-body text-sm">
+            <tbody className="divide-y divide-[#EEEEEE] text-brand-text-body text-sm">
               {claims.map((claim) => (
                 <tr key={claim.id} className="hover:bg-[#F8F9FA] transition-colors">
-                  <td className="px-6 py-4 font-mono text-avenue-text-heading font-semibold">
+                  <td className="px-6 py-4 font-mono text-brand-text-heading font-semibold">
                     <div className="flex items-center gap-2">
                       {claim._count.exceptionLogs > 0 && (
                         <span title="Has open exceptions"><ShieldAlert size={14} className="text-[#856404] shrink-0" /></span>
@@ -90,7 +90,7 @@ export default async function ClaimsPage() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-col">
-                      <span className="font-bold text-avenue-text-heading">{claim.member.firstName} {claim.member.lastName}</span>
+                      <span className="font-bold text-brand-text-heading">{claim.member.firstName} {claim.member.lastName}</span>
                       <span className="text-xs">{claim.member.memberNumber}</span>
                     </div>
                   </td>
@@ -100,7 +100,7 @@ export default async function ClaimsPage() {
                       {claim.serviceType}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-avenue-text-heading font-semibold">{Number(claim.billedAmount).toLocaleString()}</td>
+                  <td className="px-6 py-4 text-brand-text-heading font-semibold">{Number(claim.billedAmount).toLocaleString()}</td>
                   <td className="px-6 py-4 font-semibold text-[#28A745]">
                     {Number(claim.approvedAmount) > 0 ? Number(claim.approvedAmount).toLocaleString() : "—"}
                   </td>
@@ -110,7 +110,7 @@ export default async function ClaimsPage() {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <Link href={`/claims/${claim.id}`} className="text-avenue-indigo hover:text-avenue-secondary font-semibold inline-flex items-center gap-1">
+                    <Link href={`/claims/${claim.id}`} className="text-brand-indigo hover:text-brand-secondary font-semibold inline-flex items-center gap-1">
                       Review <ArrowRight size={16} />
                     </Link>
                   </td>
@@ -119,7 +119,7 @@ export default async function ClaimsPage() {
               
               {claims.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-6 py-12 text-center text-avenue-text-body">
+                  <td colSpan={8} className="px-6 py-12 text-center text-brand-text-body">
                     <FileSearch size={32} className="mx-auto mb-3 text-[#Dcdcdc]" />
                     No claims found. Click &quot;New Claim&quot; to submit one.
                   </td>

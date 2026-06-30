@@ -68,14 +68,14 @@ export default async function MemberOnboardingPage({ params }: { params: Promise
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <Link href={`/members/${id}`} className="text-avenue-text-muted hover:text-avenue-indigo transition-colors">
+        <Link href={`/members/${id}`} className="text-brand-text-muted hover:text-brand-indigo transition-colors">
           <ArrowLeft size={20} />
         </Link>
         <div>
-          <h1 className="text-xl font-bold text-avenue-text-heading font-heading">
+          <h1 className="text-xl font-bold text-brand-text-heading font-heading">
             Onboarding — {member.firstName} {member.lastName}
           </h1>
-          <p className="text-sm text-avenue-text-muted mt-0.5">
+          <p className="text-sm text-brand-text-muted mt-0.5">
             {member.memberNumber} · {member.group.name} · status: {member.status.replace(/_/g, " ")}
           </p>
         </div>
@@ -91,7 +91,7 @@ export default async function MemberOnboardingPage({ params }: { params: Promise
           <form action={initiateOnboardingAction}>
             <input type="hidden" name="memberId" value={id} />
             <button type="submit"
-              className="bg-avenue-indigo text-white px-4 py-1.5 rounded-full text-sm font-semibold hover:bg-avenue-secondary transition-colors">
+              className="bg-brand-indigo text-white px-4 py-1.5 rounded-full text-sm font-semibold hover:bg-brand-secondary transition-colors">
               Start Onboarding
             </button>
           </form>
@@ -101,9 +101,9 @@ export default async function MemberOnboardingPage({ params }: { params: Promise
       <div className="grid grid-cols-3 gap-6">
         {/* Left: checklist */}
         <div className="space-y-3">
-          <h2 className="font-semibold text-avenue-text-heading text-sm uppercase tracking-wide">Checklist</h2>
+          <h2 className="font-semibold text-brand-text-heading text-sm uppercase tracking-wide">Checklist</h2>
           {checklistItems.length === 0 ? (
-            <p className="text-xs text-avenue-text-muted">No items yet</p>
+            <p className="text-xs text-brand-text-muted">No items yet</p>
           ) : (
             <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm divide-y divide-[#EEEEEE]">
               {checklistItems.map((item) => (
@@ -112,13 +112,13 @@ export default async function MemberOnboardingPage({ params }: { params: Promise
                     ? <CheckCircle size={15} className="text-[#28A745] shrink-0" />
                     : item.status === "FAILED"
                     ? <AlertTriangle size={15} className="text-[#DC3545] shrink-0" />
-                    : <Clock size={15} className="text-avenue-text-muted shrink-0" />}
+                    : <Clock size={15} className="text-brand-text-muted shrink-0" />}
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-avenue-text-heading leading-tight">
+                    <p className="text-sm font-semibold text-brand-text-heading leading-tight">
                       {ITEM_LABEL[item.itemType] ?? item.itemType}
                     </p>
                     {item.completedAt && (
-                      <p className="text-[11px] text-avenue-text-muted mt-0.5">
+                      <p className="text-[11px] text-brand-text-muted mt-0.5">
                         {new Date(item.completedAt).toLocaleDateString("en-KE")}
                       </p>
                     )}
@@ -135,8 +135,8 @@ export default async function MemberOnboardingPage({ params }: { params: Promise
           {/* ── KYC ─────────────────────────────────────────── */}
           <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-4">
             <div className="flex items-center gap-2">
-              <UserCheck size={16} className={getItemStatus("KYC_COMPLETION") === "COMPLETED" ? "text-[#28A745]" : "text-avenue-text-muted"} />
-              <h3 className="font-semibold text-avenue-text-heading text-sm">KYC</h3>
+              <UserCheck size={16} className={getItemStatus("KYC_COMPLETION") === "COMPLETED" ? "text-[#28A745]" : "text-brand-text-muted"} />
+              <h3 className="font-semibold text-brand-text-heading text-sm">KYC</h3>
               {kycRecord && (
                 <span className={`ml-auto text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${kycRecord.status === "COMPLETED" ? "bg-[#28A745]/10 text-[#28A745]" : "bg-[#FFC107]/10 text-[#856404]"}`}>
                   {kycRecord.status}
@@ -153,7 +153,7 @@ export default async function MemberOnboardingPage({ params }: { params: Promise
             <form action={saveKycAction} className="grid grid-cols-3 gap-3">
               <input type="hidden" name="memberId" value={id} />
               <div>
-                <label className="block text-xs font-semibold text-avenue-text-muted mb-1">ID Type</label>
+                <label className="block text-xs font-semibold text-brand-text-muted mb-1">ID Type</label>
                 <select name="govIdType" defaultValue={kycRecord?.govIdType ?? ""}
                   className="w-full border border-[#EEEEEE] rounded-[6px] px-2 py-1.5 text-sm">
                   <option value="">— Select —</option>
@@ -163,19 +163,19 @@ export default async function MemberOnboardingPage({ params }: { params: Promise
                 </select>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-avenue-text-muted mb-1">ID Number</label>
+                <label className="block text-xs font-semibold text-brand-text-muted mb-1">ID Number</label>
                 <input name="govIdNumber" type="text" defaultValue={kycRecord?.govIdNumber ?? ""}
                   className="w-full border border-[#EEEEEE] rounded-[6px] px-2 py-1.5 text-sm" />
               </div>
               <div>
-                <label className="block text-xs font-semibold text-avenue-text-muted mb-1">Photo URL</label>
+                <label className="block text-xs font-semibold text-brand-text-muted mb-1">Photo URL</label>
                 <input name="photoUrl" type="url" defaultValue={kycRecord?.photoUrl ?? ""}
                   placeholder="https://…"
                   className="w-full border border-[#EEEEEE] rounded-[6px] px-2 py-1.5 text-sm" />
               </div>
               <div className="col-span-3 flex justify-end">
                 <button type="submit"
-                  className="bg-avenue-indigo text-white px-4 py-1.5 rounded-full text-sm font-semibold hover:bg-avenue-secondary transition-colors">
+                  className="bg-brand-indigo text-white px-4 py-1.5 rounded-full text-sm font-semibold hover:bg-brand-secondary transition-colors">
                   Save KYC
                 </button>
               </div>
@@ -183,11 +183,11 @@ export default async function MemberOnboardingPage({ params }: { params: Promise
 
             {kycRecord && kycRecord.documents.length > 0 && (
               <div>
-                <p className="text-xs font-semibold text-avenue-text-muted mb-2">Uploaded Documents</p>
+                <p className="text-xs font-semibold text-brand-text-muted mb-2">Uploaded Documents</p>
                 <div className="flex flex-wrap gap-2">
                   {kycRecord.documents.map((doc) => (
                     <a key={doc.id} href={doc.fileUrl} target="_blank" rel="noopener noreferrer"
-                      className={`text-[11px] px-2 py-1 rounded border ${doc.isVerified ? "border-[#28A745]/40 text-[#28A745] bg-[#28A745]/5" : "border-[#EEEEEE] text-avenue-text-muted"}`}>
+                      className={`text-[11px] px-2 py-1 rounded border ${doc.isVerified ? "border-[#28A745]/40 text-[#28A745] bg-[#28A745]/5" : "border-[#EEEEEE] text-brand-text-muted"}`}>
                       {doc.docType.replace(/_/g, " ")} {doc.isVerified ? "✓" : ""}
                     </a>
                   ))}
@@ -199,8 +199,8 @@ export default async function MemberOnboardingPage({ params }: { params: Promise
           {/* ── Cards ────────────────────────────────────────── */}
           <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-4">
             <div className="flex items-center gap-2">
-              <CreditCard size={16} className={getItemStatus("DIGITAL_CARD_GENERATED") === "COMPLETED" ? "text-[#28A745]" : "text-avenue-text-muted"} />
-              <h3 className="font-semibold text-avenue-text-heading text-sm">Membership Cards</h3>
+              <CreditCard size={16} className={getItemStatus("DIGITAL_CARD_GENERATED") === "COMPLETED" ? "text-[#28A745]" : "text-brand-text-muted"} />
+              <h3 className="font-semibold text-brand-text-heading text-sm">Membership Cards</h3>
             </div>
 
             {cards.length > 0 && (
@@ -208,11 +208,11 @@ export default async function MemberOnboardingPage({ params }: { params: Promise
                 {cards.map((card) => (
                   <div key={card.id} className="flex items-center justify-between border border-[#EEEEEE] rounded-[6px] px-4 py-3">
                     <div>
-                      <p className="text-sm font-semibold text-avenue-text-heading">
+                      <p className="text-sm font-semibold text-brand-text-heading">
                         {card.cardType} card
-                        <span className="ml-2 font-mono text-xs text-avenue-text-muted">{card.cardNumber}</span>
+                        <span className="ml-2 font-mono text-xs text-brand-text-muted">{card.cardNumber}</span>
                       </p>
-                      <p className="text-xs text-avenue-text-muted mt-0.5">
+                      <p className="text-xs text-brand-text-muted mt-0.5">
                         {CARD_STATUS_LABEL[card.status]}
                         {card.issuedAt && ` · issued ${new Date(card.issuedAt).toLocaleDateString("en-KE")}`}
                       </p>
@@ -226,7 +226,7 @@ export default async function MemberOnboardingPage({ params }: { params: Promise
                           card.status === "DISPATCHED" ? "DELIVERED" : "ACTIVATED"
                         } />
                         <button type="submit"
-                          className="text-xs font-semibold text-avenue-indigo hover:underline">
+                          className="text-xs font-semibold text-brand-indigo hover:underline">
                           Mark {card.status === "ISSUED" ? "Dispatched" : card.status === "DISPATCHED" ? "Delivered" : "Activated"} →
                         </button>
                       </form>
@@ -241,7 +241,7 @@ export default async function MemberOnboardingPage({ params }: { params: Promise
                 <form action={issueDigitalCardAction}>
                   <input type="hidden" name="memberId" value={id} />
                   <button type="submit"
-                    className="bg-avenue-indigo text-white px-4 py-1.5 rounded-full text-sm font-semibold hover:bg-avenue-secondary transition-colors">
+                    className="bg-brand-indigo text-white px-4 py-1.5 rounded-full text-sm font-semibold hover:bg-brand-secondary transition-colors">
                     Issue Digital Card
                   </button>
                 </form>
@@ -250,7 +250,7 @@ export default async function MemberOnboardingPage({ params }: { params: Promise
                 <input type="hidden" name="memberId" value={id} />
                 <input type="hidden" name="isSmart" value="false" />
                 <button type="submit"
-                  className="border border-avenue-indigo text-avenue-indigo px-4 py-1.5 rounded-full text-sm font-semibold hover:bg-avenue-indigo hover:text-white transition-colors">
+                  className="border border-brand-indigo text-brand-indigo px-4 py-1.5 rounded-full text-sm font-semibold hover:bg-brand-indigo hover:text-white transition-colors">
                   Queue Physical Card
                 </button>
               </form>
@@ -268,8 +268,8 @@ export default async function MemberOnboardingPage({ params }: { params: Promise
           {/* ── Communications & Portal ───────────────────────── */}
           <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-4">
             <div className="flex items-center gap-2">
-              <Bell size={16} className="text-avenue-text-muted" />
-              <h3 className="font-semibold text-avenue-text-heading text-sm">Communications & Portal</h3>
+              <Bell size={16} className="text-brand-text-muted" />
+              <h3 className="font-semibold text-brand-text-heading text-sm">Communications & Portal</h3>
             </div>
             <div className="flex gap-2 flex-wrap">
               {getItemStatus("WELCOME_COMMUNICATION_SENT") !== "COMPLETED" && (
@@ -285,7 +285,7 @@ export default async function MemberOnboardingPage({ params }: { params: Promise
                 <form action={markPortalProvisionedAction}>
                   <input type="hidden" name="memberId" value={id} />
                   <button type="submit"
-                    className="border border-avenue-indigo text-avenue-indigo px-4 py-1.5 rounded-full text-sm font-semibold hover:bg-avenue-indigo hover:text-white transition-colors">
+                    className="border border-brand-indigo text-brand-indigo px-4 py-1.5 rounded-full text-sm font-semibold hover:bg-brand-indigo hover:text-white transition-colors">
                     Mark Portal Provisioned
                   </button>
                 </form>
@@ -301,7 +301,7 @@ export default async function MemberOnboardingPage({ params }: { params: Promise
                 </span>
               )}
             </div>
-            <div className="text-xs text-avenue-text-muted">
+            <div className="text-xs text-brand-text-muted">
               Email: <strong>{member.email ?? "—"}</strong> · Phone: <strong>{member.phone ?? "—"}</strong>
             </div>
           </div>

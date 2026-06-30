@@ -13,7 +13,7 @@ export function ComplaintActions({ complaint }: { complaint: Complaint }) {
 
   if (complaint.status === "RESOLVED" || complaint.status === "DISMISSED") {
     return (
-      <span className="text-[10px] text-avenue-text-muted italic">
+      <span className="text-[10px] text-brand-text-muted italic">
         {complaint.resolution || "No resolution notes"}
       </span>
     );
@@ -22,7 +22,7 @@ export function ComplaintActions({ complaint }: { complaint: Complaint }) {
   return (
     <div className="space-y-2 text-right">
       {isPending ? (
-        <Loader2 size={14} className="animate-spin text-avenue-text-muted ml-auto" />
+        <Loader2 size={14} className="animate-spin text-brand-text-muted ml-auto" />
       ) : showResolve ? (
         <div className="text-left space-y-2 min-w-[220px]">
           <textarea
@@ -30,12 +30,12 @@ export function ComplaintActions({ complaint }: { complaint: Complaint }) {
             onChange={e => setResolution(e.target.value)}
             placeholder="Resolution notes…"
             rows={2}
-            className="w-full text-xs border border-[#EEEEEE] rounded px-2 py-1.5 focus:outline-none focus:border-avenue-indigo"
+            className="w-full text-xs border border-[#EEEEEE] rounded px-2 py-1.5 focus:outline-none focus:border-brand-indigo"
           />
           <div className="flex gap-2 justify-end">
             <button
               onClick={() => setShowResolve(false)}
-              className="text-xs text-avenue-text-muted hover:text-avenue-text-heading"
+              className="text-xs text-brand-text-muted hover:text-brand-text-heading"
             >
               Cancel
             </button>

@@ -92,19 +92,19 @@ export default async function DashboardPage() {
   const lossRatio     = totalBilled > 0 ? totalApproved / totalBilled : 0;
 
   const cards = [
-    { label: "Total Active Members", value: activeMembers.toLocaleString(), sub: "Enrolled & active", icon: Users, color: "text-avenue-indigo", href: "/members" },
+    { label: "Total Active Members", value: activeMembers.toLocaleString(), sub: "Enrolled & active", icon: Users, color: "text-brand-indigo", href: "/members" },
     { label: "Active Corporate Groups", value: activeGroups.toLocaleString(), sub: "Policy groups", icon: Building2, color: "text-[#28A745]", href: "/groups" },
     { label: "Pending Claims", value: pendingClaims.toLocaleString(), sub: "Requires adjudication", icon: Receipt, color: "text-[#DC3545]", href: "/claims" },
     { label: "Pending Pre-Auths", value: pendingPreauths.toLocaleString(), sub: "Awaiting approval", icon: FileText, color: "text-[#17A2B8]", href: "/preauth" },
-    { label: "Claims This Month", value: recentClaims.toLocaleString(), sub: "Last 30 days", icon: TrendingUp, color: "text-avenue-indigo", href: "/claims" },
+    { label: "Claims This Month", value: recentClaims.toLocaleString(), sub: "Last 30 days", icon: TrendingUp, color: "text-brand-indigo", href: "/claims" },
     { label: "Overdue Invoices", value: overdueInvoices.toLocaleString(), sub: "Payment overdue", icon: Clock, color: "text-[#FFC107]", href: "/billing" },
   ];
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col space-y-2">
-        <h1 className="text-3xl font-bold font-heading text-avenue-text-heading">Dashboard Overview</h1>
-        <p className="text-avenue-text-muted">Welcome back to the AiCare platform. Here is what is happening today.</p>
+        <h1 className="text-3xl font-bold font-heading text-brand-text-heading">Dashboard Overview</h1>
+        <p className="text-brand-text-muted">Welcome back to the AiCare platform. Here is what is happening today.</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -112,13 +112,13 @@ export default async function DashboardPage() {
           const Icon = card.icon;
           return (
             <Link key={card.label} href={card.href} className="block">
-              <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm hover:shadow-md hover:border-avenue-indigo/30 transition-all font-ui">
+              <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm hover:shadow-md hover:border-brand-indigo/30 transition-all font-ui">
                 <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-bold uppercase tracking-wide text-avenue-text-muted">{card.label}</p>
+                  <p className="text-xs font-bold uppercase tracking-wide text-brand-text-muted">{card.label}</p>
                   <Icon size={16} className={card.color} />
                 </div>
                 <p className={`text-2xl font-bold tabular-nums ${card.color}`}>{card.value}</p>
-                <p className="text-xs text-avenue-text-muted mt-1">{card.sub}</p>
+                <p className="text-xs text-brand-text-muted mt-1">{card.sub}</p>
               </div>
             </Link>
           );
@@ -141,15 +141,15 @@ export default async function DashboardPage() {
         {/* Quick actions */}
         <div className="lg:col-span-3 bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-[#EEEEEE]">
-            <h2 className="font-bold text-avenue-text-heading font-heading">Quick Actions</h2>
+            <h2 className="font-bold text-brand-text-heading font-heading">Quick Actions</h2>
           </div>
           <div className="p-4 grid grid-cols-2 gap-3">
             {[
-              { label: "New Claim", href: "/claims/new", bg: "bg-avenue-indigo" },
+              { label: "New Claim", href: "/claims/new", bg: "bg-brand-indigo" },
               { label: "New Pre-Auth", href: "/preauth/new", bg: "bg-[#17A2B8]" },
               { label: "Enrol Member", href: "/members/new", bg: "bg-[#28A745]" },
               { label: "New Endorsement", href: "/endorsements/new", bg: "bg-[#6C757D]" },
-              { label: "New Quotation", href: "/quotations/calculator", bg: "bg-avenue-secondary" },
+              { label: "New Quotation", href: "/quotations/calculator", bg: "bg-brand-secondary" },
               { label: "View Reports", href: "/reports", bg: "bg-[#FFC107]" },
             ].map(a => (
               <Link key={a.label} href={a.href}
@@ -163,22 +163,22 @@ export default async function DashboardPage() {
         {/* Recent claims */}
         <div className="lg:col-span-4 bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
           <div className="px-5 py-4 border-b border-[#EEEEEE] flex justify-between items-center">
-            <h2 className="font-bold text-avenue-text-heading font-heading">Recent Claims</h2>
-            <Link href="/claims" className="text-avenue-indigo text-xs font-semibold hover:underline">View all</Link>
+            <h2 className="font-bold text-brand-text-heading font-heading">Recent Claims</h2>
+            <Link href="/claims" className="text-brand-indigo text-xs font-semibold hover:underline">View all</Link>
           </div>
           <div className="divide-y divide-[#EEEEEE]">
             {recentActivity.length === 0 && (
-              <p className="px-5 py-6 text-sm text-avenue-text-body text-center">No claims yet.</p>
+              <p className="px-5 py-6 text-sm text-brand-text-body text-center">No claims yet.</p>
             )}
             {recentActivity.map(c => (
               <Link key={c.id} href={`/claims/${c.id}`}
                 className="flex items-center justify-between px-5 py-3 hover:bg-[#F8F9FA] transition-colors">
                 <div>
-                  <p className="text-xs font-bold font-mono text-avenue-text-heading">{c.claimNumber}</p>
-                  <p className="text-xs text-avenue-text-muted">{c.firstName} {c.lastName} · {c.providerName}</p>
+                  <p className="text-xs font-bold font-mono text-brand-text-heading">{c.claimNumber}</p>
+                  <p className="text-xs text-brand-text-muted">{c.firstName} {c.lastName} · {c.providerName}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs font-semibold text-avenue-text-heading">KES {Number(c.billedAmount).toLocaleString()}</p>
+                  <p className="text-xs font-semibold text-brand-text-heading">KES {Number(c.billedAmount).toLocaleString()}</p>
                   <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
                     c.status === "APPROVED" || c.status === "PAID" ? "bg-[#28A745]/10 text-[#28A745]" :
                     c.status === "DECLINED" ? "bg-[#DC3545]/10 text-[#DC3545]" :

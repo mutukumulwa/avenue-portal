@@ -4,7 +4,7 @@ import { AuditLogFilters } from "./AuditLogFilters";
 import { FileText } from "lucide-react";
 
 const MODULE_COLOR: Record<string, string> = {
-  CLAIMS:       "bg-avenue-indigo/10 text-avenue-indigo",
+  CLAIMS:       "bg-brand-indigo/10 text-brand-indigo",
   PREAUTH:      "bg-[#17A2B8]/10 text-[#17A2B8]",
   MEMBERS:      "bg-[#28A745]/10 text-[#28A745]",
   GROUPS:       "bg-[#FFC107]/10 text-[#856404]",
@@ -66,8 +66,8 @@ export default async function AuditLogPage({
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Audit Log</h1>
-        <p className="text-avenue-text-body text-sm mt-1">
+        <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Audit Log</h1>
+        <p className="text-brand-text-body text-sm mt-1">
           User activity trail — {total.toLocaleString()} record{total !== 1 ? "s" : ""}
           {Object.values(sp).some(Boolean) ? " (filtered)" : ""}.
         </p>
@@ -87,31 +87,31 @@ export default async function AuditLogPage({
               <th className="px-5 py-3">IP</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#EEEEEE] text-avenue-text-body">
+          <tbody className="divide-y divide-[#EEEEEE] text-brand-text-body">
             {logs.map(log => (
               <tr key={log.id} className="hover:bg-[#F8F9FA]">
-                <td className="px-5 py-3 text-xs text-avenue-text-muted whitespace-nowrap font-mono">
+                <td className="px-5 py-3 text-xs text-brand-text-muted whitespace-nowrap font-mono">
                   {new Date(log.createdAt).toLocaleString("en-KE", { dateStyle: "short", timeStyle: "medium" })}
                 </td>
                 <td className="px-5 py-3">
-                  <p className="font-semibold text-avenue-text-heading text-xs">{log.user.firstName} {log.user.lastName}</p>
-                  <p className="text-[10px] text-avenue-text-muted">{log.user.email}</p>
+                  <p className="font-semibold text-brand-text-heading text-xs">{log.user.firstName} {log.user.lastName}</p>
+                  <p className="text-[10px] text-brand-text-muted">{log.user.email}</p>
                 </td>
                 <td className="px-5 py-3">
                   <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${MODULE_COLOR[log.module] ?? "bg-[#6C757D]/10 text-[#6C757D]"}`}>
                     {log.module}
                   </span>
                 </td>
-                <td className="px-5 py-3 font-mono text-xs text-avenue-text-muted">
+                <td className="px-5 py-3 font-mono text-xs text-brand-text-muted">
                   {log.action.replace(/_/g, " ")}
                 </td>
-                <td className="px-5 py-3 text-avenue-text-body max-w-sm truncate">{log.description}</td>
-                <td className="px-5 py-3 font-mono text-xs text-avenue-text-muted">{log.ipAddress ?? "—"}</td>
+                <td className="px-5 py-3 text-brand-text-body max-w-sm truncate">{log.description}</td>
+                <td className="px-5 py-3 font-mono text-xs text-brand-text-muted">{log.ipAddress ?? "—"}</td>
               </tr>
             ))}
             {logs.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-5 py-12 text-center text-avenue-text-body">
+                <td colSpan={6} className="px-5 py-12 text-center text-brand-text-body">
                   <FileText size={28} className="mx-auto mb-2 text-[#DCDCDC]" />
                   No audit records found.
                 </td>
@@ -123,16 +123,16 @@ export default async function AuditLogPage({
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between text-sm text-avenue-text-muted">
+        <div className="flex items-center justify-between text-sm text-brand-text-muted">
           <span>Page {page} of {totalPages}</span>
           <div className="flex gap-2">
             {page > 1 && (
-              <a href={pageUrl(page - 1)} className="px-3 py-1.5 border border-[#EEEEEE] rounded-lg hover:bg-[#F8F9FA] transition-colors text-avenue-text-heading">
+              <a href={pageUrl(page - 1)} className="px-3 py-1.5 border border-[#EEEEEE] rounded-lg hover:bg-[#F8F9FA] transition-colors text-brand-text-heading">
                 Previous
               </a>
             )}
             {page < totalPages && (
-              <a href={pageUrl(page + 1)} className="px-3 py-1.5 border border-[#EEEEEE] rounded-lg hover:bg-[#F8F9FA] transition-colors text-avenue-text-heading">
+              <a href={pageUrl(page + 1)} className="px-3 py-1.5 border border-[#EEEEEE] rounded-lg hover:bg-[#F8F9FA] transition-colors text-brand-text-heading">
                 Next
               </a>
             )}

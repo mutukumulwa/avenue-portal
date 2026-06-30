@@ -34,7 +34,7 @@ export function InviteUserModal({ groups = [], brokers = [], members = [], fundG
     <>
       <button
         onClick={() => setOpen(true)}
-        className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-5 py-2 rounded-full text-sm font-semibold transition-colors"
+        className="bg-brand-indigo hover:bg-brand-secondary text-white px-5 py-2 rounded-full text-sm font-semibold transition-colors"
       >
         + Invite User
       </button>
@@ -44,12 +44,12 @@ export function InviteUserModal({ groups = [], brokers = [], members = [], fundG
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 relative max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setOpen(false)}
-              className="absolute top-4 right-4 text-avenue-text-muted hover:text-avenue-text-heading"
+              className="absolute top-4 right-4 text-brand-text-muted hover:text-brand-text-heading"
             >
               <X size={18} />
             </button>
 
-            <h2 className="text-lg font-bold text-avenue-text-heading font-heading mb-4">Invite User</h2>
+            <h2 className="text-lg font-bold text-brand-text-heading font-heading mb-4">Invite User</h2>
 
             {state?.error && (
               <div className="mb-4 px-4 py-2.5 bg-[#DC3545]/10 text-[#DC3545] text-sm rounded-lg">
@@ -60,26 +60,26 @@ export function InviteUserModal({ groups = [], brokers = [], members = [], fundG
             <form action={action} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-bold text-avenue-text-muted uppercase mb-1">First Name</label>
-                  <input name="firstName" required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo" />
+                  <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">First Name</label>
+                  <input name="firstName" required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-avenue-text-muted uppercase mb-1">Last Name</label>
-                  <input name="lastName" required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo" />
+                  <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Last Name</label>
+                  <input name="lastName" required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo" />
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-bold text-avenue-text-muted uppercase mb-1">Email</label>
-                <input name="email" type="email" required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo" />
+                <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Email</label>
+                <input name="email" type="email" required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-avenue-text-muted uppercase mb-1">Role</label>
+                <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Role</label>
                 <select 
                   name="role" 
                   value={selectedRole}
                   onChange={(e) => setSelectedRole(e.target.value)}
                   required 
-                  className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo bg-white"
+                  className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo bg-white"
                 >
                   <option value="">Select role…</option>
                   {ROLES.map(r => (
@@ -90,11 +90,11 @@ export function InviteUserModal({ groups = [], brokers = [], members = [], fundG
               
               {selectedRole === "HR_MANAGER" && (
                 <div>
-                  <label className="block text-xs font-bold text-avenue-text-muted uppercase mb-1">Assign to Group</label>
+                  <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Assign to Group</label>
                   <select 
                     name="groupId" 
                     required 
-                    className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo bg-white"
+                    className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo bg-white"
                   >
                     <option value="">Select corporate group…</option>
                     {groups.map(g => (
@@ -105,8 +105,8 @@ export function InviteUserModal({ groups = [], brokers = [], members = [], fundG
               )}
               {selectedRole === "BROKER_USER" && (
                 <div>
-                  <label className="block text-xs font-bold text-avenue-text-muted uppercase mb-1">Broker Profile</label>
-                  <select name="brokerId" required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo bg-white">
+                  <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Broker Profile</label>
+                  <select name="brokerId" required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo bg-white">
                     <option value="">Select broker…</option>
                     {brokers.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
                   </select>
@@ -114,8 +114,8 @@ export function InviteUserModal({ groups = [], brokers = [], members = [], fundG
               )}
               {selectedRole === "MEMBER_USER" && (
                 <div>
-                  <label className="block text-xs font-bold text-avenue-text-muted uppercase mb-1">Member Profile</label>
-                  <select name="memberId" required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo bg-white">
+                  <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Member Profile</label>
+                  <select name="memberId" required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo bg-white">
                     <option value="">Select member…</option>
                     {members.map(m => (
                       <option key={m.id} value={m.id}>{m.name} · {m.memberNumber} · {m.groupName}</option>
@@ -125,23 +125,23 @@ export function InviteUserModal({ groups = [], brokers = [], members = [], fundG
               )}
               {selectedRole === "FUND_ADMINISTRATOR" && (
                 <div>
-                  <label className="block text-xs font-bold text-avenue-text-muted uppercase mb-1">Self-Funded Schemes</label>
-                  <select name="fundGroupIds" multiple required className="w-full min-h-28 border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo bg-white">
+                  <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Self-Funded Schemes</label>
+                  <select name="fundGroupIds" multiple required className="w-full min-h-28 border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo bg-white">
                     {fundGroups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                   </select>
-                  <p className="text-[10px] text-avenue-text-muted mt-1">Hold Command/Ctrl to select multiple schemes.</p>
+                  <p className="text-[10px] text-brand-text-muted mt-1">Hold Command/Ctrl to select multiple schemes.</p>
                 </div>
               )}
               <div>
-                <label className="block text-xs font-bold text-avenue-text-muted uppercase mb-1">Temporary Password</label>
-                <input name="password" type="password" minLength={8} required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo" />
-                <p className="text-[10px] text-avenue-text-muted mt-1">Min. 8 characters. User should change on first login.</p>
+                <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Temporary Password</label>
+                <input name="password" type="password" minLength={8} required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo" />
+                <p className="text-[10px] text-brand-text-muted mt-1">Min. 8 characters. User should change on first login.</p>
               </div>
               <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setOpen(false)} className="px-4 py-2 text-sm text-avenue-text-body border border-[#EEEEEE] rounded-full hover:bg-[#F8F9FA] transition-colors">
+                <button type="button" onClick={() => setOpen(false)} className="px-4 py-2 text-sm text-brand-text-body border border-[#EEEEEE] rounded-full hover:bg-[#F8F9FA] transition-colors">
                   Cancel
                 </button>
-                <button type="submit" disabled={pending} className="px-5 py-2 text-sm font-semibold bg-avenue-indigo hover:bg-avenue-secondary text-white rounded-full transition-colors disabled:opacity-60">
+                <button type="submit" disabled={pending} className="px-5 py-2 text-sm font-semibold bg-brand-indigo hover:bg-brand-secondary text-white rounded-full transition-colors disabled:opacity-60">
                   {pending ? "Inviting…" : "Create User"}
                 </button>
               </div>

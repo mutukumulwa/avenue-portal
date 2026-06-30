@@ -53,20 +53,20 @@ export default async function RateMatrixListPage() {
     <div className="p-6 max-w-5xl mx-auto space-y-5">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading flex items-center gap-2">
-            <Grid3X3 size={22} className="text-avenue-indigo" />
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading flex items-center gap-2">
+            <Grid3X3 size={22} className="text-brand-indigo" />
             Rate Matrix Library
           </h1>
-          <p className="text-avenue-text-muted text-sm mt-1">
+          <p className="text-brand-text-muted text-sm mt-1">
             Family-size × benefit-limit contribution rate tables. Assign to packages or schemes at quotation time.
           </p>
         </div>
 
         <form action={createRateCardAction} className="flex gap-2 items-center">
           <input name="name" type="text" required placeholder="New rate card name"
-            className="border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-avenue-indigo focus:outline-none" />
+            className="border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-brand-indigo focus:outline-none" />
           <button type="submit"
-            className="bg-avenue-indigo text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-avenue-secondary transition-colors flex items-center gap-1.5">
+            className="bg-brand-indigo text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-brand-secondary transition-colors flex items-center gap-1.5">
             <Plus size={14} /> New Rate Card
           </button>
         </form>
@@ -74,8 +74,8 @@ export default async function RateMatrixListPage() {
 
       {cards.length === 0 ? (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-12 text-center">
-          <Grid3X3 size={32} className="mx-auto mb-3 text-avenue-text-muted opacity-30" />
-          <p className="text-avenue-text-muted text-sm">No rate cards yet. Create one above.</p>
+          <Grid3X3 size={32} className="mx-auto mb-3 text-brand-text-muted opacity-30" />
+          <p className="text-brand-text-muted text-sm">No rate cards yet. Create one above.</p>
         </div>
       ) : (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
@@ -91,14 +91,14 @@ export default async function RateMatrixListPage() {
             <tbody className="divide-y divide-[#EEEEEE]">
               {cards.map((c) => (
                 <tr key={c.rateCardId} className="hover:bg-[#F8F9FA]">
-                  <td className="px-5 py-3 font-mono font-semibold text-avenue-text-heading">{c.rateCardId}</td>
-                  <td className="px-5 py-3 text-center text-avenue-text-muted">{c._count._all}</td>
-                  <td className="px-5 py-3 text-avenue-text-muted text-xs">
+                  <td className="px-5 py-3 font-mono font-semibold text-brand-text-heading">{c.rateCardId}</td>
+                  <td className="px-5 py-3 text-center text-brand-text-muted">{c._count._all}</td>
+                  <td className="px-5 py-3 text-brand-text-muted text-xs">
                     {c._min.effectiveFrom ? new Date(c._min.effectiveFrom).toLocaleDateString("en-KE") : "—"}
                   </td>
                   <td className="px-5 py-3">
                     <Link href={`/packages/rate-matrix/${c.rateCardId}`}
-                      className="text-avenue-indigo hover:text-avenue-secondary font-semibold text-xs inline-flex items-center gap-1">
+                      className="text-brand-indigo hover:text-brand-secondary font-semibold text-xs inline-flex items-center gap-1">
                       Edit <ArrowRight size={12} />
                     </Link>
                   </td>

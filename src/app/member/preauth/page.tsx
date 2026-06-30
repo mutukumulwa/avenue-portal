@@ -54,15 +54,15 @@ export default async function MemberPreauthPage() {
     <div className="space-y-6 font-ui">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase text-avenue-text-muted">Member approvals</p>
-          <h1 className="mt-1 text-2xl font-bold text-avenue-text-heading">Pre-Authorizations</h1>
-          <p className="mt-1 max-w-2xl text-sm text-avenue-text-muted">
+          <p className="text-xs font-bold uppercase text-brand-text-muted">Member approvals</p>
+          <h1 className="mt-1 text-2xl font-bold text-brand-text-heading">Pre-Authorizations</h1>
+          <p className="mt-1 max-w-2xl text-sm text-brand-text-muted">
             Request approval before planned care and track decisions for you and your dependants.
           </p>
         </div>
         <Link
           href="/member/preauth/new"
-          className="inline-flex items-center justify-center gap-2 rounded-[8px] bg-avenue-indigo px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-avenue-indigo-hover"
+          className="inline-flex items-center justify-center gap-2 rounded-[8px] bg-brand-indigo px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-indigo-hover"
         >
           <PlusCircle className="h-4 w-4" />
           Request pre-auth
@@ -71,26 +71,26 @@ export default async function MemberPreauthPage() {
 
       <div className="grid gap-3 md:grid-cols-3">
         <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-2 text-avenue-text-muted">
+          <div className="flex items-center gap-2 text-brand-text-muted">
             <ShieldCheck className="h-4 w-4" />
             <p className="text-xs font-bold uppercase">Approved</p>
           </div>
-          <p className="mt-2 text-2xl font-bold text-avenue-text-heading">
+          <p className="mt-2 text-2xl font-bold text-brand-text-heading">
             {preauths.filter((item) => item.status === "APPROVED").length}
           </p>
         </div>
         <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-2 text-avenue-text-muted">
+          <div className="flex items-center gap-2 text-brand-text-muted">
             <CalendarClock className="h-4 w-4" />
             <p className="text-xs font-bold uppercase">In review</p>
           </div>
-          <p className="mt-2 text-2xl font-bold text-avenue-text-heading">
+          <p className="mt-2 text-2xl font-bold text-brand-text-heading">
             {preauths.filter((item) => item.status === "SUBMITTED" || item.status === "UNDER_REVIEW").length}
           </p>
         </div>
         <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-4 shadow-sm">
-          <p className="text-xs font-bold uppercase text-avenue-text-muted">Requested value</p>
-          <p className="mt-2 text-2xl font-bold text-avenue-text-heading">
+          <p className="text-xs font-bold uppercase text-brand-text-muted">Requested value</p>
+          <p className="mt-2 text-2xl font-bold text-brand-text-heading">
             {currency.format(preauths.reduce((sum, item) => sum + item.estimatedCost, 0))}
           </p>
         </div>
@@ -101,36 +101,36 @@ export default async function MemberPreauthPage() {
           <Link
             key={preauth.id}
             href={`/member/preauth/${preauth.id}`}
-            className="block rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm transition-colors hover:border-avenue-indigo/35"
+            className="block rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm transition-colors hover:border-brand-indigo/35"
           >
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-mono text-xs text-avenue-text-muted">{preauth.preauthNumber}</p>
+                  <p className="font-mono text-xs text-brand-text-muted">{preauth.preauthNumber}</p>
                   <span className={`rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase ${statusTone(preauth.status)}`}>
                     {preauth.status.replace(/_/g, " ")}
                   </span>
                 </div>
-                <h2 className="mt-2 text-base font-bold text-avenue-text-heading">{preauth.providerName}</h2>
-                <p className="mt-1 text-sm text-avenue-text-muted">
+                <h2 className="mt-2 text-base font-bold text-brand-text-heading">{preauth.providerName}</h2>
+                <p className="mt-1 text-sm text-brand-text-muted">
                   {preauth.memberName} · {preauth.serviceType.replace(/_/g, " ")} · {preauth.benefitCategory.replace(/_/g, " ")}
                 </p>
-                <p className="mt-2 text-sm text-avenue-text-body">{nextStep(preauth.status)}</p>
+                <p className="mt-2 text-sm text-brand-text-body">{nextStep(preauth.status)}</p>
               </div>
               <div className="flex items-end justify-between gap-4 sm:block sm:text-right">
                 <div>
-                  <p className="text-xs font-bold uppercase text-avenue-text-muted">Estimate</p>
-                  <p className="mt-1 font-bold text-avenue-text-heading">{currency.format(preauth.estimatedCost)}</p>
+                  <p className="text-xs font-bold uppercase text-brand-text-muted">Estimate</p>
+                  <p className="mt-1 font-bold text-brand-text-heading">{currency.format(preauth.estimatedCost)}</p>
                   {preauth.approvedAmount !== null && (
                     <p className="mt-1 text-xs text-[#1F7A34]">Approved {currency.format(preauth.approvedAmount)}</p>
                   )}
-                  <p className="mt-1 text-xs text-avenue-text-muted">
+                  <p className="mt-1 text-xs text-brand-text-muted">
                     {preauth.expectedDateOfService
                       ? new Date(preauth.expectedDateOfService).toLocaleDateString("en-KE")
                       : "Date to be confirmed"}
                   </p>
                 </div>
-                <ChevronRight className="h-5 w-5 text-avenue-text-muted sm:ml-auto sm:mt-3" />
+                <ChevronRight className="h-5 w-5 text-brand-text-muted sm:ml-auto sm:mt-3" />
               </div>
             </div>
           </Link>
@@ -138,13 +138,13 @@ export default async function MemberPreauthPage() {
 
         {preauths.length === 0 && (
           <div className="rounded-[8px] border border-dashed border-[#D6DCE5] bg-white p-8 text-center shadow-sm">
-            <h2 className="text-base font-bold text-avenue-text-heading">No pre-authorizations yet</h2>
-            <p className="mx-auto mt-2 max-w-xl text-sm text-avenue-text-muted">
+            <h2 className="text-base font-bold text-brand-text-heading">No pre-authorizations yet</h2>
+            <p className="mx-auto mt-2 max-w-xl text-sm text-brand-text-muted">
               Start a request before planned care and the portal will show whether it can be approved immediately or needs review.
             </p>
             <Link
               href="/member/preauth/new"
-              className="mt-5 inline-flex items-center justify-center gap-2 rounded-[8px] bg-avenue-indigo px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-avenue-indigo-hover"
+              className="mt-5 inline-flex items-center justify-center gap-2 rounded-[8px] bg-brand-indigo px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-indigo-hover"
             >
               <PlusCircle className="h-4 w-4" />
               Request pre-auth

@@ -46,7 +46,7 @@ export function FundSidebar({ schemes, userRole }: Props) {
             return (
               <li key={item.href}>
                 <Link href={item.href}
-                  className={`group flex items-center rounded-[8px] p-2 transition-colors ${active ? "bg-[#28A745]/10 text-[#28A745]" : "text-avenue-text-body hover:bg-avenue-bg-alt hover:text-[#28A745]"}`}>
+                  className={`group flex items-center rounded-[8px] p-2 transition-colors ${active ? "bg-[#28A745]/10 text-[#28A745]" : "text-brand-text-body hover:bg-brand-bg-alt hover:text-[#28A745]"}`}>
                   <Icon className="h-5 w-5 flex-shrink-0" />
                   <span className="ml-3 font-semibold">{item.label}</span>
                 </Link>
@@ -58,7 +58,7 @@ export function FundSidebar({ schemes, userRole }: Props) {
         {/* Per-scheme links */}
         {schemes.length > 0 && (
           <div className="mb-2">
-            <p className="px-2 text-[10px] font-bold uppercase tracking-widest text-avenue-text-muted mb-1">
+            <p className="px-2 text-[10px] font-bold uppercase tracking-widest text-brand-text-muted mb-1">
               My Schemes
             </p>
             <ul className="space-y-0.5">
@@ -67,7 +67,7 @@ export function FundSidebar({ schemes, userRole }: Props) {
                 return (
                   <li key={s.id}>
                     <Link href={`/fund/${s.id}`}
-                      className={`group flex items-center justify-between rounded-[8px] px-2 py-1.5 transition-colors text-sm ${groupActive ? "bg-[#28A745]/10 text-[#28A745] font-semibold" : "text-avenue-text-body hover:bg-avenue-bg-alt hover:text-[#28A745]"}`}>
+                      className={`group flex items-center justify-between rounded-[8px] px-2 py-1.5 transition-colors text-sm ${groupActive ? "bg-[#28A745]/10 text-[#28A745] font-semibold" : "text-brand-text-body hover:bg-brand-bg-alt hover:text-[#28A745]"}`}>
                       <span className="truncate">{s.name}</span>
                       {s.isLow && (
                         <span className="ml-1 h-2 w-2 rounded-full bg-[#DC3545] flex-shrink-0" title="Low balance" />
@@ -85,7 +85,7 @@ export function FundSidebar({ schemes, userRole }: Props) {
                           return (
                             <li key={sub.href}>
                               <Link href={sub.href}
-                                className={`flex items-center gap-2 rounded-[6px] px-2 py-1 text-xs transition-colors ${subActive ? "bg-[#28A745]/10 text-[#28A745] font-semibold" : "text-avenue-text-muted hover:text-[#28A745]"}`}>
+                                className={`flex items-center gap-2 rounded-[6px] px-2 py-1 text-xs transition-colors ${subActive ? "bg-[#28A745]/10 text-[#28A745] font-semibold" : "text-brand-text-muted hover:text-[#28A745]"}`}>
                                 <SubIcon size={12} />
                                 {sub.label}
                               </Link>
@@ -104,7 +104,7 @@ export function FundSidebar({ schemes, userRole }: Props) {
         <div className="mt-auto pt-4 border-t border-[#EEEEEE]">
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
-            className="w-full group flex items-center rounded-[8px] p-2 text-avenue-error hover:bg-red-50 transition-colors"
+            className="w-full group flex items-center rounded-[8px] p-2 text-brand-error hover:bg-red-50 transition-colors"
           >
             <LogOut className="h-5 w-5 shrink-0" />
             <span className="ml-3 font-semibold">Log out</span>

@@ -64,12 +64,12 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
       {/* Header */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm flex flex-wrap justify-between items-center gap-4">
         <div className="flex items-center gap-3">
-          <Link href="/quotations" className="text-avenue-text-muted hover:text-avenue-indigo transition-colors">
+          <Link href="/quotations" className="text-brand-text-muted hover:text-brand-indigo transition-colors">
             <ArrowLeft size={20} />
           </Link>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-lg font-bold text-avenue-text-heading font-heading">
+              <h1 className="text-lg font-bold text-brand-text-heading font-heading">
                 {q.group?.name ?? q.legalName ?? q.prospectName ?? "Unnamed Prospect"}
               </h1>
               <span className="font-mono text-xs bg-[#E6E7E8] text-[#6C757D] px-2 py-0.5 rounded">
@@ -81,7 +81,7 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
                 {status}
               </span>
               {q.broker && (
-                <span className="text-xs text-avenue-text-muted">via {q.broker.name}</span>
+                <span className="text-xs text-brand-text-muted">via {q.broker.name}</span>
               )}
             </div>
           </div>
@@ -90,7 +90,7 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
         <div className="flex flex-wrap gap-2">
           {canBuild && (
             <Link href={`/quotations/${q.id}/build`}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold border border-avenue-indigo text-avenue-indigo hover:bg-avenue-indigo hover:text-white transition-colors">
+              className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold border border-brand-indigo text-brand-indigo hover:bg-brand-indigo hover:text-white transition-colors">
               <Calculator size={14} /> Build Pricing
             </Link>
           )}
@@ -143,7 +143,7 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
             <BadgeCheck size={20} className="text-[#28A745]" />
             <div>
               <p className="font-bold text-[#28A745] text-sm">Quotation Accepted</p>
-              <p className="text-xs text-avenue-text-muted">Group created and ready for member onboarding.</p>
+              <p className="text-xs text-brand-text-muted">Group created and ready for member onboarding.</p>
             </div>
           </div>
           <Link href={`/groups/${q.group.id}`}
@@ -159,7 +159,7 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
           <XCircle size={20} className="text-[#DC3545]" />
           <div>
             <p className="font-bold text-[#DC3545] text-sm">Quotation Declined</p>
-            <p className="text-xs text-avenue-text-muted">The prospect did not proceed with this quotation.</p>
+            <p className="text-xs text-brand-text-muted">The prospect did not proceed with this quotation.</p>
           </div>
         </div>
       )}
@@ -167,14 +167,14 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
       {/* KPI cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Final Annual Premium", value: fmt(finalPremium), color: "text-avenue-indigo", icon: <Calculator size={16} className="text-avenue-indigo" /> },
+          { label: "Final Annual Premium", value: fmt(finalPremium), color: "text-brand-indigo", icon: <Calculator size={16} className="text-brand-indigo" /> },
           { label: "Rate per Member", value: fmt(ratePerMember), color: "text-[#28A745]", icon: <Users size={16} className="text-[#28A745]" /> },
           { label: "Total Lives Covered", value: totalLives.toLocaleString(), color: "text-[#17A2B8]", icon: <Users size={16} className="text-[#17A2B8]" /> },
           { label: "Valid Until", value: q.validUntil ? new Date(q.validUntil).toLocaleDateString("en-KE") : "—", color: q.validUntil && new Date(q.validUntil) < new Date() ? "text-[#DC3545]" : "text-[#856404]", icon: <Calendar size={16} /> },
         ].map(s => (
           <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-[8px] p-4 shadow-sm">
             <div className="flex justify-between items-center mb-1">
-              <p className="text-xs text-avenue-text-muted font-bold uppercase">{s.label}</p>
+              <p className="text-xs text-brand-text-muted font-bold uppercase">{s.label}</p>
               {s.icon}
             </div>
             <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
@@ -185,20 +185,20 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
       <div className="grid md:grid-cols-2 gap-6">
         {/* Client / Prospect info */}
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-3">
-          <h2 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2 flex items-center gap-2">
-            <Building2 size={16} className="text-avenue-indigo" />
+          <h2 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2 flex items-center gap-2">
+            <Building2 size={16} className="text-brand-indigo" />
             {q.group ? "Group Details" : "Prospect Details"}
           </h2>
           {q.group ? (
             <>
               {[
-                { label: "Group", value: <Link href={`/groups/${q.group.id}`} className="text-avenue-indigo hover:underline font-semibold">{q.group.name}</Link> },
+                { label: "Group", value: <Link href={`/groups/${q.group.id}`} className="text-brand-indigo hover:underline font-semibold">{q.group.name}</Link> },
                 { label: "Group Status", value: q.group.status },
                 { label: "Type", value: "Renewal" },
               ].map(f => (
                 <div key={f.label} className="flex justify-between text-sm py-1 border-b border-[#EEEEEE]/60 last:border-0">
-                  <span className="text-avenue-text-muted">{f.label}</span>
-                  <span className="font-semibold text-avenue-text-heading">{f.value}</span>
+                  <span className="text-brand-text-muted">{f.label}</span>
+                  <span className="font-semibold text-brand-text-heading">{f.value}</span>
                 </div>
               ))}
             </>
@@ -212,27 +212,27 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
                 { label: "Type", value: "New Prospect" },
               ].map(f => (
                 <div key={f.label} className="flex justify-between text-sm py-1 border-b border-[#EEEEEE]/60 last:border-0">
-                  <span className="text-avenue-text-muted">{f.label}</span>
-                  <span className="font-semibold text-avenue-text-heading">{f.value}</span>
+                  <span className="text-brand-text-muted">{f.label}</span>
+                  <span className="font-semibold text-brand-text-heading">{f.value}</span>
                 </div>
               ))}
             </>
           )}
           {q.broker && (
             <div className="flex justify-between text-sm py-1 border-t border-[#EEEEEE]">
-              <span className="text-avenue-text-muted">Broker</span>
-              <Link href={`/brokers/${q.broker.id}`} className="text-avenue-indigo hover:underline font-semibold">
+              <span className="text-brand-text-muted">Broker</span>
+              <Link href={`/brokers/${q.broker.id}`} className="text-brand-indigo hover:underline font-semibold">
                 {q.broker.name}
               </Link>
             </div>
           )}
           <div className="flex justify-between text-sm py-1">
-            <span className="text-avenue-text-muted">Principal Members</span>
-            <span className="font-semibold text-avenue-text-heading">{q.memberCount}</span>
+            <span className="text-brand-text-muted">Principal Members</span>
+            <span className="font-semibold text-brand-text-heading">{q.memberCount}</span>
           </div>
           <div className="flex justify-between text-sm py-1">
-            <span className="text-avenue-text-muted">Dependents</span>
-            <span className="font-semibold text-avenue-text-heading">{q.dependentCount}</span>
+            <span className="text-brand-text-muted">Dependents</span>
+            <span className="font-semibold text-brand-text-heading">{q.dependentCount}</span>
           </div>
         </div>
 
@@ -287,7 +287,7 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
 
       {/* Status flow */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm">
-        <h2 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">
+        <h2 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">
           Status Timeline
         </h2>
         <div className="flex items-center gap-0">
@@ -302,13 +302,13 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
                 <div className="flex flex-col items-center">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
                     isDone ? "bg-[#28A745] text-white" :
-                    isActive ? "bg-avenue-indigo text-white" :
+                    isActive ? "bg-brand-indigo text-white" :
                     isFinal ? "bg-[#DC3545] text-white" :
                     "bg-[#E6E7E8] text-[#6C757D]"
                   }`}>
                     {isDone ? "✓" : i + 1}
                   </div>
-                  <span className="text-xs font-semibold mt-1 text-avenue-text-muted">{s}</span>
+                  <span className="text-xs font-semibold mt-1 text-brand-text-muted">{s}</span>
                 </div>
                 {i < FLOW.length - 1 && (
                   <div className={`flex-1 h-px mx-2 ${isDone ? "bg-[#28A745]" : "bg-[#EEEEEE]"}`} />
@@ -325,7 +325,7 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
                 }`}>
                   ✕
                 </div>
-                <span className="text-xs font-semibold mt-1 text-avenue-text-muted">{q.status}</span>
+                <span className="text-xs font-semibold mt-1 text-brand-text-muted">{q.status}</span>
               </div>
             </div>
           )}
@@ -335,10 +335,10 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
       {/* Notes */}
       {q.pricingNotes && (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm">
-          <h2 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-3 flex items-center gap-2">
-            <FileText size={15} className="text-avenue-indigo" /> Pricing Notes
+          <h2 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-3 flex items-center gap-2">
+            <FileText size={15} className="text-brand-indigo" /> Pricing Notes
           </h2>
-          <p className="text-sm text-avenue-text-body whitespace-pre-line">{q.pricingNotes}</p>
+          <p className="text-sm text-brand-text-body whitespace-pre-line">{q.pricingNotes}</p>
         </div>
       )}
     </div>

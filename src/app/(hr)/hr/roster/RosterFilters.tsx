@@ -23,11 +23,11 @@ export function RosterFilters({
   return (
     <div className="flex items-center gap-3">
       <div className="relative">
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-avenue-text-muted pointer-events-none">
+        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-text-muted pointer-events-none">
           <Filter className="w-3.5 h-3.5" />
         </span>
         <select
-          className="pl-8 pr-8 py-2 text-sm bg-white border border-[#EEEEEE] rounded-full outline-none text-avenue-text-body appearance-none shadow-sm cursor-pointer"
+          className="pl-8 pr-8 py-2 text-sm bg-white border border-[#EEEEEE] rounded-full outline-none text-brand-text-body appearance-none shadow-sm cursor-pointer"
           value={statusFilter}
           onChange={(e) => update("status", e.target.value)}
         >
@@ -40,7 +40,7 @@ export function RosterFilters({
       </div>
       <div className="relative">
         <select
-          className="px-4 pr-8 py-2 text-sm bg-white border border-[#EEEEEE] rounded-full outline-none text-avenue-text-body appearance-none shadow-sm cursor-pointer"
+          className="px-4 pr-8 py-2 text-sm bg-white border border-[#EEEEEE] rounded-full outline-none text-brand-text-body appearance-none shadow-sm cursor-pointer"
           value={relFilter}
           onChange={(e) => update("relationship", e.target.value)}
         >

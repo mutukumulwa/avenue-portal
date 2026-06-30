@@ -22,7 +22,7 @@ export function EndorsementFilters({
   return (
     <div className="flex gap-3">
       <select
-        className="pl-4 pr-8 py-2 text-sm bg-white border border-[#EEEEEE] rounded-full outline-none text-avenue-text-body appearance-none shadow-sm cursor-pointer"
+        className="pl-4 pr-8 py-2 text-sm bg-white border border-[#EEEEEE] rounded-full outline-none text-brand-text-body appearance-none shadow-sm cursor-pointer"
         value={statusFilter}
         onChange={(e) => update("status", e.target.value)}
       >
@@ -33,7 +33,7 @@ export function EndorsementFilters({
         <option value="REJECTED">Rejected</option>
       </select>
       <select
-        className="px-4 pr-8 py-2 text-sm bg-white border border-[#EEEEEE] rounded-full outline-none text-avenue-text-body appearance-none shadow-sm cursor-pointer"
+        className="px-4 pr-8 py-2 text-sm bg-white border border-[#EEEEEE] rounded-full outline-none text-brand-text-body appearance-none shadow-sm cursor-pointer"
         value={typeFilter}
         onChange={(e) => update("type", e.target.value)}
       >

@@ -16,7 +16,7 @@ const STATUS_STYLE: Record<string, string> = {
   UNDER_REVIEW: "bg-[#FFC107]/10 text-[#856404]",
   APPROVED:     "bg-[#28A745]/10 text-[#28A745]",
   REJECTED:     "bg-[#DC3545]/10 text-[#DC3545]",
-  APPLIED:      "bg-avenue-indigo/10 text-avenue-indigo",
+  APPLIED:      "bg-brand-indigo/10 text-brand-indigo",
   CANCELLED:    "bg-[#6C757D]/10 text-[#6C757D]",
 };
 
@@ -65,12 +65,12 @@ export default async function EndorsementReviewPage({ params }: { params: Promis
       {/* Header */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm flex flex-wrap justify-between items-center gap-4">
         <div className="flex items-center gap-3">
-          <Link href="/endorsements" className="text-avenue-text-muted hover:text-avenue-indigo transition-colors">
+          <Link href="/endorsements" className="text-brand-text-muted hover:text-brand-indigo transition-colors">
             <ArrowLeft size={20} />
           </Link>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-lg font-bold text-avenue-text-heading font-heading">
+              <h1 className="text-lg font-bold text-brand-text-heading font-heading">
                 {endorsement.type.replace(/_/g, " ")}
               </h1>
               <span className="font-mono text-xs bg-[#E6E7E8] text-[#6C757D] px-2 py-0.5 rounded">
@@ -81,7 +81,7 @@ export default async function EndorsementReviewPage({ params }: { params: Promis
               <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${STATUS_STYLE[endorsement.status] ?? STATUS_STYLE.DRAFT}`}>
                 {endorsement.status.replace(/_/g, " ")}
               </span>
-              <span className="text-xs text-avenue-text-muted">
+              <span className="text-xs text-brand-text-muted">
                 Effective {new Date(endorsement.effectiveDate).toLocaleDateString("en-KE")}
               </span>
             </div>
@@ -111,19 +111,19 @@ export default async function EndorsementReviewPage({ params }: { params: Promis
       <div className="grid md:grid-cols-2 gap-6">
         {/* Scope */}
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-3">
-          <h2 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2 flex items-center gap-2">
-            <Building size={16} className="text-avenue-indigo" /> Policy Scope
+          <h2 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2 flex items-center gap-2">
+            <Building size={16} className="text-brand-indigo" /> Policy Scope
           </h2>
           {[
-            { label: "Target Group", value: <Link href={`/groups/${endorsement.group.id}`} className="text-avenue-indigo hover:underline font-semibold">{endorsement.group.name}</Link> },
+            { label: "Target Group", value: <Link href={`/groups/${endorsement.group.id}`} className="text-brand-indigo hover:underline font-semibold">{endorsement.group.name}</Link> },
             { label: "Change Type", value: endorsement.type.replace(/_/g, " ") },
             { label: "Effective Date", value: new Date(endorsement.effectiveDate).toLocaleDateString("en-KE") },
             { label: "Requested", value: new Date(endorsement.requestedDate).toLocaleDateString("en-KE") },
             { label: "Affected Member", value: endorsement.member ? `${endorsement.member.firstName} ${endorsement.member.lastName}` : "Group-level" },
           ].map(f => (
             <div key={f.label} className="flex justify-between text-sm py-1 border-b border-[#EEEEEE]/50 last:border-0">
-              <span className="text-avenue-text-muted">{f.label}</span>
-              <span className="font-semibold text-avenue-text-heading">{f.value}</span>
+              <span className="text-brand-text-muted">{f.label}</span>
+              <span className="font-semibold text-brand-text-heading">{f.value}</span>
             </div>
           ))}
         </div>
@@ -153,8 +153,8 @@ export default async function EndorsementReviewPage({ params }: { params: Promis
         ) : (
           <div className="bg-[#F8F9FA] border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm flex items-center justify-center text-center">
             <div>
-              <Calculator size={32} className="mx-auto mb-2 text-avenue-text-muted opacity-40" />
-              <p className="text-sm text-avenue-text-muted">No financial impact for this endorsement type.</p>
+              <Calculator size={32} className="mx-auto mb-2 text-brand-text-muted opacity-40" />
+              <p className="text-sm text-brand-text-muted">No financial impact for this endorsement type.</p>
             </div>
           </div>
         )}
@@ -162,17 +162,17 @@ export default async function EndorsementReviewPage({ params }: { params: Promis
 
       {/* Change details — human-readable */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-3">
-        <h2 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2">
+        <h2 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2">
           Change Details
         </h2>
         {Object.entries(details).filter(([, v]) => v).map(([k, v]) => (
           <div key={k} className="flex justify-between text-sm py-1.5 border-b border-[#EEEEEE]/50 last:border-0">
-            <span className="text-avenue-text-muted">{KEY_LABELS[k] ?? k.replace(/([A-Z])/g, " $1").trim()}</span>
-            <span className="font-semibold text-avenue-text-heading max-w-xs text-right">{v}</span>
+            <span className="text-brand-text-muted">{KEY_LABELS[k] ?? k.replace(/([A-Z])/g, " $1").trim()}</span>
+            <span className="font-semibold text-brand-text-heading max-w-xs text-right">{v}</span>
           </div>
         ))}
         {Object.keys(details).length === 0 && (
-          <p className="text-sm text-avenue-text-muted">No change details recorded.</p>
+          <p className="text-sm text-brand-text-muted">No change details recorded.</p>
         )}
       </div>
 
@@ -182,7 +182,7 @@ export default async function EndorsementReviewPage({ params }: { params: Promis
           <AlertTriangle size={16} className="text-[#856404] mt-0.5 shrink-0" />
           <div>
             <p className="font-semibold text-[#856404] text-sm">Back-dated amendment</p>
-            <p className="text-xs text-avenue-text-muted mt-1">
+            <p className="text-xs text-brand-text-muted mt-1">
               Effective date is in the past. A <strong>BACK_DATED_AMENDMENT</strong> override record
               {richEndorsement?.overrideRecordId
                 ? <span className="text-[#28A745]"> is linked ({richEndorsement.overrideRecordId.slice(0,8)}…)</span>
@@ -195,8 +195,8 @@ export default async function EndorsementReviewPage({ params }: { params: Promis
       {/* ── Process 7: Pro-rata detail breakdown ─────────────── */}
       {proRata && (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-3">
-          <h2 className="font-bold text-avenue-text-heading text-sm font-heading border-b border-[#EEEEEE] pb-2 flex items-center gap-2">
-            <Calculator size={15} className="text-avenue-indigo" />
+          <h2 className="font-bold text-brand-text-heading text-sm font-heading border-b border-[#EEEEEE] pb-2 flex items-center gap-2">
+            <Calculator size={15} className="text-brand-indigo" />
             Pro-Rata Calculation (Day-Count)
           </h2>
           <div className="grid grid-cols-3 gap-4 text-sm">
@@ -211,8 +211,8 @@ export default async function EndorsementReviewPage({ params }: { params: Promis
               </strong> },
             ].map(({ label, value }) => (
               <div key={label}>
-                <p className="text-xs text-avenue-text-muted">{label}</p>
-                <p className="font-semibold text-avenue-text-heading mt-0.5">{value}</p>
+                <p className="text-xs text-brand-text-muted">{label}</p>
+                <p className="font-semibold text-brand-text-heading mt-0.5">{value}</p>
               </div>
             ))}
           </div>
@@ -222,31 +222,31 @@ export default async function EndorsementReviewPage({ params }: { params: Promis
       {/* ── Process 7: Before/After snapshot diff ────────────── */}
       {(beforeSnap || afterSnap) && (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-3">
-          <h2 className="font-bold text-avenue-text-heading text-sm font-heading border-b border-[#EEEEEE] pb-2 flex items-center gap-2">
-            <GitCompareArrows size={15} className="text-avenue-indigo" />
+          <h2 className="font-bold text-brand-text-heading text-sm font-heading border-b border-[#EEEEEE] pb-2 flex items-center gap-2">
+            <GitCompareArrows size={15} className="text-brand-indigo" />
             Before / After Snapshot
           </h2>
           <div className="grid grid-cols-2 gap-4 text-xs font-mono">
             <div>
-              <p className="font-bold text-avenue-text-muted mb-2 uppercase tracking-wide">Before</p>
+              <p className="font-bold text-brand-text-muted mb-2 uppercase tracking-wide">Before</p>
               {beforeSnap ? Object.entries(beforeSnap).filter(([k]) => k !== "snapshotAt").map(([k, v]) => (
                 <div key={k} className="flex justify-between border-b border-[#EEEEEE]/50 py-1">
-                  <span className="text-avenue-text-muted">{k}</span>
-                  <span className="text-avenue-text-heading">{String(v ?? "—")}</span>
+                  <span className="text-brand-text-muted">{k}</span>
+                  <span className="text-brand-text-heading">{String(v ?? "—")}</span>
                 </div>
-              )) : <p className="text-avenue-text-muted italic">Not captured</p>}
+              )) : <p className="text-brand-text-muted italic">Not captured</p>}
             </div>
             <div>
-              <p className="font-bold text-avenue-text-muted mb-2 uppercase tracking-wide">After</p>
+              <p className="font-bold text-brand-text-muted mb-2 uppercase tracking-wide">After</p>
               {afterSnap ? Object.entries(afterSnap).filter(([k]) => k !== "snapshotAt").map(([k, v]) => {
                 const changed = beforeSnap && beforeSnap[k] !== v;
                 return (
                   <div key={k} className={`flex justify-between border-b border-[#EEEEEE]/50 py-1 ${changed ? "bg-[#28A745]/5" : ""}`}>
-                    <span className="text-avenue-text-muted">{k}</span>
-                    <span className={`${changed ? "text-[#28A745] font-bold" : "text-avenue-text-heading"}`}>{String(v ?? "—")}</span>
+                    <span className="text-brand-text-muted">{k}</span>
+                    <span className={`${changed ? "text-[#28A745] font-bold" : "text-brand-text-heading"}`}>{String(v ?? "—")}</span>
                   </div>
                 );
-              }) : <p className="text-avenue-text-muted italic">Populated on apply</p>}
+              }) : <p className="text-brand-text-muted italic">Populated on apply</p>}
             </div>
           </div>
         </div>
@@ -254,20 +254,20 @@ export default async function EndorsementReviewPage({ params }: { params: Promis
 
       {/* ── Process 7: Maker-checker & workflow actions ───────── */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-4">
-        <h2 className="font-bold text-avenue-text-heading text-sm font-heading border-b border-[#EEEEEE] pb-2">
+        <h2 className="font-bold text-brand-text-heading text-sm font-heading border-b border-[#EEEEEE] pb-2">
           Workflow Actions
         </h2>
 
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
-            <p className="text-xs text-avenue-text-muted">Maker</p>
-            <p className="font-semibold text-avenue-text-heading mt-0.5">
+            <p className="text-xs text-brand-text-muted">Maker</p>
+            <p className="font-semibold text-brand-text-heading mt-0.5">
               {richEndorsement?.maker ? `${richEndorsement.maker.firstName} ${richEndorsement.maker.lastName}` : (endorsement.requestedBy ?? "—")}
             </p>
           </div>
           <div>
-            <p className="text-xs text-avenue-text-muted">Checker / Approver</p>
-            <p className="font-semibold text-avenue-text-heading mt-0.5">
+            <p className="text-xs text-brand-text-muted">Checker / Approver</p>
+            <p className="font-semibold text-brand-text-heading mt-0.5">
               {richEndorsement?.approver ? `${richEndorsement.approver.firstName} ${richEndorsement.approver.lastName}` : "Pending"}
             </p>
           </div>
@@ -279,7 +279,7 @@ export default async function EndorsementReviewPage({ params }: { params: Promis
             <form action={computeProRataAction}>
               <input type="hidden" name="endorsementId" value={id} />
               <button type="submit"
-                className="border border-avenue-indigo text-avenue-indigo px-4 py-1.5 rounded-full text-xs font-semibold hover:bg-avenue-indigo hover:text-white transition-colors flex items-center gap-1">
+                className="border border-brand-indigo text-brand-indigo px-4 py-1.5 rounded-full text-xs font-semibold hover:bg-brand-indigo hover:text-white transition-colors flex items-center gap-1">
                 <Calculator size={12} /> Compute Pro-Rata
               </button>
             </form>
@@ -312,7 +312,7 @@ export default async function EndorsementReviewPage({ params }: { params: Promis
             <form action={applyAmendmentAction}>
               <input type="hidden" name="endorsementId" value={id} />
               <button type="submit"
-                className="bg-avenue-indigo text-white px-4 py-1.5 rounded-full text-xs font-semibold hover:bg-avenue-secondary transition-colors flex items-center gap-1">
+                className="bg-brand-indigo text-white px-4 py-1.5 rounded-full text-xs font-semibold hover:bg-brand-secondary transition-colors flex items-center gap-1">
                 <PlayCircle size={12} /> Apply Amendment
               </button>
             </form>
@@ -323,7 +323,7 @@ export default async function EndorsementReviewPage({ params }: { params: Promis
             <form action={rejectAmendmentAction} className="flex gap-2">
               <input type="hidden" name="endorsementId" value={id} />
               <input name="reason" type="text" required placeholder="Rejection reason"
-                className="border border-[#DC3545]/40 text-avenue-text-heading px-3 py-1.5 rounded-[6px] text-xs focus:outline-none focus:ring-1 focus:ring-[#DC3545]" />
+                className="border border-[#DC3545]/40 text-brand-text-heading px-3 py-1.5 rounded-[6px] text-xs focus:outline-none focus:ring-1 focus:ring-[#DC3545]" />
               <button type="submit"
                 className="border border-[#DC3545] text-[#DC3545] px-4 py-1.5 rounded-full text-xs font-semibold hover:bg-[#DC3545]/10 transition-colors flex items-center gap-1">
                 <XCircle size={12} /> Reject

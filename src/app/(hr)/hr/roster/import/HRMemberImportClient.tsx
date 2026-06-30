@@ -19,8 +19,8 @@ export function HRMemberImportClient() {
       {/* Step 1 — Upload */}
       {!importResult && (
         <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm p-6 space-y-4">
-          <h2 className="font-bold text-avenue-text-heading font-heading">Step 1 — Upload CSV</h2>
-          <p className="text-sm text-avenue-text-body">
+          <h2 className="font-bold text-brand-text-heading font-heading">Step 1 — Upload CSV</h2>
+          <p className="text-sm text-brand-text-body">
             File must have headers:{" "}
             <code className="bg-[#F8F9FA] px-1 rounded text-xs">
               firstName, lastName, dateOfBirth, gender, relationship, principalIdNumber, idNumber, phone, email, isExample
@@ -29,11 +29,11 @@ export function HRMemberImportClient() {
 
           <form action={parseAction} className="space-y-4">
             <div
-              className="border-2 border-dashed border-[#DCDCDC] rounded-lg p-8 text-center cursor-pointer hover:border-avenue-indigo transition-colors"
+              className="border-2 border-dashed border-[#DCDCDC] rounded-lg p-8 text-center cursor-pointer hover:border-brand-indigo transition-colors"
               onClick={() => fileRef.current?.click()}
             >
-              <Upload size={28} className="mx-auto mb-2 text-avenue-text-muted" />
-              <p className="text-sm text-avenue-text-body">Click to select a CSV file</p>
+              <Upload size={28} className="mx-auto mb-2 text-brand-text-muted" />
+              <p className="text-sm text-brand-text-body">Click to select a CSV file</p>
               <input ref={fileRef} name="file" type="file" accept=".csv" className="hidden" required />
             </div>
 
@@ -46,7 +46,7 @@ export function HRMemberImportClient() {
             <button
               type="submit"
               disabled={parsePending}
-              className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-6 py-2 rounded-full text-sm font-semibold transition-colors disabled:opacity-60"
+              className="bg-brand-indigo hover:bg-brand-secondary text-white px-6 py-2 rounded-full text-sm font-semibold transition-colors disabled:opacity-60"
             >
               {parsePending ? "Parsing…" : "Parse & Validate"}
             </button>
@@ -59,15 +59,15 @@ export function HRMemberImportClient() {
         <div className="space-y-4">
           <div className="grid grid-cols-3 gap-4">
             <div className="bg-white border border-[#EEEEEE] rounded-lg p-4 shadow-sm">
-              <p className="text-xs font-bold uppercase text-avenue-text-muted">Total Rows</p>
-              <p className="text-2xl font-bold text-avenue-indigo mt-1">{parseResult.rows.length}</p>
+              <p className="text-xs font-bold uppercase text-brand-text-muted">Total Rows</p>
+              <p className="text-2xl font-bold text-brand-indigo mt-1">{parseResult.rows.length}</p>
             </div>
             <div className="bg-white border border-[#EEEEEE] rounded-lg p-4 shadow-sm">
-              <p className="text-xs font-bold uppercase text-avenue-text-muted">Valid</p>
+              <p className="text-xs font-bold uppercase text-brand-text-muted">Valid</p>
               <p className="text-2xl font-bold text-[#28A745] mt-1">{parseResult.validCount}</p>
             </div>
             <div className="bg-white border border-[#EEEEEE] rounded-lg p-4 shadow-sm">
-              <p className="text-xs font-bold uppercase text-avenue-text-muted">Errors</p>
+              <p className="text-xs font-bold uppercase text-brand-text-muted">Errors</p>
               <p className="text-2xl font-bold text-[#DC3545] mt-1">{parseResult.errorCount}</p>
             </div>
           </div>
@@ -155,14 +155,14 @@ export function HRMemberImportClient() {
               <CheckCircle size={20} />
               <h2 className="font-bold text-lg font-heading">Requests Submitted</h2>
             </div>
-            <p className="text-avenue-text-body text-sm">
+            <p className="text-brand-text-body text-sm">
               <span className="font-bold text-[#28A745]">{importResult.imported}</span> endorsement request{importResult.imported !== 1 ? "s" : ""} successfully submitted for review.
               {importResult.failed.length > 0 && (
                 <> <span className="font-bold text-[#DC3545]">{importResult.failed.length}</span> failed (see below).</>
               )}
             </p>
             <div className="pt-2">
-               <Link href="/hr/endorsements" className="inline-block px-5 py-2.5 bg-avenue-indigo text-white font-semibold rounded-full text-sm hover:bg-avenue-secondary transition-colors">
+               <Link href="/hr/endorsements" className="inline-block px-5 py-2.5 bg-brand-indigo text-white font-semibold rounded-full text-sm hover:bg-brand-secondary transition-colors">
                  Go to Endorsements
                </Link>
             </div>

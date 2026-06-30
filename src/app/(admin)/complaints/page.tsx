@@ -41,8 +41,8 @@ export default async function ComplaintsPage(props: {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Complaints Triage</h1>
-          <p className="text-avenue-text-body text-sm mt-0.5">Member and provider grievances — separated from HR service desk queries.</p>
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Complaints Triage</h1>
+          <p className="text-brand-text-body text-sm mt-0.5">Member and provider grievances — separated from HR service desk queries.</p>
         </div>
       </div>
 
@@ -52,11 +52,11 @@ export default async function ComplaintsPage(props: {
           <Link
             key={s}
             href={`/complaints?status=${s}`}
-            className={`bg-white border rounded-lg p-4 shadow-sm hover:border-avenue-indigo/30 transition-all ${
-              status === s ? "border-avenue-indigo ring-1 ring-avenue-indigo/20" : "border-[#EEEEEE]"
+            className={`bg-white border rounded-lg p-4 shadow-sm hover:border-brand-indigo/30 transition-all ${
+              status === s ? "border-brand-indigo ring-1 ring-brand-indigo/20" : "border-[#EEEEEE]"
             }`}
           >
-            <p className="text-xs font-bold uppercase text-avenue-text-muted">{s.replace("_", " ")}</p>
+            <p className="text-xs font-bold uppercase text-brand-text-muted">{s.replace("_", " ")}</p>
             <p className={`text-2xl font-bold mt-1 ${STATUS_STYLES[s].split(" ")[1]}`}>
               {byStatus[s] ?? 0}
             </p>
@@ -69,7 +69,7 @@ export default async function ComplaintsPage(props: {
         <Link
           href={status ? `/complaints?status=${status}` : "/complaints"}
           className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
-            !type ? "bg-avenue-indigo text-white border-avenue-indigo" : "border-[#EEEEEE] text-avenue-text-muted hover:border-avenue-indigo"
+            !type ? "bg-brand-indigo text-white border-brand-indigo" : "border-[#EEEEEE] text-brand-text-muted hover:border-brand-indigo"
           }`}
         >
           All Types
@@ -79,7 +79,7 @@ export default async function ComplaintsPage(props: {
             key={t}
             href={`/complaints?${status ? `status=${status}&` : ""}type=${t}`}
             className={`px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
-              type === t ? "bg-avenue-indigo text-white border-avenue-indigo" : "border-[#EEEEEE] text-avenue-text-muted hover:border-avenue-indigo"
+              type === t ? "bg-brand-indigo text-white border-brand-indigo" : "border-[#EEEEEE] text-brand-text-muted hover:border-brand-indigo"
             }`}
           >
             {t}
@@ -90,14 +90,14 @@ export default async function ComplaintsPage(props: {
       {/* Complaints table */}
       <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
         {complaints.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 gap-2 text-avenue-text-muted">
+          <div className="flex flex-col items-center justify-center py-16 gap-2 text-brand-text-muted">
             <CheckCircle2 size={36} className="text-[#28A745]" />
             <p className="font-semibold">No complaints matching your filters.</p>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-[#EEEEEE] bg-[#F8F9FA] text-avenue-text-muted text-xs font-bold uppercase">
+              <tr className="border-b border-[#EEEEEE] bg-[#F8F9FA] text-brand-text-muted text-xs font-bold uppercase">
                 <th className="px-5 py-3 text-left">Subject</th>
                 <th className="px-5 py-3 text-left">Member</th>
                 <th className="px-5 py-3 text-left">Type</th>
@@ -110,17 +110,17 @@ export default async function ComplaintsPage(props: {
               {complaints.map(c => (
                 <tr key={c.id} className="hover:bg-[#F8F9FA] transition-colors">
                   <td className="px-5 py-3">
-                    <p className="font-semibold text-avenue-text-heading">{c.subject}</p>
-                    <p className="text-[10px] text-avenue-text-muted mt-0.5 max-w-xs line-clamp-1">{c.description}</p>
+                    <p className="font-semibold text-brand-text-heading">{c.subject}</p>
+                    <p className="text-[10px] text-brand-text-muted mt-0.5 max-w-xs line-clamp-1">{c.description}</p>
                   </td>
                   <td className="px-5 py-3">
                     {c.member ? (
                       <>
-                        <p className="font-semibold text-avenue-text-heading">{c.member.firstName} {c.member.lastName}</p>
-                        <p className="text-[10px] font-mono text-avenue-text-muted">{c.member.memberNumber}</p>
+                        <p className="font-semibold text-brand-text-heading">{c.member.firstName} {c.member.lastName}</p>
+                        <p className="text-[10px] font-mono text-brand-text-muted">{c.member.memberNumber}</p>
                       </>
                     ) : (
-                      <span className="text-avenue-text-muted text-xs italic">Anonymous</span>
+                      <span className="text-brand-text-muted text-xs italic">Anonymous</span>
                     )}
                   </td>
                   <td className="px-5 py-3">
@@ -133,13 +133,13 @@ export default async function ComplaintsPage(props: {
                       {c.status}
                     </span>
                   </td>
-                  <td className="px-5 py-3 text-xs text-avenue-text-muted">
+                  <td className="px-5 py-3 text-xs text-brand-text-muted">
                     {new Date(c.createdAt).toLocaleDateString()}
                   </td>
                   <td className="px-5 py-3 text-right">
                     <Link
                       href={`/complaints/${c.id}`}
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-avenue-indigo hover:text-avenue-secondary transition-colors"
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-brand-indigo hover:text-brand-secondary transition-colors"
                     >
                       View <ArrowRight size={13} />
                     </Link>

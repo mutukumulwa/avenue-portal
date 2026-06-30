@@ -26,10 +26,10 @@ export default async function HRProfilePage() {
     <div className="space-y-6 max-w-4xl">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Group Profile</h1>
-          <p className="text-avenue-text-body font-body mt-1">Review your corporate information and active package details.</p>
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Group Profile</h1>
+          <p className="text-brand-text-body font-body mt-1">Review your corporate information and active package details.</p>
         </div>
-        <Link href="/hr/support" className="px-4 py-2 bg-white text-avenue-text-body border border-[#EEEEEE] rounded-full text-sm font-semibold hover:bg-[#F8F9FA] transition-colors shadow-sm">
+        <Link href="/hr/support" className="px-4 py-2 bg-white text-brand-text-body border border-[#EEEEEE] rounded-full text-sm font-semibold hover:bg-[#F8F9FA] transition-colors shadow-sm">
            Request Changes
         </Link>
       </div>
@@ -54,39 +54,39 @@ export default async function HRProfilePage() {
         {/* Organization Details */}
         <div className="bg-white border border-[#EEEEEE] rounded-2xl shadow-sm overflow-hidden">
           <div className="border-b border-[#EEEEEE] px-5 py-4 flex items-center">
-             <Building2 className="w-5 h-5 text-avenue-indigo mr-2" />
-             <h2 className="font-bold text-avenue-text-heading font-heading">Organization Details</h2>
+             <Building2 className="w-5 h-5 text-brand-indigo mr-2" />
+             <h2 className="font-bold text-brand-text-heading font-heading">Organization Details</h2>
           </div>
           <div className="p-5 space-y-5">
              <div>
-                <div className="text-xs font-bold text-avenue-text-muted uppercase tracking-wider mb-1">Company Name</div>
-                <div className="font-semibold text-avenue-text-heading text-lg">{group.name}</div>
+                <div className="text-xs font-bold text-brand-text-muted uppercase tracking-wider mb-1">Company Name</div>
+                <div className="font-semibold text-brand-text-heading text-lg">{group.name}</div>
              </div>
              
              <div className="grid grid-cols-2 gap-4">
                <div>
-                  <div className="text-xs font-bold text-avenue-text-muted uppercase tracking-wider mb-1">Industry</div>
-                  <div className="font-semibold text-avenue-text-heading">{group.industry || "—"}</div>
+                  <div className="text-xs font-bold text-brand-text-muted uppercase tracking-wider mb-1">Industry</div>
+                  <div className="font-semibold text-brand-text-heading">{group.industry || "—"}</div>
                </div>
                <div>
-                  <div className="flex items-center gap-1.5 mb-1 text-avenue-text-muted">
+                  <div className="flex items-center gap-1.5 mb-1 text-brand-text-muted">
                     <Hash className="w-3.5 h-3.5" />
                     <div className="text-xs font-bold uppercase tracking-wider">Registration No.</div>
                   </div>
-                  <div className="font-semibold text-avenue-text-heading">{group.registrationNumber || "—"}</div>
+                  <div className="font-semibold text-brand-text-heading">{group.registrationNumber || "—"}</div>
                </div>
              </div>
 
              <div className="pt-4 border-t border-[#EEEEEE]">
-                <h3 className="text-xs font-bold text-avenue-text-muted uppercase tracking-wider mb-3">Primary Contact</h3>
-                <div className="font-semibold text-avenue-text-heading mb-2">{group.contactPersonName}</div>
+                <h3 className="text-xs font-bold text-brand-text-muted uppercase tracking-wider mb-3">Primary Contact</h3>
+                <div className="font-semibold text-brand-text-heading mb-2">{group.contactPersonName}</div>
                 <div className="flex items-center text-sm mb-1.5">
-                   <Phone className="w-4 h-4 text-avenue-text-muted mr-2" />
-                   <span className="text-avenue-text-body">{group.contactPersonPhone}</span>
+                   <Phone className="w-4 h-4 text-brand-text-muted mr-2" />
+                   <span className="text-brand-text-body">{group.contactPersonPhone}</span>
                 </div>
                 <div className="flex items-center text-sm">
-                   <Mail className="w-4 h-4 text-avenue-text-muted mr-2" />
-                   <span className="text-avenue-text-body">{group.contactPersonEmail}</span>
+                   <Mail className="w-4 h-4 text-brand-text-muted mr-2" />
+                   <span className="text-brand-text-body">{group.contactPersonEmail}</span>
                 </div>
              </div>
           </div>
@@ -95,46 +95,46 @@ export default async function HRProfilePage() {
         {/* Coverage Details */}
         <div className="bg-white border border-[#EEEEEE] rounded-2xl shadow-sm overflow-hidden">
           <div className="border-b border-[#EEEEEE] px-5 py-4 flex items-center">
-             <BriefcaseMedical className="w-5 h-5 text-avenue-indigo mr-2" />
-             <h2 className="font-bold text-avenue-text-heading font-heading">Active Package</h2>
+             <BriefcaseMedical className="w-5 h-5 text-brand-indigo mr-2" />
+             <h2 className="font-bold text-brand-text-heading font-heading">Active Package</h2>
           </div>
           <div className="p-5 space-y-5">
              <div>
-                <div className="text-xs font-bold text-avenue-text-muted uppercase tracking-wider mb-1">Assigned Package</div>
-                <div className="font-bold text-avenue-indigo text-lg">{group.package.name}</div>
-                <p className="text-sm text-avenue-text-muted mt-1">{group.package.description || "Corporate Health Cover"}</p>
+                <div className="text-xs font-bold text-brand-text-muted uppercase tracking-wider mb-1">Assigned Package</div>
+                <div className="font-bold text-brand-indigo text-lg">{group.package.name}</div>
+                <p className="text-sm text-brand-text-muted mt-1">{group.package.description || "Corporate Health Cover"}</p>
              </div>
              
              <div className="grid grid-cols-2 gap-4">
                <div>
-                  <div className="text-xs font-bold text-avenue-text-muted uppercase tracking-wider mb-1">Overall Limit</div>
-                  <div className="font-semibold text-avenue-text-heading">KES {Number(group.package.annualLimit).toLocaleString()}</div>
+                  <div className="text-xs font-bold text-brand-text-muted uppercase tracking-wider mb-1">Overall Limit</div>
+                  <div className="font-semibold text-brand-text-heading">KES {Number(group.package.annualLimit).toLocaleString()}</div>
                </div>
                <div>
-                  <div className="text-xs font-bold text-avenue-text-muted uppercase tracking-wider mb-1">Payment Frequency</div>
-                  <div className="font-semibold text-avenue-text-heading capitalize">{group.paymentFrequency.toLowerCase()}</div>
+                  <div className="text-xs font-bold text-brand-text-muted uppercase tracking-wider mb-1">Payment Frequency</div>
+                  <div className="font-semibold text-brand-text-heading capitalize">{group.paymentFrequency.toLowerCase()}</div>
                </div>
                <div>
-                  <div className="flex items-center gap-1.5 mb-1 text-avenue-text-muted">
+                  <div className="flex items-center gap-1.5 mb-1 text-brand-text-muted">
                     <Calendar className="w-3.5 h-3.5" />
                     <div className="text-xs font-bold uppercase tracking-wider">Effective Date</div>
                   </div>
-                  <div className="font-semibold text-avenue-text-heading">{new Date(group.effectiveDate).toLocaleDateString()}</div>
+                  <div className="font-semibold text-brand-text-heading">{new Date(group.effectiveDate).toLocaleDateString()}</div>
                </div>
                <div>
-                  <div className="flex items-center gap-1.5 mb-1 text-avenue-text-muted">
+                  <div className="flex items-center gap-1.5 mb-1 text-brand-text-muted">
                     <Calendar className="w-3.5 h-3.5" />
                     <div className="text-xs font-bold uppercase tracking-wider">Renewal Date</div>
                   </div>
-                  <div className="font-semibold text-avenue-text-heading">{new Date(group.renewalDate).toLocaleDateString()}</div>
+                  <div className="font-semibold text-brand-text-heading">{new Date(group.renewalDate).toLocaleDateString()}</div>
                </div>
              </div>
 
              {group.broker && (
                <div className="pt-4 border-t border-[#EEEEEE]">
-                  <h3 className="text-xs font-bold text-avenue-text-muted uppercase tracking-wider mb-3">Intermediary</h3>
-                  <div className="font-semibold text-avenue-text-heading">{group.broker.name}</div>
-                  <div className="text-sm text-avenue-text-body mt-1">{group.broker.contactPerson} &mdash; {group.broker.phone}</div>
+                  <h3 className="text-xs font-bold text-brand-text-muted uppercase tracking-wider mb-3">Intermediary</h3>
+                  <div className="font-semibold text-brand-text-heading">{group.broker.name}</div>
+                  <div className="text-sm text-brand-text-body mt-1">{group.broker.contactPerson} &mdash; {group.broker.phone}</div>
                </div>
              )}
           </div>

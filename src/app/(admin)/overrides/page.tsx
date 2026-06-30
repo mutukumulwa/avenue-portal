@@ -59,13 +59,13 @@ export default async function OverrideQueuePage({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Override Queue</h1>
-          <p className="text-avenue-text-muted text-sm mt-1">
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Override Queue</h1>
+          <p className="text-brand-text-muted text-sm mt-1">
             All rule overrides requiring approval — {pending.length} pending
           </p>
         </div>
         <Link href="/overrides/patterns"
-          className="flex items-center gap-1.5 text-xs font-semibold text-avenue-indigo border border-avenue-indigo/30 px-3 py-1.5 rounded-full hover:bg-avenue-indigo/5 transition-colors">
+          className="flex items-center gap-1.5 text-xs font-semibold text-brand-indigo border border-brand-indigo/30 px-3 py-1.5 rounded-full hover:bg-brand-indigo/5 transition-colors">
           <BarChart2 size={13} /> Compliance Patterns
         </Link>
       </div>
@@ -81,8 +81,8 @@ export default async function OverrideQueuePage({
           <Link key={value} href={value ? `?status=${value}` : "/overrides"}
             className={`px-4 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
               (status ?? "") === value
-                ? "bg-avenue-indigo text-white border-avenue-indigo"
-                : "border-[#EEEEEE] text-avenue-text-muted hover:border-avenue-indigo hover:text-avenue-indigo"
+                ? "bg-brand-indigo text-white border-brand-indigo"
+                : "border-[#EEEEEE] text-brand-text-muted hover:border-brand-indigo hover:text-brand-indigo"
             }`}>
             {label} ({count})
           </Link>
@@ -92,7 +92,7 @@ export default async function OverrideQueuePage({
       {items.length === 0 ? (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-12 text-center">
           <CheckCircle2 size={32} className="mx-auto mb-3 text-[#28A745] opacity-40" />
-          <p className="text-avenue-text-muted text-sm">No override records found.</p>
+          <p className="text-brand-text-muted text-sm">No override records found.</p>
         </div>
       ) : (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
@@ -114,7 +114,7 @@ export default async function OverrideQueuePage({
                 return (
                   <tr key={r.id} className={`hover:bg-[#F8F9FA] transition-colors ${isSlaBreached ? "bg-[#DC3545]/5" : ""}`}>
                     <td className="px-5 py-3">
-                      <p className="font-semibold text-avenue-text-heading text-xs">
+                      <p className="font-semibold text-brand-text-heading text-xs">
                         {TYPE_LABEL[r.overrideType] ?? r.overrideType}
                       </p>
                       {isSlaBreached && (
@@ -123,15 +123,15 @@ export default async function OverrideQueuePage({
                         </span>
                       )}
                     </td>
-                    <td className="px-5 py-3 text-xs text-avenue-text-muted font-mono">
+                    <td className="px-5 py-3 text-xs text-brand-text-muted font-mono">
                       {r.entityType}<br />
                       <span className="text-[10px] opacity-60">{r.entityId.slice(0, 12)}…</span>
                     </td>
-                    <td className="px-5 py-3 text-xs text-avenue-text-body">
+                    <td className="px-5 py-3 text-xs text-brand-text-body">
                       {(r.maker as { firstName: string; lastName: string }).firstName}{" "}
                       {(r.maker as { firstName: string; lastName: string }).lastName}
                     </td>
-                    <td className="px-5 py-3 text-xs text-avenue-text-muted">
+                    <td className="px-5 py-3 text-xs text-brand-text-muted">
                       {r.reasonCode.replace(/_/g, " ")}
                     </td>
                     <td className="px-5 py-3">
@@ -147,14 +147,14 @@ export default async function OverrideQueuePage({
                             : `${slaMinutesLeft(r.slaDeadlineAt)}m left`}
                         </span>
                       ) : (
-                        <span className="text-xs text-avenue-text-muted">
+                        <span className="text-xs text-brand-text-muted">
                           {r.resolvedAt ? new Date(r.resolvedAt).toLocaleDateString("en-KE") : "—"}
                         </span>
                       )}
                     </td>
                     <td className="px-5 py-3">
                       <Link href={`/overrides/${r.id}`}
-                        className="text-avenue-indigo hover:text-avenue-secondary font-semibold text-xs">
+                        className="text-brand-indigo hover:text-brand-secondary font-semibold text-xs">
                         {r.status === "PENDING" ? "Review →" : "View →"}
                       </Link>
                     </td>

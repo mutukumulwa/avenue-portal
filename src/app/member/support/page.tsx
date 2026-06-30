@@ -8,8 +8,8 @@ export default async function MemberSupportPage() {
   return (
     <div className="space-y-6 max-w-xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold font-heading text-avenue-text-heading">Support</h1>
-        <p className="text-avenue-text-muted mt-1 text-sm">We are here to help with any questions about your cover.</p>
+        <h1 className="text-2xl font-bold font-heading text-brand-text-heading">Support</h1>
+        <p className="text-brand-text-muted mt-1 text-sm">We are here to help with any questions about your cover.</p>
       </div>
 
       {/* Contact channels */}
@@ -24,15 +24,15 @@ export default async function MemberSupportPage() {
             <a
               key={item.title}
               href={item.href}
-              className="bg-white border border-[#EEEEEE] rounded-lg p-4 flex items-center gap-4 hover:border-avenue-indigo/30 hover:shadow-md transition-all group"
+              className="bg-white border border-[#EEEEEE] rounded-lg p-4 flex items-center gap-4 hover:border-brand-indigo/30 hover:shadow-md transition-all group"
             >
-              <div className="w-10 h-10 bg-avenue-indigo/10 rounded-lg flex items-center justify-center shrink-0">
-                <Icon size={20} className="text-avenue-indigo" />
+              <div className="w-10 h-10 bg-brand-indigo/10 rounded-lg flex items-center justify-center shrink-0">
+                <Icon size={20} className="text-brand-indigo" />
               </div>
               <div>
-                <p className="font-bold text-avenue-text-heading group-hover:text-avenue-indigo transition-colors">{item.title}</p>
-                <p className="text-xs text-avenue-text-muted">{item.desc}</p>
-                <p className="text-sm font-semibold text-avenue-indigo mt-0.5">{item.action}</p>
+                <p className="font-bold text-brand-text-heading group-hover:text-brand-indigo transition-colors">{item.title}</p>
+                <p className="text-xs text-brand-text-muted">{item.desc}</p>
+                <p className="text-sm font-semibold text-brand-indigo mt-0.5">{item.action}</p>
               </div>
             </a>
           );
@@ -42,8 +42,8 @@ export default async function MemberSupportPage() {
       {/* Complaint / grievance form */}
       <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm space-y-4">
         <div>
-          <h2 className="font-bold text-avenue-text-heading font-heading">Submit a Grievance</h2>
-          <p className="text-xs text-avenue-text-muted mt-0.5">
+          <h2 className="font-bold text-brand-text-heading font-heading">Submit a Grievance</h2>
+          <p className="text-xs text-brand-text-muted mt-0.5">
             Use this form for formal complaints about Medvex services, network facilities, or billing disputes.
             You will receive a reference number on submission.
           </p>

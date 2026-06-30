@@ -23,7 +23,7 @@ export default async function HRDashboard() {
 
   if (!groupId) {
     return (
-      <div className="p-8 text-center text-avenue-text-muted">
+      <div className="p-8 text-center text-brand-text-muted">
         <p>No corporate group assigned. Please contact your Medvex administrator.</p>
       </div>
     );
@@ -107,8 +107,8 @@ export default async function HRDashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Dashboard</h1>
-        <p className="text-avenue-text-body font-body mt-1">Overview of your corporate membership.</p>
+        <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Dashboard</h1>
+        <p className="text-brand-text-body font-body mt-1">Overview of your corporate membership.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -117,11 +117,11 @@ export default async function HRDashboard() {
           return (
             <div key={kpi.label} className="bg-white p-5 rounded-xl border border-[#EEEEEE] shadow-sm flex items-start justify-between font-ui">
               <div>
-                <p className="text-[11px] font-bold text-avenue-text-muted uppercase tracking-wide mb-2">{kpi.label}</p>
-                <p className="text-2xl font-bold text-avenue-text-heading tabular-nums">{kpi.value}</p>
+                <p className="text-[11px] font-bold text-brand-text-muted uppercase tracking-wide mb-2">{kpi.label}</p>
+                <p className="text-2xl font-bold text-brand-text-heading tabular-nums">{kpi.value}</p>
               </div>
-              <div className="bg-avenue-indigo/5 p-3 rounded-xl">
-                <Icon className="w-5 h-5 text-avenue-indigo" />
+              <div className="bg-brand-indigo/5 p-3 rounded-xl">
+                <Icon className="w-5 h-5 text-brand-indigo" />
               </div>
             </div>
           );
@@ -132,20 +132,20 @@ export default async function HRDashboard() {
 
       <div className="bg-white border border-[#EEEEEE] rounded-xl shadow-sm overflow-hidden mt-6">
         <div className="px-5 py-4 border-b border-[#EEEEEE] flex justify-between items-center">
-          <h3 className="font-bold text-avenue-text-heading font-heading">Recent Activity</h3>
+          <h3 className="font-bold text-brand-text-heading font-heading">Recent Activity</h3>
         </div>
         
         {activities.length === 0 ? (
-          <div className="p-8 text-center text-sm text-avenue-text-body">No recent activity.</div>
+          <div className="p-8 text-center text-sm text-brand-text-body">No recent activity.</div>
         ) : (
           <ul className="divide-y divide-[#EEEEEE]">
             {activities.map((log) => (
               <li key={log.id} className="px-5 py-3 flex text-sm items-center justify-between">
                 <div>
-                  <span className="font-bold text-avenue-text-heading">{log.action.replace(/_/g, " ")}</span>
-                  <span className="text-avenue-text-body"> &mdash; {log.description}</span>
+                  <span className="font-bold text-brand-text-heading">{log.action.replace(/_/g, " ")}</span>
+                  <span className="text-brand-text-body"> &mdash; {log.description}</span>
                 </div>
-                <div className="text-xs text-avenue-text-muted">
+                <div className="text-xs text-brand-text-muted">
                   {format(new Date(log.createdAt), "dd MMM yyyy, HH:mm")}
                 </div>
               </li>

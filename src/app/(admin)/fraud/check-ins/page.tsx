@@ -112,29 +112,29 @@ export default async function CheckInAuditPage(props: {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Check-In Audit</h1>
-          <p className="text-sm text-avenue-text-body mt-0.5">
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Check-In Audit</h1>
+          <p className="text-sm text-brand-text-body mt-0.5">
             Same-day review of biometric failures, fallback paths, and emergency overrides.
           </p>
         </div>
-        <Link href="/fraud" className="rounded-full border border-[#EEEEEE] px-4 py-2 text-sm font-semibold text-avenue-text-body hover:bg-avenue-bg-alt">
+        <Link href="/fraud" className="rounded-full border border-[#EEEEEE] px-4 py-2 text-sm font-semibold text-brand-text-body hover:bg-brand-bg-alt">
           Claim fraud desk
         </Link>
       </div>
 
       <div className="grid gap-4 md:grid-cols-5">
         {[
-          { label: "Events", value: totalEvents, icon: Fingerprint, color: "text-avenue-indigo" },
+          { label: "Events", value: totalEvents, icon: Fingerprint, color: "text-brand-indigo" },
           { label: "Biometric Success", value: biometricSuccess, icon: ShieldCheck, color: "text-[#28A745]" },
           { label: "Fallback Events", value: fallbackEvents, icon: AlertTriangle, color: "text-[#856404]" },
-          { label: "Overrides", value: overrideEvents, icon: ShieldAlert, color: "text-avenue-error" },
-          { label: "Needs Review", value: reviewEvents, icon: AlertTriangle, color: "text-avenue-error" },
+          { label: "Overrides", value: overrideEvents, icon: ShieldAlert, color: "text-brand-error" },
+          { label: "Needs Review", value: reviewEvents, icon: AlertTriangle, color: "text-brand-error" },
         ].map((card) => {
           const Icon = card.icon;
           return (
             <div key={card.label} className="rounded-lg border border-[#EEEEEE] bg-white p-4 shadow-sm">
               <div className="flex items-center justify-between">
-                <p className="text-[10px] font-bold uppercase text-avenue-text-muted">{card.label}</p>
+                <p className="text-[10px] font-bold uppercase text-brand-text-muted">{card.label}</p>
                 <Icon className={`h-4 w-4 ${card.color}`} />
               </div>
               <p className={`mt-2 text-2xl font-bold ${card.color}`}>{card.value}</p>
@@ -146,12 +146,12 @@ export default async function CheckInAuditPage(props: {
       <div className="rounded-lg border border-[#EEEEEE] bg-white p-4">
         <form className="grid gap-3 md:grid-cols-5">
           <label className="block">
-            <span className="text-xs font-bold uppercase text-avenue-text-muted">Date</span>
-            <input name="date" type="date" defaultValue={queryDate} className="mt-1 w-full rounded-md border border-[#EEEEEE] px-3 py-2 text-sm outline-none focus:border-avenue-indigo" />
+            <span className="text-xs font-bold uppercase text-brand-text-muted">Date</span>
+            <input name="date" type="date" defaultValue={queryDate} className="mt-1 w-full rounded-md border border-[#EEEEEE] px-3 py-2 text-sm outline-none focus:border-brand-indigo" />
           </label>
           <label className="block">
-            <span className="text-xs font-bold uppercase text-avenue-text-muted">Flow</span>
-            <select name="flow" defaultValue={flow ?? ""} className="mt-1 w-full rounded-md border border-[#EEEEEE] px-3 py-2 text-sm outline-none focus:border-avenue-indigo">
+            <span className="text-xs font-bold uppercase text-brand-text-muted">Flow</span>
+            <select name="flow" defaultValue={flow ?? ""} className="mt-1 w-full rounded-md border border-[#EEEEEE] px-3 py-2 text-sm outline-none focus:border-brand-indigo">
               <option value="">All flows</option>
               {Object.values(CheckInFlow).map((value) => (
                 <option key={value} value={value}>{value.replace(/_/g, " ")}</option>
@@ -159,8 +159,8 @@ export default async function CheckInAuditPage(props: {
             </select>
           </label>
           <label className="block">
-            <span className="text-xs font-bold uppercase text-avenue-text-muted">Outcome</span>
-            <select name="outcome" defaultValue={outcome ?? ""} className="mt-1 w-full rounded-md border border-[#EEEEEE] px-3 py-2 text-sm outline-none focus:border-avenue-indigo">
+            <span className="text-xs font-bold uppercase text-brand-text-muted">Outcome</span>
+            <select name="outcome" defaultValue={outcome ?? ""} className="mt-1 w-full rounded-md border border-[#EEEEEE] px-3 py-2 text-sm outline-none focus:border-brand-indigo">
               <option value="">All outcomes</option>
               {Object.values(CheckInOutcome).map((value) => (
                 <option key={value} value={value}>{value.replace(/_/g, " ")}</option>
@@ -168,14 +168,14 @@ export default async function CheckInAuditPage(props: {
             </select>
           </label>
           <label className="block">
-            <span className="text-xs font-bold uppercase text-avenue-text-muted">Review</span>
-            <select name="review" defaultValue={review ?? "true"} className="mt-1 w-full rounded-md border border-[#EEEEEE] px-3 py-2 text-sm outline-none focus:border-avenue-indigo">
+            <span className="text-xs font-bold uppercase text-brand-text-muted">Review</span>
+            <select name="review" defaultValue={review ?? "true"} className="mt-1 w-full rounded-md border border-[#EEEEEE] px-3 py-2 text-sm outline-none focus:border-brand-indigo">
               <option value="true">Needs review</option>
               <option value="false">All events</option>
             </select>
           </label>
           <div className="flex items-end">
-            <button className="w-full rounded-full bg-avenue-indigo px-4 py-2 text-sm font-bold text-white hover:bg-avenue-secondary">
+            <button className="w-full rounded-full bg-brand-indigo px-4 py-2 text-sm font-bold text-white hover:bg-brand-secondary">
               Apply
             </button>
           </div>
@@ -185,31 +185,31 @@ export default async function CheckInAuditPage(props: {
       <div className="grid gap-4 lg:grid-cols-2">
         <section className="rounded-lg border border-[#EEEEEE] bg-white">
           <div className="border-b border-[#EEEEEE] px-5 py-4">
-            <h2 className="font-bold text-avenue-text-heading">Overrides by User</h2>
+            <h2 className="font-bold text-brand-text-heading">Overrides by User</h2>
           </div>
           <div className="divide-y divide-[#EEEEEE]">
             {[...overridesByUser.values()].sort((a, b) => b.count - a.count).map((row) => (
               <div key={row.label} className="flex items-center justify-between px-5 py-3 text-sm">
-                <span className="font-semibold text-avenue-text-heading">{row.label}</span>
-                <span className="font-bold text-avenue-error">{row.count} ({pct(row.count, overrideEvents)})</span>
+                <span className="font-semibold text-brand-text-heading">{row.label}</span>
+                <span className="font-bold text-brand-error">{row.count} ({pct(row.count, overrideEvents)})</span>
               </div>
             ))}
-            {overridesByUser.size === 0 && <p className="px-5 py-6 text-center text-sm text-avenue-text-muted">No overrides for this filter.</p>}
+            {overridesByUser.size === 0 && <p className="px-5 py-6 text-center text-sm text-brand-text-muted">No overrides for this filter.</p>}
           </div>
         </section>
 
         <section className="rounded-lg border border-[#EEEEEE] bg-white">
           <div className="border-b border-[#EEEEEE] px-5 py-4">
-            <h2 className="font-bold text-avenue-text-heading">Overrides by Facility</h2>
+            <h2 className="font-bold text-brand-text-heading">Overrides by Facility</h2>
           </div>
           <div className="divide-y divide-[#EEEEEE]">
             {[...overridesByFacility.values()].sort((a, b) => b.count - a.count).map((row) => (
               <div key={row.label} className="flex items-center justify-between px-5 py-3 text-sm">
-                <span className="font-semibold text-avenue-text-heading">{row.label}</span>
-                <span className="font-bold text-avenue-error">{row.count} ({pct(row.count, overrideEvents)})</span>
+                <span className="font-semibold text-brand-text-heading">{row.label}</span>
+                <span className="font-bold text-brand-error">{row.count} ({pct(row.count, overrideEvents)})</span>
               </div>
             ))}
-            {overridesByFacility.size === 0 && <p className="px-5 py-6 text-center text-sm text-avenue-text-muted">No facility overrides for this filter.</p>}
+            {overridesByFacility.size === 0 && <p className="px-5 py-6 text-center text-sm text-brand-text-muted">No facility overrides for this filter.</p>}
           </div>
         </section>
       </div>
@@ -217,7 +217,7 @@ export default async function CheckInAuditPage(props: {
       <section className="overflow-hidden rounded-lg border border-[#EEEEEE] bg-white shadow-sm">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-[#EEEEEE] bg-[#F8F9FA] text-xs font-bold uppercase text-avenue-text-muted">
+            <tr className="border-b border-[#EEEEEE] bg-[#F8F9FA] text-xs font-bold uppercase text-brand-text-muted">
               <th className="px-5 py-3 text-left">Member</th>
               <th className="px-5 py-3 text-left">Facility</th>
               <th className="px-5 py-3 text-left">Flow</th>
@@ -231,27 +231,27 @@ export default async function CheckInAuditPage(props: {
             {events.map((event) => (
               <tr key={event.id} className="hover:bg-[#F8F9FA]">
                 <td className="px-5 py-3">
-                  <p className="font-semibold text-avenue-text-heading">{event.member.firstName} {event.member.lastName}</p>
-                  <p className="text-[10px] font-mono text-avenue-text-muted">{event.member.memberNumber}</p>
+                  <p className="font-semibold text-brand-text-heading">{event.member.firstName} {event.member.lastName}</p>
+                  <p className="text-[10px] font-mono text-brand-text-muted">{event.member.memberNumber}</p>
                 </td>
-                <td className="px-5 py-3 text-xs text-avenue-text-body">{event.provider?.name ?? "No facility"}</td>
+                <td className="px-5 py-3 text-xs text-brand-text-body">{event.provider?.name ?? "No facility"}</td>
                 <td className="px-5 py-3">
-                  <span className="rounded-full bg-avenue-indigo/10 px-2 py-0.5 text-[10px] font-bold text-avenue-indigo">
+                  <span className="rounded-full bg-brand-indigo/10 px-2 py-0.5 text-[10px] font-bold text-brand-indigo">
                     {event.flow.replace(/_/g, " ")}
                   </span>
                 </td>
-                <td className="px-5 py-3 text-xs font-bold text-avenue-text-heading">{event.outcome.replace(/_/g, " ")}</td>
-                <td className="px-5 py-3 text-xs text-avenue-text-body">
+                <td className="px-5 py-3 text-xs font-bold text-brand-text-heading">{event.outcome.replace(/_/g, " ")}</td>
+                <td className="px-5 py-3 text-xs text-brand-text-body">
                   {event.overrideBy
                     ? `${event.overrideBy.firstName} ${event.overrideBy.lastName}`
                     : event.initiatedBy
                       ? `${event.initiatedBy.firstName} ${event.initiatedBy.lastName}`
                       : "Member/device"}
                 </td>
-                <td className="px-5 py-3 text-xs text-avenue-text-muted">{event.createdAt.toLocaleTimeString()}</td>
+                <td className="px-5 py-3 text-xs text-brand-text-muted">{event.createdAt.toLocaleTimeString()}</td>
                 <td className="px-5 py-3 text-right">
                   {event.reviewRequired ? (
-                    <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-avenue-error">Required</span>
+                    <span className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-brand-error">Required</span>
                   ) : (
                     <span className="rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-bold text-green-700">Clear</span>
                   )}
@@ -260,7 +260,7 @@ export default async function CheckInAuditPage(props: {
             ))}
             {events.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-5 py-10 text-center text-sm text-avenue-text-muted">
+                <td colSpan={7} className="px-5 py-10 text-center text-sm text-brand-text-muted">
                   No check-in events match this filter.
                 </td>
               </tr>

@@ -29,8 +29,8 @@ export default async function HRInvoicesPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Invoices</h1>
-          <p className="text-avenue-text-body font-body mt-1">View your corporate billing history and outstanding balances.</p>
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Invoices</h1>
+          <p className="text-brand-text-body font-body mt-1">View your corporate billing history and outstanding balances.</p>
         </div>
       </div>
 
@@ -38,7 +38,7 @@ export default async function HRInvoicesPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm whitespace-nowrap">
             <thead>
-              <tr className="bg-[#F8F9FA] border-b border-[#EEEEEE] text-avenue-text-muted font-heading text-xs uppercase tracking-wider">
+              <tr className="bg-[#F8F9FA] border-b border-[#EEEEEE] text-brand-text-muted font-heading text-xs uppercase tracking-wider">
                 <th className="px-6 py-4 font-bold">Invoice No.</th>
                 <th className="px-6 py-4 font-bold">Period</th>
                 <th className="px-6 py-4 font-bold text-right">Total Amount (KES)</th>
@@ -52,19 +52,19 @@ export default async function HRInvoicesPage() {
               {invoices.map((inv) => (
                 <tr key={inv.id} className="hover:bg-[#F8F9FA] transition-colors group">
                   <td className="px-6 py-4">
-                     <div className="font-mono text-avenue-text-heading font-bold flex items-center">
-                        <FileText className="w-4 h-4 mr-2 text-avenue-indigo opacity-50" />
+                     <div className="font-mono text-brand-text-heading font-bold flex items-center">
+                        <FileText className="w-4 h-4 mr-2 text-brand-indigo opacity-50" />
                         {inv.invoiceNumber}
                      </div>
                   </td>
-                  <td className="px-6 py-4 font-semibold text-avenue-text-heading">{inv.period}</td>
-                  <td className="px-6 py-4 text-right font-semibold text-avenue-text-heading">
+                  <td className="px-6 py-4 font-semibold text-brand-text-heading">{inv.period}</td>
+                  <td className="px-6 py-4 text-right font-semibold text-brand-text-heading">
                      {Number(inv.totalAmount).toLocaleString()}
                   </td>
-                  <td className="px-6 py-4 text-right font-semibold text-avenue-indigo">
+                  <td className="px-6 py-4 text-right font-semibold text-brand-indigo">
                      {(Number(inv.totalAmount) - Number(inv.paidAmount)).toLocaleString()}
                   </td>
-                  <td className="px-6 py-4 text-avenue-text-body">
+                  <td className="px-6 py-4 text-brand-text-body">
                      {new Date(inv.dueDate).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4">
@@ -73,10 +73,10 @@ export default async function HRInvoicesPage() {
                      </span>
                   </td>
                   <td className="px-6 py-4 text-right space-x-3">
-                     <button className="text-avenue-text-muted hover:text-avenue-indigo transition-colors" title="Download PDF">
+                     <button className="text-brand-text-muted hover:text-brand-indigo transition-colors" title="Download PDF">
                         <Download className="w-4 h-4" />
                      </button>
-                     <button className="text-avenue-text-muted hover:text-avenue-indigo transition-colors" title="View Details">
+                     <button className="text-brand-text-muted hover:text-brand-indigo transition-colors" title="View Details">
                         <ExternalLink className="w-4 h-4" />
                      </button>
                   </td>
@@ -84,7 +84,7 @@ export default async function HRInvoicesPage() {
               ))}
               {invoices.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-6 py-12 text-center text-avenue-text-body">
+                  <td colSpan={7} className="px-6 py-12 text-center text-brand-text-body">
                      No invoices issued yet.
                   </td>
                 </tr>

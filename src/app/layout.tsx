@@ -54,7 +54,7 @@ export default function RootLayout({
       lang="en"
       className={`${sora.variable} ${hanken.variable}`}
     >
-      <body className="antialiased min-h-screen bg-avenue-bg text-avenue-text-body font-body">
+      <body className="antialiased min-h-screen bg-brand-bg text-brand-text-body font-body">
         {children}
         <PWARegister />
       </body>

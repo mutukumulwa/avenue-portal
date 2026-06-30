@@ -41,14 +41,14 @@ export default async function BrokerQuotationDetailPage({ params }: { params: Pr
   return (
     <div className="max-w-4xl space-y-6">
       <div className="flex items-center gap-3">
-        <Link href="/broker/quotations" className="text-avenue-text-muted hover:text-avenue-indigo transition-colors">
+        <Link href="/broker/quotations" className="text-brand-text-muted hover:text-brand-indigo transition-colors">
           <ArrowLeft size={20} />
         </Link>
         <div className="flex-1">
-          <h1 className="text-2xl font-bold font-heading text-avenue-text-heading">
+          <h1 className="text-2xl font-bold font-heading text-brand-text-heading">
             {quotation.prospectName ?? quotation.group?.name ?? "Quotation"}
           </h1>
-          <p className="text-sm text-avenue-text-muted mt-1">{quotation.quoteNumber}</p>
+          <p className="text-sm text-brand-text-muted mt-1">{quotation.quoteNumber}</p>
         </div>
         <span className={`px-3 py-1 text-[10px] font-bold uppercase rounded-full ${STATUS_STYLE[quotation.status] ?? STATUS_STYLE.DRAFT}`}>
           {quotation.status.replace(/_/g, " ")}
@@ -58,41 +58,41 @@ export default async function BrokerQuotationDetailPage({ params }: { params: Pr
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-4">
         <div className="grid md:grid-cols-2 gap-4 text-sm">
           <div>
-            <p className="text-xs font-bold uppercase text-avenue-text-muted">Prospect / Group</p>
-            <p className="font-bold text-avenue-text-heading mt-1">{quotation.group?.name ?? quotation.prospectName ?? "-"}</p>
+            <p className="text-xs font-bold uppercase text-brand-text-muted">Prospect / Group</p>
+            <p className="font-bold text-brand-text-heading mt-1">{quotation.group?.name ?? quotation.prospectName ?? "-"}</p>
           </div>
           <div>
-            <p className="text-xs font-bold uppercase text-avenue-text-muted">Contact Email</p>
-            <p className="font-bold text-avenue-text-heading mt-1">{quotation.prospectEmail ?? "-"}</p>
+            <p className="text-xs font-bold uppercase text-brand-text-muted">Contact Email</p>
+            <p className="font-bold text-brand-text-heading mt-1">{quotation.prospectEmail ?? "-"}</p>
           </div>
           <div>
-            <p className="text-xs font-bold uppercase text-avenue-text-muted">Lives</p>
-            <p className="font-bold text-avenue-text-heading mt-1">
+            <p className="text-xs font-bold uppercase text-brand-text-muted">Lives</p>
+            <p className="font-bold text-brand-text-heading mt-1">
               {totalLives.toLocaleString("en-KE")} ({quotation.memberCount} principal, {quotation.dependentCount} dependant)
             </p>
           </div>
           <div>
-            <p className="text-xs font-bold uppercase text-avenue-text-muted">Final Premium</p>
-            <p className="font-bold text-avenue-indigo mt-1">
+            <p className="text-xs font-bold uppercase text-brand-text-muted">Final Premium</p>
+            <p className="font-bold text-brand-indigo mt-1">
               KES {Number(quotation.finalPremium ?? 0).toLocaleString("en-KE")}
             </p>
           </div>
           <div>
-            <p className="text-xs font-bold uppercase text-avenue-text-muted">Valid Until</p>
-            <p className="font-bold text-avenue-text-heading mt-1">
+            <p className="text-xs font-bold uppercase text-brand-text-muted">Valid Until</p>
+            <p className="font-bold text-brand-text-heading mt-1">
               {quotation.validUntil ? new Date(quotation.validUntil).toLocaleDateString("en-KE") : "-"}
             </p>
           </div>
           <div>
-            <p className="text-xs font-bold uppercase text-avenue-text-muted">Industry</p>
-            <p className="font-bold text-avenue-text-heading mt-1">{quotation.prospectIndustry ?? "-"}</p>
+            <p className="text-xs font-bold uppercase text-brand-text-muted">Industry</p>
+            <p className="font-bold text-brand-text-heading mt-1">{quotation.prospectIndustry ?? "-"}</p>
           </div>
         </div>
 
         {quotation.pricingNotes && (
           <div className="border-t border-[#EEEEEE] pt-4">
-            <p className="text-xs font-bold uppercase text-avenue-text-muted">Pricing Notes</p>
-            <p className="text-sm text-avenue-text-body whitespace-pre-line mt-1">{quotation.pricingNotes}</p>
+            <p className="text-xs font-bold uppercase text-brand-text-muted">Pricing Notes</p>
+            <p className="text-sm text-brand-text-body whitespace-pre-line mt-1">{quotation.pricingNotes}</p>
           </div>
         )}
       </div>
@@ -110,7 +110,7 @@ export default async function BrokerQuotationDetailPage({ params }: { params: Pr
           {canSend && (
             <form action={sendBrokerQuotationAction}>
               <input type="hidden" name="quotationId" value={quotation.id} />
-              <button type="submit" className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-avenue-indigo text-white text-sm font-bold hover:bg-avenue-secondary transition-colors">
+              <button type="submit" className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-brand-indigo text-white text-sm font-bold hover:bg-brand-secondary transition-colors">
                 <CheckCircle size={15} /> Mark Sent
               </button>
             </form>

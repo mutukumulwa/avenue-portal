@@ -13,11 +13,11 @@ interface Doc {
 }
 
 function fileIcon(mimeType: string | null) {
-  if (!mimeType) return <File size={16} className="text-avenue-text-muted" />;
+  if (!mimeType) return <File size={16} className="text-brand-text-muted" />;
   if (mimeType.startsWith("image/")) return <ImageIcon size={16} className="text-[#17A2B8]" />;
   if (mimeType.includes("spreadsheet") || mimeType.includes("excel"))
     return <FileSpreadsheet size={16} className="text-[#28A745]" />;
-  return <FileText size={16} className="text-avenue-indigo" />;
+  return <FileText size={16} className="text-brand-indigo" />;
 }
 
 function formatBytes(bytes: number | null) {
@@ -29,7 +29,7 @@ function formatBytes(bytes: number | null) {
 
 export function DocumentList({ documents }: { documents: Doc[] }) {
   if (documents.length === 0) {
-    return <p className="text-sm text-avenue-text-muted py-4">No documents attached yet.</p>;
+    return <p className="text-sm text-brand-text-muted py-4">No documents attached yet.</p>;
   }
 
   return (
@@ -38,8 +38,8 @@ export function DocumentList({ documents }: { documents: Doc[] }) {
         <div key={doc.id} className="flex items-center gap-3 py-3">
           <div className="shrink-0">{fileIcon(doc.mimeType)}</div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-avenue-text-heading truncate">{doc.fileName}</p>
-            <p className="text-xs text-avenue-text-muted">
+            <p className="text-sm font-semibold text-brand-text-heading truncate">{doc.fileName}</p>
+            <p className="text-xs text-brand-text-muted">
               {doc.category.replace(/_/g, " ")}
               {doc.fileSize && ` · ${formatBytes(doc.fileSize)}`}
               {` · ${new Date(doc.createdAt).toLocaleDateString()}`}
@@ -49,7 +49,7 @@ export function DocumentList({ documents }: { documents: Doc[] }) {
             href={doc.fileUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="shrink-0 flex items-center gap-1 text-xs font-bold text-avenue-indigo hover:text-avenue-secondary transition-colors"
+            className="shrink-0 flex items-center gap-1 text-xs font-bold text-brand-indigo hover:text-brand-secondary transition-colors"
           >
             <Download size={13} /> Download
           </a>

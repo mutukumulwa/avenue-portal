@@ -4,8 +4,8 @@ import { useActionState } from "react";
 import { Save, AlertCircle, AlertTriangle } from "lucide-react";
 import { submitPreAuthAction } from "./actions";
 
-const inputCls = "w-full border border-[#EEEEEE] rounded-md px-4 py-2 text-sm outline-none focus:border-avenue-indigo transition-colors";
-const labelCls = "text-sm font-semibold text-avenue-text-heading block mb-1";
+const inputCls = "w-full border border-[#EEEEEE] rounded-md px-4 py-2 text-sm outline-none focus:border-brand-indigo transition-colors";
+const labelCls = "text-sm font-semibold text-brand-text-heading block mb-1";
 
 interface Member   { id: string; firstName: string; lastName: string; memberNumber: string; }
 interface Provider { id: string; name: string; type: string; }
@@ -43,7 +43,7 @@ export function PreAuthNewForm({ members, providers }: Props) {
 
       <form action={action} className="space-y-6">
         <div className="border-b border-[#EEEEEE] pb-6 space-y-4">
-          <h3 className="text-lg font-bold text-avenue-text-heading font-heading">Member &amp; Provider</h3>
+          <h3 className="text-lg font-bold text-brand-text-heading font-heading">Member &amp; Provider</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-[#F8F9FA] p-4 rounded-lg border border-[#EEEEEE]">
             <div>
               <label className={labelCls}>Member</label>
@@ -67,7 +67,7 @@ export function PreAuthNewForm({ members, providers }: Props) {
         </div>
 
         <div className="border-b border-[#EEEEEE] pb-6 space-y-4">
-          <h3 className="text-lg font-bold text-avenue-text-heading font-heading">Procedure Details</h3>
+          <h3 className="text-lg font-bold text-brand-text-heading font-heading">Procedure Details</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label className={labelCls}>Service Type</label>
@@ -102,7 +102,7 @@ export function PreAuthNewForm({ members, providers }: Props) {
         </div>
 
         <div className="space-y-4">
-          <h3 className="text-lg font-bold text-avenue-text-heading font-heading">Clinical Information</h3>
+          <h3 className="text-lg font-bold text-brand-text-heading font-heading">Clinical Information</h3>
           <div className="space-y-4">
             <div>
               <label className={labelCls}>Primary Diagnosis</label>
@@ -123,7 +123,7 @@ export function PreAuthNewForm({ members, providers }: Props) {
           <button
             type="submit"
             disabled={pending}
-            className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-8 py-3 rounded-full font-semibold transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-brand-indigo hover:bg-brand-secondary text-white px-8 py-3 rounded-full font-semibold transition-colors flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save size={18} />
             {pending ? "Submitting…" : "Submit Pre-Authorization"}

@@ -13,7 +13,7 @@ export default async function PackagesPage() {
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-['Sora']">Packages</h1>
+          <h1 className="text-2xl font-bold text-brand-text-heading font-['Sora']">Packages</h1>
           <p className="text-[#848E9F] font-['Hanken_Grotesk'] mt-1">Manage benefit packages and configuration limits.</p>
         </div>
         <Link 
@@ -43,12 +43,12 @@ export default async function PackagesPage() {
                 <tr key={pkg.id} className="hover:bg-[#F8F9FA] transition-colors">
                   <td className="px-6 py-4">
                     <div className="flex flex-col">
-                      <span className="font-bold text-avenue-text-heading">{pkg.name}</span>
+                      <span className="font-bold text-brand-text-heading">{pkg.name}</span>
                       <span className="text-xs">{pkg.description || "No description"}</span>
                     </div>
                   </td>
                   <td className="px-6 py-4 font-medium">{pkg.type}</td>
-                  <td className="px-6 py-4 text-avenue-text-heading font-semibold">{Number(pkg.annualLimit).toLocaleString()}</td>
+                  <td className="px-6 py-4 text-brand-text-heading font-semibold">{Number(pkg.annualLimit).toLocaleString()}</td>
                   <td className="px-6 py-4">{Number(pkg.contributionAmount).toLocaleString()} / yr</td>
                   <td className="px-6 py-4">
                     <span 

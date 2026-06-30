@@ -35,7 +35,7 @@ export function MemberLookup({
 
   return (
     <label className="block">
-      <span className="text-[13px] font-medium text-avenue-text-muted">{label}</span>
+      <span className="text-[13px] font-medium text-brand-text-muted">{label}</span>
       <input type="hidden" name={name} value={selected?.id ?? ""} />
       <input
         type="search"
@@ -45,10 +45,10 @@ export function MemberLookup({
           setSelected(null);
         }}
         placeholder="Search by name, member number, or group"
-        className="mt-1 w-full rounded-[8px] border border-[#D6DCE5] px-3 py-2 text-sm text-avenue-text-heading outline-none focus:border-avenue-indigo"
+        className="mt-1 w-full rounded-[8px] border border-[#D6DCE5] px-3 py-2 text-sm text-brand-text-heading outline-none focus:border-brand-indigo"
       />
       {selected && (
-        <p className="mt-2 rounded-[8px] bg-avenue-indigo/10 px-3 py-2 text-sm font-semibold text-avenue-indigo">
+        <p className="mt-2 rounded-[8px] bg-brand-indigo/10 px-3 py-2 text-sm font-semibold text-brand-indigo">
           Selected: {selected.firstName} {selected.lastName} - {selected.memberNumber}
         </p>
       )}
@@ -61,18 +61,18 @@ export function MemberLookup({
               setSelected(member);
               setQuery(`${member.firstName} ${member.lastName} - ${member.memberNumber}`);
             }}
-            className="block w-full border-b border-[#EEEEEE] px-3 py-2 text-left text-sm last:border-b-0 hover:bg-avenue-bg-alt"
+            className="block w-full border-b border-[#EEEEEE] px-3 py-2 text-left text-sm last:border-b-0 hover:bg-brand-bg-alt"
           >
-            <span className="block font-semibold text-avenue-text-heading">
+            <span className="block font-semibold text-brand-text-heading">
               {member.firstName} {member.lastName}
             </span>
-            <span className="block text-xs text-avenue-text-muted">
+            <span className="block text-xs text-brand-text-muted">
               {member.memberNumber}{member.groupName ? ` - ${member.groupName}` : ""}
             </span>
           </button>
         ))}
         {results.length === 0 && (
-          <p className="px-3 py-4 text-center text-sm text-avenue-text-muted">No matching members found.</p>
+          <p className="px-3 py-4 text-center text-sm text-brand-text-muted">No matching members found.</p>
         )}
       </div>
     </label>

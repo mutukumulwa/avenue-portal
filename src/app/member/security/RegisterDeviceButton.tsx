@@ -71,12 +71,12 @@ export function RegisterDeviceButton({ approvalToken }: { approvalToken?: string
   return (
     <div className="rounded-lg border border-[#EEEEEE] bg-white p-5">
       <div className="flex items-start gap-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-avenue-indigo/10 text-avenue-indigo">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-indigo/10 text-brand-indigo">
           <Fingerprint className="h-5 w-5" />
         </div>
         <div className="min-w-0 flex-1">
-          <h2 className="font-bold text-avenue-text-heading">Register This Device</h2>
-          <p className="mt-1 text-sm text-avenue-text-muted">
+          <h2 className="font-bold text-brand-text-heading">Register This Device</h2>
+          <p className="mt-1 text-sm text-brand-text-muted">
             Use your phone&apos;s Face ID, fingerprint, or passkey prompt to register this device for secure check-in.
           </p>
           <div className="mt-4 flex flex-col gap-3 sm:flex-row">
@@ -84,19 +84,19 @@ export function RegisterDeviceButton({ approvalToken }: { approvalToken?: string
               value={deviceName}
               onChange={(event) => setDeviceName(event.target.value)}
               placeholder="Device name, e.g. Arthur's iPhone"
-              className="w-full rounded-md border border-[#EEEEEE] px-3 py-2 text-sm outline-none focus:border-avenue-indigo"
+              className="w-full rounded-md border border-[#EEEEEE] px-3 py-2 text-sm outline-none focus:border-brand-indigo"
             />
             <button
               type="button"
               onClick={registerDevice}
               disabled={pending}
-              className="rounded-full bg-avenue-indigo px-5 py-2 text-sm font-bold text-white hover:bg-avenue-secondary disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-full bg-brand-indigo px-5 py-2 text-sm font-bold text-white hover:bg-brand-secondary disabled:cursor-not-allowed disabled:opacity-50"
             >
               {pending ? "Registering..." : "Register"}
             </button>
           </div>
           {message && <p className="mt-3 text-sm font-semibold text-green-700">{message}</p>}
-          {error && <p className="mt-3 text-sm font-semibold text-avenue-error">{error}</p>}
+          {error && <p className="mt-3 text-sm font-semibold text-brand-error">{error}</p>}
         </div>
       </div>
     </div>

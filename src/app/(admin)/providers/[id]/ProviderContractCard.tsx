@@ -15,8 +15,8 @@ interface Props {
 }
 
 const CONTRACT_STATUSES = ["ACTIVE", "PENDING", "EXPIRED", "SUSPENDED", "TERMINATED"];
-const lbl = "text-[10px] font-bold text-avenue-text-muted uppercase block mb-1";
-const inp = "w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo transition-colors";
+const lbl = "text-[10px] font-bold text-brand-text-muted uppercase block mb-1";
+const inp = "w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo transition-colors";
 
 export function ProviderContractCard(props: Props) {
   const [editing, setEditing] = useState(false);
@@ -36,12 +36,12 @@ export function ProviderContractCard(props: Props) {
     return (
       <div className="bg-white border border-[#EEEEEE] rounded-lg p-6 shadow-sm">
         <div className="flex items-center justify-between border-b border-[#EEEEEE] pb-3 mb-4">
-          <h2 className="font-bold text-avenue-text-heading font-heading flex items-center gap-2">
-            <FileText size={15} className="text-avenue-indigo" /> Contract Details
+          <h2 className="font-bold text-brand-text-heading font-heading flex items-center gap-2">
+            <FileText size={15} className="text-brand-indigo" /> Contract Details
           </h2>
           <button
             onClick={() => setEditing(true)}
-            className="text-sm font-semibold text-avenue-indigo hover:text-avenue-secondary transition-colors"
+            className="text-sm font-semibold text-brand-indigo hover:text-brand-secondary transition-colors"
           >
             Edit
           </button>
@@ -49,7 +49,7 @@ export function ProviderContractCard(props: Props) {
 
         <div className="space-y-3 text-sm">
           <div className="flex justify-between items-center">
-            <span className="text-avenue-text-muted">Status</span>
+            <span className="text-brand-text-muted">Status</span>
             <span className={`px-2.5 py-0.5 text-[10px] font-bold uppercase rounded-full ${statusColor(props.contractStatus)}`}>
               {props.contractStatus ?? "Not Set"}
             </span>
@@ -61,18 +61,18 @@ export function ProviderContractCard(props: Props) {
             { label: "Credit Limit",   value: props.creditLimit != null ? `KES ${Number(props.creditLimit).toLocaleString("en-KE")}` : "—" },
           ].map(f => (
             <div key={f.label} className="flex justify-between">
-              <span className="text-avenue-text-muted">{f.label}</span>
-              <span className="font-semibold text-avenue-text-heading">{f.value}</span>
+              <span className="text-brand-text-muted">{f.label}</span>
+              <span className="font-semibold text-brand-text-heading">{f.value}</span>
             </div>
           ))}
           {props.contractNotes && (
             <div className="pt-3 border-t border-[#EEEEEE]">
-              <p className="text-[10px] font-bold uppercase text-avenue-text-muted mb-1">Notes</p>
-              <p className="text-avenue-text-body text-sm leading-relaxed">{props.contractNotes}</p>
+              <p className="text-[10px] font-bold uppercase text-brand-text-muted mb-1">Notes</p>
+              <p className="text-brand-text-body text-sm leading-relaxed">{props.contractNotes}</p>
             </div>
           )}
           {!props.contractNotes && !props.contractStatus && (
-            <p className="text-xs text-avenue-text-muted italic pt-1">No contract details set — click Edit to configure.</p>
+            <p className="text-xs text-brand-text-muted italic pt-1">No contract details set — click Edit to configure.</p>
           )}
         </div>
       </div>
@@ -80,10 +80,10 @@ export function ProviderContractCard(props: Props) {
   }
 
   return (
-    <div className="bg-white border-2 border-avenue-indigo/20 rounded-lg p-6 shadow-sm">
+    <div className="bg-white border-2 border-brand-indigo/20 rounded-lg p-6 shadow-sm">
       <div className="flex items-center justify-between border-b border-[#EEEEEE] pb-3 mb-4">
-        <h2 className="font-bold text-avenue-text-heading font-heading">Edit Contract</h2>
-        <button onClick={() => setEditing(false)} className="text-sm text-avenue-text-muted hover:text-avenue-text-heading transition-colors">
+        <h2 className="font-bold text-brand-text-heading font-heading">Edit Contract</h2>
+        <button onClick={() => setEditing(false)} className="text-sm text-brand-text-muted hover:text-brand-text-heading transition-colors">
           Cancel
         </button>
       </div>
@@ -126,7 +126,7 @@ export function ProviderContractCard(props: Props) {
         </div>
 
         <div className="flex justify-end pt-1">
-          <button type="submit" className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-7 py-2.5 rounded-full font-semibold text-sm transition-colors shadow-sm">
+          <button type="submit" className="bg-brand-indigo hover:bg-brand-secondary text-white px-7 py-2.5 rounded-full font-semibold text-sm transition-colors shadow-sm">
             Save Contract
           </button>
         </div>

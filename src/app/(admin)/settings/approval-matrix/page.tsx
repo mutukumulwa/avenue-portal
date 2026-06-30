@@ -12,8 +12,8 @@ export default async function ApprovalMatrixPage() {
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Approval Matrix</h1>
-        <p className="text-avenue-text-body text-sm mt-1">
+        <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Approval Matrix</h1>
+        <p className="text-brand-text-body text-sm mt-1">
           Define which role must approve a claim based on its value, service type, or benefit category.
           Rules are evaluated from most specific to least specific — the first match applies.
         </p>

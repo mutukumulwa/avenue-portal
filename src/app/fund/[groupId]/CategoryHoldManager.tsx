@@ -37,7 +37,7 @@ export function CategoryHoldManager({ groupId, heldCategories }: Props) {
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border transition-colors disabled:opacity-50 ${
               isHeld
                 ? "bg-[#DC3545]/10 text-[#DC3545] border-[#DC3545]/30 hover:bg-[#DC3545]/20"
-                : "bg-[#F8F9FA] text-avenue-text-muted border-[#EEEEEE] hover:bg-[#EEEEEE]"
+                : "bg-[#F8F9FA] text-brand-text-muted border-[#EEEEEE] hover:bg-[#EEEEEE]"
             }`}
           >
             {isHeld ? <PauseCircle size={12} /> : <PlayCircle size={12} />}

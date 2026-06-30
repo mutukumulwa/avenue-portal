@@ -14,7 +14,7 @@ export default async function BrokerGroupsPage() {
   });
 
   if (!user?.brokerId) {
-    return <div className="p-6 text-center text-avenue-text-body">No broker profile linked.</div>;
+    return <div className="p-6 text-center text-brand-text-body">No broker profile linked.</div>;
   }
 
   const groups = await prisma.group.findMany({
@@ -29,8 +29,8 @@ export default async function BrokerGroupsPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold font-heading text-avenue-text-heading">My Groups</h1>
-        <p className="text-avenue-text-muted mt-1">Corporate groups under your brokerage.</p>
+        <h1 className="text-2xl font-bold font-heading text-brand-text-heading">My Groups</h1>
+        <p className="text-brand-text-muted mt-1">Corporate groups under your brokerage.</p>
       </div>
 
       <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
@@ -45,10 +45,10 @@ export default async function BrokerGroupsPage() {
               <th className="px-6 py-4">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#EEEEEE] text-avenue-text-body">
+          <tbody className="divide-y divide-[#EEEEEE] text-brand-text-body">
             {groups.map((g) => (
               <tr key={g.id} className="hover:bg-[#F8F9FA]">
-                <td className="px-6 py-4 font-bold text-avenue-text-heading">{g.name}</td>
+                <td className="px-6 py-4 font-bold text-brand-text-heading">{g.name}</td>
                 <td className="px-6 py-4">{g.package.name}</td>
                 <td className="px-6 py-4 font-semibold">{g._count.members}</td>
                 <td className="px-6 py-4">{new Date(g.renewalDate).toLocaleDateString("en-KE")}</td>
@@ -58,14 +58,14 @@ export default async function BrokerGroupsPage() {
                   }`}>{g.status}</span>
                 </td>
                 <td className="px-6 py-4">
-                  <Link href={`/broker/groups/${g.id}`} className="text-avenue-indigo hover:text-avenue-secondary font-semibold inline-flex items-center gap-1">
+                  <Link href={`/broker/groups/${g.id}`} className="text-brand-indigo hover:text-brand-secondary font-semibold inline-flex items-center gap-1">
                     View <ArrowRight size={14} />
                   </Link>
                 </td>
               </tr>
             ))}
             {groups.length === 0 && (
-              <tr><td colSpan={6} className="px-6 py-12 text-center text-avenue-text-body">No groups found.</td></tr>
+              <tr><td colSpan={6} className="px-6 py-12 text-center text-brand-text-body">No groups found.</td></tr>
             )}
           </tbody>
         </table>

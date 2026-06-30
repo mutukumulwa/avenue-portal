@@ -53,8 +53,8 @@ export default async function ExceptionsPage({
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Exception Register</h1>
-        <p className="text-avenue-text-body mt-1 text-sm">
+        <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Exception Register</h1>
+        <p className="text-brand-text-body mt-1 text-sm">
           All manually flagged exceptions across claims and pre-authorisations. Supervisors can approve or reject each one.
         </p>
       </div>
@@ -62,13 +62,13 @@ export default async function ExceptionsPage({
       {/* KPI row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Total",    value: counts.all,      color: "text-avenue-indigo" },
+          { label: "Total",    value: counts.all,      color: "text-brand-indigo" },
           { label: "Pending",  value: counts.pending,  color: "text-[#856404]"    },
           { label: "Approved", value: counts.approved, color: "text-[#28A745]"    },
           { label: "Rejected", value: counts.rejected, color: "text-[#DC3545]"    },
         ].map(s => (
           <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-lg p-4 shadow-sm">
-            <p className="text-[10px] font-bold uppercase text-avenue-text-muted">{s.label}</p>
+            <p className="text-[10px] font-bold uppercase text-brand-text-muted">{s.label}</p>
             <p className={`text-2xl font-bold mt-1 ${s.color}`}>{s.value}</p>
           </div>
         ))}
@@ -82,8 +82,8 @@ export default async function ExceptionsPage({
             href={t.value ? `/settings/exceptions?status=${t.value}` : "/settings/exceptions"}
             className={`px-4 py-1.5 rounded-md text-sm font-semibold transition-colors ${
               (filterStatus ?? "") === t.value
-                ? "bg-white text-avenue-indigo shadow-sm"
-                : "text-avenue-text-muted hover:text-avenue-text-heading"
+                ? "bg-white text-brand-indigo shadow-sm"
+                : "text-brand-text-muted hover:text-brand-text-heading"
             }`}
           >
             {t.label}
@@ -96,7 +96,7 @@ export default async function ExceptionsPage({
       <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-[#F8F9FA] text-[10px] font-bold uppercase text-avenue-text-muted border-b border-[#EEEEEE]">
+            <tr className="bg-[#F8F9FA] text-[10px] font-bold uppercase text-brand-text-muted border-b border-[#EEEEEE]">
               <th className="px-5 py-3 text-left">Type</th>
               <th className="px-5 py-3 text-left">Ref</th>
               <th className="px-5 py-3 text-left">Reason</th>
@@ -110,28 +110,28 @@ export default async function ExceptionsPage({
             {exceptions.map(ex => (
               <tr key={ex.id} className="hover:bg-[#F8F9FA]">
                 <td className="px-5 py-3">
-                  <span className="text-xs font-bold text-avenue-text-heading">
+                  <span className="text-xs font-bold text-brand-text-heading">
                     {CODE_LABELS[ex.exceptionCode] ?? ex.exceptionCode}
                   </span>
-                  <p className="text-[10px] text-avenue-text-muted mt-0.5">{ex.entityType}</p>
+                  <p className="text-[10px] text-brand-text-muted mt-0.5">{ex.entityType}</p>
                 </td>
                 <td className="px-5 py-3">
                   {ex.claimId ? (
-                    <Link href={`/claims/${ex.claimId}`} className="font-mono text-xs font-bold text-avenue-indigo hover:text-avenue-secondary flex items-center gap-1">
+                    <Link href={`/claims/${ex.claimId}`} className="font-mono text-xs font-bold text-brand-indigo hover:text-brand-secondary flex items-center gap-1">
                       {ex.entityRef ?? ex.claimId.slice(0, 8)} <ArrowRight size={11} />
                     </Link>
                   ) : (
-                    <span className="font-mono text-xs text-avenue-text-muted">{ex.entityRef ?? ex.entityId.slice(0, 8)}</span>
+                    <span className="font-mono text-xs text-brand-text-muted">{ex.entityRef ?? ex.entityId.slice(0, 8)}</span>
                   )}
                 </td>
                 <td className="px-5 py-3 max-w-xs">
-                  <p className="text-avenue-text-heading">{ex.reason}</p>
-                  {ex.notes && <p className="text-xs text-avenue-text-muted mt-0.5 truncate">{ex.notes}</p>}
+                  <p className="text-brand-text-heading">{ex.reason}</p>
+                  {ex.notes && <p className="text-xs text-brand-text-muted mt-0.5 truncate">{ex.notes}</p>}
                 </td>
-                <td className="px-5 py-3 text-avenue-text-body">
+                <td className="px-5 py-3 text-brand-text-body">
                   {ex.raisedBy.firstName} {ex.raisedBy.lastName}
                 </td>
-                <td className="px-5 py-3 text-avenue-text-muted text-xs">
+                <td className="px-5 py-3 text-brand-text-muted text-xs">
                   {new Date(ex.createdAt).toLocaleDateString("en-KE")}
                 </td>
                 <td className="px-5 py-3">
@@ -170,7 +170,7 @@ export default async function ExceptionsPage({
                     </div>
                   )}
                   {ex.status !== "PENDING" && ex.resolvedBy && (
-                    <p className="text-[10px] text-avenue-text-muted">
+                    <p className="text-[10px] text-brand-text-muted">
                       {ex.resolvedBy.firstName} {ex.resolvedBy.lastName}
                       <br />{ex.resolvedAt ? new Date(ex.resolvedAt).toLocaleDateString("en-KE") : ""}
                     </p>
@@ -180,7 +180,7 @@ export default async function ExceptionsPage({
             ))}
             {exceptions.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-5 py-10 text-center text-sm text-avenue-text-muted">
+                <td colSpan={7} className="px-5 py-10 text-center text-sm text-brand-text-muted">
                   No exceptions {filterStatus ? `with status "${filterStatus}"` : "recorded"} yet.
                 </td>
               </tr>

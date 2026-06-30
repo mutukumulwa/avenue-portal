@@ -10,7 +10,7 @@ export default async function BrokerLayout({ children }: { children: React.React
     if (!["BROKER_USER", "SUPER_ADMIN"].includes(session.user.role as string)) redirect("/unauthorized");
 
     return (
-      <div className="flex min-h-screen bg-avenue-bg-alt/30">
+      <div className="flex min-h-screen bg-brand-bg-alt/30">
         <BrokerSidebar userRole={session.user.role as string} />
         <div className="flex-1 ml-64 p-8">
           {children}

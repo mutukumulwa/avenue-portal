@@ -22,7 +22,7 @@ interface Props {
   packages: Package[];
 }
 
-const inputCls = "w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo";
+const inputCls = "w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo";
 
 function TierForm({
   groupId,
@@ -57,7 +57,7 @@ function TierForm({
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="text-xs font-bold text-avenue-text-muted uppercase block mb-1">Tier Name *</label>
+          <label className="text-xs font-bold text-brand-text-muted uppercase block mb-1">Tier Name *</label>
           <input
             name="name"
             required
@@ -67,7 +67,7 @@ function TierForm({
           />
         </div>
         <div>
-          <label className="text-xs font-bold text-avenue-text-muted uppercase block mb-1">Package *</label>
+          <label className="text-xs font-bold text-brand-text-muted uppercase block mb-1">Package *</label>
           <select name="packageId" required defaultValue={initial?.packageId} className={inputCls}>
             <option value="">Select package…</option>
             {packages.map(p => (
@@ -79,7 +79,7 @@ function TierForm({
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="text-xs font-bold text-avenue-text-muted uppercase block mb-1">Contribution Rate (KES/yr) *</label>
+          <label className="text-xs font-bold text-brand-text-muted uppercase block mb-1">Contribution Rate (KES/yr) *</label>
           <input
             name="contributionRate"
             type="number"
@@ -91,7 +91,7 @@ function TierForm({
           />
         </div>
         <div>
-          <label className="text-xs font-bold text-avenue-text-muted uppercase block mb-1">Description</label>
+          <label className="text-xs font-bold text-brand-text-muted uppercase block mb-1">Description</label>
           <input
             name="description"
             defaultValue={initial?.description ?? ""}
@@ -108,18 +108,18 @@ function TierForm({
           name="isDefault"
           value="true"
           defaultChecked={initial?.isDefault}
-          className="accent-avenue-indigo"
+          className="accent-brand-indigo"
         />
-        <span className="text-avenue-text-body">Default tier for new members</span>
+        <span className="text-brand-text-body">Default tier for new members</span>
       </label>
 
       <div className="flex gap-2 justify-end pt-1">
         <button type="button" onClick={onClose}
-          className="px-4 py-1.5 rounded-full border border-[#EEEEEE] text-sm text-avenue-text-muted hover:border-avenue-indigo transition-colors">
+          className="px-4 py-1.5 rounded-full border border-[#EEEEEE] text-sm text-brand-text-muted hover:border-brand-indigo transition-colors">
           Cancel
         </button>
         <button type="submit" disabled={loading}
-          className="px-4 py-1.5 rounded-full bg-avenue-indigo text-white text-sm font-semibold hover:bg-avenue-secondary transition-colors disabled:opacity-50">
+          className="px-4 py-1.5 rounded-full bg-brand-indigo text-white text-sm font-semibold hover:bg-brand-secondary transition-colors disabled:opacity-50">
           {loading ? "Saving…" : initial ? "Update Tier" : "Add Tier"}
         </button>
       </div>
@@ -151,12 +151,12 @@ export function BenefitTiersCard({ groupId, tiers, packages }: Props) {
     <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
       <div className="px-5 py-4 border-b border-[#EEEEEE] flex items-center justify-between">
         <div>
-          <h2 className="font-bold text-avenue-text-heading font-heading">Benefit Tiers</h2>
-          <p className="text-xs text-avenue-text-muted mt-0.5">Different packages for different employee grades</p>
+          <h2 className="font-bold text-brand-text-heading font-heading">Benefit Tiers</h2>
+          <p className="text-xs text-brand-text-muted mt-0.5">Different packages for different employee grades</p>
         </div>
         {!showAdd && (
           <button onClick={() => setShowAdd(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-avenue-indigo text-white hover:bg-avenue-secondary transition-colors">
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold bg-brand-indigo text-white hover:bg-brand-secondary transition-colors">
             <Plus size={13} /> Add Tier
           </button>
         )}
@@ -168,11 +168,11 @@ export function BenefitTiersCard({ groupId, tiers, packages }: Props) {
         )}
 
         {tiers.length === 0 && !showAdd && (
-          <div className="text-center py-6 text-avenue-text-muted text-sm">
+          <div className="text-center py-6 text-brand-text-muted text-sm">
             <Star size={24} className="mx-auto mb-2 opacity-30" />
             No benefit tiers configured. All members use the group&apos;s default package.
             <br />
-            <button onClick={() => setShowAdd(true)} className="text-avenue-indigo font-semibold hover:underline mt-1">
+            <button onClick={() => setShowAdd(true)} className="text-brand-indigo font-semibold hover:underline mt-1">
               Add your first tier →
             </button>
           </div>
@@ -190,28 +190,28 @@ export function BenefitTiersCard({ groupId, tiers, packages }: Props) {
             ) : (
               <div className="flex items-center justify-between p-3 border border-[#EEEEEE] rounded-lg hover:bg-[#F8F9FA] transition-colors">
                 <div className="flex items-center gap-3">
-                  <div className={`w-2 h-8 rounded-full ${tier.isDefault ? "bg-avenue-indigo" : "bg-[#E6E7E8]"}`} />
+                  <div className={`w-2 h-8 rounded-full ${tier.isDefault ? "bg-brand-indigo" : "bg-[#E6E7E8]"}`} />
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-avenue-text-heading text-sm">{tier.name}</span>
+                      <span className="font-bold text-brand-text-heading text-sm">{tier.name}</span>
                       {tier.isDefault && (
-                        <span className="text-[10px] font-bold uppercase bg-avenue-indigo/10 text-avenue-indigo px-1.5 py-0.5 rounded-full">Default</span>
+                        <span className="text-[10px] font-bold uppercase bg-brand-indigo/10 text-brand-indigo px-1.5 py-0.5 rounded-full">Default</span>
                       )}
                     </div>
-                    <p className="text-xs text-avenue-text-muted mt-0.5">
+                    <p className="text-xs text-brand-text-muted mt-0.5">
                       {tier.package.name} · KES {tier.contributionRate.toLocaleString()}/yr · {tier._count.members} member{tier._count.members !== 1 ? "s" : ""}
                     </p>
-                    {tier.description && <p className="text-xs text-avenue-text-muted">{tier.description}</p>}
+                    {tier.description && <p className="text-xs text-brand-text-muted">{tier.description}</p>}
                   </div>
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button onClick={() => setEditId(tier.id)}
-                    className="p-1.5 rounded-lg text-avenue-text-muted hover:text-avenue-indigo hover:bg-avenue-indigo/10 transition-colors">
+                    className="p-1.5 rounded-lg text-brand-text-muted hover:text-brand-indigo hover:bg-brand-indigo/10 transition-colors">
                     <Pencil size={14} />
                   </button>
                   <button onClick={() => handleDelete(tier.id)} disabled={deleting === tier.id}
-                    className="p-1.5 rounded-lg text-avenue-text-muted hover:text-[#DC3545] hover:bg-[#DC3545]/10 transition-colors disabled:opacity-40">
+                    className="p-1.5 rounded-lg text-brand-text-muted hover:text-[#DC3545] hover:bg-[#DC3545]/10 transition-colors disabled:opacity-40">
                     {deleting === tier.id ? <X size={14} /> : <Trash2 size={14} />}
                   </button>
                 </div>
@@ -222,7 +222,7 @@ export function BenefitTiersCard({ groupId, tiers, packages }: Props) {
       </div>
 
       {tiers.length > 0 && (
-        <div className="px-5 py-3 border-t border-[#EEEEEE] bg-[#F8F9FA] text-xs text-avenue-text-muted">
+        <div className="px-5 py-3 border-t border-[#EEEEEE] bg-[#F8F9FA] text-xs text-brand-text-muted">
           To move a member between tiers, create a <strong>Tier Change</strong> endorsement — this calculates the pro-rata contribution adjustment automatically.
         </div>
       )}

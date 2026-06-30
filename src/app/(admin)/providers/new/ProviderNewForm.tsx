@@ -5,8 +5,8 @@ import { Save, AlertCircle } from "lucide-react";
 import { addProviderAction } from "./actions";
 import { LocationPicker } from "@/components/ui/LocationPicker";
 
-const inputCls = "w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo transition-colors";
-const labelCls = "text-xs font-bold text-avenue-text-muted uppercase block mb-1";
+const inputCls = "w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo transition-colors";
+const labelCls = "text-xs font-bold text-brand-text-muted uppercase block mb-1";
 
 const SERVICES = [
   "Inpatient", "Outpatient", "Maternity", "Surgery", "Pharmacy",
@@ -29,7 +29,7 @@ export function ProviderNewForm() {
       <form action={action} className="space-y-6">
         {/* Basic Info */}
         <div>
-          <h3 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Provider Details</h3>
+          <h3 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Provider Details</h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
               <label className={labelCls}>Provider Name *</label>
@@ -74,7 +74,7 @@ export function ProviderNewForm() {
 
         {/* Contact */}
         <div>
-          <h3 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Contact <span className="font-normal text-avenue-text-muted">(optional)</span></h3>
+          <h3 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Contact <span className="font-normal text-brand-text-muted">(optional)</span></h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Contact Person</label>
@@ -93,11 +93,11 @@ export function ProviderNewForm() {
 
         {/* Services offered */}
         <div>
-          <h3 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Services Offered</h3>
+          <h3 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Services Offered</h3>
           <div className="grid grid-cols-3 gap-2">
             {SERVICES.map(s => (
               <label key={s} className="flex items-center gap-2 text-sm cursor-pointer select-none">
-                <input type="checkbox" name="servicesOffered" value={s} className="accent-avenue-indigo w-4 h-4" />
+                <input type="checkbox" name="servicesOffered" value={s} className="accent-brand-indigo w-4 h-4" />
                 {s}
               </label>
             ))}
@@ -106,14 +106,14 @@ export function ProviderNewForm() {
 
         {/* Contract */}
         <div>
-          <h3 className="font-bold text-avenue-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Contract</h3>
+          <h3 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Contract</h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Default Payment Terms (days)</label>
               <input name="paymentTermDays" type="number" min="1" defaultValue="30" className={inputCls} />
             </div>
           </div>
-          <div className="mt-3 bg-avenue-indigo/5 border border-avenue-indigo/15 rounded-lg px-4 py-3 text-xs text-avenue-text-body leading-relaxed">
+          <div className="mt-3 bg-brand-indigo/5 border border-brand-indigo/15 rounded-lg px-4 py-3 text-xs text-brand-text-body leading-relaxed">
             The provider is created <strong>without an agreement</strong> (contract status “Pending”). Once saved, open the
             provider&apos;s <strong>Contracts</strong> register to capture the signed agreement: tariff schedule (CSV import
             supported), excluded services, the unlisted-service billing rule, payment terms and credit limit. Claims from this
@@ -125,7 +125,7 @@ export function ProviderNewForm() {
           <button
             type="submit"
             disabled={pending}
-            className="flex items-center gap-2 bg-avenue-indigo hover:bg-avenue-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 bg-brand-indigo hover:bg-brand-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save size={16} />
             {pending ? "Saving…" : "Add Provider"}

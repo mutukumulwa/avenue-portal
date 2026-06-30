@@ -10,8 +10,8 @@ type RequestOptions = {
   procedures: Array<{ label: string; cptCode: string; benefitCategory: string; fallbackCost: number }>;
 };
 
-const input = "w-full rounded-[8px] border border-[#EEEEEE] bg-white px-3 py-2 text-sm outline-none focus:border-avenue-indigo";
-const label = "text-[13px] font-bold uppercase text-avenue-text-muted";
+const input = "w-full rounded-[8px] border border-[#EEEEEE] bg-white px-3 py-2 text-sm outline-none focus:border-brand-indigo";
+const label = "text-[13px] font-bold uppercase text-brand-text-muted";
 
 export function MemberPreAuthForm({ options }: { options: RequestOptions }) {
   const [state, action, pending] = useActionState(submitMemberPreAuthAction, null);
@@ -90,7 +90,7 @@ export function MemberPreAuthForm({ options }: { options: RequestOptions }) {
           <button
             type="submit"
             disabled={pending}
-            className="inline-flex items-center gap-2 rounded-[8px] bg-avenue-indigo px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-avenue-indigo-hover disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-[8px] bg-brand-indigo px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-indigo-hover disabled:cursor-not-allowed disabled:opacity-60"
           >
             <Send className="h-4 w-4" />
             {pending ? "Submitting..." : "Submit request"}

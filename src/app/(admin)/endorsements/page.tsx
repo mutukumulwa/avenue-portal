@@ -32,7 +32,7 @@ const STATUS_STYLE: Record<string, string> = {
   DRAFT:        "bg-[#6C757D]/10 text-[#6C757D]",
   SUBMITTED:    "bg-[#17A2B8]/10 text-[#17A2B8]",
   UNDER_REVIEW: "bg-[#FFC107]/10 text-[#856404]",
-  APPROVED:     "bg-avenue-indigo/10 text-avenue-indigo",
+  APPROVED:     "bg-brand-indigo/10 text-brand-indigo",
   APPLIED:      "bg-[#28A745]/10 text-[#28A745]",
   REJECTED:     "bg-[#DC3545]/10 text-[#DC3545]",
   CANCELLED:    "bg-[#6C757D]/10 text-[#6C757D]",
@@ -81,12 +81,12 @@ export default async function EndorsementsPage({
     <div className="p-6 max-w-7xl mx-auto space-y-4">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Endorsements</h1>
-          <p className="text-avenue-text-muted mt-1 text-sm">Manage mid-term policy adjustments and pro-rata recalculations.</p>
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Endorsements</h1>
+          <p className="text-brand-text-muted mt-1 text-sm">Manage mid-term policy adjustments and pro-rata recalculations.</p>
         </div>
         <Link
           href="/endorsements/new"
-          className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors flex items-center gap-2 shadow-sm"
+          className="bg-brand-indigo hover:bg-brand-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors flex items-center gap-2 shadow-sm"
         >
           <PlusCircle size={18} />
           New Endorsement
@@ -120,13 +120,13 @@ export default async function EndorsementsPage({
                 <th className="px-6 py-4">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#EEEEEE] text-avenue-text-body">
+            <tbody className="divide-y divide-[#EEEEEE] text-brand-text-body">
               {endorsements.map(end => (
                 <tr key={end.id} className="hover:bg-[#F8F9FA] transition-colors">
-                  <td className="px-6 py-4 font-mono text-xs font-semibold text-avenue-text-heading">{end.endorsementNumber}</td>
+                  <td className="px-6 py-4 font-mono text-xs font-semibold text-brand-text-heading">{end.endorsementNumber}</td>
                   <td className="px-6 py-4">
                     <Link href={`/groups/${end.group.id}`}
-                      className="font-bold text-avenue-text-heading hover:text-avenue-indigo transition-colors">
+                      className="font-bold text-brand-text-heading hover:text-brand-indigo transition-colors">
                       {end.group.name}
                     </Link>
                   </td>
@@ -135,8 +135,8 @@ export default async function EndorsementsPage({
                       {end.type.replace(/_/g, " ")}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-avenue-text-body">
-                    {end.member ? `${end.member.firstName} ${end.member.lastName}` : <span className="text-avenue-text-muted text-xs">Group-level</span>}
+                  <td className="px-6 py-4 text-brand-text-body">
+                    {end.member ? `${end.member.firstName} ${end.member.lastName}` : <span className="text-brand-text-muted text-xs">Group-level</span>}
                   </td>
                   <td className="px-6 py-4">
                     {Number(end.proratedAmount) !== 0 ? (
@@ -144,7 +144,7 @@ export default async function EndorsementsPage({
                         {Number(end.proratedAmount) > 0 ? "+" : ""}KES {Math.abs(Number(end.proratedAmount)).toLocaleString("en-KE")}
                       </span>
                     ) : (
-                      <span className="text-avenue-text-muted text-xs">—</span>
+                      <span className="text-brand-text-muted text-xs">—</span>
                     )}
                   </td>
                   <td className="px-6 py-4">
@@ -152,12 +152,12 @@ export default async function EndorsementsPage({
                       {end.status.replace(/_/g, " ")}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-avenue-text-body">
+                  <td className="px-6 py-4 text-brand-text-body">
                     {new Date(end.effectiveDate).toLocaleDateString("en-KE")}
                   </td>
                   <td className="px-6 py-4">
                     <Link href={`/endorsements/${end.id}`}
-                      className="text-avenue-indigo hover:text-avenue-secondary font-semibold text-xs inline-flex items-center gap-1 transition-colors">
+                      className="text-brand-indigo hover:text-brand-secondary font-semibold text-xs inline-flex items-center gap-1 transition-colors">
                       Review <ArrowRight size={13} />
                     </Link>
                   </td>
@@ -165,7 +165,7 @@ export default async function EndorsementsPage({
               ))}
               {endorsements.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-6 py-14 text-center text-avenue-text-muted">
+                  <td colSpan={8} className="px-6 py-14 text-center text-brand-text-muted">
                     <FileStack size={32} className="mx-auto mb-3 opacity-30" />
                     {q || status || type
                       ? "No endorsements match your search."

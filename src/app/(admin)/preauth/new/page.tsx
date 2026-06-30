@@ -23,12 +23,12 @@ export default async function NewPreAuthPage({
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div className="flex items-center space-x-4">
-        <Link href="/preauth" className="text-avenue-text-body hover:text-avenue-text-heading transition-colors">
+        <Link href="/preauth" className="text-brand-text-body hover:text-brand-text-heading transition-colors">
           <ArrowLeft size={24} />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-avenue-text-heading font-heading">Submit Pre-Authorization</h1>
-          <p className="text-avenue-text-body font-body mt-1 text-sm">Request approval for a planned medical procedure.</p>
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Submit Pre-Authorization</h1>
+          <p className="text-brand-text-body font-body mt-1 text-sm">Request approval for a planned medical procedure.</p>
         </div>
       </div>
       {memberId && <MemberClaimHistory memberId={memberId} />}

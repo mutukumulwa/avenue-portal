@@ -23,8 +23,8 @@ export default async function MemberCheckInPage(props: {
   if (!session.user.memberId) {
     return (
       <div className="rounded-lg border border-[#EEEEEE] bg-white p-5">
-        <h1 className="font-bold text-avenue-text-heading">Check-In</h1>
-        <p className="mt-1 text-sm text-avenue-text-muted">No member profile is linked to this account.</p>
+        <h1 className="font-bold text-brand-text-heading">Check-In</h1>
+        <p className="mt-1 text-sm text-brand-text-muted">No member profile is linked to this account.</p>
       </div>
     );
   }
@@ -72,12 +72,12 @@ export default async function MemberCheckInPage(props: {
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-avenue-indigo/10 text-avenue-indigo">
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-indigo/10 text-brand-indigo">
           <Fingerprint className="h-5 w-5" />
         </div>
         <div>
-          <h1 className="text-xl font-bold font-heading text-avenue-text-heading">Secure Check-In</h1>
-          <p className="text-sm text-avenue-text-muted">Confirm a reception check-in request from your phone.</p>
+          <h1 className="text-xl font-bold font-heading text-brand-text-heading">Secure Check-In</h1>
+          <p className="text-sm text-brand-text-muted">Confirm a reception check-in request from your phone.</p>
         </div>
       </div>
 
@@ -89,7 +89,7 @@ export default async function MemberCheckInPage(props: {
             </div>
           )}
           {shareError && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-semibold text-avenue-error">
+            <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm font-semibold text-brand-error">
               {shareError}
             </div>
           )}
@@ -103,12 +103,12 @@ export default async function MemberCheckInPage(props: {
               <section className="rounded-lg border border-[#EEEEEE] bg-white p-5">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <h2 className="font-bold text-avenue-text-heading">Share health records for this visit</h2>
-                    <p className="mt-1 text-sm text-avenue-text-muted">
+                    <h2 className="font-bold text-brand-text-heading">Share health records for this visit</h2>
+                    <p className="mt-1 text-sm text-brand-text-muted">
                       Choose lab results, notes, or referral details that reception or clinical staff should see for this check-in.
                     </p>
                   </div>
-                  <a href="/member/health-vault" className="text-sm font-bold text-avenue-indigo hover:underline">
+                  <a href="/member/health-vault" className="text-sm font-bold text-brand-indigo hover:underline">
                     Open vault
                   </a>
                 </div>
@@ -119,7 +119,7 @@ export default async function MemberCheckInPage(props: {
                     <div className="grid gap-2 sm:grid-cols-[1fr_150px]">
                       <select
                         name="healthRecord"
-                        className="rounded-md border border-[#EEEEEE] px-3 py-2 text-sm text-avenue-text-body outline-none focus:border-avenue-indigo"
+                        className="rounded-md border border-[#EEEEEE] px-3 py-2 text-sm text-brand-text-body outline-none focus:border-brand-indigo"
                         required
                       >
                         <option value="">Choose a record</option>
@@ -131,18 +131,18 @@ export default async function MemberCheckInPage(props: {
                       </select>
                       <select
                         name="shareExpiry"
-                        className="rounded-md border border-[#EEEEEE] px-3 py-2 text-sm text-avenue-text-body outline-none focus:border-avenue-indigo"
+                        className="rounded-md border border-[#EEEEEE] px-3 py-2 text-sm text-brand-text-body outline-none focus:border-brand-indigo"
                       >
                         <option value="24">24 hours</option>
                         <option value="72">72 hours</option>
                       </select>
                     </div>
-                    <button className="rounded-full bg-avenue-indigo px-5 py-2 text-sm font-bold text-white hover:bg-avenue-secondary">
+                    <button className="rounded-full bg-brand-indigo px-5 py-2 text-sm font-bold text-white hover:bg-brand-secondary">
                       Share
                     </button>
                   </form>
                 ) : (
-                  <p className="mt-4 rounded-md bg-avenue-bg-alt px-3 py-2 text-sm text-avenue-text-muted">
+                  <p className="mt-4 rounded-md bg-brand-bg-alt px-3 py-2 text-sm text-brand-text-muted">
                     Add files or notes in Health Vault before sharing records with a visit.
                   </p>
                 )}
@@ -153,10 +153,10 @@ export default async function MemberCheckInPage(props: {
                     return record.shares
                       .filter((share: ShareEntry) => share.checkInChallengeId === notification.challengeId)
                       .map((share: ShareEntry) => (
-                        <div key={share.id} className="flex flex-col gap-2 rounded-md bg-avenue-bg-alt px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between">
+                        <div key={share.id} className="flex flex-col gap-2 rounded-md bg-brand-bg-alt px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between">
                           <div>
-                            <p className="font-semibold text-avenue-text-heading">{record.label}</p>
-                            <p className="text-xs text-avenue-text-muted">
+                            <p className="font-semibold text-brand-text-heading">{record.label}</p>
+                            <p className="text-xs text-brand-text-muted">
                               Shared {share.createdAt.toLocaleString()}
                               {share.expiresAt ? ` · expires ${share.expiresAt.toLocaleString()}` : " · until revoked"}
                             </p>
@@ -164,7 +164,7 @@ export default async function MemberCheckInPage(props: {
                           <form action={revokeCheckInHealthShareAction}>
                             <input type="hidden" name="shareId" value={share.id} />
                             <input type="hidden" name="checkInChallengeId" value={notification.challengeId} />
-                            <button className="rounded-full border border-[#DDDDDD] px-3 py-1 text-xs font-bold text-avenue-text-body hover:bg-white">
+                            <button className="rounded-full border border-[#DDDDDD] px-3 py-1 text-xs font-bold text-brand-text-body hover:bg-white">
                               Revoke
                             </button>
                           </form>
@@ -178,8 +178,8 @@ export default async function MemberCheckInPage(props: {
         </div>
       ) : (
         <div className="rounded-lg border border-[#EEEEEE] bg-white p-6 text-center">
-          <p className="font-bold text-avenue-text-heading">No pending check-ins</p>
-          <p className="mt-1 text-sm text-avenue-text-muted">If you are at reception, ask the front desk to initiate secure check-in.</p>
+          <p className="font-bold text-brand-text-heading">No pending check-ins</p>
+          <p className="mt-1 text-sm text-brand-text-muted">If you are at reception, ask the front desk to initiate secure check-in.</p>
         </div>
       )}
     </div>

@@ -22,8 +22,8 @@ export function MemberImportClient({ groups }: { groups: Group[] }) {
       {/* Step 1 — Upload */}
       {!importResult && (
         <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm p-6 space-y-4">
-          <h2 className="font-bold text-avenue-text-heading font-heading">Step 1 — Upload CSV</h2>
-          <p className="text-sm text-avenue-text-body">
+          <h2 className="font-bold text-brand-text-heading font-heading">Step 1 — Upload CSV</h2>
+          <p className="text-sm text-brand-text-body">
             File must have headers:{" "}
             <code className="bg-[#F8F9FA] px-1 rounded text-xs">
               firstName, lastName, dateOfBirth, gender, relationship, principalIdNumber, idNumber, phone, email, isExample
@@ -32,13 +32,13 @@ export function MemberImportClient({ groups }: { groups: Group[] }) {
 
           <form action={parseAction} className="space-y-4">
             <div>
-              <label className="block text-xs font-bold text-avenue-text-muted uppercase mb-1">Target Group</label>
+              <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Target Group</label>
               <select
                 name="groupId"
                 required
                 value={selectedGroup}
                 onChange={e => setSelectedGroup(e.target.value)}
-                className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-avenue-indigo bg-white"
+                className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo bg-white"
               >
                 <option value="">Select group…</option>
                 {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
@@ -46,11 +46,11 @@ export function MemberImportClient({ groups }: { groups: Group[] }) {
             </div>
 
             <div
-              className="border-2 border-dashed border-[#DCDCDC] rounded-lg p-8 text-center cursor-pointer hover:border-avenue-indigo transition-colors"
+              className="border-2 border-dashed border-[#DCDCDC] rounded-lg p-8 text-center cursor-pointer hover:border-brand-indigo transition-colors"
               onClick={() => fileRef.current?.click()}
             >
-              <Upload size={28} className="mx-auto mb-2 text-avenue-text-muted" />
-              <p className="text-sm text-avenue-text-body">Click to select a CSV file</p>
+              <Upload size={28} className="mx-auto mb-2 text-brand-text-muted" />
+              <p className="text-sm text-brand-text-body">Click to select a CSV file</p>
               <input ref={fileRef} name="file" type="file" accept=".csv" className="hidden" required />
             </div>
 
@@ -63,7 +63,7 @@ export function MemberImportClient({ groups }: { groups: Group[] }) {
             <button
               type="submit"
               disabled={parsePending}
-              className="bg-avenue-indigo hover:bg-avenue-secondary text-white px-6 py-2 rounded-full text-sm font-semibold transition-colors disabled:opacity-60"
+              className="bg-brand-indigo hover:bg-brand-secondary text-white px-6 py-2 rounded-full text-sm font-semibold transition-colors disabled:opacity-60"
             >
               {parsePending ? "Parsing…" : "Parse & Validate"}
             </button>
@@ -77,15 +77,15 @@ export function MemberImportClient({ groups }: { groups: Group[] }) {
           {/* Summary bar */}
           <div className="grid grid-cols-3 gap-4">
             <div className="bg-white border border-[#EEEEEE] rounded-lg p-4 shadow-sm">
-              <p className="text-xs font-bold uppercase text-avenue-text-muted">Total Rows</p>
-              <p className="text-2xl font-bold text-avenue-indigo mt-1">{parseResult.rows.length}</p>
+              <p className="text-xs font-bold uppercase text-brand-text-muted">Total Rows</p>
+              <p className="text-2xl font-bold text-brand-indigo mt-1">{parseResult.rows.length}</p>
             </div>
             <div className="bg-white border border-[#EEEEEE] rounded-lg p-4 shadow-sm">
-              <p className="text-xs font-bold uppercase text-avenue-text-muted">Valid</p>
+              <p className="text-xs font-bold uppercase text-brand-text-muted">Valid</p>
               <p className="text-2xl font-bold text-[#28A745] mt-1">{parseResult.validCount}</p>
             </div>
             <div className="bg-white border border-[#EEEEEE] rounded-lg p-4 shadow-sm">
-              <p className="text-xs font-bold uppercase text-avenue-text-muted">Errors</p>
+              <p className="text-xs font-bold uppercase text-brand-text-muted">Errors</p>
               <p className="text-2xl font-bold text-[#DC3545] mt-1">{parseResult.errorCount}</p>
             </div>
           </div>
@@ -181,7 +181,7 @@ export function MemberImportClient({ groups }: { groups: Group[] }) {
               <CheckCircle size={20} />
               <h2 className="font-bold text-lg font-heading">Import complete</h2>
             </div>
-            <p className="text-avenue-text-body text-sm">
+            <p className="text-brand-text-body text-sm">
               <span className="font-bold text-[#28A745]">{importResult.imported}</span> member{importResult.imported !== 1 ? "s" : ""} successfully imported.
               {importResult.failed.length > 0 && (
                 <> <span className="font-bold text-[#DC3545]">{importResult.failed.length}</span> failed (see below).</>
