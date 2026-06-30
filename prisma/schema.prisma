@@ -67,6 +67,69 @@ model Tenant {
   overrideRecords                OverrideRecord[]
   blacklistEntries               InternalBlacklist[]
   userRoleAssignments            UserRoleAssignment[]
+  clients                        Client[]
+}
+
+// ── Multi-client TPA tenancy (Medvex spec §2.1 / gap G2.1) ──────────────
+// AD-1: `Tenant` stays the Medvex *operator* (the TPA itself). `Client` is the
+// per-payer boundary below it — an insurer, HMO, or self-funded employer whose
+// schemes (Group) Medvex administers. Cross-client isolation is a hard security
+// boundary; nearly every client-scoped entity will gain a `clientId` over the
+// Phase-0/1 rollout. This first slice introduces the entity + scheme link only.
+enum PayerType {
+  INSURER // Risk-bearing insurance company
+  HMO // Health maintenance organisation
+  EMPLOYER_SELF_FUNDED // Employer funds its own scheme; Medvex administers
+}
+
+enum ClientStatus {
+  PROSPECT
+  ACTIVE
+  SUSPENDED
+  TERMINATED
+}
+
+model Client {
+  id               String   @id @default(cuid())
+  operatorTenantId String // the Medvex operator that administers this client
+  operatorTenant   Tenant   @relation(fields: [operatorTenantId], references: [id])
+  parentClientId   String? // set for a subsidiary of a regional/parent client
+  parentClient     Client?  @relation("ClientHierarchy", fields: [parentClientId], references: [id])
+  subsidiaries     Client[] @relation("ClientHierarchy")
+
+  type PayerType
+  name String
+  slug String // unique per operator (see @@unique)
+
+  // Transaction currency for this client (ISO 4217). Base for the platform is
+  // UGX (AD-2); subsidiaries may differ and consolidate up via FX in G3.5.
+  currency String @default("UGX")
+
+  // Branding overrides — null inherits the operator's Medvex brand.
+  logoUrl      String?
+  primaryColor String?
+  accentColor  String?
+  warmColor    String?
+
+  // Per-client config bag (terminology dictionary ref, approval-matrix scope,
+  // report templates, etc. attach here / via FKs as those engines land).
+  config Json @default("{}")
+
+  // Never-delete lifecycle (activate/deactivate + effective dating).
+  status        ClientStatus @default(ACTIVE)
+  isActive      Boolean      @default(true)
+  effectiveFrom DateTime     @default(now())
+  effectiveTo   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  groups Group[]
+
+  @@unique([operatorTenantId, slug])
+  @@index([operatorTenantId])
+  @@index([operatorTenantId, status])
+  @@index([parentClientId])
 }
 
 // ─── USERS & AUTH ────────────────────────────────────────
@@ -194,6 +257,11 @@ model Group {
   id                        String              @id @default(cuid())
   tenantId                  String
   tenant                    Tenant              @relation(fields: [tenantId], references: [id])
+  // Client payer that owns this scheme (G2.1). Nullable during the multi-client
+  // rollout migration; backfilled to a default Client per tenant, then enforced
+  // as required in a later slice once every scheme has one.
+  clientId                  String?
+  client                    Client?             @relation(fields: [clientId], references: [id])
   name                      String
   industry                  String?
   registrationNumber        String?
@@ -250,6 +318,7 @@ model Group {
   @@index([tenantId, status])
   @@index([tenantId, fundingMode])
   @@index([brokerId])
+  @@index([clientId])
 }
 
 // ─── SERVICE REQUESTS (HR MODULE) ───────────────────────

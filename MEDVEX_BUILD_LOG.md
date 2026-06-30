@@ -23,6 +23,13 @@ meaningful step. Newest status at the top of each section.
   `brand:guard`. Vitest works (`npx vitest run <file>`).
 - **NOTE:** `AGENTS.md` says read `node_modules/next/dist/docs/` before coding,
   but that dir is **absent** in this install. Verify Next behaviour empirically.
+- **⚠️ SCHEMA WORKFLOW = `db push`, NOT migrations.** The 23 dirs in
+  `prisma/migrations/` are historical; recent models (provider contracts, the
+  rebrand Tenant defaults) were applied via `prisma db push`. `migrate dev`
+  detects drift and wants to **reset** (data loss) — do NOT run it. To apply a
+  schema change: `npx prisma db push` (additive = non-destructive) then run any
+  data backfill separately via `npx prisma db execute --file <sql> --schema prisma/schema.prisma`.
+  (Tech-debt: migrations history should eventually be re-baselined to the DB.)
 
 ### Current status
 > **Rebrand workstream (§D) is COMPLETE** (D-1…D-10), except deliberately
@@ -61,7 +68,7 @@ as the backbone everything depends on. Recommended first slice:
 | Baseline | Branch `medvex-phase-0` + commit existing rebrand as checkpoint. | user, 2026-06-30 |
 | Start point | Finish rebrand (D-7/D-8/D-9/D-10) **before** functional Phase 0. | user, 2026-06-30 |
 | AD-1 | Keep `Tenant` as Medvex operator; add `Client` below it. | plan §F (recommended) |
-| AD-2 | Base currency for FX normalisation: **TBD** (UGX or USD) — decide before G3.5. | plan §F |
+| AD-2 | Base currency = **UGX**; new clients default to **UGX**. | user, 2026-06-30 |
 | AD-3 | Design tokens rename to neutral `brand-*` (not `medvex-*`). | plan §F (decided) |
 
 > Open decisions still needing the user: AD-2 (base currency), AD-4 (repo folder
@@ -92,7 +99,26 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
 ### Phase 0 — Foundation (after rebrand)
 | Gap | What | Status |
 |---|---|---|
-| G2.1 | Multi-client `Client` entity + isolation + migration (XL, S0) | ⬜ |
+| G2.1 | Multi-client `Client` entity + isolation + migration (XL, S0) | 🔄 |
+
+**G2.1 sub-slices:**
+- ✅ **Slice 1 — schema + backfill.** Added `Client` model + `PayerType`
+  (INSURER/HMO/EMPLOYER_SELF_FUNDED) + `ClientStatus` enums; nullable
+  `Group.clientId` + index; `Tenant.clients` back-relation. Applied via
+  `db push`. Backfill `prisma/sql/backfill_default_client_g2_1.sql` created one
+  default Client per tenant (id `cl_<tenantId>`, slug `default`, UGX) and set
+  all 7 schemes' `clientId` (0 orphans). typecheck clean.
+  > NOTE: `ClientType` enum (CORPORATE|INDIVIDUAL) already existed for the
+  > *scheme* type — did NOT reuse it; `PayerType` is the new payer-entity enum.
+- ⬜ **Slice 1b — seed.** Update `prisma/seed.ts` + `seed-safaricom.ts` to create
+  the default Client and link seeded groups (fresh `db:seed` currently leaves
+  groups with null clientId — harmless but incomplete).
+- ⬜ **Slice 2 — tRPC isolation.** Add `clientId`/client scope to
+  `src/server/trpc/context.ts` + `protectedProcedure`; row-level client checks
+  in services; cross-client audit-chain assertion.
+- ⬜ **Slice 3 — RBAC client scope** (Medvex ops span clients; client users confined).
+- ⬜ **Slice 4 — UI:** `/(admin)/clients/` management + client switcher.
+- ⬜ **Slice 5 — enforce `Group.clientId` NOT NULL** once all paths set it.
 | G2.4 | Terminology engine (multi-client) (M, S1) | ⬜ |
 | G3.1 | Approval-matrix engine (L, S0) | ⬜ |
 | G4 (scaffold) | Offline SW (Serwist) + IndexedDB + sync skeleton | ⬜ |
