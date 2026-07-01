@@ -143,6 +143,28 @@ export class SyncService {
     if (existing) return { state: "SYNCED" };
 
     const billed = lineItems.reduce((s, l) => s + l.quantity * l.unitCost, 0);
+
+    // Benefit-balance re-validation (spec §4): the provisional decision was made
+    // against a cached balance. Re-check against live usage net of soft holds;
+    // if the claim can no longer fit, flag for review — never a silent overpay.
+    // Only enforced when a balance is determinable (member has configured usage).
+    const usages = await prisma.benefitUsage.findMany({
+      where: { memberId: member.id },
+      select: { amountUsed: true, activeHoldAmount: true, benefitConfig: { select: { annualSubLimit: true } } },
+    });
+    if (usages.length > 0) {
+      const available = usages.reduce(
+        (sum, u) =>
+          sum + Math.max(0, Number(u.benefitConfig.annualSubLimit) - Number(u.amountUsed) - Number(u.activeHoldAmount)),
+        0,
+      );
+      if (billed > available) {
+        return {
+          state: "CONFLICT",
+          reason: `Insufficient benefit balance at sync time (needs ${billed}, available ${available})`,
+        };
+      }
+    }
     const count = await prisma.claim.count({ where: { tenantId } });
     const claimNumber = `CLM-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
 

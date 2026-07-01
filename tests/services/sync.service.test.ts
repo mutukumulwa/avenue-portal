@@ -8,6 +8,7 @@ const db = vi.hoisted(() => ({
   },
   member: { findFirst: vi.fn() },
   provider: { findFirst: vi.fn() },
+  benefitUsage: { findMany: vi.fn(async (): Promise<any[]> => []) },
   claim: { findFirst: vi.fn(async (): Promise<any> => null), count: vi.fn(async () => 0), create: vi.fn(async () => ({ id: "clm1" })) },
 }));
 
@@ -80,6 +81,27 @@ describe("SyncService — store-and-forward (G4)", () => {
       db.member.findFirst.mockResolvedValue(activeMember);
       db.provider.findFirst.mockResolvedValue(okProvider);
       db.claim.findFirst.mockResolvedValue(null);
+      db.benefitUsage.findMany.mockResolvedValue([]);
+    });
+
+    it("CONFLICTs when the benefit balance is insufficient at sync time", async () => {
+      db.syncOperation.findUnique.mockResolvedValue(claimOp(fullPayload({ lineItems: [{ description: "X", quantity: 1, unitCost: 200000 }] })));
+      // available = 100000 - 20000 - 0 = 80000 < 200000
+      db.benefitUsage.findMany.mockResolvedValue([
+        { amountUsed: 20000, activeHoldAmount: 0, benefitConfig: { annualSubLimit: 100000 } },
+      ]);
+      const res = await SyncService.reconcile("c1");
+      expect(res.state).toBe("CONFLICT");
+      expect(res.reason).toMatch(/insufficient benefit balance/i);
+      expect(db.claim.create).not.toHaveBeenCalled();
+    });
+
+    it("SYNCs when the benefit balance covers the claim", async () => {
+      db.syncOperation.findUnique.mockResolvedValue(claimOp(fullPayload()));
+      db.benefitUsage.findMany.mockResolvedValue([
+        { amountUsed: 0, activeHoldAmount: 0, benefitConfig: { annualSubLimit: 1_000_000 } },
+      ]);
+      expect((await SyncService.reconcile("c1")).state).toBe("SYNCED");
     });
 
     it("SYNCs + creates a claim for a clean offline capture", async () => {
