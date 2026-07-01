@@ -9,24 +9,43 @@ export async function createApprovalMatrixRuleAction(
 ): Promise<{ error?: string }> {
   const session = await requireRole(ROLES.ADMIN_ONLY);
 
+  const actionType    = (formData.get("actionType") as string) || "CLAIM_PAYMENT";
+  const clientId      = (formData.get("clientId") as string) || null;
+  const currency      = ((formData.get("currency") as string) || "UGX").toUpperCase();
   const claimValueMin = formData.get("claimValueMin") ? Number(formData.get("claimValueMin")) : null;
   const claimValueMax = formData.get("claimValueMax") ? Number(formData.get("claimValueMax")) : null;
   const serviceType   = (formData.get("serviceType") as string) || null;
   const benefitCat    = (formData.get("benefitCategory") as string) || null;
   const requiredRole  = formData.get("requiredRole") as string;
   const requiresDual  = formData.get("requiresDual") === "true";
+  const slaMinutes    = formData.get("slaMinutes") ? Number(formData.get("slaMinutes")) : null;
+  const escalationTargetRole = (formData.get("escalationTargetRole") as string) || null;
 
   if (!requiredRole) return { error: "Required role is mandatory." };
+
+  // A client-scoped rule must belong to this operator (cross-operator blocked).
+  if (clientId) {
+    const client = await prisma.client.findFirst({
+      where: { id: clientId, operatorTenantId: session.user.tenantId },
+      select: { id: true },
+    });
+    if (!client) return { error: "Selected client not found." };
+  }
 
   await prisma.approvalMatrix.create({
     data: {
       tenantId: session.user.tenantId,
+      clientId,
+      actionType: actionType as never,
+      currency,
       claimValueMin,
       claimValueMax,
       serviceType: serviceType as never,
       benefitCategory: benefitCat as never,
       requiredRole,
       requiresDual,
+      slaMinutes,
+      escalationTargetRole,
       effectiveFrom: new Date(),
     },
   });
