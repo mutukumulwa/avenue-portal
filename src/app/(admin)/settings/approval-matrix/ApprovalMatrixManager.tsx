@@ -52,6 +52,7 @@ export interface ApprovalMatrixRuleDTO {
   requiresDual: boolean;
   slaMinutes: number | null;
   escalationTargetRole: string | null;
+  steps: { level: number; requiredRole: string }[];
   effectiveFrom: string;
   effectiveTo: string | null;
   isActive: boolean;
@@ -130,7 +131,9 @@ export function ApprovalMatrixManager({ rules, clients }: Props) {
                     {r.benefitCategory ? r.benefitCategory.replace(/_/g, " ") : <span className="text-brand-text-muted italic">All</span>}
                   </td>
                   <td className="px-4 py-3 font-semibold text-brand-text-heading">
-                    {ROLES.find(x => x.value === r.requiredRole)?.label ?? r.requiredRole}
+                    {r.steps.length > 0
+                      ? <span className="text-xs">{r.steps.map(s => `L${s.level} ${ROLES.find(x => x.value === s.requiredRole)?.label ?? s.requiredRole}`).join(" → ")}</span>
+                      : (ROLES.find(x => x.value === r.requiredRole)?.label ?? r.requiredRole)}
                   </td>
                   <td className="px-4 py-3">
                     {r.requiresDual
@@ -237,6 +240,12 @@ export function ApprovalMatrixManager({ rules, clients }: Props) {
                 <option value="">No escalation</option>
                 {ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
               </select>
+            </div>
+            <div className="space-y-1 md:col-span-3">
+              <label className="text-xs font-semibold text-brand-text-muted uppercase">Sequential Levels (optional)</label>
+              <input name="stepRoles" placeholder="Comma-separated roles for multi-level approval, e.g. CLAIMS_OFFICER, FINANCE_OFFICER"
+                className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo" />
+              <p className="text-[10px] text-brand-text-muted">Leave blank for single-level (uses Required Role). Each role becomes a sequential approval level with enforced maker≠checker.</p>
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-1">

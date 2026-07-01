@@ -32,7 +32,15 @@ export async function createApprovalMatrixRuleAction(
     if (!client) return { error: "Selected client not found." };
   }
 
-  await prisma.approvalMatrix.create({
+  // Optional multi-level sequence: comma-separated roles, level 1..n. When set,
+  // the engine walks these ApprovalSteps (requiredRole above stays the level-1
+  // fallback). e.g. "CLAIMS_OFFICER, FINANCE_OFFICER".
+  const stepRoles = ((formData.get("stepRoles") as string) || "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const created = await prisma.approvalMatrix.create({
     data: {
       tenantId: session.user.tenantId,
       clientId,
@@ -49,6 +57,18 @@ export async function createApprovalMatrixRuleAction(
       effectiveFrom: new Date(),
     },
   });
+
+  if (stepRoles.length > 0) {
+    await prisma.approvalStep.createMany({
+      data: stepRoles.map((role, i) => ({
+        matrixId: created.id,
+        level: i + 1,
+        requiredRole: role,
+        slaMinutes: i === 0 ? slaMinutes : null,
+        escalationTargetRole: i === 0 ? escalationTargetRole : null,
+      })),
+    });
+  }
 
   revalidatePath("/settings/approval-matrix");
   return {};

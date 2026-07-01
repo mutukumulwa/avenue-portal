@@ -8,7 +8,10 @@ export default async function ApprovalMatrixPage() {
   const [rules, clients] = await Promise.all([
     prisma.approvalMatrix.findMany({
       where: { tenantId: session.user.tenantId },
-      include: { client: { select: { name: true } } },
+      include: {
+        client: { select: { name: true } },
+        steps: { orderBy: { level: "asc" }, select: { level: true, requiredRole: true } },
+      },
       orderBy: [{ actionType: "asc" }, { claimValueMin: "asc" }, { serviceType: "asc" }],
     }),
     ClientsService.list(session.user.tenantId),
@@ -41,6 +44,7 @@ export default async function ApprovalMatrixPage() {
           requiresDual: rule.requiresDual,
           slaMinutes: rule.slaMinutes,
           escalationTargetRole: rule.escalationTargetRole,
+          steps: rule.steps.map((s) => ({ level: s.level, requiredRole: s.requiredRole })),
           effectiveFrom: rule.effectiveFrom.toISOString(),
           effectiveTo: rule.effectiveTo?.toISOString() ?? null,
           isActive: rule.isActive,

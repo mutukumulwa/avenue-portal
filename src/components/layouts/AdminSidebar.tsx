@@ -8,7 +8,7 @@ import {
   Stethoscope, Receipt, CreditCard, Building, PieChart,
   Settings, LogOut, Calculator, UserCheck, MessageSquareText,
   ShieldAlert, MessageSquareWarning, Wallet, Fingerprint,
-  BarChart3, TriangleAlert, Landmark,
+  BarChart3, TriangleAlert, Landmark, ClipboardCheck,
 } from "lucide-react";
 import { PortalSwitcher } from "./PortalSwitcher";
 import { useState } from "react";
@@ -46,6 +46,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Clinical",
     items: [
       { label: "Claims",             href: "/claims",             icon: Receipt,        roles: OPS        },
+      { label: "Approvals",          href: "/approvals",          icon: ClipboardCheck, roles: OPS        },
       { label: "Pre-Authorizations", href: "/preauth",            icon: Stethoscope,    roles: OPS        },
       { label: "Exceptions",         href: "/settings/exceptions",icon: TriangleAlert,  roles: OPS        },
       { label: "Secure Check-Ins",   href: "/check-ins",          icon: Fingerprint,    roles: OPS        },

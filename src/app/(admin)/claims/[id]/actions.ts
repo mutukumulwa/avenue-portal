@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { ClaimsService } from "@/server/services/claims.service";
 import { ApprovalMatrixService } from "@/server/services/approval-matrix.service";
+import { ApprovalRequestService } from "@/server/services/approval-request.service";
 import { CoContributionService } from "@/server/services/coContribution/coContribution.service";
 import { GLService } from "@/server/services/gl.service";
 import Decimal from "decimal.js";
@@ -60,6 +61,31 @@ export async function adjudicateClaimAction(formData: FormData) {
           benefitCategory: claim.benefitCategory,
         });
         if (resolved) {
+          // Multi-level rule → open (or require) an ApprovalRequest worked
+          // through the Approvals console; the direct approval is blocked.
+          if (resolved.steps.length > 1) {
+            const existing = await prisma.approvalRequest.findFirst({
+              where: { tenantId, entityType: "Claim", entityId: claimId, status: { in: ["PENDING", "ESCALATED"] } },
+              select: { id: true },
+            });
+            if (!existing) {
+              await ApprovalRequestService.create(tenantId, {
+                actionType: "CLAIM_PAYMENT",
+                entityType: "Claim",
+                entityId: claimId,
+                makerId: session.user.id,
+                clientId: claim.member?.group?.clientId ?? null,
+                amount: approvedAmount,
+                currency: "UGX",
+                serviceType: claim.serviceType,
+                benefitCategory: claim.benefitCategory,
+              });
+            }
+            throw new Error(
+              `This claim (UGX ${approvedAmount.toLocaleString()}) needs ${resolved.steps.length}-level approval. A request has been opened — action it in Approvals.`,
+            );
+          }
+          // Single-level rule → synchronous role gate + SoD.
           const step = resolved.steps[0];
           if (!ApprovalMatrixService.roleAuthorised(session.user.role, step.requiredRole)) {
             throw new Error(
