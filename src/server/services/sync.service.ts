@@ -84,7 +84,7 @@ export class SyncService {
     let outcome: { state: "SYNCED" | "CONFLICT"; reason?: string };
     switch (op.entityType) {
       case "Claim":
-        outcome = await this.reconcileClaim(op.tenantId, op.payload as Record<string, unknown>);
+        outcome = await this.reconcileClaim(op.tenantId, op.payload as Record<string, unknown>, op.clientUuid);
         break;
       default:
         outcome = { state: "SYNCED" };
@@ -93,27 +93,90 @@ export class SyncService {
   }
 
   /**
-   * Authoritative re-validation for an offline-captured claim: the membership
-   * must exist and be active at sync time (the provisional decision was made
-   * against a cached snapshot). Benefit-balance re-validation + creating the
-   * Claim (source OFFLINE_SYNC) with soft-reservation reconciliation is the next
-   * Phase-1 step; insufficient balance must resolve to CONFLICT, never a silent pay.
+   * Authoritative re-validation + creation for an offline-captured claim. The
+   * provisional decision was made against a cached snapshot; on reconnect we
+   * re-validate against live state and, when clean, create the Claim (source
+   * OFFLINE_SYNC, status RECEIVED) for adjudication. Any failure resolves to
+   * CONFLICT with a reason — surfaced for review, never silently dropped.
+   *
+   * Idempotent: reuses the operation's clientUuid as the claim's external ref
+   * so a re-run does not create a duplicate.
    */
   private static async reconcileClaim(
     tenantId: string,
     payload: Record<string, unknown>,
+    clientUuid: string,
   ): Promise<{ state: "SYNCED" | "CONFLICT"; reason?: string }> {
     const memberNumber = payload.memberNumber as string | undefined;
+    const providerCode = payload.providerCode as string | undefined;
+    const serviceType = payload.serviceType as string | undefined;
+    const lineItems = (payload.lineItems as Array<{ description: string; quantity: number; unitCost: number; serviceCategory?: string; cptCode?: string }>) ?? [];
     if (!memberNumber) return { state: "CONFLICT", reason: "Missing memberNumber" };
+    if (!providerCode) return { state: "CONFLICT", reason: "Missing providerCode" };
+    if (!serviceType) return { state: "CONFLICT", reason: "Missing serviceType" };
+    if (lineItems.length === 0) return { state: "CONFLICT", reason: "No line items" };
 
     const member = await prisma.member.findFirst({
       where: { tenantId, memberNumber },
-      select: { id: true, status: true },
+      select: { id: true, status: true, group: { select: { status: true } } },
     });
     if (!member) return { state: "CONFLICT", reason: "Member not found at sync time" };
-    if (member.status !== "ACTIVE") {
-      return { state: "CONFLICT", reason: `Membership ${member.status} at sync time` };
+    if (member.status !== "ACTIVE") return { state: "CONFLICT", reason: `Membership ${member.status} at sync time` };
+    if (["SUSPENDED", "LAPSED", "TERMINATED"].includes(member.group.status)) {
+      return { state: "CONFLICT", reason: `Scheme ${member.group.status} at sync time` };
     }
+
+    const provider = await prisma.provider.findFirst({
+      where: { tenantId, slade360ProviderId: providerCode },
+      select: { id: true, contractStatus: true },
+    });
+    if (!provider) return { state: "CONFLICT", reason: "Provider not found at sync time" };
+    if (["EXPIRED", "SUSPENDED"].includes(provider.contractStatus)) {
+      return { state: "CONFLICT", reason: `Provider contract ${provider.contractStatus}` };
+    }
+
+    // Idempotency: if a claim already exists for this offline op, do not recreate.
+    const existing = await prisma.claim.findFirst({
+      where: { tenantId, externalRef: clientUuid },
+      select: { id: true },
+    });
+    if (existing) return { state: "SYNCED" };
+
+    const billed = lineItems.reduce((s, l) => s + l.quantity * l.unitCost, 0);
+    const count = await prisma.claim.count({ where: { tenantId } });
+    const claimNumber = `CLM-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
+
+    await prisma.claim.create({
+      data: {
+        tenantId,
+        claimNumber,
+        externalRef: clientUuid,
+        memberId: member.id,
+        providerId: provider.id,
+        source: "OFFLINE_SYNC",
+        serviceType: serviceType as never,
+        dateOfService: payload.dateOfService ? new Date(payload.dateOfService as string) : new Date(),
+        diagnoses: (payload.diagnoses as string[]) ?? [],
+        procedures: [],
+        billedAmount: billed,
+        approvedAmount: 0,
+        copayAmount: 0,
+        status: "RECEIVED",
+        benefitCategory: "OUTPATIENT",
+        claimLines: {
+          create: lineItems.map((l, i) => ({
+            lineNumber: i + 1,
+            description: l.description,
+            quantity: l.quantity,
+            unitCost: l.unitCost,
+            billedAmount: l.quantity * l.unitCost,
+            approvedAmount: 0,
+            serviceCategory: (l.serviceCategory as never) ?? ("OTHER" as never),
+            cptCode: l.cptCode ?? null,
+          })),
+        },
+      },
+    });
     return { state: "SYNCED" };
   }
 

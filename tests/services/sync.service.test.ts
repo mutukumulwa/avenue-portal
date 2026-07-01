@@ -7,6 +7,8 @@ const db = vi.hoisted(() => ({
     update: vi.fn(async () => ({})),
   },
   member: { findFirst: vi.fn() },
+  provider: { findFirst: vi.fn() },
+  claim: { findFirst: vi.fn(async (): Promise<any> => null), count: vi.fn(async () => 0), create: vi.fn(async () => ({ id: "clm1" })) },
 }));
 
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
@@ -65,30 +67,60 @@ describe("SyncService — store-and-forward (G4)", () => {
     });
   });
 
-  describe("reconcile — Claim re-validation (Phase-1)", () => {
-    const claimOp = (payload: any) => ({ id: "c1", tenantId: "t1", state: "PENDING", entityType: "Claim", payload });
+  describe("reconcile — Claim re-validation + creation (Phase-1)", () => {
+    const fullPayload = (over: any = {}) => ({
+      memberNumber: "MVX-2026-00001", providerCode: "SLD-001", serviceType: "OUTPATIENT",
+      lineItems: [{ description: "Consult", quantity: 1, unitCost: 50000 }], ...over,
+    });
+    const claimOp = (payload: any) => ({ id: "c1", tenantId: "t1", clientUuid: "uuid-1", state: "PENDING", entityType: "Claim", payload });
+    const activeMember = { id: "m1", status: "ACTIVE", group: { status: "ACTIVE" } };
+    const okProvider = { id: "p1", contractStatus: "ACTIVE" };
 
-    it("SYNCs a claim for an active member", async () => {
-      db.syncOperation.findUnique.mockResolvedValue(claimOp({ memberNumber: "MVX-2026-00001" }));
-      db.member.findFirst.mockResolvedValue({ id: "m1", status: "ACTIVE" });
-      expect((await SyncService.reconcile("c1")).state).toBe("SYNCED");
+    beforeEach(() => {
+      db.member.findFirst.mockResolvedValue(activeMember);
+      db.provider.findFirst.mockResolvedValue(okProvider);
+      db.claim.findFirst.mockResolvedValue(null);
+    });
+
+    it("SYNCs + creates a claim for a clean offline capture", async () => {
+      db.syncOperation.findUnique.mockResolvedValue(claimOp(fullPayload()));
+      const res = await SyncService.reconcile("c1");
+      expect(res.state).toBe("SYNCED");
+      expect(db.claim.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ source: "OFFLINE_SYNC", externalRef: "uuid-1" }) }),
+      );
+    });
+
+    it("is idempotent — an existing claim for the op is not recreated", async () => {
+      db.syncOperation.findUnique.mockResolvedValue(claimOp(fullPayload()));
+      db.claim.findFirst.mockResolvedValue({ id: "existing" });
+      const res = await SyncService.reconcile("c1");
+      expect(res.state).toBe("SYNCED");
+      expect(db.claim.create).not.toHaveBeenCalled();
     });
 
     it("CONFLICTs when the member is not found at sync time", async () => {
-      db.syncOperation.findUnique.mockResolvedValue(claimOp({ memberNumber: "MVX-9999" }));
+      db.syncOperation.findUnique.mockResolvedValue(claimOp(fullPayload()));
       db.member.findFirst.mockResolvedValue(null);
       const res = await SyncService.reconcile("c1");
       expect(res.state).toBe("CONFLICT");
       expect(res.reason).toMatch(/not found/i);
+      expect(db.claim.create).not.toHaveBeenCalled();
     });
 
     it("CONFLICTs when the membership is inactive", async () => {
-      db.syncOperation.findUnique.mockResolvedValue(claimOp({ memberNumber: "MVX-2026-00001" }));
-      db.member.findFirst.mockResolvedValue({ id: "m1", status: "SUSPENDED" });
+      db.syncOperation.findUnique.mockResolvedValue(claimOp(fullPayload()));
+      db.member.findFirst.mockResolvedValue({ ...activeMember, status: "SUSPENDED" });
       expect((await SyncService.reconcile("c1")).state).toBe("CONFLICT");
     });
 
-    it("CONFLICTs when memberNumber is missing", async () => {
+    it("CONFLICTs when the provider is not found / contract inactive", async () => {
+      db.syncOperation.findUnique.mockResolvedValue(claimOp(fullPayload()));
+      db.provider.findFirst.mockResolvedValue({ id: "p1", contractStatus: "SUSPENDED" });
+      expect((await SyncService.reconcile("c1")).state).toBe("CONFLICT");
+    });
+
+    it("CONFLICTs on incomplete payloads", async () => {
       db.syncOperation.findUnique.mockResolvedValue(claimOp({ amount: 100 }));
       expect((await SyncService.reconcile("c1")).state).toBe("CONFLICT");
     });
