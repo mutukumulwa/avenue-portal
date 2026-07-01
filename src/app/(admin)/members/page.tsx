@@ -34,6 +34,9 @@ export default async function MembersPage({
 
   const where = {
     tenantId,
+    // Client isolation (G2.1 / G5.2): a confined client user sees only members
+    // whose scheme belongs to their client; operator users span all.
+    ...(session.user.clientId ? { group: { clientId: session.user.clientId } } : {}),
     ...(status       ? { status: status as never }       : {}),
     ...(relationship  ? { relationship: relationship as never } : {}),
     ...(q ? {
@@ -62,7 +65,9 @@ export default async function MembersPage({
         orderBy: { createdAt: "desc" },
         take: 200,
       }),
-      prisma.member.count({ where: { tenantId } }),
+      prisma.member.count({
+        where: { tenantId, ...(session.user.clientId ? { group: { clientId: session.user.clientId } } : {}) },
+      }),
     ])
   );
 

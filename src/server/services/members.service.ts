@@ -7,9 +7,10 @@ export class MembersService {
   /**
    * Retrieves all members for a given tenant
    */
-  static async getMembers(tenantId: string) {
+  static async getMembers(tenantId: string, clientId?: string | null) {
     return prisma.member.findMany({
-      where: { tenantId },
+      // Client isolation (G2.1 / G5.2): confined users see only their client's members.
+      where: { tenantId, ...(clientId ? { group: { clientId } } : {}) },
       include: {
         group: true,
         package: true,
