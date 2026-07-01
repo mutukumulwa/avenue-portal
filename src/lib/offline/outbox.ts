@@ -91,6 +91,11 @@ export const Outbox = {
     return op;
   },
 
+  async all(): Promise<OutboxOp[]> {
+    const all = await tx<OutboxOp[]>(OUTBOX, "readonly", (s) => s.getAll());
+    return all.sort((a, b) => (a.capturedAt < b.capturedAt ? 1 : -1));
+  },
+
   async pending(): Promise<OutboxOp[]> {
     const all = await tx<OutboxOp[]>(OUTBOX, "readonly", (s) => s.getAll());
     return all.filter((o) => o.state === "pending");
