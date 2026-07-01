@@ -32,13 +32,14 @@ meaningful step. Newest status at the top of each section.
   (Tech-debt: migrations history should eventually be re-baselined to the DB.)
 
 ### Current status
-> **Rebrand §D ✅ · G2.1 ✅ · G2.4 ✅ · G3.1 ✅ · G4 scaffold ✅ · Security 5/5 ✅
-> · G3.5 multi-currency CORE ✅** — currency columns on 7 money entities +
-> Currency/FxRate seed + FX-rate admin UI (never-delete, verified in-browser) +
-> FxService.normalise/consolidate (normalise already used by approval bands).
-> Suite 141/141; typecheck + brand guard green.
-> **User's remaining sequence: (1) wire remaining G3.1 action paths → (2) G9.6
-> member numbering → (3) G4 Phase-1 end-to-end.** Now on G3.1 wiring.
+> **Rebrand §D ✅ · G2.1 ✅ · G2.4 ✅ · G3.1 ✅ (+ enforce() gate wiring) · G3.5
+> multi-currency core ✅ · G4 scaffold ✅ + Phase-1 Claim re-validation ✅ ·
+> Security 5/5 ✅ · G9.6 member numbering ✅.** Suite 150/150; typecheck +
+> brand guard green.
+> **All of the user's requested sequence (G3.5 → G3.1 wiring → G9.6 → G4 Phase-1)
+> delivered.** Next open items: G4 Phase-1 full end-to-end (provider IndexedDB
+> capture UI + benefit-balance reconcile + Claim creation), then Phase-1 gaps
+> (G5.x membership/provider/claims, NIRA, active dashboard) per plan §E.
 
 ### ⚠️ Dev DB note
 The local dev DB holds **pre-rebrand data** (tenant "Avenue Healthcare", slug
@@ -196,10 +197,10 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
   RESTRICT. DB is_nullable=NO; tests 64/64.
 | G2.4 | Terminology engine (multi-client) (M, S1) | ✅ all 5 slices (model+resolver+workflow+UI+hook+seed) |
 | G3.1 | Approval-matrix engine (L, S0) | ✅ all 5 slices (model+service+claims+editor UI+runtime workflow+escalation); wiring other actions = incremental |
-| G4 (scaffold) | Offline SW + IndexedDB + sync skeleton | ✅ scaffold (model+server rail+client rail); Phase-1 end-to-end left |
+| G4 (scaffold) | Offline SW + IndexedDB + sync skeleton | ✅ scaffold + Phase-1 Claim re-validation (`963afd6`); full end-to-end (capture UI + balance reconcile + Claim create) left |
 | G3.5 | Currency/FxRate + currency columns + FX UI + consolidation | ✅ core (`7212bd0`,`95c277f`); full UI/report threading = incremental |
 | Security slice | 2FA, password reset, password policy, single-session, auth banner | ✅ 5/5 (policy `0c572fb`, banner `0c572fb`, reset `4a168a7`, single-session `37a1f89`, 2FA `7cdf3b6`) |
-| G9.6 | Client-configurable member numbering (drop `AVH-` prefix) | ⬜ |
+| G9.6 | Client-configurable member numbering (drop `AVH-` prefix) | ✅ `4b659d5` — Client.memberNumberPrefix + member-numbering.service; all AVH- sites replaced |
 
 > Later phases (1–5) tracked in the plan §E; expand here as they begin.
 
@@ -290,7 +291,14 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
   7 tests incl. RFC vector) + User.totpSecret/totpEnabled + login `totp`
   credential + /settings/security enrolment. Verified in-browser (blocked w/o
   code, passes w/ code). **Security hardening COMPLETE 5/5.** Suite 137/137.
-- **G3.5 multi-currency core** `7212bd0` (currency columns on 7 entities +
-  Currency/FxRate seed) + `95c277f` (FX-rate admin UI, never-delete, verified
-  in-browser; FxService.consolidate + 4 tests). Suite 141/141.
-- **Next (user sequence):** wire remaining G3.1 action paths, then G9.6, then G4 Phase-1.
+- **G3.5 multi-currency core** `7212bd0`+`95c277f`: currency columns, Currency/
+  FxRate seed, FX-rate admin UI (never-delete, verified), FxService.consolidate.
+- **G3.1 wiring** `2daee20`: reusable `ApprovalRequestService.enforce()` gate
+  (5 tests) + fund top-ups routed through it. One-liner pattern for the rest.
+- **G9.6** `4b659d5`: `Client.memberNumberPrefix` (default MVX) +
+  member-numbering.service; replaced every hard-coded `AVH-` site; prefix
+  exposed in the client create form. Brand guard caught 2 doc comments (fixed).
+- **G4 Phase-1 core** `963afd6`: reconcile does real Claim re-validation
+  (member exists+active at sync → SYNCED, else CONFLICT surfaced; +4 tests).
+- **Full user sequence delivered.** Suite 150/150.
+- **Next:** G4 Phase-1 full end-to-end, or Phase-1 gaps (G5.x, NIRA, dashboard) per §E.
