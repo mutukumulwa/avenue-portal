@@ -72,6 +72,9 @@ model Tenant {
   terminologyApprovals           TerminologyApproval[]
   approvalRequests               ApprovalRequest[]
   fxRates                        FxRate[]
+  syncOperations                 SyncOperation[]
+  offlineReservations            OfflineReservation[]
+  eligibilitySnapshots           EligibilitySnapshot[]
 }
 
 // ── Multi-client TPA tenancy (Medvex spec §2.1 / gap G2.1) ──────────────
@@ -1257,6 +1260,76 @@ model FxRate {
   @@index([tenantId, baseCurrency, quoteCurrency])
 }
 
+// ── Offline-first / store-and-forward (Medvex spec §4 / gap G4) ─────────
+// Server-side provenance for the offline point-of-care rail: a durable buffer
+// of client-captured operations (idempotent by opKey), soft benefit
+// reservations, and time-boxed eligibility snapshots. The client PWA holds the
+// mirror (IndexedDB); the sync-reconcile queue reconciles on reconnect.
+enum SyncOperationState {
+  PENDING // received, not yet reconciled
+  SYNCED // reconciled and applied
+  CONFLICT // needs review (e.g. insufficient balance) — never silently dropped
+  REJECTED // authoritatively rejected (with reason)
+}
+
+model SyncOperation {
+  id         String @id @default(cuid())
+  tenantId   String
+  tenant     Tenant @relation(fields: [tenantId], references: [id])
+  clientUuid String // client-generated record UUID
+  opKey      String // idempotency key (client UUID + op) — unique per tenant
+  entityType String // "CheckIn" | "PreAuth" | "Claim" | "Image"
+  payload    Json
+  deviceId   String?
+  capturedAt DateTime // when captured offline at point of care
+  syncedAt   DateTime?
+
+  state          SyncOperationState @default(PENDING)
+  conflictReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, opKey])
+  @@index([tenantId, state])
+  @@index([tenantId, entityType])
+}
+
+model OfflineReservation {
+  id              String  @id @default(cuid())
+  tenantId        String
+  tenant          Tenant  @relation(fields: [tenantId], references: [id])
+  memberId        String
+  benefitConfigId String?
+  amount          Decimal
+  currency        String  @default("UGX")
+  reason          String? // provisional claim / pre-auth hold
+  syncOperationId String? // the offline op that created this hold
+
+  state     SyncOperationState @default(PENDING)
+  expiresAt DateTime // time-boxed soft hold
+  createdAt DateTime           @default(now())
+
+  @@index([tenantId, memberId])
+  @@index([tenantId, state])
+}
+
+model EligibilitySnapshot {
+  id        String  @id @default(cuid())
+  tenantId  String
+  tenant    Tenant  @relation(fields: [tenantId], references: [id])
+  memberId  String
+  clientId  String?
+  active    Boolean
+  balances  Json // benefit balances net of soft reservation, for offline cache
+  tariffRef String? // version/pointer of the price list captured with it
+
+  capturedAt DateTime @default(now())
+  validUntil DateTime // shorter for near-limit / high-risk members
+
+  @@index([tenantId, memberId])
+}
+
 // ─── PACKAGES & BENEFITS ────────────────────────────────
 enum PackageType {
   INDIVIDUAL
@@ -1570,6 +1643,9 @@ enum ClaimSource {
   SLADE360 // Received via Slade360 EDI
   HMS // Received from hospital HMS
   BATCH // Batch upload from facility
+  OFFLINE_SYNC // Captured offline at point of care, store-and-forward synced (G4)
+  USSD // Captured via USSD session (G4.5)
+  SMS // Captured via SMS (G4.5)
 }
 
 enum ServiceType {
