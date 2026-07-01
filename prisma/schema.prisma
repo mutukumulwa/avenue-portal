@@ -275,10 +275,24 @@ model User {
   confirmedVisits             VisitVerification[]              @relation("VisitConfirmedBy")
   webAuthnEnrollmentApprovals WebAuthnEnrollmentApproval[]     @relation("WebAuthnEnrollmentApprovedBy")
   reinstatementDecisions      MembershipReinstatementRequest[]
+  passwordResetTokens         PasswordResetToken[]
 
   @@unique([tenantId, email])
   @@index([tenantId])
   @@index([clientId])
+}
+
+// Password reset via emailed one-time code (Medvex spec §6 / R24 / gap H-02).
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  codeHash  String // bcrypt hash of the 6-digit code (never stored in clear)
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }
 
 // ─── GROUPS / ORGANIZATIONS ─────────────────────────────

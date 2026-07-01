@@ -127,6 +127,10 @@ function LoginForm() {
                 {loading ? "Signing in…" : "Sign In"}
               </button>
 
+              <p className="text-center pt-1">
+                <a href="/reset" className="text-xs text-brand-secondary hover:underline">Forgot password?</a>
+              </p>
+
               <p className="text-center text-xs text-brand-text-muted pt-1">
                 Admin: admin@medvex.co.ug · HR: emily.wambui@safaricom.co.ke
                 <br />Broker: broker@kaib.co.ke · Member: member@medvex.co.ug
