@@ -97,6 +97,7 @@ const SETUP_SUB: SubItem[] = [
   { label: "Users & Access",   href: "/settings"                   },
   { label: "Approval Matrix",  href: "/settings/approval-matrix"   },
   { label: "Terminology",      href: "/settings/terminology"       },
+  { label: "FX Rates",         href: "/settings/fx-rates"          },
   { label: "Security (2FA)",   href: "/settings/security"          },
   { label: "Pricing Models",   href: "/settings/pricing-models"    },
   { label: "Audit Log",        href: "/settings/audit-log"         },
@@ -185,7 +186,7 @@ function NavGroupSection({ group, pathname }: { group: NavGroup; pathname: strin
 
 export function AdminSidebar({ userRole }: { userRole: UserRole | null }) {
   const pathname = usePathname();
-  const SETUP_ROUTES = ["/settings", "/settings/approval-matrix", "/settings/terminology", "/settings/security", "/settings/pricing-models", "/settings/audit-log"];
+  const SETUP_ROUTES = ["/settings", "/settings/approval-matrix", "/settings/terminology", "/settings/fx-rates", "/settings/security", "/settings/pricing-models", "/settings/audit-log"];
   const setupActive = SETUP_ROUTES.some(r => pathname === r || pathname.startsWith(r + "/"));
 
   const visibleGroups = NAV_GROUPS

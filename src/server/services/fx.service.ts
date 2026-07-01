@@ -52,4 +52,33 @@ export class FxService {
     if (rate === null) return { baseAmount: amount, rate: 1, identity: true };
     return { baseAmount: amount * rate, rate, identity: false };
   }
+
+  /**
+   * Consolidate multi-currency amounts (e.g. a parent client + its subsidiaries)
+   * to the base currency. Returns the base total plus a per-currency breakdown
+   * (original + base-converted), for consolidated reporting (spec §3.5).
+   */
+  static async consolidate(
+    tenantId: string,
+    items: Array<{ amount: number; currency: string }>,
+    date: Date = new Date(),
+  ): Promise<{
+    base: string;
+    baseTotal: number;
+    byCurrency: Array<{ currency: string; amount: number; baseAmount: number }>;
+  }> {
+    const grouped = new Map<string, number>();
+    for (const it of items) {
+      grouped.set(it.currency, (grouped.get(it.currency) ?? 0) + it.amount);
+    }
+    const byCurrency: Array<{ currency: string; amount: number; baseAmount: number }> = [];
+    let baseTotal = 0;
+    for (const [currency, amount] of grouped) {
+      const { baseAmount } = await this.normalise(tenantId, amount, currency, date);
+      byCurrency.push({ currency, amount, baseAmount });
+      baseTotal += baseAmount;
+    }
+    byCurrency.sort((a, b) => b.baseAmount - a.baseAmount);
+    return { base: BASE_CURRENCY, baseTotal, byCurrency };
+  }
 }
