@@ -32,14 +32,15 @@ meaningful step. Newest status at the top of each section.
   (Tech-debt: migrations history should eventually be re-baselined to the DB.)
 
 ### Current status
-> **Rebrand §D COMPLETE** · **G2.1 COMPLETE** · **G2.4 terminology engine
-> COMPLETE** · **G3.1 approval-matrix engine COMPLETE & USABLE** — model +
-> resolver + claims wire-in (V-02) + action-typed/multi-level admin editor +
-> runtime ApprovalRequest workflow + **approvals console** + SLA escalation job,
-> all verified in-browser (multi-level advance + SoD block live). Suite 100/100.
-> **Now starting G4 offline-first scaffold.**
-> Remaining G3.1 (incremental, non-blocking): wire other action paths through
-> ApprovalRequestService.
+> **Rebrand §D COMPLETE** · **G2.1 COMPLETE** · **G2.4 COMPLETE** · **G3.1
+> approval-matrix engine COMPLETE & USABLE** · **G4 offline-first SCAFFOLD DONE**
+> — SyncOperation/OfflineReservation/EligibilitySnapshot model + ClaimSource
+> offline sources + server sync rail (ingest idempotent + reconcile pipeline
+> skeleton + BullMQ queue) + client rail (IndexedDB outbox + eligibility cache +
+> SW background-sync). Suite 105/105; typecheck + brand guard green.
+> **Now starting the security-hardening slice.**
+> Remaining G4: Phase-1 end-to-end (provider capture UI, filled reconcile steps
+> per entity, USSD/SMS). Remaining G3.1: wire other action paths (incremental).
 
 ### ⚠️ Dev DB note
 The local dev DB holds **pre-rebrand data** (tenant "Avenue Healthcare", slug
@@ -50,7 +51,21 @@ client "Jubilee Insurance Uganda" was created during verification (harmless demo
 row). **Consider `npm run db:seed` to refresh to Medvex data** (now includes the
 default Client via slice 1b) — but that's destructive; do it deliberately.
 
-### Next concrete step  →  **G4 offline-first scaffold** (plan §C-4, S0, part of XL)
+### Next concrete step  →  **security-hardening slice** (plan §C-6, all S0, small)
+Batch of go-live security blockers (small each). In `src/lib/auth.ts` + related:
+- **2FA (R81/H-01):** TOTP enrolment + verify at login (add `totpSecret`,
+  `totpEnabled` to User; use `otplib` if present else hand-roll HOTP/TOTP).
+- **Password reset via emailed code (R24/H-02):** `PasswordResetToken` model +
+  request/confirm flow (email via existing notification service).
+- **Password policy (R28/V-08):** enforce min length/complexity on set/change.
+- **Single-session control (R25/H-03):** track a session/token version on User;
+  invalidate prior sessions on new login.
+- **Authorized-users-only banner (R32/H-09):** login-page notice.
+Sequence: start with password policy + auth banner (no schema), then reset
+(schema + email), then 2FA (schema + TOTP), then single-session. Check for
+existing deps (otplib/speakeasy) before adding.
+
+#### G4 offline-first scaffold (DONE — reference)
 Sequence chosen by user: G3.1 → **G4** → security hardening. G4 is XL; scaffold
 now (Phase-0), full end-to-end later (Phase-1). Planned scaffold slices:
 - **Slice 1 — data model:** `SyncOperation` (clientUuid, opKey idempotency,
@@ -181,7 +196,7 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
   RESTRICT. DB is_nullable=NO; tests 64/64.
 | G2.4 | Terminology engine (multi-client) (M, S1) | ✅ all 5 slices (model+resolver+workflow+UI+hook+seed) |
 | G3.1 | Approval-matrix engine (L, S0) | ✅ all 5 slices (model+service+claims+editor UI+runtime workflow+escalation); wiring other actions = incremental |
-| G4 (scaffold) | Offline SW (Serwist) + IndexedDB + sync skeleton | 🔄 starting |
+| G4 (scaffold) | Offline SW + IndexedDB + sync skeleton | ✅ scaffold (model+server rail+client rail); Phase-1 end-to-end left |
 | G3.5 (schema) | Currency/FxRate + currency columns | ⬜ |
 | Security slice | 2FA, password reset, password policy, single-session, auth banner | ⬜ |
 | G9.6 | Client-configurable member numbering (drop `AVH-` prefix) | ⬜ |
@@ -259,4 +274,8 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
   console (/approvals) + claim wire-in opens ApprovalRequest for multi-level
   rules. Verified live: L1 approve advances to L2; same user blocked at L2 by SoD.
   **G3.1 COMPLETE & USABLE.**
-- **Next:** G4 offline-first scaffold (see §1 next step), then security hardening.
+- **G4 offline scaffold** `042d8ba`+`85c1d6e`: SyncOperation/OfflineReservation/
+  EligibilitySnapshot model + ClaimSource offline sources; sync.service (ingest
+  idempotent + reconcile skeleton) + /api/v1/sync + BullMQ sync-reconcile; client
+  IndexedDB outbox + eligibility cache + SW background-sync. 5 tests. Suite 105/105.
+- **Next:** security-hardening slice (see §1), then G4 Phase-1 / other Phase-0.
