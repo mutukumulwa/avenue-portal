@@ -5,7 +5,7 @@ import { auditChainService } from "./audit-chain.service";
 import { blacklistService } from "./blacklist.service";
 import { resolveSchemeClientId } from "./clientResolve";
 import { resolveMemberPrefix } from "./member-numbering.service";
-import { iprsService } from "./integrations/iprs.service";
+import { niraService } from "./integrations/nira.service";
 import { pdfService } from "./pdf.service";
 import { renderQuotationHtml } from "../templates/pdf/quotation.template";
 
@@ -105,11 +105,11 @@ export const bindingService = {
       }
     }
 
-    // IPRS re-check (stub — just annotates)
+    // NIRA re-check (stub — just annotates)
     for (const life of quotation.lives) {
       if (life.nationalId) {
-        const result = await iprsService.validate(life.nationalId);
-        if (!result.valid) failures.push(`IPRS failed for ${life.nationalId}`);
+        const result = await niraService.validate(life.nationalId);
+        if (!result.valid) failures.push(`Identity (NIRA) failed for ${life.nationalId}`);
       }
     }
 

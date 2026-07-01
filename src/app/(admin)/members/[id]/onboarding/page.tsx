@@ -146,7 +146,7 @@ export default async function MemberOnboardingPage({ params }: { params: Promise
 
             {kycRecord?.iprsNote && (
               <div className="bg-[#FFC107]/10 border border-[#FFC107]/30 rounded-[6px] p-3 text-xs text-[#856404]">
-                <strong>IPRS:</strong> {kycRecord.iprsNote}
+                <strong>Identity (NIRA):</strong> {kycRecord.iprsNote}
               </div>
             )}
 

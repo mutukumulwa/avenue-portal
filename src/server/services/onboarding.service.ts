@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { TRPCError } from "@trpc/server";
 import { CardType, CardStatus, OnboardingItemType, OnboardingItemStatus, KycDocType } from "@prisma/client";
 import { auditChainService } from "./audit-chain.service";
-import { iprsService } from "./integrations/iprs.service";
+import { niraService } from "./integrations/nira.service";
 
 // ─── ONBOARDING SERVICE ───────────────────────────────────────────────────────
 
@@ -68,13 +68,13 @@ export const onboardingService = {
       },
     });
 
-    // Run IPRS stub check
+    // Run NIRA identity check (stub)
     if (data.govIdNumber) {
-      const result = await iprsService.validate(data.govIdNumber);
+      const result = await niraService.validate(data.govIdNumber);
       await prisma.memberKycRecord.update({
         where: { memberId },
         data: {
-          iprsValidated: result.valid && result.source === "iprs_api",
+          iprsValidated: result.valid && result.source === "nira_api",
           iprsCheckedAt: new Date(),
           iprsNote: result.note,
         },

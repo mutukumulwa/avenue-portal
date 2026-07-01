@@ -4,7 +4,7 @@ import { FundingMode, ClientType, Gender, LifeRole, UWDecisionType } from "@pris
 import ExcelJS from "exceljs";
 import { auditChainService } from "./audit-chain.service";
 import { blacklistService } from "./blacklist.service";
-import { iprsService } from "./integrations/iprs.service";
+import { niraService } from "./integrations/nira.service";
 
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
@@ -292,12 +292,12 @@ export const intakeService = {
       }
     }
 
-    // Gate 5: IPRS validation (stub — notes non-validated IDs for operator follow-up)
+    // Gate 5: NIRA identity validation (stub — notes non-validated IDs for operator follow-up)
     for (const life of quotation.lives) {
       if (life.nationalId) {
-        const result = await iprsService.validate(life.nationalId);
+        const result = await niraService.validate(life.nationalId);
         if (!result.valid) {
-          errors.push({ gate: "IPRS", message: `IPRS returned invalid for ${life.nationalId}`, affectedLives: [life.nationalId] });
+          errors.push({ gate: "NIRA", message: `NIRA returned invalid for ${life.nationalId}`, affectedLives: [life.nationalId] });
         }
         if (result.source === "stub" && !life.iprsValidated) {
           // Flag for operator — not a blocking error since it's a stub
