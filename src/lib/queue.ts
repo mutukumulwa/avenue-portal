@@ -134,6 +134,11 @@ export async function scheduleIntakeJobs() {
       {},
       { repeat: { every: 30 * 60 * 1000 }, jobId: "sla-breach-check-recurring", attempts: 2 },
     ),
+    Queues.system.add(
+      "approval-escalation-check",
+      {},
+      { repeat: { every: 30 * 60 * 1000 }, jobId: "approval-escalation-check-recurring", attempts: 2 },
+    ),
   ]);
 }
 

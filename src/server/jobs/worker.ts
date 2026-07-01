@@ -10,6 +10,7 @@ import { runAnalyticsRefreshJob } from "./analytics-refresh.job";
 import { runIntakeAllocationJob } from "./intake-allocation.job";
 import { runMembershipActivationJob } from "./membership-activation.job";
 import { runSlaBreachJob } from "./sla-breach.job";
+import { runApprovalEscalationJob } from "./approval-escalation.job";
 import { runQuotationExpiryJob } from "./quotation-expiry.job";
 import { runLapseDetectionJob } from "./lapse-detection.job";
 
@@ -85,6 +86,10 @@ const systemWorker = new Worker("system", async (job: Job) => {
   if (job.name === "sla-breach-check") {
     const result = await runSlaBreachJob();
     console.log(`[Worker] SLA breach check complete — ${result.breachedCount} breach(es) flagged`);
+  }
+  if (job.name === "approval-escalation-check") {
+    const result = await runApprovalEscalationJob();
+    console.log(`[Worker] Approval escalation check complete — ${result.escalatedCount} escalated`);
   }
   if (job.name === "quotation-expiry") {
     const result = await runQuotationExpiryJob();
