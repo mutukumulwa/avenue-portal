@@ -21,6 +21,7 @@ function safeCallbackUrl(value: string | null) {
 function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [totp, setTotp] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -35,6 +36,7 @@ function LoginForm() {
     const result = await signIn("credentials", {
       email,
       password,
+      totp,
       redirect: false,
     });
 
@@ -117,6 +119,22 @@ function LoginForm() {
                     required
                   />
                 </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-sm font-bold text-brand-text-heading">
+                  Authenticator code <span className="font-normal text-brand-text-muted">(if 2FA enabled)</span>
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={totp}
+                  onChange={(e) => setTotp(e.target.value)}
+                  className="bg-white border border-[#EEEEEE] text-brand-text-heading text-sm rounded-[8px] focus:ring-2 focus:ring-brand-indigo focus:border-brand-indigo block w-full p-2.5 outline-none transition-all"
+                  placeholder="6-digit code"
+                  autoComplete="one-time-code"
+                />
               </div>
 
               <button

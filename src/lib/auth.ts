@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { cache } from "react";
 import { measureAsync } from "@/lib/perf";
+import { verifyTotp } from "@/lib/totp";
 
 /** Loads all active permission codes for a user from UserRoleAssignment. */
 async function loadUserPermissions(userId: string, tenantId: string): Promise<string[]> {
@@ -53,7 +54,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       name: "Credentials",
       credentials: {
         email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" }
+        password: { label: "Password", type: "password" },
+        totp: { label: "Authenticator code", type: "text" }
       },
       async authorize(credentials) {
         return measureAsync("auth.credentials.authorize", async () => {
@@ -78,6 +80,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 clientId: true,
                 groupId: true,
                 memberId: true,
+                totpSecret: true,
+                totpEnabled: true,
               },
             })
           );
@@ -92,6 +96,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
           if (!isPasswordValid) {
             return null;
+          }
+
+          // Two-factor (R81): when enabled, a valid TOTP is mandatory. A
+          // missing/incorrect code fails the login (the form surfaces the code
+          // field so the user can retry).
+          if (user.totpEnabled && user.totpSecret) {
+            const code = (credentials.totp as string | undefined)?.trim();
+            if (!code || !verifyTotp(user.totpSecret, code)) {
+              return null;
+            }
           }
 
           const permissions = await loadUserPermissions(user.id, user.tenantId);

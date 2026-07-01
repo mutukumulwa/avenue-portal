@@ -241,6 +241,9 @@ model User {
   // Single-session control (R25/H-03): bumped on each login; a JWT carrying an
   // older version is invalidated, so only the most recent login stays valid.
   sessionVersion Int     @default(0)
+  // Two-factor auth (R81/H-01): base32 TOTP secret + enabled flag.
+  totpSecret   String?
+  totpEnabled  Boolean   @default(false)
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
 
