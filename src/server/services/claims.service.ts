@@ -101,6 +101,7 @@ export class ClaimsService {
       select: {
         dateOfService: true,
         providerId: true,
+        member: { select: { group: { select: { clientId: true } } } },
         claimLines: {
           orderBy: { lineNumber: "asc" },
           select: { id: true, cptCode: true, description: true, unitCost: true, quantity: true },
@@ -120,6 +121,7 @@ export class ClaimsService {
         unitCost: Number(l.unitCost),
         quantity: l.quantity,
       })),
+      claim.member?.group?.clientId, // per-client tariff resolution (G5.4)
     );
   }
 

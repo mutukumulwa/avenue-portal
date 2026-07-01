@@ -120,6 +120,7 @@ export const claimAdjudicationService = {
       include: {
         claimLines: true,
         provider:   { select: { id: true } },
+        member:     { select: { group: { select: { clientId: true } } } },
       },
     });
     if (!claim) throw new TRPCError({ code: "NOT_FOUND", message: "Claim not found" });
@@ -135,6 +136,7 @@ export const claimAdjudicationService = {
         unitCost: Number(l.unitCost),
         quantity: l.quantity,
       })),
+      claim.member?.group?.clientId, // per-client tariff resolution (G5.4)
     );
 
     let totalBilled     = 0;

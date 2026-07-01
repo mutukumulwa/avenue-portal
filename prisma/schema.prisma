@@ -140,6 +140,7 @@ model Client {
   terminologyEntries TerminologyEntry[]
   approvalMatrices   ApprovalMatrix[]
   approvalRequests   ApprovalRequest[]
+  providerTariffs    ProviderTariff[]
 
   @@unique([operatorTenantId, slug])
   @@index([operatorTenantId])
@@ -2045,9 +2046,14 @@ model ProviderTariff {
   provider            Provider          @relation(fields: [providerId], references: [id])
   contractId          String? // null = standalone/legacy rate not tied to an agreement
   contract            ProviderContract? @relation(fields: [contractId], references: [id])
+  // Per-client tariff (G5.4): null = shared master rate for the network; set =
+  // this client's negotiated rate for the provider service (wins at resolution).
+  clientId            String?
+  client              Client?           @relation(fields: [clientId], references: [id])
   cptCode             String?
   serviceName         String
-  agreedRate          Decimal // KES — overrides standard CPT charge for this provider
+  agreedRate          Decimal // overrides standard CPT charge for this provider
+  currency            String            @default("UGX") // G3.5
   tariffType          TariffType        @default(NEGOTIATED)
   requiresPreauth     Boolean           @default(false) // contract requires PA before this service is payable
   maxQuantityPerVisit Int? // contractual cap on units per encounter
@@ -2060,6 +2066,7 @@ model ProviderTariff {
   @@index([providerId, cptCode])
   @@index([providerId, isActive])
   @@index([contractId])
+  @@index([clientId])
 }
 
 // Diagnosis-based bundled rates — e.g. malaria admission = KES 8,000/day flat

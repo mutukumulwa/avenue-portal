@@ -77,6 +77,7 @@ export class ProviderContractsService {
     providerId: string,
     dateOfService: Date,
     lines: { id: string; cptCode: string | null; description?: string | null; unitCost: number; quantity: number }[],
+    clientId?: string | null,
   ): Promise<ResolvedClaimRates> {
     const contract = await this.getActiveContract(tenantId, providerId, dateOfService);
 
@@ -92,13 +93,22 @@ export class ProviderContractsService {
             OR: [{ effectiveTo: null }, { effectiveTo: { gte: dateOfService } }],
             // Only the governing contract's lines or standalone (legacy) lines apply —
             // never rates belonging to a draft/expired/other contract.
-            AND: [{ OR: [{ contractId: contract?.id ?? "__none__" }, { contractId: null }] }],
+            AND: [
+              { OR: [{ contractId: contract?.id ?? "__none__" }, { contractId: null }] },
+              // Per-client tariff (G5.4): this client's negotiated rate OR the
+              // shared master rate (clientId null). Never another client's rate.
+              { OR: [{ clientId: clientId ?? null }, { clientId: null }] },
+            ],
           },
         })
       : [];
 
-    // Best rate per code: contract-scoped beats standalone, then tariff-type priority, then latest.
+    // Best rate per code: client-specific beats master, then contract-scoped beats
+    // standalone, then tariff-type priority, then latest.
     tariffs.sort((a, b) => {
+      const aClient = a.clientId ? 0 : 1;
+      const bClient = b.clientId ? 0 : 1;
+      if (aClient !== bClient) return aClient - bClient;
       const aContract = a.contractId ? 0 : 1;
       const bContract = b.contractId ? 0 : 1;
       if (aContract !== bContract) return aContract - bContract;
