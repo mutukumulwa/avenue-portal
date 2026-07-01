@@ -32,14 +32,14 @@ meaningful step. Newest status at the top of each section.
   (Tech-debt: migrations history should eventually be re-baselined to the DB.)
 
 ### Current status
-> **Rebrand §D ✅ · G2.1 ✅ · G2.4 ✅ · G3.1 ✅ (+ enforce() gate wiring) · G3.5
-> multi-currency core ✅ · G4 scaffold ✅ + Phase-1 Claim re-validation ✅ ·
-> Security 5/5 ✅ · G9.6 member numbering ✅.** Suite 150/150; typecheck +
-> brand guard green.
-> **All of the user's requested sequence (G3.5 → G3.1 wiring → G9.6 → G4 Phase-1)
-> delivered.** Next open items: G4 Phase-1 full end-to-end (provider IndexedDB
-> capture UI + benefit-balance reconcile + Claim creation), then Phase-1 gaps
-> (G5.x membership/provider/claims, NIRA, active dashboard) per plan §E.
+> **Rebrand §D ✅ · G2.1 ✅ · G2.4 ✅ · G3.1 ✅ · G3.5 core ✅ · Security 5/5 ✅ ·
+> G9.6 ✅ · G4 Phase-1 headline flow ✅ (offline capture→sync→reconcile→real
+> claim, verified end-to-end w/ BullMQ worker) · G5.9 NIRA identity ✅.**
+> Suite 156/156; typecheck + brand guard green.
+> **Next Phase-1 functional gaps (each L/XL, per plan §E): G5.2 membership depth,
+> G5.4 provider network + per-client tariffs, G5.6 claims channels, G3.3 active
+> claims dashboard. G4 Phase-1 refinements: benefit-balance reconcile (soft
+> reservation), eligibility-cache provisional decisions, first-class USSD/SMS.**
 
 ### ⚠️ Dev DB note
 The local dev DB holds **pre-rebrand data** (tenant "Avenue Healthcare", slug
@@ -197,7 +197,8 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
   RESTRICT. DB is_nullable=NO; tests 64/64.
 | G2.4 | Terminology engine (multi-client) (M, S1) | ✅ all 5 slices (model+resolver+workflow+UI+hook+seed) |
 | G3.1 | Approval-matrix engine (L, S0) | ✅ all 5 slices (model+service+claims+editor UI+runtime workflow+escalation); wiring other actions = incremental |
-| G4 (scaffold) | Offline SW + IndexedDB + sync skeleton | ✅ scaffold + Phase-1 Claim re-validation (`963afd6`); full end-to-end (capture UI + balance reconcile + Claim create) left |
+| G4 | Offline SW + IndexedDB + sync + capture UI | ✅ scaffold + Phase-1 headline flow (`963afd6`/`568b1f5`/`8fccd13`): capture→sync→reconcile→real OFFLINE_SYNC claim, verified end-to-end. Refinements left: balance reconcile, eligibility cache, USSD/SMS |
+| G5.9 | NIRA identity (replaces Kenya IPRS) | ✅ `58ed550` — nira.service + 3 call-sites swapped; iprs* field rename deferred (cosmetic) |
 | G3.5 | Currency/FxRate + currency columns + FX UI + consolidation | ✅ core (`7212bd0`,`95c277f`); full UI/report threading = incremental |
 | Security slice | 2FA, password reset, password policy, single-session, auth banner | ✅ 5/5 (policy `0c572fb`, banner `0c572fb`, reset `4a168a7`, single-session `37a1f89`, 2FA `7cdf3b6`) |
 | G9.6 | Client-configurable member numbering (drop `AVH-` prefix) | ✅ `4b659d5` — Client.memberNumberPrefix + member-numbering.service; all AVH- sites replaced |
@@ -298,7 +299,14 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
 - **G9.6** `4b659d5`: `Client.memberNumberPrefix` (default MVX) +
   member-numbering.service; replaced every hard-coded `AVH-` site; prefix
   exposed in the client create form. Brand guard caught 2 doc comments (fixed).
-- **G4 Phase-1 core** `963afd6`: reconcile does real Claim re-validation
-  (member exists+active at sync → SYNCED, else CONFLICT surfaced; +4 tests).
-- **Full user sequence delivered.** Suite 150/150.
-- **Next:** G4 Phase-1 full end-to-end, or Phase-1 gaps (G5.x, NIRA, dashboard) per §E.
+- **G4 Phase-1** `963afd6` (Claim re-validation) + `568b1f5` (reconcile creates
+  real OFFLINE_SYNC claim, idempotent via externalRef) + `8fccd13` (provider
+  offline-capture UI). **Verified end-to-end in-browser + BullMQ worker:**
+  captured claim offline → outbox → Sync now → SyncOperation → worker reconciled
+  → Claim CLM-2026-00760 (OFFLINE_SYNC). Zero data loss.
+  > Worker gotcha: `npm run worker` needs DATABASE_URL exported (tsx doesn't load
+  > .env) — else Prisma hits the wrong DB (DatabaseDoesNotExist).
+- **G5.9 NIRA** `58ed550`: nira.service adapter + 3 call-sites swapped from IPRS;
+  4 tests. iprs* DB field rename deferred (cosmetic, not brand-guarded).
+- **Both requested items delivered.** Suite 156/156.
+- **Next:** Phase-1 functional gaps G5.2/G5.4/G5.6/G3.3 (each L/XL) + G4 refinements.
