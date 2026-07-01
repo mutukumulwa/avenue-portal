@@ -33,13 +33,15 @@ meaningful step. Newest status at the top of each section.
 
 ### Current status
 > **Rebrand §D COMPLETE** · **G2.1 multi-client tenancy SUBSTANTIALLY COMPLETE**
-> · **G2.4 terminology engine COMPLETE** · **G3.1 approval-matrix engine: core
-> done (slices 1-3)** — action-typed/client-scoped/FX-normalised data model +
-> `approval-matrix.service.ts` (resolve, SoD, FX, step expansion) + claim-payment
-> path routed through the engine (resolves V-02). 12 approval unit tests.
-> Suite 91/91; typecheck + brand guard green.
-> **Remaining G3.1: slice 4 (multi-level admin editor), slice 5 (SLA escalation),
-> full ApprovalRequest/Decision runtime workflow.**
+> · **G2.4 terminology engine COMPLETE** · **G3.1 approval-matrix engine
+> SUBSTANTIALLY COMPLETE (all 5 slices)** — action-typed/client-scoped/
+> FX-normalised model + resolver + claims wire-in (V-02) + action-typed admin
+> editor (verified in-browser) + runtime ApprovalRequest/Decision workflow
+> (multi-level, SoD) + SLA escalation job (scheduled 30m). 27 approval/terminology
+> unit tests in this area. Suite 100/100; typecheck + brand guard green.
+> **Remaining G3.1 (incremental): wire runtime workflow into the other action
+> paths (pre-auth/overrides/endorsements/tariff/commission/fund/write-off);
+> per-level ApprovalStep editor UI.**
 
 ### ⚠️ Dev DB note
 The local dev DB holds **pre-rebrand data** (tenant "Avenue Healthcare", slug
@@ -50,17 +52,21 @@ client "Jubilee Insurance Uganda" was created during verification (harmless demo
 row). **Consider `npm run db:seed` to refresh to Medvex data** (now includes the
 default Client via slice 1b) — but that's destructive; do it deliberately.
 
-### Next concrete step  →  finish **G3.1** (slices 4-5 + runtime workflow)
-Core engine done (slices 1-3, committed `f4a0404`/`e6bf441`/`514d9df`). Remaining:
-- **Slice 4 — admin UI:** extend `/(admin)/settings/approval-matrix` to an
-  action-typed, multi-level (ApprovalStep) editor with client scope + currency;
-  surface approvable actions in the user-rights-roles report.
-- **Slice 5 — escalation:** extend `src/server/jobs/sla-breach.job.ts` to
-  auto-escalate unactioned approvals to the step's escalationTargetRole.
-- **Runtime workflow:** persist `ApprovalRequest`/`ApprovalDecision` for true
-  multi-step sequences (currently the claim path enforces only the level-1 gate
-  + SoD synchronously). Wire other actions (pre-auth/GOP, overrides, endorsements,
-  tariff/commission changes, fund top-ups, write-offs) through the engine.
+### Next concrete step  →  next Phase-0 item or finish G3.1 integration
+G3.1 all 5 slices done (`f4a0404`/`e6bf441`/`514d9df`/`2d33e82`/`3104fa2`).
+Remaining G3.1 is incremental integration (do as each module is touched):
+- Wire `ApprovalRequestService.create/decide` into the other governed actions:
+  pre-auth/GOP, benefit-limit overrides, endorsements, provider-tariff changes,
+  commission-rate changes, fund top-ups, write-offs/refunds. (Claim path already
+  enforces the level-1 gate + SoD synchronously — upgrade it to open an
+  ApprovalRequest for multi-level rules.)
+- Per-level ApprovalStep editor in the admin UI (engine already reads steps).
+- Surface approvable actions in the user-rights-roles report (KCB R26).
+- An approvals work-queue/console UI for pending ApprovalRequests.
+
+**Then next Phase-0 backbone per plan §E:** G4 offline scaffold (Serwist +
+IndexedDB + sync skeleton), G3.5 full FX, or the **security-hardening slice**
+(2FA/password-reset/password-policy/single-session/auth-banner — all S0, small).
 
 #### Original G3.1 plan (reference)
 Redesign the thin `ApprovalMatrix` (tenant-scoped, claims-only, single-role,
@@ -169,7 +175,7 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
   shared resolver wired into all 4 create paths + seed; column NOT NULL; FK
   RESTRICT. DB is_nullable=NO; tests 64/64.
 | G2.4 | Terminology engine (multi-client) (M, S1) | ✅ all 5 slices (model+resolver+workflow+UI+hook+seed) |
-| G3.1 | Approval-matrix engine (L, S0) | 🔄 core done (slices 1-3: model+service+claims wire-in); 4-5+runtime left |
+| G3.1 | Approval-matrix engine (L, S0) | ✅ all 5 slices (model+service+claims+editor UI+runtime workflow+escalation); wiring other actions = incremental |
 | G4 (scaffold) | Offline SW (Serwist) + IndexedDB + sync skeleton | ⬜ |
 | G3.5 (schema) | Currency/FxRate + currency columns | ⬜ |
 | Security slice | 2FA, password reset, password policy, single-session, auth banner | ⬜ |
@@ -238,5 +244,11 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
   `approval-matrix.service.ts` (resolve, expandSteps, SoD, roleAuthorised) + 12 tests.
 - **G3.1 slice 3** `514d9df`: claim-payment path routed through the engine
   (client-scoped + SoD); resolves V-02. Seeded rules resolve under engine; 91/91.
-- **G3.1 core functional + enforced.** Remaining: slice 4 (UI), 5 (escalation),
-  runtime ApprovalRequest workflow + other action paths.
+- **G3.1 slice 4** `2d33e82`: action-typed/client-scoped/currency/SLA matrix
+  editor UI. Verified in-browser (created PREAUTH_GOP rule, client-scoped, SLA
+  30m→UNDERWRITER).
+- **G3.1 slice 5** `3104fa2`: runtime `ApprovalRequestService` (create/decide,
+  multi-level, SoD) + `approval-escalation.job.ts` (scheduled 30m) + 9 tests.
+- **G3.1 approval-matrix engine SUBSTANTIALLY COMPLETE (all 5 slices).** Suite 100/100.
+- **Next:** wire runtime workflow into other action paths (incremental), or next
+  Phase-0 item (G4 offline scaffold / security-hardening slice / G3.5 full FX).
