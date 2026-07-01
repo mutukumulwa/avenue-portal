@@ -22,6 +22,7 @@ export class CoContributionService {
                 annualCoContributionCap: true,
               },
             },
+            group: { select: { clientId: true } },
             principal: true,
             annualCoContributions: true,
           },
@@ -40,6 +41,7 @@ export class CoContributionService {
       networkTier,
       claim.benefitCategory,
       claim.dateOfService,
+      member.group?.clientId, // per-client copay override (G3.4/G5.7)
     );
 
     // No rule configured — plan covers 100%

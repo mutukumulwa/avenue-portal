@@ -143,6 +143,7 @@ model Client {
   approvalRequests   ApprovalRequest[]
   providerTariffs    ProviderTariff[]
   autoAdjudicationPolicies AutoAdjudicationPolicy[]
+  copayRules         CoContributionRule[]
 
   @@unique([operatorTenantId, slug])
   @@index([operatorTenantId])
@@ -3223,6 +3224,10 @@ model CoContributionRule {
   tenant    Tenant  @relation(fields: [tenantId], references: [id])
   packageId String
   package   Package @relation(fields: [packageId], references: [id])
+  // Per-client copay override (G3.4/G5.7): null = package rule; set = this
+  // client's rule (wins over the package rule at resolution).
+  clientId  String?
+  client    Client? @relation(fields: [clientId], references: [id])
 
   benefitCategory BenefitCategory? // null = package-wide default
   networkTier     NetworkTier        @default(TIER_1)
@@ -3246,6 +3251,7 @@ model CoContributionRule {
   @@index([tenantId])
   @@index([packageId])
   @@index([packageId, benefitCategory, networkTier])
+  @@index([clientId])
 }
 
 // Per-package annual out-of-pocket caps (individual + optional family)

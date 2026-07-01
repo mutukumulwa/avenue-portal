@@ -18,6 +18,7 @@ export function resolveRule(
   networkTier: NetworkTier,
   benefitCategory: BenefitCategory | null,
   claimDate: Date,
+  clientId?: string | null,
 ): CoContributionRule | null {
   const active = rules.filter((r) => {
     if (!r.isActive) return false;
@@ -26,13 +27,17 @@ export function resolveRule(
     return true;
   });
 
-  // Most-specific rule wins: category + tier > category only > tier only > global (no category, no tier)
+  // Most-specific rule wins. A client-specific rule (G3.4/G5.7) outranks the
+  // package rule; then category + tier > category > tier > global.
   const score = (r: CoContributionRule) => {
+    // A rule scoped to a different client never applies.
+    if (r.clientId && r.clientId !== clientId) return -1;
+    // Rules with a category that doesn't match the current claim are excluded.
+    if (r.benefitCategory !== null && r.benefitCategory !== benefitCategory) return -1;
     let s = 0;
+    if (r.clientId && r.clientId === clientId) s += 4; // client override wins
     if (r.benefitCategory !== null && r.benefitCategory === benefitCategory) s += 2;
     if (r.networkTier === networkTier) s += 1;
-    // Rules with category that doesn't match current claim are excluded
-    if (r.benefitCategory !== null && r.benefitCategory !== benefitCategory) return -1;
     return s;
   };
 
