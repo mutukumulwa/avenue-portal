@@ -100,6 +100,15 @@ async function main() {
   }
   console.log(`✅ Currencies: ${currencies.length}; FX rates: ${fxRates.length} (base UGX)`)
 
+  // ── Default auto-adjudication policy (G3.7) ──────────────────
+  const autoAdjExists = await prisma.autoAdjudicationPolicy.findFirst({ where: { tenantId, clientId: null, isActive: true } })
+  if (!autoAdjExists) {
+    await prisma.autoAdjudicationPolicy.create({
+      data: { tenantId, clientId: null, enabled: true, maxAutoApproveAmount: 100000, currency: 'UGX', requireCleanFraud: true },
+    })
+    console.log('✅ Auto-adjudication policy: operator default (ceiling UGX 100,000)')
+  }
+
   // ═══════════════════════════════════════════════════════════
   // 1b. BENEFIT RIDERS & TAXES
   // ═══════════════════════════════════════════════════════════

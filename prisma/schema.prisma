@@ -75,6 +75,7 @@ model Tenant {
   syncOperations                 SyncOperation[]
   offlineReservations            OfflineReservation[]
   eligibilitySnapshots           EligibilitySnapshot[]
+  autoAdjudicationPolicies       AutoAdjudicationPolicy[]
 }
 
 // ── Multi-client TPA tenancy (Medvex spec §2.1 / gap G2.1) ──────────────
@@ -141,6 +142,7 @@ model Client {
   approvalMatrices   ApprovalMatrix[]
   approvalRequests   ApprovalRequest[]
   providerTariffs    ProviderTariff[]
+  autoAdjudicationPolicies AutoAdjudicationPolicy[]
 
   @@unique([operatorTenantId, slug])
   @@index([operatorTenantId])
@@ -1286,6 +1288,33 @@ model FxRate {
   isActive      Boolean   @default(true)
 
   @@index([tenantId, baseCurrency, quoteCurrency])
+}
+
+// ── Auto-adjudication policy (Medvex spec §3.7 / gap G3.7) ──────────────
+// Client-configurable, versioned criteria for auto-approving clean low-risk
+// claims without a human touch. Everything else routes to review with the
+// failing gate named. Never-delete (effective dating = versioning).
+model AutoAdjudicationPolicy {
+  id       String  @id @default(cuid())
+  tenantId String
+  tenant   Tenant  @relation(fields: [tenantId], references: [id])
+  clientId String? // null = operator default; set = per-client override
+  client   Client? @relation(fields: [clientId], references: [id])
+
+  enabled              Boolean  @default(true)
+  maxAutoApproveAmount Decimal? // ceiling in `currency`; above → route. null = no ceiling
+  currency             String   @default("UGX")
+  requireCleanFraud    Boolean  @default(true) // no open fraud flag to auto-approve
+  requirePreauthWhenNeeded Boolean @default(true)
+
+  effectiveFrom DateTime  @default(now())
+  effectiveTo   DateTime?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([tenantId, clientId])
+  @@index([tenantId, isActive])
 }
 
 // ── Offline-first / store-and-forward (Medvex spec §4 / gap G4) ─────────
