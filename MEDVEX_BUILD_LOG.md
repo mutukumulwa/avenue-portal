@@ -32,14 +32,12 @@ meaningful step. Newest status at the top of each section.
   (Tech-debt: migrations history should eventually be re-baselined to the DB.)
 
 ### Current status
-> **Rebrand §D ✅ · G2.1 ✅ · G2.4 ✅ · G3.1 ✅ · G3.5 core ✅ · Security 5/5 ✅ ·
-> G9.6 ✅ · G4 Phase-1 headline flow ✅ (offline capture→sync→reconcile→real
-> claim, verified end-to-end w/ BullMQ worker) · G5.9 NIRA identity ✅.**
-> Suite 156/156; typecheck + brand guard green.
-> **Next Phase-1 functional gaps (each L/XL, per plan §E): G5.2 membership depth,
-> G5.4 provider network + per-client tariffs, G5.6 claims channels, G3.3 active
-> claims dashboard. G4 Phase-1 refinements: benefit-balance reconcile (soft
-> reservation), eligibility-cache provisional decisions, first-class USSD/SMS.**
+> **Rebrand §D ✅ · G2.1 ✅ · G2.4 ✅ · G3.1 ✅ · G3.3 active claims console ✅ ·
+> G3.5 core ✅ · G4 Phase-1 flow ✅ · G5.2 membership (client-scoped) ✅ · G5.9
+> NIRA ✅ · Security 5/5 ✅ · G9.6 ✅.** Suite 156/156; typecheck + brand guard green.
+> **Remaining Phase-1: G5.4 provider network + per-client tariffs, G5.6 claims
+> channels; G3.3 real-time alert fan-out; G4 refinements (balance reconcile,
+> eligibility cache, USSD/SMS). Then Phase 2+ per plan §E.**
 
 ### ⚠️ Dev DB note
 The local dev DB holds **pre-rebrand data** (tenant "Avenue Healthcare", slug
@@ -199,6 +197,8 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
 | G3.1 | Approval-matrix engine (L, S0) | ✅ all 5 slices (model+service+claims+editor UI+runtime workflow+escalation); wiring other actions = incremental |
 | G4 | Offline SW + IndexedDB + sync + capture UI | ✅ scaffold + Phase-1 headline flow (`963afd6`/`568b1f5`/`8fccd13`): capture→sync→reconcile→real OFFLINE_SYNC claim, verified end-to-end. Refinements left: balance reconcile, eligibility cache, USSD/SMS |
 | G5.9 | NIRA identity (replaces Kenya IPRS) | ✅ `58ed550` — nira.service + 3 call-sites swapped; iprs* field rename deferred (cosmetic) |
+| G3.3 | Active claims dashboard + SLA queues | ✅ `e1df67e` — /claims/queues console (lanes+SLA timers, verified). Real-time alert fan-out remaining |
+| G5.2 | Membership admin (multi-client) | ✅ `b4cfb9b` — client-scoped members list/service; NIRA+renewal+offline already covered. Otherwise strong/existing |
 | G3.5 | Currency/FxRate + currency columns + FX UI + consolidation | ✅ core (`7212bd0`,`95c277f`); full UI/report threading = incremental |
 | Security slice | 2FA, password reset, password policy, single-session, auth banner | ✅ 5/5 (policy `0c572fb`, banner `0c572fb`, reset `4a168a7`, single-session `37a1f89`, 2FA `7cdf3b6`) |
 | G9.6 | Client-configurable member numbering (drop `AVH-` prefix) | ✅ `4b659d5` — Client.memberNumberPrefix + member-numbering.service; all AVH- sites replaced |
@@ -309,4 +309,10 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
 - **G5.9 NIRA** `58ed550`: nira.service adapter + 3 call-sites swapped from IPRS;
   4 tests. iprs* DB field rename deferred (cosmetic, not brand-guarded).
 - **Both requested items delivered.** Suite 156/156.
-- **Next:** Phase-1 functional gaps G5.2/G5.4/G5.6/G3.3 (each L/XL) + G4 refinements.
+- **G3.3** `e1df67e`: `/claims/queues` active work-queue console — lanes by
+  lifecycle state + per-card SLA age (red when over target) + drill-through +
+  client-scoped. Verified in-browser (465 active, over-SLA flagged, UGX amounts).
+- **G5.2** `b4cfb9b`: client-scoped members list/service (G2.1 slice 2b for
+  membership). NIRA/renewal-SMS/offline already covered; module otherwise strong.
+- **Next:** G5.4 provider network + per-client tariffs, G5.6 claims channels,
+  G3.3 real-time alerts, G4 refinements; then Phase 2+.
