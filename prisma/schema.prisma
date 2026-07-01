@@ -1487,6 +1487,11 @@ model BenefitConfig {
   annualSubLimit     Decimal // KES
   perVisitLimit      Decimal?
   copayPercentage    Decimal         @default(0) // e.g., 10 = 10%
+  // Cost-share (G9.1) — distinct from copay: co-insurance is the member's % of
+  // the cost AFTER the annual deductible is met. deductibleAmount is the annual
+  // member-paid threshold before the plan pays. Both default 0 (off).
+  coInsurancePct     Decimal         @default(0) // e.g. 20 = member pays 20% post-deductible
+  deductibleAmount   Decimal         @default(0) // annual member-paid threshold
   waitingPeriodDays  Int             @default(0)
   notes              String?
   exclusions         String[]
