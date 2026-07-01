@@ -23,6 +23,28 @@ async function loadUserPermissions(userId: string, tenantId: string): Promise<st
   return [...codes];
 }
 
+/**
+ * Current sessionVersion for a user, cached briefly to bound the per-request DB
+ * cost of single-session enforcement (R25). Returns null on error (fail-open).
+ */
+const sessionVersionCache = new Map<string, { version: number; at: number }>();
+const SESSION_VERSION_TTL_MS = 15_000;
+async function currentSessionVersion(userId: string): Promise<number | null> {
+  const hit = sessionVersionCache.get(userId);
+  if (hit && Date.now() - hit.at < SESSION_VERSION_TTL_MS) return hit.version;
+  try {
+    const row = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { sessionVersion: true },
+    });
+    if (!row) return null;
+    sessionVersionCache.set(userId, { version: row.sessionVersion, at: Date.now() });
+    return row.sessionVersion;
+  } catch {
+    return null; // fail-open: never lock users out on a transient DB error
+  }
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
@@ -74,6 +96,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
 
           const permissions = await loadUserPermissions(user.id, user.tenantId);
 
+          // Single-session control (R25): bump the version so this login
+          // supersedes any prior session; the new version rides in the JWT.
+          const bumped = await prisma.user.update({
+            where: { id: user.id },
+            data: { sessionVersion: { increment: 1 }, lastLoginAt: new Date() },
+            select: { sessionVersion: true },
+          });
+
           return {
             id: user.id,
             email: user.email,
@@ -84,6 +114,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             groupId: user.groupId ?? undefined,
             memberId: user.memberId ?? undefined,
             permissions,
+            sessionVersion: bumped.sessionVersion,
           };
         });
       }
@@ -99,6 +130,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.groupId = user.groupId;
         token.memberId = user.memberId;
         token.permissions = user.permissions;
+        token.sessionVersion = user.sessionVersion;
+        return token;
+      }
+      // Subsequent requests: invalidate if a newer login has superseded this
+      // session (single-session, R25). Fail-open when the version is unknown.
+      if (token.id && typeof token.sessionVersion === "number") {
+        const current = await currentSessionVersion(token.id as string);
+        if (current !== null && current > (token.sessionVersion as number)) {
+          return null; // stale session → sign out
+        }
       }
       return token;
     },

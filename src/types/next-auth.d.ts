@@ -21,6 +21,7 @@ declare module "next-auth" {
     groupId?: string;
     memberId?: string;
     permissions?: string[];
+    sessionVersion?: number;
   }
 }
 
@@ -33,5 +34,6 @@ declare module "next-auth/jwt" {
     groupId?: string;
     memberId?: string;
     permissions?: string[];
+    sessionVersion?: number;
   }
 }
