@@ -69,27 +69,67 @@ export class SyncService {
    * Reconcile a single buffered operation through the pipeline. Idempotent:
    * a non-PENDING op is a no-op. Returns the terminal state.
    */
-  static async reconcile(operationId: string): Promise<{ state: string }> {
+  static async reconcile(operationId: string): Promise<{ state: string; reason?: string }> {
     const op = await prisma.syncOperation.findUnique({ where: { id: operationId } });
     if (!op) return { state: "MISSING" };
     if (op.state !== "PENDING") return { state: op.state }; // idempotency drop
 
-    // Steps 2-4 (scaffold): entity-specific re-validation / conflict / adjudication.
-    // Phase-1 fills these in per entityType; today we validate structural presence
-    // and pass through to SYNCED, flagging obviously-incomplete payloads for review.
-    const payloadOk = op.payload != null && typeof op.payload === "object";
-    const nextState: "SYNCED" | "CONFLICT" = payloadOk ? "SYNCED" : "CONFLICT";
+    if (op.payload == null || typeof op.payload !== "object") {
+      return this.finalise(operationId, "CONFLICT", "Malformed or empty payload");
+    }
 
+    // Dispatch authoritative re-validation by entity type. Each returns a
+    // terminal state; a CONFLICT is never silently dropped — it surfaces for
+    // review. (Phase-1: Claim re-validation live; other entities pass-through.)
+    let outcome: { state: "SYNCED" | "CONFLICT"; reason?: string };
+    switch (op.entityType) {
+      case "Claim":
+        outcome = await this.reconcileClaim(op.tenantId, op.payload as Record<string, unknown>);
+        break;
+      default:
+        outcome = { state: "SYNCED" };
+    }
+    return this.finalise(operationId, outcome.state, outcome.reason);
+  }
+
+  /**
+   * Authoritative re-validation for an offline-captured claim: the membership
+   * must exist and be active at sync time (the provisional decision was made
+   * against a cached snapshot). Benefit-balance re-validation + creating the
+   * Claim (source OFFLINE_SYNC) with soft-reservation reconciliation is the next
+   * Phase-1 step; insufficient balance must resolve to CONFLICT, never a silent pay.
+   */
+  private static async reconcileClaim(
+    tenantId: string,
+    payload: Record<string, unknown>,
+  ): Promise<{ state: "SYNCED" | "CONFLICT"; reason?: string }> {
+    const memberNumber = payload.memberNumber as string | undefined;
+    if (!memberNumber) return { state: "CONFLICT", reason: "Missing memberNumber" };
+
+    const member = await prisma.member.findFirst({
+      where: { tenantId, memberNumber },
+      select: { id: true, status: true },
+    });
+    if (!member) return { state: "CONFLICT", reason: "Member not found at sync time" };
+    if (member.status !== "ACTIVE") {
+      return { state: "CONFLICT", reason: `Membership ${member.status} at sync time` };
+    }
+    return { state: "SYNCED" };
+  }
+
+  private static async finalise(
+    operationId: string,
+    state: "SYNCED" | "CONFLICT",
+    reason?: string,
+  ): Promise<{ state: string; reason?: string }> {
     await prisma.syncOperation.update({
       where: { id: operationId },
       data: {
-        state: nextState,
-        syncedAt: nextState === "SYNCED" ? new Date() : null,
-        conflictReason: nextState === "CONFLICT" ? "Malformed or empty payload" : null,
+        state,
+        syncedAt: state === "SYNCED" ? new Date() : null,
+        conflictReason: state === "CONFLICT" ? (reason ?? "Conflict") : null,
       },
     });
-
-    // Step 5 (scaffold): audit-chain delta entry lands with the entity wiring.
-    return { state: nextState };
+    return { state, reason };
   }
 }

@@ -6,6 +6,7 @@ const db = vi.hoisted(() => ({
     create: vi.fn(async (a: any) => ({ id: "op_" + a.data.opKey })),
     update: vi.fn(async () => ({})),
   },
+  member: { findFirst: vi.fn() },
 }));
 
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
@@ -61,6 +62,35 @@ describe("SyncService — store-and-forward (G4)", () => {
       const res = await SyncService.reconcile("o3");
       expect(res.state).toBe("SYNCED");
       expect(db.syncOperation.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("reconcile — Claim re-validation (Phase-1)", () => {
+    const claimOp = (payload: any) => ({ id: "c1", tenantId: "t1", state: "PENDING", entityType: "Claim", payload });
+
+    it("SYNCs a claim for an active member", async () => {
+      db.syncOperation.findUnique.mockResolvedValue(claimOp({ memberNumber: "MVX-2026-00001" }));
+      db.member.findFirst.mockResolvedValue({ id: "m1", status: "ACTIVE" });
+      expect((await SyncService.reconcile("c1")).state).toBe("SYNCED");
+    });
+
+    it("CONFLICTs when the member is not found at sync time", async () => {
+      db.syncOperation.findUnique.mockResolvedValue(claimOp({ memberNumber: "MVX-9999" }));
+      db.member.findFirst.mockResolvedValue(null);
+      const res = await SyncService.reconcile("c1");
+      expect(res.state).toBe("CONFLICT");
+      expect(res.reason).toMatch(/not found/i);
+    });
+
+    it("CONFLICTs when the membership is inactive", async () => {
+      db.syncOperation.findUnique.mockResolvedValue(claimOp({ memberNumber: "MVX-2026-00001" }));
+      db.member.findFirst.mockResolvedValue({ id: "m1", status: "SUSPENDED" });
+      expect((await SyncService.reconcile("c1")).state).toBe("CONFLICT");
+    });
+
+    it("CONFLICTs when memberNumber is missing", async () => {
+      db.syncOperation.findUnique.mockResolvedValue(claimOp({ amount: 100 }));
+      expect((await SyncService.reconcile("c1")).state).toBe("CONFLICT");
     });
   });
 });
