@@ -296,6 +296,11 @@ export const preauthAdjudicationService = {
 
     if (result.decision === "AUTO_APPROVED") {
       const validUntil = new Date(Date.now() + PA_VALIDITY_DAYS * 24 * 60 * 60 * 1000);
+      // Issue a Guarantee of Payment (G5.5): approvedAmount is already capped to
+      // the member's available benefit limit by the gates, so the GOP is
+      // guaranteed within financial limits.
+      const gopCount = await prisma.preAuthorization.count({ where: { tenantId, gopNumber: { not: null } } });
+      const gopNumber = `GOP-${new Date().getFullYear()}-${String(gopCount + 1).padStart(5, "0")}`;
 
       await prisma.$transaction([
         prisma.preAuthorization.update({
@@ -307,6 +312,8 @@ export const preauthAdjudicationService = {
             approvedBy:     "AUTO",
             validFrom:      new Date(),
             validUntil,
+            gopNumber,
+            gopIssuedAt:    new Date(),
             autoDecisionLog: result.gateLog as never,
           },
         }),
@@ -472,6 +479,9 @@ export const preauthAdjudicationService = {
     if (!pa) throw new TRPCError({ code: "NOT_FOUND", message: "PA not found" });
 
     const validUntil = new Date(Date.now() + PA_VALIDITY_DAYS * 24 * 60 * 60 * 1000);
+    // Issue the GOP on manual approval too (G5.5), within the guaranteed amount.
+    const gopCount = await prisma.preAuthorization.count({ where: { tenantId, gopNumber: { not: null } } });
+    const gopNumber = `GOP-${new Date().getFullYear()}-${String(gopCount + 1).padStart(5, "0")}`;
 
     await prisma.preAuthorization.update({
       where: { id: preAuthId },
@@ -482,6 +492,8 @@ export const preauthAdjudicationService = {
         approvedBy:     reviewerId,
         validFrom:      new Date(),
         validUntil,
+        gopNumber,
+        gopIssuedAt:    new Date(),
         reviewNotes: notes,
       } as never,
     });

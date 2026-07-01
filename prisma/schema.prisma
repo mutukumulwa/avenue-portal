@@ -1929,6 +1929,11 @@ model PreAuthorization {
   approvedAt     DateTime?
   validFrom      DateTime? // Validity period start
   validUntil     DateTime? // Validity period end (e.g., 30 days from approval)
+  // Guarantee of Payment artefact (G5.5): issued on approval within financial
+  // limits. approvedAmount is the guaranteed (limit-capped) amount; validUntil
+  // the window. gopNumber references the GOP for the provider.
+  gopNumber      String? // e.g. GOP-2026-00001
+  gopIssuedAt    DateTime?
 
   // Decline details
   declineReasonCode String?
