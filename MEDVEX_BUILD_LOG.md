@@ -32,14 +32,13 @@ meaningful step. Newest status at the top of each section.
   (Tech-debt: migrations history should eventually be re-baselined to the DB.)
 
 ### Current status
-> **Rebrand §D COMPLETE** · **G2.1 COMPLETE** · **G2.4 COMPLETE** · **G3.1
-> COMPLETE & USABLE** · **G4 offline SCAFFOLD DONE** · **Security hardening
-> COMPLETE (5/5)** — password policy (R28), auth banner (R32), password reset
-> (R24), single-session (R25), 2FA/TOTP (R81). All auth-hot-path items verified
-> in-browser (login works, single-session invalidation, 2FA block+pass).
-> Suite 137/137; typecheck + brand guard green.
-> **Next candidates: G3.5 full multi-currency, G4 Phase-1 end-to-end, G9.6
-> member numbering, or wire remaining G3.1 action paths.**
+> **Rebrand §D ✅ · G2.1 ✅ · G2.4 ✅ · G3.1 ✅ · G4 scaffold ✅ · Security 5/5 ✅
+> · G3.5 multi-currency CORE ✅** — currency columns on 7 money entities +
+> Currency/FxRate seed + FX-rate admin UI (never-delete, verified in-browser) +
+> FxService.normalise/consolidate (normalise already used by approval bands).
+> Suite 141/141; typecheck + brand guard green.
+> **User's remaining sequence: (1) wire remaining G3.1 action paths → (2) G9.6
+> member numbering → (3) G4 Phase-1 end-to-end.** Now on G3.1 wiring.
 
 ### ⚠️ Dev DB note
 The local dev DB holds **pre-rebrand data** (tenant "Avenue Healthcare", slug
@@ -198,7 +197,7 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
 | G2.4 | Terminology engine (multi-client) (M, S1) | ✅ all 5 slices (model+resolver+workflow+UI+hook+seed) |
 | G3.1 | Approval-matrix engine (L, S0) | ✅ all 5 slices (model+service+claims+editor UI+runtime workflow+escalation); wiring other actions = incremental |
 | G4 (scaffold) | Offline SW + IndexedDB + sync skeleton | ✅ scaffold (model+server rail+client rail); Phase-1 end-to-end left |
-| G3.5 (schema) | Currency/FxRate + currency columns | ⬜ |
+| G3.5 | Currency/FxRate + currency columns + FX UI + consolidation | ✅ core (`7212bd0`,`95c277f`); full UI/report threading = incremental |
 | Security slice | 2FA, password reset, password policy, single-session, auth banner | ✅ 5/5 (policy `0c572fb`, banner `0c572fb`, reset `4a168a7`, single-session `37a1f89`, 2FA `7cdf3b6`) |
 | G9.6 | Client-configurable member numbering (drop `AVH-` prefix) | ⬜ |
 
@@ -291,4 +290,7 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
   7 tests incl. RFC vector) + User.totpSecret/totpEnabled + login `totp`
   credential + /settings/security enrolment. Verified in-browser (blocked w/o
   code, passes w/ code). **Security hardening COMPLETE 5/5.** Suite 137/137.
-- **Next:** G3.5 full multi-currency, or G4 Phase-1, or G9.6, or G3.1 wiring.
+- **G3.5 multi-currency core** `7212bd0` (currency columns on 7 entities +
+  Currency/FxRate seed) + `95c277f` (FX-rate admin UI, never-delete, verified
+  in-browser; FxService.consolidate + 4 tests). Suite 141/141.
+- **Next (user sequence):** wire remaining G3.1 action paths, then G9.6, then G4 Phase-1.
