@@ -32,12 +32,14 @@ meaningful step. Newest status at the top of each section.
   (Tech-debt: migrations history should eventually be re-baselined to the DB.)
 
 ### Current status
-> **Rebrand §D ✅ · G2.1 ✅ · G2.4 ✅ · G3.1 ✅ · G3.3 active claims console ✅ ·
-> G3.5 core ✅ · G4 Phase-1 flow ✅ · G5.2 membership (client-scoped) ✅ · G5.9
-> NIRA ✅ · Security 5/5 ✅ · G9.6 ✅.** Suite 156/156; typecheck + brand guard green.
-> **Remaining Phase-1: G5.4 provider network + per-client tariffs, G5.6 claims
-> channels; G3.3 real-time alert fan-out; G4 refinements (balance reconcile,
-> eligibility cache, USSD/SMS). Then Phase 2+ per plan §E.**
+> **Phase-1 core substantially COMPLETE.** Rebrand §D · G2.1 · G2.4 · G3.1 ·
+> G3.3 (console + incoming-claim alert) · G3.5 core · G4 Phase-1 flow + balance
+> reconcile · G5.2 · G5.4 (per-client tariffs) · G5.6 · G5.9 · Security 5/5 ·
+> G9.6 — all ✅. Suite 160/160; typecheck + brand guard green.
+> **Remaining: G3.7 auto-adjudication, G5.5 pre-auth depth, G5.7/G3.4 copay
+> enforcement; then Phase 2+ (finance/admin-fee G2.3/G5.8, fraud G5.11, member
+> app + MoMo G5.10, DPPA G1.2, compliance register G1.1) per plan §E. G4 tails:
+> client eligibility-cache provisional decisions, first-class USSD/SMS (P-03).**
 
 ### ⚠️ Dev DB note
 The local dev DB holds **pre-rebrand data** (tenant "Avenue Healthcare", slug
@@ -199,6 +201,9 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
 | G5.9 | NIRA identity (replaces Kenya IPRS) | ✅ `58ed550` — nira.service + 3 call-sites swapped; iprs* field rename deferred (cosmetic) |
 | G3.3 | Active claims dashboard + SLA queues | ✅ `e1df67e` — /claims/queues console (lanes+SLA timers, verified). Real-time alert fan-out remaining |
 | G5.2 | Membership admin (multi-client) | ✅ `b4cfb9b` — client-scoped members list/service; NIRA+renewal+offline already covered. Otherwise strong/existing |
+| G5.4 | Provider network + per-client tariffs | ✅ core `51edace` — ProviderTariff.clientId/currency + client-aware resolution (client rate wins), 2 tests. Editor UI + settlement accel + scorecard curation remain |
+| G5.6 | Claims management + channels | ✅ `16fa9cf` client-scoped + R62 verified; offline channel done (G4), dashboard done (G3.3). USSD/SMS wiring needs aggregator P-03 |
+| G3.3+ | Real-time incoming-claim alert | ✅ `e9b58b9` — polling banner on queues console (client-scoped) |
 | G3.5 | Currency/FxRate + currency columns + FX UI + consolidation | ✅ core (`7212bd0`,`95c277f`); full UI/report threading = incremental |
 | Security slice | 2FA, password reset, password policy, single-session, auth banner | ✅ 5/5 (policy `0c572fb`, banner `0c572fb`, reset `4a168a7`, single-session `37a1f89`, 2FA `7cdf3b6`) |
 | G9.6 | Client-configurable member numbering (drop `AVH-` prefix) | ✅ `4b659d5` — Client.memberNumberPrefix + member-numbering.service; all AVH- sites replaced |
@@ -314,5 +319,11 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
   client-scoped. Verified in-browser (465 active, over-SLA flagged, UGX amounts).
 - **G5.2** `b4cfb9b`: client-scoped members list/service (G2.1 slice 2b for
   membership). NIRA/renewal-SMS/offline already covered; module otherwise strong.
-- **Next:** G5.4 provider network + per-client tariffs, G5.6 claims channels,
-  G3.3 real-time alerts, G4 refinements; then Phase 2+.
+- **G5.4** `51edace`: per-client provider tariffs (ProviderTariff.clientId +
+  client-aware resolution, client rate wins; 2 tests).
+- **G5.6** `16fa9cf`: client-scoped claims list/service; R62 uniqueness verified.
+- **G3.3 real-time alert** `e9b58b9`: polling incoming-claim banner on the console.
+- **G4 balance reconcile** `3753475`: insufficient benefit balance at sync →
+  CONFLICT (never silent overpay); soft-hold aware; +2 tests. Suite 160/160.
+- **Phase-1 core substantially complete.** Next: G3.7 auto-adjudication /
+  G5.5 pre-auth / copay enforcement, then Phase 2+ per §E.
