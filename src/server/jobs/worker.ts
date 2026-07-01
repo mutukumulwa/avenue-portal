@@ -11,6 +11,7 @@ import { runIntakeAllocationJob } from "./intake-allocation.job";
 import { runMembershipActivationJob } from "./membership-activation.job";
 import { runSlaBreachJob } from "./sla-breach.job";
 import { runApprovalEscalationJob } from "./approval-escalation.job";
+import { SyncService } from "../services/sync.service";
 import { runQuotationExpiryJob } from "./quotation-expiry.job";
 import { runLapseDetectionJob } from "./lapse-detection.job";
 
@@ -90,6 +91,10 @@ const systemWorker = new Worker("system", async (job: Job) => {
   if (job.name === "approval-escalation-check") {
     const result = await runApprovalEscalationJob();
     console.log(`[Worker] Approval escalation check complete — ${result.escalatedCount} escalated`);
+  }
+  if (job.name === "sync-reconcile") {
+    const { state } = await SyncService.reconcile(job.data.operationId as string);
+    console.log(`[Worker] Sync reconcile ${job.data.operationId} → ${state}`);
   }
   if (job.name === "quotation-expiry") {
     const result = await runQuotationExpiryJob();

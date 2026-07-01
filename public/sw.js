@@ -69,3 +69,20 @@ self.addEventListener("fetch", (event) => {
     );
   }
 });
+
+// ── Offline store-and-forward (G4) ──────────────────────────────────────
+// Background Sync: on reconnect, ask open clients to flush their IndexedDB
+// outbox to POST /api/v1/sync. The client owns the flush (it holds the DB
+// schema + session credentials); the SW just triggers it on the "medvex-sync"
+// tag. See src/lib/offline/outbox.ts.
+self.addEventListener("sync", (event) => {
+  if (event.tag === "medvex-sync") {
+    event.waitUntil(
+      self.clients
+        .matchAll({ includeUncontrolled: true })
+        .then((clients) => {
+          for (const client of clients) client.postMessage({ type: "medvex-sync-flush" });
+        })
+    );
+  }
+});

@@ -143,6 +143,18 @@ export async function scheduleIntakeJobs() {
 }
 
 /**
+ * Enqueue reconciliation of a buffered offline sync operation (G4). Idempotent
+ * downstream (SyncService.reconcile drops non-PENDING ops); retries are safe.
+ */
+export async function enqueueSyncReconcile(operationId: string) {
+  await Queues.system.add(
+    "sync-reconcile",
+    { operationId },
+    { jobId: `sync-reconcile-${operationId}`, attempts: 5, backoff: { type: "exponential", delay: 5000 } },
+  );
+}
+
+/**
  * Refresh strategic purchasing analytics facts and lightweight derived data.
  * Runs every 15 minutes so dashboards can read from analytics tables.
  */
