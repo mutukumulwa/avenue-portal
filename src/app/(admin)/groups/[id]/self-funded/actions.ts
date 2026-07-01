@@ -3,6 +3,7 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { ApprovalRequestService } from "@/server/services/approval-request.service";
 
 export async function recordFundDepositAction(
   formData: FormData,
@@ -19,9 +20,27 @@ export async function recordFundDepositAction(
 
   const group = await prisma.group.findUnique({
     where: { id: groupId, tenantId: session.user.tenantId },
-    select: { fundingMode: true, selfFundedAccount: true },
+    select: { fundingMode: true, selfFundedAccount: true, clientId: true },
   });
   if (!group || group.fundingMode !== "SELF_FUNDED") return { error: "Not a self-funded scheme." };
+
+  // Fund top-ups are a governed action — gate through the approval matrix (G3.1).
+  if (type === "TOP_UP") {
+    try {
+      await ApprovalRequestService.enforce(session.user.tenantId, {
+        actionType: "FUND_TOPUP",
+        entityType: "SelfFundedAccount",
+        entityId: groupId,
+        actorId: session.user.id,
+        actorRole: session.user.role ?? null,
+        clientId: group.clientId,
+        amount,
+        currency: "UGX",
+      });
+    } catch (err) {
+      return { error: err instanceof Error ? err.message : "Approval required." };
+    }
+  }
 
   await prisma.$transaction(async (tx) => {
     let account = group.selfFundedAccount;

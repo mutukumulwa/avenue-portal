@@ -13,6 +13,82 @@ import { ApprovalMatrixService } from "./approval-matrix.service";
  */
 export class ApprovalRequestService {
   /**
+   * Gate a governed action through the matrix engine (G3.1). Resolves the rule;
+   * if none applies, returns silently (no extra approval). Single-level → checks
+   * the actor's role satisfies the step. Multi-level → opens (or reuses) an
+   * ApprovalRequest and throws so the action is worked via the Approvals console.
+   *
+   * Drop-in for any server action / service method:
+   *   await ApprovalRequestService.enforce(tenantId, {
+   *     actionType: "LIMIT_OVERRIDE", entityType: "OverrideRecord",
+   *     entityId, actorId, actorRole, amount, clientId,
+   *   });
+   */
+  static async enforce(
+    tenantId: string,
+    input: {
+      actionType: ApprovalActionType;
+      entityType: string;
+      entityId: string;
+      actorId: string;
+      actorRole: string | null;
+      clientId?: string | null;
+      amount?: number | null;
+      currency?: string | null;
+      serviceType?: ServiceType | null;
+      benefitCategory?: BenefitCategory | null;
+    },
+  ): Promise<void> {
+    const resolved = await ApprovalMatrixService.resolve(tenantId, {
+      actionType: input.actionType,
+      clientId: input.clientId,
+      amount: input.amount,
+      currency: input.currency,
+      serviceType: input.serviceType,
+      benefitCategory: input.benefitCategory,
+    });
+    if (!resolved) return; // no rule → no extra approval required
+
+    if (resolved.steps.length > 1) {
+      const existing = await prisma.approvalRequest.findFirst({
+        where: {
+          tenantId,
+          entityType: input.entityType,
+          entityId: input.entityId,
+          status: { in: ["PENDING", "ESCALATED"] },
+        },
+        select: { id: true },
+      });
+      if (!existing) {
+        await this.create(tenantId, {
+          actionType: input.actionType,
+          entityType: input.entityType,
+          entityId: input.entityId,
+          makerId: input.actorId,
+          clientId: input.clientId,
+          amount: input.amount,
+          currency: input.currency,
+          serviceType: input.serviceType,
+          benefitCategory: input.benefitCategory,
+        });
+      }
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: `This action needs ${resolved.steps.length}-level approval — action it in Approvals.`,
+      });
+    }
+
+    const step = resolved.steps[0];
+    if (!ApprovalMatrixService.roleAuthorised(input.actorRole, step.requiredRole)) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: `This action requires ${step.requiredRole.replace(/_/g, " ")} or above.`,
+      });
+    }
+  }
+
+
+  /**
    * Open an approval request for an action. Returns the request, or null when
    * no matrix rule applies (caller proceeds without extra approval).
    */
