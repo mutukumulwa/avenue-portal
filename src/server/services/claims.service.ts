@@ -7,6 +7,42 @@ export class ClaimsService {
   // ─── CLAIMS ─────────────────────────────────────────────
 
   /**
+   * Active claims work-queues (Medvex spec §3.3 / gap G3.3). Returns claims in
+   * the pre-terminal lifecycle states for the ops console, scoped to the caller's
+   * client when confined. Each carries member/provider/amount/receivedAt so the
+   * UI can render SLA timers + drill-through.
+   */
+  static async getActiveQueues(tenantId: string, clientId?: string | null) {
+    const ACTIVE: ClaimStatus[] = [
+      "INCURRED",
+      "RECEIVED",
+      "CAPTURED",
+      "UNDER_REVIEW",
+      "APPROVED",
+      "PARTIALLY_APPROVED",
+    ];
+    return prisma.claim.findMany({
+      where: {
+        tenantId,
+        status: { in: ACTIVE },
+        ...(clientId ? { member: { group: { clientId } } } : {}),
+      },
+      select: {
+        id: true,
+        claimNumber: true,
+        status: true,
+        source: true,
+        billedAmount: true,
+        currency: true,
+        receivedAt: true,
+        member: { select: { firstName: true, lastName: true, memberNumber: true } },
+        provider: { select: { name: true } },
+      },
+      orderBy: { receivedAt: "asc" }, // oldest first — SLA-critical ones surface
+    });
+  }
+
+  /**
    * List all claims for a tenant with related member/provider data
    */
   static async getClaims(tenantId: string, status?: ClaimStatus) {
