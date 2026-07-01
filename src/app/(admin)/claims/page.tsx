@@ -8,7 +8,7 @@ export default async function ClaimsPage() {
   const session = await requireRole(ROLES.OPS);
 
   const tenantId = session.user.tenantId;
-  const claims = await measureAsync("claims.list.data", () => ClaimsService.getClaims(tenantId));
+  const claims = await measureAsync("claims.list.data", () => ClaimsService.getClaims(tenantId, undefined, session.user.clientId));
 
   const statusColor = (status: string) => {
     switch (status) {

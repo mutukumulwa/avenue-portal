@@ -45,9 +45,10 @@ export class ClaimsService {
   /**
    * List all claims for a tenant with related member/provider data
    */
-  static async getClaims(tenantId: string, status?: ClaimStatus) {
+  static async getClaims(tenantId: string, status?: ClaimStatus, clientId?: string | null) {
     return prisma.claim.findMany({
-      where: { tenantId, ...(status ? { status } : {}) },
+      // Client isolation (G2.1 / G5.6): confined users see only their client's claims.
+      where: { tenantId, ...(status ? { status } : {}), ...(clientId ? { member: { group: { clientId } } } : {}) },
       include: {
         member:   { select: { id: true, firstName: true, lastName: true, memberNumber: true } },
         provider: { select: { id: true, name: true, type: true, tier: true } },
