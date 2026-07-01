@@ -48,6 +48,7 @@ export class ClientsService {
       currency?: string;
       slug?: string;
       parentClientId?: string | null;
+      memberNumberPrefix?: string;
     },
   ) {
     const slug = this.slugify(data.slug || data.name);
@@ -76,6 +77,7 @@ export class ClientsService {
         name: data.name,
         slug,
         currency: data.currency?.trim().toUpperCase() || "UGX",
+        memberNumberPrefix: data.memberNumberPrefix?.trim().toUpperCase() || "MVX",
         parentClientId: data.parentClientId || null,
         status: "ACTIVE",
       },
@@ -91,6 +93,7 @@ export class ClientsService {
       currency?: string;
       status?: ClientStatus;
       parentClientId?: string | null;
+      memberNumberPrefix?: string;
     },
   ) {
     const client = await prisma.client.findFirst({
@@ -120,6 +123,9 @@ export class ClientsService {
         ...(data.type !== undefined ? { type: data.type } : {}),
         ...(data.currency !== undefined
           ? { currency: data.currency.trim().toUpperCase() || "UGX" }
+          : {}),
+        ...(data.memberNumberPrefix !== undefined
+          ? { memberNumberPrefix: data.memberNumberPrefix.trim().toUpperCase() || "MVX" }
           : {}),
         ...(data.status !== undefined
           ? { status: data.status, isActive: data.status === "ACTIVE" }

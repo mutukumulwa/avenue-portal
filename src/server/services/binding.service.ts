@@ -4,6 +4,7 @@ import { AcceptanceMethod, FundingMode, MemberRelationship } from "@prisma/clien
 import { auditChainService } from "./audit-chain.service";
 import { blacklistService } from "./blacklist.service";
 import { resolveSchemeClientId } from "./clientResolve";
+import { resolveMemberPrefix } from "./member-numbering.service";
 import { iprsService } from "./integrations/iprs.service";
 import { pdfService } from "./pdf.service";
 import { renderQuotationHtml } from "../templates/pdf/quotation.template";
@@ -14,10 +15,11 @@ function leftPad(n: number, width: number) {
   return String(n).padStart(width, "0");
 }
 
-async function nextMemberNumber(tenantId: string): Promise<string> {
+async function nextMemberNumber(tenantId: string, clientId?: string | null): Promise<string> {
   const year = new Date().getFullYear();
+  const prefix = await resolveMemberPrefix(tenantId, clientId);
   const count = await prisma.member.count({ where: { tenantId } });
-  return `AVH-${year}-${leftPad(count + 1, 5)}`;
+  return `${prefix}-${year}-${leftPad(count + 1, 5)}`;
 }
 
 async function nextInvoiceNumber(tenantId: string): Promise<string> {

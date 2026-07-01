@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import type { MemberStatus, MemberRelationship, Gender } from "@prisma/client";
 import { FraudService } from "./fraud.service";
+import { nextMemberNumber } from "./member-numbering.service";
 
 export class MembersService {
   /**
@@ -113,9 +114,8 @@ export class MembersService {
     });
     // ─────────────────────────────────────────────────────────────────────────
 
-    // Generate member number
-    const count = await prisma.member.count({ where: { tenantId } });
-    const memberNumber = `AVH-${new Date().getFullYear()}-${String(count + 1).padStart(5, '0')}`;
+    // Generate member number (client-configurable prefix, G9.6)
+    const memberNumber = await nextMemberNumber(tenantId);
 
     const member = await prisma.member.create({
       data: {

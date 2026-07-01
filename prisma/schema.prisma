@@ -112,6 +112,10 @@ model Client {
   // UGX (AD-2); subsidiaries may differ and consolidate up via FX in G3.5.
   currency String @default("UGX")
 
+  // Member/policy number prefix (G9.6) — client-configurable, replaces the
+  // legacy hard-coded operator prefix. Format: {prefix}-{YYYY}-{NNNNN}.
+  memberNumberPrefix String @default("MVX")
+
   // Branding overrides — null inherits the operator's Medvex brand.
   logoUrl      String?
   primaryColor String?

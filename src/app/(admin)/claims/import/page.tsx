@@ -54,7 +54,7 @@ export default async function ClaimsBulkImportPage() {
             </thead>
             <tbody>
               <tr>
-                {["AVH-2026-00001","Aga Khan Hospital","2026-05-01","J18.9","99213","2500","AKH-INV-123"].map((v, i) => (
+                {["MVX-2026-00001","Aga Khan Hospital","2026-05-01","J18.9","99213","2500","AKH-INV-123"].map((v, i) => (
                   <td key={i} className="border border-[#EEEEEE] px-3 py-2 text-brand-text-muted font-mono">{v}</td>
                 ))}
               </tr>

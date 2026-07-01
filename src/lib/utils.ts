@@ -25,5 +25,7 @@ export function formatDate(date: Date | string) {
 export function generateMemberNumber() {
   const year = new Date().getFullYear();
   const randomSuffix = Math.floor(10000 + Math.random() * 90000);
-  return `AVH-${year}-${randomSuffix}`;
+  // Sync fallback (no DB). Persisted members use member-numbering.service
+  // nextMemberNumber() which applies the client-configurable prefix (G9.6).
+  return `MVX-${year}-${randomSuffix}`;
 }

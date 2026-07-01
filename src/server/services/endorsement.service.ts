@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { GLService } from "@/server/services/gl.service";
+import { nextMemberNumber } from "@/server/services/member-numbering.service";
 import type { Gender, MemberRelationship } from "@prisma/client";
 
 
@@ -106,10 +107,10 @@ export class EndorsementsService {
     // Execute the changes
     if (endorsement.type === "MEMBER_ADDITION") {
       const details = endorsement.changeDetails as Record<string, string>;
-      const count = await prisma.member.count({ where: { tenantId } });
-      const memberNumber = `AVH-${new Date().getFullYear()}-${String(count + 1).padStart(5, '0')}`;
 
       const group = await prisma.group.findUnique({ where: { id: endorsement.groupId }});
+      // Client-configurable member number prefix (G9.6)
+      const memberNumber = await nextMemberNumber(tenantId, group?.clientId);
       
       const newMember = await prisma.member.create({
         data: {

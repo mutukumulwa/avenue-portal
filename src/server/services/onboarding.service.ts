@@ -142,7 +142,7 @@ export const onboardingService = {
       data: { isActive: false, deactivatedAt: new Date() },
     });
 
-    const cardNumber = `AVH-CARD-${member.memberNumber.slice(4)}-D`;
+    const cardNumber = `MVX-CARD-${member.memberNumber.slice(4)}-D`;
     const card = await prisma.membershipCard.create({
       data: {
         tenantId,
@@ -183,7 +183,7 @@ export const onboardingService = {
 
     const cardType: CardType = isSmartCard ? "SMART" : "PHYSICAL";
     const suffix = isSmartCard ? "S" : "P";
-    const cardNumber = `AVH-CARD-${member.memberNumber.slice(4)}-${suffix}`;
+    const cardNumber = `MVX-CARD-${member.memberNumber.slice(4)}-${suffix}`;
 
     const card = await prisma.membershipCard.create({
       data: {

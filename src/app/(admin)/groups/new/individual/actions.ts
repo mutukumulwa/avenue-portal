@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { writeAudit } from "@/lib/audit";
 import { resolveSchemeClientId } from "@/server/services/clientResolve";
+import { nextMemberNumber } from "@/server/services/member-numbering.service";
 
 export async function enrollIndividualClientAction(formData: FormData) {
   const session = await requireRole(ROLES.OPS);
@@ -55,9 +56,8 @@ export async function enrollIndividualClientAction(formData: FormData) {
     },
   });
 
-  // Enroll the individual as principal member of their own group
-  const memberCount = await prisma.member.count({ where: { tenantId } });
-  const memberNumber = `AVH-${new Date().getFullYear()}-${String(memberCount + 1).padStart(5, "0")}`;
+  // Enroll the individual as principal member of their own group (G9.6 prefix)
+  const memberNumber = await nextMemberNumber(tenantId, session.user.clientId);
 
   await prisma.member.create({
     data: {

@@ -16,6 +16,7 @@ export async function createClientAction(formData: FormData) {
     const currency = (formData.get("currency") as string) || "UGX";
     const slug = (formData.get("slug") as string) || undefined;
     const parentClientId = (formData.get("parentClientId") as string) || null;
+    const memberNumberPrefix = (formData.get("memberNumberPrefix") as string) || undefined;
 
     if (!name) throw new Error("Client name is required.");
     if (!type) throw new Error("Client type is required.");
@@ -26,6 +27,7 @@ export async function createClientAction(formData: FormData) {
       currency,
       slug,
       parentClientId,
+      memberNumberPrefix,
     });
 
     await writeAudit({

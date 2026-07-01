@@ -93,6 +93,14 @@ export default async function NewClientPage({
         </div>
 
         <div>
+          <label className={labelCls} htmlFor="memberNumberPrefix">
+            Member-number prefix <span className="text-brand-text-muted">(optional)</span>
+          </label>
+          <input id="memberNumberPrefix" name="memberNumberPrefix" maxLength={6} className={`${inputCls} uppercase`} placeholder="MVX" />
+          <p className="mt-1 text-xs text-brand-text-muted">Member numbers are {"{prefix}"}-{new Date().getFullYear()}-NNNNN. Defaults to MVX.</p>
+        </div>
+
+        <div>
           <label className={labelCls} htmlFor="slug">
             Code / slug <span className="text-brand-text-muted">(optional)</span>
           </label>
