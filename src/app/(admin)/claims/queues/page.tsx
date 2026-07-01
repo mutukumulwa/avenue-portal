@@ -2,6 +2,7 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { ClaimsService } from "@/server/services/claims.service";
 import { LayoutGrid, Clock } from "lucide-react";
 import Link from "next/link";
+import { QueueAlerts } from "./QueueAlerts";
 
 // Ordered active-work lanes. "Ready to pay" folds the approved states.
 const LANES: { key: string; label: string; statuses: string[]; slaHours: number }[] = [
@@ -44,6 +45,9 @@ export default async function ClaimQueuesPage() {
         </div>
         <Link href="/claims" className="text-sm font-semibold text-brand-secondary hover:underline">All claims →</Link>
       </div>
+
+      <QueueAlerts initialCount={byLane.find((l) => l.key === "RECEIVED")?.items.length ?? 0} />
+
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
         {byLane.map((lane) => (
