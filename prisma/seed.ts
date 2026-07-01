@@ -74,6 +74,32 @@ async function main() {
   }
   console.log(`✅ House terminology: ${houseTerms.length} terms`)
 
+  // ── Currencies + FX rates (G3.5; base = UGX) ─────────────────
+  const currencies = [
+    { code: 'UGX', name: 'Ugandan Shilling', symbol: 'USh' },
+    { code: 'USD', name: 'US Dollar', symbol: '$' },
+    { code: 'KES', name: 'Kenyan Shilling', symbol: 'KSh' },
+    { code: 'EUR', name: 'Euro', symbol: '€' },
+    { code: 'GBP', name: 'Pound Sterling', symbol: '£' },
+  ]
+  for (const c of currencies) {
+    await prisma.currency.upsert({ where: { code: c.code }, update: { name: c.name, symbol: c.symbol }, create: c })
+  }
+  // 1 quote = rate × base (UGX). Indicative rates.
+  const fxRates: Array<{ quote: string; rate: number }> = [
+    { quote: 'USD', rate: 3800 },
+    { quote: 'KES', rate: 29 },
+    { quote: 'EUR', rate: 4100 },
+    { quote: 'GBP', rate: 4800 },
+  ]
+  for (const r of fxRates) {
+    const exists = await prisma.fxRate.findFirst({ where: { tenantId, baseCurrency: 'UGX', quoteCurrency: r.quote, isActive: true } })
+    if (!exists) {
+      await prisma.fxRate.create({ data: { tenantId, baseCurrency: 'UGX', quoteCurrency: r.quote, rate: r.rate, source: 'seed', effectiveFrom: new Date() } })
+    }
+  }
+  console.log(`✅ Currencies: ${currencies.length}; FX rates: ${fxRates.length} (base UGX)`)
+
   // ═══════════════════════════════════════════════════════════
   // 1b. BENEFIT RIDERS & TAXES
   // ═══════════════════════════════════════════════════════════

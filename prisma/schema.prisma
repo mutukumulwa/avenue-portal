@@ -355,6 +355,7 @@ enum FundTransactionType {
 }
 
 model Group {
+  currency String @default("UGX") // G3.5 multi-currency (base UGX)
   id                        String              @id @default(cuid())
   tenantId                  String
   tenant                    Tenant              @relation(fields: [tenantId], references: [id])
@@ -1045,6 +1046,7 @@ model VisitVerification {
 
 // One account per self-funded group — tracks the fund balance
 model SelfFundedAccount {
+  currency String @default("UGX") // G3.5 multi-currency (base UGX)
   id       String @id @default(cuid())
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id])
@@ -1076,6 +1078,7 @@ model SelfFundedAccount {
 
 // Ledger of every fund movement for a self-funded scheme
 model FundTransaction {
+  currency String @default("UGX") // G3.5 multi-currency (base UGX)
   id                  String            @id @default(cuid())
   tenantId            String
   tenant              Tenant            @relation(fields: [tenantId], references: [id])
@@ -1676,6 +1679,7 @@ enum ServiceType {
 }
 
 model Claim {
+  currency String @default("UGX") // G3.5 multi-currency (base UGX)
   id              String            @id @default(cuid())
   tenantId        String
   tenant          Tenant            @relation(fields: [tenantId], references: [id])
@@ -2586,6 +2590,7 @@ enum InvoiceStatus {
 }
 
 model Invoice {
+  currency String @default("UGX") // G3.5 multi-currency (base UGX)
   id            String        @id @default(cuid())
   tenantId      String
   tenant        Tenant        @relation(fields: [tenantId], references: [id])
@@ -2620,6 +2625,7 @@ model Invoice {
 }
 
 model Payment {
+  currency String @default("UGX") // G3.5 multi-currency (base UGX)
   id              String    @id @default(cuid())
   groupId         String
   group           Group     @relation(fields: [groupId], references: [id])
@@ -2683,6 +2689,7 @@ enum LifeRole {
 }
 
 model Quotation {
+  currency String @default("UGX") // G3.5 multi-currency (base UGX)
   id          String  @id @default(cuid())
   tenantId    String
   tenant      Tenant  @relation(fields: [tenantId], references: [id])
