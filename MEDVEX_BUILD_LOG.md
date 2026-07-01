@@ -33,14 +33,13 @@ meaningful step. Newest status at the top of each section.
 
 ### Current status
 > **Rebrand §D COMPLETE** · **G2.1 COMPLETE** · **G2.4 COMPLETE** · **G3.1
-> COMPLETE & USABLE** · **G4 offline SCAFFOLD DONE** · **Security hardening 3/5**
-> — password policy (R28), authorized-users banner (R32), password reset via
-> emailed code (R24) all done + tested (verified in-browser). Suite 116/116;
-> typecheck + brand guard green.
-> **Remaining security (2, auth hot-path — do carefully next session with
-> in-browser login verification): single-session control (R25/H-03), 2FA/TOTP
-> (R81/H-01).** Remaining G4: Phase-1 end-to-end. Remaining G3.1: wire other
-> action paths (incremental).
+> COMPLETE & USABLE** · **G4 offline SCAFFOLD DONE** · **Security hardening
+> COMPLETE (5/5)** — password policy (R28), auth banner (R32), password reset
+> (R24), single-session (R25), 2FA/TOTP (R81). All auth-hot-path items verified
+> in-browser (login works, single-session invalidation, 2FA block+pass).
+> Suite 137/137; typecheck + brand guard green.
+> **Next candidates: G3.5 full multi-currency, G4 Phase-1 end-to-end, G9.6
+> member numbering, or wire remaining G3.1 action paths.**
 
 ### ⚠️ Dev DB note
 The local dev DB holds **pre-rebrand data** (tenant "Avenue Healthcare", slug
@@ -200,7 +199,7 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
 | G3.1 | Approval-matrix engine (L, S0) | ✅ all 5 slices (model+service+claims+editor UI+runtime workflow+escalation); wiring other actions = incremental |
 | G4 (scaffold) | Offline SW + IndexedDB + sync skeleton | ✅ scaffold (model+server rail+client rail); Phase-1 end-to-end left |
 | G3.5 (schema) | Currency/FxRate + currency columns | ⬜ |
-| Security slice | 2FA, password reset, password policy, single-session, auth banner | 🔄 3/5 done (policy+banner+reset); single-session + 2FA left (auth hot-path) |
+| Security slice | 2FA, password reset, password policy, single-session, auth banner | ✅ 5/5 (policy `0c572fb`, banner `0c572fb`, reset `4a168a7`, single-session `37a1f89`, 2FA `7cdf3b6`) |
 | G9.6 | Client-configurable member numbering (drop `AVH-` prefix) | ⬜ |
 
 > Later phases (1–5) tracked in the plan §E; expand here as they begin.
@@ -285,5 +284,11 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
   `4a168a7` password reset via emailed 6-digit code (PasswordResetToken +
   request/confirm service + /reset page + login link). 11 tests. Suite 116/116.
   Verified in-browser (reset page + token issuance).
-- **Next:** finish security (single-session R25 + 2FA R81 — auth hot-path, verify
-  login in-browser), then G4 Phase-1 / remaining G3.1 wiring.
+- **Security single-session (R25)** `37a1f89`: User.sessionVersion bumped on
+  login; jwt callback invalidates stale tokens (15s cache, fail-open). Verified
+  in-browser (login → bump → invalidated → re-login).
+- **Security 2FA/TOTP (R81)** `7cdf3b6`: hand-rolled RFC 6238 (src/lib/totp.ts,
+  7 tests incl. RFC vector) + User.totpSecret/totpEnabled + login `totp`
+  credential + /settings/security enrolment. Verified in-browser (blocked w/o
+  code, passes w/ code). **Security hardening COMPLETE 5/5.** Suite 137/137.
+- **Next:** G3.5 full multi-currency, or G4 Phase-1, or G9.6, or G3.1 wiring.
