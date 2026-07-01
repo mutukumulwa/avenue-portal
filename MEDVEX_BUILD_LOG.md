@@ -33,14 +33,14 @@ meaningful step. Newest status at the top of each section.
 
 ### Current status
 > **Rebrand §D COMPLETE** · **G2.1 COMPLETE** · **G2.4 COMPLETE** · **G3.1
-> approval-matrix engine COMPLETE & USABLE** · **G4 offline-first SCAFFOLD DONE**
-> — SyncOperation/OfflineReservation/EligibilitySnapshot model + ClaimSource
-> offline sources + server sync rail (ingest idempotent + reconcile pipeline
-> skeleton + BullMQ queue) + client rail (IndexedDB outbox + eligibility cache +
-> SW background-sync). Suite 105/105; typecheck + brand guard green.
-> **Now starting the security-hardening slice.**
-> Remaining G4: Phase-1 end-to-end (provider capture UI, filled reconcile steps
-> per entity, USSD/SMS). Remaining G3.1: wire other action paths (incremental).
+> COMPLETE & USABLE** · **G4 offline SCAFFOLD DONE** · **Security hardening 3/5**
+> — password policy (R28), authorized-users banner (R32), password reset via
+> emailed code (R24) all done + tested (verified in-browser). Suite 116/116;
+> typecheck + brand guard green.
+> **Remaining security (2, auth hot-path — do carefully next session with
+> in-browser login verification): single-session control (R25/H-03), 2FA/TOTP
+> (R81/H-01).** Remaining G4: Phase-1 end-to-end. Remaining G3.1: wire other
+> action paths (incremental).
 
 ### ⚠️ Dev DB note
 The local dev DB holds **pre-rebrand data** (tenant "Avenue Healthcare", slug
@@ -51,19 +51,21 @@ client "Jubilee Insurance Uganda" was created during verification (harmless demo
 row). **Consider `npm run db:seed` to refresh to Medvex data** (now includes the
 default Client via slice 1b) — but that's destructive; do it deliberately.
 
-### Next concrete step  →  **security-hardening slice** (plan §C-6, all S0, small)
-Batch of go-live security blockers (small each). In `src/lib/auth.ts` + related:
-- **2FA (R81/H-01):** TOTP enrolment + verify at login (add `totpSecret`,
-  `totpEnabled` to User; use `otplib` if present else hand-roll HOTP/TOTP).
-- **Password reset via emailed code (R24/H-02):** `PasswordResetToken` model +
-  request/confirm flow (email via existing notification service).
-- **Password policy (R28/V-08):** enforce min length/complexity on set/change.
-- **Single-session control (R25/H-03):** track a session/token version on User;
-  invalidate prior sessions on new login.
-- **Authorized-users-only banner (R32/H-09):** login-page notice.
-Sequence: start with password policy + auth banner (no schema), then reset
-(schema + email), then 2FA (schema + TOTP), then single-session. Check for
-existing deps (otplib/speakeasy) before adding.
+### Next concrete step  →  finish **security hardening** (2 remaining, auth hot-path)
+Done: password policy (R28) `0c572fb`, auth banner (R32) `0c572fb`, password
+reset (R24) `4a168a7`. Remaining — **modify `src/lib/auth.ts` authorize/jwt/
+session callbacks; VERIFY LOGIN IN-BROWSER after each (high blast radius):**
+- **Single-session (R25/H-03):** add `User.sessionVersion Int @default(0)`;
+  `authorize` increments it and returns it → jwt stores it; jwt/session callback
+  compares token vs DB version (bound DB cost with a short in-memory cache),
+  invalidating stale sessions. **Fail-open on DB error (never lock users out).**
+- **2FA/TOTP (R81/H-01):** add `User.totpSecret`/`totpEnabled`; hand-roll RFC-6238
+  TOTP with node `crypto` (no otplib/speakeasy installed); enrolment page (QR via
+  a lib-free otpauth:// URI + manual secret) + verify step at login. Largest item.
+Dev-login note: seeded users are pre-rebrand `@avenue.co.ke`; admin password was
+set to `Verify123!` for verification.
+
+Then: G4 Phase-1 end-to-end, or wire remaining G3.1 action paths.
 
 #### G4 offline-first scaffold (DONE — reference)
 Sequence chosen by user: G3.1 → **G4** → security hardening. G4 is XL; scaffold
@@ -198,7 +200,7 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
 | G3.1 | Approval-matrix engine (L, S0) | ✅ all 5 slices (model+service+claims+editor UI+runtime workflow+escalation); wiring other actions = incremental |
 | G4 (scaffold) | Offline SW + IndexedDB + sync skeleton | ✅ scaffold (model+server rail+client rail); Phase-1 end-to-end left |
 | G3.5 (schema) | Currency/FxRate + currency columns | ⬜ |
-| Security slice | 2FA, password reset, password policy, single-session, auth banner | ⬜ |
+| Security slice | 2FA, password reset, password policy, single-session, auth banner | 🔄 3/5 done (policy+banner+reset); single-session + 2FA left (auth hot-path) |
 | G9.6 | Client-configurable member numbering (drop `AVH-` prefix) | ⬜ |
 
 > Later phases (1–5) tracked in the plan §E; expand here as they begin.
@@ -278,4 +280,10 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
   EligibilitySnapshot model + ClaimSource offline sources; sync.service (ingest
   idempotent + reconcile skeleton) + /api/v1/sync + BullMQ sync-reconcile; client
   IndexedDB outbox + eligibility cache + SW background-sync. 5 tests. Suite 105/105.
-- **Next:** security-hardening slice (see §1), then G4 Phase-1 / other Phase-0.
+- **Security hardening 3/5:** `0c572fb` password policy (validatePassword, min 10
+  + complexity, applied at all set-sites) + authorized-users login banner;
+  `4a168a7` password reset via emailed 6-digit code (PasswordResetToken +
+  request/confirm service + /reset page + login link). 11 tests. Suite 116/116.
+  Verified in-browser (reset page + token issuance).
+- **Next:** finish security (single-session R25 + 2FA R81 — auth hot-path, verify
+  login in-browser), then G4 Phase-1 / remaining G3.1 wiring.
