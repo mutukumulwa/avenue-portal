@@ -32,14 +32,14 @@ meaningful step. Newest status at the top of each section.
   (Tech-debt: migrations history should eventually be re-baselined to the DB.)
 
 ### Current status
-> **Phase-1 core substantially COMPLETE.** Rebrand §D · G2.1 · G2.4 · G3.1 ·
-> G3.3 (console + incoming-claim alert) · G3.5 core · G4 Phase-1 flow + balance
-> reconcile · G5.2 · G5.4 (per-client tariffs) · G5.6 · G5.9 · Security 5/5 ·
-> G9.6 — all ✅. Suite 160/160; typecheck + brand guard green.
-> **Remaining: G3.7 auto-adjudication, G5.5 pre-auth depth, G5.7/G3.4 copay
-> enforcement; then Phase 2+ (finance/admin-fee G2.3/G5.8, fraud G5.11, member
-> app + MoMo G5.10, DPPA G1.2, compliance register G1.1) per plan §E. G4 tails:
-> client eligibility-cache provisional decisions, first-class USSD/SMS (P-03).**
+> **Phase-1 COMPLETE + Phase-2 headline (G9.1) done.** Rebrand §D · G2.1 · G2.4 ·
+> G3.1 · G3.3 · G3.4 · G3.5 core · G3.7 (auto-adj engine) · G4 flow+balance ·
+> G5.2 · G5.4 · G5.5 (GOP) · G5.6 · G5.7 · G5.9 · G9.1 (co-insurance+deductibles)
+> · G9.6 · Security 5/5 — all ✅. Suite 174/174; typecheck + brand guard green.
+> **Remaining Phase 2: G9.5 drug-level exclusions (needs drug coding). Phase 3+:
+> finance/admin-fee G2.3/G5.8, full G3.5 FX reporting, compliance register G1.1,
+> DPPA G1.2, fraud G5.11, member app + MoMo G5.10 (per plan §E). Plus wire-ins:
+> auto-adj execution (G3.7), cost-share adjudication (G9.1), G4 USSD/SMS (P-03).**
 
 ### ⚠️ Dev DB note
 The local dev DB holds **pre-rebrand data** (tenant "Avenue Healthcare", slug
@@ -325,5 +325,15 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
 - **G3.3 real-time alert** `e9b58b9`: polling incoming-claim banner on the console.
 - **G4 balance reconcile** `3753475`: insufficient benefit balance at sync →
   CONFLICT (never silent overpay); soft-hold aware; +2 tests. Suite 160/160.
-- **Phase-1 core substantially complete.** Next: G3.7 auto-adjudication /
-  G5.5 pre-auth / copay enforcement, then Phase 2+ per §E.
+- **Phase-1 core substantially complete.**
+- **G3.7** `c1a417b`: AutoAdjudicationPolicy (client-scoped/versioned) +
+  evaluateClaim (auto-approve vs route w/ named gate); 6 tests. Default seeded.
+- **G5.5** `ec67524`: GOP artefact (gopNumber/gopIssuedAt) issued within limits
+  on both pre-auth approval paths.
+- **G3.4/G5.7** `8a2552c`: per-client copay overrides (CoContributionRule.clientId
+  + resolver preference); 3 tests.
+- **G9.1 (Phase-2 headline)** `856a12e`: co-insurance + deductibles —
+  BenefitConfig.coInsurancePct/deductibleAmount + cost-share.service
+  (deductible-then-co-insurance, distinct from copay); 5 tests. Suite 174/174.
+- **Next:** G9.5 drug exclusions; wire-ins (auto-adj exec, cost-share adjudication);
+  Phase 3+ (admin-fee ledger, FX reporting, compliance/DPPA, fraud, member app).
