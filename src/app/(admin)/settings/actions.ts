@@ -4,6 +4,7 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { writeAudit } from "@/lib/audit";
+import { validatePassword } from "@/lib/password-policy";
 import bcrypt from "bcryptjs";
 import { Prisma, type UserRole } from "@prisma/client";
 import { revalidatePath } from "next/cache";
@@ -34,8 +35,9 @@ export async function inviteUserAction(
   if (!email || !firstName || !lastName || !role || !password) {
     return { error: "All fields are required." };
   }
-  if (password.length < 8) {
-    return { error: "Password must be at least 8 characters." };
+  const pwError = validatePassword(password);
+  if (pwError) {
+    return { error: pwError };
   }
 
   const existing = await prisma.user.findFirst({

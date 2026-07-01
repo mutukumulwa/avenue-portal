@@ -71,6 +71,12 @@ function LoginForm() {
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {/* Authorized-users-only notice (R32 / H-09) */}
+            <p className="mb-4 rounded-md border border-brand-border bg-brand-bg-alt/60 px-3 py-2 text-center text-[11px] leading-snug text-brand-text-muted">
+              Authorized users only. This is a private Medvex system. Access is
+              monitored and logged; unauthorized use is prohibited and may be
+              prosecuted.
+            </p>
             <form onSubmit={handleLogin} className="space-y-5">
               {error && (
                 <div className="flex items-center gap-2 bg-[#DC3545]/10 text-[#DC3545] border border-[#DC3545]/20 rounded-lg px-4 py-3 text-sm">
