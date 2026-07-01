@@ -32,16 +32,14 @@ meaningful step. Newest status at the top of each section.
   (Tech-debt: migrations history should eventually be re-baselined to the DB.)
 
 ### Current status
-> **Rebrand §D COMPLETE** · **G2.1 multi-client tenancy SUBSTANTIALLY COMPLETE**
-> · **G2.4 terminology engine COMPLETE** · **G3.1 approval-matrix engine
-> SUBSTANTIALLY COMPLETE (all 5 slices)** — action-typed/client-scoped/
-> FX-normalised model + resolver + claims wire-in (V-02) + action-typed admin
-> editor (verified in-browser) + runtime ApprovalRequest/Decision workflow
-> (multi-level, SoD) + SLA escalation job (scheduled 30m). 27 approval/terminology
-> unit tests in this area. Suite 100/100; typecheck + brand guard green.
-> **Remaining G3.1 (incremental): wire runtime workflow into the other action
-> paths (pre-auth/overrides/endorsements/tariff/commission/fund/write-off);
-> per-level ApprovalStep editor UI.**
+> **Rebrand §D COMPLETE** · **G2.1 COMPLETE** · **G2.4 terminology engine
+> COMPLETE** · **G3.1 approval-matrix engine COMPLETE & USABLE** — model +
+> resolver + claims wire-in (V-02) + action-typed/multi-level admin editor +
+> runtime ApprovalRequest workflow + **approvals console** + SLA escalation job,
+> all verified in-browser (multi-level advance + SoD block live). Suite 100/100.
+> **Now starting G4 offline-first scaffold.**
+> Remaining G3.1 (incremental, non-blocking): wire other action paths through
+> ApprovalRequestService.
 
 ### ⚠️ Dev DB note
 The local dev DB holds **pre-rebrand data** (tenant "Avenue Healthcare", slug
@@ -52,21 +50,28 @@ client "Jubilee Insurance Uganda" was created during verification (harmless demo
 row). **Consider `npm run db:seed` to refresh to Medvex data** (now includes the
 default Client via slice 1b) — but that's destructive; do it deliberately.
 
-### Next concrete step  →  next Phase-0 item or finish G3.1 integration
-G3.1 all 5 slices done (`f4a0404`/`e6bf441`/`514d9df`/`2d33e82`/`3104fa2`).
-Remaining G3.1 is incremental integration (do as each module is touched):
-- Wire `ApprovalRequestService.create/decide` into the other governed actions:
-  pre-auth/GOP, benefit-limit overrides, endorsements, provider-tariff changes,
-  commission-rate changes, fund top-ups, write-offs/refunds. (Claim path already
-  enforces the level-1 gate + SoD synchronously — upgrade it to open an
-  ApprovalRequest for multi-level rules.)
-- Per-level ApprovalStep editor in the admin UI (engine already reads steps).
-- Surface approvable actions in the user-rights-roles report (KCB R26).
-- An approvals work-queue/console UI for pending ApprovalRequests.
+### Next concrete step  →  **G4 offline-first scaffold** (plan §C-4, S0, part of XL)
+Sequence chosen by user: G3.1 → **G4** → security hardening. G4 is XL; scaffold
+now (Phase-0), full end-to-end later (Phase-1). Planned scaffold slices:
+- **Slice 1 — data model:** `SyncOperation` (clientUuid, opKey idempotency,
+  entityType, payload, deviceId, capturedAt, syncedAt, state
+  pending|synced|conflict|rejected, conflictReason), plus `OfflineReservation`
+  (soft hold) + provenance for cached eligibility/balances. db push.
+- **Slice 2 — service worker:** replace shell-only `public/sw.js` with a
+  Serwist worker (precache provider shell + background-sync queue); keep member
+  shell behaviour. (Check next/serwist availability; else a hand-rolled SW.)
+- **Slice 3 — IndexedDB store:** client-side schema for cached eligibility +
+  benefit balances (net of soft reservation), tariff/copay/pre-auth rules;
+  time-boxed validity.
+- **Slice 4 — sync-reconcile engine:** BullMQ `sync-reconcile` queue skeleton —
+  idempotency drop → authoritative re-validation → deterministic conflict
+  resolution → adjudication hand-off → audit-chain delta. Add OFFLINE_SYNC/
+  USSD/SMS to `ClaimSource`.
+- **AD-5 (offline v1 scope):** member verification + claim capture + provisional
+  copay first; pre-auth next. (Confirm with user before Phase-1 build-out.)
 
-**Then next Phase-0 backbone per plan §E:** G4 offline scaffold (Serwist +
-IndexedDB + sync skeleton), G3.5 full FX, or the **security-hardening slice**
-(2FA/password-reset/password-policy/single-session/auth-banner — all S0, small).
+**After G4 scaffold → security-hardening slice** (2FA/R81, password-reset/R24,
+password-policy/R28, single-session/R25, auth-banner/R32 — all S0, small).
 
 #### Original G3.1 plan (reference)
 Redesign the thin `ApprovalMatrix` (tenant-scoped, claims-only, single-role,
@@ -176,7 +181,7 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
   RESTRICT. DB is_nullable=NO; tests 64/64.
 | G2.4 | Terminology engine (multi-client) (M, S1) | ✅ all 5 slices (model+resolver+workflow+UI+hook+seed) |
 | G3.1 | Approval-matrix engine (L, S0) | ✅ all 5 slices (model+service+claims+editor UI+runtime workflow+escalation); wiring other actions = incremental |
-| G4 (scaffold) | Offline SW (Serwist) + IndexedDB + sync skeleton | ⬜ |
+| G4 (scaffold) | Offline SW (Serwist) + IndexedDB + sync skeleton | 🔄 starting |
 | G3.5 (schema) | Currency/FxRate + currency columns | ⬜ |
 | Security slice | 2FA, password reset, password policy, single-session, auth banner | ⬜ |
 | G9.6 | Client-configurable member numbering (drop `AVH-` prefix) | ⬜ |
@@ -250,5 +255,8 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
 - **G3.1 slice 5** `3104fa2`: runtime `ApprovalRequestService` (create/decide,
   multi-level, SoD) + `approval-escalation.job.ts` (scheduled 30m) + 9 tests.
 - **G3.1 approval-matrix engine SUBSTANTIALLY COMPLETE (all 5 slices).** Suite 100/100.
-- **Next:** wire runtime workflow into other action paths (incremental), or next
-  Phase-0 item (G4 offline scaffold / security-hardening slice / G3.5 full FX).
+- **G3.1 integration** `da02e44`: multi-level config (stepRoles) + approvals
+  console (/approvals) + claim wire-in opens ApprovalRequest for multi-level
+  rules. Verified live: L1 approve advances to L2; same user blocked at L2 by SoD.
+  **G3.1 COMPLETE & USABLE.**
+- **Next:** G4 offline-first scaffold (see §1 next step), then security hardening.
