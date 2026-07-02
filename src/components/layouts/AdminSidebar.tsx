@@ -9,6 +9,7 @@ import {
   Settings, LogOut, Calculator, UserCheck, MessageSquareText,
   ShieldAlert, MessageSquareWarning, Wallet, Fingerprint,
   BarChart3, TriangleAlert, Landmark, ClipboardCheck, CloudOff, LayoutGrid,
+  ShieldCheck, Lock,
 } from "lucide-react";
 import { PortalSwitcher } from "./PortalSwitcher";
 import { useState } from "react";
@@ -72,6 +73,13 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { label: "Strategic Purchasing", href: "/analytics", icon: BarChart3, roles: ANY_STAFF },
       { label: "Reports",              href: "/reports",   icon: PieChart,  roles: ANY_STAFF },
+    ],
+  },
+  {
+    label: "Compliance",
+    items: [
+      { label: "Compliance Register", href: "/compliance",         icon: ShieldCheck, roles: ADMIN_ONLY },
+      { label: "Data Protection",     href: "/compliance/privacy", icon: Lock,        roles: ADMIN_ONLY },
     ],
   },
   {
