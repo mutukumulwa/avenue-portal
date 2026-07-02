@@ -71,6 +71,73 @@ export class AdminFeeService {
   }
 
   /**
+   * Accrue ALL recurring-method fees for a period ("YYYY-MM"): PMPM and
+   * FLAT_PER_INSURED from the active-member count, PCT_OF_CLAIMS from claims
+   * PAID within the period. Idempotent per agreement+period (re-runs refresh
+   * the non-invoiced entry, so a daily job keeps the current month current).
+   * Event-driven methods accrue via recordEventFee at their call-sites.
+   */
+  static async accrueRecurringForPeriod(tenantId: string, period: string) {
+    const agreements = await prisma.adminFeeAgreement.findMany({
+      where: {
+        tenantId,
+        isActive: true,
+        method: { in: ["PMPM", "FLAT_PER_INSURED", "PCT_OF_CLAIMS"] },
+      },
+    });
+
+    const [y, m] = period.split("-").map(Number);
+    const periodStart = new Date(y, m - 1, 1);
+    const periodEnd = new Date(y, m, 1);
+
+    const written: Array<{ agreementId: string; method: AdminFeeMethod; amount: number; basis: number }> = [];
+    for (const a of agreements) {
+      const scope = a.groupId
+        ? { groupId: a.groupId }
+        : a.clientId
+          ? { group: { clientId: a.clientId } }
+          : {};
+
+      let driver: number;
+      if (a.method === "PCT_OF_CLAIMS") {
+        const paid = await prisma.claim.aggregate({
+          _sum: { approvedAmount: true },
+          where: {
+            tenantId,
+            status: "PAID",
+            paidAt: { gte: periodStart, lt: periodEnd },
+            ...(a.groupId || a.clientId ? { member: scope } : {}),
+          },
+        });
+        driver = Number(paid._sum.approvedAmount ?? 0);
+      } else {
+        driver = await prisma.member.count({
+          where: { tenantId, status: "ACTIVE", ...scope },
+        });
+      }
+
+      const { amount, basis } = this.computeAccrual(a.method, Number(a.rate), driver);
+
+      const existing = await prisma.adminFeeLedgerEntry.findFirst({
+        where: { tenantId, agreementId: a.id, period, status: { not: "INVOICED" } },
+        select: { id: true },
+      });
+      if (existing) {
+        await prisma.adminFeeLedgerEntry.update({ where: { id: existing.id }, data: { amount, basis } });
+      } else {
+        await prisma.adminFeeLedgerEntry.create({
+          data: {
+            tenantId, clientId: a.clientId, agreementId: a.id, method: a.method,
+            period, basis, amount, currency: a.currency, status: "ACCRUED",
+          },
+        });
+      }
+      written.push({ agreementId: a.id, method: a.method, amount, basis });
+    }
+    return written;
+  }
+
+  /**
    * Invoice a client's accrued admin fees (Medvex spec §5.8 / G5.8). Rolls all
    * ACCRUED ledger entries for the client (optionally a period) into a single
    * admin-fee invoice reference and marks them INVOICED. Returns the invoice

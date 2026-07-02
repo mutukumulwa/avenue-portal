@@ -98,6 +98,29 @@ export async function scheduleLapseDetectionJob() {
 }
 
 /**
+ * Schedule admin-fee accrual (G2.3) — daily at 03:30 EAT (00:30 UTC).
+ * Idempotent per agreement+period, so daily runs keep the month current.
+ */
+export async function scheduleAdminFeeAccrualJob() {
+  await Queues.billing.add(
+    "admin-fee-accrual",
+    {},
+    { repeat: { pattern: "30 0 * * *" }, jobId: "admin-fee-accrual-daily", attempts: 2 },
+  );
+}
+
+/**
+ * Schedule the configurable fraud-rule scan (G5.11) — every 6 hours.
+ */
+export async function scheduleFraudScanJob() {
+  await Queues.system.add(
+    "fraud-scan",
+    {},
+    { repeat: { pattern: "0 */6 * * *" }, jobId: "fraud-scan-6h", attempts: 2 },
+  );
+}
+
+/**
  * Schedule membership activation — daily at 00:01 EAT (21:01 UTC).
  */
 export async function scheduleMembershipActivationJob() {

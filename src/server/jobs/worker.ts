@@ -1,5 +1,5 @@
 import { Worker, Job } from "bullmq";
-import { connection, scheduleEscalationJob, scheduleDailyJobs, scheduleCommissionReconciliationJob, scheduleAnalyticsRefreshJob, scheduleIntakeJobs, scheduleQuotationExpiryJob, scheduleMembershipActivationJob, scheduleLapseDetectionJob, scheduleReportGenerationJob } from "../../lib/queue";
+import { connection, scheduleEscalationJob, scheduleDailyJobs, scheduleCommissionReconciliationJob, scheduleAnalyticsRefreshJob, scheduleIntakeJobs, scheduleQuotationExpiryJob, scheduleMembershipActivationJob, scheduleLapseDetectionJob, scheduleReportGenerationJob, scheduleAdminFeeAccrualJob, scheduleFraudScanJob } from "../../lib/queue";
 import { NotificationService } from "../services/notification.service";
 import { runPreauthEscalationJob } from "./preauth-escalation.job";
 import { runRenewalReminderJob }    from "./renewal-reminder.job";
@@ -14,6 +14,8 @@ import { runApprovalEscalationJob } from "./approval-escalation.job";
 import { SyncService } from "../services/sync.service";
 import { runQuotationExpiryJob } from "./quotation-expiry.job";
 import { runLapseDetectionJob } from "./lapse-detection.job";
+import { runAdminFeeAccrualJob } from "./admin-fee-accrual.job";
+import { runFraudScanJob } from "./fraud-scan.job";
 
 console.log("Starting background workers...");
 
@@ -27,6 +29,8 @@ scheduleQuotationExpiryJob().catch(err => console.error("[Worker] Failed to sche
 scheduleMembershipActivationJob().catch(err => console.error("[Worker] Failed to schedule membership activation job:", err));
 scheduleLapseDetectionJob().catch(err => console.error("[Worker] Failed to schedule lapse detection job:", err));
 scheduleReportGenerationJob().catch(err => console.error("[Worker] Failed to schedule report generation job:", err));
+scheduleAdminFeeAccrualJob().catch(err => console.error("[Worker] Failed to schedule admin-fee accrual job:", err));
+scheduleFraudScanJob().catch(err => console.error("[Worker] Failed to schedule fraud-scan job:", err));
 
 /**
  * NOTIFICATIONS WORKER
@@ -56,6 +60,10 @@ const billingWorker = new Worker("billing", async (job: Job) => {
   if (job.name === "reconcile-commissions") {
     const result = await runCommissionReconciliationJob(job.data.period);
     console.log(`[Worker] Commission reconciliation complete for ${result.period}`);
+  }
+  if (job.name === "admin-fee-accrual") {
+    const result = await runAdminFeeAccrualJob();
+    console.log(`[Worker] Admin-fee accrual complete — ${result.entriesWritten} entr(ies) for ${result.period}`);
   }
 }, { connection });
 
@@ -112,6 +120,10 @@ const systemWorker = new Worker("system", async (job: Job) => {
     const { runReportGenerationJob } = await import("./report-generation.job");
     await runReportGenerationJob();
     console.log("[Worker] Report generation complete");
+  }
+  if (job.name === "fraud-scan") {
+    const result = await runFraudScanJob();
+    console.log(`[Worker] Fraud scan complete — ${result.totalAlerts} alert(s) over ${result.totalScanned} claim(s)`);
   }
 }, { connection });
 

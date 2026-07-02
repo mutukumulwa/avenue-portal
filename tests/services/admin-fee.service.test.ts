@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const db = vi.hoisted(() => ({
   adminFeeAgreement: { findMany: vi.fn(async (): Promise<any[]> => []), findFirst: vi.fn() },
   member: { count: vi.fn(async () => 0) },
+  claim: { aggregate: vi.fn(async (): Promise<any> => ({ _sum: { approvedAmount: 0 } })) },
   adminFeeLedgerEntry: {
     findFirst: vi.fn(async (): Promise<any> => null),
     findMany: vi.fn(async (): Promise<any[]> => []),
@@ -51,6 +52,44 @@ describe("AdminFeeService.accruePmpmForPeriod (G2.3)", () => {
     db.adminFeeLedgerEntry.findFirst.mockResolvedValue({ id: "existing" });
     await AdminFeeService.accruePmpmForPeriod("t1", "2026-07");
     expect(db.adminFeeLedgerEntry.update).toHaveBeenCalled();
+    expect(db.adminFeeLedgerEntry.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("AdminFeeService.accrueRecurringForPeriod (G2.3 job)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("accrues PMPM + FLAT from member counts and PCT_OF_CLAIMS from paid claims", async () => {
+    db.adminFeeAgreement.findMany.mockResolvedValue([
+      { id: "a1", method: "PMPM", clientId: "c1", groupId: null, rate: 500, currency: "UGX" },
+      { id: "a2", method: "PCT_OF_CLAIMS", clientId: "c1", groupId: null, rate: 5, currency: "UGX" },
+    ]);
+    db.member.count.mockResolvedValue(100);
+    db.claim.aggregate.mockResolvedValue({ _sum: { approvedAmount: 2_000_000 } });
+    db.adminFeeLedgerEntry.findFirst.mockResolvedValue(null);
+
+    const written = await AdminFeeService.accrueRecurringForPeriod("t1", "2026-07");
+    expect(written).toEqual([
+      { agreementId: "a1", method: "PMPM", amount: 50000, basis: 100 },
+      { agreementId: "a2", method: "PCT_OF_CLAIMS", amount: 100000, basis: 2_000_000 },
+    ]);
+    expect(db.adminFeeLedgerEntry.create).toHaveBeenCalledTimes(2);
+    // PCT_OF_CLAIMS aggregates PAID claims inside the period window
+    expect(db.claim.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ status: "PAID" }) }),
+    );
+  });
+
+  it("refreshes an existing non-invoiced entry instead of duplicating", async () => {
+    db.adminFeeAgreement.findMany.mockResolvedValue([
+      { id: "a1", method: "PMPM", clientId: "c1", groupId: null, rate: 500, currency: "UGX" },
+    ]);
+    db.member.count.mockResolvedValue(80);
+    db.adminFeeLedgerEntry.findFirst.mockResolvedValue({ id: "existing" });
+    await AdminFeeService.accrueRecurringForPeriod("t1", "2026-07");
+    expect(db.adminFeeLedgerEntry.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "existing" }, data: { amount: 40000, basis: 80 } }),
+    );
     expect(db.adminFeeLedgerEntry.create).not.toHaveBeenCalled();
   });
 });
