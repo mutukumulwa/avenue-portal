@@ -54,6 +54,21 @@ export class FxService {
   }
 
   /**
+   * FX gain/loss on a foreign-currency amount between the rate it was booked at
+   * and a current/settlement rate (spec §3.5). Positive = gain (base value rose).
+   * gainLoss = amount × (currentRate − bookedRate).
+   */
+  static gainLoss(amount: number, bookedRate: number, currentRate: number): {
+    baseAtBooked: number;
+    baseAtCurrent: number;
+    gainLoss: number;
+  } {
+    const baseAtBooked = round2(amount * bookedRate);
+    const baseAtCurrent = round2(amount * currentRate);
+    return { baseAtBooked, baseAtCurrent, gainLoss: round2(baseAtCurrent - baseAtBooked) };
+  }
+
+  /**
    * Consolidate multi-currency amounts (e.g. a parent client + its subsidiaries)
    * to the base currency. Returns the base total plus a per-currency breakdown
    * (original + base-converted), for consolidated reporting (spec §3.5).
@@ -81,4 +96,8 @@ export class FxService {
     byCurrency.sort((a, b) => b.baseAmount - a.baseAmount);
     return { base: BASE_CURRENCY, baseTotal, byCurrency };
   }
+}
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
 }
