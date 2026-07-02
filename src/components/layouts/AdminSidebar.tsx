@@ -59,6 +59,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Finance",
     items: [
       { label: "Billing & Invoices",  href: "/billing",           icon: CreditCard, roles: FINANCE      },
+      { label: "TPA Admin Fees",      href: "/billing/admin-fees", icon: Landmark,  roles: ADMIN_ONLY   },
       { label: "General Ledger",      href: "/billing/gl",        icon: FileText,   roles: FINANCE      },
       { label: "Account Ledger",      href: "/billing/gl/ledger", icon: FileText,   roles: FINANCE      },
       { label: "Self-Funded Schemes", href: "/fund/dashboard",    icon: Wallet,     roles: FUND_PORTAL  },
