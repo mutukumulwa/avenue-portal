@@ -77,6 +77,8 @@ model Tenant {
   eligibilitySnapshots           EligibilitySnapshot[]
   autoAdjudicationPolicies       AutoAdjudicationPolicy[]
   drugExclusions                 DrugExclusion[]
+  adminFeeAgreements             AdminFeeAgreement[]
+  adminFeeLedgerEntries          AdminFeeLedgerEntry[]
 }
 
 // ── Multi-client TPA tenancy (Medvex spec §2.1 / gap G2.1) ──────────────
@@ -146,6 +148,8 @@ model Client {
   autoAdjudicationPolicies AutoAdjudicationPolicy[]
   copayRules         CoContributionRule[]
   drugExclusions     DrugExclusion[]
+  adminFeeAgreements AdminFeeAgreement[]
+  adminFeeLedgerEntries AdminFeeLedgerEntry[]
 
   @@unique([operatorTenantId, slug])
   @@index([operatorTenantId])
@@ -353,6 +357,71 @@ enum FamilySize {
 enum AdminFeeMethod {
   FLAT_PER_INSURED // Fixed fee per member at policy start
   PCT_OF_CLAIMS // Percentage of total claims paid, computed post-period
+  PMPM // Per-member-per-month, accrued monthly from active-member counts (G2.3)
+  CASE_MGMT // Per case-management episode
+  PREAUTH // Per pre-authorization / GOP
+  CROSS_BORDER // Per cross-border coordination
+  CARD_ISSUANCE // Per card issued
+  CARD_REPLACEMENT // Per card replacement
+}
+
+enum AdminFeeLedgerStatus {
+  ACCRUED // earned, not yet invoiced
+  INVOICED // rolled into an invoice
+  WAIVED
+}
+
+// TPA admin-fee agreements (Medvex spec §2.3 / gap G2.3). The TPA's primary
+// revenue line: fees configured per client/scheme by method. Feeds the
+// AdminFeeLedger (system of record) and, via that, invoicing + the IRA levy (G1.1).
+model AdminFeeAgreement {
+  id       String  @id @default(cuid())
+  tenantId String
+  tenant   Tenant  @relation(fields: [tenantId], references: [id])
+  clientId String? // per-client agreement
+  client   Client? @relation(fields: [clientId], references: [id])
+  groupId  String? // optional per-scheme override
+  group    Group?  @relation(fields: [groupId], references: [id])
+
+  method   AdminFeeMethod
+  rate     Decimal // interpretation depends on method (amount per member/case/card, or % for PCT_OF_CLAIMS)
+  currency String         @default("UGX")
+
+  effectiveFrom DateTime  @default(now())
+  effectiveTo   DateTime?
+  isActive      Boolean   @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ledgerEntries AdminFeeLedgerEntry[]
+
+  @@index([tenantId, clientId])
+  @@index([tenantId, method])
+}
+
+// Admin-fee ledger — the system of record for fees earned, per period per client.
+model AdminFeeLedgerEntry {
+  id          String             @id @default(cuid())
+  tenantId    String
+  tenant      Tenant             @relation(fields: [tenantId], references: [id])
+  clientId    String?
+  client      Client?            @relation(fields: [clientId], references: [id])
+  agreementId String?
+  agreement   AdminFeeAgreement? @relation(fields: [agreementId], references: [id])
+
+  method   AdminFeeMethod
+  period   String // e.g. "2026-07" (PMPM/PCT) or "" for event-driven
+  basis    Decimal? // the driver (member count, claims paid, etc.) for audit
+  amount   Decimal
+  currency String               @default("UGX")
+  status   AdminFeeLedgerStatus @default(ACCRUED)
+  invoiceId String?
+
+  createdAt DateTime @default(now())
+
+  @@index([tenantId, clientId, period])
+  @@index([tenantId, status])
 }
 
 enum FundTransactionType {
@@ -425,6 +494,7 @@ model Group {
   hrManagers         User[]             @relation("HRManagerGroup")
   serviceRequests    ServiceRequest[]
   selfFundedAccount  SelfFundedAccount?
+  adminFeeAgreements AdminFeeAgreement[]
 
   @@index([tenantId])
   @@index([tenantId, status])
