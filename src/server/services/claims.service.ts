@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import type { ClaimStatus, PreauthStatus, BenefitCategory, ServiceType, Prisma } from "@prisma/client";
 import { FraudService } from "./fraud.service";
 import { ProviderContractsService, type ResolvedClaimRates } from "./provider-contracts.service";
+import { CostShareResolver } from "./cost-share.service";
 
 export class ClaimsService {
   // ─── CLAIMS ─────────────────────────────────────────────
@@ -322,11 +323,17 @@ export class ClaimsService {
     }
 
     const approvedAmount = decision.approvedAmount ?? 0;
-    const copay = approvedAmount * 0.1; // Default 10% copay — will come from benefit config in 1.10
-    const memberLiability = copay;
     const isApproved = decision.action !== "DECLINED";
 
     return prisma.$transaction(async (tx) => {
+      // Cost-share (G9.1): deductible + co-insurance from the member's
+      // BenefitConfig, plus its configured copay % (was a hard-coded 10%).
+      const costShare = isApproved && approvedAmount > 0
+        ? await CostShareResolver.applyForClaim(tx as never, claim.memberId, claim.benefitCategory, approvedAmount)
+        : null;
+      const copay = costShare ? approvedAmount * (costShare.copayPercentage / 100) : 0;
+      const memberLiability = copay + (costShare?.memberPays ?? 0);
+
       // 1. Stamp contracted tariff rates onto claim lines (audit trail).
       // Resolution is contract-aware: the ACTIVE agreement's schedule governs,
       // standalone provider rates are the fallback.
@@ -355,6 +362,8 @@ export class ClaimsService {
           approvedAmount: isApproved ? approvedAmount : 0,
           copayAmount:    isApproved ? copay : 0,
           memberLiability: isApproved ? memberLiability : 0,
+          costShareDeductible:  costShare?.deductibleApplied ?? 0,
+          costShareCoInsurance: costShare?.coInsuranceApplied ?? 0,
           assignedReviewerId: decision.reviewerId,
           decidedAt: new Date(),
           turnaroundDays: Math.ceil(

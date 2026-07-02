@@ -18,6 +18,7 @@ import { ClaimLineDecision, SettlementStatus } from "@prisma/client";
 import { auditChainService } from "./audit-chain.service";
 import { preauthAdjudicationService } from "./preauth-adjudication.service";
 import { ProviderContractsService } from "./provider-contracts.service";
+import { CostShareResolver } from "./cost-share.service";
 
 // Senior approval threshold in KES (configurable per scheme; this is the default)
 const SENIOR_APPROVAL_THRESHOLD_KES = 100_000;
@@ -300,10 +301,21 @@ export const claimAdjudicationService = {
     const netAmount = Number(claim.approvedAmount);
 
     await prisma.$transaction(async (tx) => {
-      // Record adjudicator
+      // Cost-share (G9.1): deductible + co-insurance split on the net amount
+      const costShare = await CostShareResolver.applyForClaim(
+        tx as never, claim.memberId, claim.benefitCategory, netAmount,
+      );
+
+      // Record adjudicator + member split
       await tx.claim.update({
         where: { id: claimId },
-        data: { adjudicatorId, paidAt: undefined }, // paidAt set when settlement batch is processed
+        data: {
+          adjudicatorId,
+          paidAt: undefined, // paidAt set when settlement batch is processed
+          costShareDeductible:  costShare.deductibleApplied,
+          costShareCoInsurance: costShare.coInsuranceApplied,
+          memberLiability:      { increment: costShare.memberPays },
+        },
       });
 
       // Convert PA hold → actual consumption

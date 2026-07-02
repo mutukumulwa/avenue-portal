@@ -1861,6 +1861,7 @@ model BenefitUsage {
   periodEnd        DateTime
   amountUsed       Decimal       @default(0)
   activeHoldAmount Decimal       @default(0) @db.Decimal(14, 2) // sum of active BenefitHold records
+  deductibleMet    Decimal       @default(0) @db.Decimal(14, 2) // member deductible paid this period (G9.1)
   claimCount       Int           @default(0)
   lastUpdated      DateTime      @default(now())
 
@@ -2086,6 +2087,16 @@ model Claim {
   adjudicator       User?                    @relation("ClaimAdjudicator", fields: [adjudicatorId], references: [id])
   seniorAdjudicator User?                    @relation("ClaimSeniorAdjudicator", fields: [seniorAdjudicatorId], references: [id])
   settlementBatch   ProviderSettlementBatch? @relation(fields: [settlementBatchId], references: [id])
+
+  // ── Auto-adjudication provenance (G3.7) — a routed claim always names why ──
+  autoAdjDecision    String? // AUTO_APPROVE | ROUTE
+  autoAdjFailingGate String? // named failing gate when routed
+  autoAdjPolicyId    String? // resolved AutoAdjudicationPolicy id (null = built-in default)
+  autoAdjudicatedAt  DateTime?
+
+  // ── Cost-share components (G9.1) — deductible + co-insurance, distinct from copay ──
+  costShareDeductible  Decimal @default(0) @db.Decimal(14, 2)
+  costShareCoInsurance Decimal @default(0) @db.Decimal(14, 2)
 
   // Status & workflow
   status             ClaimStatus @default(RECEIVED)
