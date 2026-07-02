@@ -70,6 +70,33 @@ export class AdminFeeService {
     return written;
   }
 
+  /**
+   * Invoice a client's accrued admin fees (Medvex spec §5.8 / G5.8). Rolls all
+   * ACCRUED ledger entries for the client (optionally a period) into a single
+   * admin-fee invoice reference and marks them INVOICED. Returns the invoice
+   * summary, or null when nothing is accrued. Amounts stay in the ledger currency
+   * (multi-currency, G3.5). This is the ledger → invoicing bridge; GL posting +
+   * receipting build on it.
+   */
+  static async invoiceAccrued(tenantId: string, clientId: string, period?: string) {
+    const entries = await prisma.adminFeeLedgerEntry.findMany({
+      where: { tenantId, clientId, status: "ACCRUED", ...(period ? { period } : {}) },
+      select: { id: true, amount: true, currency: true },
+    });
+    if (entries.length === 0) return null;
+
+    const total = round2(entries.reduce((s, e) => s + Number(e.amount), 0));
+    const currency = entries[0].currency;
+    const issued = await prisma.adminFeeLedgerEntry.count({ where: { tenantId, invoiceId: { not: null } } });
+    const reference = `AFI-${new Date().getFullYear()}-${String(issued + 1).padStart(5, "0")}`;
+
+    await prisma.adminFeeLedgerEntry.updateMany({
+      where: { id: { in: entries.map((e) => e.id) } },
+      data: { status: "INVOICED", invoiceId: reference },
+    });
+    return { reference, total, currency, entryCount: entries.length };
+  }
+
   /** Record an event-driven fee (case-mgmt / pre-auth / card) against an agreement. */
   static async recordEventFee(
     tenantId: string,

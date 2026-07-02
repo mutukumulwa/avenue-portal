@@ -3,7 +3,14 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const db = vi.hoisted(() => ({
   adminFeeAgreement: { findMany: vi.fn(async (): Promise<any[]> => []), findFirst: vi.fn() },
   member: { count: vi.fn(async () => 0) },
-  adminFeeLedgerEntry: { findFirst: vi.fn(async (): Promise<any> => null), create: vi.fn(async (a: any) => ({ id: "le1", ...a.data })), update: vi.fn() },
+  adminFeeLedgerEntry: {
+    findFirst: vi.fn(async (): Promise<any> => null),
+    findMany: vi.fn(async (): Promise<any[]> => []),
+    count: vi.fn(async () => 0),
+    create: vi.fn(async (a: any) => ({ id: "le1", ...a.data })),
+    update: vi.fn(),
+    updateMany: vi.fn(),
+  },
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
 
@@ -45,5 +52,28 @@ describe("AdminFeeService.accruePmpmForPeriod (G2.3)", () => {
     await AdminFeeService.accruePmpmForPeriod("t1", "2026-07");
     expect(db.adminFeeLedgerEntry.update).toHaveBeenCalled();
     expect(db.adminFeeLedgerEntry.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("AdminFeeService.invoiceAccrued (G5.8)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("rolls accrued entries into one invoice and marks them INVOICED", async () => {
+    db.adminFeeLedgerEntry.findMany.mockResolvedValue([
+      { id: "e1", amount: 60000, currency: "UGX" },
+      { id: "e2", amount: 15000, currency: "UGX" },
+    ]);
+    db.adminFeeLedgerEntry.count.mockResolvedValue(0);
+    const res = await AdminFeeService.invoiceAccrued("t1", "c1", "2026-07");
+    expect(res).toMatchObject({ total: 75000, currency: "UGX", entryCount: 2 });
+    expect(res!.reference).toMatch(/^AFI-\d{4}-00001$/);
+    expect(db.adminFeeLedgerEntry.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: "INVOICED" }) }),
+    );
+  });
+
+  it("returns null when nothing is accrued", async () => {
+    db.adminFeeLedgerEntry.findMany.mockResolvedValue([]);
+    expect(await AdminFeeService.invoiceAccrued("t1", "c1")).toBeNull();
   });
 });
