@@ -12,23 +12,26 @@ checklists, and continues without re-deriving context.
 
 ## RESUME POINTER (update this every time you stop)
 
-- **Current phase:** Phase 1 — Contract structuring foundation (core built end-to-end)
-- **Current task:** Phase 1 remaining polish, then Phase 2 (tariff-based claims automation).
+- **Current phase:** Phase 2 — Tariff-based claims automation (engine core built + tested)
+- **Current task:** Phase 2 remaining polish, then Phase 3 (full rule engine).
 - **Next action (pick up here):**
-  1. Wire the intake pre-check (`ContractLifecycleService.precheck`) into `intake.service.ts` so capture surfaces "no active contract" (spec §8.1). Currently the router exposes `contracts.precheck` but intake does not call it yet.
-  2. Build the Tariffs tab on the contract detail page (grid editor + CSV bulk upload, spec §11.4). Right now the top-level detail page shows a tariff-line count but not the editor — the legacy provider-scoped editor at `/providers/[id]/contracts/[contractId]` still exists and can be adapted/linked.
-  3. Add applicability / branch / source-doc management UI to the detail page (routers already exist: `contracts.addApplicability`, `contracts.addContractBranch`, `contracts.addSourceDocument`, `providerBranches.*`).
-  4. Add BullMQ jobs: auto-activate APPROVED contracts at startDate; auto-expire ACTIVE past endDate; NO_CONTRACT queue re-sweep on activation (spec §4.3). See `src/server/jobs/`.
-  5. Then start **Phase 2** — engine stages 3–4 + reason-code catalog. Extend `ProviderTariff` with pricing-rule fields (rateType, UoM, caps, rateMissing, serviceCategoryId, providerServiceCode, sourceRef) — this is the first Phase-2 schema migration.
+  1. **Wire the engine into adjudication / persist per-line provenance** (spec §8.3, acceptance "every adjudicated line stores contract/version/rule/reason"). Right now `ContractEngine.evaluateClaim(ById)` is read-only and shown in the claims Contract panel + `contractEngine.evaluate*` tRPC. Add a persist step that writes each line's contractId/versionId/matchedRuleType/matchedRuleId/reasonCodeId/amounts to `ClaimLine`, and add the named contract gates to `auto-adjudication.service.ts` (CONTRACT_MATCH, PRICING_COMPLETE). Keep it opt-in first to avoid disrupting the existing adjudication flow.
+  2. **Manual-queue framework** (§8.5): `Claim.assignedQueue` is computed by the engine but not yet routed/persisted. Extend the existing `/(admin)/claims/queues` UI with the digital-contract queue categories.
+  3. **ServiceCategory taxonomy seed** from the Masters files (§5.5) + Tariff-editor UI for the new §5.6 fields (rateType/UoM/caps/serviceCategory) on the contract detail Tariffs tab.
+  4. Still-open Phase-1 items: intake pre-check wiring into `intake.service.ts`; contract detail Tariffs/Applicability/Branch management widgets; BullMQ lifecycle jobs (auto-activate/expire, NO_CONTRACT re-sweep).
+  5. Then **Phase 3** — PricingRule/ContractPackage/PreauthRule/DocumentationRule/ContractExclusion generalisation, stages 5–8, precedence engine (§7), rule builder + sandbox (the `contractEngine.evaluateLine` sandbox endpoint already exists).
 - **Blocked on:** nothing.
-- **Last verified green:** 2026-07-02 — Phase-1 schema applied via `prisma db push`
-  (NOT migrate — see note below); `npm run typecheck` clean; `eslint` clean on all new
-  files; `/contracts` route compiles (307 auth-gate, no errors).
-- **Verification note:** Could NOT complete a browser pixel-render check — the preview
-  harness does not persist the next-auth session cookie (credentials callback returns 200
-  but bounces to /login). This is an environment quirk, not a code defect. To verify the
-  rendered pages next session, log in via a real browser as `admin@medvex.co.ug` /
-  `MedvexAdmin2024!` and open `/contracts`.
+- **Last verified green:** 2026-07-02 — Phase-2 schema applied via `prisma db push`;
+  `npm run typecheck` clean; `eslint` clean on all new files; **`vitest` 204/204 service
+  tests pass** including `tests/services/contract-engine.test.ts` (6 tests reproducing spec
+  §10.3 examples 1 & 8 + LOWER_OF, LIM-001, CON-001, determinism). Reason-code catalog
+  seeded (40 codes) for tenant Avenue Healthcare.
+- **Verification note:** Browser pixel-render still blocked by the preview harness not
+  persisting the next-auth session cookie (callback 200 → bounces to /login). Engine
+  correctness is instead proven by the vitest suite. To eyeball UI, log in via a real
+  browser as `admin@medvex.co.ug` / `MedvexAdmin2024!` and open `/contracts` or any claim.
+- **Seeding note:** run tenant seeds/scripts with `npx tsx --env-file=.env <script>` — plain
+  `tsx` does not load `.env` and connects to the wrong DB.
 
 > **IMPORTANT — schema apply method:** This project's live dev DB is *ahead* of the
 > committed migration history (team uses `npx prisma db push`; there is a `db:push`
@@ -73,7 +76,7 @@ checklists, and continues without re-deriving context.
 | Phase | Title | Status |
 |---|---|---|
 | 1 | Contract structuring foundation | CORE DONE (schema+service+router+UI); polish + intake wiring + lifecycle jobs remain |
-| 2 | Tariff-based claims automation | not started |
+| 2 | Tariff-based claims automation | ENGINE CORE DONE (schema+engine+reason-codes+claims panel+tests); adjudication-persist wiring + queues UI remain |
 | 3 | Rule engine (full) | not started |
 | 4 | Markdown extraction & assisted creation | not started |
 | 5 | Advanced automation & optimisation | not started |
@@ -130,6 +133,45 @@ File: `src/server/services/contract-lifecycle.service.ts`
 - claim intake shows correct contract match
 - maker≠checker enforced
 - all events on audit chain
+
+---
+
+## Phase 2 — Tariff-based claims automation
+
+Spec §16 Phase 2 + §5.5, §5.6, §5.13, §6.3, §6.4, §6.8, §8.5, §10.
+
+### 2.1 Schema — DONE ✅ (db push + typecheck + tests green)
+- [x] Enums: `TariffRateType`, `UnitOfMeasure`, `FrequencyPeriod`, `CodingSystem`, `PatientClass`, `ReasonSeverity`
+- [x] `ProviderTariff` EXTEND (§5.6): serviceCategoryId, providerServiceCode, provider/standardDescription, codingSystem, rateType, discount/markupPct, min/maxPayableAmount, unitOfMeasure, quantity/frequencyLimit+frequencyPeriod, gender/age restrictions, diagnosisRestriction, requiresReferral, rateMissing, sourceRef, notes
+- [x] NEW `ServiceCategory` + `ServiceCategoryAlias` (§5.5)
+- [x] NEW `ServiceMappingMemory` (§6.3)
+- [x] NEW `AdjudicationReasonCode` catalog (§5.13)
+- [x] `ClaimLine` EXTEND (§5.13/§6.4): serviceCategoryId, contractId, contractVersionId, matchedRuleType/Id, payableSource, reasonCodeId, contracted/shortfall/disallowed/memberLiability/payerLiability/providerWriteOff/externalRebate amounts, quantityApproved, ruleTrace
+- [x] Tenant back-relations
+
+### 2.2 Reason-code catalog — DONE ✅
+- [x] `reason-codes.service.ts` — `REASON_CODE_CATALOG` (§10.1: CON/ELG/SVC/PRC/LIM/EXC/AUTH/DOC/SUB/DUP/MAN, 40 codes) with provider/member/internal wording, severity, remedy, override types, escalation queue
+- [x] `ReasonCodeService.seedForTenant()` (idempotent upsert) + `resolve()`
+- [x] `scripts/seed-reason-codes.ts` — run with `npx tsx --env-file=.env scripts/seed-reason-codes.ts` (seeded 40 for the tenant)
+
+### 2.3 Contract rule engine — DONE ✅ (stages 1–4 + 9)
+Module: `src/server/services/contract-engine/` (`types.ts`, `engine.ts`)
+- [x] `ContractEngine.evaluateClaim(ctx)` — pure/read-only, deterministic; emits per-line + claim-level RuleTrace
+- [x] `evaluateClaimById(tenantId, claimId)` — loads claim/lines/payer, calls evaluateClaim
+- [x] Stage 1–2 matching/validity via `ContractLifecycleService.precheck`
+- [x] Stage 3 mapping: code → exact description → mapping-memory → fuzzy(Dice, ≥0.92, auto only if memory-confirmed) → unlisted rule
+- [x] Stage 4 pricing: FIXED (LOWER_OF default), PER_DIEM (uses lengthOfStay), DISCOUNT_OFF_BILLED, MARKUP_OVER_COST; min/max caps; quantity caps → LIM-001; rateMissing → PRC-002; deferred rate types (EXTERNAL/NET/CAPITATION/AVG) → MAN-001 pend
+- [x] Shortfall routing: provider write-off default, member liability only when balanceBillingPolicy=ALLOWED (§6.4 O19)
+- [x] Stage 9 decision synthesis: per-line decision + claim decision (AUTO/PARTIAL/DECLINED/UNDER_REVIEW) + assignedQueue from reason→queue map
+- [ ] TODO(next): persist results to ClaimLine + wire named gates into `auto-adjudication.service.ts` (§8.3); stages 5–8 are Phase 3
+
+### 2.4 tRPC + UI — DONE ✅ (read-only)
+- [x] `contractEngine` router: `evaluateClaim` (with reason wording), `evaluateLine` (sandbox §11.5), `seedReasonCodes` — registered
+- [x] Claims Contract panel `src/app/(admin)/claims/[id]/ContractPanel.tsx` embedded in claim detail (§11.6): matched contract link, claim decision + queue, totals, per-line mapping→rule→payable/shortfall→reason→decision
+- [ ] TODO(next): tariff-editor fields for §5.6; queues UI (§8.5); make the panel actionable (overrides)
+
+### 2.5 Tests — DONE ✅
+- [x] `tests/services/contract-engine.test.ts` — 6 tests: §10.3 ex.1 (PRC-001 shortfall + write-off), ex.1b (LOWER_OF pays billed), ex.8 (SVC-002 refer), CON-001 no-contract, LIM-001 qty cap, determinism. Full suite 204/204 green.
 
 ---
 
