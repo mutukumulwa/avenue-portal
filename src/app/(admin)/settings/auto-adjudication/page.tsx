@@ -57,7 +57,7 @@ export default async function AutoAdjudicationPage({
 
       <section className="rounded-lg border border-brand-border bg-brand-bg p-5">
         <h2 className="mb-3 text-sm font-semibold uppercase text-brand-text-muted">Set a policy (supersedes the scope&rsquo;s current one)</h2>
-        <form action={createAutoAdjPolicyAction} className="grid grid-cols-2 gap-4">
+        <form action={createAutoAdjPolicyAction} className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className={labelCls} htmlFor="clientId">Scope</label>
             <select id="clientId" name="clientId" className={inputCls} defaultValue="">
@@ -92,7 +92,7 @@ export default async function AutoAdjudicationPage({
         </form>
       </section>
 
-      <section className="overflow-hidden rounded-lg border border-brand-border bg-brand-bg">
+      <section className="overflow-x-auto rounded-lg border border-brand-border bg-brand-bg">
         <table className="w-full text-sm">
           <thead className="bg-brand-bg-alt text-left text-xs uppercase text-brand-text-muted">
             <tr>
@@ -134,7 +134,7 @@ export default async function AutoAdjudicationPage({
         </table>
       </section>
 
-      <section className="overflow-hidden rounded-lg border border-brand-border bg-brand-bg">
+      <section className="overflow-x-auto rounded-lg border border-brand-border bg-brand-bg">
         <h2 className="border-b border-brand-border px-4 py-3 text-sm font-semibold uppercase text-brand-text-muted">Recent decisions</h2>
         <table className="w-full text-sm">
           <thead className="bg-brand-bg-alt text-left text-xs uppercase text-brand-text-muted">

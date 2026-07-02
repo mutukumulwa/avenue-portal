@@ -70,7 +70,7 @@ export default async function CompliancePage({
       )}
 
       {/* Obligation traffic-lights */}
-      <section className="grid grid-cols-3 gap-4">
+      <section className="grid gap-4 sm:grid-cols-3">
         {[
           { label: "Regulatory licence", state: obligations.licence },
           { label: "Security deposit", state: obligations.securityDeposit },
@@ -95,7 +95,7 @@ export default async function CompliancePage({
         </p>
       </section>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid gap-6 md:grid-cols-3">
         <section className="rounded-lg border border-brand-border bg-brand-bg p-5">
           <h2 className="mb-3 text-sm font-semibold uppercase text-brand-text-muted">Record licence</h2>
           <form action={recordLicenceAction} className="space-y-3">
@@ -152,7 +152,7 @@ export default async function CompliancePage({
       </div>
 
       {/* Directors table */}
-      <section className="overflow-hidden rounded-lg border border-brand-border bg-brand-bg">
+      <section className="overflow-x-auto rounded-lg border border-brand-border bg-brand-bg">
         <h2 className="border-b border-brand-border px-4 py-3 text-sm font-semibold uppercase text-brand-text-muted">Directors</h2>
         <table className="w-full text-sm">
           <thead className="bg-brand-bg-alt text-left text-xs uppercase text-brand-text-muted">
@@ -192,8 +192,8 @@ export default async function CompliancePage({
       </section>
 
       {/* Licences + levies */}
-      <div className="grid grid-cols-2 gap-6">
-        <section className="overflow-hidden rounded-lg border border-brand-border bg-brand-bg">
+      <div className="grid gap-6 lg:grid-cols-2">
+        <section className="overflow-x-auto rounded-lg border border-brand-border bg-brand-bg">
           <h2 className="border-b border-brand-border px-4 py-3 text-sm font-semibold uppercase text-brand-text-muted">Licences</h2>
           <table className="w-full text-sm">
             <thead className="bg-brand-bg-alt text-left text-xs uppercase text-brand-text-muted">
@@ -213,7 +213,7 @@ export default async function CompliancePage({
           </table>
         </section>
 
-        <section className="overflow-hidden rounded-lg border border-brand-border bg-brand-bg">
+        <section className="overflow-x-auto rounded-lg border border-brand-border bg-brand-bg">
           <h2 className="border-b border-brand-border px-4 py-3 text-sm font-semibold uppercase text-brand-text-muted">Compliance levy</h2>
           <table className="w-full text-sm">
             <thead className="bg-brand-bg-alt text-left text-xs uppercase text-brand-text-muted">

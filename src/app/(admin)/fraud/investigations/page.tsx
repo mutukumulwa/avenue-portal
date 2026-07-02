@@ -74,8 +74,8 @@ export default async function FraudInvestigationsPage({
         </div>
       )}
 
-      <section className="overflow-hidden rounded-lg border border-brand-border bg-brand-bg">
-        <table className="w-full text-sm">
+      <section className="overflow-x-auto rounded-lg border border-brand-border bg-brand-bg">
+        <table className="w-full min-w-[720px] text-sm">
           <thead className="bg-brand-bg-alt text-left text-xs uppercase text-brand-text-muted">
             <tr>
               <th className="px-4 py-2.5">Opened</th>
@@ -110,21 +110,20 @@ export default async function FraudInvestigationsPage({
                   {showClosed ? (
                     <span className="text-xs text-brand-text-muted">{inv.findings ?? "—"}{inv.outcome ? ` → ${inv.outcome}` : ""}</span>
                   ) : (
-                    <div className="flex flex-wrap items-center gap-2">
-                      {inv.status === "OPEN" && (
-                        <form action={assignInvestigationAction}>
-                          <input type="hidden" name="id" value={inv.id} />
-                          <button className="text-xs font-semibold text-brand-indigo hover:underline">Take it</button>
-                        </form>
-                      )}
-                      <form action={resolveInvestigationAction} className="flex items-center gap-2">
-                        <input type="hidden" name="id" value={inv.id} />
-                        <input name="findings" placeholder="Findings" className={inputCls} />
-                        <input name="outcome" placeholder="Outcome (e.g. recover, blacklist)" className={inputCls} />
+                    <form action={resolveInvestigationAction} className="flex flex-col gap-2 min-w-[220px]">
+                      <input type="hidden" name="id" value={inv.id} />
+                      <div className="flex gap-2">
+                        <input name="findings" placeholder="Findings" className={`${inputCls} flex-1`} />
+                        <input name="outcome" placeholder="Outcome" className={`${inputCls} flex-1`} />
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {inv.status === "OPEN" && (
+                          <button formAction={assignInvestigationAction} name="id" value={inv.id} className="text-xs font-semibold text-brand-indigo hover:underline">Take it</button>
+                        )}
                         <button name="status" value="SUBSTANTIATED" className="text-xs font-semibold text-brand-error hover:underline">Substantiate</button>
                         <button name="status" value="DISMISSED" className="text-xs font-semibold text-brand-text-muted hover:underline">Dismiss</button>
-                      </form>
-                    </div>
+                      </div>
+                    </form>
                   )}
                 </td>
               </tr>

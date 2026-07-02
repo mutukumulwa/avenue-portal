@@ -67,7 +67,7 @@ export default async function PrivacyPage({
       {/* DSR intake */}
       <section className="rounded-lg border border-brand-border bg-brand-bg p-5">
         <h2 className="mb-3 text-sm font-semibold uppercase text-brand-text-muted">Open a data-subject request</h2>
-        <form action={openDsrAction} className="grid grid-cols-3 gap-4">
+        <form action={openDsrAction} className="grid gap-4 sm:grid-cols-3">
           <div>
             <label className={labelCls} htmlFor="memberId">Member ID</label>
             <input id="memberId" name="memberId" required className={inputCls} placeholder="cuid…" />
@@ -90,9 +90,9 @@ export default async function PrivacyPage({
       </section>
 
       {/* DSR queue */}
-      <section className="overflow-hidden rounded-lg border border-brand-border bg-brand-bg">
+      <section className="overflow-x-auto rounded-lg border border-brand-border bg-brand-bg">
         <h2 className="border-b border-brand-border px-4 py-3 text-sm font-semibold uppercase text-brand-text-muted">Data-subject requests</h2>
-        <table className="w-full text-sm">
+        <table className="w-full min-w-[720px] text-sm">
           <thead className="bg-brand-bg-alt text-left text-xs uppercase text-brand-text-muted">
             <tr>
               <th className="px-4 py-2.5">Member</th>
@@ -121,14 +121,16 @@ export default async function PrivacyPage({
                     {d.status === "FULFILLED" || d.status === "REJECTED" ? (
                       <span className="text-xs text-brand-text-muted">{d.fulfilmentRef ?? "—"}</span>
                     ) : (
-                      <form action={setDsrStatusAction} className="flex items-center gap-2">
+                      <form action={setDsrStatusAction} className="flex flex-col gap-2 min-w-[200px]">
                         <input type="hidden" name="id" value={d.id} />
                         <input name="fulfilmentRef" placeholder="Artefact ref" className={smallInput} />
-                        {d.status === "RECEIVED" && (
-                          <button name="status" value="IN_PROGRESS" className="text-xs font-semibold text-brand-indigo hover:underline">Start</button>
-                        )}
-                        <button name="status" value="FULFILLED" className="text-xs font-semibold text-brand-success hover:underline">Fulfil</button>
-                        <button name="status" value="REJECTED" className="text-xs font-semibold text-brand-error hover:underline">Reject</button>
+                        <div className="flex items-center gap-3">
+                          {d.status === "RECEIVED" && (
+                            <button name="status" value="IN_PROGRESS" className="text-xs font-semibold text-brand-indigo hover:underline">Start</button>
+                          )}
+                          <button name="status" value="FULFILLED" className="text-xs font-semibold text-brand-success hover:underline">Fulfil</button>
+                          <button name="status" value="REJECTED" className="text-xs font-semibold text-brand-error hover:underline">Reject</button>
+                        </div>
                       </form>
                     )}
                   </td>
@@ -140,7 +142,7 @@ export default async function PrivacyPage({
       </section>
 
       {/* Processor register + breach intake */}
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid gap-6 md:grid-cols-2">
         <section className="rounded-lg border border-brand-border bg-brand-bg p-5">
           <h2 className="mb-3 text-sm font-semibold uppercase text-brand-text-muted">Register a processor</h2>
           <form action={recordProcessorAction} className="space-y-3">
@@ -205,8 +207,8 @@ export default async function PrivacyPage({
       </div>
 
       {/* Processor + breach tables */}
-      <div className="grid grid-cols-2 gap-6">
-        <section className="overflow-hidden rounded-lg border border-brand-border bg-brand-bg">
+      <div className="grid gap-6 md:grid-cols-2">
+        <section className="overflow-x-auto rounded-lg border border-brand-border bg-brand-bg">
           <h2 className="border-b border-brand-border px-4 py-3 text-sm font-semibold uppercase text-brand-text-muted">Processor register</h2>
           <table className="w-full text-sm">
             <thead className="bg-brand-bg-alt text-left text-xs uppercase text-brand-text-muted">
@@ -226,7 +228,7 @@ export default async function PrivacyPage({
           </table>
         </section>
 
-        <section className="overflow-hidden rounded-lg border border-brand-border bg-brand-bg">
+        <section className="overflow-x-auto rounded-lg border border-brand-border bg-brand-bg">
           <h2 className="border-b border-brand-border px-4 py-3 text-sm font-semibold uppercase text-brand-text-muted">Breach incidents</h2>
           <table className="w-full text-sm">
             <thead className="bg-brand-bg-alt text-left text-xs uppercase text-brand-text-muted">

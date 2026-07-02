@@ -54,7 +54,7 @@ export default async function FraudRulesPage({
 
       <section className="rounded-lg border border-brand-border bg-brand-bg p-5">
         <h2 className="mb-3 text-sm font-semibold uppercase text-brand-text-muted">Set a rule</h2>
-        <form action={upsertFraudRuleAction} className="grid grid-cols-2 gap-4">
+        <form action={upsertFraudRuleAction} className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className={labelCls} htmlFor="code">Code</label>
             <input id="code" name="code" required className={inputCls} placeholder="UPCODING" list="fraud-codes" />
@@ -94,8 +94,8 @@ export default async function FraudRulesPage({
         </form>
       </section>
 
-      <section className="overflow-hidden rounded-lg border border-brand-border bg-brand-bg">
-        <table className="w-full text-sm">
+      <section className="overflow-x-auto rounded-lg border border-brand-border bg-brand-bg">
+        <table className="w-full min-w-[820px] text-sm">
           <thead className="bg-brand-bg-alt text-left text-xs uppercase text-brand-text-muted">
             <tr>
               <th className="px-4 py-2.5">Code</th>

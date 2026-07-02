@@ -50,7 +50,7 @@ export default async function DrugExclusionsPage({
 
       <section className="rounded-lg border border-brand-border bg-brand-bg p-5">
         <h2 className="mb-3 text-sm font-semibold uppercase text-brand-text-muted">Exclude a drug</h2>
-        <form action={createDrugExclusionAction} className="grid grid-cols-2 gap-4">
+        <form action={createDrugExclusionAction} className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className={labelCls} htmlFor="drugCode">Drug code (ATC/NDC)</label>
             <input id="drugCode" name="drugCode" required className={inputCls} placeholder="N02BE01" />
@@ -83,7 +83,7 @@ export default async function DrugExclusionsPage({
         </form>
       </section>
 
-      <section className="overflow-hidden rounded-lg border border-brand-border bg-brand-bg">
+      <section className="overflow-x-auto rounded-lg border border-brand-border bg-brand-bg">
         <table className="w-full text-sm">
           <thead className="bg-brand-bg-alt text-left text-xs uppercase text-brand-text-muted">
             <tr>

@@ -19,7 +19,7 @@ export function SubmitButton({
     <button 
       type="submit"
       disabled={pending}
-      className={className || "bg-[#0B1437] hover:bg-[#142150] disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-3 rounded-full font-semibold transition-colors flex items-center space-x-2 shadow-sm"}
+      className={className || "bg-[#0B1437] hover:bg-[#142150] disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-3 rounded-full font-semibold transition-colors inline-flex items-center justify-center gap-2 whitespace-nowrap shrink-0 shadow-sm"}
     >
       {pending ? <Loader2 size={18} className="animate-spin" /> : icon}
       <span>{pending ? "Processing..." : children}</span>

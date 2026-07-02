@@ -38,7 +38,7 @@ function TariffForm({
   return (
     <form
       action={async (fd) => { await upsertCptTariffAction(fd); onDone(); }}
-      className="grid grid-cols-7 gap-3 px-5 py-4 bg-brand-indigo/5 border-b border-[#EEEEEE] items-end"
+      className="grid gap-3 px-5 py-4 bg-brand-indigo/5 border-b border-[#EEEEEE] sm:grid-cols-2 lg:grid-cols-3"
     >
       <input type="hidden" name="providerId" value={providerId} />
       {tariff && <input type="hidden" name="tariffId" value={tariff.id} />}
@@ -58,23 +58,25 @@ function TariffForm({
           {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </div>
-      <div>
-        <label className={lbl}>Agreed Rate *</label>
-        <input name="agreedRate" type="number" step="0.01" required defaultValue={tariff?.agreedRate} className={inp} />
-      </div>
-      <div>
-        <label className={lbl}>Currency</label>
-        <select name="currency" defaultValue={tariff?.currency ?? "UGX"} className={inp}>
-          <option value="UGX">UGX</option>
-          <option value="USD">USD</option>
-          <option value="KES">KES</option>
-        </select>
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <label className={lbl}>Agreed Rate *</label>
+          <input name="agreedRate" type="number" step="0.01" required defaultValue={tariff?.agreedRate} className={inp} />
+        </div>
+        <div className="w-24">
+          <label className={lbl}>Currency</label>
+          <select name="currency" defaultValue={tariff?.currency ?? "UGX"} className={inp}>
+            <option value="UGX">UGX</option>
+            <option value="USD">USD</option>
+            <option value="KES">KES</option>
+          </select>
+        </div>
       </div>
       <div>
         <label className={lbl}>Effective From *</label>
         <input name="effectiveFrom" type="date" required defaultValue={tariff?.effectiveFrom?.slice(0, 10)} className={inp} />
       </div>
-      <div className="flex gap-2">
+      <div className="flex items-end gap-2">
         <button type="submit" className="bg-brand-indigo text-white px-4 py-2 rounded-full text-xs font-bold hover:bg-brand-secondary flex-1 transition-colors">
           Save
         </button>
@@ -117,7 +119,8 @@ export function ProviderTariffsCard({
         <TariffForm providerId={providerId} clients={clients} onDone={() => setAdding(false)} />
       )}
 
-      <table className="w-full text-sm">
+      <div className="overflow-x-auto">
+      <table className="w-full min-w-[640px] text-sm">
         <thead>
           <tr className="bg-[#F8F9FA] text-[10px] font-bold uppercase text-brand-text-muted border-b border-[#EEEEEE]">
             <th className="px-5 py-2.5 text-left">Service</th>
@@ -187,6 +190,7 @@ export function ProviderTariffsCard({
           )}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
