@@ -15,7 +15,7 @@ export default async function ProviderDetailPage({ params }: { params: Promise<{
   const provider = await prisma.provider.findUnique({
     where: { id, tenantId: session.user.tenantId },
     include: {
-      tariffs:         { orderBy: { effectiveFrom: "desc" } },
+      tariffs:         { orderBy: { effectiveFrom: "desc" }, include: { client: { select: { name: true } } } },
       diagnosisTariffs:{ orderBy: { effectiveFrom: "desc" } },
       contracts: {
         orderBy: [{ startDate: "desc" }],
@@ -39,6 +39,13 @@ export default async function ProviderDetailPage({ params }: { params: Promise<{
   });
 
   if (!provider) notFound();
+
+  // Clients available for per-client tariff overrides (G5.4)
+  const clients = await prisma.client.findMany({
+    where: { operatorTenantId: session.user.tenantId, isActive: true },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true },
+  });
 
   const sharedHealthRecords = await prisma.memberHealthShare.findMany({
     where: {
@@ -87,6 +94,9 @@ export default async function ProviderDetailPage({ params }: { params: Promise<{
     serviceName:  t.serviceName,
     cptCode:      t.cptCode,
     agreedRate:   Number(t.agreedRate),
+    currency:     t.currency,
+    clientId:     t.clientId,
+    clientName:   t.client?.name ?? null,
     effectiveFrom:t.effectiveFrom.toISOString(),
     effectiveTo:  t.effectiveTo?.toISOString() ?? null,
   }));
@@ -178,7 +188,7 @@ export default async function ProviderDetailPage({ params }: { params: Promise<{
           adjudication, but new rate schedules should be captured inside a contract so they expire, renew and audit together.
         </div>
       )}
-      {tariffs.length > 0 && <ProviderTariffsCard providerId={provider.id} tariffs={tariffs} />}
+      <ProviderTariffsCard providerId={provider.id} tariffs={tariffs} clients={clients} />
       {diagnosisTariffs.length > 0 && <ProviderDiagnosisTariffsCard providerId={provider.id} tariffs={diagnosisTariffs} />}
 
       <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm">

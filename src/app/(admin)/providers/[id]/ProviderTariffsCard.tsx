@@ -9,8 +9,16 @@ export interface SerializedTariff {
   serviceName: string;
   cptCode: string | null;
   agreedRate: number;
+  currency: string;
+  clientId: string | null;
+  clientName: string | null;
   effectiveFrom: string;
   effectiveTo: string | null;
+}
+
+export interface TariffClient {
+  id: string;
+  name: string;
 }
 
 const inp = "border border-[#EEEEEE] rounded-lg px-2.5 py-2 text-sm focus:outline-none focus:border-brand-indigo w-full";
@@ -18,17 +26,19 @@ const lbl = "text-[10px] font-bold uppercase text-brand-text-muted block mb-1";
 
 function TariffForm({
   providerId,
+  clients,
   tariff,
   onDone,
 }: {
   providerId: string;
+  clients: TariffClient[];
   tariff?: SerializedTariff;
   onDone: () => void;
 }) {
   return (
     <form
       action={async (fd) => { await upsertCptTariffAction(fd); onDone(); }}
-      className="grid grid-cols-5 gap-3 px-5 py-4 bg-brand-indigo/5 border-b border-[#EEEEEE] items-end"
+      className="grid grid-cols-7 gap-3 px-5 py-4 bg-brand-indigo/5 border-b border-[#EEEEEE] items-end"
     >
       <input type="hidden" name="providerId" value={providerId} />
       {tariff && <input type="hidden" name="tariffId" value={tariff.id} />}
@@ -42,8 +52,23 @@ function TariffForm({
         <input name="cptCode" defaultValue={tariff?.cptCode ?? ""} className={inp} placeholder="99213" />
       </div>
       <div>
-        <label className={lbl}>Agreed Rate (KES) *</label>
+        <label className={lbl}>Client</label>
+        <select name="clientId" defaultValue={tariff?.clientId ?? ""} className={inp}>
+          <option value="">Network master</option>
+          {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className={lbl}>Agreed Rate *</label>
         <input name="agreedRate" type="number" step="0.01" required defaultValue={tariff?.agreedRate} className={inp} />
+      </div>
+      <div>
+        <label className={lbl}>Currency</label>
+        <select name="currency" defaultValue={tariff?.currency ?? "UGX"} className={inp}>
+          <option value="UGX">UGX</option>
+          <option value="USD">USD</option>
+          <option value="KES">KES</option>
+        </select>
       </div>
       <div>
         <label className={lbl}>Effective From *</label>
@@ -64,9 +89,11 @@ function TariffForm({
 export function ProviderTariffsCard({
   providerId,
   tariffs,
+  clients,
 }: {
   providerId: string;
   tariffs: SerializedTariff[];
+  clients: TariffClient[];
 }) {
   const [adding, setAdding]       = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -76,7 +103,7 @@ export function ProviderTariffsCard({
       <div className="px-6 py-4 border-b border-[#EEEEEE] flex justify-between items-center">
         <div>
           <h2 className="font-bold text-brand-text-heading font-heading">CPT Tariff Schedule</h2>
-          <p className="text-xs text-brand-text-muted mt-0.5">Procedure-level agreed rates by CPT code.</p>
+          <p className="text-xs text-brand-text-muted mt-0.5">Procedure-level agreed rates by CPT code. A client-specific rate overrides the network master at adjudication.</p>
         </div>
         <button
           onClick={() => { setAdding(true); setEditingId(null); }}
@@ -87,7 +114,7 @@ export function ProviderTariffsCard({
       </div>
 
       {adding && (
-        <TariffForm providerId={providerId} onDone={() => setAdding(false)} />
+        <TariffForm providerId={providerId} clients={clients} onDone={() => setAdding(false)} />
       )}
 
       <table className="w-full text-sm">
@@ -95,7 +122,8 @@ export function ProviderTariffsCard({
           <tr className="bg-[#F8F9FA] text-[10px] font-bold uppercase text-brand-text-muted border-b border-[#EEEEEE]">
             <th className="px-5 py-2.5 text-left">Service</th>
             <th className="px-5 py-2.5 text-left">CPT</th>
-            <th className="px-5 py-2.5 text-right">Rate (KES)</th>
+            <th className="px-5 py-2.5 text-left">Scope</th>
+            <th className="px-5 py-2.5 text-right">Rate</th>
             <th className="px-5 py-2.5 text-left">Effective From</th>
             <th className="px-5 py-2.5 w-16" />
           </tr>
@@ -104,16 +132,23 @@ export function ProviderTariffsCard({
           {tariffs.map(t =>
             editingId === t.id ? (
               <tr key={t.id}>
-                <td colSpan={5} className="p-0">
-                  <TariffForm providerId={providerId} tariff={t} onDone={() => setEditingId(null)} />
+                <td colSpan={6} className="p-0">
+                  <TariffForm providerId={providerId} clients={clients} tariff={t} onDone={() => setEditingId(null)} />
                 </td>
               </tr>
             ) : (
               <tr key={t.id} className="hover:bg-[#F8F9FA]">
                 <td className="px-5 py-3 font-medium text-brand-text-heading">{t.serviceName}</td>
                 <td className="px-5 py-3 font-mono text-xs text-brand-text-muted">{t.cptCode ?? "—"}</td>
+                <td className="px-5 py-3">
+                  {t.clientName ? (
+                    <span className="rounded-full bg-brand-indigo/10 px-2 py-0.5 text-[10px] font-bold uppercase text-brand-indigo">{t.clientName}</span>
+                  ) : (
+                    <span className="text-xs text-brand-text-muted">Network master</span>
+                  )}
+                </td>
                 <td className="px-5 py-3 text-right font-semibold text-brand-text-heading">
-                  {Number(t.agreedRate).toLocaleString("en-UG")}
+                  {Number(t.agreedRate).toLocaleString("en-UG")} <span className="text-[10px] font-normal text-brand-text-muted">{t.currency}</span>
                 </td>
                 <td className="px-5 py-3 text-brand-text-muted">
                   {new Date(t.effectiveFrom).toLocaleDateString("en-UG")}
@@ -145,7 +180,7 @@ export function ProviderTariffsCard({
           )}
           {tariffs.length === 0 && !adding && (
             <tr>
-              <td colSpan={5} className="px-5 py-8 text-center text-sm text-brand-text-muted">
+              <td colSpan={6} className="px-5 py-8 text-center text-sm text-brand-text-muted">
                 No CPT tariffs configured yet. Add the first rate above.
               </td>
             </tr>

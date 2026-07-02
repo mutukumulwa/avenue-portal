@@ -3,6 +3,7 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { writeAudit } from "@/lib/audit";
 
 // ── Contract details ───────────────────────────────────────────────────────
 
@@ -36,6 +37,10 @@ export async function upsertCptTariffAction(formData: FormData) {
   const cptCode     = (formData.get("cptCode")    as string) || null;
   const serviceName = formData.get("serviceName") as string;
   const agreedRate  = Number(formData.get("agreedRate"));
+  const currency    = ((formData.get("currency") as string) || "UGX").trim().toUpperCase();
+  // Per-client override (G5.4): empty = network master rate; set = this client's
+  // negotiated rate, which wins at claim-line resolution.
+  const clientId    = ((formData.get("clientId") as string) || "").trim() || null;
   const effectiveFrom = new Date(formData.get("effectiveFrom") as string);
   const effectiveTo   = formData.get("effectiveTo") ? new Date(formData.get("effectiveTo") as string) : null;
 
@@ -43,16 +48,33 @@ export async function upsertCptTariffAction(formData: FormData) {
   const provider = await prisma.provider.findUnique({ where: { id: providerId, tenantId: session.user.tenantId } });
   if (!provider) throw new Error("Provider not found");
 
+  // Verify the client (if any) belongs to this operator
+  if (clientId) {
+    const client = await prisma.client.findFirst({
+      where: { id: clientId, operatorTenantId: session.user.tenantId },
+      select: { id: true },
+    });
+    if (!client) throw new Error("Client not found");
+  }
+
   if (tariffId) {
     await prisma.providerTariff.update({
       where: { id: tariffId },
-      data: { cptCode, serviceName, agreedRate, effectiveFrom, effectiveTo },
+      data: { cptCode, serviceName, agreedRate, currency, clientId, effectiveFrom, effectiveTo },
     });
   } else {
     await prisma.providerTariff.create({
-      data: { providerId, cptCode, serviceName, agreedRate, effectiveFrom, effectiveTo },
+      data: { providerId, cptCode, serviceName, agreedRate, currency, clientId, effectiveFrom, effectiveTo },
     });
   }
+
+  await writeAudit({
+    userId: session.user.id,
+    action: tariffId ? "PROVIDER_TARIFF_UPDATED" : "PROVIDER_TARIFF_CREATED",
+    module: "PROVIDERS",
+    description: `Provider tariff ${serviceName} @ ${agreedRate} ${currency}${clientId ? " (client override)" : " (network master)"}`,
+    metadata: { providerId, tariffId, clientId, cptCode, agreedRate, currency },
+  });
 
   revalidatePath(`/providers/${providerId}`);
 }
