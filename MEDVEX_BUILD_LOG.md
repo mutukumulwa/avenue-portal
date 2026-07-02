@@ -32,14 +32,17 @@ meaningful step. Newest status at the top of each section.
   (Tech-debt: migrations history should eventually be re-baselined to the DB.)
 
 ### Current status
-> **Phase-1 COMPLETE + Phase-2 headline (G9.1) done.** Rebrand §D · G2.1 · G2.4 ·
-> G3.1 · G3.3 · G3.4 · G3.5 core · G3.7 (auto-adj engine) · G4 flow+balance ·
-> G5.2 · G5.4 · G5.5 (GOP) · G5.6 · G5.7 · G5.9 · G9.1 (co-insurance+deductibles)
-> · G9.6 · Security 5/5 — all ✅. Suite 174/174; typecheck + brand guard green.
-> **Remaining Phase 2: G9.5 drug-level exclusions (needs drug coding). Phase 3+:
-> finance/admin-fee G2.3/G5.8, full G3.5 FX reporting, compliance register G1.1,
-> DPPA G1.2, fraud G5.11, member app + MoMo G5.10 (per plan §E). Plus wire-ins:
-> auto-adj execution (G3.7), cost-share adjudication (G9.1), G4 USSD/SMS (P-03).**
+> **Phases 1-3 core substantially COMPLETE across the plan.** All of: Rebrand §D,
+> G1.1 (compliance register), G1.2 (DPPA), G2.1, G2.3 (admin-fee), G2.4, G3.1,
+> G3.3, G3.4, G3.5 (full FX), G3.7, G4 (flow+balance), G5.2, G5.4, G5.5, G5.6,
+> G5.7, G5.8 (finance), G5.9, G5.10 (MoMo/Airtel), G5.11 (fraud engine), G9.1,
+> G9.5, G9.6, Security 5/5 — data models + service/decision engines done & tested.
+> Suite 208/208; typecheck + brand guard green.
+> **Remaining = mostly UI/wire-ins/jobs on top of the built engines** (admin
+> editors, compliance/DSR/fraud consoles, accrual + anomaly jobs, member-payment
+> call-site swap, auto-adj execution, cost-share/drug-exclusion adjudication
+> wiring) + external-gated integrations (NIRA/MoMo APIs, SMS aggregator P-03,
+> FHIR/EDI). Then Phase 4-5 depth (G5.15 cross-border, G8 integrations, HA/DR docs).
 
 ### ⚠️ Dev DB note
 The local dev DB holds **pre-rebrand data** (tenant "Avenue Healthcare", slug
@@ -335,5 +338,17 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
 - **G9.1 (Phase-2 headline)** `856a12e`: co-insurance + deductibles —
   BenefitConfig.coInsurancePct/deductibleAmount + cost-share.service
   (deductible-then-co-insurance, distinct from copay); 5 tests. Suite 174/174.
-- **Next:** G9.5 drug exclusions; wire-ins (auto-adj exec, cost-share adjudication);
-  Phase 3+ (admin-fee ledger, FX reporting, compliance/DPPA, fraud, member app).
+- **G9.5** `8bd0570`: ClaimLine.drugCode + DrugExclusion + service (3 tests).
+- **G2.3** `372b2e4`: AdminFeeAgreement + AdminFeeLedgerEntry + accrual service
+  (PMPM/flat/pct/event; 6 tests).
+- **G5.8** `b0e6a22`: admin-fee invoicing from the ledger (2 tests).
+- **G3.5 full** `b618f9e`: FxService.gainLoss + ClientConsolidationService
+  (parent+subsidiary claims → base; 3 tests).
+- **G1.1** `fd914a4`: compliance register models + ComplianceService (levy from
+  admin-fee ledger, director-residency, obligation status; 5 tests).
+- **G1.2** `3b8f2fc`: DPPA models (consent/DSR/processor/breach) + DpoService (5 tests).
+- **G5.11** `5c5b7be`: configurable FraudRule + FraudInvestigation + service (4 tests).
+- **G5.10** `f173a2e`: MTN MoMo + Airtel Money adapters + MobileMoneyService
+  facade (MSISDN detection, fake-SMS reframing; 6 tests).
+- **Full 8-item sequence delivered.** Suite 208/208. Each is model+service+tests;
+  UIs/jobs/adjudication wire-ins + external APIs are the documented follow-ups.
