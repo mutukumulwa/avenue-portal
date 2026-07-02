@@ -88,6 +88,8 @@ model Tenant {
   dataSubjectRequests            DataSubjectRequest[]
   processorRegister              ProcessorRegister[]
   breachIncidents                BreachIncident[]
+  fraudRules                     FraudRule[]
+  fraudInvestigations            FraudInvestigation[]
 }
 
 // ── Multi-client TPA tenancy (Medvex spec §2.1 / gap G2.1) ──────────────
@@ -159,6 +161,7 @@ model Client {
   drugExclusions     DrugExclusion[]
   adminFeeAgreements AdminFeeAgreement[]
   adminFeeLedgerEntries AdminFeeLedgerEntry[]
+  fraudRules         FraudRule[]
 
   @@unique([operatorTenantId, slug])
   @@index([operatorTenantId])
@@ -613,6 +616,58 @@ model BreachIncident {
 
   @@index([tenantId])
   @@index([tenantId, severity])
+}
+
+// ── Configurable fraud engine + investigations (Medvex spec §5.11 / gap G5.11
+//    / AICARE_TODO F-01…F-12) ──────────────────────────────────────────
+// Promotes the hard-coded deterministic rules into client-configurable rules,
+// with an investigation workflow over the alerts they raise.
+model FraudRule {
+  id          String  @id @default(cuid())
+  tenantId    String
+  tenant      Tenant  @relation(fields: [tenantId], references: [id])
+  clientId    String? // null = operator default; set = per-client override
+  client      Client? @relation(fields: [clientId], references: [id])
+  code        String // e.g. "PHANTOM_BILLING", "DUAL_INVOICING", "UPCODING"
+  name        String
+  description String?
+  config      Json    @default("{}") // thresholds/parameters
+  weight      Int     @default(1) // score/severity weight
+  enabled     Boolean @default(true)
+
+  effectiveFrom DateTime  @default(now())
+  effectiveTo   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([tenantId, clientId, code])
+  @@index([tenantId, clientId])
+  @@index([tenantId, enabled])
+}
+
+enum FraudInvestigationStatus {
+  OPEN
+  IN_PROGRESS
+  SUBSTANTIATED
+  DISMISSED
+}
+
+model FraudInvestigation {
+  id           String                   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant                   @relation(fields: [tenantId], references: [id])
+  claimId      String?
+  fraudAlertId String?
+  status       FraudInvestigationStatus @default(OPEN)
+  assigneeId   String?
+  findings     String?
+  outcome      String?
+
+  openedAt DateTime  @default(now())
+  closedAt DateTime?
+
+  @@index([tenantId, status])
+  @@index([claimId])
 }
 
 enum FundTransactionType {
