@@ -31,7 +31,21 @@ meaningful step. Newest status at the top of each section.
   data backfill separately via `npx prisma db execute --file <sql> --schema prisma/schema.prisma`.
   (Tech-debt: migrations history should eventually be re-baselined to the DB.)
 
-### Current status
+### Current status (2026-07-02 session — wire-in phase)
+> **Adjudication wire-ins DONE:** G9.1 cost-share (CostShareResolver → both
+> adjudication paths, BenefitUsage.deductibleMet accumulator), G9.5 drug
+> exclusions (applyToClaim declines excluded lines at receipt), G3.7 execution
+> (AutoAdjudicationService.processIntake at claim-submission actions + offline
+> sync reconcile; AUTO_APPROVE executes via ClaimsService.adjudicateClaim, ROUTE
+> persists Claim.autoAdj* provenance + ROUTED log; reimbursements always route;
+> fail-safe never loses a claim). New system-actor.service (per-tenant
+> deactivated service user) for unattended writes — also fixed latent FK bug in
+> membership-activation.job (actorId "system" had no User row).
+> **In progress this session:** G5.10 member-payment call-site swap → jobs
+> (admin-fee accrual G2.3, fraud scan G5.11) → admin consoles (fraud,
+> compliance, DSR, admin-fee, drug exclusions, auto-adj policy editor).
+
+### Current status (previous session)
 > **Phases 1-3 core substantially COMPLETE across the plan.** All of: Rebrand §D,
 > G1.1 (compliance register), G1.2 (DPPA), G2.1, G2.3 (admin-fee), G2.4, G3.1,
 > G3.3, G3.4, G3.5 (full FX), G3.7, G4 (flow+balance), G5.2, G5.4, G5.5, G5.6,

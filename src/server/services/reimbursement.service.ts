@@ -13,7 +13,7 @@ import { prisma } from "@/lib/prisma";
 import { TRPCError } from "@trpc/server";
 import { ProofType, ReimbursementPaymentMethod } from "@prisma/client";
 import { auditChainService } from "./audit-chain.service";
-import { mpesaService } from "./integrations/mpesa.service";
+import { MobileMoneyService } from "./integrations/mobile-money.service";
 
 // Default reimbursement window: 90 days from service date
 const DEFAULT_REIMBURSEMENT_WINDOW_DAYS = 90;
@@ -61,7 +61,7 @@ export const reimbursementService = {
   }) {
     const member = await prisma.member.findUnique({
       where: { id: memberId, tenantId },
-      select: { status: true, firstName: true, lastName: true },
+      select: { status: true, firstName: true, lastName: true, phone: true },
     });
     if (!member) throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
     if (!["ACTIVE"].includes(member.status)) {
@@ -75,12 +75,15 @@ export const reimbursementService = {
     const windowCutoff = new Date(serviceDate.getTime() + windowDays * 24 * 60 * 60 * 1000);
     const submittedWithinWindow = new Date() <= windowCutoff;
 
-    // Run M-Pesa verification stub if confirmation code provided
+    // Mobile-money verification (G5.10): MTN MoMo / Airtel Money via the
+    // provider-agnostic facade, inferred from the member's MSISDN. Never trust
+    // the confirmation SMS itself — verify against the provider API.
+    // (mpesa* field names are the legacy DB columns; rename deferred.)
     let mpesaNote: string | undefined;
     let mpesaVerified = false;
     if (proofType === "MPESA_SMS" && mpesaConfirmationCode) {
-      const result = await mpesaService.verifyConfirmation(
-        mpesaConfirmationCode, totalPaidByMember, memberId,
+      const result = await MobileMoneyService.verify(
+        "AUTO", mpesaConfirmationCode, totalPaidByMember, member.phone ?? "",
       );
       mpesaVerified = result.verified;
       mpesaNote     = result.note;

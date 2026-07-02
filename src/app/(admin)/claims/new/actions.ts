@@ -172,7 +172,7 @@ export async function submitReimbursementClaimAction(data: {
   }
 
   if (!data.reimbursementBankName && !data.reimbursementMpesaPhone) {
-    throw new Error("Provide either bank account details or an M-Pesa phone number for the reimbursement payment.");
+    throw new Error("Provide either bank account details or a mobile-money phone number for the reimbursement payment.");
   }
 
   const billedAmount = data.lineItems.reduce((s, l) => s + l.billedAmount, 0);
@@ -229,7 +229,7 @@ export async function submitReimbursementClaimAction(data: {
         proofFileUrl:         data.proofFileUrl,
         mpesaConfirmationCode: data.mpesaConfirmationCode || null,
         mpesaNote:            data.proofType === "MPESA_SMS" && data.mpesaConfirmationCode
-          ? "M-Pesa Daraja verification not yet integrated — verify manually"
+          ? "Mobile-money verification pending provider API integration — verify manually (never trust the SMS alone)"
           : null,
         submittedWithinWindow: true,
         disbursementMethod:   data.reimbursementMpesaPhone ? "MPESA" : data.reimbursementBankName ? "BANK_TRANSFER" : null,

@@ -7,7 +7,7 @@ import { PaymentInitiationForm } from "./PaymentInitiationForm";
 
 const currency = new Intl.NumberFormat("en-UG", {
   style: "currency",
-  currency: "KES",
+  currency: "UGX",
   maximumFractionDigits: 0,
 });
 
@@ -51,9 +51,9 @@ export default async function MemberWalletPage() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-xs font-bold uppercase text-brand-text-muted">Member wallet</p>
-          <h1 className="mt-1 text-2xl font-bold text-brand-text-heading">M-Pesa Co-Contributions</h1>
+          <h1 className="mt-1 text-2xl font-bold text-brand-text-heading">Mobile-Money Co-Contributions</h1>
           <p className="mt-1 max-w-2xl text-sm text-brand-text-muted">
-            Pay confirmed member-share balances and track sandbox M-Pesa callbacks.
+            Pay confirmed member-share balances via MTN MoMo or Airtel Money and track sandbox callbacks.
           </p>
         </div>
         <div className="rounded-[8px] border border-[#EEEEEE] bg-white px-4 py-3 shadow-sm">
@@ -181,7 +181,7 @@ export default async function MemberWalletPage() {
           <div className="rounded-[8px] border border-dashed border-[#D6DCE5] bg-white p-8 text-center shadow-sm">
             <h3 className="text-base font-bold text-brand-text-heading">No outstanding member share</h3>
             <p className="mx-auto mt-2 max-w-xl text-sm text-brand-text-muted">
-              When a care event creates a co-contribution, it will appear here for M-Pesa collection.
+              When a care event creates a co-contribution, it will appear here for mobile-money collection.
             </p>
           </div>
         )}

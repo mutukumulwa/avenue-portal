@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { MemberAppService } from "@/server/services/member-app.service";
 import { MemberNotificationService } from "@/server/services/member-notification.service";
+import { MobileMoneyService } from "@/server/services/integrations/mobile-money.service";
 import crypto from "crypto";
 
 const PAYMENT_WINDOW_MINUTES = 5;
@@ -12,9 +13,9 @@ function toMoney(value: unknown) {
 
 function normalisePhone(phone: string) {
   const compact = phone.replace(/[^\d+]/g, "");
-  if (compact.startsWith("+254")) return compact;
-  if (compact.startsWith("254")) return `+${compact}`;
-  if (compact.startsWith("0")) return `+254${compact.slice(1)}`;
+  if (compact.startsWith("+256")) return compact;
+  if (compact.startsWith("256")) return `+${compact}`;
+  if (compact.startsWith("0")) return `+256${compact.slice(1)}`;
   return compact;
 }
 
@@ -52,7 +53,7 @@ export class MemberPaymentService {
         status: "TIMED_OUT",
         failedAt: now,
         resultCode: "TIMEOUT",
-        resultDescription: "No M-Pesa confirmation was received before the sandbox checkout expired.",
+        resultDescription: "No mobile-money confirmation was received before the sandbox checkout expired.",
       },
     });
 
@@ -195,9 +196,12 @@ export class MemberPaymentService {
     }
 
     const phoneNumber = normalisePhone(input.phoneNumber || transaction.member.phone || context.phone || "");
-    if (!/^\+254\d{9}$/.test(phoneNumber)) {
-      throw new Error("Enter a valid Kenyan M-Pesa phone number, for example +254712345678.");
+    if (!/^\+2567\d{8}$/.test(phoneNumber)) {
+      throw new Error("Enter a valid Ugandan mobile-money phone number, for example +256772345678.");
     }
+    // Provider-agnostic rail (G5.10): MTN MoMo / Airtel Money via MSISDN detection
+    const provider = MobileMoneyService.detectProvider(phoneNumber);
+    const providerLabel = provider === "MTN_MOMO" ? "MTN MoMo" : provider === "AIRTEL_MONEY" ? "Airtel Money" : "mobile money";
 
     const existing = await prisma.memberCoContributionPayment.findFirst({
       where: {
@@ -210,7 +214,7 @@ export class MemberPaymentService {
     });
     if (existing) return existing;
 
-    const checkoutRequestId = `AICARE-${crypto.randomUUID()}`;
+    const checkoutRequestId = `MEDVEX-${crypto.randomUUID()}`;
     const merchantRequestId = `MR-${crypto.randomUUID()}`;
 
     const payment = await prisma.memberCoContributionPayment.create({
@@ -231,8 +235,8 @@ export class MemberPaymentService {
       tenantId,
       memberId: transaction.memberId,
       type: "PAYMENT_STATUS",
-      title: "M-Pesa checkout requested",
-      body: `Confirm the M-Pesa prompt for KES ${Math.round(amountDue).toLocaleString("en-UG")}.`,
+      title: `${providerLabel} payment requested`,
+      body: `Confirm the ${providerLabel} prompt for UGX ${Math.round(amountDue).toLocaleString("en-UG")}.`,
       href: "/member/wallet",
       metadata: { paymentId: payment.id, checkoutRequestId: payment.checkoutRequestId },
     });
@@ -279,7 +283,7 @@ export class MemberPaymentService {
         memberId: payment.memberId,
         type: "PAYMENT_STATUS",
         priority: "HIGH",
-        title: "M-Pesa payment not completed",
+        title: "Mobile-money payment not completed",
         body: payload.resultDescription,
         href: "/member/wallet",
         metadata: { paymentId: payment.id, checkoutRequestId: payload.checkoutRequestId, resultCode },
@@ -326,8 +330,8 @@ export class MemberPaymentService {
       memberId: payment.memberId,
       type: "PAYMENT_STATUS",
       priority: "HIGH",
-      title: "M-Pesa payment confirmed",
-      body: `Your payment of KES ${Math.round(amount).toLocaleString("en-UG")} has been confirmed.`,
+      title: "Mobile-money payment confirmed",
+      body: `Your payment of UGX ${Math.round(amount).toLocaleString("en-UG")} has been confirmed.`,
       href: "/member/wallet",
       metadata: { paymentId: payment.id, checkoutRequestId: payload.checkoutRequestId, mpesaReceipt: payload.mpesaReceipt },
     });
