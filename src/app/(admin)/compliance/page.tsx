@@ -12,7 +12,7 @@ import { ShieldCheck } from "lucide-react";
 
 const OBLIGATION_TONE: Record<string, string> = {
   OK: "bg-brand-success/10 text-brand-success",
-  EXPIRING: "bg-brand-warning/10 text-brand-warning",
+  EXPIRING: "bg-[#FFC107]/15 text-[#856404]",
   EXPIRED: "bg-brand-error/10 text-brand-error",
   MISSING: "bg-brand-text-muted/10 text-brand-text-muted",
 };
@@ -86,7 +86,7 @@ export default async function CompliancePage({
       </section>
 
       {/* Director residency status */}
-      <section className={`rounded-lg border p-4 ${directorStatus.ok ? "border-brand-success/30 bg-brand-success/5" : "border-brand-warning/30 bg-brand-warning/5"}`}>
+      <section className={`rounded-lg border p-4 ${directorStatus.ok ? "border-brand-success/30 bg-brand-success/5" : "border-[#FFC107]/40 bg-[#FFC107]/5"}`}>
         <p className="text-sm text-brand-text-body">
           <strong>Director residency majority (IRA-UG):</strong> {directorStatus.resident} of {directorStatus.total} directors are Uganda-resident.{" "}
           {directorStatus.ok

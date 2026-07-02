@@ -153,7 +153,7 @@ export default async function AutoAdjudicationPage({
               <tr key={c.id}>
                 <td className="px-4 py-2.5 font-medium text-brand-text-heading">{c.claimNumber}</td>
                 <td className="px-4 py-2.5">
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${c.autoAdjDecision === "AUTO_APPROVE" ? "bg-brand-success/10 text-brand-success" : "bg-brand-warning/10 text-brand-warning"}`}>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${c.autoAdjDecision === "AUTO_APPROVE" ? "bg-brand-success/10 text-brand-success" : "bg-[#FFC107]/15 text-[#856404]"}`}>
                     {c.autoAdjDecision === "AUTO_APPROVE" ? "Auto-approved" : "Routed"}
                   </span>
                 </td>

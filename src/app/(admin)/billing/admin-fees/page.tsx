@@ -194,7 +194,7 @@ export default async function AdminFeesPage({
                 <td className="px-4 py-2.5 font-mono text-brand-text-muted">{e.basis != null ? Number(e.basis).toLocaleString() : "—"}</td>
                 <td className="px-4 py-2.5 font-mono text-brand-text-heading">{Number(e.amount).toLocaleString()} {e.currency}</td>
                 <td className="px-4 py-2.5">
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${e.status === "ACCRUED" ? "bg-brand-warning/10 text-brand-warning" : e.status === "INVOICED" ? "bg-brand-success/10 text-brand-success" : "bg-brand-text-muted/10 text-brand-text-muted"}`}>
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${e.status === "ACCRUED" ? "bg-[#FFC107]/15 text-[#856404]" : e.status === "INVOICED" ? "bg-brand-success/10 text-brand-success" : "bg-brand-text-muted/10 text-brand-text-muted"}`}>
                     {e.status}
                   </span>
                 </td>

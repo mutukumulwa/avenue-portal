@@ -45,7 +45,7 @@ export default async function FraudInvestigationsPage({
     s === "SUBSTANTIATED" ? "bg-brand-error/10 text-brand-error"
     : s === "DISMISSED" ? "bg-brand-text-muted/10 text-brand-text-muted"
     : s === "IN_PROGRESS" ? "bg-brand-indigo/10 text-brand-indigo"
-    : "bg-brand-warning/10 text-brand-warning";
+    : "bg-[#FFC107]/15 text-[#856404]";
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-6">

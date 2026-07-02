@@ -11,7 +11,7 @@ import { SubmitButton } from "@/components/ui/SubmitButton";
 import { Lock } from "lucide-react";
 
 const DSR_TONE: Record<string, string> = {
-  RECEIVED: "bg-brand-warning/10 text-brand-warning",
+  RECEIVED: "bg-[#FFC107]/15 text-[#856404]",
   IN_PROGRESS: "bg-brand-indigo/10 text-brand-indigo",
   FULFILLED: "bg-brand-success/10 text-brand-success",
   REJECTED: "bg-brand-text-muted/10 text-brand-text-muted",
