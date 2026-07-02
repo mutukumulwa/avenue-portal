@@ -76,6 +76,7 @@ model Tenant {
   offlineReservations            OfflineReservation[]
   eligibilitySnapshots           EligibilitySnapshot[]
   autoAdjudicationPolicies       AutoAdjudicationPolicy[]
+  drugExclusions                 DrugExclusion[]
 }
 
 // ── Multi-client TPA tenancy (Medvex spec §2.1 / gap G2.1) ──────────────
@@ -144,6 +145,7 @@ model Client {
   providerTariffs    ProviderTariff[]
   autoAdjudicationPolicies AutoAdjudicationPolicy[]
   copayRules         CoContributionRule[]
+  drugExclusions     DrugExclusion[]
 
   @@unique([operatorTenantId, slug])
   @@index([operatorTenantId])
@@ -1853,6 +1855,30 @@ enum SettlementStatus {
   REJECTED
 }
 
+// Drug-level exclusion control (Medvex spec §H.2 / gap G9.5). An excluded-drug
+// list per client and/or package, enforced at adjudication against
+// ClaimLine.drugCode. Never-delete (effective dating).
+model DrugExclusion {
+  id        String  @id @default(cuid())
+  tenantId  String
+  tenant    Tenant  @relation(fields: [tenantId], references: [id])
+  clientId  String? // null = applies to all clients
+  client    Client? @relation(fields: [clientId], references: [id])
+  packageId String? // null = applies to all packages
+
+  drugCode String // ATC/NDC or local register code
+  drugName String?
+  reason   String?
+
+  effectiveFrom DateTime  @default(now())
+  effectiveTo   DateTime?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+
+  @@index([tenantId, drugCode])
+  @@index([tenantId, clientId])
+}
+
 model ClaimLine {
   id                   String             @id @default(cuid())
   claimId              String
@@ -1862,6 +1888,7 @@ model ClaimLine {
   description          String
   icdCode              String? // Diagnosis code for this line (may differ from claim header)
   cptCode              String?
+  drugCode             String? // ATC/NDC or local drug-register code (G9.2/G9.5)
   quantity             Int                @default(1)
   unitCost             Decimal
   billedAmount         Decimal
