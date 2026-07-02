@@ -84,6 +84,10 @@ model Tenant {
   directorRegister               DirectorRegister[]
   indemnityCovers                IndemnityCover[]
   complianceLevyComputations     ComplianceLevyComputation[]
+  consentRecords                 ConsentRecord[]
+  dataSubjectRequests            DataSubjectRequest[]
+  processorRegister              ProcessorRegister[]
+  breachIncidents                BreachIncident[]
 }
 
 // ── Multi-client TPA tenancy (Medvex spec §2.1 / gap G2.1) ──────────────
@@ -517,6 +521,98 @@ model ComplianceLevyComputation {
 
   @@unique([tenantId, period])
   @@index([tenantId])
+}
+
+// ── Data protection (Uganda DPPA-2019 / gap G1.2) ──────────────────────
+// Consent ledger, data-subject-rights handling, processor/sub-processor
+// register, and breach workflow. PDPO (NITA-U) is the UG analogue of Kenya's
+// ODPC. memberId is a scalar ref (avoids widening the Member model here).
+model ConsentRecord {
+  id          String    @id @default(cuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  memberId    String
+  purpose     String // e.g. "CLAIMS_PROCESSING", "HEALTH_DATA_SHARING"
+  lawfulBasis String // e.g. "CONSENT", "CONTRACT", "LEGAL_OBLIGATION"
+  version     String // consent-notice version
+  channel     String? // ONBOARDING | PORTAL | USSD
+  grantedAt   DateTime  @default(now())
+  withdrawnAt DateTime?
+
+  @@index([tenantId, memberId])
+  @@index([tenantId, memberId, purpose])
+}
+
+enum DsrType {
+  ACCESS
+  CORRECTION
+  OBJECTION
+  ERASURE
+}
+
+enum DsrStatus {
+  RECEIVED
+  IN_PROGRESS
+  FULFILLED
+  REJECTED
+}
+
+model DataSubjectRequest {
+  id            String    @id @default(cuid())
+  tenantId      String
+  tenant        Tenant    @relation(fields: [tenantId], references: [id])
+  memberId      String
+  type          DsrType
+  status        DsrStatus @default(RECEIVED)
+  slaDeadlineAt DateTime // statutory fulfilment deadline
+  fulfilmentRef String? // export/endorsement artefact
+  notes         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([tenantId, status])
+  @@index([tenantId, memberId])
+}
+
+model ProcessorRegister {
+  id             String   @id @default(cuid())
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+  name           String
+  role           String // "PROCESSOR" | "SUB_PROCESSOR"
+  dataCategories String[]
+  location       String? // data-residency / cross-border assessment
+  dpaRef         String? // data-processing-agreement ref
+  subProcessors  String[]
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+enum BreachSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model BreachIncident {
+  id                String         @id @default(cuid())
+  tenantId          String
+  tenant            Tenant         @relation(fields: [tenantId], references: [id])
+  detectedAt        DateTime
+  scope             String
+  severity          BreachSeverity
+  notifiableBy      DateTime? // regulator-notification deadline
+  regulatorNotified Boolean        @default(false)
+  narrative         String?
+  remediation       String?
+  createdAt         DateTime       @default(now())
+
+  @@index([tenantId])
+  @@index([tenantId, severity])
 }
 
 enum FundTransactionType {
