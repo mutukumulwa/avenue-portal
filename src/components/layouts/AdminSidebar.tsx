@@ -9,7 +9,7 @@ import {
   Settings, LogOut, Calculator, UserCheck, MessageSquareText,
   ShieldAlert, MessageSquareWarning, Wallet, Fingerprint,
   BarChart3, TriangleAlert, Landmark, ClipboardCheck, CloudOff, LayoutGrid,
-  ShieldCheck, Lock,
+  ShieldCheck, Lock, FileSignature,
 } from "lucide-react";
 import { PortalSwitcher } from "./PortalSwitcher";
 import { useState } from "react";
@@ -54,6 +54,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Exceptions",         href: "/settings/exceptions",icon: TriangleAlert,  roles: OPS        },
       { label: "Secure Check-Ins",   href: "/check-ins",          icon: Fingerprint,    roles: OPS        },
       { label: "Providers",          href: "/providers",          icon: Building,       roles: ADMIN_ONLY },
+      { label: "Contracts",          href: "/contracts",          icon: FileSignature,  roles: UNDERWRITING },
     ],
   },
   {
