@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { writeAudit } from "@/lib/audit";
 import { FraudService } from "@/server/services/fraud.service";
+import { AutoAdjudicationService } from "@/server/services/auto-adjudication.service";
 import type { ServiceType, BenefitCategory, ClaimLineCategory } from "@prisma/client";
 
 interface LineItemInput {
@@ -121,6 +122,10 @@ export async function submitClaimAction(data: {
 
   await FraudService.evaluateClaim(claim.id, session.user.tenantId);
 
+  // Intake pipeline (G3.7/G9.5): drug exclusions + auto-adjudication.
+  // Runs after fraud evaluation so open alerts gate auto-approval.
+  await AutoAdjudicationService.processIntake(tenantId, claim.id, session.user.id);
+
   await writeAudit({
     userId: session.user.id,
     action: "CLAIM_SUBMITTED",
@@ -233,6 +238,10 @@ export async function submitReimbursementClaimAction(data: {
   }
 
   await FraudService.evaluateClaim(claim.id, tenantId);
+
+  // Intake pipeline: reimbursements always ROUTE (manual proof verification),
+  // but excluded-drug lines are still declined at receipt.
+  await AutoAdjudicationService.processIntake(tenantId, claim.id, session.user.id);
 
   await writeAudit({
     userId: session.user.id,

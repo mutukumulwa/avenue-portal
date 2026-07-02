@@ -47,4 +47,56 @@ export class DrugExclusionService {
     for (const l of lines) (this.isExcluded(l.drugCode, excluded) ? ex : ok).push(l);
     return { excluded: ex, payable: ok };
   }
+
+  /**
+   * Intake enforcement: DECLINE every claim line whose drugCode is on the
+   * effective (client, package) exclusion list, with the reason recorded on the
+   * line. Returns the excluded count/amount and the remaining payable amount so
+   * the intake pipeline can adjudicate on the net.
+   */
+  static async applyToClaim(
+    tenantId: string,
+    claimId: string,
+  ): Promise<{ excludedCount: number; excludedAmount: number; payableAmount: number }> {
+    const claim = await prisma.claim.findUnique({
+      where: { id: claimId, tenantId },
+      select: {
+        dateOfService: true,
+        claimLines: { select: { id: true, drugCode: true, billedAmount: true, adjudicationDecision: true } },
+        member: { select: { packageId: true, group: { select: { clientId: true } } } },
+      },
+    });
+    if (!claim) return { excludedCount: 0, excludedAmount: 0, payableAmount: 0 };
+
+    const excluded = await this.getExcludedCodes(tenantId, {
+      clientId: claim.member?.group?.clientId ?? null,
+      packageId: claim.member?.packageId ?? null,
+      date: claim.dateOfService,
+    });
+
+    let excludedCount = 0;
+    let excludedAmount = 0;
+    let payableAmount = 0;
+
+    for (const line of claim.claimLines) {
+      if (this.isExcluded(line.drugCode, excluded)) {
+        excludedCount += 1;
+        excludedAmount += Number(line.billedAmount);
+        if (line.adjudicationDecision !== "DECLINED") {
+          await prisma.claimLine.update({
+            where: { id: line.id },
+            data: {
+              adjudicationDecision: "DECLINED",
+              approvedAmount: 0,
+              declineReason: `Drug ${line.drugCode?.trim().toUpperCase()} is excluded for this client/package (G9.5)`,
+            },
+          });
+        }
+      } else {
+        payableAmount += Number(line.billedAmount);
+      }
+    }
+
+    return { excludedCount, excludedAmount, payableAmount };
+  }
 }

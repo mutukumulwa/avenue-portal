@@ -1,4 +1,7 @@
 import { prisma } from "@/lib/prisma";
+import { FraudService } from "./fraud.service";
+import { AutoAdjudicationService } from "./auto-adjudication.service";
+import { getSystemActorId } from "./system-actor.service";
 
 /**
  * Store-and-forward sync rail (Medvex spec §4 / gap G4).
@@ -168,7 +171,7 @@ export class SyncService {
     const count = await prisma.claim.count({ where: { tenantId } });
     const claimNumber = `CLM-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
 
-    await prisma.claim.create({
+    const created = await prisma.claim.create({
       data: {
         tenantId,
         claimNumber,
@@ -199,6 +202,14 @@ export class SyncService {
         },
       },
     });
+
+    // Intake pipeline (G3.7/G9.5): fraud signals, drug exclusions, then
+    // auto-adjudication under the system actor. processIntake never throws —
+    // any pipeline failure routes the claim to manual review.
+    const systemActorId = await getSystemActorId(tenantId);
+    await FraudService.evaluateClaim(created.id, tenantId).catch(() => undefined);
+    await AutoAdjudicationService.processIntake(tenantId, created.id, systemActorId);
+
     return { state: "SYNCED" };
   }
 

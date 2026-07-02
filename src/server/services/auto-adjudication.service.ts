@@ -1,5 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { claimAdjudicationService } from "./claim-adjudication.service";
+import { DrugExclusionService } from "./drug-exclusion.service";
+import { ClaimsService } from "./claims.service";
+import { auditChainService } from "./audit-chain.service";
 
 /**
  * Auto-adjudication (Medvex spec §3.7 / gap G3.7). Clean, low-risk claims that
@@ -99,5 +102,124 @@ export class AutoAdjudicationService {
     }
 
     return { decision: "AUTO_APPROVE", reason: "All gates passed within policy", policyId };
+  }
+
+  /**
+   * Intake pipeline (G3.7 execution + G9.5 enforcement). Runs at claim receipt:
+   * 1. Drug exclusions — DECLINE excluded lines with the reason on the line.
+   * 2. Evaluate auto-adjudication (reimbursements always route: proof docs
+   *    need human eyes).
+   * 3. AUTO_APPROVE → executes the approval through the standard adjudication
+   *    machinery (tariff stamping, benefit reservation, cost-share, logs);
+   *    ROUTE → records the named failing gate on the claim + adjudication log.
+   * Never throws — an intake pipeline failure must not lose the claim; it
+   * routes to manual review instead.
+   */
+  static async processIntake(
+    tenantId: string,
+    claimId: string,
+    actorId: string,
+  ): Promise<AutoAdjResult & { executed: boolean }> {
+    try {
+      const exclusions = await DrugExclusionService.applyToClaim(tenantId, claimId);
+
+      const claim = await prisma.claim.findUnique({
+        where: { id: claimId, tenantId },
+        select: { isReimbursement: true, billedAmount: true, claimNumber: true, status: true, claimLines: { select: { id: true } } },
+      });
+      if (!claim) return { decision: "ROUTE", failingGate: "CLAIM_NOT_FOUND", reason: "Claim not found", policyId: null, executed: false };
+
+      let result: AutoAdjResult;
+      if (claim.isReimbursement) {
+        result = {
+          decision: "ROUTE",
+          failingGate: "REIMBURSEMENT_MANUAL_REVIEW",
+          reason: "Reimbursement claims require manual proof-of-payment verification",
+          policyId: null,
+        };
+      } else if (exclusions.excludedCount > 0 && exclusions.payableAmount === 0) {
+        result = {
+          decision: "ROUTE",
+          failingGate: "ALL_LINES_EXCLUDED",
+          reason: `All ${exclusions.excludedCount} line(s) carry excluded drugs`,
+          policyId: null,
+        };
+      } else {
+        result = await this.evaluateClaim(tenantId, claimId);
+      }
+
+      await prisma.claim.update({
+        where: { id: claimId },
+        data: {
+          autoAdjDecision: result.decision,
+          autoAdjFailingGate: result.failingGate ?? null,
+          autoAdjPolicyId: result.policyId,
+          autoAdjudicatedAt: new Date(),
+        },
+      });
+
+      if (result.decision === "ROUTE") {
+        await prisma.adjudicationLog.create({
+          data: {
+            claimId,
+            userId: actorId,
+            action: "ROUTED",
+            fromStatus: claim.status,
+            toStatus: claim.status,
+            notes: `Routed to manual review — ${result.failingGate}: ${result.reason}`,
+          },
+        });
+        return { ...result, executed: false };
+      }
+
+      // AUTO_APPROVE — approve the payable lines at billed, then execute the
+      // claim-level approval through the standard machinery.
+      const undecided = await prisma.claimLine.findMany({
+        where: { claimId, adjudicationDecision: null },
+        select: { id: true, billedAmount: true },
+      });
+      for (const line of undecided) {
+        await prisma.claimLine.update({
+          where: { id: line.id },
+          data: { adjudicationDecision: "APPROVED", approvedAmount: line.billedAmount },
+        });
+      }
+
+      const approvedAmount =
+        claim.claimLines.length > 0 ? exclusions.payableAmount : Number(claim.billedAmount);
+      const action = exclusions.excludedCount > 0 ? ("PARTIALLY_APPROVED" as const) : ("APPROVED" as const);
+
+      await ClaimsService.adjudicateClaim(tenantId, claimId, {
+        action,
+        approvedAmount,
+        reviewerId: actorId,
+        notes: `Auto-adjudicated (policy ${result.policyId ?? "built-in default"})${
+          exclusions.excludedCount > 0 ? ` — ${exclusions.excludedCount} excluded-drug line(s) declined` : ""
+        }`,
+      });
+
+      await auditChainService.append({
+        actorId,
+        action: "CLAIM:AUTO_APPROVED",
+        module: "CLAIM",
+        entityType: "Claim",
+        entityId: claimId,
+        payload: { approvedAmount, policyId: result.policyId, excludedLines: exclusions.excludedCount },
+        tenantId,
+        description: `Claim ${claim.claimNumber} auto-approved — ${approvedAmount.toLocaleString("en-UG")} (policy ${result.policyId ?? "default"})`,
+      });
+
+      return { ...result, executed: true };
+    } catch (err) {
+      // Fail-safe: never lose the claim; leave it for manual review.
+      const reason = err instanceof Error ? err.message : String(err);
+      await prisma.claim
+        .update({
+          where: { id: claimId },
+          data: { autoAdjDecision: "ROUTE", autoAdjFailingGate: "PIPELINE_ERROR", autoAdjudicatedAt: new Date() },
+        })
+        .catch(() => undefined);
+      return { decision: "ROUTE", failingGate: "PIPELINE_ERROR", reason, policyId: null, executed: false };
+    }
   }
 }

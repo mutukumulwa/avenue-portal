@@ -1,14 +1,24 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
-  claim: { findUnique: vi.fn() },
+  claim: { findUnique: vi.fn(), update: vi.fn(async () => ({})) },
+  claimLine: { findMany: vi.fn(async (): Promise<any[]> => []), update: vi.fn(async () => ({})) },
+  adjudicationLog: { create: vi.fn(async () => ({})) },
   autoAdjudicationPolicy: { findMany: vi.fn(async (): Promise<any[]> => []) },
   claimFraudAlert: { count: vi.fn(async () => 0) },
 }));
 const gate = vi.hoisted(() => ({ runHardGateValidation: vi.fn(async () => ({ passed: true, errors: [] as string[] })) }));
+const exclusions = vi.hoisted(() => ({
+  applyToClaim: vi.fn(async () => ({ excludedCount: 0, excludedAmount: 0, payableAmount: 50000 })),
+}));
+const claimsSvc = vi.hoisted(() => ({ adjudicateClaim: vi.fn(async () => ({})) }));
+const audit = vi.hoisted(() => ({ append: vi.fn(async () => ({})) }));
 
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
 vi.mock("@/server/services/claim-adjudication.service", () => ({ claimAdjudicationService: gate }));
+vi.mock("@/server/services/drug-exclusion.service", () => ({ DrugExclusionService: exclusions }));
+vi.mock("@/server/services/claims.service", () => ({ ClaimsService: claimsSvc }));
+vi.mock("@/server/services/audit-chain.service", () => ({ auditChainService: audit }));
 
 import { AutoAdjudicationService } from "@/server/services/auto-adjudication.service";
 
@@ -76,5 +86,90 @@ describe("AutoAdjudicationService.evaluateClaim (G3.7)", () => {
     // The client policy's ceiling (100k) applies → routes; proves client wins.
     expect(r.policyId).toBe("cl");
     expect(r.decision).toBe("ROUTE");
+  });
+});
+
+describe("AutoAdjudicationService.processIntake — execution pipeline (G3.7/G9.5)", () => {
+  const intakeClaim = (over: any = {}) => ({
+    ...claim(),
+    isReimbursement: false,
+    claimNumber: "CLM-2026-00001",
+    status: "RECEIVED",
+    claimLines: [{ id: "l1" }],
+    ...over,
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    db.claim.findUnique.mockResolvedValue(intakeClaim());
+    db.autoAdjudicationPolicy.findMany.mockResolvedValue([]);
+    db.claimFraudAlert.count.mockResolvedValue(0);
+    db.claimLine.findMany.mockResolvedValue([{ id: "l1", billedAmount: 50000 }]);
+    gate.runHardGateValidation.mockResolvedValue({ passed: true, errors: [] });
+    exclusions.applyToClaim.mockResolvedValue({ excludedCount: 0, excludedAmount: 0, payableAmount: 50000 });
+  });
+
+  it("AUTO_APPROVE executes through the standard adjudication machinery", async () => {
+    const r = await AutoAdjudicationService.processIntake("t1", "clm1", "u1");
+    expect(r.decision).toBe("AUTO_APPROVE");
+    expect(r.executed).toBe(true);
+    // Undecided lines approved at billed
+    expect(db.claimLine.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "l1" }, data: expect.objectContaining({ adjudicationDecision: "APPROVED" }) }),
+    );
+    expect(claimsSvc.adjudicateClaim).toHaveBeenCalledWith("t1", "clm1", expect.objectContaining({
+      action: "APPROVED", approvedAmount: 50000, reviewerId: "u1",
+    }));
+    expect(audit.append).toHaveBeenCalledWith(expect.objectContaining({ action: "CLAIM:AUTO_APPROVED" }));
+    // Provenance persisted on the claim
+    expect(db.claim.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ autoAdjDecision: "AUTO_APPROVE" }) }),
+    );
+  });
+
+  it("routes with the failing gate persisted + logged (no execution)", async () => {
+    gate.runHardGateValidation.mockResolvedValue({ passed: false, errors: ["Double-capture: dup"] });
+    const r = await AutoAdjudicationService.processIntake("t1", "clm1", "u1");
+    expect(r.decision).toBe("ROUTE");
+    expect(r.executed).toBe(false);
+    expect(claimsSvc.adjudicateClaim).not.toHaveBeenCalled();
+    expect(db.adjudicationLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ action: "ROUTED" }) }),
+    );
+    expect(db.claim.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ autoAdjDecision: "ROUTE" }) }),
+    );
+  });
+
+  it("excluded-drug lines make the approval PARTIAL on the payable net", async () => {
+    exclusions.applyToClaim.mockResolvedValue({ excludedCount: 1, excludedAmount: 20000, payableAmount: 30000 });
+    const r = await AutoAdjudicationService.processIntake("t1", "clm1", "u1");
+    expect(r.executed).toBe(true);
+    expect(claimsSvc.adjudicateClaim).toHaveBeenCalledWith("t1", "clm1", expect.objectContaining({
+      action: "PARTIALLY_APPROVED", approvedAmount: 30000,
+    }));
+  });
+
+  it("routes ALL_LINES_EXCLUDED when nothing is payable", async () => {
+    exclusions.applyToClaim.mockResolvedValue({ excludedCount: 2, excludedAmount: 50000, payableAmount: 0 });
+    const r = await AutoAdjudicationService.processIntake("t1", "clm1", "u1");
+    expect(r.decision).toBe("ROUTE");
+    expect(r.failingGate).toBe("ALL_LINES_EXCLUDED");
+    expect(claimsSvc.adjudicateClaim).not.toHaveBeenCalled();
+  });
+
+  it("reimbursements always route for manual proof verification", async () => {
+    db.claim.findUnique.mockResolvedValue(intakeClaim({ isReimbursement: true }));
+    const r = await AutoAdjudicationService.processIntake("t1", "clm1", "u1");
+    expect(r.decision).toBe("ROUTE");
+    expect(r.failingGate).toBe("REIMBURSEMENT_MANUAL_REVIEW");
+  });
+
+  it("never throws — a pipeline error routes to manual review", async () => {
+    exclusions.applyToClaim.mockRejectedValue(new Error("boom"));
+    const r = await AutoAdjudicationService.processIntake("t1", "clm1", "u1");
+    expect(r.decision).toBe("ROUTE");
+    expect(r.failingGate).toBe("PIPELINE_ERROR");
+    expect(r.executed).toBe(false);
   });
 });

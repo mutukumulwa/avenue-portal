@@ -10,6 +10,7 @@
 
 import { prisma } from "@/lib/prisma";
 import { auditChainService } from "../services/audit-chain.service";
+import { getSystemActorId } from "../services/system-actor.service";
 
 export async function runMembershipActivationJob() {
   const today = new Date();
@@ -72,7 +73,7 @@ export async function runMembershipActivationJob() {
         totalActivated++;
 
         await auditChainService.append({
-          actorId: "system",
+          actorId: await getSystemActorId(tenantId),
           action: "MEMBER:ACTIVATED",
           module: "BINDING",
           entityType: "Member",
@@ -96,7 +97,7 @@ export async function runMembershipActivationJob() {
           totalLapsed++;
 
           await auditChainService.append({
-            actorId: "system",
+            actorId: await getSystemActorId(tenantId),
             action: "MEMBER:LAPSED_BEFORE_ACTIVATION",
             module: "BINDING",
             entityType: "Member",

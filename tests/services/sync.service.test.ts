@@ -12,7 +12,14 @@ const db = vi.hoisted(() => ({
   claim: { findFirst: vi.fn(async (): Promise<any> => null), count: vi.fn(async () => 0), create: vi.fn(async () => ({ id: "clm1" })) },
 }));
 
+const intake = vi.hoisted(() => ({
+  processIntake: vi.fn(async () => ({ decision: "ROUTE", reason: "test", policyId: null, executed: false })),
+}));
+
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
+vi.mock("@/server/services/fraud.service", () => ({ FraudService: { evaluateClaim: vi.fn(async () => ({})) } }));
+vi.mock("@/server/services/auto-adjudication.service", () => ({ AutoAdjudicationService: intake }));
+vi.mock("@/server/services/system-actor.service", () => ({ getSystemActorId: vi.fn(async () => "sys-user-1") }));
 
 import { SyncService } from "@/server/services/sync.service";
 
