@@ -79,6 +79,11 @@ model Tenant {
   drugExclusions                 DrugExclusion[]
   adminFeeAgreements             AdminFeeAgreement[]
   adminFeeLedgerEntries          AdminFeeLedgerEntry[]
+  regulatoryLicences             RegulatoryLicence[]
+  securityDeposits               SecurityDeposit[]
+  directorRegister               DirectorRegister[]
+  indemnityCovers                IndemnityCover[]
+  complianceLevyComputations     ComplianceLevyComputation[]
 }
 
 // ── Multi-client TPA tenancy (Medvex spec §2.1 / gap G2.1) ──────────────
@@ -422,6 +427,96 @@ model AdminFeeLedgerEntry {
 
   @@index([tenantId, clientId, period])
   @@index([tenantId, status])
+}
+
+// ── TPA compliance register (Medvex spec §1.1 / gap G1.1) ───────────────
+// The operator's own regulatory standing (IRA-UG): licence, security deposit,
+// director register, indemnity cover, and the annual compliance-levy return
+// (computed from the admin-fee ledger — the fees-received system of record).
+enum LicenceStatus {
+  ACTIVE
+  EXPIRED
+  SUSPENDED
+  PENDING
+}
+
+model RegulatoryLicence {
+  id          String        @id @default(cuid())
+  tenantId    String
+  tenant      Tenant        @relation(fields: [tenantId], references: [id])
+  type        String // e.g. "TPA_LICENCE"
+  number      String
+  issuer      String        @default("IRA-UG")
+  issuedAt    DateTime
+  expiresAt   DateTime
+  status      LicenceStatus @default(ACTIVE)
+  documentRef String? // MinIO object ref
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([tenantId])
+  @@index([tenantId, expiresAt])
+}
+
+model SecurityDeposit {
+  id          String    @id @default(cuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  amount      Decimal
+  currency    String    @default("UGX")
+  evidenceRef String?
+  verifiedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([tenantId])
+}
+
+model DirectorRegister {
+  id            String    @id @default(cuid())
+  tenantId      String
+  tenant        Tenant    @relation(fields: [tenantId], references: [id])
+  name          String
+  role          String?
+  isResident    Boolean   @default(false) // Uganda-resident director flag
+  appointedAt   DateTime
+  effectiveFrom DateTime  @default(now())
+  effectiveTo   DateTime?
+  isActive      Boolean   @default(true)
+
+  @@index([tenantId])
+  @@index([tenantId, isActive])
+}
+
+model IndemnityCover {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  insurer     String
+  sumInsured  Decimal
+  currency    String   @default("UGX")
+  periodStart DateTime
+  periodEnd   DateTime
+  documentRef String?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId])
+}
+
+model ComplianceLevyComputation {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  tenant             Tenant   @relation(fields: [tenantId], references: [id])
+  period             String // e.g. "2026"
+  feesReceivedBasis  Decimal // from the admin-fee ledger
+  ratePercent        Decimal // levy rate applied
+  amount             Decimal
+  currency           String   @default("UGX")
+  status             String   @default("DRAFT") // DRAFT | FILED
+  generatedReturnRef String?
+  createdAt          DateTime @default(now())
+
+  @@unique([tenantId, period])
+  @@index([tenantId])
 }
 
 enum FundTransactionType {
