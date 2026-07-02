@@ -31,27 +31,78 @@ meaningful step. Newest status at the top of each section.
   data backfill separately via `npx prisma db execute --file <sql> --schema prisma/schema.prisma`.
   (Tech-debt: migrations history should eventually be re-baselined to the DB.)
 
-### Current status (2026-07-02 session — wire-in phase)
-> **Adjudication wire-ins DONE:** G9.1 cost-share (CostShareResolver → both
-> adjudication paths, BenefitUsage.deductibleMet accumulator), G9.5 drug
-> exclusions (applyToClaim declines excluded lines at receipt), G3.7 execution
-> (AutoAdjudicationService.processIntake at claim-submission actions + offline
-> sync reconcile; AUTO_APPROVE executes via ClaimsService.adjudicateClaim, ROUTE
-> persists Claim.autoAdj* provenance + ROUTED log; reimbursements always route;
-> fail-safe never loses a claim). New system-actor.service (per-tenant
-> deactivated service user) for unattended writes — also fixed latent FK bug in
-> membership-activation.job (actorId "system" had no User row).
+### Current status (2026-07-02 session — wire-in + consoles phase COMPLETE)
+> **The entire "layer on top of the engines" is now built, wired, and
+> in-browser-verified.** Suite 229/229; typecheck + brand guard green. This
+> session closed every documented follow-up from the previous status block.
+>
+> **Adjudication wire-ins DONE** (commit before consoles):
+> - G9.1 cost-share — `CostShareResolver` (cost-share.service.ts) resolves
+>   BenefitConfig (coInsurancePct/deductibleAmount/copayPercentage) for the
+>   member's package + enrollment-anniversary period, computes the split,
+>   persists running `BenefitUsage.deductibleMet`. Wired into BOTH
+>   `ClaimsService.adjudicateClaim` (replaced hard-coded 10% copay) and
+>   `claimAdjudicationService.approveClaim` (Process 9).
+> - G9.5 drug exclusions — `DrugExclusionService.applyToClaim` declines
+>   excluded-drug lines at intake (client/package-scoped, idempotent).
+> - G3.7 execution — `AutoAdjudicationService.processIntake` (exclusions →
+>   evaluate → execute). AUTO_APPROVE runs the real approval via
+>   `ClaimsService.adjudicateClaim`; ROUTE persists `Claim.autoAdj*` provenance
+>   + a ROUTED adjudication log. Reimbursements always route. Fail-safe: any
+>   pipeline error routes, never loses the claim. Wired into both claim-submit
+>   server actions AND the offline `sync.service` reconcile (added fraud eval
+>   there too).
+> - `system-actor.service.ts` — per-tenant deactivated service User for
+>   unattended writes (offline sync, jobs); fixed a latent FK bug in
+>   membership-activation.job (actorId "system" had no matching User row).
+> - Schema (db push, additive): `Claim.autoAdjDecision/autoAdjFailingGate/
+>   autoAdjPolicyId/autoAdjudicatedAt`, `Claim.costShareDeductible/
+>   costShareCoInsurance`, `BenefitUsage.deductibleMet`.
+>
 > **G5.10 call-site swap DONE:** reimbursement verification → MobileMoneyService
 > (AUTO MSISDN detection); member-payment rail on Uganda MSISDNs (+2567…),
 > provider-aware notifications, UGX copy in wallet UI. mpesa* DB columns kept
 > (cosmetic rename deferred, same as iprs*).
-> **Jobs DONE:** AdminFeeService.accrueRecurringForPeriod (PMPM/FLAT/PCT_OF_CLAIMS,
-> idempotent per agreement+period) via daily admin-fee-accrual job (03:30 EAT,
-> billing queue); FraudEngineService.scanRecentClaims (config-driven UPCODING/
-> HIGH_FREQUENCY/IDENTITY_SHARING/PHANTOM_BILLING) via 6-hourly fraud-scan job.
-> **In progress this session:** admin consoles — auto-adj policy editor, drug
-> exclusions, fraud (rules+alerts+investigations), admin-fee agreements+ledger,
-> compliance register, DSR console.
+>
+> **Jobs DONE:** `AdminFeeService.accrueRecurringForPeriod` (PMPM/FLAT/
+> PCT_OF_CLAIMS, idempotent per agreement+period) via daily admin-fee-accrual
+> job (03:30 EAT, billing queue); `FraudEngineService.scanRecentClaims`
+> (config-driven UPCODING/HIGH_FREQUENCY/IDENTITY_SHARING/PHANTOM_BILLING) via
+> 6-hourly fraud-scan job. Both registered in queue.ts + worker.ts.
+>
+> **Admin consoles DONE (all in-browser verified):**
+> - `/settings/auto-adjudication` — policy editor (never-delete supersede) +
+>   recent-decisions view. Verified: new 500k policy superseded seeded 100k.
+> - `/settings/drug-exclusions` — client/package-scoped exclusion editor.
+> - `/fraud/rules` — configurable rule editor (code/scope/weight/JSON config)
+>   + enable/disable. `/fraud/investigations` — open→assign→resolve workflow;
+>   alert desk gained a one-click "open investigation" action.
+> - `/billing/admin-fees` — agreement editor + ledger + "Run accrual now" +
+>   "Invoice accrued". Verified: PMPM 5,000 × 248 members = 1,240,000 UGX.
+> - `/compliance` — obligation traffic-lights, director residency majority,
+>   licence/director capture, IRA levy compute. Verified: 1,240,000 × 0.5% =
+>   6,200 UGX.
+> - `/compliance/privacy` — DSR intake (30-day SLA), processor register, breach
+>   workflow (72h clock). Verified: processor registered.
+> - Sidebar: Setup (auto-adj, drug-exclusions), Fraud (investigations, rules),
+>   Finance (admin fees), new Compliance group.
+>
+> ### Next concrete step (what actually remains)
+> Everything left is **externally-gated integrations or Phase 4-5 depth** — no
+> more "wire the built engine into the UI" work. Candidates, roughly by
+> buildability without external creds:
+> - **G5.15 cross-border** (Phase 4-5): model + service for cross-border claims/
+>   settlement (partially seeded via AdminFeeMethod.CROSS_BORDER). Buildable.
+> - **NIRA / MoMo / Airtel provider APIs**: adapters are stubs returning
+>   `verified:false`; real calls need `NIRA_*` / `MOMO_*` / `AIRTEL_*` creds +
+>   sandbox provisioning (external). Leave as stubs.
+> - **SMS aggregator P-03**: USSD/SMS claim channels need an aggregator account
+>   (external). `ussd.service`/`sms-query.service` exist as scaffolds.
+> - **FHIR / EDI (G8)**: clinical/claims interchange — large, needs partner
+>   specs (external).
+> - **HA/DR + ops docs** (Phase 5): documentation deliverables, no code.
+> - Optional polish: rename mpesa*/iprs* DB columns (cosmetic), re-baseline
+>   Prisma migrations to the DB (tech-debt noted below).
 
 ### Current status (previous session)
 > **Phases 1-3 core substantially COMPLETE across the plan.** All of: Rebrand §D,
@@ -233,11 +284,55 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
 | Security slice | 2FA, password reset, password policy, single-session, auth banner | ✅ 5/5 (policy `0c572fb`, banner `0c572fb`, reset `4a168a7`, single-session `37a1f89`, 2FA `7cdf3b6`) |
 | G9.6 | Client-configurable member numbering (drop `AVH-` prefix) | ✅ `4b659d5` — Client.memberNumberPrefix + member-numbering.service; all AVH- sites replaced |
 
+### Wire-in / jobs / consoles phase (2026-07-02) — ✅ COMPLETE
+| Gap | What | Status |
+|---|---|---|
+| G9.1 wire-in | Cost-share into adjudication | ✅ `CostShareResolver` in both adjudication paths; `BenefitUsage.deductibleMet`; replaced hard-coded copay |
+| G9.5 wire-in | Drug exclusions at intake | ✅ `DrugExclusionService.applyToClaim` declines excluded lines (idempotent) |
+| G3.7 exec | Auto-adjudication execution | ✅ `AutoAdjudicationService.processIntake` at both submit actions + sync reconcile; provenance on Claim; fail-safe routing |
+| — | System actor for unattended writes | ✅ `system-actor.service.ts`; fixed FK bug in membership-activation.job |
+| G5.10 wire-in | Member-payment rail → MobileMoneyService | ✅ reimbursement + member-payment call-sites; Uganda MSISDNs; UGX/wallet copy |
+| G2.3 job | Recurring admin-fee accrual | ✅ `accrueRecurringForPeriod` + daily `admin-fee-accrual` job |
+| G5.11 job | Configurable fraud scan | ✅ `scanRecentClaims` + 6-hourly `fraud-scan` job |
+| G3.7 UI | Auto-adj policy editor | ✅ `/settings/auto-adjudication` (verified) |
+| G9.5 UI | Drug-exclusions console | ✅ `/settings/drug-exclusions` (verified) |
+| G5.11 UI | Fraud rules + investigations | ✅ `/fraud/rules` + `/fraud/investigations` + alert-desk action (verified) |
+| G2.3/G5.8 UI | Admin-fees console | ✅ `/billing/admin-fees` — agreements/ledger/accrual/invoice (verified) |
+| G1.1 UI | Compliance register | ✅ `/compliance` — obligations/directors/licence/levy (verified) |
+| G1.2 UI | Data-protection console | ✅ `/compliance/privacy` — DSR/processor/breach (verified) |
+
 > Later phases (1–5) tracked in the plan §E; expand here as they begin.
+> **Everything remaining is externally-gated (provider APIs, SMS aggregator,
+> FHIR/EDI) or Phase 4-5 depth (G5.15 cross-border, HA/DR docs)** — see §1.
 
 ---
 
 ## §4. Chronological log (newest first)
+
+### 2026-07-02 — wire-in + jobs + consoles (closes all documented follow-ups)
+- **Cost-share (G9.1)** committed: `CostShareResolver.applyForClaim` +
+  `benefitPeriodFor`; wired into `ClaimsService.adjudicateClaim` (dropped the
+  hard-coded 10% copay) and `claimAdjudicationService.approveClaim`. Schema
+  (db push): Claim.autoAdj*/costShare*, BenefitUsage.deductibleMet. 11 tests.
+- **Intake pipeline (G3.7/G9.5)** committed: `DrugExclusionService.applyToClaim`
+  + `AutoAdjudicationService.processIntake`; wired into both claim-submit server
+  actions + `sync.service` reconcile; `system-actor.service` (fixed
+  membership-activation FK bug). Suite 223/223.
+- **G5.10 call-site swap** committed: reimbursement + member-payment →
+  MobileMoneyService; Uganda MSISDNs + UGX copy.
+- **Jobs (G2.3/G5.11)** committed: `accrueRecurringForPeriod` +
+  `scanRecentClaims`; `admin-fee-accrual` (daily) + `fraud-scan` (6h) jobs in
+  queue.ts + worker.ts. Suite 229/229.
+- **Consoles** committed (each in-browser verified via preview + admin login
+  admin@avenue.co.ke / Verify123!):
+  - `/settings/auto-adjudication` + `/settings/drug-exclusions` (`330960e` prior
+    style; new commit this session).
+  - `/fraud/rules` + `/fraud/investigations` (+ alert-desk "open investigation").
+  - `/billing/admin-fees` (agreements/ledger; ran accrual → 1,240,000 UGX).
+  - `/compliance` (levy 2026 = 6,200 UGX from the ledger basis).
+  - `/compliance/privacy` (registered a processor).
+  - Sidebar updated: Setup, Fraud, Finance entries + new Compliance group.
+- **All 6 session tasks complete.** typecheck + brand guard green throughout.
 
 ### 2026-06-30
 - Read full gap plan + spec context. Verified env (Postgres up, 23 migrations
