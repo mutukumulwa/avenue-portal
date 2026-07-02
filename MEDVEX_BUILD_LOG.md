@@ -41,9 +41,17 @@ meaningful step. Newest status at the top of each section.
 > fail-safe never loses a claim). New system-actor.service (per-tenant
 > deactivated service user) for unattended writes — also fixed latent FK bug in
 > membership-activation.job (actorId "system" had no User row).
-> **In progress this session:** G5.10 member-payment call-site swap → jobs
-> (admin-fee accrual G2.3, fraud scan G5.11) → admin consoles (fraud,
-> compliance, DSR, admin-fee, drug exclusions, auto-adj policy editor).
+> **G5.10 call-site swap DONE:** reimbursement verification → MobileMoneyService
+> (AUTO MSISDN detection); member-payment rail on Uganda MSISDNs (+2567…),
+> provider-aware notifications, UGX copy in wallet UI. mpesa* DB columns kept
+> (cosmetic rename deferred, same as iprs*).
+> **Jobs DONE:** AdminFeeService.accrueRecurringForPeriod (PMPM/FLAT/PCT_OF_CLAIMS,
+> idempotent per agreement+period) via daily admin-fee-accrual job (03:30 EAT,
+> billing queue); FraudEngineService.scanRecentClaims (config-driven UPCODING/
+> HIGH_FREQUENCY/IDENTITY_SHARING/PHANTOM_BILLING) via 6-hourly fraud-scan job.
+> **In progress this session:** admin consoles — auto-adj policy editor, drug
+> exclusions, fraud (rules+alerts+investigations), admin-fee agreements+ledger,
+> compliance register, DSR console.
 
 ### Current status (previous session)
 > **Phases 1-3 core substantially COMPLETE across the plan.** All of: Rebrand §D,

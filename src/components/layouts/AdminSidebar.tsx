@@ -96,13 +96,15 @@ const NAV_GROUPS: NavGroup[] = [
 ];
 
 const SETUP_SUB: SubItem[] = [
-  { label: "Users & Access",   href: "/settings"                   },
-  { label: "Approval Matrix",  href: "/settings/approval-matrix"   },
-  { label: "Terminology",      href: "/settings/terminology"       },
-  { label: "FX Rates",         href: "/settings/fx-rates"          },
-  { label: "Security (2FA)",   href: "/settings/security"          },
-  { label: "Pricing Models",   href: "/settings/pricing-models"    },
-  { label: "Audit Log",        href: "/settings/audit-log"         },
+  { label: "Users & Access",    href: "/settings"                    },
+  { label: "Approval Matrix",   href: "/settings/approval-matrix"    },
+  { label: "Auto-Adjudication", href: "/settings/auto-adjudication"  },
+  { label: "Drug Exclusions",   href: "/settings/drug-exclusions"    },
+  { label: "Terminology",       href: "/settings/terminology"        },
+  { label: "FX Rates",          href: "/settings/fx-rates"           },
+  { label: "Security (2FA)",    href: "/settings/security"           },
+  { label: "Pricing Models",    href: "/settings/pricing-models"     },
+  { label: "Audit Log",         href: "/settings/audit-log"          },
 ];
 
 function SubItems({ items, pathname }: { items: SubItem[]; pathname: string }) {
