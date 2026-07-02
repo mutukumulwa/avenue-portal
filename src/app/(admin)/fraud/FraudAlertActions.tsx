@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { CheckCircle, ArrowUpCircle, Loader2 } from "lucide-react";
-import { dismissAlertAction, escalateClaimAction } from "./actions";
+import { CheckCircle, ArrowUpCircle, Loader2, Search } from "lucide-react";
+import { dismissAlertAction, escalateClaimAction, openInvestigationFromAlertAction } from "./actions";
 
 export function FraudAlertActions({
   alertId,
@@ -14,11 +14,11 @@ export function FraudAlertActions({
   claimNumber: string;
 }) {
   const [isPending, startTransition] = useTransition();
-  const [done, setDone] = useState<"dismissed" | "escalated" | null>(null);
+  const [done, setDone] = useState<"dismissed" | "escalated" | "investigating" | null>(null);
 
   if (done) {
     return (
-      <span className={`text-[10px] font-bold uppercase ${done === "dismissed" ? "text-[#6C757D]" : "text-[#DC3545]"}`}>
+      <span className={`text-[10px] font-bold uppercase ${done === "dismissed" ? "text-[#6C757D]" : done === "investigating" ? "text-brand-indigo" : "text-[#DC3545]"}`}>
         {done}
       </span>
     );
@@ -41,6 +41,18 @@ export function FraudAlertActions({
             className="p-1 rounded text-[#28A745] hover:bg-[#28A745]/10 transition-colors"
           >
             <CheckCircle size={15} />
+          </button>
+          <button
+            onClick={() =>
+              startTransition(async () => {
+                await openInvestigationFromAlertAction(alertId, claimId);
+                setDone("investigating");
+              })
+            }
+            title="Open a formal fraud investigation"
+            className="p-1 rounded text-brand-indigo hover:bg-brand-indigo/10 transition-colors"
+          >
+            <Search size={15} />
           </button>
           <button
             onClick={() => {

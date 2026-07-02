@@ -81,8 +81,10 @@ const NAV_GROUPS: NavGroup[] = [
       {
         label: "Fraud Alerts", href: "/fraud", icon: ShieldAlert, roles: OPS,
         children: [
-          { label: "Claim Alerts",    href: "/fraud"           },
-          { label: "Check-In Audit",  href: "/fraud/check-ins" },
+          { label: "Claim Alerts",    href: "/fraud"                },
+          { label: "Investigations",  href: "/fraud/investigations" },
+          { label: "Rules",           href: "/fraud/rules"          },
+          { label: "Check-In Audit",  href: "/fraud/check-ins"      },
         ],
       },
     ],

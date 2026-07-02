@@ -28,6 +28,28 @@ export async function dismissAlertAction(alertId: string) {
   revalidatePath("/fraud");
 }
 
+/** Open a formal fraud investigation (G5.11) over an alert + its claim. */
+export async function openInvestigationFromAlertAction(alertId: string, claimId: string) {
+  const session = await requireRole(ROLES.OPS);
+  const { FraudInvestigationService } = await import("@/server/services/fraud-engine.service");
+
+  const inv = await FraudInvestigationService.open(session.user.tenantId, {
+    claimId,
+    fraudAlertId: alertId,
+  });
+
+  await writeAudit({
+    userId: session.user.id,
+    action: "FRAUD_INVESTIGATION_OPENED",
+    module: "FRAUD",
+    description: `Fraud investigation ${inv.id} opened from alert ${alertId}`,
+    metadata: { investigationId: inv.id, alertId, claimId },
+  });
+
+  revalidatePath("/fraud");
+  revalidatePath("/fraud/investigations");
+}
+
 export async function escalateClaimAction(claimId: string) {
   const session = await requireRole(ROLES.OPS);
 
