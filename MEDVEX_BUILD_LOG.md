@@ -277,7 +277,7 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
 | G5.9 | NIRA identity (replaces Kenya IPRS) | ✅ `58ed550` — nira.service + 3 call-sites swapped; iprs* field rename deferred (cosmetic) |
 | G3.3 | Active claims dashboard + SLA queues | ✅ `e1df67e` — /claims/queues console (lanes+SLA timers, verified). Real-time alert fan-out remaining |
 | G5.2 | Membership admin (multi-client) | ✅ `b4cfb9b` — client-scoped members list/service; NIRA+renewal+offline already covered. Otherwise strong/existing |
-| G5.4 | Provider network + per-client tariffs | ✅ core `51edace` — ProviderTariff.clientId/currency + client-aware resolution (client rate wins), 2 tests. Editor UI + settlement accel + scorecard curation remain |
+| G5.4 | Provider network + per-client tariffs | ✅ core `51edace` (engine) + editor UI (2026-07-02): ProviderTariffsCard exposes the clientId override + currency + Scope column, verified in-browser. Settlement accel + scorecard curation still incremental |
 | G5.6 | Claims management + channels | ✅ `16fa9cf` client-scoped + R62 verified; offline channel done (G4), dashboard done (G3.3). USSD/SMS wiring needs aggregator P-03 |
 | G3.3+ | Real-time incoming-claim alert | ✅ `e9b58b9` — polling banner on queues console (client-scoped) |
 | G3.5 | Currency/FxRate + currency columns + FX UI + consolidation | ✅ core (`7212bd0`,`95c277f`); full UI/report threading = incremental |
@@ -300,6 +300,7 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
 | G2.3/G5.8 UI | Admin-fees console | ✅ `/billing/admin-fees` — agreements/ledger/accrual/invoice (verified) |
 | G1.1 UI | Compliance register | ✅ `/compliance` — obligations/directors/licence/levy (verified) |
 | G1.2 UI | Data-protection console | ✅ `/compliance/privacy` — DSR/processor/breach (verified) |
+| G5.4 UI | Per-client tariff editor | ✅ ProviderTariffsCard clientId override + currency + Scope column (verified) |
 
 > Later phases (1–5) tracked in the plan §E; expand here as they begin.
 > **Everything remaining is externally-gated (provider APIs, SMS aggregator,
@@ -333,6 +334,17 @@ Status: ⬜ not started · 🔄 in progress · ✅ done · ⏸ blocked/deferred
   - `/compliance/privacy` (registered a processor).
   - Sidebar updated: Setup, Fraud, Finance entries + new Compliance group.
 - **All 6 session tasks complete.** typecheck + brand guard green throughout.
+- **Bonus G5.4 editor UI**: `ProviderTariffsCard` now exposes the per-client
+  `clientId` override + `currency` (Scope column; KES→currency); action
+  persists clientId with operator-ownership check + audit; provider page loads
+  clients and renders the card unconditionally. Verified in-browser (85,000 UGX
+  Default-Client override shown beside the network-master rate). Suite 229/229.
+- **Session end state: every non-externally-gated, non-decision-gated item in
+  the plan is built + verified.** Next agent: remaining work is provider-API
+  integrations (need creds), SMS aggregator (P-03), FHIR/EDI (G8), and the
+  decision-gated Phase-5 modules G5.15 (cross-border, OD-8) / G5.16 (wellness,
+  OD-9). None are startable without either external credentials or a user
+  decision — surface those to the user rather than building speculatively.
 
 ### 2026-06-30
 - Read full gap plan + spec context. Verified env (Postgres up, 23 migrations
