@@ -122,6 +122,32 @@ export async function terminateContractAction(fd: FormData) {
   await guarded(id, () => ContractLifecycleService.terminate(tenantId, id, userId, str(fd, "reason")));
 }
 
+export async function renewContractAction(fd: FormData) {
+  const session = await requireRole(ROLES.UNDERWRITING);
+  const id = str(fd, "id");
+  const startDate = str(fd, "startDate");
+  const endDate = str(fd, "endDate");
+  if (!id || !startDate || !endDate) {
+    redirect(`/contracts/${id}?error=${encodeURIComponent("Renewal needs a start and end date.")}`);
+  }
+  const upliftPct = num(fd, "upliftPct") ?? 0;
+  let renewed: { id: string };
+  try {
+    renewed = await ContractLifecycleService.renew(session.user.tenantId, id!, {
+      startDate: new Date(startDate!),
+      endDate: new Date(endDate!),
+      upliftPct,
+      userId: session.user.id,
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Renewal failed";
+    revalidatePath(`/contracts/${id}`);
+    redirect(`/contracts/${id}?error=${encodeURIComponent(msg)}`);
+  }
+  revalidatePath("/contracts");
+  redirect(`/contracts/${renewed!.id}`);
+}
+
 /** Run a transition; on failure redirect back to detail with the error surfaced. */
 async function guarded(id: string, fn: () => Promise<unknown>) {
   try {

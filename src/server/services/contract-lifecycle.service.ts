@@ -352,6 +352,227 @@ export class ContractLifecycleService {
     };
   }
 
+  // ── Renewal (spec §4.4) — a NEW contract that supersedes the predecessor ──
+  /**
+   * Clone a contract into a fresh DRAFT for the next period, carrying forward
+   * the FULL definition (tariff lines, applicability, branches, pricing rules,
+   * packages, pre-auth/documentation rules, exclusions) with an optional %
+   * uplift on all money amounts. Links the old contract via `supersededById`.
+   * The renewal is UNSIGNED and DRAFT — it goes through the normal approval path.
+   */
+  static async renew(
+    tenantId: string,
+    contractId: string,
+    opts: { startDate: Date; endDate: Date; upliftPct: number; userId?: string },
+  ) {
+    const old = await prisma.providerContract.findUnique({
+      where: { id: contractId, tenantId },
+      include: {
+        tariffLines: { where: { isActive: true } },
+        applicability: { where: { isActive: true } },
+        contractBranches: true,
+        pricingRules: { where: { isActive: true } },
+        contractPackages: { where: { isActive: true }, include: { components: true } },
+        preauthRules: { where: { isActive: true } },
+        documentationRules: { where: { isActive: true } },
+        exclusions: true,
+      },
+    });
+    if (!old) throw new Error("Contract not found");
+    if (old.supersededById) throw new Error("This contract has already been renewed.");
+    if (opts.endDate <= opts.startDate) throw new Error("Renewal end date must be after the start date.");
+
+    const factor = 1 + opts.upliftPct / 100;
+    const up = (n: Prisma.Decimal | number | null | undefined): number | null =>
+      n == null ? null : Math.round(Number(n) * factor * 100) / 100;
+    const contractNumber = await ProviderContractsService.nextContractNumber(tenantId);
+    const bumpedTitle = old.title.replace(/\b20\d{2}\b/, String(opts.startDate.getFullYear()));
+    const title = bumpedTitle === old.title ? `${old.title} (Renewal)` : bumpedTitle;
+
+    const renewed = await prisma.$transaction(async tx => {
+      const c = await tx.providerContract.create({
+        data: {
+          tenantId,
+          providerId: old.providerId,
+          contractNumber,
+          title,
+          contractType: old.contractType,
+          status: "DRAFT",
+          branchScope: old.branchScope,
+          parentContractId: old.parentContractId,
+          parentDigitised: old.parentDigitised,
+          externalContractRef: old.externalContractRef,
+          startDate: opts.startDate,
+          endDate: opts.endDate,
+          reviewDueDate: null,
+          executionStatus: "UNSIGNED", // a renewal must be re-executed
+          currency: old.currency,
+          country: old.country,
+          region: old.region,
+          paymentTermDays: old.paymentTermDays,
+          paymentTermType: old.paymentTermType,
+          creditLimit: old.creditLimit,
+          invoiceDiscountPct: old.invoiceDiscountPct,
+          earlySettlementDiscountPct: old.earlySettlementDiscountPct,
+          earlySettlementWindowDays: old.earlySettlementWindowDays,
+          submissionWindowDays: old.submissionWindowDays,
+          submissionWindowBasis: old.submissionWindowBasis,
+          balanceBillingPolicy: old.balanceBillingPolicy,
+          taxInclusive: old.taxInclusive,
+          reconciliationCadence: old.reconciliationCadence,
+          unlistedServiceRule: old.unlistedServiceRule,
+          unlistedDiscountPct: old.unlistedDiscountPct,
+          autoRenew: old.autoRenew,
+          notes: old.notes,
+          createdById: opts.userId,
+          contractOwnerId: opts.userId ?? old.contractOwnerId,
+        },
+      });
+
+      if (old.tariffLines.length) {
+        await tx.providerTariff.createMany({
+          data: old.tariffLines.map(t => ({
+            providerId: old.providerId,
+            contractId: c.id,
+            branchId: t.branchId,
+            clientId: t.clientId,
+            cptCode: t.cptCode,
+            serviceName: t.serviceName,
+            agreedRate: up(t.agreedRate) ?? 0,
+            currency: t.currency,
+            tariffType: t.tariffType,
+            requiresPreauth: t.requiresPreauth,
+            maxQuantityPerVisit: t.maxQuantityPerVisit,
+            serviceCategoryId: t.serviceCategoryId,
+            providerServiceCode: t.providerServiceCode,
+            providerDescription: t.providerDescription,
+            standardDescription: t.standardDescription,
+            codingSystem: t.codingSystem,
+            rateType: t.rateType,
+            discountPct: t.discountPct,
+            markupPct: t.markupPct,
+            maxPayableAmount: up(t.maxPayableAmount),
+            minPayableAmount: up(t.minPayableAmount),
+            unitOfMeasure: t.unitOfMeasure,
+            quantityLimit: t.quantityLimit,
+            frequencyLimit: t.frequencyLimit,
+            frequencyPeriod: t.frequencyPeriod,
+            genderRestriction: t.genderRestriction,
+            ageMin: t.ageMin,
+            ageMax: t.ageMax,
+            diagnosisRestriction: t.diagnosisRestriction ?? undefined,
+            requiresReferral: t.requiresReferral,
+            rateMissing: t.rateMissing,
+            externalScheme: t.externalScheme,
+            externalRebateAmount: up(t.externalRebateAmount),
+            effectiveFrom: opts.startDate,
+          })),
+        });
+      }
+
+      if (old.applicability.length) {
+        await tx.contractApplicability.createMany({
+          data: old.applicability.map(a => ({
+            contractId: c.id,
+            clientId: a.clientId,
+            groupId: a.groupId,
+            packageId: a.packageId,
+            packageVersionId: a.packageVersionId,
+            benefitCategory: a.benefitCategory,
+            networkTier: a.networkTier,
+            memberCategory: a.memberCategory,
+            inclusionType: a.inclusionType,
+          })),
+        });
+      }
+
+      if (old.contractBranches.length) {
+        await tx.contractBranch.createMany({ data: old.contractBranches.map(b => ({ contractId: c.id, branchId: b.branchId })) });
+      }
+
+      if (old.pricingRules.length) {
+        await tx.pricingRule.createMany({
+          data: old.pricingRules.map(r => {
+            const params = { ...((r.params ?? {}) as Record<string, unknown>) };
+            if (typeof params.rate === "number") params.rate = Math.round(params.rate * factor * 100) / 100;
+            return {
+              tenantId,
+              contractId: c.id,
+              scope: r.scope,
+              serviceCategoryId: r.serviceCategoryId,
+              tariffLineId: r.tariffLineId,
+              ruleKind: r.ruleKind,
+              params: params as Prisma.InputJsonValue,
+              priority: r.priority,
+            };
+          }),
+        });
+      }
+
+      for (const p of old.contractPackages) {
+        await tx.contractPackage.create({
+          data: {
+            tenantId,
+            contractId: c.id,
+            name: p.name,
+            code: p.code,
+            packagePrice: up(p.packagePrice) ?? 0,
+            currency: p.currency,
+            netOfExternalScheme: p.netOfExternalScheme,
+            externalRebateAmount: up(p.externalRebateAmount),
+            triggerType: p.triggerType,
+            triggerCodes: p.triggerCodes,
+            losAssumptionDays: p.losAssumptionDays,
+            losCapDays: p.losCapDays,
+            complicationRule: p.complicationRule,
+            unbundlingAllowed: p.unbundlingAllowed,
+            packageOverridesLineItems: p.packageOverridesLineItems,
+            genderRestriction: p.genderRestriction,
+            effectiveFrom: opts.startDate,
+            components: { create: p.components.map(comp => ({ type: comp.type, description: comp.description, code: comp.code, qtyCap: comp.qtyCap })) },
+          },
+        });
+      }
+
+      if (old.preauthRules.length) {
+        await tx.preauthRule.createMany({
+          data: old.preauthRules.map(r => ({
+            tenantId, contractId: c.id, scope: r.scope, serviceCategoryId: r.serviceCategoryId, tariffLineId: r.tariffLineId,
+            packageId: r.packageId, triggerType: r.triggerType, thresholdAmount: r.thresholdAmount, serviceRefs: r.serviceRefs,
+            admissionRequired: r.admissionRequired, emergencyExempt: r.emergencyExempt, retrospectiveAllowed: r.retrospectiveAllowed,
+            retrospectiveWindowHours: r.retrospectiveWindowHours, approvalSlaHours: r.approvalSlaHours, validityDays: r.validityDays,
+            requiredDocumentTypes: r.requiredDocumentTypes, consequenceIfMissing: r.consequenceIfMissing,
+          })),
+        });
+      }
+
+      if (old.documentationRules.length) {
+        await tx.documentationRule.createMany({
+          data: old.documentationRules.map(r => ({
+            tenantId, contractId: c.id, scope: r.scope, serviceCategoryId: r.serviceCategoryId, tariffLineId: r.tariffLineId,
+            documentType: r.documentType, mandatory: r.mandatory, appliesWhen: r.appliesWhen ?? undefined, consequenceIfMissing: r.consequenceIfMissing,
+          })),
+        });
+      }
+
+      if (old.exclusions.length) {
+        await tx.providerContractExclusion.createMany({
+          data: old.exclusions.map(e => ({
+            contractId: c.id, cptCode: e.cptCode, serviceName: e.serviceName, reason: e.reason, level: e.level,
+            serviceCategoryId: e.serviceCategoryId, icdCodes: e.icdCodes, packageId: e.packageId, memberCategory: e.memberCategory,
+            dateFrom: e.dateFrom, dateTo: e.dateTo, appliesToBranchId: e.appliesToBranchId,
+          })),
+        });
+      }
+
+      await tx.providerContract.update({ where: { id: old.id }, data: { supersededById: c.id } });
+      return c;
+    });
+
+    await this.logEvent(prisma as never, tenantId, opts.userId ?? "system", "CONTRACT:RENEWED", contractId, { renewedInto: renewed.id, contractNumber: renewed.contractNumber, upliftPct: opts.upliftPct }, `Contract ${old.contractNumber} renewed → ${renewed.contractNumber}`);
+    return renewed;
+  }
+
   // ── Intake contract pre-check (engine stages 1–2, spec §6.1–6.2, §8.1) ──
   /**
    * Read-only pre-check surfaced at claim capture: is there a matching, valid

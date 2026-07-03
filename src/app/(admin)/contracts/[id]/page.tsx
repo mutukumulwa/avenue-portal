@@ -14,6 +14,7 @@ import {
   suspendContractAction,
   reinstateContractAction,
   terminateContractAction,
+  renewContractAction,
 } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -88,6 +89,11 @@ export default async function ContractDetailPage({
   const validation = await ContractLifecycleService.validate(tenantId, id);
   const now = new Date();
   const display = c.status === "ACTIVE" && c.endDate < now ? "EXPIRED" : c.status;
+
+  // Renewal is offered once a contract is in force or past its window (§4.4).
+  const renewEligible = ["ACTIVE", "EXPIRED", "TERMINATED"].includes(c.status) || display === "EXPIRED";
+  const renewStart = new Date(c.endDate.getTime() + 86_400_000).toISOString().slice(0, 10);
+  const renewEnd = new Date(new Date(c.endDate).setFullYear(c.endDate.getFullYear() + 1) + 86_400_000).toISOString().slice(0, 10);
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -173,6 +179,30 @@ export default async function ContractDetailPage({
           </>
         )}
       </div>
+
+      {/* Renewal (spec §4.4) — clones the full contract into a new DRAFT for the next period */}
+      {renewEligible && (
+        <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4">
+          {c.supersededById ? (
+            <p className="text-sm text-[#6C757D]">
+              Already renewed →{" "}
+              <Link href={`/contracts/${c.supersededById}`} className="text-[#06B9AB] underline">successor contract</Link>.
+            </p>
+          ) : (
+            <form action={renewContractAction} className="flex flex-wrap items-end gap-3">
+              <input type="hidden" name="id" value={c.id} />
+              <div>
+                <span className="block text-xs font-medium text-[#6C757D] mb-1">Renew for the next period</span>
+                <span className="text-xs text-[#6C757D]">Clones tariffs, rules, packages, applicability &amp; branches into a new DRAFT.</span>
+              </div>
+              <label className="text-xs text-[#6C757D]">Start<input type="date" name="startDate" required defaultValue={renewStart} className="block rounded-lg border border-gray-200 px-2 py-1.5 text-sm" /></label>
+              <label className="text-xs text-[#6C757D]">End<input type="date" name="endDate" required defaultValue={renewEnd} className="block rounded-lg border border-gray-200 px-2 py-1.5 text-sm" /></label>
+              <label className="text-xs text-[#6C757D]">Uplift %<input type="number" step="0.1" name="upliftPct" defaultValue={0} className="block w-20 rounded-lg border border-gray-200 px-2 py-1.5 text-sm" /></label>
+              <button type="submit" className="rounded-lg bg-[#6610F2] px-4 py-2 text-sm font-medium text-white hover:bg-[#560bd0]">Renew</button>
+            </form>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-6">
         {/* Left: overview */}
