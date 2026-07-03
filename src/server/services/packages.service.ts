@@ -60,8 +60,25 @@ export class PackagesService {
       annualSubLimit: number;
       copayPercentage?: number;
       waitingPeriodDays?: number;
+      // WP-F1/D8: how this benefit pays providers. HYBRID uses fundingOverrides
+      // ([{ tier, model }]) validated below.
+      fundingModel?: "FEE_FOR_SERVICE" | "CAPITATION" | "HYBRID";
+      fundingOverrides?: { tier: string; model: "FEE_FOR_SERVICE" | "CAPITATION" }[];
     }[];
   }) {
+    // Validate HYBRID overrides against the ServiceTier enum (WP-F1).
+    const VALID_TIERS = new Set(["HEADLINE", "LABORATORY", "IMAGING", "PHARMACY", "THEATRE", "PROFESSIONAL_FEES", "OTHER"]);
+    for (const b of data.benefits) {
+      if (b.fundingOverrides?.length && b.fundingModel !== "HYBRID") {
+        throw new Error(`${b.category}: funding overrides are only valid with the HYBRID funding model`);
+      }
+      for (const o of b.fundingOverrides ?? []) {
+        if (!VALID_TIERS.has(o.tier)) {
+          throw new Error(`${b.category}: unknown service tier "${o.tier}" in funding overrides`);
+        }
+      }
+    }
+
     const newPackage = await prisma.package.create({
       data: {
         tenantId,
@@ -85,6 +102,8 @@ export class PackagesService {
                 annualSubLimit: b.annualSubLimit,
                 copayPercentage: b.copayPercentage ?? 0,
                 waitingPeriodDays: b.waitingPeriodDays ?? 0,
+                fundingModel: b.fundingModel ?? "FEE_FOR_SERVICE",
+                fundingOverrides: b.fundingOverrides ?? undefined,
                 exclusions: [],
               })),
             },

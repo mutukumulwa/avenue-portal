@@ -18,16 +18,33 @@ export async function createPackageAction(formData: FormData) {
   const minAge = Number(formData.get("minAge"));
   const maxAge = Number(formData.get("maxAge"));
 
-  // Create core benefits
+  // Create core benefits — each carries its funding model (WP-F1/D8).
+  type FundingModel = "FEE_FOR_SERVICE" | "CAPITATION" | "HYBRID";
+  const readFunding = (prefix: string) => {
+    const model = (formData.get(`${prefix}FundingModel`) as FundingModel) || "FEE_FOR_SERVICE";
+    const capitatedTiers = formData.getAll(`${prefix}CapitatedTiers`).map(String);
+    const fundingOverrides =
+      model === "HYBRID" && capitatedTiers.length > 0
+        ? capitatedTiers.map((tier) => ({ tier, model: "CAPITATION" as const }))
+        : undefined;
+    return { fundingModel: model, fundingOverrides };
+  };
+
   const inpatientLimit = Number(formData.get("inpatientLimit") || 0);
   const outpatientLimit = Number(formData.get("outpatientLimit") || 0);
 
-  const benefits: { category: "INPATIENT" | "OUTPATIENT"; annualSubLimit: number; copayPercentage: number }[] = [];
+  const benefits: {
+    category: "INPATIENT" | "OUTPATIENT";
+    annualSubLimit: number;
+    copayPercentage: number;
+    fundingModel?: FundingModel;
+    fundingOverrides?: { tier: string; model: "FEE_FOR_SERVICE" | "CAPITATION" }[];
+  }[] = [];
   if (inpatientLimit > 0) {
-    benefits.push({ category: "INPATIENT", annualSubLimit: inpatientLimit, copayPercentage: 0 });
+    benefits.push({ category: "INPATIENT", annualSubLimit: inpatientLimit, copayPercentage: 0, ...readFunding("inpatient") });
   }
   if (outpatientLimit > 0) {
-    benefits.push({ category: "OUTPATIENT", annualSubLimit: outpatientLimit, copayPercentage: 0 });
+    benefits.push({ category: "OUTPATIENT", annualSubLimit: outpatientLimit, copayPercentage: 0, ...readFunding("outpatient") });
   }
 
   await PackagesService.createPackage(tenantId, {
