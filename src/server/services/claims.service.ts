@@ -288,7 +288,7 @@ export class ClaimsService {
       lengthOfStay = Math.max(1, Math.ceil(diff / (1000 * 3600 * 24)));
     }
 
-    return prisma.claim.create({
+    const created = await prisma.claim.create({
       data: {
         tenantId,
         claimNumber,
@@ -322,6 +322,15 @@ export class ClaimsService {
         provider: { select: { name: true } },
       },
     });
+
+    // Stamp attachment state on any PA connected at create (WP-C2).
+    if (data.preauthId) {
+      await prisma.preAuthorization.updateMany({
+        where: { claimId: created.id, status: "APPROVED" },
+        data: { status: "ATTACHED", attachedAt: new Date() },
+      });
+    }
+    return created;
   }
 
   /**
@@ -413,6 +422,14 @@ export class ClaimsService {
         );
       }
 
+      // Attached PAs are consumed by the decision (WP-C2): ATTACHED → UTILISED.
+      if (claim.preauths.length > 0) {
+        await tx.preAuthorization.updateMany({
+          where: { claimId, status: { in: ["APPROVED", "ATTACHED"] } },
+          data: { status: "UTILISED" },
+        });
+      }
+
       return tx.claim.update({
         where: { id: claimId },
         data: {
@@ -442,6 +459,96 @@ export class ClaimsService {
         },
       });
     });
+  }
+
+  // ─── PRE-AUTH ATTACHMENT (WP-C2, TPA_FEEDBACK_WORKPLAN.md §C) ────────────
+
+  /**
+   * Attach an approved pre-authorization to a claim. The claim keeps its BAU
+   * lines; the PA covers the PA-required services within it. Validates member,
+   * provider, PA status, validity window, and single-attachment.
+   */
+  static async attachPreauth(tenantId: string, claimId: string, preauthId: string) {
+    const [claim, pa] = await Promise.all([
+      prisma.claim.findUnique({
+        where: { id: claimId, tenantId },
+        select: { id: true, memberId: true, providerId: true, status: true },
+      }),
+      prisma.preAuthorization.findUnique({
+        where: { id: preauthId, tenantId },
+        select: {
+          id: true, memberId: true, providerId: true, status: true,
+          claimId: true, validUntil: true, preauthNumber: true,
+        },
+      }),
+    ]);
+    if (!claim) throw new Error("Claim not found");
+    if (!pa) throw new Error("Pre-authorization not found");
+    if (["PAID", "DECLINED", "VOID"].includes(claim.status)) {
+      throw new Error(`Cannot attach a pre-auth to a ${claim.status} claim`);
+    }
+    if (pa.claimId === claimId) return pa; // already attached here — idempotent
+    if (pa.claimId) {
+      throw new Error(`Pre-auth ${pa.preauthNumber} is already attached to another claim`);
+    }
+    if (pa.status !== "APPROVED") {
+      throw new Error(`Only APPROVED pre-auths can be attached (current: ${pa.status})`);
+    }
+    if (pa.memberId !== claim.memberId) {
+      throw new Error("Pre-auth belongs to a different member");
+    }
+    if (pa.providerId !== claim.providerId) {
+      throw new Error("Pre-auth was issued for a different facility");
+    }
+    if (pa.validUntil && pa.validUntil < new Date()) {
+      throw new Error(`Pre-auth ${pa.preauthNumber} validity window has passed`);
+    }
+    return prisma.preAuthorization.update({
+      where: { id: preauthId },
+      data: { claimId, attachedAt: new Date(), status: "ATTACHED" },
+    });
+  }
+
+  /** Detach a pre-auth from a claim — reverts it to APPROVED for reuse. */
+  static async detachPreauth(tenantId: string, claimId: string, preauthId: string) {
+    const pa = await prisma.preAuthorization.findUnique({
+      where: { id: preauthId, tenantId },
+      select: { id: true, claimId: true, status: true },
+    });
+    if (!pa || pa.claimId !== claimId) {
+      throw new Error("Pre-auth is not attached to this claim");
+    }
+    if (pa.status === "UTILISED") {
+      throw new Error("Pre-auth has been consumed by a claim decision and cannot be detached");
+    }
+    return prisma.preAuthorization.update({
+      where: { id: preauthId },
+      data: { claimId: null, attachedAt: null, status: "APPROVED" },
+    });
+  }
+
+  /**
+   * Total PA cover attached to a claim vs its billed amount (WP-C2 cap check —
+   * warn, don't block, when the PA-covered portion exceeds approved cover).
+   */
+  static async getPreauthCoverage(tenantId: string, claimId: string) {
+    const claim = await prisma.claim.findUnique({
+      where: { id: claimId, tenantId },
+      select: {
+        billedAmount: true,
+        preauths: { select: { id: true, preauthNumber: true, approvedAmount: true, estimatedCost: true } },
+      },
+    });
+    if (!claim) throw new Error("Claim not found");
+    const cover = claim.preauths.reduce(
+      (sum, pa) => sum + Number(pa.approvedAmount ?? pa.estimatedCost ?? 0), 0,
+    );
+    return {
+      attachedCount: claim.preauths.length,
+      approvedCover: cover,
+      billedAmount: Number(claim.billedAmount),
+      exceedsCover: claim.preauths.length > 0 && Number(claim.billedAmount) > cover,
+    };
   }
 
   // ─── PRE-AUTHORIZATIONS ─────────────────────────────────
@@ -731,16 +838,22 @@ export class ClaimsService {
   }
 
   /**
-   * Convert an approved pre-auth into a claim
+   * Create an ordinary claim shell with this pre-auth ATTACHED (WP-C2/D4).
+   * Replaces the legacy 1:1 "conversion": the claim starts from the PA's
+   * clinical picture but remains a normal claim that can accrue BAU lines and
+   * further PAs. The PA becomes ATTACHED, not CONVERTED_TO_CLAIM.
    */
-  static async convertPreAuthToClaim(tenantId: string, preauthId: string) {
+  static async createClaimWithPreauth(tenantId: string, preauthId: string) {
     const preauth = await prisma.preAuthorization.findUnique({
       where: { id: preauthId, tenantId },
     });
 
     if (!preauth) throw new Error("Pre-authorization not found");
     if (preauth.status !== "APPROVED") {
-      throw new Error("Only approved pre-authorizations can be converted to claims");
+      throw new Error("Only approved pre-authorizations can start a claim");
+    }
+    if (preauth.claimId) {
+      throw new Error("Pre-authorization is already attached to a claim");
     }
 
     const claim = await this.createClaim(tenantId, {
@@ -753,18 +866,20 @@ export class ClaimsService {
       billedAmount: Number(preauth.approvedAmount ?? preauth.estimatedCost),
       benefitCategory: preauth.benefitCategory,
       source: "PREAUTH",
+      preauthId: preauth.id,
     });
 
-    // Mark the pre-auth as converted
+    // createClaim connected the PA; stamp attachment state explicitly.
     await prisma.preAuthorization.update({
       where: { id: preauthId },
-      data: {
-        status: "CONVERTED_TO_CLAIM",
-        claimId: claim.id,
-        convertedAt: new Date(),
-      },
+      data: { claimId: claim.id, attachedAt: new Date(), status: "ATTACHED" },
     });
 
     return claim;
+  }
+
+  /** @deprecated WP-C2 — use createClaimWithPreauth; kept for API compatibility. */
+  static async convertPreAuthToClaim(tenantId: string, preauthId: string) {
+    return this.createClaimWithPreauth(tenantId, preauthId);
   }
 }

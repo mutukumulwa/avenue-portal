@@ -155,12 +155,23 @@ export async function adjudicateClaimAction(formData: FormData) {
       }
     }
 
+    // PA cover cap (WP-C2): warn — never block — when the claim exceeds the
+    // attached pre-auth cover. The overage note travels in the adjudication log.
+    let notes = (formData.get("notes") as string) || undefined;
+    if (action === "APPROVED" || action === "PARTIALLY_APPROVED") {
+      const coverage = await ClaimsService.getPreauthCoverage(tenantId, claimId);
+      if (coverage.exceedsCover) {
+        const warn = `PA cover warning: billed ${coverage.billedAmount.toLocaleString()} exceeds attached pre-auth cover ${coverage.approvedCover.toLocaleString()}.`;
+        notes = notes ? `${notes} ${warn}` : warn;
+      }
+    }
+
     const claim = await ClaimsService.adjudicateClaim(tenantId, claimId, {
       action,
       approvedAmount,
       declineReasonCode: formData.get("declineReasonCode") as string || undefined,
       declineNotes: formData.get("declineNotes") as string || undefined,
-      notes: formData.get("notes") as string || undefined,
+      notes,
       reviewerId: session.user.id,
     });
 

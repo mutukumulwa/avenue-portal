@@ -119,6 +119,14 @@ async function postClaim(req: Request) {
       },
     });
 
+    // Stamp attachment state on the connected PA (WP-C2).
+    if (preauthId) {
+      await prisma.preAuthorization.update({
+        where: { id: preauthId },
+        data: { status: "ATTACHED", attachedAt: new Date() },
+      });
+    }
+
     return NextResponse.json(
       {
         success:     true,
