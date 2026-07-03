@@ -12,20 +12,17 @@ checklists, and continues without re-deriving context.
 
 ## RESUME POINTER (update this every time you stop)
 
-- **Current phase:** Phases 1–4 core all built & tested. Remaining = integration/polish + Phase 5.
+- **Current phase:** Phases 1–4 built & tested; engine wired into adjudication. Next = Phase 5.
 - **Next action (pick up here), in priority order:**
-  1. **Wire the engine into adjudication / persist per-line provenance** (spec §8.3). `ContractEngine.evaluateClaim(ById)` is read-only (claims Contract panel + `contractEngine.*`). Add a persist step writing each line's contractId/versionId/matchedRuleType/matchedRuleId/reasonCodeId/amounts to `ClaimLine`, and add named gates (CONTRACT_MATCH, PRICING_COMPLETE) to `auto-adjudication.service.ts`. Opt-in first.
-  2. **Manual-queue framework** (§8.5): persist `Claim.assignedQueue` + extend `/(admin)/claims/queues` UI with the digital-contract queue categories.
-  3. **Rule-builder UI** (§11.5): visual IF/THEN composer over the `contractRules.*` router + `contractEngine.evaluateLine` sandbox (both exist).
-  4. **NET_OF_EXTERNAL / EXTERNAL_TARIFF_REF** pricing from `ExternalTariffTable` (schema exists; engine routes these to MAN-001 today). **DocumentationRule stage-7** in the engine (`applyDocumentation`, DOC-001/002).
-  5. Wire **OverrideControl** into `override.service` (maxFinancialImpact block, dual-approval threshold); ServiceCategory seed from Masters; contract-detail Tariffs/Applicability/Branch widgets; BullMQ lifecycle jobs; intake pre-check into `intake.service.ts`.
-  6. **Phase 5** — analytics suite (§15), reconciliation automation, override-pattern→amendment suggestions, capitation pool settlement.
+  1. **Phase 5** — analytics suite (§15 datasets 1-15), average-cost reconciliation automation (finance maker-checker), override-pattern→amendment suggestions, unmapped-service suggestions from SVC-002 clusters, capitation pool settlement.
+  2. Remaining polish (any order): Manual-queue UI (§8.5 — `Claim.assignedQueue` now persisted); Rule-builder UI (§11.5 — `contractRules.*` + `contractEngine.evaluateLine` sandbox exist); NET_OF_EXTERNAL/EXTERNAL_TARIFF_REF pricing from `ExternalTariffTable`; DocumentationRule stage-7 (`applyDocumentation`); wire OverrideControl into `override.service`; ServiceCategory seed from Masters; contract-detail Tariffs/Applicability widgets; BullMQ lifecycle jobs; intake pre-check into `intake.service.ts`.
+- **Engine gate flag:** contract-engine auto-adjudication gates are OFF by default. Set env `CONTRACT_ENGINE_GATES=1` to enable CONTRACT_MATCH / PRICING_COMPLETE routing. Provenance persistence runs regardless (always on).
 - **Blocked on:** nothing.
-- **Last verified green:** 2026-07-03 — Phases 3 & 4 schema applied via `prisma db push`;
-  `npm run typecheck` clean; `eslint` clean on all new files; **`vitest` 218/218 service
-  tests pass** (`contract-engine.test.ts` 13 reproducing §10.3 examples 1-9;
-  `contract-extraction.test.ts` 7 for the extractor). All `/contracts*` routes compile
-  (307 auth-gate, no errors). Reason-codes (40) + override-controls (16) seeded for tenant.
+- **Last verified green:** 2026-07-03 — engine wired into `auto-adjudication.service.ts`
+  (opt-in gates + always-on provenance persist via `ContractEngineIntegration.evaluateAndPersist`);
+  `npm run typecheck` clean; production source `eslint` clean; **`vitest` 221/221 service
+  tests pass** (incl. `contract-engine-persist.test.ts` 3 tests). Test files use `any` in
+  prisma mocks per the existing repo convention (repo tests are not lint-clean by that rule).
 - **Verification note:** Browser pixel-render still blocked by the preview harness not
   persisting the next-auth session cookie (callback 200 → bounces to /login). Engine
   correctness is instead proven by the vitest suite. To eyeball UI, log in via a real
