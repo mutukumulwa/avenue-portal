@@ -75,6 +75,8 @@ model Tenant {
   syncOperations                 SyncOperation[]
   offlineReservations            OfflineReservation[]
   eligibilitySnapshots           EligibilitySnapshot[]
+  offlineWorkAuthorizations      OfflineWorkAuthorization[]
+  offlineDataPacks               OfflineDataPack[]
   autoAdjudicationPolicies       AutoAdjudicationPolicy[]
   drugExclusions                 DrugExclusion[]
   adminFeeAgreements             AdminFeeAgreement[]
@@ -335,6 +337,7 @@ model User {
   webAuthnEnrollmentApprovals WebAuthnEnrollmentApproval[]     @relation("WebAuthnEnrollmentApprovedBy")
   reinstatementDecisions      MembershipReinstatementRequest[]
   passwordResetTokens         PasswordResetToken[]
+  issuedOfflineAuths          OfflineWorkAuthorization[]       @relation("OfflineAuthIssuer")
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -1693,12 +1696,18 @@ model SyncOperation {
   state          SyncOperationState @default(PENDING)
   conflictReason String?
 
+  // Offline work authorization (WP-B1/B4): the agent-issued code this op was
+  // captured under. Null for pre-code legacy ops; invalid codes ⇒ CONFLICT.
+  offlineAuthId String?
+  offlineAuth   OfflineWorkAuthorization? @relation(fields: [offlineAuthId], references: [id])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([tenantId, opKey])
   @@index([tenantId, state])
   @@index([tenantId, entityType])
+  @@index([offlineAuthId])
 }
 
 model OfflineReservation {
@@ -1734,6 +1743,74 @@ model EligibilitySnapshot {
   validUntil DateTime // shorter for near-limit / high-risk members
 
   @@index([tenantId, memberId])
+}
+
+// ─── OFFLINE WORK AUTHORIZATION (WP-B1, TPA_FEEDBACK_WORKPLAN.md §B) ──────
+// A facility that loses connectivity calls the claims agent; the agent issues
+// a short time-boxed code over the phone / SMS (off-system by design). The
+// code unlocks offline capture at that facility and every synced operation is
+// traceable back to it.
+
+enum OfflineAuthStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+  EXHAUSTED // maxOperations reached
+}
+
+model OfflineWorkAuthorization {
+  id            String            @id @default(cuid())
+  tenantId      String
+  tenant        Tenant            @relation(fields: [tenantId], references: [id])
+  providerId    String // facility the code is issued to
+  provider      Provider          @relation(fields: [providerId], references: [id])
+  branchId      String? // optional branch scope
+  branch        ProviderBranch?   @relation(fields: [branchId], references: [id])
+  code          String // short human-readable, e.g. OWA-7F3K2M
+  issuedById    String // claims agent who took the call
+  issuedBy      User              @relation("OfflineAuthIssuer", fields: [issuedById], references: [id])
+  reason        String? // e.g. "fibre cut at facility" — captured on the call
+  contactName   String? // who called from the facility
+  contactPhone  String?
+  validFrom     DateTime          @default(now())
+  validUntil    DateTime // time-boxed, default 48 h
+  maxOperations Int? // optional cap on ops synced under this code
+  status        OfflineAuthStatus @default(ACTIVE)
+  revokedById   String?
+  revokedAt     DateTime?
+  packId        String? // last OfflineDataPack served under this authorization
+
+  syncOperations SyncOperation[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@unique([tenantId, code])
+  @@index([tenantId, providerId, status])
+  @@index([tenantId, status])
+}
+
+// Facility offline data pack (WP-B3, decision D3): the MINIMUM data a facility
+// needs to run its day offline — member roster (number/name/status), benefit
+// balances, tariff excerpt. Stored and served ONLY as an AES-256-GCM envelope;
+// the key is HKDF-derived from the work code + server secret and delivered
+// separately, so a stolen pack file alone is useless.
+model OfflineDataPack {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  providerId  String
+  provider    Provider @relation(fields: [providerId], references: [id])
+  generatedAt DateTime @default(now())
+  validUntil  DateTime
+  memberCount Int
+  tariffRef   String? // contract/version pinned into the pack
+  ciphertext  Bytes // AES-256-GCM(roster + balances + tariff excerpt)
+  iv          Bytes
+  authTag     Bytes
+  keyVersion  Int      @default(1) // server-secret rotation
+  sizeBytes   Int?
+
+  @@index([tenantId, providerId, generatedAt])
 }
 
 // ─── PACKAGES & BENEFITS ────────────────────────────────
@@ -2547,6 +2624,8 @@ model Provider {
   practitioners      ProviderPractitioner[]
   branches           ProviderBranch[]
   aliases            ProviderAlias[]
+  offlineWorkAuths   OfflineWorkAuthorization[]
+  offlineDataPacks   OfflineDataPack[]
 
   @@index([tenantId])
   @@index([tenantId, tier])
@@ -2575,6 +2654,7 @@ model ProviderBranch {
   claims           Claim[]
   contractBranches ContractBranch[]
   tariffLines      ProviderTariff[]
+  offlineWorkAuths OfflineWorkAuthorization[]
 
   @@index([tenantId, providerId])
   @@index([providerId, isActive])
@@ -2729,6 +2809,18 @@ model ProviderTariff {
   @@index([contractId, rateMissing])
 }
 
+// Contract fee-schedule tier (WP-E1 / TPA_FEEDBACK_WORKPLAN.md D7): groups the
+// taxonomy into the bands a fee-for-service contract is negotiated in.
+enum ServiceTier {
+  HEADLINE // most-common services: consultations, ward/ICU per day, ER fee
+  LABORATORY
+  IMAGING
+  PHARMACY // drugs + consumables
+  THEATRE // theatre time bands, OT equipment
+  PROFESSIONAL_FEES // surgeon / anaesthetist / doctor fees
+  OTHER // dental, optical, physio, ambulance, dialysis, packages…
+}
+
 // ─── SERVICE CATALOGUE / TAXONOMY (spec §5.5) ────────────────────────────
 // Canonical, tenant-level service taxonomy that contract tariff lines and claim
 // lines map onto. Seeded from the §2.2 category list + provider Masters.
@@ -2742,6 +2834,9 @@ model ServiceCategory {
   parent       ServiceCategory?  @relation("ServiceCategoryTree", fields: [parentId], references: [id])
   children     ServiceCategory[] @relation("ServiceCategoryTree")
   patientClass PatientClass?
+  // Fee-schedule tier (WP-E1): set on top-level categories; children inherit
+  // at read time. Null = unmapped (renders in the OTHER bucket with a chip).
+  tier         ServiceTier?
   isActive     Boolean           @default(true)
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
@@ -2752,6 +2847,7 @@ model ServiceCategory {
 
   @@unique([tenantId, code])
   @@index([tenantId])
+  @@index([tenantId, tier])
   @@index([parentId])
 }
 
