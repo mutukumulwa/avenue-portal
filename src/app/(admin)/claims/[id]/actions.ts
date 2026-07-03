@@ -104,8 +104,17 @@ export async function adjudicateClaimAction(formData: FormData) {
     // The provider's ACTIVE contract governs what each line may pay:
     // scheduled rates cap coded lines, exclusions pay zero, the contract's
     // unlisted-service rule decides everything else.
+    // ── Benefit funding model (WP-F2/D8) ─────────────────────────────────────
+    // CAPITATION-funded lines are prepaid via the provider's pool: they leave
+    // the FFS pricing path entirely (payable 0, pool-tagged on decision).
+    const { FundingModelService } = await import("@/server/services/funding-model.service");
+    const funding = await FundingModelService.resolveForClaim(tenantId, claimId);
+    const capitatedLineIds = new Set(funding.lines.filter((l) => l.capitated).map((l) => l.lineId));
+
     if (action === "APPROVED" || action === "PARTIALLY_APPROVED") {
-      const { contract, lines: rates } = await ClaimsService.resolveClaimContractRates(tenantId, claimId);
+      const { contract, lines: allRates } = await ClaimsService.resolveClaimContractRates(tenantId, claimId);
+      // Capitated lines skip FFS enforcement — they price at 0 regardless.
+      const rates = allRates.filter((r) => !capitatedLineIds.has(r.lineId));
       if (rates.length > 0) {
         const claimMeta = await prisma.claim.findUnique({
           where: { id: claimId, tenantId },
@@ -164,6 +173,10 @@ export async function adjudicateClaimAction(formData: FormData) {
         const warn = `PA cover warning: billed ${coverage.billedAmount.toLocaleString()} exceeds attached pre-auth cover ${coverage.approvedCover.toLocaleString()}.`;
         notes = notes ? `${notes} ${warn}` : warn;
       }
+      if (funding.anyCapitated) {
+        const note = `COVERED_BY_CAPITATION: ${capitatedLineIds.size} line(s) are prepaid via the capitation pool and price at 0.`;
+        notes = notes ? `${notes} ${note}` : note;
+      }
     }
 
     const claim = await ClaimsService.adjudicateClaim(tenantId, claimId, {
@@ -174,6 +187,11 @@ export async function adjudicateClaimAction(formData: FormData) {
       notes,
       reviewerId: session.user.id,
     });
+
+    // WP-F2: zero the capitated lines + tag the pool on the decided claim.
+    if (action === "APPROVED" || action === "PARTIALLY_APPROVED") {
+      await FundingModelService.applyToDecidedClaim(tenantId, claimId, funding);
+    }
 
     // Auto-post GL entry when claim is approved or partially approved
     if ((action === "APPROVED" || action === "PARTIALLY_APPROVED") && approvedAmount > 0) {
