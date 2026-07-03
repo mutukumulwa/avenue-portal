@@ -13,19 +13,25 @@ export class ClaimsService {
    * client when confined. Each carries member/provider/amount/receivedAt so the
    * UI can render SLA timers + drill-through.
    */
-  static async getActiveQueues(tenantId: string, clientId?: string | null) {
-    const ACTIVE: ClaimStatus[] = [
-      "INCURRED",
-      "RECEIVED",
-      "CAPTURED",
-      "UNDER_REVIEW",
-      "APPROVED",
-      "PARTIALLY_APPROVED",
-    ];
+  static readonly ACTIVE_QUEUE_STATUSES: ClaimStatus[] = [
+    "INCURRED",
+    "RECEIVED",
+    "CAPTURED",
+    "UNDER_REVIEW",
+    "APPROVED",
+    "PARTIALLY_APPROVED",
+  ];
+
+  static async getActiveQueues(
+    tenantId: string,
+    clientId?: string | null,
+    opts?: { take?: number; providerId?: string },
+  ) {
     return prisma.claim.findMany({
       where: {
         tenantId,
-        status: { in: ACTIVE },
+        status: { in: ClaimsService.ACTIVE_QUEUE_STATUSES },
+        ...(opts?.providerId ? { providerId: opts.providerId } : {}),
         ...(clientId ? { member: { group: { clientId } } } : {}),
       },
       select: {
@@ -33,14 +39,63 @@ export class ClaimsService {
         claimNumber: true,
         status: true,
         source: true,
+        serviceType: true,
+        dateOfService: true,
         billedAmount: true,
         currency: true,
         receivedAt: true,
+        providerId: true,
         member: { select: { firstName: true, lastName: true, memberNumber: true } },
         provider: { select: { name: true } },
+        // Contract-first SLA (WP-A1/D2): payment terms travel with the claim.
+        contract: { select: { paymentTermDays: true, paymentTermType: true } },
       },
       orderBy: { receivedAt: "asc" }, // oldest first — SLA-critical ones surface
+      ...(opts?.take ? { take: opts.take } : {}),
     });
+  }
+
+  /**
+   * Facility-level roll-up for the queues console (WP-A1): active-claim counts
+   * per provider so the UI can group facility-first and order by workload.
+   */
+  static async getQueueFacilitySummary(tenantId: string, clientId?: string | null) {
+    const grouped = await prisma.claim.groupBy({
+      by: ["providerId", "status"],
+      where: {
+        tenantId,
+        status: { in: ClaimsService.ACTIVE_QUEUE_STATUSES },
+        ...(clientId ? { member: { group: { clientId } } } : {}),
+      },
+      _count: { _all: true },
+      _min: { receivedAt: true },
+    });
+    const providerIds = [...new Set(grouped.map((g) => g.providerId))];
+    const providers = await prisma.provider.findMany({
+      where: { id: { in: providerIds } },
+      select: { id: true, name: true },
+    });
+    const nameById = new Map(providers.map((p) => [p.id, p.name]));
+    const summary = new Map<
+      string,
+      { providerId: string; providerName: string; total: number; oldestReceivedAt: Date | null; byStatus: Record<string, number> }
+    >();
+    for (const g of grouped) {
+      const row = summary.get(g.providerId) ?? {
+        providerId: g.providerId,
+        providerName: nameById.get(g.providerId) ?? "Unknown facility",
+        total: 0,
+        oldestReceivedAt: null as Date | null,
+        byStatus: {} as Record<string, number>,
+      };
+      row.total += g._count._all;
+      row.byStatus[g.status] = (row.byStatus[g.status] ?? 0) + g._count._all;
+      if (g._min.receivedAt && (!row.oldestReceivedAt || g._min.receivedAt < row.oldestReceivedAt)) {
+        row.oldestReceivedAt = g._min.receivedAt;
+      }
+      summary.set(g.providerId, row);
+    }
+    return [...summary.values()].sort((a, b) => b.total - a.total);
   }
 
   /**
