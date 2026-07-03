@@ -1,6 +1,7 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { CaseService } from "@/server/services/case.service";
-import { BriefcaseMedical, PlusCircle, Building2, Clock } from "lucide-react";
+import { uploadHmsBatchAction } from "./actions";
+import { BriefcaseMedical, PlusCircle, Building2, Clock, UploadCloud } from "lucide-react";
 import Link from "next/link";
 
 function losDays(admissionDate: Date | null): number | null {
@@ -16,8 +17,13 @@ const TYPE_LABEL: Record<string, string> = {
   CHRONIC_CYCLE: "Chronic cycle",
 };
 
-export default async function OpenCasesPage() {
+export default async function OpenCasesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ batch?: string }>;
+}) {
   const session = await requireRole(ROLES.OPS);
+  const { batch } = await searchParams;
   const cases = await CaseService.listOpenCases(session.user.tenantId, session.user.clientId);
 
   // Facility-first grouping (mirrors the claims queues board).
@@ -49,6 +55,32 @@ export default async function OpenCasesPage() {
           <PlusCircle size={18} /> Open Case
         </Link>
       </div>
+
+      {batch && (
+        <p className="rounded-lg border border-[#28A745]/30 bg-[#28A745]/5 px-4 py-2 text-sm text-brand-text-heading">
+          HMS batch processed: {batch}
+        </p>
+      )}
+
+      {/* HMS daily batch (WP-D4): facilities without a live integration email
+          the JSON export; ops paste it here. Same pipeline as POST /api/v1/hms-batch. */}
+      <details className="rounded-lg border border-brand-border bg-brand-bg-alt/40">
+        <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-semibold text-brand-text-heading">
+          <UploadCloud className="h-4 w-4 text-brand-secondary" /> Upload HMS daily batch (JSON)
+        </summary>
+        <form action={uploadHmsBatchAction} className="space-y-3 border-t border-brand-border p-4">
+          <textarea
+            name="batchJson"
+            required
+            rows={6}
+            placeholder='{"formatVersion":1,"facilityCode":"…","batchRef":"…","entries":[{"caseNumber":"CASE-2026-00001","entryDate":"2026-07-03","description":"Ward fees","unitAmount":15000}]}'
+            className="w-full rounded-md border border-[#D6DCE5] px-3 py-2 font-mono text-xs text-brand-text-body outline-none focus:border-brand-teal"
+          />
+          <button type="submit" className="rounded-full bg-brand-indigo px-6 py-2 text-sm font-semibold text-white hover:bg-brand-secondary">
+            Process batch
+          </button>
+        </form>
+      </details>
 
       {facilities.length === 0 && (
         <p className="rounded-lg border border-brand-border bg-brand-bg-alt/40 p-8 text-center text-sm text-brand-text-muted">
