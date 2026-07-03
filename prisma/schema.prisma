@@ -106,6 +106,9 @@ model Tenant {
   overrideControls               OverrideControl[]
   contractExtractions            ContractExtraction[]
   contractReconciliations        ContractReconciliation[]
+  crossBorderFacilities          CrossBorderFacility[]
+  crossBorderCases               CrossBorderCase[]
+  crossBorderLineItems           CrossBorderLineItem[]
 }
 
 // ── Multi-client TPA tenancy (Medvex spec §2.1 / gap G2.1) ──────────────
@@ -168,19 +171,20 @@ model Client {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  groups             Group[]
-  users              User[]
-  terminologyEntries TerminologyEntry[]
-  approvalMatrices   ApprovalMatrix[]
-  approvalRequests   ApprovalRequest[]
-  providerTariffs    ProviderTariff[]
+  groups                   Group[]
+  users                    User[]
+  terminologyEntries       TerminologyEntry[]
+  approvalMatrices         ApprovalMatrix[]
+  approvalRequests         ApprovalRequest[]
+  providerTariffs          ProviderTariff[]
   autoAdjudicationPolicies AutoAdjudicationPolicy[]
-  copayRules         CoContributionRule[]
-  drugExclusions     DrugExclusion[]
-  adminFeeAgreements AdminFeeAgreement[]
+  copayRules            CoContributionRule[]
+  drugExclusions        DrugExclusion[]
+  adminFeeAgreements    AdminFeeAgreement[]
   adminFeeLedgerEntries AdminFeeLedgerEntry[]
-  fraudRules         FraudRule[]
+  fraudRules            FraudRule[]
   contractApplicability ContractApplicability[]
+  crossBorderCases      CrossBorderCase[]
 
   @@unique([operatorTenantId, slug])
   @@index([operatorTenantId])
@@ -269,28 +273,28 @@ enum UserRole {
 }
 
 model User {
-  id           String    @id @default(cuid())
-  tenantId     String
-  tenant       Tenant    @relation(fields: [tenantId], references: [id])
+  id             String    @id @default(cuid())
+  tenantId       String
+  tenant         Tenant    @relation(fields: [tenantId], references: [id])
   // Client confinement (G2.1). null = operator-level Medvex ops user who spans
   // every client in the tenant; set = user is confined to this one client.
-  clientId     String?
-  client       Client?   @relation(fields: [clientId], references: [id])
-  email        String
-  passwordHash String
-  firstName    String
-  lastName     String
-  role         UserRole
-  isActive     Boolean   @default(true)
-  lastLoginAt  DateTime?
+  clientId       String?
+  client         Client?   @relation(fields: [clientId], references: [id])
+  email          String
+  passwordHash   String
+  firstName      String
+  lastName       String
+  role           UserRole
+  isActive       Boolean   @default(true)
+  lastLoginAt    DateTime?
   // Single-session control (R25/H-03): bumped on each login; a JWT carrying an
   // older version is invalidated, so only the most recent login stays valid.
-  sessionVersion Int     @default(0)
+  sessionVersion Int       @default(0)
   // Two-factor auth (R81/H-01): base32 TOTP secret + enabled flag.
-  totpSecret   String?
-  totpEnabled  Boolean   @default(false)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
+  totpSecret     String?
+  totpEnabled    Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   // Link to broker or member profile
   brokerId String? @unique
@@ -441,12 +445,12 @@ model AdminFeeLedgerEntry {
   agreementId String?
   agreement   AdminFeeAgreement? @relation(fields: [agreementId], references: [id])
 
-  method   AdminFeeMethod
-  period   String // e.g. "2026-07" (PMPM/PCT) or "" for event-driven
-  basis    Decimal? // the driver (member count, claims paid, etc.) for audit
-  amount   Decimal
-  currency String               @default("UGX")
-  status   AdminFeeLedgerStatus @default(ACCRUED)
+  method    AdminFeeMethod
+  period    String // e.g. "2026-07" (PMPM/PCT) or "" for event-driven
+  basis     Decimal? // the driver (member count, claims paid, etc.) for audit
+  amount    Decimal
+  currency  String               @default("UGX")
+  status    AdminFeeLedgerStatus @default(ACCRUED)
   invoiceId String?
 
   createdAt DateTime @default(now())
@@ -699,7 +703,7 @@ enum FundTransactionType {
 }
 
 model Group {
-  currency String @default("UGX") // G3.5 multi-currency (base UGX)
+  currency                  String              @default("UGX") // G3.5 multi-currency (base UGX)
   id                        String              @id @default(cuid())
   tenantId                  String
   tenant                    Tenant              @relation(fields: [tenantId], references: [id])
@@ -748,15 +752,15 @@ model Group {
 
   members            Member[]
   benefitTiers       GroupBenefitTier[]
-  endorsements       Endorsement[]      @relation("EndorsementGroup")
-  inboundTransfers   Endorsement[]      @relation("EndorsementToGroup")
-  fundAdministrators User[]             @relation("FundAdminGroups")
+  endorsements       Endorsement[]       @relation("EndorsementGroup")
+  inboundTransfers   Endorsement[]       @relation("EndorsementToGroup")
+  fundAdministrators User[]              @relation("FundAdminGroups")
   invoices           Invoice[]
   payments           Payment[]
   documents          Document[]
   activityLogs       ActivityLog[]
   quotations         Quotation[]
-  hrManagers         User[]             @relation("HRManagerGroup")
+  hrManagers         User[]              @relation("HRManagerGroup")
   serviceRequests    ServiceRequest[]
   selfFundedAccount  SelfFundedAccount?
   adminFeeAgreements AdminFeeAgreement[]
@@ -932,6 +936,7 @@ model Member {
   healthShares                   MemberHealthShare[]
   visitVerifications             VisitVerification[]
   reinstatementRequests          MembershipReinstatementRequest[]
+  crossBorderCases               CrossBorderCase[]
 
   @@unique([tenantId, memberNumber])
   @@index([tenantId])
@@ -1423,7 +1428,7 @@ model SelfFundedAccount {
 
 // Ledger of every fund movement for a self-funded scheme
 model FundTransaction {
-  currency String @default("UGX") // G3.5 multi-currency (base UGX)
+  currency            String            @default("UGX") // G3.5 multi-currency (base UGX)
   id                  String            @id @default(cuid())
   tenantId            String
   tenant              Tenant            @relation(fields: [tenantId], references: [id])
@@ -1569,11 +1574,11 @@ model ApprovalRequest {
   entityType String // e.g. "Claim", "PreAuthorization"
   entityId   String
 
-  amount      Decimal?
-  currency    String   @default("UGX")
-  baseAmount  Decimal? // amount normalised to base (UGX) at request time
-  matrixId    String? // resolved matrix rule (version in force at request time)
-  matrix      ApprovalMatrix? @relation(fields: [matrixId], references: [id])
+  amount     Decimal?
+  currency   String          @default("UGX")
+  baseAmount Decimal? // amount normalised to base (UGX) at request time
+  matrixId   String? // resolved matrix rule (version in force at request time)
+  matrix     ApprovalMatrix? @relation(fields: [matrixId], references: [id])
 
   status       ApprovalRequestStatus @default(PENDING)
   currentLevel Int                   @default(1)
@@ -1639,11 +1644,11 @@ model AutoAdjudicationPolicy {
   clientId String? // null = operator default; set = per-client override
   client   Client? @relation(fields: [clientId], references: [id])
 
-  enabled              Boolean  @default(true)
-  maxAutoApproveAmount Decimal? // ceiling in `currency`; above → route. null = no ceiling
-  currency             String   @default("UGX")
-  requireCleanFraud    Boolean  @default(true) // no open fraud flag to auto-approve
-  requirePreauthWhenNeeded Boolean @default(true)
+  enabled                  Boolean  @default(true)
+  maxAutoApproveAmount     Decimal? // ceiling in `currency`; above → route. null = no ceiling
+  currency                 String   @default("UGX")
+  requireCleanFraud        Boolean  @default(true) // no open fraud flag to auto-approve
+  requirePreauthWhenNeeded Boolean  @default(true)
 
   effectiveFrom DateTime  @default(now())
   effectiveTo   DateTime?
@@ -1668,9 +1673,9 @@ enum SyncOperationState {
 }
 
 model SyncOperation {
-  id         String @id @default(cuid())
+  id         String    @id @default(cuid())
   tenantId   String
-  tenant     Tenant @relation(fields: [tenantId], references: [id])
+  tenant     Tenant    @relation(fields: [tenantId], references: [id])
   clientUuid String // client-generated record UUID
   opKey      String // idempotency key (client UUID + op) — unique per tenant
   entityType String // "CheckIn" | "PreAuth" | "Claim" | "Image"
@@ -2057,7 +2062,7 @@ enum ServiceType {
 }
 
 model Claim {
-  currency String @default("UGX") // G3.5 multi-currency (base UGX)
+  currency        String            @default("UGX") // G3.5 multi-currency (base UGX)
   id              String            @id @default(cuid())
   tenantId        String
   tenant          Tenant            @relation(fields: [tenantId], references: [id])
@@ -3908,7 +3913,7 @@ enum InvoiceStatus {
 }
 
 model Invoice {
-  currency String @default("UGX") // G3.5 multi-currency (base UGX)
+  currency      String        @default("UGX") // G3.5 multi-currency (base UGX)
   id            String        @id @default(cuid())
   tenantId      String
   tenant        Tenant        @relation(fields: [tenantId], references: [id])
@@ -3943,7 +3948,7 @@ model Invoice {
 }
 
 model Payment {
-  currency String @default("UGX") // G3.5 multi-currency (base UGX)
+  currency        String    @default("UGX") // G3.5 multi-currency (base UGX)
   id              String    @id @default(cuid())
   groupId         String
   group           Group     @relation(fields: [groupId], references: [id])
@@ -4007,7 +4012,7 @@ enum LifeRole {
 }
 
 model Quotation {
-  currency String @default("UGX") // G3.5 multi-currency (base UGX)
+  currency    String  @default("UGX") // G3.5 multi-currency (base UGX)
   id          String  @id @default(cuid())
   tenantId    String
   tenant      Tenant  @relation(fields: [tenantId], references: [id])
@@ -5694,4 +5699,131 @@ model InternalBlacklist {
 
   @@index([tenantId, isActive])
   @@index([tenantId, nationalId, isActive])
+}
+
+// ── Cross-border / overseas care coordination (Medvex spec §5.15 / gap G5.15) ──
+// AD-8 cross-border employee-benefits play. A coordination layer that sits on
+// top of client pre-auth: vetted-facility sourcing → upfront estimate →
+// GOP-within-limits commitment → single consolidated, audit-ready invoice.
+// Foreign amounts are FX-normalised to the base currency (UGX, G3.5) at each
+// step so limits, GOPs and invoices are all comparable and reportable. A
+// per-case CROSS_BORDER coordination fee (G2.3) accrues on settlement.
+enum CrossBorderCaseStatus {
+  SOURCING // facility being sourced/vetted; no estimate yet
+  ESTIMATED // upfront estimate captured & FX-normalised
+  GOP_ISSUED // guarantee of payment committed within limits
+  IN_TREATMENT // member receiving care
+  INVOICED // consolidated invoice raised
+  SETTLED // paid & coordination fee accrued
+  CANCELLED // abandoned (never deleted)
+}
+
+enum CrossBorderLineKind {
+  ESTIMATE // pre-treatment cost estimate line
+  INVOICE // post-treatment consolidated-invoice line
+}
+
+// A vetted overseas/cross-border facility Medvex can steer cases to. Never
+// deleted — retired facilities are closed with `effectiveTo` / `isActive`.
+model CrossBorderFacility {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  name          String
+  country       String // ISO country name (e.g. "India", "Kenya", "South Africa")
+  city          String?
+  currency      String   @default("UGX") // facility's billing currency
+  specialties   String[] // e.g. ["Oncology", "Cardiac Surgery"]
+  accreditation String? // e.g. "JCI", "NABH"
+  contactName   String?
+  contactEmail  String?
+  contactPhone  String?
+  notes         String?
+  isVetted      Boolean  @default(false) // passed Medvex clinical/commercial vetting
+
+  effectiveFrom DateTime  @default(now())
+  effectiveTo   DateTime?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  cases CrossBorderCase[]
+
+  @@index([tenantId, isActive])
+  @@index([tenantId, country])
+}
+
+// A single cross-border coordination episode for one member. Carries the FX
+// snapshots for the estimate, the GOP commitment and the final invoice so the
+// audit trail is self-contained.
+model CrossBorderCase {
+  id         String               @id @default(cuid())
+  tenantId   String
+  tenant     Tenant               @relation(fields: [tenantId], references: [id])
+  clientId   String // the paying client (payer)
+  client     Client               @relation(fields: [clientId], references: [id])
+  memberId   String
+  member     Member               @relation(fields: [memberId], references: [id])
+  facilityId String?
+  facility   CrossBorderFacility? @relation(fields: [facilityId], references: [id])
+  preauthId  String? // links into client pre-auth when coordinated from there
+
+  caseNumber       String
+  diagnosis        String
+  treatmentSummary String?
+  status           CrossBorderCaseStatus @default(SOURCING)
+
+  // Estimate snapshot (base = UGX)
+  estimatedAmount    Decimal?
+  estimatedCurrency  String?
+  estimatedAmountUgx Decimal?
+
+  // GOP commitment snapshot (base = UGX) + limit check
+  gopAmount        Decimal?
+  gopCurrency      String?
+  gopAmountUgx     Decimal?
+  approvedLimitUgx Decimal? // member/benefit limit the GOP was checked against
+  gopWithinLimit   Boolean? // true when gopAmountUgx <= approvedLimitUgx
+
+  // Consolidated invoice snapshot
+  invoiceReference String?
+  invoiceTotalUgx  Decimal?
+  invoicedAt       DateTime?
+  settledAt        DateTime?
+
+  adminFeeLedgerEntryId String? // CROSS_BORDER coordination fee accrued at settlement
+  createdById           String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  lineItems CrossBorderLineItem[]
+
+  @@unique([tenantId, caseNumber])
+  @@index([tenantId, clientId])
+  @@index([tenantId, status])
+  @@index([memberId])
+  @@index([facilityId])
+}
+
+// Estimate and consolidated-invoice lines for a case, each FX-normalised to UGX
+// at capture. The single consolidated invoice = the sum of kind=INVOICE lines.
+model CrossBorderLineItem {
+  id          String              @id @default(cuid())
+  tenantId    String
+  tenant      Tenant              @relation(fields: [tenantId], references: [id])
+  caseId      String
+  case        CrossBorderCase     @relation(fields: [caseId], references: [id])
+  kind        CrossBorderLineKind
+  description String
+  serviceDate DateTime?
+  amount      Decimal
+  currency    String
+  fxRate      Decimal             @default(1) // rate used: amountUgx = amount × fxRate
+  amountUgx   Decimal
+
+  createdAt DateTime @default(now())
+
+  @@index([caseId, kind])
+  @@index([tenantId])
 }

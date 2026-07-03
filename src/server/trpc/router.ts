@@ -27,6 +27,7 @@ import { contractEngineRouter } from "./routers/contractEngine";
 import { contractRulesRouter } from "./routers/contractRules";
 import { contractImportRouter } from "./routers/contractImport";
 import { contractAnalyticsRouter } from "./routers/contractAnalytics";
+import { crossBorderRouter } from "./routers/crossBorder";
 
 export const appRouter = createTRPCRouter({
   healthcheck: publicProcedure.query(() => {
@@ -60,6 +61,7 @@ export const appRouter = createTRPCRouter({
   contractRules: contractRulesRouter,
   contractImport: contractImportRouter,
   contractAnalytics: contractAnalyticsRouter,
+  crossBorder: crossBorderRouter,
 });
 
 export type AppRouter = typeof appRouter;

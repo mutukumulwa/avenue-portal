@@ -30,6 +30,64 @@ meaningful step. Newest status at the top of each section.
   schema change: `npx prisma db push` (additive = non-destructive) then run any
   data backfill separately via `npx prisma db execute --file <sql> --schema prisma/schema.prisma`.
   (Tech-debt: migrations history should eventually be re-baselined to the DB.)
+- **⚠️ SHARED DEV DB DRIFT (2026-07-03):** the local DB now carries tables from
+  the **digital-contract-module** merged on `main` (`ServiceCategory`,
+  `PricingRule`, `OverrideControl`, `ServiceCategoryAlias`, `ServiceMappingMemory`,
+  contract/pricing tables) that are **not** in `medvex-phase-0`'s schema. A plain
+  `prisma db push` therefore wants to **DROP** them (data loss) — do NOT
+  `--accept-data-loss`. For additive schema work on this branch, apply the new
+  DDL surgically: `psql "$DATABASE_URL" -f <file>.sql` (hand-written to match
+  Prisma conventions), then `prisma generate`. Verify with
+  `prisma migrate diff --from-config-datasource prisma.config.ts --to-schema prisma/schema.prisma`
+  — your new tables should produce **no** diff lines (only the legacy drops remain).
+- **⚠️ PRISMA 7 CLI CHANGES:** `db execute --file` prints help only (broken);
+  use `psql`. `migrate diff` flags renamed: `--from-url`→`--from-config-datasource`,
+  `--to-schema-datamodel`→`--to-schema`. `PrismaClient` now needs a driver
+  adapter in its constructor (a bare `new PrismaClient()` throws).
+- **⚠️ BRANCH/CACHE HYGIENE:** after switching to `medvex-phase-0`, always
+  `prisma generate` + `rm -rf .next` — a stale client (from `main`'s schema)
+  caused phantom `override.service.ts` OverrideType errors; stale `.next`
+  referenced `main`'s `contracts/page`. Both cleared after regenerate+clean.
+
+### Current status (2026-07-03 session — G5.15 cross-border ENGINE done)
+> Recovered the branch (a prior interrupt left me on `main`; all work is on
+> `medvex-phase-0`, tip was `cfdc9af`). Re-verified green after regenerate+clean:
+> typecheck clean, brand guard pass, suite **229/229** before this slice.
+>
+> **G5.15 cross-border / overseas care coordination — data model + engine + tests.**
+> - Schema (applied via `psql`, not `db push`, per the drift note above):
+>   `CrossBorderFacility` (vetted registry, never-delete), `CrossBorderCase`
+>   (state machine + FX snapshots for estimate/GOP/invoice), `CrossBorderLineItem`
+>   (ESTIMATE|INVOICE lines, FX-normalised). Enums `CrossBorderCaseStatus`,
+>   `CrossBorderLineKind`. Back-relations on Tenant/Client/Member. `migrate diff`
+>   shows the 3 tables match the schema exactly (no diff).
+> - `cross-border.service.ts` — lifecycle SOURCING→ESTIMATED→GOP_ISSUED→
+>   IN_TREATMENT→INVOICED→SETTLED (+CANCELLED), enforced transitions. Vetted-
+>   facility gate; member↔client isolation on openCase; every money step
+>   FX-normalised to UGX (G3.5); **GOP strictly within limits** (rejects when
+>   gopAmountUgx > approvedLimitUgx); single consolidated audit-ready invoice
+>   (CBI-YYYY-NNNNN); settlement accrues a `CROSS_BORDER` admin fee (G2.3) when
+>   the client has an active agreement. 12 tests, all green. typecheck clean.
+> - **UI + wiring DONE (in-browser verified):** `crossBorder` tRPC router
+>   (wired into appRouter); `/cross-border` console (facility registry +
+>   open-case + cases list) and `/cross-border/[id]` workflow (assign facility,
+>   capture estimate, issue GOP, start treatment, add invoice lines, consolidate,
+>   settle, cancel) via server actions with audit writes; sidebar "Cross-Border
+>   Care" under Clinical (Globe2). Successful detail actions redirect to the
+>   clean path (drops stale `?error`).
+> - **In-browser E2E verified** (full lifecycle on CBC-2026-00001): added vetted
+>   facility Apollo Hospitals (India); opened case; estimate 5000+500 USD →
+>   19,000,000 + 1,900,000 = **20,900,000 UGX** at FX 3800; **over-limit GOP
+>   (22.8M > 20M) rejected** with the limit error; valid GOP (20.9M ≤ 21M)
+>   committed → GOP_ISSUED with the within-limit note; treatment; invoice lines
+>   4800+700 USD → consolidated to single invoice **CBI-2026-00001 = 20,900,000
+>   UGX**; settled → SETTLED. Suite **241/241**, typecheck + brand guard green.
+> - **PRE-EXISTING BUG FOUND (not mine):** all admin pages threw a client-side
+>   "Application error" in the browser due to a **stale service worker** (`sw.js`
+>   from the G4 offline scaffold) serving broken cached chunks. Fix during
+>   verification = unregister SW + `caches.delete()` (member-shell/runtime v1).
+>   SSR was always 200/correct. Worth a proper SW-versioning/kill-switch pass
+>   later (tracked as follow-up).
 
 ### Current status (2026-07-02 session — wire-in + consoles phase COMPLETE)
 > **The entire "layer on top of the engines" is now built, wired, and
