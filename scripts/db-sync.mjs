@@ -33,7 +33,8 @@ if (!process.env.DIRECT_URL) {
 
 console.log("[db-sync] Syncing database schema with `prisma db push`...");
 try {
-  execSync("npx prisma db push --skip-generate", { stdio: "inherit" });
+  // Prisma 7 removed --skip-generate; plain `db push` is the supported form.
+  execSync("npx prisma db push", { stdio: "inherit" });
   console.log("[db-sync] Schema is in sync.");
 } catch {
   console.error(
