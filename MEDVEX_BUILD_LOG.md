@@ -10,7 +10,10 @@ meaningful step. Newest status at the top of each section.
 
 ## §1. RESUME HERE  ⟵ read this first
 
-- **Branch:** `medvex-phase-0` (off `main`).
+- **Branch:** `main` — as of the 2026-07-03 session, `medvex-phase-0` has been
+  **merged into `main`**, which now also carries the digital-contract-module.
+  `main` is the single integrated source of truth. (`medvex-phase-0` remains at
+  the pre-merge tip `71e27fc`.)
 - **Commits so far (newest last):**
   - `e9638fc` rebrand checkpoint (D-1…D-6, the 78-file uncommitted sweep).
   - `fe125bb` D-7 token-name rename `avenue-*` → `brand-*` (~3,760 usages).
@@ -48,6 +51,49 @@ meaningful step. Newest status at the top of each section.
   `prisma generate` + `rm -rf .next` — a stale client (from `main`'s schema)
   caused phantom `override.service.ts` OverrideType errors; stale `.next`
   referenced `main`'s `contracts/page`. Both cleared after regenerate+clean.
+
+### Current status (2026-07-03 session — MERGE TO MAIN + G5.16 wellness done)
+> **Merged `medvex-phase-0` → `main`** (`67740f1`). Topology discovered: `main`
+> already contained the entire medvex rebrand + build up to `cfdc9af` (the
+> merge-base), **plus 15 digital-contract-module commits** on top; medvex-phase-0
+> only carried my 2 cross-border commits. So the merge = bring cross-border onto
+> the integrated branch. Only 3 conflicts, all additive (schema Tenant/Client
+> relations, `router.ts` imports+registrations, `AdminSidebar.tsx` icon import) —
+> unioned both sides. Post-merge: `migrate diff` **No difference detected** (the
+> DB is main's DB — contract tables + cross-border tables all present); typecheck
+> clean, brand guard green, suite **287/287**. In-browser: `/cross-border`,
+> `/contracts`, `/dashboard` all 200 + correct. This also resolves the earlier
+> "shared dev DB drift" note — on `main` the schema matches the DB.
+>
+> **G5.16 preventative care & wellness — model + engine + tests + UI, in-browser
+> verified.** Applied via `psql` (matching Prisma DDL), diff clean.
+> - Models: `WellnessProgram` (SCREENING|CHRONIC_DISEASE_MGMT|INCENTIVE;
+>   cadenceMonths, fundedAmount, targetConditions, pointsReward; never-delete),
+>   `WellnessEnrollment` (unique per tenant+program+member; status machine;
+>   nextDueDate), `WellnessActivity` (points + advances cadence). Back-relations
+>   on Tenant/Client/Member.
+> - `wellness.service.ts` — `enroll` (idempotent, reactivates withdrawn, computes
+>   next-due from cadence, client-scope isolation), `logActivity` (awards points,
+>   advances cadence checkpoint, completes one-off screenings, keeps INCENTIVE
+>   open), `dueScreenings`, `programAnalytics` (enrolment/completion/points),
+>   `memberSummary`. Pure `addMonths` with month-length clamp. **11 tests.**
+> - `wellness` tRPC router; `/wellness` console (analytics + enrol + due list +
+>   recent enrolments with inline log-activity + programme registry); sidebar
+>   "Wellness" under Clinical (HeartPulse). Suite **298/298**, typecheck + brand
+>   guard green.
+> - **In-browser E2E:** created "Annual Health Check" (SCREENING, 12mo, 150,000
+>   UGX, 50 pts); enrolled AVH-2024-00001 → next due 2027-07-03; logged a
+>   SCREENING_COMPLETED activity → **50 pts awarded**, stayed ACTIVE (recurring),
+>   checkpoint recomputed from activity date. Analytics reflected it.
+> - **⚠️ After applying schema via psql + `prisma generate`, RESTART the dev
+>   server** — a running Next server caches `@prisma/client` from startup, so new
+>   model delegates (`prisma.wellnessProgram`) are `undefined` until restart
+>   (manifested as a 500 "Cannot read properties of undefined (reading
+>   'findMany')"). The stale-service-worker gotcha (task_95908fdf) still applies.
+>
+> **NEXT:** everything remaining in the plan is external-gated (NIRA/MoMo/Airtel
+> APIs, SMS aggregator P-03, FHIR/EDI G8) or Phase-5 docs (HA/DR). No more
+> buildable-without-creds feature modules — G5.15 and G5.16 were the last two.
 
 ### Current status (2026-07-03 session — G5.15 cross-border ENGINE done)
 > Recovered the branch (a prior interrupt left me on `main`; all work is on
