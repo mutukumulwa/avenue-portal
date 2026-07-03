@@ -68,9 +68,26 @@ meaningful step. Newest status at the top of each section.
 >   gopAmountUgx > approvedLimitUgx); single consolidated audit-ready invoice
 >   (CBI-YYYY-NNNNN); settlement accrues a `CROSS_BORDER` admin fee (G2.3) when
 >   the client has an active agreement. 12 tests, all green. typecheck clean.
-> - **NEXT (this feature):** tRPC router + `/cross-border` admin console (facility
->   registry + case workflow) + sidebar link, then in-browser verify. Engine
->   committed first for resumability.
+> - **UI + wiring DONE (in-browser verified):** `crossBorder` tRPC router
+>   (wired into appRouter); `/cross-border` console (facility registry +
+>   open-case + cases list) and `/cross-border/[id]` workflow (assign facility,
+>   capture estimate, issue GOP, start treatment, add invoice lines, consolidate,
+>   settle, cancel) via server actions with audit writes; sidebar "Cross-Border
+>   Care" under Clinical (Globe2). Successful detail actions redirect to the
+>   clean path (drops stale `?error`).
+> - **In-browser E2E verified** (full lifecycle on CBC-2026-00001): added vetted
+>   facility Apollo Hospitals (India); opened case; estimate 5000+500 USD →
+>   19,000,000 + 1,900,000 = **20,900,000 UGX** at FX 3800; **over-limit GOP
+>   (22.8M > 20M) rejected** with the limit error; valid GOP (20.9M ≤ 21M)
+>   committed → GOP_ISSUED with the within-limit note; treatment; invoice lines
+>   4800+700 USD → consolidated to single invoice **CBI-2026-00001 = 20,900,000
+>   UGX**; settled → SETTLED. Suite **241/241**, typecheck + brand guard green.
+> - **PRE-EXISTING BUG FOUND (not mine):** all admin pages threw a client-side
+>   "Application error" in the browser due to a **stale service worker** (`sw.js`
+>   from the G4 offline scaffold) serving broken cached chunks. Fix during
+>   verification = unregister SW + `caches.delete()` (member-shell/runtime v1).
+>   SSR was always 200/correct. Worth a proper SW-versioning/kill-switch pass
+>   later (tracked as follow-up).
 
 ### Current status (2026-07-02 session — wire-in + consoles phase COMPLETE)
 > **The entire "layer on top of the engines" is now built, wired, and
