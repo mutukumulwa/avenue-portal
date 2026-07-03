@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, AlertTriangle, CheckCircle2, FileSignature, GitBranch } from "lucide-react";
 import { ContractLifecycleService } from "@/server/services/contract-lifecycle.service";
 import { ManagePanel } from "./ManagePanel";
+import { FeeSchedule } from "./FeeSchedule";
 import {
   submitForReviewAction,
   approveContractAction,
@@ -322,6 +323,12 @@ export default async function ContractDetailPage({
             </dl>
           </section>
         </div>
+      </div>
+
+      {/* Tier-grouped fee schedule (WP-E3): headline / labs / imaging /
+          pharmacy / theatre / professional fees / other */}
+      <div className="mt-6">
+        <FeeSchedule tenantId={tenantId} contractId={c.id} />
       </div>
 
       {/* Management widgets — tariffs, applicability, branches, rules, exclusions (§11.2/§11.4/§11.5) */}
