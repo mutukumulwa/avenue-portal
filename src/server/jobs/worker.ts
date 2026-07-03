@@ -17,6 +17,7 @@ import { runLapseDetectionJob } from "./lapse-detection.job";
 import { runAdminFeeAccrualJob } from "./admin-fee-accrual.job";
 import { runFraudScanJob } from "./fraud-scan.job";
 import { runContractLifecycleJob } from "./contract-lifecycle.job";
+import { runOfflinePackJob } from "./offline-pack.job";
 
 console.log("Starting background workers...");
 
@@ -108,6 +109,10 @@ const systemWorker = new Worker("system", async (job: Job) => {
   if (job.name === "sync-reconcile") {
     const { state } = await SyncService.reconcile(job.data.operationId as string);
     console.log(`[Worker] Sync reconcile ${job.data.operationId} → ${state}`);
+  }
+  if (job.name === "offline-pack-refresh") {
+    console.log("[Worker] Running offline pack refresh...");
+    await runOfflinePackJob();
   }
   if (job.name === "quotation-expiry") {
     const result = await runQuotationExpiryJob();

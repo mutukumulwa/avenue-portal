@@ -9,7 +9,7 @@ import {
   Settings, LogOut, Calculator, UserCheck, MessageSquareText,
   ShieldAlert, MessageSquareWarning, Wallet, Fingerprint,
   BarChart3, TriangleAlert, Landmark, ClipboardCheck, CloudOff, LayoutGrid,
-  ShieldCheck, Lock, FileSignature, Globe2, HeartPulse,
+  ShieldCheck, Lock, FileSignature, Globe2, HeartPulse, KeyRound,
 } from "lucide-react";
 import { PortalSwitcher } from "./PortalSwitcher";
 import { useState } from "react";
@@ -49,6 +49,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Claims",             href: "/claims",             icon: Receipt,        roles: OPS        },
       { label: "Claims Queues",      href: "/claims/queues",      icon: LayoutGrid,     roles: OPS        },
       { label: "Offline Capture",    href: "/offline-capture",    icon: CloudOff,       roles: OPS        },
+      { label: "Offline Work Codes", href: "/offline-auth",       icon: KeyRound,       roles: OPS        },
       { label: "Approvals",          href: "/approvals",          icon: ClipboardCheck, roles: OPS        },
       { label: "Pre-Authorizations", href: "/preauth",            icon: Stethoscope,    roles: OPS        },
       { label: "Cross-Border Care",  href: "/cross-border",       icon: Globe2,         roles: OPS        },
