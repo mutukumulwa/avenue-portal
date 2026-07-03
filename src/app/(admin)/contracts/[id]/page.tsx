@@ -6,6 +6,7 @@ import { ArrowLeft, AlertTriangle, CheckCircle2, FileSignature, GitBranch } from
 import { ContractLifecycleService } from "@/server/services/contract-lifecycle.service";
 import { ManagePanel } from "./ManagePanel";
 import { FeeSchedule } from "./FeeSchedule";
+import { CapitationPanel } from "./CapitationPanel";
 import {
   submitForReviewAction,
   approveContractAction,
@@ -91,6 +92,15 @@ export default async function ContractDetailPage({
   const now = new Date();
   const display = c.status === "ACTIVE" && c.endDate < now ? "EXPIRED" : c.status;
 
+  // Funding badge (WP-E4): FFS / CAPITATION / MIXED, derived from what the
+  // contract actually carries.
+  const capitationRuleCount = await prisma.pricingRule.count({
+    where: { contractId: id, isActive: true, ruleKind: { in: ["CAPITATION", "PER_VISIT_CASE_RATE", "AVERAGE_COST_POOL"] } },
+  });
+  const hasCapitation = capitationRuleCount > 0 || c.contractType === "CASE_RATE_AGREEMENT";
+  const hasFfs = c._count.tariffLines > 0;
+  const fundingBadge = hasCapitation && hasFfs ? "MIXED" : hasCapitation ? "CAPITATION" : "FFS";
+
   // Renewal is offered once a contract is in force or past its window (§4.4).
   const renewEligible = ["ACTIVE", "EXPIRED", "TERMINATED"].includes(c.status) || display === "EXPIRED";
   const renewStart = new Date(c.endDate.getTime() + 86_400_000).toISOString().slice(0, 10);
@@ -117,6 +127,18 @@ export default async function ContractDetailPage({
               <h1 className="text-2xl font-semibold text-[#000523]">{c.contractNumber}</h1>
               <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLES[display] ?? ""}`}>
                 {display.replace(/_/g, " ")}
+              </span>
+              <span
+                className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                  fundingBadge === "FFS"
+                    ? "bg-[#E6E7E8] text-[#6C757D]"
+                    : fundingBadge === "CAPITATION"
+                      ? "bg-[#6610F2]/10 text-[#6610F2]"
+                      : "bg-[#17A2B8]/10 text-[#17A2B8]"
+                }`}
+                title="How this contract pays: fee-for-service tariff lines, capitation, or both"
+              >
+                {fundingBadge}
               </span>
             </div>
             <p className="text-sm text-[#6C757D]">{c.title}</p>
@@ -327,8 +349,14 @@ export default async function ContractDetailPage({
 
       {/* Tier-grouped fee schedule (WP-E3): headline / labs / imaging /
           pharmacy / theatre / professional fees / other */}
-      <div className="mt-6">
+      <div className="mt-6 space-y-6">
         <FeeSchedule tenantId={tenantId} contractId={c.id} />
+        {/* Capitation setup + display (WP-E4) */}
+        <CapitationPanel
+          contractId={c.id}
+          contractType={c.contractType}
+          editable={c.status === "DRAFT" || c.status === "PENDING_CLARIFICATION"}
+        />
       </div>
 
       {/* Management widgets — tariffs, applicability, branches, rules, exclusions (§11.2/§11.4/§11.5) */}
