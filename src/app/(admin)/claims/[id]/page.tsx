@@ -15,6 +15,7 @@ import Link from "next/link";
 import { ClaimDocuments } from "./ClaimDocuments";
 import { CoContributionCollectionForm } from "./CoContributionCollectionForm";
 import { ContractPanel } from "./ContractPanel";
+import { PreauthPanel } from "./PreauthPanel";
 
 const LINE_CAT_META: Record<string, { label: string; color: string; Icon: React.ElementType }> = {
   CONSULTATION: { label: "Consultation", color: "bg-brand-indigo/10 text-brand-indigo",  Icon: Stethoscope },
@@ -157,6 +158,18 @@ export default async function ClaimDetailPage({
           </div>
         </div>
       </div>
+
+      {/* Attached pre-authorizations (WP-C3) */}
+      <PreauthPanel
+        claim={{
+          id: claim.id,
+          tenantId,
+          memberId: claim.memberId,
+          providerId: claim.providerId,
+          status: claim.status,
+          preauths: claim.preauths,
+        }}
+      />
 
       {/* Diagnoses */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm">

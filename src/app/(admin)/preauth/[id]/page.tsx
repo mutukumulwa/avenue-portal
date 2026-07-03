@@ -85,7 +85,7 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
         <span className={`px-4 py-2 text-xs font-bold uppercase rounded-full ${
           pa.status === "APPROVED" ? "bg-[#28A745]/10 text-[#28A745]" :
           pa.status === "DECLINED" ? "bg-[#DC3545]/10 text-[#DC3545]" :
-          pa.status === "CONVERTED_TO_CLAIM" ? "bg-brand-indigo/10 text-brand-indigo" :
+          ["ATTACHED", "UTILISED", "CONVERTED_TO_CLAIM"].includes(pa.status) ? "bg-brand-indigo/10 text-brand-indigo" :
           "bg-[#17A2B8]/10 text-[#17A2B8]"
         }`}>
           {pa.status.replace(/_/g, " ")}
@@ -227,22 +227,29 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
         </div>
       </div>
 
-      {/* Convert to claim CTA for approved preauths */}
+      {/* Attach workflow for approved preauths (WP-C3): a PA attaches to a
+          claim that also carries BAU services — it rarely becomes a claim on
+          its own. Attaching happens from the claim screen; this CTA covers
+          the case where no claim exists yet. */}
       {canConvert && (
         <div className="bg-brand-indigo/5 border-2 border-brand-indigo/20 rounded-lg p-6 shadow-sm">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <div>
               <h3 className="text-lg font-bold text-brand-text-heading flex items-center gap-2">
                 <ArrowRightCircle size={20} className="text-brand-indigo" />
-                Convert to Claim
+                Approved — ready to attach
               </h3>
-              <p className="text-sm text-brand-text-body mt-1">This pre-authorization is approved. Convert it to a claim for payment processing.</p>
+              <p className="text-sm text-brand-text-body mt-1">
+                Attach this pre-auth from the member&apos;s claim screen (it appears in the
+                claim&apos;s Pre-Authorizations panel), or start a claim with it attached if
+                none exists yet.
+              </p>
             </div>
             <form action={convertToClaimAction}>
               <input type="hidden" name="preauthId" value={pa.id} />
               <button type="submit" className="bg-brand-indigo hover:bg-brand-secondary text-white px-6 py-2.5 rounded-full font-semibold transition-colors shadow-sm flex items-center gap-2">
                 <ArrowRightCircle size={18} />
-                Convert to Claim
+                Start claim with this PA
               </button>
             </form>
           </div>
@@ -270,10 +277,11 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
         </div>
       )}
 
-      {pa.status === "CONVERTED_TO_CLAIM" && pa.claim && (
+      {["ATTACHED", "UTILISED", "CONVERTED_TO_CLAIM"].includes(pa.status) && pa.claim && (
         <div className="bg-brand-indigo/5 border border-brand-indigo/20 rounded-lg p-5">
           <h3 className="flex items-center gap-2 text-sm font-bold text-brand-indigo uppercase tracking-wide">
-            <CheckCircle2 size={16} /> Converted to Claim
+            <CheckCircle2 size={16} />
+            {pa.status === "UTILISED" ? "Utilised by claim decision" : "Attached to claim"}
           </h3>
           <Link href={`/claims/${pa.claim.id}`} className="text-brand-indigo hover:text-brand-secondary font-semibold mt-2 inline-block">
             View Claim →

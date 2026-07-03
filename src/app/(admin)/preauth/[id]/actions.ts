@@ -60,21 +60,25 @@ export async function requestMedicalReviewAction(formData: FormData) {
   redirect(`/preauth/${preauthId}`);
 }
 
+/**
+ * Start an ordinary claim with this PA attached (WP-C3). The claim can then
+ * accrue BAU lines and further PAs — the PA is ATTACHED, not converted.
+ */
 export async function convertToClaimAction(formData: FormData) {
   const session = await requireRole(ROLES.CLINICAL);
 
   const tenantId  = session.user.tenantId;
   const preauthId = formData.get("preauthId") as string;
 
-  await ClaimsService.convertPreAuthToClaim(tenantId, preauthId);
+  const claim = await ClaimsService.createClaimWithPreauth(tenantId, preauthId);
 
   await writeAudit({
     userId: session.user.id,
-    action: "PREAUTH_CONVERTED",
+    action: "PREAUTH_ATTACHED",
     module: "PREAUTH",
-    description: `Pre-auth ${preauthId.slice(0, 8)} converted to claim`,
-    metadata: { preauthId },
+    description: `Claim ${claim.claimNumber} started with pre-auth ${preauthId.slice(0, 8)} attached`,
+    metadata: { preauthId, claimId: claim.id },
   });
 
-  redirect("/claims");
+  redirect(`/claims/${claim.id}`);
 }

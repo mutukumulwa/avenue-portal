@@ -422,3 +422,37 @@ export async function waiveCoContributionAction(
   revalidatePath(`/claims/${tx.claimId}`);
   return {};
 }
+
+// ─── PRE-AUTH ATTACHMENT (WP-C3) ─────────────────────────────────────────────
+
+export async function attachPreauthAction(formData: FormData) {
+  const session = await requireRole(ROLES.OPS);
+  const claimId = formData.get("claimId") as string;
+  const preauthId = formData.get("preauthId") as string;
+
+  const pa = await ClaimsService.attachPreauth(session.user.tenantId, claimId, preauthId);
+  await writeAudit({
+    userId: session.user.id,
+    action: "PREAUTH_ATTACHED",
+    module: "CLAIMS",
+    description: `Pre-auth ${pa.preauthNumber} attached to claim ${claimId.slice(0, 8)}`,
+    metadata: { claimId, preauthId },
+  });
+  revalidatePath(`/claims/${claimId}`);
+}
+
+export async function detachPreauthAction(formData: FormData) {
+  const session = await requireRole(ROLES.OPS);
+  const claimId = formData.get("claimId") as string;
+  const preauthId = formData.get("preauthId") as string;
+
+  await ClaimsService.detachPreauth(session.user.tenantId, claimId, preauthId);
+  await writeAudit({
+    userId: session.user.id,
+    action: "PREAUTH_DETACHED",
+    module: "CLAIMS",
+    description: `Pre-auth ${preauthId.slice(0, 8)} detached from claim ${claimId.slice(0, 8)}`,
+    metadata: { claimId, preauthId },
+  });
+  revalidatePath(`/claims/${claimId}`);
+}
