@@ -21,6 +21,12 @@ import { auditChainRouter } from "./routers/auditChain";
 import { intakeRouter } from "./routers/intake";
 import { bindingRouter } from "./routers/binding";
 import { terminologyRouter } from "./routers/terminology";
+import { contractsRouter } from "./routers/contracts";
+import { providerBranchesRouter } from "./routers/providerBranches";
+import { contractEngineRouter } from "./routers/contractEngine";
+import { contractRulesRouter } from "./routers/contractRules";
+import { contractImportRouter } from "./routers/contractImport";
+import { contractAnalyticsRouter } from "./routers/contractAnalytics";
 
 export const appRouter = createTRPCRouter({
   healthcheck: publicProcedure.query(() => {
@@ -48,6 +54,12 @@ export const appRouter = createTRPCRouter({
   intake: intakeRouter,
   binding: bindingRouter,
   terminology: terminologyRouter,
+  contracts: contractsRouter,
+  providerBranches: providerBranchesRouter,
+  contractEngine: contractEngineRouter,
+  contractRules: contractRulesRouter,
+  contractImport: contractImportRouter,
+  contractAnalytics: contractAnalyticsRouter,
 });
 
 export type AppRouter = typeof appRouter;

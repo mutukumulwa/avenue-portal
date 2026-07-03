@@ -90,6 +90,22 @@ model Tenant {
   breachIncidents                BreachIncident[]
   fraudRules                     FraudRule[]
   fraudInvestigations            FraudInvestigation[]
+  providerBranches               ProviderBranch[]
+  providerAliases                ProviderAlias[]
+  contractVersions               ContractVersion[]
+  contractSourceDocuments        ContractSourceDocument[]
+  serviceCategories              ServiceCategory[]
+  serviceCategoryAliases         ServiceCategoryAlias[]
+  serviceMappingMemories         ServiceMappingMemory[]
+  adjudicationReasonCodes        AdjudicationReasonCode[]
+  pricingRules                   PricingRule[]
+  contractPackages               ContractPackage[]
+  preauthRules                   PreauthRule[]
+  documentationRules             DocumentationRule[]
+  externalTariffTables           ExternalTariffTable[]
+  overrideControls               OverrideControl[]
+  contractExtractions            ContractExtraction[]
+  contractReconciliations        ContractReconciliation[]
 }
 
 // ── Multi-client TPA tenancy (Medvex spec §2.1 / gap G2.1) ──────────────
@@ -102,6 +118,8 @@ enum PayerType {
   INSURER // Risk-bearing insurance company
   HMO // Health maintenance organisation
   EMPLOYER_SELF_FUNDED // Employer funds its own scheme; Medvex administers
+  GOVERNMENT_SCHEME // Statutory scheme (e.g. SHA/Social Health Authority) — digital-contract spec §5.3
+  TPA_CLAIMS_MANAGER // Claims manager / TPA-of-TPA (e.g. Amanah); real risk carrier via parentClientId
 }
 
 enum ClientStatus {
@@ -162,6 +180,7 @@ model Client {
   adminFeeAgreements AdminFeeAgreement[]
   adminFeeLedgerEntries AdminFeeLedgerEntry[]
   fraudRules         FraudRule[]
+  contractApplicability ContractApplicability[]
 
   @@unique([operatorTenantId, slug])
   @@index([operatorTenantId])
@@ -2048,6 +2067,11 @@ model Claim {
   member          Member            @relation(fields: [memberId], references: [id])
   providerId      String
   provider        Provider          @relation(fields: [providerId], references: [id])
+  // Branch at which the service was rendered (digital-contract spec §5.2/§8.1) —
+  // required at capture for multi-branch providers so branch-scoped contracts and
+  // rates can match. Null for legacy/single-branch providers.
+  providerBranchId String?
+  providerBranch   ProviderBranch?  @relation(fields: [providerBranchId], references: [id])
   preauthId       String?           @unique // If converted from pre-auth
   preauth         PreAuthorization? @relation(fields: [preauthId], references: [id])
   source          ClaimSource       @default(MANUAL)
@@ -2079,6 +2103,17 @@ model Claim {
   // ── Process 9 adjudication extensions ────────────────────
   contractedRate        Decimal? @db.Decimal(14, 2) // looked-up from ProviderTariff at adjudication
   contractedVariancePct Decimal? @db.Decimal(5, 4) // (billed - contracted) / contracted
+
+  // ── Digital-contract engine provenance (spec §6.1/§8.2) ──
+  // The contract family and version that priced this claim, pinned at first
+  // adjudication (re-pin logged). `assignedQueue` names the §8.5 manual-review
+  // queue when the claim cannot auto-process.
+  contractId        String?
+  contract          ProviderContract? @relation(fields: [contractId], references: [id])
+  contractVersionId String?
+  contractFamilyIds String[]          @default([]) // parent + sibling addenda ids merged at match
+  assignedQueue     String? // NO_CONTRACT | RATE_MISSING | SERVICE_NOT_MAPPED | ... (§8.5)
+  avgCostPoolId     String? // AVERAGE_COST_POOL tag — claim belongs to a reconciliation pool (§6.4, spec P5/P6)
   adjudicatorId         String? // FK to User who adjudicated
   seniorAdjudicatorId   String? // FK to User who gave senior approval
   appealReviewerId      String? // must differ from adjudicatorId
@@ -2206,6 +2241,43 @@ model DrugExclusion {
   @@index([tenantId, clientId])
 }
 
+// Reason-code catalog (spec §5.13/§10.1) — not an enum so payers/tenants can
+// extend. Seeded with the CON/ELG/SVC/PRC/LIM/EXC/AUTH/DOC/SUB/DUP/MAN taxonomy.
+enum ReasonSeverity {
+  REJECT
+  SHORTFALL
+  PEND
+  INFO
+}
+
+model AdjudicationReasonCode {
+  id                  String         @id @default(cuid())
+  tenantId            String? // null = platform-shipped default; set = tenant override/extension
+  tenant              Tenant?        @relation(fields: [tenantId], references: [id])
+  code                String // e.g. "PRC-001"
+  category            String // Contract | Eligibility | Service | Pricing | Limits | Exclusion | Pre-auth | Documents | Submission | Duplicate | Manual
+  internalDescription String
+  providerDescription String
+  memberDescription   String
+  contractRuleRefType String? // which rule type triggers it (Tariff | Package | PreauthRule | ...)
+  defaultSeverity     ReasonSeverity @default(REJECT)
+  remedy              String?
+  resubmissionAllowed Boolean        @default(false)
+  overrideAllowed     Boolean        @default(false)
+  allowedOverrideTypes String[]      @default([]) // OverrideType names
+  requiredDocsForReconsideration String[] @default([])
+  escalationRoute     String? // queue name (§8.5)
+  isActive            Boolean        @default(true)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  claimLines ClaimLine[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([code])
+}
+
 model ClaimLine {
   id                   String             @id @default(cuid())
   claimId              String
@@ -2230,7 +2302,30 @@ model ClaimLine {
   adjustmentReason     String?
   declineReason        String?
 
+  // ── Digital-contract engine per-line provenance & amounts (spec §5.13/§6.4) ──
+  serviceCategoryId   String?
+  serviceCategoryRef  ServiceCategory?        @relation(fields: [serviceCategoryId], references: [id])
+  contractId          String? // family/contract that priced the line
+  contractVersionId   String? // version effective on the service date
+  matchedRuleType     String? // CONTRACT_TARIFF | STANDALONE_TARIFF | UNLISTED_* | EXCLUDED | NO_CONTRACT | ...
+  matchedRuleId       String? // the tariff/rule id that priced it
+  payableSource       String? // human label of what produced the payable
+  reasonCodeId        String?
+  reasonCode          AdjudicationReasonCode? @relation(fields: [reasonCodeId], references: [id])
+  contractedAmount    Decimal?           @db.Decimal(14, 2) // qty × contracted unit
+  shortfallAmount     Decimal            @default(0) @db.Decimal(14, 2) // claimed − payable absorbed by provider
+  disallowedAmount    Decimal            @default(0) @db.Decimal(14, 2) // components rejected outright
+  memberLiability     Decimal            @default(0) @db.Decimal(14, 2) // only where balance-billing permits
+  payerLiability      Decimal            @default(0) @db.Decimal(14, 2)
+  providerWriteOff    Decimal            @default(0) @db.Decimal(14, 2)
+  externalRebateAmount Decimal?          @db.Decimal(14, 2) // NET_OF_EXTERNAL (Phase 3)
+  quantityApproved    Int? // payable quantity after caps
+  ruleTrace           Json? // machine-readable per-stage engine trace (§6)
+
   @@index([claimId])
+  @@index([contractId])
+  @@index([reasonCodeId])
+  @@index([serviceCategoryId])
 }
 
 model AdjudicationLog {
@@ -2394,6 +2489,17 @@ model Provider {
   email         String?
   contactPerson String?
 
+  // ── Legal identity & licensing (digital-contract spec §5.2, O1) ──
+  // Trading name lives in `name`; these capture the legal/registered entity so
+  // contract matching can resolve the naming variance seen across the corpus.
+  legalName          String? // "AFRIHOSPITAL HOLDINGS LIMITED" vs trading "Life Care Hospitals"
+  registrationNumber String? // company registration number
+  licenceNumber      String? // facility operating licence
+  licenceExpiry      DateTime?
+  taxPin             String? // KRA PIN (Britam schedule)
+  facilityLevel      String? // SHA "LEVEL 4" etc.
+  bankDetailsRef     String? // link into settlement data (bank details stay in settlement module)
+
   // NEW: Geospatial and operational data
   geoLatitude    Decimal? @db.Decimal(9, 6)
   geoLongitude   Decimal? @db.Decimal(9, 6)
@@ -2423,9 +2529,55 @@ model Provider {
   visitVerifications VisitVerification[]
   eligibilityRules   PackageProviderEligibility[]
   practitioners      ProviderPractitioner[]
+  branches           ProviderBranch[]
+  aliases            ProviderAlias[]
 
   @@index([tenantId])
   @@index([tenantId, tier])
+}
+
+// A physical branch/facility of a provider network (spec §5.2). Branch-level
+// rates (O10) and branch-scoped contracts (Britam, SHA per-branch) are
+// unmatchable without this.
+model ProviderBranch {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  providerId    String
+  provider      Provider @relation(fields: [providerId], references: [id])
+  name          String // Bungoma, Migori, Eldoret, Meru, Kikuyu, Mlolongo
+  code          String? // short branch code
+  address       String?
+  county        String?
+  geoLatitude   Decimal? @db.Decimal(9, 6)
+  geoLongitude  Decimal? @db.Decimal(9, 6)
+  licenceNumber String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  claims          Claim[]
+  contractBranches ContractBranch[]
+  tariffLines     ProviderTariff[]
+
+  @@index([tenantId, providerId])
+  @@index([providerId, isActive])
+}
+
+// Name variants for a provider (spec §5.2, O1) — resolves the legal/trading
+// name spread during extraction and EDI intake.
+model ProviderAlias {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+  providerId String
+  provider   Provider @relation(fields: [providerId], references: [id])
+  aliasName  String
+  source     String? // where the alias was observed (e.g. "Britam 2024 contract")
+  createdAt  DateTime @default(now())
+
+  @@index([tenantId, providerId])
+  @@index([tenantId, aliasName])
 }
 
 enum TariffType {
@@ -2434,12 +2586,72 @@ enum TariffType {
   GAZETTED
 }
 
+// How a tariff line's payable is computed (digital-contract spec §5.6/§5.7).
+// Phase 2 prices FIXED / DISCOUNT_OFF_BILLED / MARKUP_OVER_COST / PER_DIEM;
+// the remaining kinds are valid values that route to manual review until their
+// pricing lands in Phase 3.
+enum TariffRateType {
+  FIXED // pay contracted amount (LOWER_OF billed vs rate by default)
+  DISCOUNT_OFF_BILLED // billed × (1 − discountPct)
+  MARKUP_OVER_COST // cost basis × (1 + markupPct)
+  PER_DIEM // rate × length-of-stay days
+  EXTERNAL_TARIFF_REF // Phase 3 — rate from an external tariff table
+  NET_OF_EXTERNAL // Phase 3 — payable = rate; gross = rate + external rebate
+  CAPITATION // Phase 3/5 — per-member-per-period pool
+  AVERAGE_COST_POOL // Phase 3/5 — portfolio reconciliation, not line-priced
+}
+
+// Unit the contracted rate is expressed in (spec §5.6) — used for UoM-mismatch
+// detection (E20) and per-diem/quantity maths.
+enum UnitOfMeasure {
+  PER_ITEM
+  PER_HOUR // Oxygen Therapy Per Hour
+  PER_DAY // ward/ICU daily
+  PER_VISIT
+  PER_SESSION // dialysis, brachytherapy
+  PER_EPISODE
+  PER_ADMISSION
+  PER_PROCEDURE
+  PER_CONSULTATION
+  PER_KM_BAND // ambulance distance bands
+}
+
+// Window a frequency limit is counted over (spec §5.6).
+enum FrequencyPeriod {
+  DAY
+  VISIT
+  ADMISSION
+  YEAR
+}
+
+// Coding system a tariff line is keyed by (spec §5.6).
+enum CodingSystem {
+  CPT
+  ICD10
+  LOCAL
+  SHA_PACKAGE
+}
+
+// OP/IP/OT service class (Masters convention; spec §5.5).
+enum PatientClass {
+  OP // outpatient
+  IP // inpatient
+  OT // theatre / operating
+}
+
 model ProviderTariff {
   id                  String            @id @default(cuid())
   providerId          String
   provider            Provider          @relation(fields: [providerId], references: [id])
   contractId          String? // null = standalone/legacy rate not tied to an agreement
   contract            ProviderContract? @relation(fields: [contractId], references: [id])
+  // Version pinning (digital-contract spec §4.4/§5.6): the version that priced
+  // this line. null = pre-versioning / standalone rate.
+  versionId           String?
+  version             ContractVersion?  @relation(fields: [versionId], references: [id])
+  // Branch-scoped rate (spec §5.6, O10): null = all branches in contract scope.
+  branchId            String?
+  branch              ProviderBranch?   @relation(fields: [branchId], references: [id])
   // Per-client tariff (G5.4): null = shared master rate for the network; set =
   // this client's negotiated rate for the provider service (wins at resolution).
   clientId            String?
@@ -2451,16 +2663,113 @@ model ProviderTariff {
   tariffType          TariffType        @default(NEGOTIATED)
   requiresPreauth     Boolean           @default(false) // contract requires PA before this service is payable
   maxQuantityPerVisit Int? // contractual cap on units per encounter
+
+  // ── Phase 2: mapping + pricing extensions (spec §5.6) ──
+  serviceCategoryId   String? // canonical taxonomy link (§5.5)
+  serviceCategory     ServiceCategory? @relation(fields: [serviceCategoryId], references: [id])
+  providerServiceCode String? // provider master / HMS code (e.g. SER015) — join key to provider bills (O21)
+  providerDescription String? // raw contract text preserved
+  standardDescription String? // normalised service name
+  codingSystem        CodingSystem?
+  rateType            TariffRateType   @default(FIXED)
+  discountPct         Decimal?         @db.Decimal(5, 2) // for DISCOUNT_OFF_BILLED
+  markupPct           Decimal?         @db.Decimal(5, 2) // for MARKUP_OVER_COST
+  maxPayableAmount    Decimal?         @db.Decimal(14, 2) // ceiling independent of rate
+  minPayableAmount    Decimal?         @db.Decimal(14, 2) // floor independent of rate
+  unitOfMeasure       UnitOfMeasure    @default(PER_ITEM)
+  quantityLimit       Int? // hard cap on units (beyond maxQuantityPerVisit semantics)
+  frequencyLimit      Int? // e.g. "1 Visit Per Day/Per Consultant"
+  frequencyPeriod     FrequencyPeriod?
+  genderRestriction   String? // "M" | "F" — maternity/paeds tariffs
+  ageMin              Int?
+  ageMax              Int?
+  diagnosisRestriction Json? // ICD list/pattern — SHA MRI/CT indication limits
+  requiresReferral    Boolean          @default(false) // SHA imaging self-referral ban
+  rateMissing         Boolean          @default(false) // O2/O13 — line exists, price unreadable; blocks activation (§13-V6)
+  // External-scheme offset (spec §5.6/§5.7 P3/P12) — for NET_OF_EXTERNAL /
+  // EXTERNAL_TARIFF_REF rate types. externalScheme keys the ExternalTariffTable
+  // lookup; externalRebateAmount is the known offset when printed on the contract.
+  externalScheme       String? // NHIF | SHA | ...
+  externalRebateAmount Decimal?        @db.Decimal(14, 2)
+  sourceRef           Json? // { documentId, page, rawText, confidence }
+  notes               String?
+
   effectiveFrom       DateTime
   effectiveTo         DateTime?
   isActive            Boolean           @default(true) // Never delete — deactivate instead
   createdAt           DateTime          @default(now())
 
+  mappingMemories ServiceMappingMemory[]
+
   @@index([providerId])
   @@index([providerId, cptCode])
   @@index([providerId, isActive])
+  @@index([providerId, providerServiceCode])
   @@index([contractId])
+  @@index([versionId])
+  @@index([branchId])
   @@index([clientId])
+  @@index([serviceCategoryId])
+  @@index([contractId, rateMissing])
+}
+
+// ─── SERVICE CATALOGUE / TAXONOMY (spec §5.5) ────────────────────────────
+// Canonical, tenant-level service taxonomy that contract tariff lines and claim
+// lines map onto. Seeded from the §2.2 category list + provider Masters.
+model ServiceCategory {
+  id          String            @id @default(cuid())
+  tenantId    String
+  tenant      Tenant            @relation(fields: [tenantId], references: [id])
+  code        String // canonical code, e.g. RADIOLOGY, CT_SCAN
+  name        String
+  parentId    String? // hierarchy: RADIOLOGY > CT_SCAN
+  parent      ServiceCategory?  @relation("ServiceCategoryTree", fields: [parentId], references: [id])
+  children    ServiceCategory[] @relation("ServiceCategoryTree")
+  patientClass PatientClass?
+  isActive    Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  aliases     ServiceCategoryAlias[]
+  tariffLines ProviderTariff[]
+  claimLines  ClaimLine[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([parentId])
+}
+
+// Raw corpus labels → canonical category (spec §5.5, O11: "Mo Minor Procedure").
+model ServiceCategoryAlias {
+  id                String          @id @default(cuid())
+  tenantId          String
+  tenant            Tenant          @relation(fields: [tenantId], references: [id])
+  serviceCategoryId String
+  serviceCategory   ServiceCategory @relation(fields: [serviceCategoryId], references: [id])
+  rawLabel          String
+  source            String?
+  createdAt         DateTime        @default(now())
+
+  @@index([tenantId, rawLabel])
+  @@index([serviceCategoryId])
+}
+
+// Learned, maker-confirmed service→tariff mappings reused by the engine's fuzzy
+// description matcher (spec §6.3). Written by the MAP_SERVICE_TO_TARIFF override.
+model ServiceMappingMemory {
+  id                 String         @id @default(cuid())
+  tenantId           String
+  tenant             Tenant         @relation(fields: [tenantId], references: [id])
+  providerId         String? // null = applies across the provider's tariffs
+  contractId         String? // null = across contracts
+  normalizedText     String // lower-cased, trimmed billed description
+  tariffId           String
+  tariff             ProviderTariff @relation(fields: [tariffId], references: [id])
+  confirmedById      String?
+  createdAt          DateTime       @default(now())
+
+  @@index([tenantId, normalizedText])
+  @@index([tariffId])
 }
 
 // Diagnosis-based bundled rates — e.g. malaria admission = KES 8,000/day flat
@@ -2491,11 +2800,85 @@ model ProviderDiagnosisTariff {
 // exclusions, and billing rules that adjudication enforces.
 
 enum ProviderContractStatus {
-  DRAFT // being negotiated — rates not yet applied
+  DRAFT // being negotiated — rates not yet applied; invisible to claims engine
+  UNDER_REVIEW // submitted for approval — reviewer comments/approves/rejects (spec §4.2)
+  PENDING_CLARIFICATION // editor answering reviewer queries
+  APPROVED // approved, not yet activated (auto-activates at startDate)
   ACTIVE // in force — adjudication uses this contract's schedule
   SUSPENDED // temporarily not honoured (e.g. compliance issue)
   EXPIRED // past end date
   TERMINATED // ended early
+  SUPERSEDED // replaced by a successor contract; read-only historical
+  ARCHIVED // read-only; excluded from default lists
+}
+
+// Digital-contract taxonomy (spec §3.3) — the shape of the agreement.
+enum ContractType {
+  MASTER_SERVICE_AGREEMENT // full legal agreement, usually rate-silent or schedule-carrying
+  RATE_SCHEDULE // pricelist letter attached to an MSA
+  PACKAGE_AGREEMENT // surgical/maternity/dental package price sets
+  CASE_RATE_AGREEMENT // fixed-fee-per-visit / FCM / capitation-style
+  RECONCILIATION_AGREEMENT // average-cost / discount addenda settled by reconciliation
+  ADDENDUM // amends a parent contract
+  GOVERNMENT_SCHEME_CONTRACT // statutory scheme contract (SHA)
+}
+
+// Whether a contract applies to every branch of the provider or an explicit list
+// (spec §5.1 O10 — Britam signing-entity trap).
+enum ContractBranchScope {
+  ALL_BRANCHES
+  LISTED // requires ≥1 ContractBranch row
+}
+
+// Execution/signature evidence (spec §5.1 O22). UNSIGNED blocks activation without override.
+enum ContractExecutionStatus {
+  FULLY_EXECUTED
+  PROVIDER_ONLY
+  UNSIGNED
+}
+
+// Payment-term day counting (spec §5.1 — Jubilee "10 working days").
+enum PaymentTermType {
+  CALENDAR
+  BUSINESS
+}
+
+// What date the submission window is measured from (spec §5.1 — SHA 7 days).
+enum SubmissionWindowBasis {
+  SERVICE_DATE
+  DISCHARGE_DATE
+  INVOICE_DATE
+  MONTHLY_BATCH
+}
+
+// Whether the provider may bill the member for the shortfall (spec §5.1 O19, SHA GCC 12.15/12.16).
+enum BalanceBillingPolicy {
+  PROHIBITED
+  ALLOWED_NONCOVERED_WITH_CONSENT
+  ALLOWED
+}
+
+// Reconciliation settlement cadence (spec §5.1 — Old Mutual quarterly, Jubilee monthly).
+enum ReconciliationCadence {
+  NONE
+  MONTHLY
+  QUARTERLY
+  BIANNUAL
+}
+
+// Tri-state tax inclusivity (spec §5.1 — SHA inclusive; commercial letters silent).
+enum TaxInclusivity {
+  INCLUSIVE
+  EXCLUSIVE
+  UNKNOWN
+}
+
+// Contract version snapshot lifecycle (spec §4.4).
+enum ContractVersionStatus {
+  DRAFT // being edited; not yet approved
+  APPROVED // approved, awaiting effective date
+  ACTIVE // the version currently pricing claims within its window
+  SUPERSEDED // replaced by a later version
 }
 
 // How services NOT on the tariff schedule are paid. This is the single most
@@ -2517,23 +2900,57 @@ model ProviderContract {
 
   contractNumber String // PC-2026-001 — generated per tenant
   title          String // e.g. "2026 Master Services Agreement"
+  contractType   ContractType           @default(RATE_SCHEDULE) // spec §3.3
   status         ProviderContractStatus @default(DRAFT)
 
-  startDate  DateTime
-  endDate    DateTime
-  signedDate DateTime?
-  autoRenew  Boolean   @default(false)
+  // ── Provider/payer scope (spec §5.1) ──
+  branchScope        ContractBranchScope @default(ALL_BRANCHES) // LISTED requires ≥1 ContractBranch (O10)
+  externalContractRef String? // e.g. SHA "CN-73009"
+
+  // Parent/child linkage — ADDENDUM / RATE_SCHEDULE under an MSA (spec §5.1, O6).
+  parentContractId String?
+  parentContract   ProviderContract?  @relation("ContractFamily", fields: [parentContractId], references: [id])
+  children         ProviderContract[] @relation("ContractFamily")
+  parentDigitised  Boolean            @default(true) // false warns the controlling parent MSA is not in the system
+
+  startDate     DateTime
+  endDate       DateTime
+  reviewDueDate DateTime? // spec O4 "subject to review" — distinct from endDate; does NOT auto-expire
+  signedDate    DateTime?
+  autoRenew     Boolean   @default(false)
+
+  // ── Execution / signature evidence (spec §5.1 O22) ──
+  executionStatus ContractExecutionStatus @default(UNSIGNED) // UNSIGNED blocks activation without override
+  signatories     Json? // [{ party, name, designation, date }]
+
+  currency String  @default("KES") // ISO 4217; corpus = KES. Default seeded from Client.currency at creation
+  country  String?
+  region   String?
 
   // Commercial terms
-  paymentTermDays    Int      @default(30)
+  paymentTermDays    Int             @default(30)
+  paymentTermType    PaymentTermType @default(CALENDAR) // Jubilee "10 working days" → BUSINESS
   creditLimit        Decimal? // max outstanding payable (KES)
   invoiceDiscountPct Decimal? // negotiated % discount applied across the invoice
+
+  // Early-settlement discount (spec P7) — consumed by settlement, not adjudication.
+  earlySettlementDiscountPct Decimal? @db.Decimal(5, 2) // Old Mutual 2%
+  earlySettlementWindowDays  Int? // within 30 days
+
+  // Submission window (spec §5.1 — SHA 7 days) — consequence = reason SUB-001.
+  submissionWindowDays  Int?
+  submissionWindowBasis SubmissionWindowBasis?
+
+  // Operational policy terms
+  balanceBillingPolicy  BalanceBillingPolicy? // SHA GCC 12.15/12.16 (O19)
+  taxInclusive          TaxInclusivity        @default(UNKNOWN) // SHA GCC 13 inclusive; commercial letters silent
+  reconciliationCadence ReconciliationCadence @default(NONE) // Old Mutual quarterly; Jubilee monthly
 
   // Billing rules
   unlistedServiceRule UnlistedServiceRule @default(REFER_FOR_REVIEW)
   unlistedDiscountPct Decimal? // required when unlistedServiceRule = DISCOUNT_OFF_BILLED
 
-  documentUrl String? // scanned signed agreement
+  documentUrl String? // scanned signed agreement (legacy single-doc link; multi-doc via ContractSourceDocument)
   notes       String?
 
   // Renewal chain: old contract points at the contract that replaced it
@@ -2541,18 +2958,153 @@ model ProviderContract {
   supersededBy   ProviderContract? @relation("ContractRenewal", fields: [supersededById], references: [id])
   predecessor    ProviderContract? @relation("ContractRenewal")
 
-  createdById String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  // ── Versioning & ownership (spec §4.4, §5.1) — maker ≠ checker enforced in service ──
+  currentVersionId String?          @unique
+  currentVersion   ContractVersion? @relation("ContractCurrentVersion", fields: [currentVersionId], references: [id])
+  contractOwnerId  String?
+  createdById      String?
+  submittedById    String?
+  submittedAt      DateTime?
+  approvedById     String?
+  approvedAt       DateTime?
+  activatedById    String?
+  activatedAt      DateTime?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   tariffLines      ProviderTariff[]
   diagnosisTariffs ProviderDiagnosisTariff[]
   exclusions       ProviderContractExclusion[]
+  versions         ContractVersion[]           @relation("ContractVersions")
+  applicability    ContractApplicability[]
+  contractBranches ContractBranch[]
+  sourceDocuments  ContractSourceDocument[]
+  claims           Claim[]
+  pricingRules     PricingRule[]
+  contractPackages ContractPackage[]
+  preauthRules     PreauthRule[]
+  documentationRules DocumentationRule[]
 
   @@unique([tenantId, contractNumber])
   @@index([providerId, status])
   @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, providerId, status])
+  @@index([parentContractId])
   @@index([endDate])
+  @@index([reviewDueDate])
+}
+
+// Immutable version snapshot of a contract's operative content (spec §4.4).
+// The version effective on the SERVICE DATE prices a claim. New versions are
+// created in DRAFT and leave version n live until approved + effective.
+model ContractVersion {
+  id            String                @id @default(cuid())
+  tenantId      String
+  tenant        Tenant                @relation(fields: [tenantId], references: [id])
+  contractId    String
+  contract      ProviderContract      @relation("ContractVersions", fields: [contractId], references: [id], onDelete: Cascade)
+  versionNumber Int
+  status        ContractVersionStatus @default(DRAFT)
+  effectiveFrom DateTime
+  effectiveTo   DateTime? // set when superseded by a later version
+
+  // Snapshot of contract-level operative fields at version-cut time. Child rows
+  // (tariffs, rules) are version-pinned via their own versionId FK.
+  snapshot         Json? // metadata + terms snapshot for diffing
+  validationReport Json? // §13 validation result persisted with the version, shown to the approver
+  changeSummary    String? // human note describing what changed vs the prior version
+
+  createdById  String?
+  approvedById String?
+  approvedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  currentOf   ProviderContract? @relation("ContractCurrentVersion")
+  tariffLines ProviderTariff[]
+
+  @@unique([contractId, versionNumber])
+  @@index([tenantId])
+  @@index([contractId, status])
+  @@index([contractId, effectiveFrom])
+}
+
+// Which populations a contract governs (spec §5.4). Evaluated as: specific
+// INCLUDE rows win over payer-wide default; EXCLUDE rows always win (§7).
+model ContractApplicability {
+  contractId String
+  contract   ProviderContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  versionId  String? // null = applies across versions
+  id         String           @id @default(cuid())
+
+  clientId         String // payer
+  client           Client  @relation(fields: [clientId], references: [id])
+  groupId          String? // scheme/employer group; null = all payer groups
+  packageId        String? // plan; null = all plans
+  packageVersionId String?
+  benefitCategory  BenefitCategory? // restrict to e.g. DENTAL (KCB/Madison dental letters)
+  networkTier      ProviderTier? // reuse existing tier as "network"
+  memberCategory   String? // e.g. SHA "registered, fully paid-up and officially declared"
+
+  inclusionType EligibilityRule @default(INCLUDE)
+
+  effectiveFrom DateTime  @default(now())
+  effectiveTo   DateTime?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+
+  @@index([contractId])
+  @@index([clientId])
+  @@index([contractId, clientId])
+}
+
+// Branch coverage for contracts with branchScope = LISTED (spec §5.1, O10).
+model ContractBranch {
+  id         String           @id @default(cuid())
+  contractId String
+  contract   ProviderContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  branchId   String
+  branch     ProviderBranch   @relation(fields: [branchId], references: [id])
+  createdAt  DateTime         @default(now())
+
+  @@unique([contractId, branchId])
+  @@index([contractId])
+  @@index([branchId])
+}
+
+// Source-document join (spec §3.2) — a contract may have several sources
+// (main agreement + addenda + rate letters). The document is evidence; the
+// structured contract is the executable.
+model ContractSourceDocument {
+  id          String           @id @default(cuid())
+  tenantId    String
+  tenant      Tenant           @relation(fields: [tenantId], references: [id])
+  contractId  String
+  contract    ProviderContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  documentId  String? // FK into existing Document model when stored there
+  fileUrl     String? // direct URL when not yet a Document row
+  fileName    String?
+  sourceRole  String? // MAIN_AGREEMENT | RATE_LETTER | ADDENDUM | OTHER
+  status      String   @default("UPLOADED") // UPLOADED | PARSED | REVIEWED (extraction pipeline §12)
+  uploadedById String?
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([contractId])
+}
+
+// Multi-level exclusion (digital-contract spec §5.9). Generalises the original
+// CPT/name exclusion with a level + diagnosis/plan/date/branch scoping so the
+// engine can evaluate contract exclusions at stage 5.
+enum ExclusionLevel {
+  CONTRACT
+  CATEGORY
+  TARIFF_LINE
+  DIAGNOSIS
+  PLAN
+  MEMBER_CATEGORY
+  DATE_RANGE
 }
 
 // Services that are contractually NOT payable at this provider
@@ -2561,13 +3113,374 @@ model ProviderContractExclusion {
   id          String           @id @default(cuid())
   contractId  String
   contract    ProviderContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  versionId   String?
   cptCode     String? // match by CPT when coded
   serviceName String // human-readable service description (used for display + uncoded match)
   reason      String? // why it is excluded
+
+  // ── Phase 3 generalisation (§5.9) ──
+  level             ExclusionLevel   @default(TARIFF_LINE)
+  serviceCategoryId String? // CATEGORY level
+  icdCodes          String[]         @default([]) // DIAGNOSIS level (SHA MRI/CT indication limits)
+  packageId         String? // PLAN level (benefits Package)
+  memberCategory    String? // MEMBER_CATEGORY level
+  dateFrom          DateTime? // DATE_RANGE level
+  dateTo            DateTime?
+  appliesToBranchId String?
+  sourceRef         Json?
+
   createdAt   DateTime         @default(now())
 
   @@index([contractId])
   @@index([contractId, cptCode])
+  @@index([contractId, level])
+}
+
+// ─── CONTRACT EXTRACTION (spec §12, Phase 4) ─────────────────────────────────
+// A run of the markdown/PDF extraction pipeline over a source document. The
+// extractor is assistive and NEVER activates anything: candidates carry
+// provenance + confidence and require human confirmation. Zero-hallucination —
+// no amount enters a field without a source-cell provenance record.
+enum ExtractionStatus {
+  UPLOADED
+  PARSED // candidates produced, awaiting review
+  REVIEWED // human confirmed/answered ambiguities
+  COMMITTED // written to a DRAFT contract
+  FAILED
+}
+
+model ContractExtraction {
+  id               String           @id @default(cuid())
+  tenantId         String
+  tenant           Tenant           @relation(fields: [tenantId], references: [id])
+  contractId       String? // set when committed to a draft contract
+  sourceDocumentId String? // ContractSourceDocument
+  fileName         String?
+  status           ExtractionStatus @default(UPLOADED)
+  extractorVersion String           @default("rule-based-v1")
+
+  // Extracted entities: { effectiveDateCandidates[], reviewBased, externalRefs[], providerNames[], currencyStated, taxStated }
+  entities         Json?
+  // Array of { description, category, canonicalCategory, amount|null, rateMissing, sourceRef{page,rawText}, confidence }
+  tariffCandidates Json             @default("[]")
+  // Array of { type, message, candidates[] } — each a mandatory review question (§12.7)
+  ambiguities      Json             @default("[]")
+  reviewAnswers    Json? // human answers keyed by ambiguity/field
+  stats            Json? // { rowsDetected, rowsWithRate, rowsMissingRate }
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([contractId])
+}
+
+// ─── AVERAGE-COST RECONCILIATION (spec §15.12, Phase 5) ──────────────────────
+// A computed recovery/settlement proposal for an average-cost pool over a
+// period (Old Mutual clauses 1.1-1.3). Reconciliation adjustments are NEVER
+// auto-posted: they are finance maker-checker actions.
+enum ReconciliationStatus {
+  COMPUTED // proposal generated
+  APPROVED // finance-approved for settlement
+  REJECTED
+  SETTLED // adjustment posted
+}
+
+model ContractReconciliation {
+  id            String               @id @default(cuid())
+  tenantId      String
+  tenant        Tenant               @relation(fields: [tenantId], references: [id])
+  contractId    String?
+  poolId        String // AVERAGE_COST_POOL tag (Claim.avgCostPoolId)
+  periodStart   DateTime
+  periodEnd     DateTime
+  agreedAverage Decimal              @db.Decimal(14, 2) // agreed gross average cost (e.g. 4,000)
+  claimCount    Int
+  agreedTotal   Decimal              @db.Decimal(14, 2) // agreedAverage × claimCount
+  billedTotal   Decimal              @db.Decimal(14, 2)
+  recovery      Decimal              @db.Decimal(14, 2) // max(0, billedTotal − agreedTotal)
+  status        ReconciliationStatus @default(COMPUTED)
+  computedById  String?
+  approvedById  String? // must differ from computedById (maker-checker)
+  approvedAt    DateTime?
+  notes         String?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  @@index([tenantId])
+  @@index([tenantId, poolId])
+  @@index([contractId])
+}
+
+// ─── DIGITAL CONTRACT RULE ENGINE — PHASE 3 MODELS ───────────────────────────
+
+// Scope a pricing/pre-auth/documentation rule attaches at (spec §5.7).
+enum ContractRuleScope {
+  CONTRACT
+  CATEGORY
+  LINE
+  PACKAGE
+}
+
+// Typed pricing rules (spec §5.7) — superset of the corpus pricing models P1–P12.
+enum PricingRuleKind {
+  FIXED
+  DISCOUNT_OFF_BILLED
+  MARKUP_OVER_COST
+  MAX_CAP
+  MIN_FLOOR
+  PER_DIEM
+  PER_VISIT_CASE_RATE // Madison FCM / Jubilee capitation — fixed per valid visit with carve-outs
+  PER_ADMISSION
+  PER_PROCEDURE
+  PER_CONSULTATION
+  PER_ITEM
+  PER_SESSION
+  PACKAGE
+  CAPITATION
+  NET_OF_EXTERNAL
+  EXTERNAL_TARIFF_REF
+  AVERAGE_COST_POOL
+  LOWER_OF
+  HIGHER_OF
+}
+
+// A typed pricing rule attached at contract/category/line scope (spec §5.7).
+// `params` is a kind-specific JSON payload validated in the service layer.
+model PricingRule {
+  id                String            @id @default(cuid())
+  tenantId          String
+  tenant            Tenant            @relation(fields: [tenantId], references: [id])
+  contractId        String
+  contract          ProviderContract  @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  versionId         String?
+  scope             ContractRuleScope @default(CONTRACT)
+  serviceCategoryId String?
+  tariffLineId      String?
+  ruleKind          PricingRuleKind
+  params            Json              @default("{}") // e.g. { rate, pct, payBasis, carveOutCodes, poolId, scheme }
+  priority          Int               @default(100)
+  effectiveFrom     DateTime          @default(now())
+  effectiveTo       DateTime?
+  isActive          Boolean           @default(true)
+  createdAt         DateTime          @default(now())
+
+  @@index([contractId, isActive])
+  @@index([tenantId])
+}
+
+// How a package is triggered off a claim (spec §5.8).
+enum PackageTriggerType {
+  PROCEDURE_CODE
+  DIAGNOSIS_CODE
+  SERVICE_DESCRIPTION
+}
+
+// What happens when a complication falls outside the package (spec §5.8).
+enum ComplicationRule {
+  EXCLUDED_BILL_SEPARATELY // CIC: complications → ICU excluded = revert to FFS/per-diem
+  INCLUDED
+  ESCALATE
+}
+
+// Episode-priced procedure set (spec §5.8, family B). Distinct from the benefits
+// `Package` (plan design) — this is a surgical/case package price.
+model ContractPackage {
+  id                     String             @id @default(cuid())
+  tenantId               String
+  tenant                 Tenant             @relation(fields: [tenantId], references: [id])
+  contractId             String
+  contract               ProviderContract   @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  versionId              String?
+  name                   String // "Caesarean Section Package"
+  code                   String?
+  packagePrice           Decimal            @db.Decimal(14, 2)
+  currency               String             @default("KES")
+  netOfExternalScheme    String? // P3 "Net of NHIF"
+  externalRebateAmount   Decimal?           @db.Decimal(14, 2)
+  triggerType            PackageTriggerType @default(PROCEDURE_CODE)
+  triggerCodes           String[]           @default([]) // CPT/ICD/local codes or normalised names
+  losAssumptionDays      Int?
+  losCapDays             Int?
+  complicationRule       ComplicationRule   @default(EXCLUDED_BILL_SEPARATELY)
+  unbundlingAllowed      Boolean            @default(false)
+  packageOverridesLineItems Boolean         @default(true)
+  genderRestriction      String?
+  effectiveFrom          DateTime           @default(now())
+  effectiveTo            DateTime?
+  isActive               Boolean            @default(true)
+  createdAt              DateTime           @default(now())
+
+  components PackageComponent[]
+
+  @@index([contractId, isActive])
+  @@index([tenantId])
+}
+
+enum PackageComponentType {
+  INCLUDED // priced inside the package (zero-priced separately)
+  EXCLUDED // priced independently (complications, advanced imaging)
+}
+
+// A typed inclusion/exclusion of a package with an optional quantity cap
+// (spec §5.8 — e.g. orthopaedic "Two X-rays" → qtyCap 2).
+model PackageComponent {
+  id          String               @id @default(cuid())
+  packageId   String
+  package     ContractPackage      @relation(fields: [packageId], references: [id], onDelete: Cascade)
+  type        PackageComponentType
+  description String
+  code        String?
+  qtyCap      Int?
+  createdAt   DateTime             @default(now())
+
+  @@index([packageId])
+}
+
+// Pre-authorisation trigger type (spec §5.10).
+enum PreauthTriggerType {
+  SERVICE_LIST
+  AMOUNT_THRESHOLD
+  ADMISSION
+  LOS_BEYOND
+  ALWAYS
+}
+
+enum PreauthConsequence {
+  REJECT // AUTH-001
+  ROUTE_MANUAL
+  PAY_WITH_PENALTY
+}
+
+// Contract-sourced pre-authorisation rule (spec §5.10). Feeds the existing
+// PreAuthorization module and the engine's stage-6 check.
+model PreauthRule {
+  id                    String             @id @default(cuid())
+  tenantId              String
+  tenant                Tenant             @relation(fields: [tenantId], references: [id])
+  contractId            String
+  contract              ProviderContract   @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  versionId             String?
+  scope                 ContractRuleScope  @default(CONTRACT)
+  serviceCategoryId     String?
+  tariffLineId          String?
+  packageId             String?
+  triggerType           PreauthTriggerType @default(ALWAYS)
+  thresholdAmount       Decimal?           @db.Decimal(14, 2) // LOU for services > X
+  serviceRefs           String[]           @default([]) // FCM carve-out lists
+  admissionRequired     Boolean            @default(false)
+  emergencyExempt       Boolean            @default(false) // SHA GCC 11.1 (O17)
+  retrospectiveAllowed  Boolean            @default(false)
+  retrospectiveWindowHours Int?
+  approvalSlaHours      Int? // SHA 72h
+  validityDays          Int?
+  requiredDocumentTypes String[]           @default([])
+  consequenceIfMissing  PreauthConsequence @default(ROUTE_MANUAL)
+  effectiveFrom         DateTime           @default(now())
+  effectiveTo           DateTime?
+  isActive              Boolean            @default(true)
+  createdAt             DateTime           @default(now())
+
+  @@index([contractId, isActive])
+  @@index([tenantId])
+}
+
+// Documents a claim must carry (spec §5.11).
+enum ContractDocumentType {
+  INVOICE
+  ITEMISED_BILL
+  CLAIM_FORM
+  PRESCRIPTION
+  LAB_REQUEST
+  LAB_RESULT
+  DOCTOR_NOTES
+  DISCHARGE_SUMMARY
+  CARE_PLAN
+  MEDICAL_REPORT
+  REFERRAL_LETTER
+  PREAUTH_APPROVAL // LOU
+  THEATRE_NOTES
+  DELIVERY_NOTES
+  IMAGING_REPORT
+  RADIOLOGY_REPORT_STRUCTURED
+  OTHER
+}
+
+enum DocConsequence {
+  REJECT // DOC-001
+  ROUTE // DOC-002 route
+  PEND_PROVIDER // pend for provider
+}
+
+// Documentation requirement rule (spec §5.11).
+model DocumentationRule {
+  id                   String               @id @default(cuid())
+  tenantId             String
+  tenant               Tenant               @relation(fields: [tenantId], references: [id])
+  contractId           String
+  contract             ProviderContract     @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  versionId            String?
+  scope                ContractRuleScope    @default(CONTRACT)
+  serviceCategoryId    String?
+  tariffLineId         String?
+  documentType         ContractDocumentType
+  mandatory            Boolean              @default(true)
+  appliesWhen          Json? // e.g. { onlyIP: true } or { amountOver: 10000 }
+  consequenceIfMissing DocConsequence       @default(ROUTE)
+  effectiveFrom        DateTime             @default(now())
+  effectiveTo          DateTime?
+  isActive             Boolean              @default(true)
+  createdAt            DateTime             @default(now())
+
+  @@index([contractId, isActive])
+  @@index([tenantId])
+}
+
+// External scheme tariff table (spec §5.7 EXTERNAL_TARIFF_REF / NET_OF_EXTERNAL) —
+// e.g. NHIF/SHA offsets keyed by (scheme, code, period). Unresolved → manual.
+model ExternalTariffTable {
+  id            String    @id @default(cuid())
+  tenantId      String
+  tenant        Tenant    @relation(fields: [tenantId], references: [id])
+  scheme        String // NHIF | SHA | ...
+  code          String
+  description   String?
+  rate          Decimal   @db.Decimal(14, 2)
+  effectiveFrom DateTime  @default(now())
+  effectiveTo   DateTime?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+
+  @@unique([tenantId, scheme, code, effectiveFrom])
+  @@index([tenantId, scheme, code])
+}
+
+// Per-(tenant, overrideType) governance config for claims-contract overrides
+// (spec §9.3). Defaults ship conservative.
+model OverrideControl {
+  id                    String   @id @default(cuid())
+  tenantId              String
+  tenant                Tenant   @relation(fields: [tenantId], references: [id])
+  overrideType          String // OverrideType enum name
+  allowed               Boolean  @default(true)
+  requestorRoles        String[] @default([])
+  approverRoles         String[] @default([])
+  dualApprovalThreshold Decimal? @db.Decimal(14, 2) // financial impact requiring 2 approvers
+  maxFinancialImpact    Decimal? @db.Decimal(14, 2) // hard block above
+  reasonCodeRequired    Boolean  @default(true)
+  justificationMinLength Int     @default(20)
+  requiredDocumentTypes String[] @default([])
+  notifyProvider        Boolean  @default(false)
+  notifyPayer           Boolean  @default(false)
+  updatesAutomation     Boolean  @default(false) // only MAP_SERVICE_TO_TARIFF + CREATE_TEMPORARY_RATE may be reusable
+  createsContractReviewTask Boolean @default(false)
+  isActive              Boolean  @default(true)
+  createdAt             DateTime @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@unique([tenantId, overrideType])
+  @@index([tenantId])
 }
 
 // ─── PHASE B: PROVIDER & POLICY HARDENING ───────────────
@@ -4685,6 +5598,23 @@ enum OverrideType {
   FRAUD_RULE_THRESHOLD_ADJUSTMENT
   RESTORE_TERMINATED_MEMBERSHIP
   PRIVILEGE_ESCALATION
+  // ── Digital-contract claims overrides (spec §9.1) ──
+  PAY_MISSING_RATE
+  PAY_ABOVE_CONTRACT_RATE
+  PAY_DESPITE_EXPIRED_CONTRACT
+  PAY_DESPITE_MISSING_PREAUTH
+  PAY_DESPITE_MISSING_DOCS
+  PAY_DESPITE_LATE_SUBMISSION
+  APPLY_ALTERNATIVE_TARIFF
+  APPLY_PACKAGE_MANUALLY
+  SPLIT_CLAIM_LINE
+  RECLASSIFY_SERVICE_CATEGORY
+  MAP_SERVICE_TO_TARIFF
+  CREATE_TEMPORARY_RATE
+  ESCALATE_TO_CONTRACT_TEAM
+  ESCALATE_TO_PAYER
+  ESCALATE_TO_MEDICAL_REVIEW
+  CONTRACT_BACKDATE
   CUSTOM
 }
 

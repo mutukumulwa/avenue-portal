@@ -16,6 +16,7 @@ import { runQuotationExpiryJob } from "./quotation-expiry.job";
 import { runLapseDetectionJob } from "./lapse-detection.job";
 import { runAdminFeeAccrualJob } from "./admin-fee-accrual.job";
 import { runFraudScanJob } from "./fraud-scan.job";
+import { runContractLifecycleJob } from "./contract-lifecycle.job";
 
 console.log("Starting background workers...");
 
@@ -124,6 +125,10 @@ const systemWorker = new Worker("system", async (job: Job) => {
   if (job.name === "fraud-scan") {
     const result = await runFraudScanJob();
     console.log(`[Worker] Fraud scan complete — ${result.totalAlerts} alert(s) over ${result.totalScanned} claim(s)`);
+  }
+  if (job.name === "contract-lifecycle") {
+    const result = await runContractLifecycleJob();
+    console.log(`[Worker] Contract lifecycle complete — ${result.activated} activated, ${result.expired} expired, ${result.reswept} re-swept`);
   }
 }, { connection });
 

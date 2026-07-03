@@ -43,3 +43,7 @@ next-env.d.ts
 
 # Binary design-handoff bundle (kept on disk, not in git)
 *design-handoff*.zip
+
+# Digital-contract raw source corpus (evidence, not code — do not commit large binaries)
+/Contracts/
+/contract-mds/

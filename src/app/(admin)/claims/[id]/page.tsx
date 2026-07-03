@@ -14,6 +14,7 @@ import { ArrowLeft, Clock, CheckCircle2, XCircle, AlertTriangle, Info, FlaskConi
 import Link from "next/link";
 import { ClaimDocuments } from "./ClaimDocuments";
 import { CoContributionCollectionForm } from "./CoContributionCollectionForm";
+import { ContractPanel } from "./ContractPanel";
 
 const LINE_CAT_META: Record<string, { label: string; color: string; Icon: React.ElementType }> = {
   CONSULTATION: { label: "Consultation", color: "bg-brand-indigo/10 text-brand-indigo",  Icon: Stethoscope },
@@ -187,7 +188,7 @@ export default async function ClaimDetailPage({
           <div>
             <p className="text-brand-text-heading">
               Adjudicating under{" "}
-              <Link href={`/providers/${claim.providerId}/contracts/${governingContract.id}`} className="font-bold text-brand-indigo hover:underline">
+              <Link href={`/contracts/${governingContract.id}`} className="font-bold text-brand-indigo hover:underline">
                 {governingContract.contractNumber}
               </Link>{" "}
               — {governingContract.title}
@@ -208,6 +209,9 @@ export default async function ClaimDetailPage({
           </p>
         </div>
       )}
+
+      {/* Digital contract engine panel (spec §11.6) */}
+      <ContractPanel tenantId={tenantId} claimId={id} />
 
       {/* Tariff variance banner */}
       {overbilledLines.length > 0 && (

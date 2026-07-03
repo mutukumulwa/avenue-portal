@@ -3,6 +3,13 @@ import { claimAdjudicationService } from "./claim-adjudication.service";
 import { DrugExclusionService } from "./drug-exclusion.service";
 import { ClaimsService } from "./claims.service";
 import { auditChainService } from "./audit-chain.service";
+import { ContractEngine } from "./contract-engine/engine";
+import { ContractEngineIntegration } from "./contract-engine/persist";
+
+// Digital-contract engine gates are opt-in (spec §8.3): when enabled, a claim
+// the engine cannot fully price/match ROUTES with a named contract gate.
+// Provenance persistence runs regardless. Default OFF preserves existing flow.
+const CONTRACT_ENGINE_GATES = process.env.CONTRACT_ENGINE_GATES === "1";
 
 /**
  * Auto-adjudication (Medvex spec §3.7 / gap G3.7). Clean, low-risk claims that
@@ -101,6 +108,20 @@ export class AutoAdjudicationService {
       };
     }
 
+    // Digital-contract engine gates (opt-in). Named gates feed the same routing
+    // machinery: CONTRACT_MATCH (no matching contract family) and
+    // PRICING_COMPLETE (a line pended — rate-missing, unmapped, pre-auth, etc.).
+    if (CONTRACT_ENGINE_GATES) {
+      const engine = await ContractEngine.evaluateClaimById(tenantId, claimId);
+      if (engine && !engine.matched) {
+        return { decision: "ROUTE", failingGate: "CONTRACT_MATCH", reason: engine.reasonCode ?? "No contract matched", policyId };
+      }
+      if (engine && engine.claimDecision === "UNDER_REVIEW") {
+        const firstPend = engine.lines.find(l => l.decision === "PENDED");
+        return { decision: "ROUTE", failingGate: "PRICING_COMPLETE", reason: `Engine could not fully price: ${firstPend?.reasonCode ?? engine.reasonCode ?? "line pended"}`, policyId };
+      }
+    }
+
     return { decision: "AUTO_APPROVE", reason: "All gates passed within policy", policyId };
   }
 
@@ -157,6 +178,10 @@ export class AutoAdjudicationService {
           autoAdjudicatedAt: new Date(),
         },
       });
+
+      // Stamp digital-contract engine provenance on the claim + lines (spec §8.3).
+      // Non-fatal: a provenance-write failure must not affect the claim.
+      await ContractEngineIntegration.evaluateAndPersist(tenantId, claimId);
 
       if (result.decision === "ROUTE") {
         await prisma.adjudicationLog.create({
