@@ -55,6 +55,11 @@ export async function scheduleDailyJobs() {
       {},
       { repeat: { pattern: SIX_AM_CRON }, jobId: "fund-balance-alert-daily", attempts: 2 },
     ),
+    Queues.system.add(
+      "contract-lifecycle",
+      {},
+      { repeat: { pattern: SIX_AM_CRON }, jobId: "contract-lifecycle-daily", attempts: 2 },
+    ),
   ]);
 }
 
