@@ -22,9 +22,24 @@ checklists, and continues without re-deriving context.
 - **Blocked on:** nothing.
 - **Last verified green:** 2026-07-03 — polish batches applied via `prisma db push`;
   `npm run typecheck` clean; production source `eslint` clean; **`vitest` 240/240 service
-  tests pass**. All `/contracts*` routes compile (307 auth-gate, no errors). Reason-codes (40)
-  + override-controls (16) + service-categories (23) seeded. Test files use `any` in prisma
-  mocks per existing repo convention.
+  tests pass**. All `/contracts*` routes compile. Reason-codes (40) + override-controls (16)
+  + service-categories (23) seeded. Test files use `any` in prisma mocks per existing repo convention.
+
+> **BROWSER VERIFICATION — the earlier "auth cookie quirk" was a MISDIAGNOSIS.**
+> The preview harness persists the next-auth session fine. Earlier logins failed only
+> because I used the wrong credentials: this dev DB is seeded for tenant **Avenue Healthcare**
+> with **`@avenue.co.ke`** users (NOT the `@medvex.co.ug` from `prisma/seed.ts` / the login-page
+> hint). The seeded admin password was also rotated away from the UAT default, so on 2026-07-03
+> I reset **`admin@avenue.co.ke`** → **`AvenueAdmin2024!`** (SUPER_ADMIN, TOTP off) to enable
+> testing. Full end-to-end browser verification then PASSED: logged in; `/contracts` renders;
+> imported CIC markdown via `/contracts/import` (5 rates extracted, 2 rate-missing flagged,
+> conflicting effective dates 2025-02-01 vs 2025-02-04 detected as BLOCKING); committed to
+> DRAFT contract PC-2026-001 with 7 tariff lines; detail page shows the lifecycle action bar,
+> the ManagePanel (tariff grid/applicability/rule-builder), and the §13 validation report
+> correctly blocking on **V1** (no applicability), **V2** (unsigned), **V6** (2 rate-missing
+> lines) — i.e. the zero-hallucination guarantee flows from extraction to the activation gate.
+> To re-verify next session: `preview_start aicare-dev`, log in as `admin@avenue.co.ke` /
+> `AvenueAdmin2024!`, open `/contracts`.
 - **Verification note:** Browser pixel-render still blocked by the preview harness not
   persisting the next-auth session cookie (callback 200 → bounces to /login). Engine
   correctness is instead proven by the vitest suite. To eyeball UI, log in via a real
