@@ -89,7 +89,23 @@ meaningful step. Newest status at the top of each section.
 >   server** — a running Next server caches `@prisma/client` from startup, so new
 >   model delegates (`prisma.wellnessProgram`) are `undefined` until restart
 >   (manifested as a 500 "Cannot read properties of undefined (reading
->   'findMany')"). The stale-service-worker gotcha (task_95908fdf) still applies.
+>   'findMany')").
+>
+> **Stale-service-worker bug FIXED (task_95908fdf).** Root cause: `public/sw.js`
+> was **cache-first** for script/style/font/image, so after any build change it
+> served stale JS chunks that mismatched the freshly-served document → client
+> "Application error" on every page (admin included), needing a manual SW
+> unregister. Fix: SW is now **network-first** for assets + navigations (cache is
+> an offline-only fallback), cache names bumped to `medvex-*-v2` so `activate`
+> purges the old `aicare-member-*-v1` caches, and a `SKIP_WAITING` message handler
+> promotes the new worker. `PWARegister` now registers with `updateViaCache:
+> "none"` and reloads **once** on `controllerchange` (only when already
+> controlled) so already-broken clients self-heal automatically — no manual
+> unregister. Verified in-browser: seeded a leftover v1 cache → new SW purged it
+> and rendered clean; **poisoned a cached JS chunk with `throw` → page still
+> loaded** (network-first ignored the poison), proving stale chunks can no longer
+> shadow a new build. Global registration is intentional (root layout) so the
+> kill-switch reaches admin users who already have the broken worker.
 >
 > **NEXT:** everything remaining in the plan is external-gated (NIRA/MoMo/Airtel
 > APIs, SMS aggregator P-03, FHIR/EDI G8) or Phase-5 docs (HA/DR). No more
