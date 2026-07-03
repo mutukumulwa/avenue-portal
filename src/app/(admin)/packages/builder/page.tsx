@@ -68,15 +68,36 @@ export default function PackageBuilder() {
             <h3 className="text-lg font-bold text-brand-text-heading font-['Sora']">Core Benefits</h3>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2 bg-[#F8F9FA] p-4 rounded-lg border border-[#EEEEEE]">
-                <label className="text-sm font-semibold text-brand-text-heading">Inpatient Sub-Limit (KES)</label>
-                <input required name="inpatientLimit" type="number" defaultValue="500000" className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-[#0B1437] transition-colors" />
-              </div>
-              
-              <div className="space-y-2 bg-[#F8F9FA] p-4 rounded-lg border border-[#EEEEEE]">
-                <label className="text-sm font-semibold text-brand-text-heading">Outpatient Sub-Limit (KES)</label>
-                <input required name="outpatientLimit" type="number" defaultValue="100000" className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-[#0B1437] transition-colors" />
-              </div>
+              {([
+                { key: "inpatient", label: "Inpatient", limitName: "inpatientLimit", limitDefault: "500000" },
+                { key: "outpatient", label: "Outpatient", limitName: "outpatientLimit", limitDefault: "100000" },
+              ] as const).map((b) => (
+                <div key={b.key} className="space-y-3 bg-[#F8F9FA] p-4 rounded-lg border border-[#EEEEEE]">
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-brand-text-heading">{b.label} Sub-Limit (KES)</label>
+                    <input required name={b.limitName} type="number" defaultValue={b.limitDefault} className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-[#0B1437] transition-colors" />
+                  </div>
+                  {/* WP-F1/D8: how this benefit pays providers */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-brand-text-heading">Funding Model</label>
+                    <select name={`${b.key}FundingModel`} defaultValue="FEE_FOR_SERVICE" className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-[#0B1437] transition-colors">
+                      <option value="FEE_FOR_SERVICE">Fee for service</option>
+                      <option value="CAPITATION">Capitation</option>
+                      <option value="HYBRID">Hybrid (per service tier)</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-semibold text-brand-text-heading">
+                      Capitated tiers <span className="font-normal text-xs text-brand-text-muted">(Hybrid only — others pay fee-for-service)</span>
+                    </label>
+                    <select name={`${b.key}CapitatedTiers`} multiple size={4} className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-[#0B1437] transition-colors">
+                      {["HEADLINE", "LABORATORY", "IMAGING", "PHARMACY", "THEATRE", "PROFESSIONAL_FEES", "OTHER"].map((t) => (
+                        <option key={t} value={t}>{t.replace(/_/g, " ")}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 

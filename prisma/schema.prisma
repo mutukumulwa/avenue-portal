@@ -75,6 +75,10 @@ model Tenant {
   syncOperations                 SyncOperation[]
   offlineReservations            OfflineReservation[]
   eligibilitySnapshots           EligibilitySnapshot[]
+  offlineWorkAuthorizations      OfflineWorkAuthorization[]
+  offlineDataPacks               OfflineDataPack[]
+  clinicalCases                  ClinicalCase[]
+  lettersOfUndertaking           LetterOfUndertaking[]
   autoAdjudicationPolicies       AutoAdjudicationPolicy[]
   drugExclusions                 DrugExclusion[]
   adminFeeAgreements             AdminFeeAgreement[]
@@ -335,6 +339,10 @@ model User {
   webAuthnEnrollmentApprovals WebAuthnEnrollmentApproval[]     @relation("WebAuthnEnrollmentApprovedBy")
   reinstatementDecisions      MembershipReinstatementRequest[]
   passwordResetTokens         PasswordResetToken[]
+  issuedOfflineAuths          OfflineWorkAuthorization[]       @relation("OfflineAuthIssuer")
+  openedCases                 ClinicalCase[]                   @relation("CaseOpenedBy")
+  closedCases                 ClinicalCase[]                   @relation("CaseClosedBy")
+  issuedLous                  LetterOfUndertaking[]            @relation("LouIssuedBy")
 
   @@unique([tenantId, email])
   @@index([tenantId])
@@ -943,6 +951,8 @@ model Member {
   crossBorderCases               CrossBorderCase[]
   wellnessEnrollments            WellnessEnrollment[]
   wellnessActivities             WellnessActivity[]
+  clinicalCases                  ClinicalCase[]
+  lettersOfUndertaking           LetterOfUndertaking[]
 
   @@unique([tenantId, memberNumber])
   @@index([tenantId])
@@ -1693,12 +1703,18 @@ model SyncOperation {
   state          SyncOperationState @default(PENDING)
   conflictReason String?
 
+  // Offline work authorization (WP-B1/B4): the agent-issued code this op was
+  // captured under. Null for pre-code legacy ops; invalid codes ⇒ CONFLICT.
+  offlineAuthId String?
+  offlineAuth   OfflineWorkAuthorization? @relation(fields: [offlineAuthId], references: [id])
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@unique([tenantId, opKey])
   @@index([tenantId, state])
   @@index([tenantId, entityType])
+  @@index([offlineAuthId])
 }
 
 model OfflineReservation {
@@ -1734,6 +1750,74 @@ model EligibilitySnapshot {
   validUntil DateTime // shorter for near-limit / high-risk members
 
   @@index([tenantId, memberId])
+}
+
+// ─── OFFLINE WORK AUTHORIZATION (WP-B1, TPA_FEEDBACK_WORKPLAN.md §B) ──────
+// A facility that loses connectivity calls the claims agent; the agent issues
+// a short time-boxed code over the phone / SMS (off-system by design). The
+// code unlocks offline capture at that facility and every synced operation is
+// traceable back to it.
+
+enum OfflineAuthStatus {
+  ACTIVE
+  EXPIRED
+  REVOKED
+  EXHAUSTED // maxOperations reached
+}
+
+model OfflineWorkAuthorization {
+  id            String            @id @default(cuid())
+  tenantId      String
+  tenant        Tenant            @relation(fields: [tenantId], references: [id])
+  providerId    String // facility the code is issued to
+  provider      Provider          @relation(fields: [providerId], references: [id])
+  branchId      String? // optional branch scope
+  branch        ProviderBranch?   @relation(fields: [branchId], references: [id])
+  code          String // short human-readable, e.g. OWA-7F3K2M
+  issuedById    String // claims agent who took the call
+  issuedBy      User              @relation("OfflineAuthIssuer", fields: [issuedById], references: [id])
+  reason        String? // e.g. "fibre cut at facility" — captured on the call
+  contactName   String? // who called from the facility
+  contactPhone  String?
+  validFrom     DateTime          @default(now())
+  validUntil    DateTime // time-boxed, default 48 h
+  maxOperations Int? // optional cap on ops synced under this code
+  status        OfflineAuthStatus @default(ACTIVE)
+  revokedById   String?
+  revokedAt     DateTime?
+  packId        String? // last OfflineDataPack served under this authorization
+
+  syncOperations SyncOperation[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@unique([tenantId, code])
+  @@index([tenantId, providerId, status])
+  @@index([tenantId, status])
+}
+
+// Facility offline data pack (WP-B3, decision D3): the MINIMUM data a facility
+// needs to run its day offline — member roster (number/name/status), benefit
+// balances, tariff excerpt. Stored and served ONLY as an AES-256-GCM envelope;
+// the key is HKDF-derived from the work code + server secret and delivered
+// separately, so a stolen pack file alone is useless.
+model OfflineDataPack {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  providerId  String
+  provider    Provider @relation(fields: [providerId], references: [id])
+  generatedAt DateTime @default(now())
+  validUntil  DateTime
+  memberCount Int
+  tariffRef   String? // contract/version pinned into the pack
+  ciphertext  Bytes // AES-256-GCM(roster + balances + tariff excerpt)
+  iv          Bytes
+  authTag     Bytes
+  keyVersion  Int      @default(1) // server-secret rotation
+  sizeBytes   Int?
+
+  @@index([tenantId, providerId, generatedAt])
 }
 
 // ─── PACKAGES & BENEFITS ────────────────────────────────
@@ -1826,6 +1910,16 @@ model BenefitRider {
   createdAt   DateTime @default(now())
 }
 
+// How a benefit line is paid to providers (WP-F1, decision D8). FFS prices
+// each line off the contract; CAPITATION lines are covered by the provider's
+// capitation pool (no per-line payable); HYBRID splits by service tier via
+// fundingOverrides.
+enum FundingModelType {
+  FEE_FOR_SERVICE
+  CAPITATION
+  HYBRID
+}
+
 model BenefitConfig {
   id                 String          @id @default(cuid())
   packageVersionId   String
@@ -1840,6 +1934,11 @@ model BenefitConfig {
   // member-paid threshold before the plan pays. Both default 0 (off).
   coInsurancePct     Decimal         @default(0) // e.g. 20 = member pays 20% post-deductible
   deductibleAmount   Decimal         @default(0) // annual member-paid threshold
+  // Funding model (WP-F1/D8): default FFS keeps existing behaviour. HYBRID
+  // uses fundingOverrides: [{ tier: ServiceTier, model: FundingModelType }],
+  // validated in the service layer.
+  fundingModel       FundingModelType @default(FEE_FOR_SERVICE)
+  fundingOverrides   Json?
   waitingPeriodDays  Int             @default(0)
   notes              String?
   exclusions         String[]
@@ -2083,8 +2182,13 @@ model Claim {
   // rates can match. Null for legacy/single-branch providers.
   providerBranchId String?
   providerBranch   ProviderBranch?   @relation(fields: [providerBranchId], references: [id])
-  preauthId        String?           @unique // If converted from pre-auth
-  preauth          PreAuthorization? @relation(fields: [preauthId], references: [id])
+  // Attached pre-authorizations (WP-C1/D4): a claim may carry several PAs
+  // alongside BAU lines; the FK lives on PreAuthorization.claimId.
+  preauths         PreAuthorization[]
+  // Filing case (WP-D1/D5): set when this claim was assembled from a clinical
+  // case at closure. Non-unique by design — one-case-many-claims stays open.
+  caseId           String?
+  case             ClinicalCase?     @relation(fields: [caseId], references: [id])
   source           ClaimSource       @default(MANUAL)
   serviceType      ServiceType
   dateOfService    DateTime
@@ -2202,7 +2306,6 @@ model Claim {
   @@index([tenantId, status, createdAt])
   @@index([memberId])
   @@index([providerId])
-  @@index([preauthId])
 }
 
 enum ClaimLineCategory {
@@ -2361,7 +2464,9 @@ enum PreauthStatus {
   APPROVED
   DECLINED
   EXPIRED // Approved but validity period passed without use
-  CONVERTED_TO_CLAIM // Approved and claim was created
+  ATTACHED // Approved and attached to a claim awaiting decision (WP-C1/D4)
+  UTILISED // Attached claim was decided — PA consumed
+  CONVERTED_TO_CLAIM // Legacy 1:1 conversion — historical rows only, no longer produced
   CANCELLED
 }
 
@@ -2413,10 +2518,16 @@ model PreAuthorization {
   escalatedToId            String?
   escalatedTo              User?     @relation("PreauthEscalation", fields: [escalatedToId], references: [id])
 
-  // Conversion to claim
+  // Attachment to a claim (WP-C1/D4): a PA attaches to at most one claim; a
+  // claim may carry many PAs alongside BAU service lines.
   claimId     String?
-  claim       Claim?
-  convertedAt DateTime?
+  claim       Claim?    @relation(fields: [claimId], references: [id])
+  attachedAt  DateTime?
+  convertedAt DateTime? // legacy 1:1 conversion timestamp — historical rows only
+  // Open-case linkage (WP-D1): PA accrues on the case until closure re-points
+  // it at the filed claim.
+  caseId      String?
+  case        ClinicalCase? @relation(fields: [caseId], references: [id])
 
   // ── Process 8 extensions ──────────────────────────────────
   isEmergency         Boolean   @default(false)
@@ -2440,6 +2551,135 @@ model PreAuthorization {
   @@index([tenantId, status])
   @@index([tenantId, status, createdAt])
   @@index([memberId])
+  @@index([claimId])
+}
+
+// ─── CASE MANAGEMENT (WP-D1, TPA_FEEDBACK_WORKPLAN.md §D) ────────────────
+// A clinical episode container: services, pre-auths, and letters of
+// undertaking accrue against an OPEN case (e.g. an inpatient stay) and are
+// filed as a single claim at closure. One case → one claim is enforced in the
+// service layer (the FK lives on Claim.caseId, non-unique, so one-case-many-
+// claims — pregnancy + newborn — stays open as a future path with no migration).
+
+enum CaseStatus {
+  OPEN
+  PENDING_CLOSURE
+  CLOSED_FILED
+  CANCELLED
+}
+
+enum CaseType {
+  INPATIENT_ADMISSION
+  OUTPATIENT_EPISODE
+  MATERNITY
+  DAY_CASE
+  CHRONIC_CYCLE
+}
+
+model ClinicalCase {
+  id                    String          @id @default(cuid())
+  tenantId              String
+  tenant                Tenant          @relation(fields: [tenantId], references: [id])
+  caseNumber            String // e.g. CASE-2026-00001
+  memberId              String
+  member                Member          @relation(fields: [memberId], references: [id])
+  providerId            String
+  provider              Provider        @relation(fields: [providerId], references: [id])
+  providerBranchId      String?
+  providerBranch        ProviderBranch? @relation(fields: [providerBranchId], references: [id])
+  caseType              CaseType
+  status                CaseStatus      @default(OPEN)
+  admissionDate         DateTime?
+  expectedDischargeDate DateTime?
+  dischargeDate         DateTime?
+  primaryDiagnoses      Json? // same shape as Claim.diagnoses
+  attendingDoctor       String?
+  benefitCategory       BenefitCategory
+  estimatedCost         Decimal?        @db.Decimal(14, 2)
+  accruedAmount         Decimal         @default(0) @db.Decimal(14, 2) // sum of non-voided entries
+  currency              String          @default("UGX")
+  openedById            String
+  openedBy              User            @relation("CaseOpenedBy", fields: [openedById], references: [id])
+  closedById            String?
+  closedBy              User?           @relation("CaseClosedBy", fields: [closedById], references: [id])
+  closedAt              DateTime?
+
+  claims         Claim[]
+  serviceEntries CaseServiceEntry[]
+  preauths       PreAuthorization[]
+  lous           LetterOfUndertaking[]
+  documents      Document[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, caseNumber])
+  @@index([tenantId, status])
+  @@index([tenantId, providerId, status])
+  @@index([memberId])
+}
+
+model CaseServiceEntry {
+  id          String            @id @default(cuid())
+  caseId      String
+  case        ClinicalCase      @relation(fields: [caseId], references: [id])
+  entryDate   DateTime
+  category    ClaimLineCategory
+  serviceCode String?
+  description String
+  quantity    Int               @default(1)
+  unitAmount  Decimal           @db.Decimal(14, 2)
+  totalAmount Decimal           @db.Decimal(14, 2)
+  source      String            @default("MANUAL") // MANUAL | HMS_BATCH
+  enteredById String?
+  hmsBatchRef String?
+  voided      Boolean           @default(false) // never delete — void instead
+  voidReason  String?
+  createdAt   DateTime          @default(now())
+
+  @@index([caseId, entryDate])
+  @@index([hmsBatchRef])
+}
+
+// Letter of Undertaking (WP-D1, decision D6): a payer undertaking issued to a
+// facility for an admission — distinct from a pre-auth GOP. Carries an amount
+// ceiling and validity window; optionally attached to a case.
+enum LouStatus {
+  DRAFT
+  ISSUED
+  EXHAUSTED
+  UTILISED
+  CANCELLED
+}
+
+model LetterOfUndertaking {
+  id            String        @id @default(cuid())
+  tenantId      String
+  tenant        Tenant        @relation(fields: [tenantId], references: [id])
+  louNumber     String // e.g. LOU-2026-00001
+  memberId      String
+  member        Member        @relation(fields: [memberId], references: [id])
+  providerId    String
+  provider      Provider      @relation(fields: [providerId], references: [id])
+  caseId        String?
+  case          ClinicalCase? @relation(fields: [caseId], references: [id])
+  amountCeiling Decimal       @db.Decimal(14, 2)
+  currency      String        @default("UGX")
+  status        LouStatus     @default(DRAFT)
+  issuedById    String
+  issuedBy      User          @relation("LouIssuedBy", fields: [issuedById], references: [id])
+  issuedAt      DateTime?
+  validFrom     DateTime?
+  validUntil    DateTime?
+  notes         String?
+  documentId    String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@unique([tenantId, louNumber])
+  @@index([tenantId, status])
+  @@index([memberId])
+  @@index([caseId])
 }
 
 // ─── BENEFIT HOLDS (Process 8) ────────────────────────────
@@ -2542,6 +2782,10 @@ model Provider {
   practitioners      ProviderPractitioner[]
   branches           ProviderBranch[]
   aliases            ProviderAlias[]
+  offlineWorkAuths   OfflineWorkAuthorization[]
+  offlineDataPacks   OfflineDataPack[]
+  clinicalCases      ClinicalCase[]
+  lettersOfUndertaking LetterOfUndertaking[]
 
   @@index([tenantId])
   @@index([tenantId, tier])
@@ -2570,6 +2814,8 @@ model ProviderBranch {
   claims           Claim[]
   contractBranches ContractBranch[]
   tariffLines      ProviderTariff[]
+  offlineWorkAuths OfflineWorkAuthorization[]
+  clinicalCases    ClinicalCase[]
 
   @@index([tenantId, providerId])
   @@index([providerId, isActive])
@@ -2724,6 +2970,18 @@ model ProviderTariff {
   @@index([contractId, rateMissing])
 }
 
+// Contract fee-schedule tier (WP-E1 / TPA_FEEDBACK_WORKPLAN.md D7): groups the
+// taxonomy into the bands a fee-for-service contract is negotiated in.
+enum ServiceTier {
+  HEADLINE // most-common services: consultations, ward/ICU per day, ER fee
+  LABORATORY
+  IMAGING
+  PHARMACY // drugs + consumables
+  THEATRE // theatre time bands, OT equipment
+  PROFESSIONAL_FEES // surgeon / anaesthetist / doctor fees
+  OTHER // dental, optical, physio, ambulance, dialysis, packages…
+}
+
 // ─── SERVICE CATALOGUE / TAXONOMY (spec §5.5) ────────────────────────────
 // Canonical, tenant-level service taxonomy that contract tariff lines and claim
 // lines map onto. Seeded from the §2.2 category list + provider Masters.
@@ -2737,6 +2995,9 @@ model ServiceCategory {
   parent       ServiceCategory?  @relation("ServiceCategoryTree", fields: [parentId], references: [id])
   children     ServiceCategory[] @relation("ServiceCategoryTree")
   patientClass PatientClass?
+  // Fee-schedule tier (WP-E1): set on top-level categories; children inherit
+  // at read time. Null = unmapped (renders in the OTHER bucket with a chip).
+  tier         ServiceTier?
   isActive     Boolean           @default(true)
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
@@ -2747,6 +3008,7 @@ model ServiceCategory {
 
   @@unique([tenantId, code])
   @@index([tenantId])
+  @@index([tenantId, tier])
   @@index([parentId])
 }
 
@@ -4147,6 +4409,8 @@ model Document {
   claim         Claim?            @relation(fields: [claimId], references: [id])
   preauthId     String?
   preauth       PreAuthorization? @relation(fields: [preauthId], references: [id])
+  caseId        String?
+  case          ClinicalCase?     @relation(fields: [caseId], references: [id])
   brokerId      String?
   broker        Broker?           @relation(fields: [brokerId], references: [id])
   quotationId   String?

@@ -13,7 +13,7 @@ export default async function PreAuthPage() {
     switch (status) {
       case "APPROVED": return "bg-[#28A745]/10 text-[#28A745]";
       case "SUBMITTED": case "UNDER_REVIEW": return "bg-[#17A2B8]/10 text-[#17A2B8]";
-      case "CONVERTED_TO_CLAIM": return "bg-brand-indigo/10 text-brand-indigo";
+      case "ATTACHED": case "UTILISED": case "CONVERTED_TO_CLAIM": return "bg-brand-indigo/10 text-brand-indigo";
       case "DECLINED": case "EXPIRED": return "bg-[#DC3545]/10 text-[#DC3545]";
       default: return "bg-[#6C757D]/10 text-[#6C757D]";
     }
@@ -41,7 +41,7 @@ export default async function PreAuthPage() {
           { label: "Total", count: preauths.length, color: "bg-brand-indigo" },
           { label: "Pending Review", count: preauths.filter(p => ["SUBMITTED", "UNDER_REVIEW"].includes(p.status)).length, color: "bg-[#17A2B8]" },
           { label: "Approved", count: preauths.filter(p => p.status === "APPROVED").length, color: "bg-[#28A745]" },
-          { label: "Converted", count: preauths.filter(p => p.status === "CONVERTED_TO_CLAIM").length, color: "bg-brand-indigo" },
+          { label: "Attached to Claims", count: preauths.filter(p => ["ATTACHED", "UTILISED", "CONVERTED_TO_CLAIM"].includes(p.status)).length, color: "bg-brand-indigo" },
         ].map((s) => (
           <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-lg p-4 shadow-sm">
             <p className="text-xs text-brand-text-muted font-bold uppercase">{s.label}</p>

@@ -90,6 +90,12 @@ export async function scheduleDailyJobs() {
       {},
       { repeat: { pattern: SIX_AM_CRON }, jobId: "contract-lifecycle-daily", attempts: 2 },
     ),
+    // WP-B3/B4: expire lapsed offline work codes + refresh facility data packs.
+    Queues.system.add(
+      "offline-pack-refresh",
+      {},
+      { repeat: { pattern: SIX_AM_CRON }, jobId: "offline-pack-refresh-daily", attempts: 2 },
+    ),
   ]);
 }
 

@@ -69,6 +69,7 @@ export async function submitClaimAction(data: {
         memberId:        data.memberId,
         benefitCategory: data.benefitCategory,
         status:          "APPROVED",
+        claimId:         null, // not already attached elsewhere (WP-C2)
         validUntil:      { gte: new Date() },
       },
       select: { id: true, preauthNumber: true },
@@ -94,7 +95,8 @@ export async function submitClaimAction(data: {
       claimNumber,
       memberId:        data.memberId,
       providerId:      data.providerId,
-      preauthId:       approvedPA?.id || undefined,
+      // Attach the approved PA (WP-C1): FK lives on PreAuthorization.claimId.
+      preauths:        approvedPA ? { connect: [{ id: approvedPA.id }] } : undefined,
       serviceType:     data.serviceType,
       benefitCategory: data.benefitCategory,
       dateOfService:   new Date(data.dateOfService),
@@ -119,6 +121,14 @@ export async function submitClaimAction(data: {
       },
     },
   });
+
+  // Stamp attachment state on the connected PA (WP-C2).
+  if (approvedPA) {
+    await prisma.preAuthorization.update({
+      where: { id: approvedPA.id },
+      data: { status: "ATTACHED", attachedAt: new Date() },
+    });
+  }
 
   await FraudService.evaluateClaim(claim.id, session.user.tenantId);
 

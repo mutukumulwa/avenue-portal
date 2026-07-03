@@ -115,6 +115,10 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
                 <div>
                   <p className="font-semibold text-brand-text-heading">{categoryLabel(b.category)}</p>
                   <div className="flex gap-3 mt-0.5">
+                    {/* Funding model (WP-F1/D8) */}
+                    <span className={`text-[10px] font-semibold ${b.fundingModel === "FEE_FOR_SERVICE" ? "text-brand-text-muted" : "text-brand-indigo"}`}>
+                      {b.fundingModel === "CAPITATION" ? "Capitation" : b.fundingModel === "HYBRID" ? "Hybrid funding" : "Fee for service"}
+                    </span>
                     {Number(b.copayPercentage) > 0 && (
                       <span className="text-[10px] text-brand-text-muted">Co-pay: {Number(b.copayPercentage)}%</span>
                     )}

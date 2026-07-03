@@ -36,9 +36,37 @@ export class SyncService {
    * Durably buffer operations. Idempotent: an opKey already seen is returned as
    * `duplicate` and not re-inserted. Returns per-op outcome for the client to
    * mark its local records synced/queued.
+   *
+   * WP-B4: `offlineAuthCode` is the agent-issued work code the batch was
+   * captured under. A valid code stamps every op with offlineAuthId for
+   * traceability; an invalid/expired/missing code buffers the ops as CONFLICT
+   * (`INVALID_OFFLINE_AUTH`) — reviewable, never dropped.
    */
-  static async ingest(tenantId: string, ops: IncomingOp[]) {
-    const results: Array<{ opKey: string; id: string; duplicate: boolean }> = [];
+  static async ingest(tenantId: string, ops: IncomingOp[], offlineAuthCode?: string) {
+    const results: Array<{ opKey: string; id: string; duplicate: boolean; state?: string }> = [];
+
+    // Resolve the work code once per batch.
+    let offlineAuthId: string | null = null;
+    let authRejection: string | null = null;
+    if (offlineAuthCode) {
+      const { OfflineAuthService } = await import("./offline-auth.service");
+      const verdict = await OfflineAuthService.verifyCode(tenantId, offlineAuthCode);
+      if (verdict.ok) {
+        offlineAuthId = verdict.auth.id;
+        // Enforce maxOperations across the incoming batch, not just per-call.
+        if (verdict.auth.maxOperations != null) {
+          const used = await prisma.syncOperation.count({ where: { offlineAuthId } });
+          if (used + ops.length > verdict.auth.maxOperations) {
+            authRejection = "INVALID_OFFLINE_AUTH:EXHAUSTED";
+            offlineAuthId = null;
+          }
+        }
+      } else {
+        authRejection = `INVALID_OFFLINE_AUTH:${verdict.reason}`;
+      }
+    } else {
+      authRejection = "INVALID_OFFLINE_AUTH:MISSING_CODE";
+    }
 
     for (const op of ops) {
       const existing = await prisma.syncOperation.findUnique({
@@ -58,11 +86,13 @@ export class SyncService {
           payload: op.payload as object,
           deviceId: op.deviceId ?? null,
           capturedAt: new Date(op.capturedAt),
-          state: "PENDING",
+          offlineAuthId,
+          state: authRejection ? "CONFLICT" : "PENDING",
+          conflictReason: authRejection,
         },
-        select: { id: true },
+        select: { id: true, state: true },
       });
-      results.push({ opKey: op.opKey, id: created.id, duplicate: false });
+      results.push({ opKey: op.opKey, id: created.id, duplicate: false, state: created.state });
     }
 
     return results;

@@ -285,7 +285,7 @@ export const claimAdjudicationService = {
     const claim = await prisma.claim.findUnique({
       where: { id: claimId, tenantId },
       select: {
-        preauthId: true, memberId: true, approvedAmount: true,
+        preauths: { select: { id: true } }, memberId: true, approvedAmount: true,
         status: true, adjudicatorId: true, benefitCategory: true,
         claimNumber: true,
       },
@@ -318,9 +318,9 @@ export const claimAdjudicationService = {
         },
       });
 
-      // Convert PA hold → actual consumption
-      if (claim.preauthId) {
-        await preauthAdjudicationService.convertHoldToClaim(claim.preauthId, claimId, tenantId);
+      // Convert PA holds → actual consumption (a claim may carry several PAs, WP-C1)
+      for (const pa of claim.preauths) {
+        await preauthAdjudicationService.convertHoldToClaim(pa.id, claimId, tenantId);
       }
 
       // Increment BenefitUsage.amountUsed (atomic)

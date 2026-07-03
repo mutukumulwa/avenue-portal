@@ -76,6 +76,7 @@ export class FraudService {
       where: { id: claimId },
       include: {
         claimLines: true,
+        preauths: { select: { id: true } },
         member: {
           include: {
             claims: {
@@ -99,7 +100,7 @@ export class FraudService {
 
     // ── RULE-GATE-001: Unlinked High-Value Claim ──────────────────────────────
     if (
-      !claim.preauthId &&
+      claim.preauths.length === 0 &&
       Number(claim.billedAmount) > CONFIG.highValueNoPreAuthThreshold
     ) {
       newAlerts.push({

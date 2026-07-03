@@ -5,11 +5,11 @@ import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
   LayoutDashboard, Users, Building2, FileText, BriefcaseMedical,
-  Stethoscope, Receipt, CreditCard, Building, PieChart,
+  Receipt, CreditCard, Building, PieChart,
   Settings, LogOut, Calculator, UserCheck, MessageSquareText,
   ShieldAlert, MessageSquareWarning, Wallet, Fingerprint,
-  BarChart3, TriangleAlert, Landmark, ClipboardCheck, CloudOff, LayoutGrid,
-  ShieldCheck, Lock, FileSignature, Globe2, HeartPulse,
+  BarChart3, TriangleAlert, Landmark, ClipboardCheck, CloudOff,
+  ShieldCheck, Lock, FileSignature, Globe2, HeartPulse, KeyRound,
 } from "lucide-react";
 import { PortalSwitcher } from "./PortalSwitcher";
 import { useState } from "react";
@@ -46,11 +46,21 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Clinical",
     items: [
-      { label: "Claims",             href: "/claims",             icon: Receipt,        roles: OPS        },
-      { label: "Claims Queues",      href: "/claims/queues",      icon: LayoutGrid,     roles: OPS        },
+      // Case management sub-menu (WP-D3): claims are worked clinically — an
+      // open case accrues services/PAs/LOUs and files as a single claim.
+      {
+        label: "Case Management", href: "/cases", icon: Receipt, roles: OPS,
+        children: [
+          { label: "Open Cases",              href: "/cases"          },
+          { label: "All Claims",              href: "/claims"         },
+          { label: "Claims Queues",           href: "/claims/queues"  },
+          { label: "Pre-Authorizations",      href: "/preauth"        },
+          { label: "Letters of Undertaking",  href: "/lou"            },
+        ],
+      },
       { label: "Offline Capture",    href: "/offline-capture",    icon: CloudOff,       roles: OPS        },
+      { label: "Offline Work Codes", href: "/offline-auth",       icon: KeyRound,       roles: OPS        },
       { label: "Approvals",          href: "/approvals",          icon: ClipboardCheck, roles: OPS        },
-      { label: "Pre-Authorizations", href: "/preauth",            icon: Stethoscope,    roles: OPS        },
       { label: "Cross-Border Care",  href: "/cross-border",       icon: Globe2,         roles: OPS        },
       { label: "Wellness",           href: "/wellness",           icon: HeartPulse,     roles: OPS        },
       { label: "Exceptions",         href: "/settings/exceptions",icon: TriangleAlert,  roles: OPS        },

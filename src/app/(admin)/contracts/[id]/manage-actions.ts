@@ -165,3 +165,80 @@ export async function deactivatePricingRuleAction(fd: FormData) {
   if (id) await prisma.pricingRule.update({ where: { id }, data: { isActive: false } });
   back(c.id);
 }
+
+// ── Capitation setup (WP-E4, TPA-confirmed) ──
+// Package lists + capitation amount are editable on the contract now; deep
+// capitation (pool accounting, PMPM invoicing, settlement) is a later
+// workstream.
+
+export async function addCapitationRuleAction(fd: FormData) {
+  const session = await requireRole(ROLES.UNDERWRITING);
+  const c = await ownedContract(fd, session.user.tenantId);
+
+  const amount = n(fd, "amount");
+  const per = s(fd, "per");
+  if (amount == null || amount <= 0) redirect(`/contracts/${c.id}?error=Capitation+amount+must+be+positive`);
+  if (per !== "MEMBER_PER_MONTH" && per !== "MEMBER_PER_YEAR") {
+    redirect(`/contracts/${c.id}?error=Pick+a+capitation+period`);
+  }
+  const carveOutCodes = (s(fd, "carveOutCodes") ?? "")
+    .split(",").map((x) => x.trim()).filter(Boolean);
+
+  await prisma.pricingRule.create({
+    data: {
+      tenantId: session.user.tenantId,
+      contractId: c.id,
+      scope: "CONTRACT",
+      ruleKind: "CAPITATION",
+      params: {
+        amount,
+        currency: s(fd, "currency") ?? c.currency,
+        per,
+        poolId: s(fd, "poolId") ?? `CAP-${c.contractNumber}`,
+        ...(carveOutCodes.length ? { carveOutCodes } : {}),
+      } as never,
+      priority: 10, // capitation outranks line pricing
+    },
+  });
+  back(c.id);
+}
+
+export async function addContractPackageAction(fd: FormData) {
+  const session = await requireRole(ROLES.UNDERWRITING);
+  const c = await ownedContract(fd, session.user.tenantId);
+
+  const name = s(fd, "name");
+  const packagePrice = n(fd, "packagePrice");
+  if (!name) redirect(`/contracts/${c.id}?error=Package+name+required`);
+  const parse = (k: string) => (s(fd, k) ?? "").split("\n").map((x) => x.trim()).filter(Boolean);
+
+  await prisma.contractPackage.create({
+    data: {
+      tenantId: session.user.tenantId,
+      contractId: c.id,
+      name: name!,
+      code: s(fd, "code"),
+      // Capitation-covered packages may carry no per-episode price (0 =
+      // covered by the capitation amount); carve-out packages price separately.
+      packagePrice: packagePrice ?? 0,
+      currency: s(fd, "currency") ?? c.currency,
+      triggerType: "SERVICE_DESCRIPTION",
+      triggerCodes: parse("triggerCodes"),
+      components: {
+        create: [
+          ...parse("includedComponents").map((d) => ({ type: "INCLUDED" as const, description: d })),
+          ...parse("excludedComponents").map((d) => ({ type: "EXCLUDED" as const, description: d })),
+        ],
+      },
+    },
+  });
+  back(c.id);
+}
+
+export async function deactivateContractPackageAction(fd: FormData) {
+  const session = await requireRole(ROLES.UNDERWRITING);
+  const c = await ownedContract(fd, session.user.tenantId);
+  const id = s(fd, "packageId");
+  if (id) await prisma.contractPackage.update({ where: { id }, data: { isActive: false } });
+  back(c.id);
+}

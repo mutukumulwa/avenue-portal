@@ -13,19 +13,25 @@ export class ClaimsService {
    * client when confined. Each carries member/provider/amount/receivedAt so the
    * UI can render SLA timers + drill-through.
    */
-  static async getActiveQueues(tenantId: string, clientId?: string | null) {
-    const ACTIVE: ClaimStatus[] = [
-      "INCURRED",
-      "RECEIVED",
-      "CAPTURED",
-      "UNDER_REVIEW",
-      "APPROVED",
-      "PARTIALLY_APPROVED",
-    ];
+  static readonly ACTIVE_QUEUE_STATUSES: ClaimStatus[] = [
+    "INCURRED",
+    "RECEIVED",
+    "CAPTURED",
+    "UNDER_REVIEW",
+    "APPROVED",
+    "PARTIALLY_APPROVED",
+  ];
+
+  static async getActiveQueues(
+    tenantId: string,
+    clientId?: string | null,
+    opts?: { take?: number; providerId?: string },
+  ) {
     return prisma.claim.findMany({
       where: {
         tenantId,
-        status: { in: ACTIVE },
+        status: { in: ClaimsService.ACTIVE_QUEUE_STATUSES },
+        ...(opts?.providerId ? { providerId: opts.providerId } : {}),
         ...(clientId ? { member: { group: { clientId } } } : {}),
       },
       select: {
@@ -33,30 +39,122 @@ export class ClaimsService {
         claimNumber: true,
         status: true,
         source: true,
+        serviceType: true,
+        dateOfService: true,
         billedAmount: true,
         currency: true,
         receivedAt: true,
+        providerId: true,
         member: { select: { firstName: true, lastName: true, memberNumber: true } },
         provider: { select: { name: true } },
+        // Contract-first SLA (WP-A1/D2): payment terms travel with the claim.
+        contract: { select: { paymentTermDays: true, paymentTermType: true } },
       },
       orderBy: { receivedAt: "asc" }, // oldest first — SLA-critical ones surface
+      ...(opts?.take ? { take: opts.take } : {}),
     });
+  }
+
+  /**
+   * Facility-level roll-up for the queues console (WP-A1): active-claim counts
+   * per provider so the UI can group facility-first and order by workload.
+   */
+  static async getQueueFacilitySummary(tenantId: string, clientId?: string | null) {
+    const grouped = await prisma.claim.groupBy({
+      by: ["providerId", "status"],
+      where: {
+        tenantId,
+        status: { in: ClaimsService.ACTIVE_QUEUE_STATUSES },
+        ...(clientId ? { member: { group: { clientId } } } : {}),
+      },
+      _count: { _all: true },
+      _min: { receivedAt: true },
+    });
+    const providerIds = [...new Set(grouped.map((g) => g.providerId))];
+    const providers = await prisma.provider.findMany({
+      where: { id: { in: providerIds } },
+      select: { id: true, name: true },
+    });
+    const nameById = new Map(providers.map((p) => [p.id, p.name]));
+    const summary = new Map<
+      string,
+      { providerId: string; providerName: string; total: number; oldestReceivedAt: Date | null; byStatus: Record<string, number> }
+    >();
+    for (const g of grouped) {
+      const row = summary.get(g.providerId) ?? {
+        providerId: g.providerId,
+        providerName: nameById.get(g.providerId) ?? "Unknown facility",
+        total: 0,
+        oldestReceivedAt: null as Date | null,
+        byStatus: {} as Record<string, number>,
+      };
+      row.total += g._count._all;
+      row.byStatus[g.status] = (row.byStatus[g.status] ?? 0) + g._count._all;
+      if (g._min.receivedAt && (!row.oldestReceivedAt || g._min.receivedAt < row.oldestReceivedAt)) {
+        row.oldestReceivedAt = g._min.receivedAt;
+      }
+      summary.set(g.providerId, row);
+    }
+    return [...summary.values()].sort((a, b) => b.total - a.total);
   }
 
   /**
    * List all claims for a tenant with related member/provider data
    */
-  static async getClaims(tenantId: string, status?: ClaimStatus, clientId?: string | null) {
+  static async getClaims(
+    tenantId: string,
+    status?: ClaimStatus,
+    clientId?: string | null,
+    opts?: { take?: number; skip?: number; providerId?: string; serviceType?: ServiceType },
+  ) {
     return prisma.claim.findMany({
       // Client isolation (G2.1 / G5.6): confined users see only their client's claims.
-      where: { tenantId, ...(status ? { status } : {}), ...(clientId ? { member: { group: { clientId } } } : {}) },
+      where: {
+        tenantId,
+        ...(status ? { status } : {}),
+        ...(opts?.providerId ? { providerId: opts.providerId } : {}),
+        ...(opts?.serviceType ? { serviceType: opts.serviceType } : {}),
+        ...(clientId ? { member: { group: { clientId } } } : {}),
+      },
       include: {
         member:   { select: { id: true, firstName: true, lastName: true, memberNumber: true } },
         provider: { select: { id: true, name: true, type: true, tier: true } },
+        contract: { select: { paymentTermDays: true, paymentTermType: true } },
         _count:   { select: { exceptionLogs: { where: { status: "PENDING" } } } },
       },
       orderBy: { createdAt: "desc" },
+      ...(opts?.take ? { take: opts.take } : {}),
+      ...(opts?.skip ? { skip: opts.skip } : {}),
     });
+  }
+
+  /**
+   * Status roll-up for the claims list header (WP-A3) — computed with groupBy
+   * so summary cards stay correct regardless of the page loaded.
+   */
+  static async getClaimStatusCounts(
+    tenantId: string,
+    clientId?: string | null,
+    opts?: { providerId?: string; serviceType?: ServiceType; status?: ClaimStatus },
+  ) {
+    const grouped = await prisma.claim.groupBy({
+      by: ["status"],
+      where: {
+        tenantId,
+        ...(opts?.status ? { status: opts.status } : {}),
+        ...(opts?.providerId ? { providerId: opts.providerId } : {}),
+        ...(opts?.serviceType ? { serviceType: opts.serviceType } : {}),
+        ...(clientId ? { member: { group: { clientId } } } : {}),
+      },
+      _count: { _all: true },
+    });
+    const byStatus: Record<string, number> = {};
+    let total = 0;
+    for (const g of grouped) {
+      byStatus[g.status] = g._count._all;
+      total += g._count._all;
+    }
+    return { total, byStatus };
   }
 
   /**
@@ -72,7 +170,7 @@ export class ClaimsService {
           },
         },
         provider: true,
-        preauth: true,
+        preauths: true,
         claimLines: { orderBy: { lineNumber: "asc" } },
         adjudicationLogs: { orderBy: { createdAt: "desc" } },
         exceptionLogs: {
@@ -233,12 +331,15 @@ export class ClaimsService {
       lengthOfStay = Math.max(1, Math.ceil(diff / (1000 * 3600 * 24)));
     }
 
-    return prisma.claim.create({
+    const created = await prisma.claim.create({
       data: {
         tenantId,
         claimNumber,
         memberId: data.memberId,
         providerId: data.providerId,
+        // Attach the linked/auto-linked PA (WP-C1). Previously data.preauthId
+        // was resolved but never persisted — the link silently went nowhere.
+        preauths: data.preauthId ? { connect: [{ id: data.preauthId }] } : undefined,
         serviceType: data.serviceType,
         dateOfService: data.dateOfService,
         admissionDate: data.admissionDate,
@@ -264,6 +365,15 @@ export class ClaimsService {
         provider: { select: { name: true } },
       },
     });
+
+    // Stamp attachment state on any PA connected at create (WP-C2).
+    if (data.preauthId) {
+      await prisma.preAuthorization.updateMany({
+        where: { claimId: created.id, status: "APPROVED" },
+        data: { status: "ATTACHED", attachedAt: new Date() },
+      });
+    }
+    return created;
   }
 
   /**
@@ -288,7 +398,7 @@ export class ClaimsService {
       select: {
         id: true, claimNumber: true, status: true,
         memberId: true, benefitCategory: true,
-        preauthId: true, receivedAt: true,
+        preauths: { select: { id: true } }, receivedAt: true,
       },
     });
 
@@ -345,14 +455,22 @@ export class ClaimsService {
       }
 
       // 2. Reserve benefit usage only for direct (non-PA) claims that are approved.
-      // PA-originated claims were already reserved at PA approval time.
-      if (isApproved && approvedAmount > 0 && !claim.preauthId) {
+      // PA-attached claims were already reserved at PA approval time.
+      if (isApproved && approvedAmount > 0 && claim.preauths.length === 0) {
         await ClaimsService.reserveBenefitUsage(
           tx,
           claim.memberId,
           claim.benefitCategory,
           approvedAmount
         );
+      }
+
+      // Attached PAs are consumed by the decision (WP-C2): ATTACHED → UTILISED.
+      if (claim.preauths.length > 0) {
+        await tx.preAuthorization.updateMany({
+          where: { claimId, status: { in: ["APPROVED", "ATTACHED"] } },
+          data: { status: "UTILISED" },
+        });
       }
 
       return tx.claim.update({
@@ -384,6 +502,96 @@ export class ClaimsService {
         },
       });
     });
+  }
+
+  // ─── PRE-AUTH ATTACHMENT (WP-C2, TPA_FEEDBACK_WORKPLAN.md §C) ────────────
+
+  /**
+   * Attach an approved pre-authorization to a claim. The claim keeps its BAU
+   * lines; the PA covers the PA-required services within it. Validates member,
+   * provider, PA status, validity window, and single-attachment.
+   */
+  static async attachPreauth(tenantId: string, claimId: string, preauthId: string) {
+    const [claim, pa] = await Promise.all([
+      prisma.claim.findUnique({
+        where: { id: claimId, tenantId },
+        select: { id: true, memberId: true, providerId: true, status: true },
+      }),
+      prisma.preAuthorization.findUnique({
+        where: { id: preauthId, tenantId },
+        select: {
+          id: true, memberId: true, providerId: true, status: true,
+          claimId: true, validUntil: true, preauthNumber: true,
+        },
+      }),
+    ]);
+    if (!claim) throw new Error("Claim not found");
+    if (!pa) throw new Error("Pre-authorization not found");
+    if (["PAID", "DECLINED", "VOID"].includes(claim.status)) {
+      throw new Error(`Cannot attach a pre-auth to a ${claim.status} claim`);
+    }
+    if (pa.claimId === claimId) return pa; // already attached here — idempotent
+    if (pa.claimId) {
+      throw new Error(`Pre-auth ${pa.preauthNumber} is already attached to another claim`);
+    }
+    if (pa.status !== "APPROVED") {
+      throw new Error(`Only APPROVED pre-auths can be attached (current: ${pa.status})`);
+    }
+    if (pa.memberId !== claim.memberId) {
+      throw new Error("Pre-auth belongs to a different member");
+    }
+    if (pa.providerId !== claim.providerId) {
+      throw new Error("Pre-auth was issued for a different facility");
+    }
+    if (pa.validUntil && pa.validUntil < new Date()) {
+      throw new Error(`Pre-auth ${pa.preauthNumber} validity window has passed`);
+    }
+    return prisma.preAuthorization.update({
+      where: { id: preauthId },
+      data: { claimId, attachedAt: new Date(), status: "ATTACHED" },
+    });
+  }
+
+  /** Detach a pre-auth from a claim — reverts it to APPROVED for reuse. */
+  static async detachPreauth(tenantId: string, claimId: string, preauthId: string) {
+    const pa = await prisma.preAuthorization.findUnique({
+      where: { id: preauthId, tenantId },
+      select: { id: true, claimId: true, status: true },
+    });
+    if (!pa || pa.claimId !== claimId) {
+      throw new Error("Pre-auth is not attached to this claim");
+    }
+    if (pa.status === "UTILISED") {
+      throw new Error("Pre-auth has been consumed by a claim decision and cannot be detached");
+    }
+    return prisma.preAuthorization.update({
+      where: { id: preauthId },
+      data: { claimId: null, attachedAt: null, status: "APPROVED" },
+    });
+  }
+
+  /**
+   * Total PA cover attached to a claim vs its billed amount (WP-C2 cap check —
+   * warn, don't block, when the PA-covered portion exceeds approved cover).
+   */
+  static async getPreauthCoverage(tenantId: string, claimId: string) {
+    const claim = await prisma.claim.findUnique({
+      where: { id: claimId, tenantId },
+      select: {
+        billedAmount: true,
+        preauths: { select: { id: true, preauthNumber: true, approvedAmount: true, estimatedCost: true } },
+      },
+    });
+    if (!claim) throw new Error("Claim not found");
+    const cover = claim.preauths.reduce(
+      (sum, pa) => sum + Number(pa.approvedAmount ?? pa.estimatedCost ?? 0), 0,
+    );
+    return {
+      attachedCount: claim.preauths.length,
+      approvedCover: cover,
+      billedAmount: Number(claim.billedAmount),
+      exceedsCover: claim.preauths.length > 0 && Number(claim.billedAmount) > cover,
+    };
   }
 
   // ─── PRE-AUTHORIZATIONS ─────────────────────────────────
@@ -673,16 +881,22 @@ export class ClaimsService {
   }
 
   /**
-   * Convert an approved pre-auth into a claim
+   * Create an ordinary claim shell with this pre-auth ATTACHED (WP-C2/D4).
+   * Replaces the legacy 1:1 "conversion": the claim starts from the PA's
+   * clinical picture but remains a normal claim that can accrue BAU lines and
+   * further PAs. The PA becomes ATTACHED, not CONVERTED_TO_CLAIM.
    */
-  static async convertPreAuthToClaim(tenantId: string, preauthId: string) {
+  static async createClaimWithPreauth(tenantId: string, preauthId: string) {
     const preauth = await prisma.preAuthorization.findUnique({
       where: { id: preauthId, tenantId },
     });
 
     if (!preauth) throw new Error("Pre-authorization not found");
     if (preauth.status !== "APPROVED") {
-      throw new Error("Only approved pre-authorizations can be converted to claims");
+      throw new Error("Only approved pre-authorizations can start a claim");
+    }
+    if (preauth.claimId) {
+      throw new Error("Pre-authorization is already attached to a claim");
     }
 
     const claim = await this.createClaim(tenantId, {
@@ -695,18 +909,20 @@ export class ClaimsService {
       billedAmount: Number(preauth.approvedAmount ?? preauth.estimatedCost),
       benefitCategory: preauth.benefitCategory,
       source: "PREAUTH",
+      preauthId: preauth.id,
     });
 
-    // Mark the pre-auth as converted
+    // createClaim connected the PA; stamp attachment state explicitly.
     await prisma.preAuthorization.update({
       where: { id: preauthId },
-      data: {
-        status: "CONVERTED_TO_CLAIM",
-        claimId: claim.id,
-        convertedAt: new Date(),
-      },
+      data: { claimId: claim.id, attachedAt: new Date(), status: "ATTACHED" },
     });
 
     return claim;
+  }
+
+  /** @deprecated WP-C2 — use createClaimWithPreauth; kept for API compatibility. */
+  static async convertPreAuthToClaim(tenantId: string, preauthId: string) {
+    return this.createClaimWithPreauth(tenantId, preauthId);
   }
 }

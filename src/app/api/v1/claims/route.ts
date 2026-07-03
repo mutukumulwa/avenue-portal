@@ -90,7 +90,8 @@ async function postClaim(req: Request) {
         claimNumber,
         memberId:      member.id,
         providerId:    provider.id,
-        preauthId:     preauthId ?? null,
+        // Attach the resolved PA (WP-C1): FK lives on PreAuthorization.claimId.
+        preauths:      preauthId ? { connect: [{ id: preauthId }] } : undefined,
         source:        "SMART",
         serviceType,
         dateOfService: new Date(dateOfService),
@@ -117,6 +118,14 @@ async function postClaim(req: Request) {
         },
       },
     });
+
+    // Stamp attachment state on the connected PA (WP-C2).
+    if (preauthId) {
+      await prisma.preAuthorization.update({
+        where: { id: preauthId },
+        data: { status: "ATTACHED", attachedAt: new Date() },
+      });
+    }
 
     return NextResponse.json(
       {

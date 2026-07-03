@@ -104,17 +104,26 @@ export async function adjudicateClaimAction(formData: FormData) {
     // The provider's ACTIVE contract governs what each line may pay:
     // scheduled rates cap coded lines, exclusions pay zero, the contract's
     // unlisted-service rule decides everything else.
+    // ── Benefit funding model (WP-F2/D8) ─────────────────────────────────────
+    // CAPITATION-funded lines are prepaid via the provider's pool: they leave
+    // the FFS pricing path entirely (payable 0, pool-tagged on decision).
+    const { FundingModelService } = await import("@/server/services/funding-model.service");
+    const funding = await FundingModelService.resolveForClaim(tenantId, claimId);
+    const capitatedLineIds = new Set(funding.lines.filter((l) => l.capitated).map((l) => l.lineId));
+
     if (action === "APPROVED" || action === "PARTIALLY_APPROVED") {
-      const { contract, lines: rates } = await ClaimsService.resolveClaimContractRates(tenantId, claimId);
+      const { contract, lines: allRates } = await ClaimsService.resolveClaimContractRates(tenantId, claimId);
+      // Capitated lines skip FFS enforcement — they price at 0 regardless.
+      const rates = allRates.filter((r) => !capitatedLineIds.has(r.lineId));
       if (rates.length > 0) {
         const claimMeta = await prisma.claim.findUnique({
           where: { id: claimId, tenantId },
-          select: { preauthId: true },
+          select: { preauths: { select: { id: true } } },
         });
 
         // Contract requires pre-authorization for specific services
         const paLines = rates.filter(r => r.requiresPreauth);
-        if (paLines.length > 0 && !claimMeta?.preauthId) {
+        if (paLines.length > 0 && (claimMeta?.preauths.length ?? 0) === 0) {
           const codes = paLines.map(r => r.cptCode ?? "uncoded").join(", ");
           throw new Error(
             `Contract ${contract?.contractNumber ?? ""} requires pre-authorization for: ${codes}. Link an approved PA to this claim or decline the line(s).`,
@@ -155,14 +164,34 @@ export async function adjudicateClaimAction(formData: FormData) {
       }
     }
 
+    // PA cover cap (WP-C2): warn — never block — when the claim exceeds the
+    // attached pre-auth cover. The overage note travels in the adjudication log.
+    let notes = (formData.get("notes") as string) || undefined;
+    if (action === "APPROVED" || action === "PARTIALLY_APPROVED") {
+      const coverage = await ClaimsService.getPreauthCoverage(tenantId, claimId);
+      if (coverage.exceedsCover) {
+        const warn = `PA cover warning: billed ${coverage.billedAmount.toLocaleString()} exceeds attached pre-auth cover ${coverage.approvedCover.toLocaleString()}.`;
+        notes = notes ? `${notes} ${warn}` : warn;
+      }
+      if (funding.anyCapitated) {
+        const note = `COVERED_BY_CAPITATION: ${capitatedLineIds.size} line(s) are prepaid via the capitation pool and price at 0.`;
+        notes = notes ? `${notes} ${note}` : note;
+      }
+    }
+
     const claim = await ClaimsService.adjudicateClaim(tenantId, claimId, {
       action,
       approvedAmount,
       declineReasonCode: formData.get("declineReasonCode") as string || undefined,
       declineNotes: formData.get("declineNotes") as string || undefined,
-      notes: formData.get("notes") as string || undefined,
+      notes,
       reviewerId: session.user.id,
     });
+
+    // WP-F2: zero the capitated lines + tag the pool on the decided claim.
+    if (action === "APPROVED" || action === "PARTIALLY_APPROVED") {
+      await FundingModelService.applyToDecidedClaim(tenantId, claimId, funding);
+    }
 
     // Auto-post GL entry when claim is approved or partially approved
     if ((action === "APPROVED" || action === "PARTIALLY_APPROVED") && approvedAmount > 0) {
@@ -410,4 +439,38 @@ export async function waiveCoContributionAction(
 
   revalidatePath(`/claims/${tx.claimId}`);
   return {};
+}
+
+// ─── PRE-AUTH ATTACHMENT (WP-C3) ─────────────────────────────────────────────
+
+export async function attachPreauthAction(formData: FormData) {
+  const session = await requireRole(ROLES.OPS);
+  const claimId = formData.get("claimId") as string;
+  const preauthId = formData.get("preauthId") as string;
+
+  const pa = await ClaimsService.attachPreauth(session.user.tenantId, claimId, preauthId);
+  await writeAudit({
+    userId: session.user.id,
+    action: "PREAUTH_ATTACHED",
+    module: "CLAIMS",
+    description: `Pre-auth ${pa.preauthNumber} attached to claim ${claimId.slice(0, 8)}`,
+    metadata: { claimId, preauthId },
+  });
+  revalidatePath(`/claims/${claimId}`);
+}
+
+export async function detachPreauthAction(formData: FormData) {
+  const session = await requireRole(ROLES.OPS);
+  const claimId = formData.get("claimId") as string;
+  const preauthId = formData.get("preauthId") as string;
+
+  await ClaimsService.detachPreauth(session.user.tenantId, claimId, preauthId);
+  await writeAudit({
+    userId: session.user.id,
+    action: "PREAUTH_DETACHED",
+    module: "CLAIMS",
+    description: `Pre-auth ${preauthId.slice(0, 8)} detached from claim ${claimId.slice(0, 8)}`,
+    metadata: { claimId, preauthId },
+  });
+  revalidatePath(`/claims/${claimId}`);
 }

@@ -45,6 +45,9 @@ async function postSync(req: Request) {
         deviceId: o.deviceId ?? body.deviceId,
         capturedAt: o.capturedAt,
       })),
+      // WP-B4: the agent-issued offline work code the batch was captured
+      // under. Missing/invalid ⇒ ops buffer as reviewable CONFLICTs.
+      body.offlineAuthCode,
     );
 
     // Enqueue reconcile for freshly-buffered (non-duplicate) operations.
