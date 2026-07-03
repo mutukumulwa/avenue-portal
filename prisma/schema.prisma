@@ -2083,8 +2083,9 @@ model Claim {
   // rates can match. Null for legacy/single-branch providers.
   providerBranchId String?
   providerBranch   ProviderBranch?   @relation(fields: [providerBranchId], references: [id])
-  preauthId        String?           @unique // If converted from pre-auth
-  preauth          PreAuthorization? @relation(fields: [preauthId], references: [id])
+  // Attached pre-authorizations (WP-C1/D4): a claim may carry several PAs
+  // alongside BAU lines; the FK lives on PreAuthorization.claimId.
+  preauths         PreAuthorization[]
   source           ClaimSource       @default(MANUAL)
   serviceType      ServiceType
   dateOfService    DateTime
@@ -2202,7 +2203,6 @@ model Claim {
   @@index([tenantId, status, createdAt])
   @@index([memberId])
   @@index([providerId])
-  @@index([preauthId])
 }
 
 enum ClaimLineCategory {
@@ -2361,7 +2361,9 @@ enum PreauthStatus {
   APPROVED
   DECLINED
   EXPIRED // Approved but validity period passed without use
-  CONVERTED_TO_CLAIM // Approved and claim was created
+  ATTACHED // Approved and attached to a claim awaiting decision (WP-C1/D4)
+  UTILISED // Attached claim was decided — PA consumed
+  CONVERTED_TO_CLAIM // Legacy 1:1 conversion — historical rows only, no longer produced
   CANCELLED
 }
 
@@ -2413,10 +2415,12 @@ model PreAuthorization {
   escalatedToId            String?
   escalatedTo              User?     @relation("PreauthEscalation", fields: [escalatedToId], references: [id])
 
-  // Conversion to claim
+  // Attachment to a claim (WP-C1/D4): a PA attaches to at most one claim; a
+  // claim may carry many PAs alongside BAU service lines.
   claimId     String?
-  claim       Claim?
-  convertedAt DateTime?
+  claim       Claim?    @relation(fields: [claimId], references: [id])
+  attachedAt  DateTime?
+  convertedAt DateTime? // legacy 1:1 conversion timestamp — historical rows only
 
   // ── Process 8 extensions ──────────────────────────────────
   isEmergency         Boolean   @default(false)
@@ -2440,6 +2444,7 @@ model PreAuthorization {
   @@index([tenantId, status])
   @@index([tenantId, status, createdAt])
   @@index([memberId])
+  @@index([claimId])
 }
 
 // ─── BENEFIT HOLDS (Process 8) ────────────────────────────

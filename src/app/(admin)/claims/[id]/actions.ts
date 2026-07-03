@@ -109,12 +109,12 @@ export async function adjudicateClaimAction(formData: FormData) {
       if (rates.length > 0) {
         const claimMeta = await prisma.claim.findUnique({
           where: { id: claimId, tenantId },
-          select: { preauthId: true },
+          select: { preauths: { select: { id: true } } },
         });
 
         // Contract requires pre-authorization for specific services
         const paLines = rates.filter(r => r.requiresPreauth);
-        if (paLines.length > 0 && !claimMeta?.preauthId) {
+        if (paLines.length > 0 && (claimMeta?.preauths.length ?? 0) === 0) {
           const codes = paLines.map(r => r.cptCode ?? "uncoded").join(", ");
           throw new Error(
             `Contract ${contract?.contractNumber ?? ""} requires pre-authorization for: ${codes}. Link an approved PA to this claim or decline the line(s).`,

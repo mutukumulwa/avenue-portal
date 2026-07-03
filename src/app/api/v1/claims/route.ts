@@ -90,7 +90,8 @@ async function postClaim(req: Request) {
         claimNumber,
         memberId:      member.id,
         providerId:    provider.id,
-        preauthId:     preauthId ?? null,
+        // Attach the resolved PA (WP-C1): FK lives on PreAuthorization.claimId.
+        preauths:      preauthId ? { connect: [{ id: preauthId }] } : undefined,
         source:        "SMART",
         serviceType,
         dateOfService: new Date(dateOfService),

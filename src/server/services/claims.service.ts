@@ -127,7 +127,7 @@ export class ClaimsService {
           },
         },
         provider: true,
-        preauth: true,
+        preauths: true,
         claimLines: { orderBy: { lineNumber: "asc" } },
         adjudicationLogs: { orderBy: { createdAt: "desc" } },
         exceptionLogs: {
@@ -294,6 +294,9 @@ export class ClaimsService {
         claimNumber,
         memberId: data.memberId,
         providerId: data.providerId,
+        // Attach the linked/auto-linked PA (WP-C1). Previously data.preauthId
+        // was resolved but never persisted — the link silently went nowhere.
+        preauths: data.preauthId ? { connect: [{ id: data.preauthId }] } : undefined,
         serviceType: data.serviceType,
         dateOfService: data.dateOfService,
         admissionDate: data.admissionDate,
@@ -343,7 +346,7 @@ export class ClaimsService {
       select: {
         id: true, claimNumber: true, status: true,
         memberId: true, benefitCategory: true,
-        preauthId: true, receivedAt: true,
+        preauths: { select: { id: true } }, receivedAt: true,
       },
     });
 
@@ -400,8 +403,8 @@ export class ClaimsService {
       }
 
       // 2. Reserve benefit usage only for direct (non-PA) claims that are approved.
-      // PA-originated claims were already reserved at PA approval time.
-      if (isApproved && approvedAmount > 0 && !claim.preauthId) {
+      // PA-attached claims were already reserved at PA approval time.
+      if (isApproved && approvedAmount > 0 && claim.preauths.length === 0) {
         await ClaimsService.reserveBenefitUsage(
           tx,
           claim.memberId,

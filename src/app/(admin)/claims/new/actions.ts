@@ -94,7 +94,8 @@ export async function submitClaimAction(data: {
       claimNumber,
       memberId:        data.memberId,
       providerId:      data.providerId,
-      preauthId:       approvedPA?.id || undefined,
+      // Attach the approved PA (WP-C1): FK lives on PreAuthorization.claimId.
+      preauths:        approvedPA ? { connect: [{ id: approvedPA.id }] } : undefined,
       serviceType:     data.serviceType,
       benefitCategory: data.benefitCategory,
       dateOfService:   new Date(data.dateOfService),
