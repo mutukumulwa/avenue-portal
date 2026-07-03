@@ -306,7 +306,7 @@ export default async function ContractDetailPage({
         {/* Right: validation + version + counts */}
         <div className="space-y-6">
           <section className="rounded-xl border border-gray-200 bg-white p-5">
-            <h2 className="text-sm font-semibold text-[#000523] mb-3">Activation validation (§13)</h2>
+            <h2 className="text-sm font-semibold text-[#000523] mb-3">Activation validation</h2>
             {validation.ok && validation.issues.length === 0 ? (
               <p className="flex items-center gap-2 text-sm text-[#28A745]"><CheckCircle2 className="w-4 h-4" /> All checks pass.</p>
             ) : (

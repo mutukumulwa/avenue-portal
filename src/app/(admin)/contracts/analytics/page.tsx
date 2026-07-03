@@ -44,7 +44,7 @@ export default async function ContractAnalyticsPage() {
       <h1 className="flex items-center gap-2 text-2xl font-semibold text-[#000523] mb-1">
         <BarChart3 className="w-6 h-6 text-[#06B9AB]" /> Contract analytics
       </h1>
-      <p className="text-sm text-[#6C757D] mb-6">Datasets keyed to per-line contract provenance (spec §15).</p>
+      <p className="text-sm text-[#6C757D] mb-6">How contracts are pricing claims — datasets keyed to per-line contract provenance.</p>
 
       {/* KPI row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -140,7 +140,7 @@ export default async function ContractAnalyticsPage() {
           )}
         </Card>
 
-        <Card title="Manual-review queue load (§8.5)">
+        <Card title="Manual-review queue load">
           {queueLoad.length === 0 ? (
             <p className="text-xs text-[#6C757D]">No queued claims.</p>
           ) : (

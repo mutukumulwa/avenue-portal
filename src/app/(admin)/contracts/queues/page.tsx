@@ -56,7 +56,7 @@ export default async function ContractQueuesPage() {
       <h1 className="flex items-center gap-2 text-2xl font-semibold text-[#000523] mb-1">
         <LayoutGrid className="w-6 h-6 text-[#06B9AB]" /> Contract review queues
       </h1>
-      <p className="text-sm text-[#6C757D] mb-6">Claims routed by the contract engine (spec §8.5). {claims.length} in queue.</p>
+      <p className="text-sm text-[#6C757D] mb-6">Claims the contract engine could not auto-process, grouped by the reason they need manual review. {claims.length} in queue.</p>
 
       {queueKeys.length === 0 ? (
         <div className="rounded-xl border border-gray-200 bg-white p-10 text-center text-[#6C757D]">No claims are currently queued by the contract engine.</div>

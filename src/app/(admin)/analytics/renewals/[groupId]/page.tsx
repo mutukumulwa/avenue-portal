@@ -343,7 +343,7 @@ export default async function RenewalWorkspacePage({
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="font-bold text-brand-text-heading text-sm font-heading flex items-center gap-2">
-            <Cpu size={15} className="text-brand-indigo" /> Renewal Intelligence — Spec Algorithm
+            <Cpu size={15} className="text-brand-indigo" /> Renewal Intelligence
           </h2>
           <form action={computeIntelligenceAction}>
             <input type="hidden" name="groupId" value={groupId} />
@@ -373,7 +373,7 @@ export default async function RenewalWorkspacePage({
           </div>
         ) : (
           <p className="text-sm text-brand-text-muted">
-            Click <strong>Recompute</strong> to run the spec §11 algorithm and generate a recommendation.
+            Click <strong>Recompute</strong> to run the renewal analysis and generate a recommendation.
           </p>
         )}
       </div>

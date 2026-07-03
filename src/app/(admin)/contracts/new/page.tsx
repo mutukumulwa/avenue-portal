@@ -29,7 +29,7 @@ export default async function NewContractPage({
         <ArrowLeft className="w-4 h-4" /> Back to contracts
       </Link>
       <h1 className="text-2xl font-semibold text-[#000523] mb-1">New Contract</h1>
-      <p className="text-sm text-[#6C757D] mb-6">Capture the minimum viable digital contract (spec §20). It starts as a DRAFT — add tariffs, applicability and branches, then submit for approval.</p>
+      <p className="text-sm text-[#6C757D] mb-6">Capture the core contract details. It starts as a DRAFT — add tariffs, applicability and branches, then submit for approval.</p>
 
       {error && (
         <div className="mb-4 flex items-center gap-2 rounded-lg bg-[#DC3545]/10 px-4 py-3 text-sm text-[#DC3545]">

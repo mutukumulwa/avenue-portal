@@ -108,7 +108,7 @@ export async function ContractPanel({ tenantId, claimId }: { tenantId: string; c
           </tbody>
         </table>
       </div>
-      <p className="mt-2 text-[10px] text-[#6C757D]">Read-only preview from the contract rule engine (§6). It does not change the claim; the adjudicator&apos;s decision stands until the engine is wired into auto-adjudication.</p>
+      <p className="mt-2 text-[10px] text-[#6C757D]">Read-only preview of how the contract prices this claim. It does not change the claim — the adjudicator&apos;s decision stands.</p>
     </section>
   );
 }
