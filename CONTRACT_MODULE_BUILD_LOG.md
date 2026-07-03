@@ -12,20 +12,20 @@ checklists, and continues without re-deriving context.
 
 ## RESUME POINTER (update this every time you stop)
 
-- **Current phase:** Phase 2 — Tariff-based claims automation (engine core built + tested)
-- **Current task:** Phase 2 remaining polish, then Phase 3 (full rule engine).
-- **Next action (pick up here):**
-  1. **Wire the engine into adjudication / persist per-line provenance** (spec §8.3, acceptance "every adjudicated line stores contract/version/rule/reason"). Right now `ContractEngine.evaluateClaim(ById)` is read-only and shown in the claims Contract panel + `contractEngine.evaluate*` tRPC. Add a persist step that writes each line's contractId/versionId/matchedRuleType/matchedRuleId/reasonCodeId/amounts to `ClaimLine`, and add the named contract gates to `auto-adjudication.service.ts` (CONTRACT_MATCH, PRICING_COMPLETE). Keep it opt-in first to avoid disrupting the existing adjudication flow.
-  2. **Manual-queue framework** (§8.5): `Claim.assignedQueue` is computed by the engine but not yet routed/persisted. Extend the existing `/(admin)/claims/queues` UI with the digital-contract queue categories.
-  3. **ServiceCategory taxonomy seed** from the Masters files (§5.5) + Tariff-editor UI for the new §5.6 fields (rateType/UoM/caps/serviceCategory) on the contract detail Tariffs tab.
-  4. Still-open Phase-1 items: intake pre-check wiring into `intake.service.ts`; contract detail Tariffs/Applicability/Branch management widgets; BullMQ lifecycle jobs (auto-activate/expire, NO_CONTRACT re-sweep).
-  5. Then **Phase 3** — PricingRule/ContractPackage/PreauthRule/DocumentationRule/ContractExclusion generalisation, stages 5–8, precedence engine (§7), rule builder + sandbox (the `contractEngine.evaluateLine` sandbox endpoint already exists).
+- **Current phase:** Phases 1–4 core all built & tested. Remaining = integration/polish + Phase 5.
+- **Next action (pick up here), in priority order:**
+  1. **Wire the engine into adjudication / persist per-line provenance** (spec §8.3). `ContractEngine.evaluateClaim(ById)` is read-only (claims Contract panel + `contractEngine.*`). Add a persist step writing each line's contractId/versionId/matchedRuleType/matchedRuleId/reasonCodeId/amounts to `ClaimLine`, and add named gates (CONTRACT_MATCH, PRICING_COMPLETE) to `auto-adjudication.service.ts`. Opt-in first.
+  2. **Manual-queue framework** (§8.5): persist `Claim.assignedQueue` + extend `/(admin)/claims/queues` UI with the digital-contract queue categories.
+  3. **Rule-builder UI** (§11.5): visual IF/THEN composer over the `contractRules.*` router + `contractEngine.evaluateLine` sandbox (both exist).
+  4. **NET_OF_EXTERNAL / EXTERNAL_TARIFF_REF** pricing from `ExternalTariffTable` (schema exists; engine routes these to MAN-001 today). **DocumentationRule stage-7** in the engine (`applyDocumentation`, DOC-001/002).
+  5. Wire **OverrideControl** into `override.service` (maxFinancialImpact block, dual-approval threshold); ServiceCategory seed from Masters; contract-detail Tariffs/Applicability/Branch widgets; BullMQ lifecycle jobs; intake pre-check into `intake.service.ts`.
+  6. **Phase 5** — analytics suite (§15), reconciliation automation, override-pattern→amendment suggestions, capitation pool settlement.
 - **Blocked on:** nothing.
-- **Last verified green:** 2026-07-02 — Phase-2 schema applied via `prisma db push`;
-  `npm run typecheck` clean; `eslint` clean on all new files; **`vitest` 204/204 service
-  tests pass** including `tests/services/contract-engine.test.ts` (6 tests reproducing spec
-  §10.3 examples 1 & 8 + LOWER_OF, LIM-001, CON-001, determinism). Reason-code catalog
-  seeded (40 codes) for tenant Avenue Healthcare.
+- **Last verified green:** 2026-07-03 — Phases 3 & 4 schema applied via `prisma db push`;
+  `npm run typecheck` clean; `eslint` clean on all new files; **`vitest` 218/218 service
+  tests pass** (`contract-engine.test.ts` 13 reproducing §10.3 examples 1-9;
+  `contract-extraction.test.ts` 7 for the extractor). All `/contracts*` routes compile
+  (307 auth-gate, no errors). Reason-codes (40) + override-controls (16) seeded for tenant.
 - **Verification note:** Browser pixel-render still blocked by the preview harness not
   persisting the next-auth session cookie (callback 200 → bounces to /login). Engine
   correctness is instead proven by the vitest suite. To eyeball UI, log in via a real
@@ -78,7 +78,7 @@ checklists, and continues without re-deriving context.
 | 1 | Contract structuring foundation | CORE DONE (schema+service+router+UI); polish + intake wiring + lifecycle jobs remain |
 | 2 | Tariff-based claims automation | ENGINE CORE DONE (schema+engine+reason-codes+claims panel+tests); adjudication-persist wiring + queues UI remain |
 | 3 | Rule engine (full) | ENGINE + DATA MODEL DONE (stages 5-8, packages/case-rate/avg-pool/exclusions/preauth/submission, V12, rule CRUD, override controls, tests); rule-builder UI remains |
-| 4 | Markdown extraction & assisted creation | IN PROGRESS |
+| 4 | Markdown extraction & assisted creation | DONE (zero-hallucination extractor, import pipeline, review UI, tests); LLM-assisted clause tagging optional enhancement |
 | 5 | Advanced automation & optimisation | not started |
 
 ---
@@ -211,6 +211,36 @@ Spec §16 Phase 3 + §5.7–5.11, §6.5–6.8, §7, §8.4, §9.1–9.3.
 - [ ] NET_OF_EXTERNAL / EXTERNAL_TARIFF_REF pricing (schema + ExternalTariffTable exist; engine currently routes these tariff.rateType values to MAN-001 — implement resolution from ExternalTariffTable)
 - [ ] Wire OverrideControl into `override.service` request/approve (maxFinancialImpact block, dual-approval threshold)
 - [ ] DocumentationRule stage-7 check in the engine (rules CRUD + schema exist; engine does not yet evaluate DOC-001/002 — add `applyDocumentation`)
+
+---
+
+## Phase 4 — Markdown extraction & assisted creation
+
+Spec §12 + §11.3 import mode. Acceptance: family-A ≥90% readable rows extracted;
+100% unreadable flagged not guessed; ambiguous dates always block; every field
+traceable to source or reviewer.
+
+### 4.1 Schema — DONE ✅
+- [x] `ExtractionStatus` enum + `ContractExtraction` model (entities/tariffCandidates/ambiguities/reviewAnswers/stats JSON, provenance) + Tenant back-relation
+
+### 4.2 Extractor — DONE ✅ (deterministic, rule-based, zero-hallucination)
+`contract-extraction.service.ts`
+- [x] `parse(markdown)`: page split (`## Page N`), OCR row cleaning, **trailing-amount** detection (thousands/decimal/bare 3-6 digit at line end — never embedded like "50KM"), rateMissing for structured rows with no readable amount (O2), content-hash de-dup (O7)
+- [x] Entity extraction: effective-date candidates (context-gated by "effective/starting from"), review-based validity (O4), external refs (CN-numbers), provider names, currency/tax stated
+- [x] Ambiguity detection → mandatory review questions: AMBIGUOUS_EFFECTIVE_DATE (O3, **blocking**), EFFECTIVE_DATE_UNSTATED (blocking), VALIDITY_REVIEW_BASED, CURRENCY_UNSTATED, TAX_UNSTATED, RATE_MISSING_ROWS (blocking)
+- [x] `createExtraction()` (persist, status PARSED) + `commit()` (write kept candidates as tariff lines incl. rateMissing → DRAFT contract; never activates)
+- [x] Sanity-checked on real corpus: CIC 55 priced/60 missing, Amanah 80/70, GA 182/51; currency correctly UNSTATED (corpus never prints ISO, §2.5e)
+
+### 4.3 API + UI — DONE ✅
+- [x] `contractImport` tRPC router: preview / create / list / get / submitReviewAnswers / commit
+- [x] `/(admin)/contracts/import` paste page + `/(admin)/contracts/import/[id]` review page (entities, blocking/confirm ambiguities, candidate table with rate-missing highlight + confidence, commit-to-draft form); "Import" button on contracts list
+
+### 4.4 Tests — DONE ✅
+- [x] `tests/services/contract-extraction.test.ts` — 7 tests: readable amounts correct, unreadable flagged with null amount + provenance (zero-hallucination), conflicting dates block (O3), review-based (O4), rate-missing blocking, no fabricated amounts, determinism. Full suite 218/218.
+
+### Phase 4 remaining (optional enhancement)
+- [ ] LLM-assisted clause tagging (§12.3) for narrative pre-auth/exclusion/package clauses — current extractor is rule-based (tariff tables + dates + entities). Rule-based is the zero-hallucination baseline; LLM step would add clause structuring behind the same human-confirm gate.
+- [ ] Candidate keep/drop checkboxes in the review UI (commit currently imports all candidates; `commit` service already supports `keepCandidateIndexes`)
 
 ---
 

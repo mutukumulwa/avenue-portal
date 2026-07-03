@@ -104,6 +104,7 @@ model Tenant {
   documentationRules             DocumentationRule[]
   externalTariffTables           ExternalTariffTable[]
   overrideControls               OverrideControl[]
+  contractExtractions            ContractExtraction[]
 }
 
 // ── Multi-client TPA tenancy (Medvex spec §2.1 / gap G2.1) ──────────────
@@ -3127,6 +3128,46 @@ model ProviderContractExclusion {
   @@index([contractId])
   @@index([contractId, cptCode])
   @@index([contractId, level])
+}
+
+// ─── CONTRACT EXTRACTION (spec §12, Phase 4) ─────────────────────────────────
+// A run of the markdown/PDF extraction pipeline over a source document. The
+// extractor is assistive and NEVER activates anything: candidates carry
+// provenance + confidence and require human confirmation. Zero-hallucination —
+// no amount enters a field without a source-cell provenance record.
+enum ExtractionStatus {
+  UPLOADED
+  PARSED // candidates produced, awaiting review
+  REVIEWED // human confirmed/answered ambiguities
+  COMMITTED // written to a DRAFT contract
+  FAILED
+}
+
+model ContractExtraction {
+  id               String           @id @default(cuid())
+  tenantId         String
+  tenant           Tenant           @relation(fields: [tenantId], references: [id])
+  contractId       String? // set when committed to a draft contract
+  sourceDocumentId String? // ContractSourceDocument
+  fileName         String?
+  status           ExtractionStatus @default(UPLOADED)
+  extractorVersion String           @default("rule-based-v1")
+
+  // Extracted entities: { effectiveDateCandidates[], reviewBased, externalRefs[], providerNames[], currencyStated, taxStated }
+  entities         Json?
+  // Array of { description, category, canonicalCategory, amount|null, rateMissing, sourceRef{page,rawText}, confidence }
+  tariffCandidates Json             @default("[]")
+  // Array of { type, message, candidates[] } — each a mandatory review question (§12.7)
+  ambiguities      Json             @default("[]")
+  reviewAnswers    Json? // human answers keyed by ambiguity/field
+  stats            Json? // { rowsDetected, rowsWithRate, rowsMissingRate }
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([contractId])
 }
 
 // ─── DIGITAL CONTRACT RULE ENGINE — PHASE 3 MODELS ───────────────────────────

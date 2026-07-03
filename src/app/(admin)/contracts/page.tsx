@@ -1,7 +1,7 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { FileSignature, Plus, AlertTriangle } from "lucide-react";
+import { FileSignature, Plus, AlertTriangle, FileUp } from "lucide-react";
 import type { Prisma, ProviderContractStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -72,12 +72,20 @@ export default async function ContractsListPage({
             <p className="text-sm text-[#6C757D]">Digital rate agreements — capture, approve, activate, version.</p>
           </div>
         </div>
-        <Link
-          href="/contracts/new"
-          className="inline-flex items-center gap-2 rounded-lg bg-[#06B9AB] px-4 py-2 text-sm font-medium text-white hover:bg-[#05a598]"
-        >
-          <Plus className="w-4 h-4" /> New Contract
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/contracts/import"
+            className="inline-flex items-center gap-2 rounded-lg border border-[#06B9AB] px-4 py-2 text-sm font-medium text-[#06B9AB] hover:bg-[#06B9AB]/5"
+          >
+            <FileUp className="w-4 h-4" /> Import
+          </Link>
+          <Link
+            href="/contracts/new"
+            className="inline-flex items-center gap-2 rounded-lg bg-[#06B9AB] px-4 py-2 text-sm font-medium text-white hover:bg-[#05a598]"
+          >
+            <Plus className="w-4 h-4" /> New Contract
+          </Link>
+        </div>
       </div>
 
       {/* Filters */}
