@@ -179,13 +179,18 @@ export class ContractEngine {
     let avgCostPoolTag: string | null = null;
     let lineResults: EngineLineResult[];
 
-    // Contract-level pricing model (spec §5.7): a PER_VISIT_CASE_RATE or
-    // AVERAGE_COST_POOL rule changes how the whole claim prices.
+    // Contract-level pricing model (spec §5.7): a PER_VISIT_CASE_RATE,
+    // AVERAGE_COST_POOL or CAPITATION rule changes how the whole claim prices.
     const caseRateRule = pricingRules.find(r => r.scope === "CONTRACT" && r.ruleKind === "PER_VISIT_CASE_RATE");
     const avgPoolRule = pricingRules.find(r => r.scope === "CONTRACT" && r.ruleKind === "AVERAGE_COST_POOL");
+    const capitationRule = pricingRules.find(r => r.scope === "CONTRACT" && r.ruleKind === "CAPITATION");
 
     if (caseRateRule) {
       lineResults = this.applyCaseRate(ctx, contract, tariffs, memoryByText, caseRateRule, externalTariffMap);
+    } else if (capitationRule) {
+      const r = this.applyCapitation(ctx, capitationRule);
+      lineResults = r.lines;
+      avgCostPoolTag = r.poolTag;
     } else if (avgPoolRule) {
       const r = this.applyAverageCostPool(ctx, avgPoolRule);
       lineResults = r.lines;
@@ -857,6 +862,23 @@ export class ContractEngine {
       disallowedAmount: 0, memberLiability: 0, payerLiability: round2(l.billedAmount), providerWriteOff: 0,
       quantityApproved: null,
       trace: [{ stage: "PRICING", outcome: "AVERAGE_COST_POOL", detail: poolTag }],
+    }));
+    return { lines, poolTag };
+  }
+
+  // ── Stage 8: CAPITATION (spec §5.7 P — Jubilee capitation) ──
+  // Capitation is prepaid per-member-per-period. The encounter is recorded at
+  // ZERO claim payable and the claim is tagged to a capitation pool; the pool is
+  // settled separately (Phase 5). Lines are informational.
+  private static applyCapitation(ctx: EngineClaimContext, rule: { params: unknown }): { lines: EngineLineResult[]; poolTag: string } {
+    const params = (rule.params ?? {}) as { poolId?: string };
+    const poolTag = params.poolId ?? "CAPITATION_POOL";
+    const lines = ctx.lines.map(l => ({
+      lineId: l.id, decision: "AUTO_APPROVED" as const, matchedRuleType: "CAPITATION", matchedRuleId: null,
+      matchMethod: "CAPITATION", payableSource: "Capitation — prepaid; encounter recorded at 0", reasonCode: "PRC-005",
+      contractedAmount: 0, payableAmount: 0, shortfallAmount: 0, disallowedAmount: 0, memberLiability: 0,
+      payerLiability: 0, providerWriteOff: 0, quantityApproved: null,
+      trace: [{ stage: "PRICING", outcome: "CAPITATION", detail: poolTag }],
     }));
     return { lines, poolTag };
   }

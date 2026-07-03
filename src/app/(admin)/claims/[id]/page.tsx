@@ -188,7 +188,7 @@ export default async function ClaimDetailPage({
           <div>
             <p className="text-brand-text-heading">
               Adjudicating under{" "}
-              <Link href={`/providers/${claim.providerId}/contracts/${governingContract.id}`} className="font-bold text-brand-indigo hover:underline">
+              <Link href={`/contracts/${governingContract.id}`} className="font-bold text-brand-indigo hover:underline">
                 {governingContract.contractNumber}
               </Link>{" "}
               — {governingContract.title}

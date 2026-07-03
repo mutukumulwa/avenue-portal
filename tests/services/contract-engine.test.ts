@@ -276,6 +276,21 @@ describe("ContractEngine — Phase 3 stages 5-8 (spec §10.3 examples 2-9)", () 
     expect(result.claimDecision).toBe("UNDER_REVIEW");
   });
 
+  it("CAPITATION — encounter recorded at 0 payable, claim tagged to capitation pool", async () => {
+    db.providerTariff.findMany.mockResolvedValue([]);
+    db.pricingRule.findMany.mockResolvedValue([
+      { id: "r1", scope: "CONTRACT", ruleKind: "CAPITATION", isActive: true, params: { poolId: "JUBILEE-CAP" } },
+    ]);
+    const result = await ContractEngine.evaluateClaim(
+      ctx([{ id: "L1", cptCode: null, description: "OP visit", quantity: 1, unitCost: 3600, billedAmount: 3600 }]),
+    );
+    expect(result.avgCostPoolTag).toBe("JUBILEE-CAP");
+    expect(result.lines[0].matchedRuleType).toBe("CAPITATION");
+    expect(result.lines[0].payableAmount).toBe(0);
+    expect(result.totals.payable).toBe(0);
+    expect(result.claimDecision).toBe("AUTO_APPROVED");
+  });
+
   it("Example 9: AVERAGE_COST_POOL — line pays billed, no shortfall, claim tagged to pool", async () => {
     db.providerTariff.findMany.mockResolvedValue([]);
     db.pricingRule.findMany.mockResolvedValue([

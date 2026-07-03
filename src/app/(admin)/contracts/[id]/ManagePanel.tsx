@@ -58,8 +58,13 @@ export async function ManagePanel({
             <input name="serviceName" placeholder="Service name" required className={inp} />
             <input name="cptCode" placeholder="Code" className={`${inp} w-20`} />
             <input name="agreedRate" type="number" step="0.01" placeholder="Rate" className={`${inp} w-24`} />
-            <select name="rateType" className={inp} defaultValue="FIXED">
-              {["FIXED", "PER_DIEM", "DISCOUNT_OFF_BILLED", "MARKUP_OVER_COST", "NET_OF_EXTERNAL", "EXTERNAL_TARIFF_REF"].map(x => <option key={x}>{x}</option>)}
+            <select name="rateType" className={inp} defaultValue="FIXED" title="How this line is priced">
+              <option value="FIXED">Fee-for-service (fixed)</option>
+              <option value="PER_DIEM">Per diem</option>
+              <option value="DISCOUNT_OFF_BILLED">Discount off billed</option>
+              <option value="MARKUP_OVER_COST">Markup over cost</option>
+              <option value="NET_OF_EXTERNAL">Net of external scheme</option>
+              <option value="EXTERNAL_TARIFF_REF">External tariff reference</option>
             </select>
             <select name="unitOfMeasure" className={inp} defaultValue="PER_ITEM">
               {["PER_ITEM", "PER_DAY", "PER_VISIT", "PER_HOUR", "PER_SESSION", "PER_EPISODE"].map(x => <option key={x}>{x}</option>)}
@@ -138,8 +143,13 @@ export async function ManagePanel({
         {editable && (
           <form action={addPricingRuleAction} className="flex flex-wrap items-end gap-2">
             {hiddenId}
-            <select name="ruleKind" className={inp} defaultValue="PER_VISIT_CASE_RATE">
-              {["PER_VISIT_CASE_RATE", "AVERAGE_COST_POOL", "DISCOUNT_OFF_BILLED", "PER_DIEM", "PACKAGE"].map(x => <option key={x}>{x}</option>)}
+            <select name="ruleKind" className={inp} defaultValue="PER_VISIT_CASE_RATE" title="Whole-contract pricing model">
+              <option value="PER_VISIT_CASE_RATE">Case rate (fixed per visit)</option>
+              <option value="CAPITATION">Capitation (prepaid, 0 per encounter)</option>
+              <option value="AVERAGE_COST_POOL">Average-cost pool (reconciled)</option>
+              <option value="DISCOUNT_OFF_BILLED">Discount off billed</option>
+              <option value="PER_DIEM">Per diem</option>
+              <option value="PACKAGE">Package</option>
             </select>
             <input name="rate" type="number" step="0.01" placeholder="rate" className={`${inp} w-24`} />
             <input name="pct" type="number" step="0.01" placeholder="pct" className={`${inp} w-16`} />
