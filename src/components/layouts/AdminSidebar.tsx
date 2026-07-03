@@ -10,9 +10,10 @@ import {
   ShieldAlert, MessageSquareWarning, Wallet, Fingerprint,
   BarChart3, TriangleAlert, Landmark, ClipboardCheck, CloudOff,
   ShieldCheck, Lock, FileSignature, Globe2, HeartPulse, KeyRound,
+  UserPlus, Scale, Banknote,
 } from "lucide-react";
 import { PortalSwitcher } from "./PortalSwitcher";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { UserRole } from "@prisma/client";
 
 type SubItem = { label: string; href: string };
@@ -39,6 +40,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Clients",      href: "/clients",      icon: Landmark,         roles: ADMIN_ONLY   },
       { label: "Groups",       href: "/groups",       icon: Building2,        roles: OPS          },
       { label: "Members",      href: "/members",      icon: Users,            roles: OPS          },
+      { label: "Onboarding Queue", href: "/onboarding-queue", icon: UserPlus,     roles: OPS          },
       { label: "Endorsements", href: "/endorsements", icon: FileText,         roles: OPS          },
       { label: "Packages",     href: "/packages",     icon: BriefcaseMedical, roles: UNDERWRITING },
     ],
@@ -61,6 +63,8 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Offline Capture",    href: "/offline-capture",    icon: CloudOff,       roles: OPS        },
       { label: "Offline Work Codes", href: "/offline-auth",       icon: KeyRound,       roles: OPS        },
       { label: "Approvals",          href: "/approvals",          icon: ClipboardCheck, roles: OPS        },
+      { label: "Assessor Queue",     href: "/assessor-queue",     icon: Scale,          roles: UNDERWRITING },
+      { label: "Override Queue",     href: "/overrides",          icon: TriangleAlert,  roles: OPS        },
       { label: "Cross-Border Care",  href: "/cross-border",       icon: Globe2,         roles: OPS        },
       { label: "Wellness",           href: "/wellness",           icon: HeartPulse,     roles: OPS        },
       { label: "Exceptions",         href: "/settings/exceptions",icon: TriangleAlert,  roles: OPS        },
@@ -79,6 +83,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Self-Funded Schemes", href: "/fund/dashboard",    icon: Wallet,     roles: FUND_PORTAL  },
       { label: "Brokers",             href: "/brokers",           icon: UserCheck,  roles: ADMIN_ONLY   },
       { label: "Quotations",          href: "/quotations",        icon: Calculator, roles: UNDERWRITING },
+      { label: "Provider Settlements", href: "/settlement",       icon: Banknote,   roles: FINANCE      },
     ],
   },
   {
@@ -131,11 +136,45 @@ const SETUP_SUB: SubItem[] = [
   { label: "Audit Log",         href: "/settings/audit-log"          },
 ];
 
-function SubItems({ items, pathname }: { items: SubItem[]; pathname: string }) {
+// ── Active-route resolution ──────────────────────────────────────────────────
+// The sidebar highlights by GLOBAL best match: among every item, child, and
+// setup href, the longest one that prefix-matches the pathname wins. This keeps
+// exactly one entry lit (detail pages included: /claims/123 → "All Claims",
+// /claims/queues → "Claims Queues") and lets a parent like Case Management own
+// children on foreign prefixes (/claims, /preauth, /lou) without collapsing.
+
+function hrefMatches(href: string, pathname: string): boolean {
+  return pathname === href || pathname.startsWith(href + "/");
+}
+
+function resolveBestMatch(pathname: string): string | null {
+  const candidates: string[] = [];
+  for (const group of NAV_GROUPS) {
+    for (const item of group.items) {
+      candidates.push(item.href);
+      for (const child of item.children ?? []) candidates.push(child.href);
+    }
+  }
+  for (const sub of SETUP_SUB) candidates.push(sub.href);
+  let best: string | null = null;
+  for (const href of candidates) {
+    if (hrefMatches(href, pathname) && (best === null || href.length > best.length)) {
+      best = href;
+    }
+  }
+  return best;
+}
+
+function itemIsActive(item: NavItem, bestMatch: string | null): boolean {
+  if (!bestMatch) return false;
+  return item.href === bestMatch || (item.children ?? []).some(c => c.href === bestMatch);
+}
+
+function SubItems({ items, bestMatch }: { items: SubItem[]; bestMatch: string | null }) {
   return (
     <ul className="ml-6 mt-0.5 mb-1 space-y-0.5 border-l border-[#EEEEEE] pl-3">
       {items.map(item => {
-        const active = pathname === item.href;
+        const active = item.href === bestMatch;
         return (
           <li key={item.href}>
             <Link
@@ -155,9 +194,9 @@ function SubItems({ items, pathname }: { items: SubItem[]; pathname: string }) {
   );
 }
 
-function NavItemRow({ item, pathname }: { item: NavItem; pathname: string }) {
+function NavItemRow({ item, bestMatch }: { item: NavItem; bestMatch: string | null }) {
   const Icon = item.icon;
-  const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+  const isActive = itemIsActive(item, bestMatch);
   const hasChildren = !!item.children?.length;
 
   return (
@@ -178,17 +217,22 @@ function NavItemRow({ item, pathname }: { item: NavItem; pathname: string }) {
         </Link>
       </li>
       {hasChildren && isActive && (
-        <SubItems items={item.children!} pathname={pathname} />
+        <SubItems items={item.children!} bestMatch={bestMatch} />
       )}
     </>
   );
 }
 
-function NavGroupSection({ group, pathname }: { group: NavGroup; pathname: string }) {
-  const isAnyActive = group.items.some(
-    item => pathname === item.href || pathname.startsWith(item.href + "/")
-  );
+function NavGroupSection({ group, bestMatch }: { group: NavGroup; bestMatch: string | null }) {
+  const isAnyActive = group.items.some(item => itemIsActive(item, bestMatch));
   const [open, setOpen] = useState(isAnyActive || group.label === "Overview");
+
+  // Navigating into a section always reveals it — a page must never render
+  // with its own sidebar hierarchy collapsed. Manual toggles stay respected
+  // otherwise (we only ever auto-open, never auto-close).
+  useEffect(() => {
+    if (isAnyActive) setOpen(true);
+  }, [isAnyActive]);
 
   return (
     <div>
@@ -204,7 +248,7 @@ function NavGroupSection({ group, pathname }: { group: NavGroup; pathname: strin
       {open && (
         <ul className="space-y-0.5 mb-2">
           {group.items.map(item => (
-            <NavItemRow key={item.href} item={item} pathname={pathname} />
+            <NavItemRow key={item.href} item={item} bestMatch={bestMatch} />
           ))}
         </ul>
       )}
@@ -214,8 +258,10 @@ function NavGroupSection({ group, pathname }: { group: NavGroup; pathname: strin
 
 export function AdminSidebar({ userRole }: { userRole: UserRole | null }) {
   const pathname = usePathname();
-  const SETUP_ROUTES = ["/settings", "/settings/approval-matrix", "/settings/terminology", "/settings/fx-rates", "/settings/security", "/settings/pricing-models", "/settings/audit-log"];
-  const setupActive = SETUP_ROUTES.some(r => pathname === r || pathname.startsWith(r + "/"));
+  const bestMatch = resolveBestMatch(pathname);
+  // Setup lights up only when the best match is one of ITS sub-routes — so
+  // /settings/exceptions (a Clinical entry) no longer double-highlights here.
+  const setupActive = bestMatch !== null && SETUP_SUB.some(s => s.href === bestMatch);
 
   const visibleGroups = NAV_GROUPS
     .map(group => ({
@@ -246,7 +292,7 @@ export function AdminSidebar({ userRole }: { userRole: UserRole | null }) {
         {/* Nav groups */}
         <nav className="flex-1 space-y-1">
           {visibleGroups.map(group => (
-            <NavGroupSection key={group.label} group={group} pathname={pathname} />
+            <NavGroupSection key={group.label} group={group} bestMatch={bestMatch} />
           ))}
         </nav>
 
@@ -266,7 +312,7 @@ export function AdminSidebar({ userRole }: { userRole: UserRole | null }) {
                 <span className="ml-2.5 text-sm font-semibold">Setup</span>
               </Link>
               {setupActive && (
-                <SubItems items={SETUP_SUB} pathname={pathname} />
+                <SubItems items={SETUP_SUB} bestMatch={bestMatch} />
               )}
             </>
           )}
