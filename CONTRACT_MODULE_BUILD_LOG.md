@@ -12,19 +12,19 @@ checklists, and continues without re-deriving context.
 
 ## RESUME POINTER (update this every time you stop)
 
-- **Current phase:** All 5 phases core-complete + adjudication wiring. Remaining = optional polish.
-- **Next action (pick up here), any order — all optional polish:**
-  1. Manual-queue UI (§8.5 — `Claim.assignedQueue` persisted; dashboard shows queueLoad; a dedicated triage UI would extend `/(admin)/claims/queues`).
-  2. Rule-builder visual IF/THEN UI (§11.5 — `contractRules.*` CRUD + `contractEngine.evaluateLine` sandbox already exist as the backend).
-  3. NET_OF_EXTERNAL / EXTERNAL_TARIFF_REF pricing from `ExternalTariffTable` (engine routes these to MAN-001 today); DocumentationRule stage-7 (`applyDocumentation`, DOC-001/002).
-  4. Wire OverrideControl into `override.service` (maxFinancialImpact block, dual-approval threshold); ServiceCategory seed from Masters; contract-detail Tariffs/Applicability/Branch widgets; BullMQ lifecycle jobs (auto-activate/expire, NO_CONTRACT re-sweep); intake pre-check into `intake.service.ts`.
-  5. Phase-5 extras: provider dispute analytics (dataset 9), capitation pool settlement, early-settlement discount capture (13), override-pattern→amendment auto-suggestions, LLM-assisted clause tagging (§12.3).
+- **Current phase:** All 5 phases + adjudication wiring + polish batches A–D COMPLETE.
+- **Next action (pick up here) — only genuinely-large/optional features remain:**
+  1. Capitation pool settlement (per-member-per-period pool ledger + settlement) — needs a pool-ledger model + finance flow.
+  2. LLM-assisted clause tagging (§12.3) for narrative pre-auth/exclusion/package clauses — the rule-based extractor is the zero-hallucination baseline; an LLM step would sit behind the same human-confirm gate.
+  3. Provider dispute analytics (dataset 9) + renegotiation insight packs — needs a provider-portal dispute-filing surface first.
+  4. Full early-settlement discount capture (dataset 13) — needs settlement paidAt data wired.
 - **Engine gate flag:** contract-engine auto-adjudication gates are OFF by default. Set env `CONTRACT_ENGINE_GATES=1` to enable CONTRACT_MATCH / PRICING_COMPLETE routing. Provenance persistence runs regardless (always on).
 - **Blocked on:** nothing.
-- **Last verified green:** 2026-07-03 — Phase-5 schema applied via `prisma db push`;
-  `npm run typecheck` clean; production source `eslint` clean; **`vitest` 228/228 service
-  tests pass** (incl. `contract-analytics.test.ts` 7). `/contracts/analytics` compiles
-  (307 auth-gate, no errors). Test files use `any` in prisma mocks per existing repo convention.
+- **Last verified green:** 2026-07-03 — polish batches applied via `prisma db push`;
+  `npm run typecheck` clean; production source `eslint` clean; **`vitest` 240/240 service
+  tests pass**. All `/contracts*` routes compile (307 auth-gate, no errors). Reason-codes (40)
+  + override-controls (16) + service-categories (23) seeded. Test files use `any` in prisma
+  mocks per existing repo convention.
 - **Verification note:** Browser pixel-render still blocked by the preview harness not
   persisting the next-auth session cookie (callback 200 → bounces to /login). Engine
   correctness is instead proven by the vitest suite. To eyeball UI, log in via a real
@@ -78,7 +78,13 @@ checklists, and continues without re-deriving context.
 | 2 | Tariff-based claims automation | ENGINE CORE DONE (schema+engine+reason-codes+claims panel+tests); adjudication-persist wiring + queues UI remain |
 | 3 | Rule engine (full) | ENGINE + DATA MODEL DONE (stages 5-8, packages/case-rate/avg-pool/exclusions/preauth/submission, V12, rule CRUD, override controls, tests); rule-builder UI remains |
 | 4 | Markdown extraction & assisted creation | DONE (zero-hallucination extractor, import pipeline, review UI, tests); LLM-assisted clause tagging optional enhancement |
-| 5 | Advanced automation & optimisation | CORE DONE (§15 analytics datasets, avg-cost reconciliation w/ finance maker-checker, amendment backlog, dashboard, tests); dispute analytics + capitation settlement remain |
+| 5 | Advanced automation & optimisation | DONE (§15 datasets 1,3,4,5,6,8,11,12,14 + queue load, avg-cost reconciliation w/ finance maker-checker, dashboard, tests); capitation settlement + LLM tagging + dispute analytics are large optional features |
+
+### Polish batches (post-Phase-5) — ALL DONE ✅
+- **A** (`fde3b37`): EXTERNAL_TARIFF_REF pricing from ExternalTariffTable (unresolved→PRC-002), NET_OF_EXTERNAL net-pay + rebate record, DocumentationRule stage-7 (DOC-001/002), OverrideControl enforcement in override.service (allow/justification/max-impact/dual-approval). +10 tests.
+- **B** (`8bddb9f`): contract-lifecycle BullMQ job (auto-activate/expire/NO_CONTRACT re-sweep) wired to system queue + worker; canonical ServiceCategory taxonomy seed (23). +2 tests.
+- **C** (`7359140`): contract-detail ManagePanel (tariff grid+add, applicability, LISTED branches, exclusions, pricing-rule builder); `/contracts/queues` review-triage UI (§8.5).
+- **D**: analytics datasets 4 (overrides) + 8 (provider leakage/unlisted spend) + dashboard cards.
 
 ---
 

@@ -23,7 +23,7 @@ export default async function ContractAnalyticsPage() {
   const session = await requireRole(ROLES.UNDERWRITING);
   const tenantId = session.user.tenantId;
 
-  const [claimsByContract, shortPaid, backlog, expiring, rateVariance, turnaround, queueLoad, reconciliations] = await Promise.all([
+  const [claimsByContract, shortPaid, backlog, expiring, rateVariance, turnaround, queueLoad, overrides, leakage, reconciliations] = await Promise.all([
     ContractAnalyticsService.claimsByContract(tenantId),
     ContractAnalyticsService.shortPaidSummary(tenantId),
     ContractAnalyticsService.amendmentBacklog(tenantId),
@@ -31,6 +31,8 @@ export default async function ContractAnalyticsPage() {
     ContractAnalyticsService.rateVariance(tenantId),
     ContractAnalyticsService.turnaround(tenantId),
     ContractAnalyticsService.queueLoad(tenantId),
+    ContractAnalyticsService.overridesSummary(tenantId),
+    ContractAnalyticsService.providerLeakage(tenantId),
     ContractReconciliationService.list(tenantId),
   ]);
 
@@ -148,6 +150,28 @@ export default async function ContractAnalyticsPage() {
               ))}
             </ul>
           )}
+        </Card>
+
+        <Card title="Overrides by type (dataset 4)">
+          {overrides.length === 0 ? (
+            <p className="text-xs text-[#6C757D]">No overrides recorded.</p>
+          ) : (
+            <table className="w-full text-xs">
+              <thead className="text-left text-[#6C757D]"><tr><th className="py-1">Type</th><th className="py-1 text-right">Total</th><th className="py-1 text-right">Approved</th><th className="py-1 text-right">Pending</th></tr></thead>
+              <tbody className="divide-y divide-gray-100">
+                {overrides.slice(0, 10).map((o, i) => (
+                  <tr key={i}><td className="py-1">{o.type.replace(/_/g, " ")}</td><td className="py-1 text-right">{o.total}</td><td className="py-1 text-right text-[#28A745]">{o.approved}</td><td className="py-1 text-right text-[#856404]">{o.pending}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Card>
+
+        <Card title="Provider leakage — unlisted spend (dataset 8)">
+          <div className="text-sm">
+            <div className="text-2xl font-semibold text-[#DC3545]">{money(leakage.unlistedSpend)}</div>
+            <div className="text-xs text-[#6C757D]">{leakage.lines} line(s) paid as billed with no contracted ceiling</div>
+          </div>
         </Card>
 
         <Card title="Average-cost reconciliations (dataset 12)">

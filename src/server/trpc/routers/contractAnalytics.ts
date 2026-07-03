@@ -6,7 +6,7 @@ import { ContractReconciliationService } from "@/server/services/contract-reconc
 // Contract analytics + average-cost reconciliation (spec §15, Phase 5).
 export const contractAnalyticsRouter = createTRPCRouter({
   overview: protectedProcedure.query(async ({ ctx }) => {
-    const [claimsByContract, shortPaid, backlog, expiring, rateVariance, turnaround, queueLoad] = await Promise.all([
+    const [claimsByContract, shortPaid, backlog, expiring, rateVariance, turnaround, queueLoad, overrides, leakage] = await Promise.all([
       ContractAnalyticsService.claimsByContract(ctx.tenantId),
       ContractAnalyticsService.shortPaidSummary(ctx.tenantId),
       ContractAnalyticsService.amendmentBacklog(ctx.tenantId),
@@ -14,8 +14,10 @@ export const contractAnalyticsRouter = createTRPCRouter({
       ContractAnalyticsService.rateVariance(ctx.tenantId),
       ContractAnalyticsService.turnaround(ctx.tenantId),
       ContractAnalyticsService.queueLoad(ctx.tenantId),
+      ContractAnalyticsService.overridesSummary(ctx.tenantId),
+      ContractAnalyticsService.providerLeakage(ctx.tenantId),
     ]);
-    return { claimsByContract, shortPaid, backlog, expiring, rateVariance, turnaround, queueLoad };
+    return { claimsByContract, shortPaid, backlog, expiring, rateVariance, turnaround, queueLoad, overrides, leakage };
   }),
 
   reconciliations: protectedProcedure.query(async ({ ctx }) => ContractReconciliationService.list(ctx.tenantId)),

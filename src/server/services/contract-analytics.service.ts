@@ -135,6 +135,34 @@ export class ContractAnalyticsService {
     };
   }
 
+  /** Dataset 4 — overrides by type + status (feeds the override-patterns view). */
+  static async overridesSummary(tenantId: string) {
+    const grouped = await prisma.overrideRecord.groupBy({
+      by: ["overrideType", "status"],
+      where: { tenantId },
+      _count: { _all: true },
+    });
+    const byType = new Map<string, { type: string; total: number; approved: number; pending: number }>();
+    for (const g of grouped) {
+      const row = byType.get(g.overrideType) ?? { type: g.overrideType, total: 0, approved: 0, pending: 0 };
+      row.total += g._count._all;
+      if (g.status === "APPROVED") row.approved += g._count._all;
+      if (g.status === "PENDING") row.pending += g._count._all;
+      byType.set(g.overrideType, row);
+    }
+    return [...byType.values()].sort((a, b) => b.total - a.total);
+  }
+
+  /** Dataset 8 — provider leakage: unlisted pay-as-billed spend (no contracted ceiling). */
+  static async providerLeakage(tenantId: string) {
+    const agg = await prisma.claimLine.aggregate({
+      where: { matchedRuleType: "UNLISTED_PAY_AS_BILLED", claim: { tenantId } },
+      _count: { _all: true },
+      _sum: { payerLiability: true },
+    });
+    return { lines: agg._count._all, unlistedSpend: Number(agg._sum.payerLiability ?? 0) };
+  }
+
   /** Queue load (§8.5) — claims per assigned digital-contract queue. */
   static async queueLoad(tenantId: string) {
     const grouped = await prisma.claim.groupBy({
