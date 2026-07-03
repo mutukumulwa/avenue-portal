@@ -163,12 +163,17 @@ export class ContractEngine {
 
     // Load Phase-3 rule sets effective on the pricing date.
     const dateWindow = { effectiveFrom: { lte: pricingDate }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: pricingDate } }] };
-    const [packages, pricingRules, exclusions, preauthRules] = await Promise.all([
+    const [packages, pricingRules, exclusions, preauthRules, documentationRules, externalTariffs] = await Promise.all([
       prisma.contractPackage.findMany({ where: { contractId: contract.id, isActive: true, ...dateWindow }, include: { components: true } }),
       prisma.pricingRule.findMany({ where: { contractId: contract.id, isActive: true, ...dateWindow } }),
       prisma.providerContractExclusion.findMany({ where: { contractId: contract.id } }),
       prisma.preauthRule.findMany({ where: { contractId: contract.id, isActive: true, ...dateWindow } }),
+      prisma.documentationRule.findMany({ where: { contractId: contract.id, isActive: true, ...dateWindow } }),
+      prisma.externalTariffTable.findMany({ where: { tenantId: ctx.tenantId, isActive: true, ...dateWindow } }),
     ]);
+    // External-scheme rate lookup for NET_OF_EXTERNAL / EXTERNAL_TARIFF_REF (§5.7).
+    const externalTariffMap = new Map<string, number>();
+    for (const e of externalTariffs) externalTariffMap.set(`${e.scheme}|${e.code}`, Number(e.rate));
 
     const inputById = new Map(ctx.lines.map(l => [l.id, l]));
     let avgCostPoolTag: string | null = null;
@@ -180,13 +185,13 @@ export class ContractEngine {
     const avgPoolRule = pricingRules.find(r => r.scope === "CONTRACT" && r.ruleKind === "AVERAGE_COST_POOL");
 
     if (caseRateRule) {
-      lineResults = this.applyCaseRate(ctx, contract, tariffs, memoryByText, caseRateRule);
+      lineResults = this.applyCaseRate(ctx, contract, tariffs, memoryByText, caseRateRule, externalTariffMap);
     } else if (avgPoolRule) {
       const r = this.applyAverageCostPool(ctx, avgPoolRule);
       lineResults = r.lines;
       avgCostPoolTag = r.poolTag;
     } else {
-      lineResults = ctx.lines.map(line => this.evaluateLine(line, contract, tariffs, memoryByText, ctx));
+      lineResults = ctx.lines.map(line => this.evaluateLine(line, contract, tariffs, memoryByText, ctx, externalTariffMap));
       // ── Stage 5: coverage & exclusions (runs after pricing for dispute value) ──
       for (const lr of lineResults) {
         const input = inputById.get(lr.lineId);
@@ -202,9 +207,13 @@ export class ContractEngine {
       if (input) this.applyPreauth(lr, input, ctx, preauthRules);
     }
 
+    // ── Stage 7: documentation (claim-level, §6.7) ──
+    const docResult = this.checkDocumentation(ctx, documentationRules);
+
     // ── Stage 8: submission-window check (claim-level, §8.4) ──
     const submissionLate = this.checkSubmissionWindow(contract, ctx);
     if (submissionLate) trace.push({ stage: "DECISION", outcome: "LATE_SUBMISSION", reasonCode: "SUB-001" });
+    if (docResult.reasonCode) trace.push({ stage: "DOCUMENTATION", outcome: docResult.missing.join(","), reasonCode: docResult.reasonCode });
 
     // ── Stage 9: decision synthesis ──
     const totals = lineResults.reduce(
@@ -221,18 +230,28 @@ export class ContractEngine {
       { billed: 0, contracted: 0, payable: 0, shortfall: 0, disallowed: 0, memberLiability: 0, providerWriteOff: 0 },
     );
 
-    const anyPend = lineResults.some(l => l.decision === "PENDED") || submissionLate;
+    // A missing mandatory document with consequence REJECT declines the claim;
+    // ROUTE / PEND_PROVIDER routes it (§6.7).
+    const docRejects = docResult.reasonCode === "DOC-001";
+    const docRoutes = docResult.reasonCode === "DOC-002";
+    const anyPend = lineResults.some(l => l.decision === "PENDED") || submissionLate || docRoutes;
     const allDeclined = lineResults.length > 0 && lineResults.every(l => l.decision === "DECLINED");
     const anyAdjustOrDecline = lineResults.some(l => l.decision === "APPROVED_WITH_ADJUSTMENT" || l.decision === "DECLINED");
 
     let claimDecision: EngineClaimResult["claimDecision"];
     let assignedQueue: string | null = null;
     let claimReason: string | null = null;
-    if (anyPend) {
+    if (docRejects && !lineResults.some(l => l.decision === "PENDED")) {
+      claimDecision = "DECLINED";
+      claimReason = "DOC-001";
+    } else if (anyPend) {
       claimDecision = "UNDER_REVIEW";
       const firstPend = lineResults.find(l => l.decision === "PENDED");
       if (firstPend?.reasonCode) {
         assignedQueue = this.queueForReason(firstPend.reasonCode);
+      } else if (docRoutes) {
+        assignedQueue = "MISSING_DOCS";
+        claimReason = "DOC-002";
       } else if (submissionLate) {
         assignedQueue = "MISSING_DOCS";
         claimReason = "SUB-001";
@@ -277,6 +296,7 @@ export class ContractEngine {
     tariffs: ProviderTariff[],
     memoryByText: Map<string, string>,
     ctx: EngineClaimContext,
+    externalTariffs: Map<string, number> = new Map(),
   ): EngineLineResult {
     const trace: TraceStep[] = [];
     const base: EngineLineResult = {
@@ -351,7 +371,7 @@ export class ContractEngine {
 
     if (tariff) {
       trace.push({ stage: "MAPPING", outcome: "MAPPED", ruleRef: tariff.id, detail: `${method}: ${tariff.serviceName}` });
-      return this.priceMapped(line, contract, tariff, method, base, trace, ctx.lengthOfStay ?? null);
+      return this.priceMapped(line, contract, tariff, method, base, trace, ctx.lengthOfStay ?? null, externalTariffs);
     }
 
     // 4. Unlisted-service rule (§6.3.5).
@@ -368,6 +388,7 @@ export class ContractEngine {
     base: EngineLineResult,
     trace: TraceStep[],
     lengthOfStay: number | null,
+    externalTariffs: Map<string, number> = new Map(),
   ): EngineLineResult {
     base.matchedRuleId = tariff.id;
     base.matchMethod = method;
@@ -383,11 +404,39 @@ export class ContractEngine {
       return base;
     }
 
-    const rate = Number(tariff.agreedRate);
+    let rate = Number(tariff.agreedRate);
     const qty = Math.max(1, line.quantity);
 
-    // Rate types deferred to Phase 3 route to manual with a trace note.
-    if (["EXTERNAL_TARIFF_REF", "NET_OF_EXTERNAL", "CAPITATION", "AVERAGE_COST_POOL"].includes(tariff.rateType)) {
+    // EXTERNAL_TARIFF_REF (§5.7 P11, E9): resolve the rate from the external
+    // scheme tariff table; unresolved → manual (RATE-EXT), never approximate.
+    if (tariff.rateType === "EXTERNAL_TARIFF_REF") {
+      const scheme = tariff.externalScheme;
+      const code = tariff.cptCode ?? tariff.providerServiceCode ?? null;
+      const resolved = scheme && code ? externalTariffs.get(`${scheme}|${code}`) : undefined;
+      if (resolved == null) {
+        trace.push({ stage: "PRICING", outcome: "EXTERNAL_TARIFF_UNRESOLVED", reasonCode: "PRC-002", ruleRef: tariff.id, detail: `${scheme ?? "?"}|${code ?? "?"}` });
+        base.decision = "PENDED";
+        base.reasonCode = "PRC-002";
+        base.matchedRuleType = "EXTERNAL_TARIFF_UNRESOLVED";
+        return base;
+      }
+      rate = resolved;
+      base.payableSource = `External tariff (${scheme}) ${rate}`;
+    }
+
+    // NET_OF_EXTERNAL (§5.7 P3/P12): payable is the net rate; the external
+    // rebate is recorded (gross = rate + rebate) for payer reconciliation.
+    if (tariff.rateType === "NET_OF_EXTERNAL") {
+      const code = tariff.cptCode ?? tariff.providerServiceCode ?? null;
+      const rebate = tariff.externalRebateAmount != null
+        ? Number(tariff.externalRebateAmount)
+        : (tariff.externalScheme && code ? externalTariffs.get(`${tariff.externalScheme}|${code}`) : undefined);
+      if (rebate != null) base.externalRebateAmount = round2(rebate);
+      base.payableSource = `Net of ${tariff.externalScheme ?? "external"} — payable ${rate}`;
+    }
+
+    // Remaining deferred line-level rate types route to manual.
+    if (["CAPITATION", "AVERAGE_COST_POOL"].includes(tariff.rateType)) {
       trace.push({ stage: "PRICING", outcome: "DEFERRED_RATE_TYPE", reasonCode: "MAN-001", ruleRef: tariff.id, detail: tariff.rateType });
       base.decision = "PENDED";
       base.reasonCode = "MAN-001";
@@ -721,6 +770,33 @@ export class ContractEngine {
     return days > contract.submissionWindowDays;
   }
 
+  // ── Stage 7: documentation (spec §6.7) ──
+  // Checks mandatory documentation rules against the documents attached to the
+  // claim. Worst consequence wins: any REJECT (DOC-001) declines; else missing
+  // routes (DOC-002). `appliesWhen` supports { onlyIP } and { amountOver }.
+  private static checkDocumentation(
+    ctx: EngineClaimContext,
+    rules: Array<{ documentType: string; mandatory: boolean; appliesWhen: unknown; consequenceIfMissing: string }>,
+  ): { reasonCode: "DOC-001" | "DOC-002" | null; missing: string[] } {
+    const attached = new Set((ctx.attachedDocumentTypes ?? []).map(d => d.toUpperCase()));
+    const isIP = (ctx.serviceType ?? "").toUpperCase() === "INPATIENT" || !!ctx.admissionDate;
+    const billedTotal = ctx.lines.reduce((s, l) => s + l.billedAmount, 0);
+    const missing: string[] = [];
+    let reject = false;
+    for (const r of rules) {
+      if (!r.mandatory) continue;
+      const when = (r.appliesWhen ?? {}) as { onlyIP?: boolean; amountOver?: number };
+      if (when.onlyIP && !isIP) continue;
+      if (when.amountOver != null && billedTotal <= when.amountOver) continue;
+      if (!attached.has(r.documentType.toUpperCase())) {
+        missing.push(r.documentType);
+        if (r.consequenceIfMissing === "REJECT") reject = true;
+      }
+    }
+    if (missing.length === 0) return { reasonCode: null, missing };
+    return { reasonCode: reject ? "DOC-001" : "DOC-002", missing };
+  }
+
   // ── Stage 8: PER_VISIT_CASE_RATE (spec §5.7 P4, examples 2 & 3) ──
   // Non-carve-out lines fold into one fixed case-rate payable (AS_CONTRACTED);
   // carve-out lines price separately and go through pre-auth.
@@ -730,6 +806,7 @@ export class ContractEngine {
     tariffs: ProviderTariff[],
     memoryByText: Map<string, string>,
     rule: { params: unknown },
+    externalTariffs: Map<string, number> = new Map(),
   ): EngineLineResult[] {
     const params = (rule.params ?? {}) as { rate?: number; carveOutCodes?: string[]; carveOutDescriptions?: string[]; label?: string };
     const rate = Number(params.rate ?? 0);
@@ -744,7 +821,7 @@ export class ContractEngine {
     for (const l of ctx.lines) {
       if (isCarveOut(l)) {
         // Price the carve-out normally (pre-auth applied later in stage 6).
-        results.push(this.evaluateLine(l, contract, tariffs, memoryByText, ctx));
+        results.push(this.evaluateLine(l, contract, tariffs, memoryByText, ctx, externalTariffs));
       } else {
         // Folded into the case rate — informational, zero payable.
         results.push({

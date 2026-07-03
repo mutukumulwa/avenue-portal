@@ -3,6 +3,7 @@ import { TRPCError } from "@trpc/server";
 import { OverrideType, OverrideReasonCode } from "@prisma/client";
 import { rbacService } from "./rbac.service";
 import { auditChainService } from "./audit-chain.service";
+import { OverrideControlService } from "./override-control.service";
 
 // ─── SLA DURATIONS ───────────────────────────────────────────────────────────
 
@@ -79,6 +80,7 @@ export const overrideService = {
     reasonCode,
     justification,
     preState,
+    financialImpact,
   }: {
     tenantId: string;
     makerId: string;
@@ -88,8 +90,28 @@ export const overrideService = {
     reasonCode: OverrideReasonCode;
     justification: string;
     preState?: Record<string, unknown>;
+    financialImpact?: number;
   }) {
     await rbacService.requirePermission(makerId, "OVERRIDE:REQUEST", tenantId);
+
+    // OverrideControl governance (spec §9.3): allow/deny, minimum justification,
+    // hard financial-impact cap, and threshold-driven dual approval.
+    const control = await OverrideControlService.resolve(tenantId, overrideType);
+    let dualApprovalRequired = false;
+    if (control) {
+      if (!control.allowed) {
+        throw new TRPCError({ code: "FORBIDDEN", message: `Override ${overrideType} is not permitted for this tenant.` });
+      }
+      if (justification.trim().length < control.justificationMinLength) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: `Justification must be at least ${control.justificationMinLength} characters.` });
+      }
+      if (control.maxFinancialImpact != null && financialImpact != null && financialImpact > Number(control.maxFinancialImpact)) {
+        throw new TRPCError({ code: "FORBIDDEN", message: `Financial impact ${financialImpact} exceeds the hard cap ${Number(control.maxFinancialImpact)} for ${overrideType}.` });
+      }
+      if (control.dualApprovalThreshold != null && financialImpact != null && financialImpact > Number(control.dualApprovalThreshold)) {
+        dualApprovalRequired = true;
+      }
+    }
 
     const record = await prisma.overrideRecord.create({
       data: {
@@ -100,7 +122,7 @@ export const overrideService = {
         justification,
         entityType,
         entityId,
-        preState: (preState ?? {}) as never,
+        preState: { ...(preState ?? {}), _financialImpact: financialImpact ?? null, _dualApprovalRequired: dualApprovalRequired } as never,
         status: "PENDING",
         slaDeadlineAt: slaDeadlineAt(overrideType),
       },
@@ -172,7 +194,10 @@ export const overrideService = {
       });
     }
 
-    const isDualApproval = requiredRoles.length > 1;
+    // Dual approval required when the type maps to ≥2 roles OR when the
+    // OverrideControl financial-impact threshold flagged it at request time (§9.3).
+    const thresholdDual = (record.preState as { _dualApprovalRequired?: boolean } | null)?._dualApprovalRequired === true;
+    const isDualApproval = requiredRoles.length > 1 || thresholdDual;
     const isFirstChecker = !record.checkerId;
     const justificationNote = notes
       ? record.justification + `\n\nApprover note: ${notes}`

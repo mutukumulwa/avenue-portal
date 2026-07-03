@@ -14,6 +14,8 @@ const db = vi.hoisted(() => ({
   pricingRule: { findMany: vi.fn(async (): Promise<any[]> => []) },
   providerContractExclusion: { findMany: vi.fn(async (): Promise<any[]> => []) },
   preauthRule: { findMany: vi.fn(async (): Promise<any[]> => []) },
+  documentationRule: { findMany: vi.fn(async (): Promise<any[]> => []) },
+  externalTariffTable: { findMany: vi.fn(async (): Promise<any[]> => []) },
   adjudicationReasonCode: { findMany: vi.fn(async (): Promise<any[]> => []) },
   claimLine: { findMany: vi.fn(async (): Promise<any[]> => []) },
   $transaction: vi.fn(async (fn: any) => fn({ claimLine: { update: claimLineUpdate }, claim: { update: claimUpdate } })),

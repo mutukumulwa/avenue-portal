@@ -60,6 +60,7 @@ export class ContractEngineIntegration {
               memberLiability: l.memberLiability,
               payerLiability: l.payerLiability,
               providerWriteOff: l.providerWriteOff,
+              externalRebateAmount: l.externalRebateAmount ?? null,
               quantityApproved: l.quantityApproved,
               ruleTrace: l.trace as never,
             },

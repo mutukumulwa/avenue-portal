@@ -12,6 +12,8 @@ const db = vi.hoisted(() => ({
   pricingRule: { findMany: vi.fn(async (): Promise<any[]> => []) },
   providerContractExclusion: { findMany: vi.fn(async (): Promise<any[]> => []) },
   preauthRule: { findMany: vi.fn(async (): Promise<any[]> => []) },
+  documentationRule: { findMany: vi.fn(async (): Promise<any[]> => []) },
+  externalTariffTable: { findMany: vi.fn(async (): Promise<any[]> => []) },
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
 
@@ -74,6 +76,8 @@ beforeEach(() => {
   db.pricingRule.findMany.mockResolvedValue([]);
   db.providerContractExclusion.findMany.mockResolvedValue([]);
   db.preauthRule.findMany.mockResolvedValue([]);
+  db.documentationRule.findMany.mockResolvedValue([]);
+  db.externalTariffTable.findMany.mockResolvedValue([]);
 });
 
 describe("ContractEngine — spec §10.3 worked examples", () => {
@@ -284,5 +288,66 @@ describe("ContractEngine — Phase 3 stages 5-8 (spec §10.3 examples 2-9)", () 
     expect(result.lines[0].payableAmount).toBe(6200);
     expect(result.lines[0].shortfallAmount).toBe(0);
     expect(result.totals.shortfall).toBe(0);
+  });
+});
+
+describe("ContractEngine — external tariffs & documentation (polish)", () => {
+  it("EXTERNAL_TARIFF_REF: prices from the external tariff table when resolvable", async () => {
+    db.providerTariff.findMany.mockResolvedValue([tariff({ cptCode: "CHEMO1", serviceName: "Chemotherapy", agreedRate: 0, rateType: "EXTERNAL_TARIFF_REF", externalScheme: "NCI", providerServiceCode: null })]);
+    db.externalTariffTable.findMany.mockResolvedValue([{ scheme: "NCI", code: "CHEMO1", rate: 25000 }]);
+    const result = await ContractEngine.evaluateClaim(
+      ctx([{ id: "L1", cptCode: "CHEMO1", description: "Chemotherapy", quantity: 1, unitCost: 25000, billedAmount: 25000 }]),
+    );
+    expect(result.lines[0].payableAmount).toBe(25000);
+    expect(result.lines[0].decision).toBe("AUTO_APPROVED");
+  });
+
+  it("EXTERNAL_TARIFF_REF: unresolved external rate → PRC-002 pend, never approximated", async () => {
+    db.providerTariff.findMany.mockResolvedValue([tariff({ cptCode: "CHEMO2", serviceName: "Chemotherapy", agreedRate: 0, rateType: "EXTERNAL_TARIFF_REF", externalScheme: "NCI", providerServiceCode: null })]);
+    db.externalTariffTable.findMany.mockResolvedValue([]);
+    const result = await ContractEngine.evaluateClaim(
+      ctx([{ id: "L1", cptCode: "CHEMO2", description: "Chemotherapy", quantity: 1, unitCost: 25000, billedAmount: 25000 }]),
+    );
+    expect(result.lines[0].reasonCode).toBe("PRC-002");
+    expect(result.lines[0].decision).toBe("PENDED");
+    expect(result.lines[0].payableAmount).toBe(0);
+  });
+
+  it("NET_OF_EXTERNAL: pays the net rate and records the external rebate", async () => {
+    db.providerTariff.findMany.mockResolvedValue([tariff({ serviceName: "CS Package Net of NHIF", agreedRate: 100000, rateType: "NET_OF_EXTERNAL", externalRebateAmount: 20000 })]);
+    const result = await ContractEngine.evaluateClaim(
+      ctx([{ id: "L1", cptCode: null, description: "CS Package Net of NHIF", quantity: 1, unitCost: 100000, billedAmount: 100000 }]),
+    );
+    expect(result.lines[0].payableAmount).toBe(100000);
+    expect(result.lines[0].externalRebateAmount).toBe(20000);
+  });
+
+  it("Documentation: missing mandatory doc with REJECT consequence → DOC-001 declined claim", async () => {
+    db.providerTariff.findMany.mockResolvedValue([tariff({})]);
+    db.documentationRule.findMany.mockResolvedValue([
+      { documentType: "DISCHARGE_SUMMARY", mandatory: true, appliesWhen: null, consequenceIfMissing: "REJECT" },
+    ]);
+    const result = await ContractEngine.evaluateClaim({
+      tenantId: "t", providerId: "prov1", clientId: "cli1", dateOfService: DAY,
+      attachedDocumentTypes: ["INVOICE"],
+      lines: [{ id: "L1", cptCode: null, description: "Outpatient Consultation Fees", quantity: 1, unitCost: 1000, billedAmount: 1000 }],
+    });
+    expect(result.reasonCode).toBe("DOC-001");
+    expect(result.claimDecision).toBe("DECLINED");
+  });
+
+  it("Documentation: missing doc with ROUTE consequence → DOC-002 routes to MISSING_DOCS", async () => {
+    db.providerTariff.findMany.mockResolvedValue([tariff({})]);
+    db.documentationRule.findMany.mockResolvedValue([
+      { documentType: "ITEMISED_BILL", mandatory: true, appliesWhen: null, consequenceIfMissing: "ROUTE" },
+    ]);
+    const result = await ContractEngine.evaluateClaim({
+      tenantId: "t", providerId: "prov1", clientId: "cli1", dateOfService: DAY,
+      attachedDocumentTypes: ["INVOICE"],
+      lines: [{ id: "L1", cptCode: null, description: "Outpatient Consultation Fees", quantity: 1, unitCost: 1000, billedAmount: 1000 }],
+    });
+    expect(result.reasonCode).toBe("DOC-002");
+    expect(result.assignedQueue).toBe("MISSING_DOCS");
+    expect(result.claimDecision).toBe("UNDER_REVIEW");
   });
 });

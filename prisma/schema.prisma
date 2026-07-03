@@ -2686,6 +2686,11 @@ model ProviderTariff {
   diagnosisRestriction Json? // ICD list/pattern — SHA MRI/CT indication limits
   requiresReferral    Boolean          @default(false) // SHA imaging self-referral ban
   rateMissing         Boolean          @default(false) // O2/O13 — line exists, price unreadable; blocks activation (§13-V6)
+  // External-scheme offset (spec §5.6/§5.7 P3/P12) — for NET_OF_EXTERNAL /
+  // EXTERNAL_TARIFF_REF rate types. externalScheme keys the ExternalTariffTable
+  // lookup; externalRebateAmount is the known offset when printed on the contract.
+  externalScheme       String? // NHIF | SHA | ...
+  externalRebateAmount Decimal?        @db.Decimal(14, 2)
   sourceRef           Json? // { documentId, page, rawText, confidence }
   notes               String?
 

@@ -40,6 +40,7 @@ export interface EngineLineResult {
   memberLiability: number;
   payerLiability: number;
   providerWriteOff: number;
+  externalRebateAmount?: number | null; // NET_OF_EXTERNAL gross-up offset (§5.7 P3/P12)
   quantityApproved: number | null;
 
   trace: TraceStep[];
