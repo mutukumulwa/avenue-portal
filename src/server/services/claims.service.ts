@@ -101,17 +101,60 @@ export class ClaimsService {
   /**
    * List all claims for a tenant with related member/provider data
    */
-  static async getClaims(tenantId: string, status?: ClaimStatus, clientId?: string | null) {
+  static async getClaims(
+    tenantId: string,
+    status?: ClaimStatus,
+    clientId?: string | null,
+    opts?: { take?: number; skip?: number; providerId?: string; serviceType?: ServiceType },
+  ) {
     return prisma.claim.findMany({
       // Client isolation (G2.1 / G5.6): confined users see only their client's claims.
-      where: { tenantId, ...(status ? { status } : {}), ...(clientId ? { member: { group: { clientId } } } : {}) },
+      where: {
+        tenantId,
+        ...(status ? { status } : {}),
+        ...(opts?.providerId ? { providerId: opts.providerId } : {}),
+        ...(opts?.serviceType ? { serviceType: opts.serviceType } : {}),
+        ...(clientId ? { member: { group: { clientId } } } : {}),
+      },
       include: {
         member:   { select: { id: true, firstName: true, lastName: true, memberNumber: true } },
         provider: { select: { id: true, name: true, type: true, tier: true } },
+        contract: { select: { paymentTermDays: true, paymentTermType: true } },
         _count:   { select: { exceptionLogs: { where: { status: "PENDING" } } } },
       },
       orderBy: { createdAt: "desc" },
+      ...(opts?.take ? { take: opts.take } : {}),
+      ...(opts?.skip ? { skip: opts.skip } : {}),
     });
+  }
+
+  /**
+   * Status roll-up for the claims list header (WP-A3) — computed with groupBy
+   * so summary cards stay correct regardless of the page loaded.
+   */
+  static async getClaimStatusCounts(
+    tenantId: string,
+    clientId?: string | null,
+    opts?: { providerId?: string; serviceType?: ServiceType; status?: ClaimStatus },
+  ) {
+    const grouped = await prisma.claim.groupBy({
+      by: ["status"],
+      where: {
+        tenantId,
+        ...(opts?.status ? { status: opts.status } : {}),
+        ...(opts?.providerId ? { providerId: opts.providerId } : {}),
+        ...(opts?.serviceType ? { serviceType: opts.serviceType } : {}),
+        ...(clientId ? { member: { group: { clientId } } } : {}),
+      },
+      _count: { _all: true },
+    });
+    const byStatus: Record<string, number> = {};
+    let total = 0;
+    for (const g of grouped) {
+      byStatus[g.status] = g._count._all;
+      total += g._count._all;
+    }
+    return { total, byStatus };
   }
 
   /**
