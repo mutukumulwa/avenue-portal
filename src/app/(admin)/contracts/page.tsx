@@ -1,7 +1,7 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { FileSignature, Plus, AlertTriangle, FileUp } from "lucide-react";
+import { FileSignature, Plus, AlertTriangle, FileUp, BarChart3 } from "lucide-react";
 import type { Prisma, ProviderContractStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -73,6 +73,12 @@ export default async function ContractsListPage({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Link
+            href="/contracts/analytics"
+            className="inline-flex items-center gap-2 rounded-lg border border-gray-200 px-4 py-2 text-sm font-medium text-[#6C757D] hover:bg-gray-50"
+          >
+            <BarChart3 className="w-4 h-4" /> Analytics
+          </Link>
           <Link
             href="/contracts/import"
             className="inline-flex items-center gap-2 rounded-lg border border-[#06B9AB] px-4 py-2 text-sm font-medium text-[#06B9AB] hover:bg-[#06B9AB]/5"

@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 // Mock prisma for the engine (evaluateClaimById → evaluateClaim) + persist.
-const claimLineUpdate = vi.fn(async () => ({}));
-const claimUpdate = vi.fn(async () => ({}));
+const claimLineUpdate = vi.fn(async (_arg: any) => ({}));
+const claimUpdate = vi.fn(async (_arg: any) => ({}));
 
 const db = vi.hoisted(() => ({
   claim: { findUnique: vi.fn(async (): Promise<any> => null), update: vi.fn(async () => ({})) },

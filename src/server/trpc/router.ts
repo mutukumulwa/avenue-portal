@@ -26,6 +26,7 @@ import { providerBranchesRouter } from "./routers/providerBranches";
 import { contractEngineRouter } from "./routers/contractEngine";
 import { contractRulesRouter } from "./routers/contractRules";
 import { contractImportRouter } from "./routers/contractImport";
+import { contractAnalyticsRouter } from "./routers/contractAnalytics";
 
 export const appRouter = createTRPCRouter({
   healthcheck: publicProcedure.query(() => {
@@ -58,6 +59,7 @@ export const appRouter = createTRPCRouter({
   contractEngine: contractEngineRouter,
   contractRules: contractRulesRouter,
   contractImport: contractImportRouter,
+  contractAnalytics: contractAnalyticsRouter,
 });
 
 export type AppRouter = typeof appRouter;

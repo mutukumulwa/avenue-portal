@@ -12,17 +12,19 @@ checklists, and continues without re-deriving context.
 
 ## RESUME POINTER (update this every time you stop)
 
-- **Current phase:** Phases 1–4 built & tested; engine wired into adjudication. Next = Phase 5.
-- **Next action (pick up here), in priority order:**
-  1. **Phase 5** — analytics suite (§15 datasets 1-15), average-cost reconciliation automation (finance maker-checker), override-pattern→amendment suggestions, unmapped-service suggestions from SVC-002 clusters, capitation pool settlement.
-  2. Remaining polish (any order): Manual-queue UI (§8.5 — `Claim.assignedQueue` now persisted); Rule-builder UI (§11.5 — `contractRules.*` + `contractEngine.evaluateLine` sandbox exist); NET_OF_EXTERNAL/EXTERNAL_TARIFF_REF pricing from `ExternalTariffTable`; DocumentationRule stage-7 (`applyDocumentation`); wire OverrideControl into `override.service`; ServiceCategory seed from Masters; contract-detail Tariffs/Applicability widgets; BullMQ lifecycle jobs; intake pre-check into `intake.service.ts`.
+- **Current phase:** All 5 phases core-complete + adjudication wiring. Remaining = optional polish.
+- **Next action (pick up here), any order — all optional polish:**
+  1. Manual-queue UI (§8.5 — `Claim.assignedQueue` persisted; dashboard shows queueLoad; a dedicated triage UI would extend `/(admin)/claims/queues`).
+  2. Rule-builder visual IF/THEN UI (§11.5 — `contractRules.*` CRUD + `contractEngine.evaluateLine` sandbox already exist as the backend).
+  3. NET_OF_EXTERNAL / EXTERNAL_TARIFF_REF pricing from `ExternalTariffTable` (engine routes these to MAN-001 today); DocumentationRule stage-7 (`applyDocumentation`, DOC-001/002).
+  4. Wire OverrideControl into `override.service` (maxFinancialImpact block, dual-approval threshold); ServiceCategory seed from Masters; contract-detail Tariffs/Applicability/Branch widgets; BullMQ lifecycle jobs (auto-activate/expire, NO_CONTRACT re-sweep); intake pre-check into `intake.service.ts`.
+  5. Phase-5 extras: provider dispute analytics (dataset 9), capitation pool settlement, early-settlement discount capture (13), override-pattern→amendment auto-suggestions, LLM-assisted clause tagging (§12.3).
 - **Engine gate flag:** contract-engine auto-adjudication gates are OFF by default. Set env `CONTRACT_ENGINE_GATES=1` to enable CONTRACT_MATCH / PRICING_COMPLETE routing. Provenance persistence runs regardless (always on).
 - **Blocked on:** nothing.
-- **Last verified green:** 2026-07-03 — engine wired into `auto-adjudication.service.ts`
-  (opt-in gates + always-on provenance persist via `ContractEngineIntegration.evaluateAndPersist`);
-  `npm run typecheck` clean; production source `eslint` clean; **`vitest` 221/221 service
-  tests pass** (incl. `contract-engine-persist.test.ts` 3 tests). Test files use `any` in
-  prisma mocks per the existing repo convention (repo tests are not lint-clean by that rule).
+- **Last verified green:** 2026-07-03 — Phase-5 schema applied via `prisma db push`;
+  `npm run typecheck` clean; production source `eslint` clean; **`vitest` 228/228 service
+  tests pass** (incl. `contract-analytics.test.ts` 7). `/contracts/analytics` compiles
+  (307 auth-gate, no errors). Test files use `any` in prisma mocks per existing repo convention.
 - **Verification note:** Browser pixel-render still blocked by the preview harness not
   persisting the next-auth session cookie (callback 200 → bounces to /login). Engine
   correctness is instead proven by the vitest suite. To eyeball UI, log in via a real
@@ -76,7 +78,7 @@ checklists, and continues without re-deriving context.
 | 2 | Tariff-based claims automation | ENGINE CORE DONE (schema+engine+reason-codes+claims panel+tests); adjudication-persist wiring + queues UI remain |
 | 3 | Rule engine (full) | ENGINE + DATA MODEL DONE (stages 5-8, packages/case-rate/avg-pool/exclusions/preauth/submission, V12, rule CRUD, override controls, tests); rule-builder UI remains |
 | 4 | Markdown extraction & assisted creation | DONE (zero-hallucination extractor, import pipeline, review UI, tests); LLM-assisted clause tagging optional enhancement |
-| 5 | Advanced automation & optimisation | not started |
+| 5 | Advanced automation & optimisation | CORE DONE (§15 analytics datasets, avg-cost reconciliation w/ finance maker-checker, amendment backlog, dashboard, tests); dispute analytics + capitation settlement remain |
 
 ---
 
@@ -238,6 +240,38 @@ traceable to source or reviewer.
 ### Phase 4 remaining (optional enhancement)
 - [ ] LLM-assisted clause tagging (§12.3) for narrative pre-auth/exclusion/package clauses — current extractor is rule-based (tariff tables + dates + entities). Rule-based is the zero-hallucination baseline; LLM step would add clause structuring behind the same human-confirm gate.
 - [ ] Candidate keep/drop checkboxes in the review UI (commit currently imports all candidates; `commit` service already supports `keepCandidateIndexes`)
+
+---
+
+## Adjudication wiring (spec §8.3) — DONE ✅
+- [x] `contract-engine/persist.ts` `ContractEngineIntegration.evaluateAndPersist` — writes per-line provenance + amounts + ruleTrace to ClaimLine and the contract match/queue/pool tag to Claim; resolves reason codes → ids; non-fatal (swallows).
+- [x] `auto-adjudication.service.ts`: always persists provenance at intake; opt-in named gates CONTRACT_MATCH / PRICING_COMPLETE behind env `CONTRACT_ENGINE_GATES` (default OFF).
+- [x] `tests/services/contract-engine-persist.test.ts` (3) — provenance write, claim stamp, error-swallow.
+
+## Phase 5 — Advanced automation & optimisation
+
+Spec §16 Phase 5 + §15.
+
+### 5.1 Schema — DONE ✅
+- [x] `ReconciliationStatus` enum + `ContractReconciliation` model (pool recovery proposals, finance maker-checker) + Tenant back-relation
+
+### 5.2 Analytics — DONE ✅
+`contract-analytics.service.ts`
+- [x] Pure helpers (unit-tested): `computeReconciliation` (§15.12 Old Mutual 1.1-1.3), `rankAmendmentBacklog` (dataset 5), `summarizeRateVariance` (dataset 11/O12)
+- [x] DB datasets: claimsByContract (1), shortPaidSummary (3), amendmentBacklog (5), expiringContracts (6), rateVariance (11), turnaround/auto-adj share (14), queueLoad (§8.5) — all from persisted per-line provenance
+
+### 5.3 Reconciliation — DONE ✅
+`contract-reconciliation.service.ts`: `compute` (from pool-tagged claims over a period) → COMPUTED proposal (audit-chained); `approve` enforces maker≠checker; never auto-posts. `list`.
+
+### 5.4 API + UI — DONE ✅
+- [x] `contractAnalytics` tRPC router: overview, reconciliations, computeReconciliation, approveReconciliation
+- [x] `/(admin)/contracts/analytics` dashboard (KPIs + 6 dataset cards); "Analytics" button on contracts list
+
+### 5.5 Tests — DONE ✅
+- [x] `tests/services/contract-analytics.test.ts` (7): reconciliation math, backlog ranking, rate-variance spread, reconciliation maker-checker. Full suite 228/228.
+
+### Phase 5 remaining (optional)
+- [ ] Provider dispute analytics (dataset 9) + renegotiation insight packs; capitation pool settlement; early-settlement discount capture (dataset 13); override-pattern→amendment auto-suggestions
 
 ---
 
