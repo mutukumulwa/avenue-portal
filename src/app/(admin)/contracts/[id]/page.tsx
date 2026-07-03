@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, AlertTriangle, CheckCircle2, FileSignature, GitBranch } from "lucide-react";
 import { ContractLifecycleService } from "@/server/services/contract-lifecycle.service";
+import { ManagePanel } from "./ManagePanel";
 import {
   submitForReviewAction,
   approveContractAction,
@@ -292,6 +293,14 @@ export default async function ContractDetailPage({
           </section>
         </div>
       </div>
+
+      {/* Management widgets — tariffs, applicability, branches, rules, exclusions (§11.2/§11.4/§11.5) */}
+      <ManagePanel
+        contractId={c.id}
+        providerId={c.provider.id}
+        branchScope={c.branchScope}
+        editable={c.status === "DRAFT" || c.status === "PENDING_CLARIFICATION"}
+      />
     </div>
   );
 }
