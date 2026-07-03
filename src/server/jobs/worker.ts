@@ -1,5 +1,5 @@
 import { Worker, Job } from "bullmq";
-import { connection, scheduleEscalationJob, scheduleDailyJobs, scheduleCommissionReconciliationJob, scheduleAnalyticsRefreshJob, scheduleIntakeJobs, scheduleQuotationExpiryJob, scheduleMembershipActivationJob, scheduleLapseDetectionJob, scheduleReportGenerationJob, scheduleAdminFeeAccrualJob, scheduleFraudScanJob } from "../../lib/queue";
+import { getConnection, scheduleEscalationJob, scheduleDailyJobs, scheduleCommissionReconciliationJob, scheduleAnalyticsRefreshJob, scheduleIntakeJobs, scheduleQuotationExpiryJob, scheduleMembershipActivationJob, scheduleLapseDetectionJob, scheduleReportGenerationJob, scheduleAdminFeeAccrualJob, scheduleFraudScanJob } from "../../lib/queue";
 import { NotificationService } from "../services/notification.service";
 import { runPreauthEscalationJob } from "./preauth-escalation.job";
 import { runRenewalReminderJob }    from "./renewal-reminder.job";
@@ -19,6 +19,10 @@ import { runFraudScanJob } from "./fraud-scan.job";
 import { runContractLifecycleJob } from "./contract-lifecycle.job";
 
 console.log("Starting background workers...");
+
+// The worker is a long-running process, so opening the Redis socket here is
+// exactly what we want (unlike at import time during the build).
+const connection = getConnection();
 
 // Register recurring scheduled jobs (idempotent — BullMQ deduplicates by jobId)
 scheduleEscalationJob().catch(err => console.error("[Worker] Failed to schedule escalation job:", err));

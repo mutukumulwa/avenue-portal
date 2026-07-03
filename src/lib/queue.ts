@@ -3,18 +3,48 @@ import Redis from "ioredis";
 
 const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
 
-// Shared Redis connection for queues (reused to avoid socket exhaustion)
-export const connection = new Redis(redisUrl, {
-  maxRetriesPerRequest: null, // Required by BullMQ
-});
+/**
+ * Lazily-created shared Redis connection.
+ *
+ * Constructing an ioredis client connects immediately, and BullMQ's `Queue`
+ * pings Redis on construction too. Doing either at module load meant every
+ * route that transitively imports this file opened a socket during
+ * `next build` (page-data collection / static generation), flooding the
+ * build log with ECONNREFUSED when no Redis is reachable. Deferring both to
+ * first use keeps import side-effect-free — the socket only opens inside the
+ * worker process or a request handler that actually enqueues a job.
+ */
+let _connection: Redis | undefined;
 
-// Define core system queues
+export function getConnection(): Redis {
+  if (!_connection) {
+    _connection = new Redis(redisUrl, {
+      maxRetriesPerRequest: null, // Required by BullMQ
+    });
+  }
+  return _connection;
+}
+
+type QueueName = "notifications" | "billing" | "clinical" | "system" | "analytics";
+
+const _queues = new Map<QueueName, Queue>();
+
+function getQueue(name: QueueName): Queue {
+  let q = _queues.get(name);
+  if (!q) {
+    q = new Queue(name, { connection: getConnection() });
+    _queues.set(name, q);
+  }
+  return q;
+}
+
+// Core system queues — lazy getters so no connection opens at import time.
 export const Queues = {
-  notifications: new Queue("notifications", { connection }),
-  billing:       new Queue("billing",       { connection }),
-  clinical:      new Queue("clinical",      { connection }),
-  system:        new Queue("system",        { connection }),
-  analytics:     new Queue("analytics",     { connection }),
+  get notifications() { return getQueue("notifications"); },
+  get billing()       { return getQueue("billing"); },
+  get clinical()      { return getQueue("clinical"); },
+  get system()        { return getQueue("system"); },
+  get analytics()     { return getQueue("analytics"); },
 };
 
 /**
