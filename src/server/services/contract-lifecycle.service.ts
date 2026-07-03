@@ -56,6 +56,9 @@ export class ContractLifecycleService {
         contractBranches: true,
         applicability: { where: { isActive: true } },
         tariffLines: { where: { isActive: true } },
+        pricingRules: { where: { isActive: true } },
+        contractPackages: { where: { isActive: true }, include: { components: true } },
+        preauthRules: { where: { isActive: true } },
       },
     });
     if (!contract) return { ok: false, issues: [{ rule: "V0", severity: "ERROR", message: "Contract not found" }] };
@@ -106,6 +109,31 @@ export class ContractLifecycleService {
     // V16 — currency set; tax inclusivity answered (UNKNOWN allowed, W).
     if (!contract.currency) err("V16", "Currency is required.", "overview");
     if (contract.taxInclusive === "UNKNOWN") warn("V16", "Tax inclusivity is UNKNOWN — confirm before go-live.", "overview");
+
+    // V8 — every package: ≥1 component OR explicit unbundling, trigger defined.
+    for (const p of contract.contractPackages) {
+      if (p.triggerCodes.length === 0) err("V8", `Package "${p.name}" has no trigger codes.`, "packages");
+    }
+
+    // V9 — every pre-auth rule sets consequenceIfMissing + emergencyExempt explicitly (schema enforces).
+
+    // V12 — conflicting pricing rules of equal specificity (same scope + target,
+    // overlapping window, different ruleKind) block activation (§7, §13-V12).
+    const rules = contract.pricingRules;
+    for (let i = 0; i < rules.length; i++) {
+      for (let j = i + 1; j < rules.length; j++) {
+        const a = rules[i];
+        const b = rules[j];
+        const sameTarget =
+          a.scope === b.scope &&
+          (a.serviceCategoryId ?? null) === (b.serviceCategoryId ?? null) &&
+          (a.tariffLineId ?? null) === (b.tariffLineId ?? null);
+        const overlap = (a.effectiveTo ?? new Date(8.64e15)) >= b.effectiveFrom && (b.effectiveTo ?? new Date(8.64e15)) >= a.effectiveFrom;
+        if (sameTarget && overlap && a.ruleKind !== b.ruleKind) {
+          err("V12", `Conflicting pricing rules of equal specificity (${a.ruleKind} vs ${b.ruleKind}) at scope ${a.scope}.`, "rules");
+        }
+      }
+    }
 
     return { ok: !issues.some(i => i.severity === "ERROR"), issues };
   }

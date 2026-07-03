@@ -77,8 +77,8 @@ checklists, and continues without re-deriving context.
 |---|---|---|
 | 1 | Contract structuring foundation | CORE DONE (schema+service+router+UI); polish + intake wiring + lifecycle jobs remain |
 | 2 | Tariff-based claims automation | ENGINE CORE DONE (schema+engine+reason-codes+claims panel+tests); adjudication-persist wiring + queues UI remain |
-| 3 | Rule engine (full) | not started |
-| 4 | Markdown extraction & assisted creation | not started |
+| 3 | Rule engine (full) | ENGINE + DATA MODEL DONE (stages 5-8, packages/case-rate/avg-pool/exclusions/preauth/submission, V12, rule CRUD, override controls, tests); rule-builder UI remains |
+| 4 | Markdown extraction & assisted creation | IN PROGRESS |
 | 5 | Advanced automation & optimisation | not started |
 
 ---
@@ -172,6 +172,45 @@ Module: `src/server/services/contract-engine/` (`types.ts`, `engine.ts`)
 
 ### 2.5 Tests — DONE ✅
 - [x] `tests/services/contract-engine.test.ts` — 6 tests: §10.3 ex.1 (PRC-001 shortfall + write-off), ex.1b (LOWER_OF pays billed), ex.8 (SVC-002 refer), CON-001 no-contract, LIM-001 qty cap, determinism. Full suite 204/204 green.
+
+---
+
+## Phase 3 — Rule engine (full)
+
+Spec §16 Phase 3 + §5.7–5.11, §6.5–6.8, §7, §8.4, §9.1–9.3.
+
+### 3.1 Schema — DONE ✅ (db push + typecheck + tests green)
+- [x] Enums: `ExclusionLevel`, `ContractRuleScope`, `PricingRuleKind`, `PackageTriggerType`, `ComplicationRule`, `PackageComponentType`, `PreauthTriggerType`, `PreauthConsequence`, `ContractDocumentType`, `DocConsequence`
+- [x] `ProviderContractExclusion` EXTEND (§5.9): level, serviceCategoryId, icdCodes, packageId, memberCategory, dateFrom/To, appliesToBranchId, sourceRef
+- [x] NEW `PricingRule` (§5.7), `ContractPackage` + `PackageComponent` (§5.8), `PreauthRule` (§5.10), `DocumentationRule` (§5.11), `ExternalTariffTable` (§5.7), `OverrideControl` (§9.3)
+- [x] `OverrideType` enum EXTEND (§9.1): 15 contract-claims override types + CONTRACT_BACKDATE
+- [x] `Claim.avgCostPoolId`; ProviderContract + Tenant back-relations
+- [x] `override.service.ts` OVERRIDE_APPROVER_ROLES extended for the new types
+
+### 3.2 Engine stages 5–8 + precedence — DONE ✅
+`contract-engine/engine.ts` (+ types)
+- [x] Stage 5 exclusions (`applyExclusions`): EXC-001/002/003 by level; requiresReferral → EXC-004 (runs after pricing for dispute value)
+- [x] Stage 6 pre-auth (`applyPreauth`): SERVICE_LIST/AMOUNT_THRESHOLD/ADMISSION/ALWAYS triggers; emergency exemption; AUTH-001 (reject/route/penalty), AUTH-002 validity, AUTH-003 amount, AUTH-004 coverage
+- [x] Stage 8 PER_VISIT_CASE_RATE (`applyCaseRate`): non-carve-out lines fold into a fixed AS_CONTRACTED payable (PRC-005); carve-outs price separately + preauth
+- [x] Stage 8 AVERAGE_COST_POOL (`applyAverageCostPool`): pay billed, no shortfall, tag `avgCostPoolTag`
+- [x] Stage 8 package assembly (`assemblePackages`): package-beats-itemised (PRC-005 components, disallowed excess); EXCLUDED components priced separately (complications)
+- [x] Stage 8 submission window (`checkSubmissionWindow`): SUB-001 claim-level
+- [x] Precedence: package overrides line items; line>category>contract; exclusion beats inclusion (§7 — money conflicts route, not auto-picked)
+- [x] Engine result: `avgCostPoolTag`, `submissionLate`; queue routing extended (AUTH→MISSING_PREAUTH, DOC/SUB→MISSING_DOCS)
+
+### 3.3 Validation V12 + rule CRUD + override controls — DONE ✅
+- [x] `ContractLifecycleService.validate` adds V8 (package trigger) + V12 (conflicting equal-specificity pricing rules block activation)
+- [x] `contractRules` tRPC router: CRUD for PricingRule / ContractPackage(+components) / PreauthRule / DocumentationRule / ContractExclusion + `listForContract`
+- [x] `override-control.service.ts` + seeder (16 conservative defaults; MAP_SERVICE_TO_TARIFF + CREATE_TEMPORARY_RATE reusable; payer-notify on pay-above/expired/escalate-payer). Seeded via the reason-codes script.
+
+### 3.4 Tests — DONE ✅
+- [x] `contract-engine.test.ts` now 13 tests: §10.3 examples 1,1b,8 (Phase 2) + 2 (case rate), 3 (carve-out AUTH-001), 4 (package), 5 (package+NICU excluded), 6 (EXC-004 referral), 7 (SUB-001), 9 (avg-cost pool), LIM-001, CON-001, determinism. Full suite 211/211.
+
+### Phase 3 remaining (polish)
+- [ ] Rule-builder UI (§11.5) — backend (`contractRules.*`) + sandbox (`contractEngine.evaluateLine`) exist; the visual IF/THEN composer + conflict-lint UI is not built
+- [ ] NET_OF_EXTERNAL / EXTERNAL_TARIFF_REF pricing (schema + ExternalTariffTable exist; engine currently routes these tariff.rateType values to MAN-001 — implement resolution from ExternalTariffTable)
+- [ ] Wire OverrideControl into `override.service` request/approve (maxFinancialImpact block, dual-approval threshold)
+- [ ] DocumentationRule stage-7 check in the engine (rules CRUD + schema exist; engine does not yet evaluate DOC-001/002 — add `applyDocumentation`)
 
 ---
 

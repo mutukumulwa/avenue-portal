@@ -45,6 +45,14 @@ export interface EngineLineResult {
   trace: TraceStep[];
 }
 
+export interface EnginePreauthApproval {
+  approvedAmount?: number | null;
+  validFrom?: Date | null;
+  validUntil?: Date | null;
+  serviceCodes?: string[]; // codes/descriptions the approval covers
+  isEmergency?: boolean;
+}
+
 export interface EngineClaimContext {
   tenantId: string;
   providerId: string;
@@ -53,7 +61,13 @@ export interface EngineClaimContext {
   serviceType?: string | null; // OUTPATIENT | INPATIENT | ...
   dateOfService: Date;
   admissionDate?: Date | null;
+  dischargeDate?: Date | null;
+  submissionDate?: Date | null; // receivedAt — for submission-window check (stage 8)
   lengthOfStay?: number | null;
+  isEmergency?: boolean; // emergency-exemption for pre-auth (§6.6)
+  hasReferral?: boolean; // referral present — for requiresReferral / SHA self-referral (EXC-004)
+  preauth?: EnginePreauthApproval | null; // linked approval (Claim.preauthId)
+  attachedDocumentTypes?: string[]; // ContractDocumentType names present on the claim
   lines: EngineLineInput[];
 }
 
@@ -66,6 +80,8 @@ export interface EngineClaimResult {
   reasonCode: string | null; // claim-level (e.g. CON-001 when nothing matched)
   claimDecision: "AUTO_APPROVED" | "PARTIALLY_APPROVED" | "DECLINED" | "UNDER_REVIEW";
   assignedQueue: string | null;
+  avgCostPoolTag: string | null; // AVERAGE_COST_POOL claim tag (§6.4, reconciliation)
+  submissionLate: boolean; // SUB-001 flagged at claim level
   totals: {
     billed: number;
     contracted: number;

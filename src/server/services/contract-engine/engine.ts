@@ -161,7 +161,50 @@ export class ContractEngine {
     const memoryByText = new Map<string, string>();
     for (const m of memories) memoryByText.set(m.normalizedText, m.tariffId);
 
-    const lineResults = ctx.lines.map(line => this.evaluateLine(line, contract, tariffs, memoryByText, ctx));
+    // Load Phase-3 rule sets effective on the pricing date.
+    const dateWindow = { effectiveFrom: { lte: pricingDate }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: pricingDate } }] };
+    const [packages, pricingRules, exclusions, preauthRules] = await Promise.all([
+      prisma.contractPackage.findMany({ where: { contractId: contract.id, isActive: true, ...dateWindow }, include: { components: true } }),
+      prisma.pricingRule.findMany({ where: { contractId: contract.id, isActive: true, ...dateWindow } }),
+      prisma.providerContractExclusion.findMany({ where: { contractId: contract.id } }),
+      prisma.preauthRule.findMany({ where: { contractId: contract.id, isActive: true, ...dateWindow } }),
+    ]);
+
+    const inputById = new Map(ctx.lines.map(l => [l.id, l]));
+    let avgCostPoolTag: string | null = null;
+    let lineResults: EngineLineResult[];
+
+    // Contract-level pricing model (spec §5.7): a PER_VISIT_CASE_RATE or
+    // AVERAGE_COST_POOL rule changes how the whole claim prices.
+    const caseRateRule = pricingRules.find(r => r.scope === "CONTRACT" && r.ruleKind === "PER_VISIT_CASE_RATE");
+    const avgPoolRule = pricingRules.find(r => r.scope === "CONTRACT" && r.ruleKind === "AVERAGE_COST_POOL");
+
+    if (caseRateRule) {
+      lineResults = this.applyCaseRate(ctx, contract, tariffs, memoryByText, caseRateRule);
+    } else if (avgPoolRule) {
+      const r = this.applyAverageCostPool(ctx, avgPoolRule);
+      lineResults = r.lines;
+      avgCostPoolTag = r.poolTag;
+    } else {
+      lineResults = ctx.lines.map(line => this.evaluateLine(line, contract, tariffs, memoryByText, ctx));
+      // ── Stage 5: coverage & exclusions (runs after pricing for dispute value) ──
+      for (const lr of lineResults) {
+        const input = inputById.get(lr.lineId);
+        if (input) this.applyExclusions(lr, input, contract, exclusions, tariffs, ctx);
+      }
+      // ── Stage 8: package assembly (may override itemised lines) ──
+      lineResults = this.assemblePackages(lineResults, ctx, packages, contract);
+    }
+
+    // ── Stage 6: pre-authorisation (per real line) ──
+    for (const lr of lineResults) {
+      const input = inputById.get(lr.lineId);
+      if (input) this.applyPreauth(lr, input, ctx, preauthRules);
+    }
+
+    // ── Stage 8: submission-window check (claim-level, §8.4) ──
+    const submissionLate = this.checkSubmissionWindow(contract, ctx);
+    if (submissionLate) trace.push({ stage: "DECISION", outcome: "LATE_SUBMISSION", reasonCode: "SUB-001" });
 
     // ── Stage 9: decision synthesis ──
     const totals = lineResults.reduce(
@@ -178,16 +221,22 @@ export class ContractEngine {
       { billed: 0, contracted: 0, payable: 0, shortfall: 0, disallowed: 0, memberLiability: 0, providerWriteOff: 0 },
     );
 
-    const anyPend = lineResults.some(l => l.decision === "PENDED");
+    const anyPend = lineResults.some(l => l.decision === "PENDED") || submissionLate;
     const allDeclined = lineResults.length > 0 && lineResults.every(l => l.decision === "DECLINED");
     const anyAdjustOrDecline = lineResults.some(l => l.decision === "APPROVED_WITH_ADJUSTMENT" || l.decision === "DECLINED");
 
     let claimDecision: EngineClaimResult["claimDecision"];
     let assignedQueue: string | null = null;
+    let claimReason: string | null = null;
     if (anyPend) {
       claimDecision = "UNDER_REVIEW";
       const firstPend = lineResults.find(l => l.decision === "PENDED");
-      assignedQueue = this.queueForReason(firstPend?.reasonCode ?? null);
+      if (firstPend?.reasonCode) {
+        assignedQueue = this.queueForReason(firstPend.reasonCode);
+      } else if (submissionLate) {
+        assignedQueue = "MISSING_DOCS";
+        claimReason = "SUB-001";
+      }
     } else if (allDeclined) {
       claimDecision = "DECLINED";
     } else if (anyAdjustOrDecline) {
@@ -202,9 +251,11 @@ export class ContractEngine {
       contractNumber: contract.contractNumber,
       contractVersionId: contract.currentVersionId,
       contractFamilyIds: contract.parentContractId ? [contract.parentContractId, contract.id] : [contract.id],
-      reasonCode: null,
+      reasonCode: claimReason,
       claimDecision,
       assignedQueue,
+      avgCostPoolTag,
+      submissionLate,
       totals: {
         billed: round2(totals.billed),
         contracted: round2(totals.contracted),
@@ -490,6 +541,9 @@ export class ContractEngine {
     if (reasonCode === "PRC-002") return "RATE_MISSING";
     if (reasonCode === "PRC-004") return "RATE_AMBIGUITY";
     if (reasonCode === "MAN-001") return "CONTRACT_AMENDMENT_REQUIRED";
+    if (reasonCode.startsWith("AUTH-")) return "MISSING_PREAUTH";
+    if (reasonCode.startsWith("DOC-") || reasonCode === "SUB-001") return "MISSING_DOCS";
+    if (reasonCode === "EXC-004") return "MEDICAL_REVIEW";
     return "MEDICAL_REVIEW";
   }
 
@@ -522,9 +576,276 @@ export class ContractEngine {
       reasonCode,
       claimDecision: "UNDER_REVIEW",
       assignedQueue: queue,
+      avgCostPoolTag: null,
+      submissionLate: false,
       totals: { billed, contracted: 0, payable: 0, shortfall: 0, disallowed: 0, memberLiability: 0, providerWriteOff: 0 },
       lines,
       trace,
     };
+  }
+
+  // ── Stage 5: coverage & exclusions (spec §6.5) ──
+  // Runs after pricing so the trace shows what would have been paid. Contract
+  // exclusions and referral requirements reject/zero the line.
+  private static applyExclusions(
+    lr: EngineLineResult,
+    input: EngineLineInput,
+    contract: ProviderContract,
+    exclusions: Array<{ level: string; cptCode: string | null; serviceName: string; icdCodes: string[]; memberCategory: string | null; dateFrom: Date | null; dateTo: Date | null }>,
+    tariffs: ProviderTariff[],
+    ctx: EngineClaimContext,
+  ) {
+    const nd = normalize(input.description);
+    // Referral requirement on the mapped tariff (SHA imaging self-referral ban → EXC-004).
+    const mapped = lr.matchedRuleId ? tariffs.find(t => t.id === lr.matchedRuleId) : undefined;
+    if (mapped?.requiresReferral && !ctx.hasReferral) {
+      this.declineLine(lr, contract, input, "EXC-004", "Referral required — self-referral not covered");
+      return;
+    }
+    for (const ex of exclusions) {
+      let hit = false;
+      let code = "EXC-001";
+      if (ex.level === "DIAGNOSIS") {
+        if (input.icdCode && ex.icdCodes.includes(input.icdCode)) { hit = true; code = "EXC-002"; }
+      } else if (ex.level === "DATE_RANGE") {
+        const d = ctx.dateOfService;
+        if ((!ex.dateFrom || d >= ex.dateFrom) && (!ex.dateTo || d <= ex.dateTo)) { hit = true; code = "EXC-003"; }
+      } else {
+        // CONTRACT / CATEGORY / TARIFF_LINE / PLAN / MEMBER_CATEGORY — match by code or name.
+        if ((ex.cptCode && input.cptCode && ex.cptCode === input.cptCode) || (ex.serviceName && normalize(ex.serviceName) === nd)) hit = true;
+      }
+      if (hit) {
+        this.declineLine(lr, contract, input, code, `Excluded by contract (${ex.level.toLowerCase()})`);
+        return;
+      }
+    }
+  }
+
+  private static declineLine(lr: EngineLineResult, contract: ProviderContract, input: EngineLineInput, reasonCode: string, note: string) {
+    lr.decision = "DECLINED";
+    lr.reasonCode = reasonCode;
+    lr.payableAmount = 0;
+    lr.payerLiability = 0;
+    lr.shortfallAmount = 0;
+    lr.disallowedAmount = round2(input.billedAmount);
+    if (this.memberPays(contract)) { lr.memberLiability = lr.disallowedAmount; lr.providerWriteOff = 0; }
+    else { lr.providerWriteOff = lr.disallowedAmount; lr.memberLiability = 0; }
+    lr.trace.push({ stage: "EXCLUSION", outcome: "EXCLUDED", reasonCode, detail: note });
+  }
+
+  // ── Stage 6: pre-authorisation (spec §6.6) ──
+  private static applyPreauth(
+    lr: EngineLineResult,
+    input: EngineLineInput,
+    ctx: EngineClaimContext,
+    rules: Array<{ triggerType: string; thresholdAmount: unknown; serviceRefs: string[]; emergencyExempt: boolean; retrospectiveAllowed: boolean; consequenceIfMissing: string; admissionRequired: boolean }>,
+  ) {
+    if (lr.decision === "DECLINED") return; // already rejected upstream
+    const nd = normalize(input.description);
+    const triggered = rules.find(r => {
+      switch (r.triggerType) {
+        case "ALWAYS": return true;
+        case "SERVICE_LIST": return r.serviceRefs.some(s => (input.cptCode && s === input.cptCode) || normalize(s) === nd || nd.includes(normalize(s)));
+        case "AMOUNT_THRESHOLD": return r.thresholdAmount != null && input.billedAmount > Number(r.thresholdAmount);
+        case "ADMISSION": return (ctx.serviceType ?? "").toUpperCase() === "INPATIENT" || !!ctx.admissionDate;
+        default: return false;
+      }
+    });
+    if (!triggered) return;
+
+    // Emergency exemption (SHA GCC 11.1, O17).
+    if (triggered.emergencyExempt && ctx.isEmergency) {
+      lr.trace.push({ stage: "PREAUTH", outcome: "EMERGENCY_EXEMPT", detail: triggered.retrospectiveAllowed ? "retro approval task" : "" });
+      return;
+    }
+
+    const approval = ctx.preauth;
+    if (!approval) {
+      // Missing pre-auth → consequence.
+      if (triggered.consequenceIfMissing === "PAY_WITH_PENALTY") {
+        lr.trace.push({ stage: "PREAUTH", outcome: "MISSING_PAY_WITH_PENALTY", reasonCode: "AUTH-001" });
+        return;
+      }
+      lr.reasonCode = "AUTH-001";
+      lr.trace.push({ stage: "PREAUTH", outcome: "MISSING", reasonCode: "AUTH-001" });
+      if (triggered.consequenceIfMissing === "REJECT") {
+        lr.decision = "DECLINED";
+        lr.disallowedAmount = round2(lr.payableAmount || input.billedAmount);
+        lr.payableAmount = 0;
+        lr.payerLiability = 0;
+      } else {
+        lr.decision = "PENDED";
+        lr.payableAmount = 0;
+        lr.payerLiability = 0;
+      }
+      return;
+    }
+
+    // Approval present — validity, coverage, amount checks.
+    if ((approval.validFrom && ctx.dateOfService < approval.validFrom) || (approval.validUntil && ctx.dateOfService > approval.validUntil)) {
+      lr.reasonCode = "AUTH-002"; lr.decision = "PENDED"; lr.payableAmount = 0;
+      lr.trace.push({ stage: "PREAUTH", outcome: "EXPIRED", reasonCode: "AUTH-002" });
+      return;
+    }
+    if (approval.serviceCodes && approval.serviceCodes.length > 0) {
+      const covers = approval.serviceCodes.some(s => (input.cptCode && s === input.cptCode) || normalize(s) === nd);
+      if (!covers) {
+        lr.reasonCode = "AUTH-004"; lr.decision = "PENDED"; lr.payableAmount = 0;
+        lr.trace.push({ stage: "PREAUTH", outcome: "NOT_COVERED", reasonCode: "AUTH-004" });
+        return;
+      }
+    }
+    if (approval.approvedAmount != null && lr.payableAmount > approval.approvedAmount) {
+      const capped = round2(approval.approvedAmount);
+      lr.shortfallAmount = round2(lr.shortfallAmount + (lr.payableAmount - capped));
+      lr.payableAmount = capped; lr.payerLiability = capped;
+      lr.reasonCode = "AUTH-003";
+      lr.decision = "APPROVED_WITH_ADJUSTMENT";
+      lr.trace.push({ stage: "PREAUTH", outcome: "AMOUNT_EXCEEDED", reasonCode: "AUTH-003" });
+    }
+  }
+
+  // ── Stage 8: submission-window check (spec §8.4) ──
+  private static checkSubmissionWindow(contract: ProviderContract, ctx: EngineClaimContext): boolean {
+    if (!contract.submissionWindowDays || !ctx.submissionDate) return false;
+    let basis: Date | null;
+    switch (contract.submissionWindowBasis) {
+      case "DISCHARGE_DATE": basis = ctx.dischargeDate ?? ctx.dateOfService; break;
+      case "INVOICE_DATE": basis = ctx.dateOfService; break;
+      case "MONTHLY_BATCH": return false;
+      case "SERVICE_DATE":
+      default: basis = ctx.dateOfService;
+    }
+    if (!basis) return false;
+    const days = Math.floor((ctx.submissionDate.getTime() - basis.getTime()) / 86_400_000);
+    return days > contract.submissionWindowDays;
+  }
+
+  // ── Stage 8: PER_VISIT_CASE_RATE (spec §5.7 P4, examples 2 & 3) ──
+  // Non-carve-out lines fold into one fixed case-rate payable (AS_CONTRACTED);
+  // carve-out lines price separately and go through pre-auth.
+  private static applyCaseRate(
+    ctx: EngineClaimContext,
+    contract: ProviderContract,
+    tariffs: ProviderTariff[],
+    memoryByText: Map<string, string>,
+    rule: { params: unknown },
+  ): EngineLineResult[] {
+    const params = (rule.params ?? {}) as { rate?: number; carveOutCodes?: string[]; carveOutDescriptions?: string[]; label?: string };
+    const rate = Number(params.rate ?? 0);
+    const carveCodes = new Set((params.carveOutCodes ?? []).map(c => c.toUpperCase()));
+    const carveDescr = (params.carveOutDescriptions ?? []).map(d => normalize(d));
+
+    const isCarveOut = (l: EngineLineInput) =>
+      (l.cptCode && carveCodes.has(l.cptCode.toUpperCase())) ||
+      carveDescr.some(d => normalize(l.description).includes(d));
+
+    const results: EngineLineResult[] = [];
+    for (const l of ctx.lines) {
+      if (isCarveOut(l)) {
+        // Price the carve-out normally (pre-auth applied later in stage 6).
+        results.push(this.evaluateLine(l, contract, tariffs, memoryByText, ctx));
+      } else {
+        // Folded into the case rate — informational, zero payable.
+        results.push({
+          lineId: l.id, decision: "AUTO_APPROVED", matchedRuleType: "CASE_RATE_INCLUDED", matchedRuleId: null,
+          matchMethod: "CASE_RATE", payableSource: "Included in per-visit case rate", reasonCode: "PRC-005",
+          contractedAmount: 0, payableAmount: 0, shortfallAmount: 0, disallowedAmount: 0, memberLiability: 0,
+          payerLiability: 0, providerWriteOff: 0, quantityApproved: null,
+          trace: [{ stage: "PRICING", outcome: "CASE_RATE_INCLUDED", reasonCode: "PRC-005" }],
+        });
+      }
+    }
+    // Synthetic case-rate payable line (AS_CONTRACTED — paid regardless of billed).
+    results.push({
+      lineId: "case-rate", decision: "AUTO_APPROVED", matchedRuleType: "PER_VISIT_CASE_RATE", matchedRuleId: null,
+      matchMethod: "CASE_RATE", payableSource: params.label ?? `Per-visit case rate ${rate}`, reasonCode: null,
+      contractedAmount: round2(rate), payableAmount: round2(rate), shortfallAmount: 0, disallowedAmount: 0,
+      memberLiability: 0, payerLiability: round2(rate), providerWriteOff: 0, quantityApproved: null,
+      trace: [{ stage: "PRICING", outcome: "PER_VISIT_CASE_RATE", detail: `payable ${rate}` }],
+    });
+    return results;
+  }
+
+  // ── Stage 8: AVERAGE_COST_POOL (spec §5.7 P5/P6, example 9) ──
+  // Lines pay per billed; NO line shortfall; claim tagged to a reconciliation
+  // pool. Recovery is computed at reconciliation, not per claim.
+  private static applyAverageCostPool(ctx: EngineClaimContext, rule: { params: unknown }): { lines: EngineLineResult[]; poolTag: string } {
+    const params = (rule.params ?? {}) as { poolId?: string };
+    const poolTag = params.poolId ?? "AVG_COST_POOL";
+    const lines = ctx.lines.map(l => ({
+      lineId: l.id, decision: "AUTO_APPROVED" as const, matchedRuleType: "AVERAGE_COST_POOL", matchedRuleId: null,
+      matchMethod: "AVERAGE_COST", payableSource: "Average-cost pool — settled at reconciliation", reasonCode: null,
+      contractedAmount: round2(l.billedAmount), payableAmount: round2(l.billedAmount), shortfallAmount: 0,
+      disallowedAmount: 0, memberLiability: 0, payerLiability: round2(l.billedAmount), providerWriteOff: 0,
+      quantityApproved: null,
+      trace: [{ stage: "PRICING", outcome: "AVERAGE_COST_POOL", detail: poolTag }],
+    }));
+    return { lines, poolTag };
+  }
+
+  // ── Stage 8: package assembly (spec §5.8, examples 4 & 5) ──
+  // The first triggered package (when packageOverridesLineItems ∧ ¬unbundling)
+  // zero-prices its included components (PRC-005), prices excluded components
+  // separately, and adds a single package-price payable line.
+  private static assemblePackages(
+    lineResults: EngineLineResult[],
+    ctx: EngineClaimContext,
+    packages: Array<{ id: string; name: string; packagePrice: unknown; triggerType: string; triggerCodes: string[]; unbundlingAllowed: boolean; packageOverridesLineItems: boolean; components: Array<{ type: string; description: string; code: string | null }> }>,
+    contract: ProviderContract,
+  ): EngineLineResult[] {
+    const inputById = new Map(ctx.lines.map(l => [l.id, l]));
+    for (const pkg of packages) {
+      if (pkg.unbundlingAllowed || !pkg.packageOverridesLineItems) continue;
+      const triggered = ctx.lines.some(l => this.packageTriggered(l, pkg));
+      if (!triggered) continue;
+
+      const excluded = pkg.components.filter(c => c.type === "EXCLUDED");
+      const isExcludedComp = (l: EngineLineInput) =>
+        excluded.some(c => (c.code && l.cptCode && c.code === l.cptCode) || (c.description && normalize(l.description).includes(normalize(c.description))));
+
+      let includedBilled = 0;
+      for (const lr of lineResults) {
+        const input = inputById.get(lr.lineId);
+        if (!input) continue;
+        if (isExcludedComp(input)) continue; // priced separately (complications, advanced imaging)
+        includedBilled += input.billedAmount;
+        lr.decision = "AUTO_APPROVED";
+        lr.matchedRuleType = "PACKAGE";
+        lr.matchMethod = "PACKAGE";
+        lr.payableSource = `Included in package "${pkg.name}"`;
+        lr.reasonCode = "PRC-005";
+        lr.contractedAmount = 0;
+        lr.payableAmount = 0;
+        lr.payerLiability = 0;
+        lr.shortfallAmount = 0;
+        lr.disallowedAmount = 0;
+        lr.providerWriteOff = 0;
+        lr.memberLiability = 0;
+        lr.trace.push({ stage: "PACKAGE", outcome: "PACKAGE_COMPONENT", reasonCode: "PRC-005", detail: pkg.name });
+      }
+
+      const price = round2(Number(pkg.packagePrice));
+      const disallowed = round2(Math.max(0, includedBilled - price));
+      lineResults.push({
+        lineId: `package-${pkg.id}`, decision: "AUTO_APPROVED", matchedRuleType: "PACKAGE", matchedRuleId: pkg.id,
+        matchMethod: "PACKAGE", payableSource: `Package "${pkg.name}"`, reasonCode: null,
+        contractedAmount: price, payableAmount: price, shortfallAmount: 0, disallowedAmount: disallowed,
+        memberLiability: this.memberPays(contract) ? disallowed : 0, payerLiability: price,
+        providerWriteOff: this.memberPays(contract) ? 0 : disallowed, quantityApproved: null,
+        trace: [{ stage: "PACKAGE", outcome: "PACKAGE_APPLIED", ruleRef: pkg.id, detail: `price ${price}, disallowed ${disallowed}` }],
+      });
+      break; // one package per episode
+    }
+    return lineResults;
+  }
+
+  private static packageTriggered(l: EngineLineInput, pkg: { triggerType: string; triggerCodes: string[] }): boolean {
+    switch (pkg.triggerType) {
+      case "PROCEDURE_CODE": return !!l.cptCode && pkg.triggerCodes.includes(l.cptCode);
+      case "DIAGNOSIS_CODE": return !!l.icdCode && pkg.triggerCodes.includes(l.icdCode);
+      case "SERVICE_DESCRIPTION": return pkg.triggerCodes.some(c => normalize(l.description).includes(normalize(c)));
+      default: return false;
+    }
   }
 }
