@@ -34,9 +34,9 @@ const STATUS_STYLES: Record<string, string> = {
 
 function Term({ k, v }: { k: string; v: React.ReactNode }) {
   return (
-    <div>
+    <div className="min-w-0">
       <dt className="text-xs text-[#6C757D]">{k}</dt>
-      <dd className="text-sm text-[#000523]">{v ?? "—"}</dd>
+      <dd className="text-sm text-[#000523] break-words">{v ?? "—"}</dd>
     </div>
   );
 }
@@ -204,12 +204,12 @@ export default async function ContractDetailPage({
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: overview */}
-        <div className="col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-6">
           <section className="rounded-xl border border-gray-200 bg-white p-5">
             <h2 className="text-sm font-semibold text-[#000523] mb-4">Overview</h2>
-            <dl className="grid grid-cols-3 gap-4">
+            <dl className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               <Term k="Type" v={c.contractType.replace(/_/g, " ")} />
               <Term k="Execution" v={c.executionStatus.replace(/_/g, " ")} />
               <Term k="Branch scope" v={c.branchScope.replace(/_/g, " ")} />

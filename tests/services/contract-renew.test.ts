@@ -2,15 +2,15 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const h = vi.hoisted(() => {
   const tx = {
-    providerContract: { create: vi.fn(async (a: any) => ({ id: "new1", contractNumber: "PC-2027-001", ...a.data })), update: vi.fn(async () => ({})) },
-    providerTariff: { createMany: vi.fn(async () => ({ count: 0 })) },
-    contractApplicability: { createMany: vi.fn(async () => ({ count: 0 })) },
-    contractBranch: { createMany: vi.fn(async () => ({ count: 0 })) },
-    pricingRule: { createMany: vi.fn(async () => ({ count: 0 })) },
-    contractPackage: { create: vi.fn(async () => ({ id: "pkgN" })) },
-    preauthRule: { createMany: vi.fn(async () => ({ count: 0 })) },
-    documentationRule: { createMany: vi.fn(async () => ({ count: 0 })) },
-    providerContractExclusion: { createMany: vi.fn(async () => ({ count: 0 })) },
+    providerContract: { create: vi.fn(async (a: any) => ({ id: "new1", contractNumber: "PC-2027-001", ...a.data })), update: vi.fn(async (a: any) => ({ a })) },
+    providerTariff: { createMany: vi.fn(async (a: any) => ({ a, count: 0 })) },
+    contractApplicability: { createMany: vi.fn(async (a: any) => ({ a, count: 0 })) },
+    contractBranch: { createMany: vi.fn(async (a: any) => ({ a, count: 0 })) },
+    pricingRule: { createMany: vi.fn(async (a: any) => ({ a, count: 0 })) },
+    contractPackage: { create: vi.fn(async (a: any) => ({ a, id: "pkgN" })) },
+    preauthRule: { createMany: vi.fn(async (a: any) => ({ a, count: 0 })) },
+    documentationRule: { createMany: vi.fn(async (a: any) => ({ a, count: 0 })) },
+    providerContractExclusion: { createMany: vi.fn(async (a: any) => ({ a, count: 0 })) },
   };
   return {
     tx,

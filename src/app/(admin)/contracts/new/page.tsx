@@ -40,7 +40,7 @@ export default async function NewContractPage({
       <form action={createContractAction} className="space-y-6">
         <section className="rounded-xl border border-gray-200 bg-white p-5">
           <h2 className="text-sm font-semibold text-[#000523] mb-4">Identity & parties</h2>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="col-span-2">
               <label className={label}>Provider *</label>
               <select name="providerId" defaultValue={providerId ?? ""} required className={field}>
@@ -88,7 +88,7 @@ export default async function NewContractPage({
 
         <section className="rounded-xl border border-gray-200 bg-white p-5">
           <h2 className="text-sm font-semibold text-[#000523] mb-4">Effective window</h2>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className={label}>Start date *</label>
               <input type="date" name="startDate" required className={field} />
@@ -106,7 +106,7 @@ export default async function NewContractPage({
 
         <section className="rounded-xl border border-gray-200 bg-white p-5">
           <h2 className="text-sm font-semibold text-[#000523] mb-4">Commercial & operational terms</h2>
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             <div>
               <label className={label}>Currency</label>
               <input name="currency" defaultValue="KES" className={field} />

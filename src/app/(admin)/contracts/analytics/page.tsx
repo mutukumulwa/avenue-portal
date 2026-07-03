@@ -47,7 +47,7 @@ export default async function ContractAnalyticsPage() {
       <p className="text-sm text-[#6C757D] mb-6">Datasets keyed to per-line contract provenance (spec §15).</p>
 
       {/* KPI row */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="rounded-xl border border-gray-200 bg-white p-4">
           <div className="text-xs text-[#6C757D]">Auto-adjudicated</div>
           <div className="text-2xl font-semibold text-[#28A745]">{turnaround.autoApprovedPct}%</div>
@@ -70,7 +70,7 @@ export default async function ContractAnalyticsPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card title="Claims by contract (dataset 1)">
           {claimsByContract.length === 0 ? (
             <p className="text-xs text-[#6C757D]">No priced claims yet.</p>

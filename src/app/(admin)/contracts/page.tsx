@@ -126,8 +126,8 @@ export default async function ContractsListPage({
         </form>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-gray-200 bg-white">
-        <table className="w-full text-sm">
+      <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+        <table className="w-full min-w-[720px] text-sm">
           <thead className="bg-gray-50 text-left text-xs uppercase tracking-wide text-[#6C757D]">
             <tr>
               <th className="px-4 py-3 font-medium">Contract</th>
