@@ -281,8 +281,8 @@ export function AdminSidebar({ userRole }: { userRole: UserRole | null }) {
         <Link href="/dashboard" className="mb-5 flex items-center pl-1 space-x-2">
           <div className="h-8 w-8 bg-brand-indigo rounded-full shrink-0" />
           <span className="text-lg font-bold font-heading text-brand-indigo leading-tight" style={{ letterSpacing: 0 }}>
-            AiCare<br />
-            <span className="text-xs font-semibold text-brand-text-muted font-body">Medvex</span>
+            Medvex<br />
+            <span className="text-xs font-semibold text-brand-text-muted font-body">TPA Platform</span>
           </span>
         </Link>
 

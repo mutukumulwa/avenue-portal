@@ -3,8 +3,13 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { redirect } from "next/navigation";
 import { ClaimsService } from "@/server/services/claims.service";
+import { preauthAdjudicationService } from "@/server/services/preauth-adjudication.service";
 import { writeAudit } from "@/lib/audit";
 
+/**
+ * W1.1: the single pre-auth decision entry point. Delegates to the canonical
+ * preauthAdjudicationService so every approval places a BenefitHold (PR-011).
+ */
 export async function adjudicatePreAuthAction(
   _prev: { error?: string } | null,
   formData: FormData
@@ -18,14 +23,24 @@ export async function adjudicatePreAuthAction(
   const isApprove = decision === "APPROVE_FULL" || decision === "APPROVE_PARTIAL";
 
   try {
-    await ClaimsService.adjudicatePreAuth(tenantId, preauthId, {
-      action:            isApprove ? "APPROVED" : "DECLINED",
-      approvedAmount:    isApprove ? Number(formData.get("approvedAmount") || 0) : undefined,
-      validDays:         isApprove ? Number(formData.get("validDays") || 30)     : undefined,
-      declineReasonCode: !isApprove ? (formData.get("declineReasonCode") as string) : undefined,
-      declineNotes:      formData.get("declineNotes") as string || undefined,
-      reviewerId:        session.user.id,
-    });
+    if (isApprove) {
+      await preauthAdjudicationService.approveByHuman(
+        preauthId,
+        tenantId,
+        session.user.id,
+        Number(formData.get("approvedAmount") || 0),
+        (formData.get("declineNotes") as string) || undefined,
+        Number(formData.get("validDays") || 30),
+      );
+    } else {
+      await preauthAdjudicationService.declineByHuman(
+        preauthId,
+        tenantId,
+        session.user.id,
+        (formData.get("declineReasonCode") as string) || "OTHER",
+        (formData.get("declineNotes") as string) || "",
+      );
+    }
   } catch (err) {
     return { error: (err as Error).message };
   }

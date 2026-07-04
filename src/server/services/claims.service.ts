@@ -2,7 +2,7 @@ import { prisma } from "@/lib/prisma";
 import type { ClaimStatus, PreauthStatus, BenefitCategory, ServiceType, Prisma } from "@prisma/client";
 import { FraudService } from "./fraud.service";
 import { ProviderContractsService, type ResolvedClaimRates } from "./provider-contracts.service";
-import { CostShareResolver } from "./cost-share.service";
+import { assertServiceDateNotFuture } from "@/lib/service-date";
 
 export class ClaimsService {
   // ─── CLAIMS ─────────────────────────────────────────────
@@ -243,6 +243,11 @@ export class ClaimsService {
     source?: string;
     preauthId?: string; // explicitly linked pre-auth
   }) {
+    // ── Service-date gate (PR-013) ──────────────────────────────────────────
+    // Server-side and channel-independent: the wizard, B2B API and batch
+    // imports all pass through here or apply the same shared assertion.
+    assertServiceDateNotFuture(new Date(data.dateOfService));
+
     // ── Pre-auth gate ───────────────────────────────────────────────────────
     const member = await prisma.member.findUnique({
       where: { id: data.memberId },
@@ -273,7 +278,7 @@ export class ClaimsService {
       }
     }
 
-    // ── Provider gate ────────────────────────────────────────────────────────
+    // ── Provider gate (PR-006 ratified lifecycle, server-enforced) ──────────
     const provider = await prisma.provider.findUnique({
       where: { id: data.providerId },
       select: { contractStatus: true, name: true, tier: true },
@@ -281,6 +286,11 @@ export class ClaimsService {
     if (provider && ["EXPIRED", "SUSPENDED"].includes(provider.contractStatus)) {
       throw new Error(
         `Provider "${provider.name}" contract is ${provider.contractStatus}. Claims cannot be submitted against this provider.`
+      );
+    }
+    if (provider && provider.contractStatus === "PENDING") {
+      throw new Error(
+        `Provider "${provider.name}" is PENDING — it must be activated by an administrator before claims can be submitted against it.`
       );
     }
 
@@ -331,10 +341,18 @@ export class ClaimsService {
       lengthOfStay = Math.max(1, Math.ceil(diff / (1000 * 3600 * 24)));
     }
 
+    // ── Claim currency (PR-017 D2) ──────────────────────────────────────────
+    // Every claim carries an explicit currency: the provider's ACTIVE contract
+    // currency where determinable, else the client's transaction currency,
+    // else base. Threshold controls (approval matrix, auto-adjudication
+    // ceilings) FX-normalise from this value.
+    const currency = await ClaimsService.resolveClaimCurrency(tenantId, data.providerId, data.memberId);
+
     const created = await prisma.claim.create({
       data: {
         tenantId,
         claimNumber,
+        currency,
         memberId: data.memberId,
         providerId: data.providerId,
         // Attach the linked/auto-linked PA (WP-C1). Previously data.preauthId
@@ -377,132 +395,29 @@ export class ClaimsService {
   }
 
   /**
-   * Adjudicate (approve/decline) a claim.
-   * On approval, reserves benefit usage — unless the claim originated from a pre-auth
-   * (whose approval already reserved the usage).
+   * PR-017 D2: provider ACTIVE-contract currency → client currency → base.
+   * Shared by every intake channel so no claim is created currency-less.
    */
-  static async adjudicateClaim(
-    tenantId: string,
-    claimId: string,
-    decision: {
-      action: "APPROVED" | "PARTIALLY_APPROVED" | "DECLINED";
-      approvedAmount?: number;
-      declineReasonCode?: string;
-      declineNotes?: string;
-      notes?: string;
-      reviewerId: string;
-    }
-  ) {
-    const claim = await prisma.claim.findUnique({
-      where: { id: claimId, tenantId },
-      select: {
-        id: true, claimNumber: true, status: true,
-        memberId: true, benefitCategory: true,
-        preauths: { select: { id: true } }, receivedAt: true,
-      },
+  static async resolveClaimCurrency(tenantId: string, providerId: string, memberId: string): Promise<string> {
+    const contract = await prisma.providerContract.findFirst({
+      where: { tenantId, providerId, status: "ACTIVE" },
+      orderBy: { updatedAt: "desc" },
+      select: { currency: true },
     });
+    if (contract?.currency) return contract.currency;
 
-    if (!claim) throw new Error("Claim not found");
-    if (!["RECEIVED", "CAPTURED", "UNDER_REVIEW"].includes(claim.status)) {
-      throw new Error("Claim cannot be adjudicated in current status");
-    }
-
-    // ── Practitioner credential gate ─────────────────────────────────────────
-    const fullClaim = await prisma.claim.findUnique({
-      where: { id: claimId },
-      select: { attendingDoctor: true },
+    const member = await prisma.member.findUnique({
+      where: { id: memberId },
+      select: { group: { select: { client: { select: { currency: true } } } } },
     });
-    if (fullClaim?.attendingDoctor) {
-      const practitioner = await prisma.practitioner.findFirst({
-        where: { tenantId, licenseNumber: fullClaim.attendingDoctor },
-        include: {
-          credentials: {
-            where: { status: "ACTIVE", expiryDate: { gte: new Date() } },
-            take: 1,
-          },
-        },
-      });
-      if (practitioner && practitioner.credentials.length === 0) {
-        if (decision.action !== "DECLINED") {
-          throw new Error(
-            `Practitioner license ${fullClaim.attendingDoctor} has no active credentials. ` +
-            "Renew the credential in the provider's practitioner registry before approving."
-          );
-        }
-      }
-    }
-
-    const approvedAmount = decision.approvedAmount ?? 0;
-    const isApproved = decision.action !== "DECLINED";
-
-    return prisma.$transaction(async (tx) => {
-      // Cost-share (G9.1): deductible + co-insurance from the member's
-      // BenefitConfig, plus its configured copay % (was a hard-coded 10%).
-      const costShare = isApproved && approvedAmount > 0
-        ? await CostShareResolver.applyForClaim(tx as never, claim.memberId, claim.benefitCategory, approvedAmount)
-        : null;
-      const copay = costShare ? approvedAmount * (costShare.copayPercentage / 100) : 0;
-      const memberLiability = copay + (costShare?.memberPays ?? 0);
-
-      // 1. Stamp contracted tariff rates onto claim lines (audit trail).
-      // Resolution is contract-aware: the ACTIVE agreement's schedule governs,
-      // standalone provider rates are the fallback.
-      const resolved = await ClaimsService.resolveClaimContractRates(tenantId, claimId);
-      for (const line of resolved.lines) {
-        if (line.agreedRate !== null) {
-          await tx.claimLine.update({ where: { id: line.lineId }, data: { tariffRate: line.agreedRate } });
-        }
-      }
-
-      // 2. Reserve benefit usage only for direct (non-PA) claims that are approved.
-      // PA-attached claims were already reserved at PA approval time.
-      if (isApproved && approvedAmount > 0 && claim.preauths.length === 0) {
-        await ClaimsService.reserveBenefitUsage(
-          tx,
-          claim.memberId,
-          claim.benefitCategory,
-          approvedAmount
-        );
-      }
-
-      // Attached PAs are consumed by the decision (WP-C2): ATTACHED → UTILISED.
-      if (claim.preauths.length > 0) {
-        await tx.preAuthorization.updateMany({
-          where: { claimId, status: { in: ["APPROVED", "ATTACHED"] } },
-          data: { status: "UTILISED" },
-        });
-      }
-
-      return tx.claim.update({
-        where: { id: claimId },
-        data: {
-          status: decision.action,
-          approvedAmount: isApproved ? approvedAmount : 0,
-          copayAmount:    isApproved ? copay : 0,
-          memberLiability: isApproved ? memberLiability : 0,
-          costShareDeductible:  costShare?.deductibleApplied ?? 0,
-          costShareCoInsurance: costShare?.coInsuranceApplied ?? 0,
-          assignedReviewerId: decision.reviewerId,
-          decidedAt: new Date(),
-          turnaroundDays: Math.ceil(
-            (new Date().getTime() - claim.receivedAt.getTime()) / (1000 * 3600 * 24)
-          ),
-          declineReasonCode: decision.declineReasonCode,
-          declineNotes:      decision.declineNotes,
-          adjudicationLogs: {
-            create: {
-              userId:     decision.reviewerId,
-              action:     decision.action,
-              fromStatus: claim.status,
-              toStatus:   decision.action,
-              amount:     approvedAmount,
-              notes:      decision.notes || decision.declineNotes,
-            },
-          },
-        },
-      });
-    });
+    return member?.group?.client?.currency ?? "UGX";
   }
+
+  // ── Claim decisions moved to ClaimDecisionService (W1.1) ──────────────────
+  // The former `adjudicateClaim` here and `claimAdjudicationService.approveClaim`
+  // were duplicate decision stacks (the systemic root cause behind PR-011/014/
+  // 015/016/017/018). Both are retired; the ONLY claim decision entry point is
+  // `ClaimDecisionService.decide` — do not re-add a decision method here.
 
   // ─── PRE-AUTH ATTACHMENT (WP-C2, TPA_FEEDBACK_WORKPLAN.md §C) ────────────
 
@@ -662,6 +577,18 @@ export class ClaimsService {
         `Cannot submit pre-authorisation: group "${member.group.name}" is ${member.group.status}.`
       );
     }
+
+    // Provider gate (PR-006): PA requests are new encounters — only ACTIVE
+    // providers accept them (server-enforced, matching the dropdown rule).
+    const paProvider = await prisma.provider.findUnique({
+      where: { id: data.providerId },
+      select: { contractStatus: true, name: true },
+    });
+    if (paProvider && !["ACTIVE"].includes(paProvider.contractStatus)) {
+      throw new Error(
+        `Provider "${paProvider.name}" is ${paProvider.contractStatus} — pre-authorisations can only be requested at ACTIVE providers.`
+      );
+    }
     // ────────────────────────────────────────────────────────────────────────
 
     // ── Fraud pre-auth screen (CRITICAL rules throw; others return warnings) ─
@@ -706,95 +633,6 @@ export class ClaimsService {
   }
 
   /**
-   * Reserve benefit usage for a member atomically within a transaction.
-   * Called on PA approval and on non-PA claim approval.
-   * Returns the benefit config ID so the caller can store it on the record.
-   */
-  private static async reserveBenefitUsage(
-    tx: Prisma.TransactionClient,
-    memberId: string,
-    benefitCategory: BenefitCategory,
-    amount: number
-  ): Promise<{ configId: string | null; remaining: number }> {
-    const member = await tx.member.findUnique({
-      where: { id: memberId },
-      select: { packageVersionId: true, enrollmentDate: true },
-    });
-    if (!member?.packageVersionId) return { configId: null, remaining: 0 };
-
-    const config = await tx.benefitConfig.findFirst({
-      where: { packageVersionId: member.packageVersionId, category: benefitCategory },
-      include: {
-        sharedLimitGroups: {
-          include: {
-            sharedLimitGroup: {
-              include: { benefitConfigs: true },
-            },
-          },
-        },
-      },
-    });
-    if (!config) return { configId: null, remaining: 0 };
-
-    // Annual benefit period anchored to enrollment anniversary
-    const now = new Date();
-    const enroll = new Date(member.enrollmentDate);
-    let periodStart = new Date(now.getFullYear(), enroll.getMonth(), enroll.getDate());
-    if (periodStart > now) periodStart = new Date(now.getFullYear() - 1, enroll.getMonth(), enroll.getDate());
-    const periodEnd = new Date(periodStart.getFullYear() + 1, enroll.getMonth(), enroll.getDate());
-
-    const existing = await tx.benefitUsage.findUnique({
-      where: { memberId_benefitConfigId_periodStart: { memberId, benefitConfigId: config.id, periodStart } },
-    });
-
-    const currentUsed = Number(existing?.amountUsed ?? 0);
-    const limit = Number(config.annualSubLimit);
-    const newUsed = currentUsed + amount;
-
-    // Evaluate shared limit groups
-    let sharedRemaining = Infinity;
-    if (config.sharedLimitGroups && config.sharedLimitGroups.length > 0) {
-      for (const link of config.sharedLimitGroups) {
-        const group = link.sharedLimitGroup;
-        const configIds = group.benefitConfigs.map(bc => bc.benefitConfigId);
-        
-        const groupUsages = await tx.benefitUsage.findMany({
-          where: {
-            memberId,
-            benefitConfigId: { in: configIds },
-            periodStart,
-          },
-        });
-        
-        const groupUsedSoFar = groupUsages.reduce((sum, u) => sum + Number(u.amountUsed), 0);
-        const groupLimit = Number(group.limitAmount);
-        const remainingForGroup = Math.max(0, groupLimit - (groupUsedSoFar + amount));
-        
-        if (remainingForGroup < sharedRemaining) {
-          sharedRemaining = remainingForGroup;
-        }
-      }
-    }
-
-    if (existing) {
-      await tx.benefitUsage.update({
-        where: { id: existing.id },
-        data: { amountUsed: newUsed, claimCount: { increment: 1 }, lastUpdated: now },
-      });
-    } else {
-      await tx.benefitUsage.create({
-        data: { memberId, benefitConfigId: config.id, periodStart, periodEnd, amountUsed: amount, claimCount: 1 },
-      });
-    }
-
-    const standardRemaining = Math.max(0, limit - newUsed);
-    return { 
-      configId: config.id, 
-      remaining: sharedRemaining !== Infinity ? Math.min(standardRemaining, sharedRemaining) : standardRemaining 
-    };
-  }
-
-  /**
    * Stage 1 of two-stage review: move a SUBMITTED inpatient pre-auth to UNDER_REVIEW.
    */
   static async markPreAuthUnderReview(tenantId: string, preauthId: string) {
@@ -811,74 +649,11 @@ export class ClaimsService {
     });
   }
 
-  /**
-   * Approve or decline a pre-authorization.
-   * On approval, atomically reserves the approved amount against the member's benefit usage.
-   */
-  static async adjudicatePreAuth(
-    tenantId: string,
-    preauthId: string,
-    decision: {
-      action: "APPROVED" | "DECLINED";
-      approvedAmount?: number;
-      validDays?: number;
-      declineReasonCode?: string;
-      declineNotes?: string;
-      reviewerId: string;
-    }
-  ) {
-    const preauth = await prisma.preAuthorization.findUnique({
-      where: { id: preauthId, tenantId },
-    });
-
-    if (!preauth) throw new Error("Pre-authorization not found");
-    if (!["SUBMITTED", "UNDER_REVIEW"].includes(preauth.status)) {
-      throw new Error("Pre-authorization cannot be adjudicated in current status");
-    }
-
-    const now = new Date();
-    const validUntil = new Date(now);
-    validUntil.setDate(validUntil.getDate() + (decision.validDays ?? 30));
-
-    if (decision.action === "APPROVED") {
-      const approvedAmount = decision.approvedAmount ?? Number(preauth.estimatedCost);
-
-      return prisma.$transaction(async (tx) => {
-        // 1. Reserve benefit usage atomically
-        const { remaining } = await ClaimsService.reserveBenefitUsage(
-          tx,
-          preauth.memberId,
-          preauth.benefitCategory,
-          approvedAmount
-        );
-
-        // 2. Approve the pre-auth, snapshot remaining benefit
-        return tx.preAuthorization.update({
-          where: { id: preauthId },
-          data: {
-            status: "APPROVED",
-            approvedAmount,
-            approvedBy: decision.reviewerId,
-            approvedAt: now,
-            validFrom: now,
-            validUntil,
-            benefitRemaining: remaining,
-          },
-        });
-      });
-    } else {
-      return prisma.preAuthorization.update({
-        where: { id: preauthId },
-        data: {
-          status: "DECLINED",
-          declineReasonCode: decision.declineReasonCode,
-          declineNotes: decision.declineNotes,
-          declinedBy: decision.reviewerId,
-          declinedAt: now,
-        },
-      });
-    }
-  }
+  // ── Pre-auth decisions moved to preauthAdjudicationService (W1.1) ─────────
+  // The former `adjudicatePreAuth` here bypassed BenefitHold creation entirely
+  // (defect PR-011). The ONLY pre-auth decision entry points are
+  // `preauthAdjudicationService.approveByHuman` / `declineByHuman` (which
+  // always place/release the hold) and `executeAutoDecision`.
 
   /**
    * Create an ordinary claim shell with this pre-auth ATTACHED (WP-C2/D4).
@@ -899,11 +674,15 @@ export class ClaimsService {
       throw new Error("Pre-authorization is already attached to a claim");
     }
 
+    // A PA's expected DOS is prospective; the claim starts when service actually
+    // happens — never in the future (PR-013).
+    const now = new Date();
+    const expected = preauth.expectedDateOfService;
     const claim = await this.createClaim(tenantId, {
       memberId: preauth.memberId,
       providerId: preauth.providerId,
       serviceType: preauth.serviceType,
-      dateOfService: preauth.expectedDateOfService ?? new Date(),
+      dateOfService: expected && expected < now ? expected : now,
       diagnoses: preauth.diagnoses as Record<string, unknown>[],
       procedures: preauth.procedures as Record<string, unknown>[],
       billedAmount: Number(preauth.approvedAmount ?? preauth.estimatedCost),

@@ -15,7 +15,7 @@ type UssdInput = {
 
 function menu() {
   return [
-    "CON AiCare member self-service",
+    "CON Medvex member self-service",
     "1. Benefit balance",
     "2. Recent visits",
     "3. Renewal date",

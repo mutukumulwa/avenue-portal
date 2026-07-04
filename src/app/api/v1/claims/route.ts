@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withApiKey } from "@/lib/apiAuth";
 import { ClaimLineCategory } from "@prisma/client";
+import { isFutureServiceDate, FUTURE_SERVICE_DATE_ERROR } from "@/lib/service-date";
 
 /**
  * POST /api/v1/claims
@@ -27,6 +28,11 @@ async function postClaim(req: Request) {
         { error: "Missing required fields: memberNumber, providerCode, serviceType, dateOfService, diagnoses, lineItems" },
         { status: 400 }
       );
+    }
+
+    // PR-013: no intake channel accepts a future date of service.
+    if (isFutureServiceDate(new Date(dateOfService))) {
+      return NextResponse.json({ error: FUTURE_SERVICE_DATE_ERROR }, { status: 422 });
     }
 
     const member = await prisma.member.findFirst({
@@ -84,10 +90,15 @@ async function postClaim(req: Request) {
       0
     );
 
+    // PR-017 D2: stamp the claim currency at intake.
+    const { ClaimsService } = await import("@/server/services/claims.service");
+    const currency = await ClaimsService.resolveClaimCurrency(member.tenantId, provider.id, member.id);
+
     const claim = await prisma.claim.create({
       data: {
         tenantId:      member.tenantId,
         claimNumber,
+        currency,
         memberId:      member.id,
         providerId:    provider.id,
         // Attach the resolved PA (WP-C1): FK lives on PreAuthorization.claimId.

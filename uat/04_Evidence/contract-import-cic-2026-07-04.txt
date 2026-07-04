@@ -1,0 +1,15 @@
+Evidence: S3 contract import (CIC tariff markdown) — 2026-07-04, SUPER_ADMIN
+
+1) /contracts/import: pasted contract-mds/FFS RATES/CIC Insurance tariff.md (10,063 bytes, messy OCR) + fileName.
+2) Extract → extraction cmr60qv420001huvq15z46z64: "55 priced, 60 rate-missing, 115 total".
+   Review questions (4): VALIDITY_REVIEW_BASED (confirm), CURRENCY_UNSTATED (confirm, corpus implied KES),
+   TAX_UNSTATED (INCLUSIVE/EXCLUSIVE/UNKNOWN), RATE_MISSING_ROWS (BLOCKING - 60 rows unreadable).
+   Candidates carry per-row category mapping (CONSULTATION/PROCEDURE/IP_SERVICES/PHYSIOTHERAPY/RADIOLOGY),
+   page provenance + confidence (90% priced rows, 40% rate-missing).
+3) Commit form: provider=LifeCare Hospitals (UAT) [NOTE: PENDING provider selectable], title "UAT CIC Insurance FFS
+   Tariff 2025 — LifeCare", 2025-02-01→2026-01-31, KES → "Create draft contract".
+4) Result: /contracts/cmr60rs030002huvq9ixryu1h — PC-2026-001 DRAFT FFS RATE SCHEDULE, UNSIGNED, ALL BRANCHES,
+   KES, payment 30 calendar days (default), unlisted REFER FOR REVIEW, tax UNKNOWN.
+   Activation validation correctly failing: V1 no applicability rows; V2 UNSIGNED; V6 60 unpriced lines.
+   Action available: "Submit for review".
+Assessment: extraction/review/commit workflow works end-to-end on genuinely messy OCR. PASS (workflow CT-01 happy path).

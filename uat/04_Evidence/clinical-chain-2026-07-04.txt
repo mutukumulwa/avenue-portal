@@ -1,0 +1,19 @@
+Evidence: S9 end-to-end clinical/financial chain — 2026-07-04
+
+1. PA /preauth/new (as ADMIN): Ursula @ LifeCare, DAY_CASE/SURGICAL, est 85,000, K42.9 → PA-2026-00009 SUBMITTED.
+2. As MEDICAL_OFFICER: PA detail → two-stage flow (Stage 1 "Send for Medical Review" → UNDER_REVIEW; Stage 2 Submit Approval 85,000)
+   → APPROVED, valid until 8/3/2026. SQL: BenefitHold count = 0 system-wide (PR-011).
+3. Claim /claims/new 4-step wizard (as MEDICAL_OFFICER): member/provider comboboxes (pointerdown-driven), DAY_CASE/SURGICAL,
+   DOS 2026-07-06 (FUTURE date accepted — PR-013), ICD K42.9 w/ standard charge display, 2 free-text lines (85,000 + 1,000)
+   → CLM-2026-00760 RECEIVED, billed 86,000. Claims list shows SLA "336h left" (= Jubilee 10 business days ✔).
+4. Claim detail: PA-2026-00009 AUTO-ATTACHED (85,000 cover). Contract panel: "Adjudicating under PC-2026-003", engine preview
+   billed 86,000 → payable 3,600 (case rate), lines PRC-005 "Included in per-visit case rate". Timeline: "Double-capture:
+   ... already exists (CLM-2026-00760)" — the claim itself (PR-012); "Service date cannot be in the future".
+5. Mark as Captured → CAPTURED. Line ✓✓ → Compute Outcome → "Outcome: APPROVED, Net approved KES 86,000" (vs contract 3,600 —
+   PR-014; > PA cover 85,000 no warning — PR-015). Finalize & Queue for Settlement → APPROVED timeline entry.
+   SQL after decision: BenefitUsage rows for Ursula = 0; PA still ATTACHED (not UTILISED) — PR-016.
+   ApprovalRequest count = 0; matrix resolved lowest band because claim amount passed as UGX (hard-coded) — PR-017.
+6. Settlement /settlement as FINANCE: Create Batch LifeCare Jul 2026 → 1 claim 86,000 MAKER SUBMITTED.
+   Self-approve as maker → clean error "Maker and checker must be different users" (fixed vs June).
+   As ADMIN (checker): Approve → CHECKER APPROVED → Mark Paid → SETTLED 04/07/2026.
+7. SQL after settlement: Claim=PAID 86,000; PaymentVoucher count=0; newest JournalEntries all seed-era → no GL posting (PR-018).

@@ -34,15 +34,19 @@ _Last reviewed: 2026-07-03._
   per-config HTTP fetch, reuse `HmsBatchService.apply` (idempotency already handled).
 
 ### 3. Contract rule engine → auto-adjudication wiring
-- **Status:** partial — the contract engine prices claims and the Contract Panel on
-  the claim screen shows a **read-only preview** of its outcome, but the engine's
-  per-line decisions do not yet drive auto-adjudication. The adjudicator's manual
-  decision (guarded by the contract-enforcement ceiling checks) is authoritative.
+- **Status:** partial — the contract engine prices claims, the Contract Panel on
+  the claim screen shows a read-only preview, and **since the 2026-07 remediation
+  (PR-014) the engine's deterministic payable is a hard ceiling on every manual
+  decision** (`ClaimDecisionService.assessCeiling` — same engine as the preview;
+  exceeding it requires an approved PAY_ABOVE_CONTRACT_RATE override). The
+  engine's per-line decisions still do not drive auto-adjudication approval
+  amounts.
 - **Where:** `src/server/services/contract-engine/engine.ts` + `persist.ts`,
-  preview in `src/app/(admin)/claims/[id]/ContractPanel.tsx`, manual enforcement in
-  `src/app/(admin)/claims/[id]/actions.ts`.
+  preview in `src/app/(admin)/claims/[id]/ContractPanel.tsx`, enforcement in
+  `src/server/services/claim-decision.service.ts` (the single decision stack, W1.1).
 - **To finish:** feed engine line results into `AutoAdjudicationService` as the
-  pricing source, with the manual path as fallback.
+  pricing source (it must call the same capped computation — PR-014 #3), with
+  the manual path as fallback.
 
 ### 4. Capitation settlement (pool accounting, PMPM invoicing)
 - **Status:** deferred by decision (TPA, 2026-07-03) — capitation **setup** is live

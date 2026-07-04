@@ -2,16 +2,25 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { redirect, notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { ArrowLeft, FileText, NotebookPen, Share2 } from "lucide-react";
+import { ArrowLeft, FileText, NotebookPen, Share2, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { ProviderContractsCard } from "./ProviderContractsCard";
 import { ProviderTariffsCard } from "./ProviderTariffsCard";
 import { ProviderDiagnosisTariffsCard } from "./ProviderDiagnosisTariffsCard";
 import { ProviderPractitionersCard } from "./ProviderPractitionersCard";
+import { ProviderAdminCard } from "./ProviderAdminCard";
+import { ProviderBranchesCard } from "./ProviderBranchesCard";
 
-export default async function ProviderDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProviderDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ error?: string; notice?: string }>;
+}) {
   const session = await requireRole(ROLES.ADMIN_ONLY);
 
   const { id } = await params;
+  const { error, notice } = await searchParams;
   const provider = await prisma.provider.findUnique({
     where: { id, tenantId: session.user.tenantId },
     include: {
@@ -39,6 +48,20 @@ export default async function ProviderDetailPage({ params }: { params: Promise<{
   });
 
   if (!provider) notFound();
+
+  // Branches + aliases (PR-007)
+  const [branches, aliases] = await Promise.all([
+    prisma.providerBranch.findMany({
+      where: { tenantId: session.user.tenantId, providerId: id },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, code: true, county: true, isActive: true },
+    }),
+    prisma.providerAlias.findMany({
+      where: { tenantId: session.user.tenantId, providerId: id },
+      orderBy: { aliasName: "asc" },
+      select: { id: true, aliasName: true, source: true },
+    }),
+  ]);
 
   // Clients available for per-client tariff overrides (G5.4)
   const clients = await prisma.client.findMany({
@@ -114,6 +137,20 @@ export default async function ProviderDetailPage({ params }: { params: Promise<{
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
+      {/* Action feedback (PR-009 pattern) */}
+      {error && (
+        <div className="flex items-center gap-3 bg-[#DC3545]/10 border border-[#DC3545]/30 rounded-lg px-4 py-3">
+          <AlertTriangle size={18} className="text-[#DC3545] shrink-0" />
+          <p className="text-sm font-semibold text-[#DC3545] flex-1">{error}</p>
+        </div>
+      )}
+      {notice && (
+        <div className="flex items-center gap-3 bg-[#28A745]/10 border border-[#28A745]/40 rounded-lg px-4 py-3">
+          <CheckCircle2 size={18} className="text-[#28A745] shrink-0" />
+          <p className="text-sm font-semibold text-[#1E7E34] flex-1">{notice}</p>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link href="/providers" className="text-brand-text-muted hover:text-brand-indigo transition-colors">
@@ -129,6 +166,23 @@ export default async function ProviderDetailPage({ params }: { params: Promise<{
           {provider.tier}
         </span>
       </div>
+
+      {/* Status lifecycle + master-data edit (PR-006) */}
+      <ProviderAdminCard
+        provider={{
+          id: provider.id,
+          name: provider.name,
+          contractStatus: provider.contractStatus,
+          phone: provider.phone,
+          email: provider.email,
+          contactPerson: provider.contactPerson,
+          address: provider.address,
+          county: provider.county,
+        }}
+      />
+
+      {/* Branch + alias management (PR-007) */}
+      <ProviderBranchesCard providerId={provider.id} branches={branches} aliases={aliases} />
 
       {/* Top row: provider info + KPIs */}
       <div className="grid md:grid-cols-3 gap-5">

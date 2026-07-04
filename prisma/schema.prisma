@@ -3083,6 +3083,7 @@ enum ProviderContractStatus {
   TERMINATED // ended early
   SUPERSEDED // replaced by a successor contract; read-only historical
   ARCHIVED // read-only; excluded from default lists
+  VOIDED // PR-010 D2: abandoned in DRAFT with a reason; excluded from default lists/dropdowns, never deletable
 }
 
 // Digital-contract taxonomy (spec §3.3) — the shape of the agreement.
@@ -4237,6 +4238,7 @@ model Payment {
 model PaymentVoucher {
   id            String    @id @default(cuid())
   voucherNumber String
+  tenantId      String? // PR-018: tenant scope (nullable for legacy rows)
   providerId    String
   totalAmount   Decimal
   claimCount    Int
@@ -4245,7 +4247,14 @@ model PaymentVoucher {
   processedBy   String?
   createdAt     DateTime  @default(now())
 
+  // PR-018 #2: batch ↔ voucher ↔ JE cross-links, resolvable both ways.
+  settlementBatchId String? @unique
+  journalEntryId    String?
+
   claims Claim[]
+
+  @@index([tenantId])
+  @@index([providerId])
 }
 
 // ─── QUOTATIONS ─────────────────────────────────────────
@@ -4578,6 +4587,8 @@ enum GLSourceType {
   PREMIUM_RECEIVED
   CLAIM_APPROVED
   CLAIM_PAID
+  CLAIM_VOID // PR-018 D3: reversing JE when an approved claim is voided
+  SETTLEMENT_PAID // PR-018 D1: batch Mark Paid — Dr Claims Payable / Cr Bank
   COMMISSION_EARNED
   ENDORSEMENT_ADJUSTMENT
   CO_CONTRIBUTION_COLLECTED

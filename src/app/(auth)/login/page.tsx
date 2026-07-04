@@ -60,7 +60,7 @@ function LoginForm() {
           <div className="flex items-center space-x-3">
             <div className="h-12 w-12 bg-brand-indigo rounded-full" />
             <h1 className="text-3xl font-bold font-heading text-brand-indigo">
-              AiCare Platform
+              Medvex
             </h1>
           </div>
         </div>
@@ -147,12 +147,6 @@ function LoginForm() {
 
               <p className="text-center pt-1">
                 <a href="/reset" className="text-xs text-brand-secondary hover:underline">Forgot password?</a>
-              </p>
-
-              <p className="text-center text-xs text-brand-text-muted pt-1">
-                Admin: admin@medvex.co.ug · HR: emily.wambui@safaricom.co.ke
-                <br />Broker: broker@kaib.co.ke · Member: member@medvex.co.ug
-                <br />Password: <span className="font-mono">MedvexAdmin2024!</span>
               </p>
             </form>
           </CardContent>

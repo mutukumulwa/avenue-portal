@@ -46,12 +46,12 @@ export function DebitNoteDocument({ data }: { data: DebitNoteData }) {
   const basePremium = data.memberCount * data.ratePerMember;
 
   return (
-    <Document title={`Debit Note – ${data.invoiceNumber}`} author="AiCare Platform">
+    <Document title={`Debit Note – ${data.invoiceNumber}`} author="Medvex">
       <Page size="A4" style={s.page}>
         {/* Header */}
         <View style={s.header}>
           <View>
-            <Text style={s.brand}>AiCare</Text>
+            <Text style={s.brand}>Medvex</Text>
             <Text style={s.brandSub}>Membership Management Platform</Text>
           </View>
           <View>
@@ -142,7 +142,7 @@ export function DebitNoteDocument({ data }: { data: DebitNoteData }) {
 
         {/* Footer */}
         <View style={s.footer}>
-          <Text style={s.footerText}>AiCare Membership Platform · Confidential</Text>
+          <Text style={s.footerText}>Medvex Membership Platform · Confidential</Text>
           <Text style={s.footerText}>This debit note is computer-generated and valid without a signature.</Text>
         </View>
       </Page>

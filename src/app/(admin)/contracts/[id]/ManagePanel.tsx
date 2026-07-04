@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { formatPricingRule } from "@/lib/format-pricing-rule";
 import {
   addApplicabilityAction, attachBranchAction, detachBranchAction,
   createProviderBranchAction, addTariffLineAction, deactivateTariffAction, addExclusionAction,
@@ -131,11 +132,19 @@ export async function ManagePanel({
       {/* Pricing rules — builder */}
       <section className="rounded-xl border border-gray-200 bg-white p-5">
         <h2 className="text-sm font-semibold text-[#000523] mb-3">Pricing rules ({pricingRules.length})</h2>
-        <ul className="mb-3 space-y-1 text-xs">
+        {/* PR-008: operator-language rendering with a raw view for support. */}
+        <ul className="mb-3 space-y-1.5 text-xs">
           {pricingRules.map(r => (
-            <li key={r.id} className="flex items-center justify-between">
-              <span>{r.scope} · <span className="font-medium">{r.ruleKind}</span> {JSON.stringify(r.params)}</span>
-              {editable && <form action={deactivatePricingRuleAction}>{hiddenId}<input type="hidden" name="ruleId" value={r.id} /><button className="text-[#DC3545]">remove</button></form>}
+            <li key={r.id} className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <span className="text-[#6C757D]">{r.scope === "CONTRACT" ? "Whole contract" : r.scope.replace(/_/g, " ").toLowerCase()} · </span>
+                <span className="font-medium text-[#000523]">{formatPricingRule(r)}</span>
+                <details className="inline-block ml-2 align-baseline">
+                  <summary className="cursor-pointer text-[10px] text-[#6C757D] underline decoration-dotted inline">raw</summary>
+                  <code className="block mt-1 rounded bg-[#F8F9FA] px-2 py-1 text-[10px] text-[#6C757D] break-all">{r.ruleKind} {JSON.stringify(r.params)}</code>
+                </details>
+              </div>
+              {editable && <form action={deactivatePricingRuleAction}>{hiddenId}<input type="hidden" name="ruleId" value={r.id} /><button className="text-[#DC3545] shrink-0">remove</button></form>}
             </li>
           ))}
           {pricingRules.length === 0 && <li className="text-[#6C757D]">No pricing rules — line tariffs price directly.</li>}

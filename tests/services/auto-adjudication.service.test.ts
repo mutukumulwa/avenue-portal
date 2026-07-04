@@ -11,13 +11,13 @@ const gate = vi.hoisted(() => ({ runHardGateValidation: vi.fn(async () => ({ pas
 const exclusions = vi.hoisted(() => ({
   applyToClaim: vi.fn(async () => ({ excludedCount: 0, excludedAmount: 0, payableAmount: 50000 })),
 }));
-const claimsSvc = vi.hoisted(() => ({ adjudicateClaim: vi.fn(async () => ({})) }));
+const decisionSvc = vi.hoisted(() => ({ decide: vi.fn(async () => ({})) }));
 const audit = vi.hoisted(() => ({ append: vi.fn(async () => ({})) }));
 
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
 vi.mock("@/server/services/claim-adjudication.service", () => ({ claimAdjudicationService: gate }));
 vi.mock("@/server/services/drug-exclusion.service", () => ({ DrugExclusionService: exclusions }));
-vi.mock("@/server/services/claims.service", () => ({ ClaimsService: claimsSvc }));
+vi.mock("@/server/services/claim-decision.service", () => ({ ClaimDecisionService: decisionSvc }));
 vi.mock("@/server/services/audit-chain.service", () => ({ auditChainService: audit }));
 
 import { AutoAdjudicationService } from "@/server/services/auto-adjudication.service";
@@ -117,8 +117,8 @@ describe("AutoAdjudicationService.processIntake — execution pipeline (G3.7/G9.
     expect(db.claimLine.update).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: "l1" }, data: expect.objectContaining({ adjudicationDecision: "APPROVED" }) }),
     );
-    expect(claimsSvc.adjudicateClaim).toHaveBeenCalledWith("t1", "clm1", expect.objectContaining({
-      action: "APPROVED", approvedAmount: 50000, reviewerId: "u1",
+    expect(decisionSvc.decide).toHaveBeenCalledWith("t1", "clm1", expect.objectContaining({
+      action: "APPROVED", approvedAmount: 50000, reviewerId: "u1", systemDecision: true,
     }));
     expect(audit.append).toHaveBeenCalledWith(expect.objectContaining({ action: "CLAIM:AUTO_APPROVED" }));
     // Provenance persisted on the claim
@@ -132,7 +132,7 @@ describe("AutoAdjudicationService.processIntake — execution pipeline (G3.7/G9.
     const r = await AutoAdjudicationService.processIntake("t1", "clm1", "u1");
     expect(r.decision).toBe("ROUTE");
     expect(r.executed).toBe(false);
-    expect(claimsSvc.adjudicateClaim).not.toHaveBeenCalled();
+    expect(decisionSvc.decide).not.toHaveBeenCalled();
     expect(db.adjudicationLog.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ action: "ROUTED" }) }),
     );
@@ -145,7 +145,7 @@ describe("AutoAdjudicationService.processIntake — execution pipeline (G3.7/G9.
     exclusions.applyToClaim.mockResolvedValue({ excludedCount: 1, excludedAmount: 20000, payableAmount: 30000 });
     const r = await AutoAdjudicationService.processIntake("t1", "clm1", "u1");
     expect(r.executed).toBe(true);
-    expect(claimsSvc.adjudicateClaim).toHaveBeenCalledWith("t1", "clm1", expect.objectContaining({
+    expect(decisionSvc.decide).toHaveBeenCalledWith("t1", "clm1", expect.objectContaining({
       action: "PARTIALLY_APPROVED", approvedAmount: 30000,
     }));
   });
@@ -155,7 +155,7 @@ describe("AutoAdjudicationService.processIntake — execution pipeline (G3.7/G9.
     const r = await AutoAdjudicationService.processIntake("t1", "clm1", "u1");
     expect(r.decision).toBe("ROUTE");
     expect(r.failingGate).toBe("ALL_LINES_EXCLUDED");
-    expect(claimsSvc.adjudicateClaim).not.toHaveBeenCalled();
+    expect(decisionSvc.decide).not.toHaveBeenCalled();
   });
 
   it("reimbursements always route for manual proof verification", async () => {

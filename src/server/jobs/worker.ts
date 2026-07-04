@@ -1,3 +1,8 @@
+// PR-002 #1: the worker runs outside Next's env loader — load .env itself so
+// `npm run worker` works from a clean shell. First import so every module that
+// reads process.env at init time sees the loaded values.
+import "dotenv/config";
+import { validateWorkerConfig } from "./worker-config";
 import { Worker, Job } from "bullmq";
 import { getConnection, scheduleEscalationJob, scheduleDailyJobs, scheduleCommissionReconciliationJob, scheduleAnalyticsRefreshJob, scheduleIntakeJobs, scheduleQuotationExpiryJob, scheduleMembershipActivationJob, scheduleLapseDetectionJob, scheduleReportGenerationJob, scheduleAdminFeeAccrualJob, scheduleFraudScanJob } from "../../lib/queue";
 import { NotificationService } from "../services/notification.service";
@@ -19,11 +24,31 @@ import { runFraudScanJob } from "./fraud-scan.job";
 import { runContractLifecycleJob } from "./contract-lifecycle.job";
 import { runOfflinePackJob } from "./offline-pack.job";
 
+// PR-002 #2: fail fast on missing/placeholder config — never fall back to
+// defaults (the OS-username DB fallback caused June's silent failure storm).
+const cfg = validateWorkerConfig(process.env);
+if (!cfg.ok) {
+  for (const e of cfg.errors) console.error(`[Worker] FATAL: ${e}`);
+  process.exit(1);
+}
+
 console.log("Starting background workers...");
 
 // The worker is a long-running process, so opening the Redis socket here is
 // exactly what we want (unlike at import time during the build).
 const connection = getConnection();
+
+// PR-002 #3: heartbeat — a log line + Redis key (worker:heartbeat, TTL 180s)
+// every 60s so operations can detect a dead worker (alerting: absence of the
+// key or a stale timestamp; see docs/INSTALL.md).
+const HEARTBEAT_KEY = "worker:heartbeat";
+setInterval(() => {
+  const ts = new Date().toISOString();
+  connection
+    .set(HEARTBEAT_KEY, ts, "EX", 180)
+    .then(() => console.log(`[Worker] heartbeat ${ts}`))
+    .catch((err: Error) => console.error("[Worker] heartbeat write failed:", err.message));
+}, 60_000).unref();
 
 // Register recurring scheduled jobs (idempotent — BullMQ deduplicates by jobId)
 scheduleEscalationJob().catch(err => console.error("[Worker] Failed to schedule escalation job:", err));

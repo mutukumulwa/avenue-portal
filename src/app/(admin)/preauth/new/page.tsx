@@ -17,7 +17,8 @@ export default async function NewPreAuthPage({
   const tenantId = session.user.tenantId;
   const [members, providers] = await Promise.all([
     MembersService.getMembers(tenantId),
-    ProvidersService.getProviders(tenantId),
+    // PR-006: only operational providers are selectable for new encounters.
+    ProvidersService.getOperationalProviders(tenantId),
   ]);
 
   return (

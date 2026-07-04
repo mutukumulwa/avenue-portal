@@ -1,0 +1,24 @@
+Evidence: S4 Jubilee OP case-rate contract via guided capture — 2026-07-04
+
+Attempt 1 (PC-2026-002, created by SUPER_ADMIN):
+- /contracts/new all terms from the letter (KES, 10 BUSINESS days, MONTHLY recon, REFER_FOR_REVIEW unlisted, FULLY_EXECUTED, 2026-01-01→2026-12-31).
+- Detail page inline forms: added PER_VISIT_CASE_RATE rule rate=3600 + 7 carve-outs (rendered as raw JSON — PR-008);
+  applicability row Medvex Default Client INCLUDE (V1 cleared: "No blocking errors — warnings only");
+  5 exclusions per letter.
+- Submit for review → UNDER REVIEW. "Approve" as same user (maker) → NOTHING happens, silent (server correctly throws
+  segregation-of-duties — PR-009). Verified by reload: still UNDER REVIEW.
+- As UNDERWRITER: Approve → APPROVED (maker-checker positive path ✔).
+- Activate → silent no-op. Cause (code): start date 184d past > 90d backdating horizon → throws "requires override
+  CONTRACT_BACKDATE"; UI surfaces nothing (PR-009 extension). No path to raise that override from the screen.
+- Withdraw to draft → DRAFT, but NO header fields editable (PR-010). Contract abandoned in register.
+
+Attempt 2 (PC-2026-003, created by UNDERWRITER, start 2026-06-01→2027-05-31, submission window 30d MONTHLY_BATCH,
+balance billing ALLOWED_NONCOVERED_WITH_CONSENT):
+- Same rule/applicability/exclusions added; validation "warnings only" (V16 tax UNKNOWN).
+- Submit (underwriter) → UNDER REVIEW → log out → Approve as SUPER_ADMIN → APPROVED → Activate → **ACTIVE, v1 · ACTIVE 2026-06-01**.
+Lifecycle PASS end-to-end with segregation of duties + backdating horizon enforced.
+
+Contracts now on file for provider LifeCare Hospitals (UAT):
+- PC-2026-001 DRAFT (CIC import, 115 tariff lines, 60 rate-missing → V6 blocks activation as designed)
+- PC-2026-002 DRAFT (orphaned artifact of PR-010)
+- PC-2026-003 ACTIVE (Jubilee case-rate v2)

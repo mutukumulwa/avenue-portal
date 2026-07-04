@@ -1,5 +1,6 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
+import { ProvidersService } from "@/server/services/providers.service";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { ClaimForm } from "./ClaimForm";
@@ -26,11 +27,23 @@ export default async function NewClaimPage({
       orderBy: [{ group: { name: "asc" } }, { firstName: "asc" }],
     }),
     prisma.provider.findMany({
-      where: { tenantId },
+      // PR-006: only operational providers are selectable for new encounters.
+      where: ProvidersService.operationalWhere(tenantId),
       select: { id: true, name: true, type: true, tier: true, county: true },
       orderBy: { name: "asc" },
     }),
   ]);
+
+  // PR-007: active branches per provider power the optional branch selector.
+  const branchRows = await prisma.providerBranch.findMany({
+    where: { tenantId, isActive: true, providerId: { in: providers.map((p) => p.id) } },
+    select: { id: true, name: true, code: true, providerId: true },
+    orderBy: { name: "asc" },
+  });
+  const branchesByProvider: Record<string, { id: string; name: string; code: string | null }[]> = {};
+  for (const b of branchRows) {
+    (branchesByProvider[b.providerId] ??= []).push({ id: b.id, name: b.name, code: b.code });
+  }
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
@@ -61,6 +74,7 @@ export default async function NewClaimPage({
           tier: p.tier,
           county: p.county ?? "",
         }))}
+        branchesByProvider={branchesByProvider}
       />
     </div>
   );

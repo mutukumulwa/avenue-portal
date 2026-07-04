@@ -1,5 +1,6 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
+import { ProvidersService } from "@/server/services/providers.service";
 import { claimAdjudicationService } from "@/server/services/claim-adjudication.service";
 import { CheckCircle2, Clock, AlertTriangle, DollarSign } from "lucide-react";
 import Link from "next/link";
@@ -98,7 +99,9 @@ export default async function SettlementPage({
   });
 
   const providers = await prisma.provider.findMany({
-    where: { tenantId, contractStatus: "ACTIVE" },
+    // PR-006: settlement pays EXISTING claims — suspended/expired providers stay
+    // settleable; only PENDING (never operational) is excluded.
+    where: { tenantId, contractStatus: { in: [...ProvidersService.SETTLEMENT_STATUSES] } },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
   });

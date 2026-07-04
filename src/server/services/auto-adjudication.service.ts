@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { claimAdjudicationService } from "./claim-adjudication.service";
 import { DrugExclusionService } from "./drug-exclusion.service";
-import { ClaimsService } from "./claims.service";
+import { ClaimDecisionService } from "./claim-decision.service";
 import { auditChainService } from "./audit-chain.service";
 import { ContractEngine } from "./contract-engine/engine";
 import { ContractEngineIntegration } from "./contract-engine/persist";
@@ -63,6 +63,7 @@ export class AutoAdjudicationService {
         benefitCategory: true,
         invoiceNumber: true,
         billedAmount: true,
+        currency: true,
         member: { select: { group: { select: { clientId: true } } } },
       },
     });
@@ -78,12 +79,14 @@ export class AutoAdjudicationService {
     }
 
     // Deterministic hard gates (dup invoice, double-capture, temporal, cover).
+    // The claim under evaluation is excluded so it never flags itself (PR-012).
     const gates = await claimAdjudicationService.runHardGateValidation(tenantId, {
       providerId: claim.providerId,
       memberId: claim.memberId,
       dateOfService: claim.dateOfService,
       benefitCategory: claim.benefitCategory,
       invoiceNumber: claim.invoiceNumber ?? undefined,
+      excludeClaimId: claimId,
     });
     if (!gates.passed) {
       return { decision: "ROUTE", failingGate: gates.errors[0] ?? "HARD_GATE", reason: gates.errors.join("; "), policyId };
@@ -97,15 +100,34 @@ export class AutoAdjudicationService {
       }
     }
 
-    // Within the auto-approve ceiling.
+    // Within the auto-approve ceiling — FX-normalised (PR-017 boundary sweep):
+    // the policy ceiling is denominated in the policy's currency (seed default
+    // UGX) while claims may carry KES; both sides convert to base before the
+    // comparison. A missing rate fails safe (routes).
     const ceiling = policy.maxAutoApproveAmount != null ? Number(policy.maxAutoApproveAmount) : null;
-    if (ceiling != null && Number(claim.billedAmount) > ceiling) {
-      return {
-        decision: "ROUTE",
-        failingGate: "ABOVE_CEILING",
-        reason: `Billed ${Number(claim.billedAmount)} exceeds auto-approve ceiling ${ceiling}`,
-        policyId,
-      };
+    if (ceiling != null) {
+      const { FxService } = await import("./fx.service");
+      const policyCurrency = (policyRow?.currency as string | undefined) ?? "UGX";
+      const claimNorm = await FxService.normalise(tenantId, Number(claim.billedAmount), claim.currency ?? "UGX");
+      const ceilingNorm = await FxService.normalise(tenantId, ceiling, policyCurrency);
+      const claimFxMissing = claimNorm.identity && (claim.currency ?? "UGX") !== "UGX";
+      const ceilingFxMissing = ceilingNorm.identity && policyCurrency !== "UGX";
+      if (claimFxMissing || ceilingFxMissing) {
+        return {
+          decision: "ROUTE",
+          failingGate: "FX_RATE_MISSING",
+          reason: `No FX rate in force to compare ${claim.currency} claim against ${policyCurrency} ceiling — fail-safe route`,
+          policyId,
+        };
+      }
+      if (claimNorm.baseAmount > ceilingNorm.baseAmount) {
+        return {
+          decision: "ROUTE",
+          failingGate: "ABOVE_CEILING",
+          reason: `Billed ${claim.currency} ${Number(claim.billedAmount).toLocaleString()} (≈ UGX ${Math.round(claimNorm.baseAmount).toLocaleString()}) exceeds auto-approve ceiling ${policyCurrency} ${ceiling.toLocaleString()}`,
+          policyId,
+        };
+      }
     }
 
     // Digital-contract engine gates (opt-in). Named gates feed the same routing
@@ -214,10 +236,16 @@ export class AutoAdjudicationService {
         claim.claimLines.length > 0 ? exclusions.payableAmount : Number(claim.billedAmount);
       const action = exclusions.excludedCount > 0 ? ("PARTIALLY_APPROVED" as const) : ("APPROVED" as const);
 
-      await ClaimsService.adjudicateClaim(tenantId, claimId, {
+      // W1.1: auto-approval executes through the canonical decision stack so
+      // usage/holds/GL side-effects are identical to a human decision.
+      // systemDecision skips the matrix role-gate — the policy gates above are
+      // the auto path's authorisation; matrix-banded claims exceed the policy
+      // ceiling and route to humans anyway.
+      await ClaimDecisionService.decide(tenantId, claimId, {
         action,
         approvedAmount,
         reviewerId: actorId,
+        systemDecision: true,
         notes: `Auto-adjudicated (policy ${result.policyId ?? "built-in default"})${
           exclusions.excludedCount > 0 ? ` — ${exclusions.excludedCount} excluded-drug line(s) declined` : ""
         }`,

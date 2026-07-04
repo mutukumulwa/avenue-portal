@@ -67,7 +67,7 @@ export const ReportDocument = ({ title, data }: { title: string, data: ReportPdf
       )}
 
       <Text style={styles.footer}>
-        Confidential Document · Generated via AiCare Membership Platform
+        Confidential Document · Generated via the Medvex Membership Platform
       </Text>
     </Page>
   </Document>

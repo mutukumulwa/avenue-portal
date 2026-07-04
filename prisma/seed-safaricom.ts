@@ -55,7 +55,9 @@ async function main() {
   const essentialPkg = await prisma.packageVersion.findFirstOrThrow({ where: { package: { name: "Medvex Essential" } }, include: { package: true } });
 
   // ── 4. HR_MANAGER user ────────────────────────────────────────────────────────
-  const pw = await bcrypt.hash("MedvexAdmin2024!", 10);
+  // PR-003: burned default rotated — same convention as prisma/seed.ts.
+  const SEED_PASSWORD = process.env.SEED_PASSWORD || "Mdx!Seed-2026#Rotate";
+  const pw = await bcrypt.hash(SEED_PASSWORD, 10);
 
   const existing = await prisma.user.findFirst({
     where: { tenantId, email: "emily.wambui@safaricom.co.ke" },
@@ -422,7 +424,7 @@ async function main() {
   }
 
   console.log("\n🎉 Safaricom top-up complete!");
-  console.log("   HR Login: emily.wambui@safaricom.co.ke / MedvexAdmin2024!");
+  console.log("   HR Login: emily.wambui@safaricom.co.ke (seed password)");
 }
 
 main()

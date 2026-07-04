@@ -104,7 +104,7 @@ export default async function DashboardPage() {
     <div className="space-y-6">
       <div className="flex flex-col space-y-2">
         <h1 className="text-3xl font-bold font-heading text-brand-text-heading">Dashboard Overview</h1>
-        <p className="text-brand-text-muted">Welcome back to the AiCare platform. Here is what is happening today.</p>
+        <p className="text-brand-text-muted">Welcome back to the Medvex platform. Here is what is happening today.</p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

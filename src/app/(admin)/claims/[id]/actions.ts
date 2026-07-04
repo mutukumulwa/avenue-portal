@@ -4,14 +4,18 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { ClaimsService } from "@/server/services/claims.service";
-import { ApprovalMatrixService } from "@/server/services/approval-matrix.service";
-import { ApprovalRequestService } from "@/server/services/approval-request.service";
+import { ClaimDecisionService } from "@/server/services/claim-decision.service";
+import { overrideService } from "@/server/services/override.service";
 import { CoContributionService } from "@/server/services/coContribution/coContribution.service";
 import { GLService } from "@/server/services/gl.service";
 import Decimal from "decimal.js";
 import { revalidatePath } from "next/cache";
 import { writeAudit } from "@/lib/audit";
 
+/**
+ * Canonical decision entry point (W1.1): parse the form, delegate every
+ * control to ClaimDecisionService.decide, surface its message verbatim.
+ */
 export async function adjudicateClaimAction(formData: FormData) {
   const session = await requireRole(ROLES.OPS);
   const tenantId = session.user.tenantId;
@@ -22,12 +26,21 @@ export async function adjudicateClaimAction(formData: FormData) {
   try {
     // CAPTURED is a state transition only — mark claim as data-entry complete
     if (action === "CAPTURED") {
-      await prisma.claim.update({
+      const captured = await prisma.claim.update({
         where: { id: claimId, tenantId },
         data: { status: "CAPTURED" },
+        select: { claimNumber: true },
       });
       await prisma.adjudicationLog.create({
         data: { claimId, action: "CAPTURED", toStatus: "CAPTURED", notes: "Claim data entry complete — forwarded for review.", userId: session.user.id },
+      });
+      // PR-020: the CAPTURED transition is an auditable business mutation.
+      await writeAudit({
+        userId: session.user.id,
+        action: "CLAIM_CAPTURED",
+        module: "CLAIMS",
+        description: `Claim ${captured.claimNumber} marked captured — forwarded for adjudication`,
+        metadata: { claimId },
       });
       revalidatePath(`/claims/${claimId}`);
       revalidatePath("/claims");
@@ -35,224 +48,26 @@ export async function adjudicateClaimAction(formData: FormData) {
     }
 
     const approvedAmount = action !== "DECLINED" ? Number(formData.get("approvedAmount") || 0) : 0;
+    const overCover = formData.get("overCoverConfirmed") === "on"
+      ? ((formData.get("overCoverNote") as string)?.trim() || "confirmed by adjudicator")
+      : null;
 
-    // ── Approval-matrix engine (G3.1) ─────────────────────────────────────────
-    // Route the claim-payment authorization through the matrix engine: it
-    // resolves the single governing rule (client-scoped, action-typed, amount
-    // band FX-normalised to base) and gates on the first required role. Replaces
-    // the prior ad-hoc band/role check (resolves AICARE_TODO V-02).
-    if (action === "APPROVED" || action === "PARTIALLY_APPROVED") {
-      const claim = await prisma.claim.findUnique({
-        where: { id: claimId, tenantId },
-        select: {
-          serviceType: true,
-          benefitCategory: true,
-          adjudicatorId: true,
-          member: { select: { group: { select: { clientId: true } } } },
-        },
-      });
-      if (claim) {
-        const resolved = await ApprovalMatrixService.resolve(tenantId, {
-          actionType: "CLAIM_PAYMENT",
-          clientId: claim.member?.group?.clientId ?? null,
-          amount: approvedAmount,
-          currency: "UGX",
-          serviceType: claim.serviceType,
-          benefitCategory: claim.benefitCategory,
-        });
-        if (resolved) {
-          // Multi-level rule → open (or require) an ApprovalRequest worked
-          // through the Approvals console; the direct approval is blocked.
-          if (resolved.steps.length > 1) {
-            const existing = await prisma.approvalRequest.findFirst({
-              where: { tenantId, entityType: "Claim", entityId: claimId, status: { in: ["PENDING", "ESCALATED"] } },
-              select: { id: true },
-            });
-            if (!existing) {
-              await ApprovalRequestService.create(tenantId, {
-                actionType: "CLAIM_PAYMENT",
-                entityType: "Claim",
-                entityId: claimId,
-                makerId: session.user.id,
-                clientId: claim.member?.group?.clientId ?? null,
-                amount: approvedAmount,
-                currency: "UGX",
-                serviceType: claim.serviceType,
-                benefitCategory: claim.benefitCategory,
-              });
-            }
-            throw new Error(
-              `This claim (UGX ${approvedAmount.toLocaleString()}) needs ${resolved.steps.length}-level approval. A request has been opened — action it in Approvals.`,
-            );
-          }
-          // Single-level rule → synchronous role gate + SoD.
-          const step = resolved.steps[0];
-          if (!ApprovalMatrixService.roleAuthorised(session.user.role, step.requiredRole)) {
-            throw new Error(
-              `Approval matrix: this claim (UGX ${approvedAmount.toLocaleString()}) requires ${step.requiredRole.replace(/_/g, " ")} or above. Your role (${session.user.role}) is not authorised to approve it.`,
-            );
-          }
-          // Segregation of duties: the approver must not be the claim's adjudicator/maker.
-          if (claim.adjudicatorId) {
-            ApprovalMatrixService.enforceSegregationOfDuties(claim.adjudicatorId, session.user.id);
-          }
-        }
-      }
-    }
-
-    // ── Contract enforcement block ────────────────────────────────────────────
-    // The provider's ACTIVE contract governs what each line may pay:
-    // scheduled rates cap coded lines, exclusions pay zero, the contract's
-    // unlisted-service rule decides everything else.
-    // ── Benefit funding model (WP-F2/D8) ─────────────────────────────────────
-    // CAPITATION-funded lines are prepaid via the provider's pool: they leave
-    // the FFS pricing path entirely (payable 0, pool-tagged on decision).
-    const { FundingModelService } = await import("@/server/services/funding-model.service");
-    const funding = await FundingModelService.resolveForClaim(tenantId, claimId);
-    const capitatedLineIds = new Set(funding.lines.filter((l) => l.capitated).map((l) => l.lineId));
-
-    if (action === "APPROVED" || action === "PARTIALLY_APPROVED") {
-      const { contract, lines: allRates } = await ClaimsService.resolveClaimContractRates(tenantId, claimId);
-      // Capitated lines skip FFS enforcement — they price at 0 regardless.
-      const rates = allRates.filter((r) => !capitatedLineIds.has(r.lineId));
-      if (rates.length > 0) {
-        const claimMeta = await prisma.claim.findUnique({
-          where: { id: claimId, tenantId },
-          select: { preauths: { select: { id: true } } },
-        });
-
-        // Contract requires pre-authorization for specific services
-        const paLines = rates.filter(r => r.requiresPreauth);
-        if (paLines.length > 0 && (claimMeta?.preauths.length ?? 0) === 0) {
-          const codes = paLines.map(r => r.cptCode ?? "uncoded").join(", ");
-          throw new Error(
-            `Contract ${contract?.contractNumber ?? ""} requires pre-authorization for: ${codes}. Link an approved PA to this claim or decline the line(s).`,
-          );
-        }
-
-        // Quantity caps per visit
-        const qtyLines = rates.filter(r => r.quantityExceeded);
-        if (qtyLines.length > 0) {
-          const detail = qtyLines.map(r => `${r.cptCode ?? "uncoded"} (${r.quantity} > max ${r.maxQuantityPerVisit})`).join(", ");
-          throw new Error(`Contract quantity limits exceeded: ${detail}. Reduce the billed quantity or query the provider.`);
-        }
-
-        // Payable ceiling: enforce wherever the contract gives a hard number.
-        let ceiling = 0;
-        let hasEnforceableLines = false;
-        const zeroRules: string[] = [];
-        for (const r of rates) {
-          const cappedQty = r.maxQuantityPerVisit != null ? Math.min(r.quantity, r.maxQuantityPerVisit) : r.quantity;
-          if (r.allowedUnit !== null) {
-            hasEnforceableLines = true;
-            ceiling += r.allowedUnit * cappedQty;
-            if (r.allowedUnit === 0) zeroRules.push(`${r.cptCode ?? "uncoded"} (${r.ruleApplied === "EXCLUDED" ? "excluded by contract" : "unlisted services not payable"})`);
-          } else {
-            ceiling += r.unitCost * cappedQty; // REFER_FOR_REVIEW / no contract — reviewer judgement
-          }
-        }
-
-        if (hasEnforceableLines && approvedAmount > ceiling) {
-          const ruleNote = contract
-            ? `Contract ${contract.contractNumber} (unlisted services: ${contract.unlistedServiceRule.replace(/_/g, " ").toLowerCase()}${contract.unlistedDiscountPct != null ? ` ${contract.unlistedDiscountPct}%` : ""})`
-            : "Provider tariff schedule";
-          const zeroNote = zeroRules.length ? ` Non-payable lines: ${zeroRules.join("; ")}.` : "";
-          throw new Error(
-            `Contract enforcement: approved amount (KES ${approvedAmount.toLocaleString()}) exceeds the payable ceiling of KES ${Math.round(ceiling).toLocaleString()} under ${ruleNote}.${zeroNote} Reduce the amount or query the provider.`,
-          );
-        }
-      }
-    }
-
-    // PA cover cap (WP-C2): warn — never block — when the claim exceeds the
-    // attached pre-auth cover. The overage note travels in the adjudication log.
-    let notes = (formData.get("notes") as string) || undefined;
-    if (action === "APPROVED" || action === "PARTIALLY_APPROVED") {
-      const coverage = await ClaimsService.getPreauthCoverage(tenantId, claimId);
-      if (coverage.exceedsCover) {
-        const warn = `PA cover warning: billed ${coverage.billedAmount.toLocaleString()} exceeds attached pre-auth cover ${coverage.approvedCover.toLocaleString()}.`;
-        notes = notes ? `${notes} ${warn}` : warn;
-      }
-      if (funding.anyCapitated) {
-        const note = `COVERED_BY_CAPITATION: ${capitatedLineIds.size} line(s) are prepaid via the capitation pool and price at 0.`;
-        notes = notes ? `${notes} ${note}` : note;
-      }
-    }
-
-    const claim = await ClaimsService.adjudicateClaim(tenantId, claimId, {
+    const claim = await ClaimDecisionService.decide(tenantId, claimId, {
       action,
       approvedAmount,
-      declineReasonCode: formData.get("declineReasonCode") as string || undefined,
-      declineNotes: formData.get("declineNotes") as string || undefined,
-      notes,
+      declineReasonCode: (formData.get("declineReasonCode") as string) || undefined,
+      declineNotes: (formData.get("declineNotes") as string) || undefined,
+      notes: (formData.get("notes") as string) || undefined,
       reviewerId: session.user.id,
+      reviewerRole: session.user.role,
+      overCoverConfirmation: overCover,
     });
-
-    // WP-F2: zero the capitated lines + tag the pool on the decided claim.
-    if (action === "APPROVED" || action === "PARTIALLY_APPROVED") {
-      await FundingModelService.applyToDecidedClaim(tenantId, claimId, funding);
-    }
-
-    // Auto-post GL entry when claim is approved or partially approved
-    if ((action === "APPROVED" || action === "PARTIALLY_APPROVED") && approvedAmount > 0) {
-      try {
-        const coTx = await prisma.coContributionTransaction.findUnique({
-          where: { claimId },
-          select: { finalAmount: true },
-        });
-        const coContribAmount = coTx ? Number(coTx.finalAmount) : 0;
-
-        await GLService.postClaimApproved(tenantId, {
-          sourceId:  claim.id,
-          reference: claim.claimNumber,
-          amount:    approvedAmount,
-          coContributionAmount: coContribAmount,
-          postedById: session.user.id,
-        });
-      } catch {
-        // GL not yet set up — swallow silently so adjudication still completes
-      }
-    }
-
-    // ── Self-funded deduction ──────────────────────────────────────────────────
-    if ((action === "APPROVED" || action === "PARTIALLY_APPROVED") && approvedAmount > 0) {
-      try {
-        const memberGroup = await prisma.member.findUnique({
-          where: { id: claim.memberId },
-          select: { group: { select: { fundingMode: true, selfFundedAccount: { select: { id: true, balance: true } } } } },
-        });
-        const account = memberGroup?.group?.selfFundedAccount;
-        if (memberGroup?.group?.fundingMode === "SELF_FUNDED" && account) {
-          const newBalance = Number(account.balance) - approvedAmount;
-          await prisma.$transaction([
-            prisma.selfFundedAccount.update({
-              where: { id: account.id },
-              data: { balance: newBalance, totalClaims: { increment: approvedAmount } },
-            }),
-            prisma.fundTransaction.create({
-              data: {
-                tenantId,
-                selfFundedAccountId: account.id,
-                claimId: claim.id,
-                type: "CLAIM_DEDUCTION",
-                amount: approvedAmount,
-                balanceAfter: newBalance,
-                description: `Claim ${claim.claimNumber} — ${action.replace(/_/g, " ").toLowerCase()}`,
-                postedById: session.user.id,
-              },
-            }),
-          ]);
-        }
-      } catch {
-        // Fund deduction failed — log silently, adjudication already committed
-      }
-    }
 
     await writeAudit({
       userId: session.user.id,
       action: `CLAIM_${action}`,
       module: "CLAIMS",
-      description: `Claim ${claim.claimNumber} ${action.toLowerCase().replace(/_/g, " ")} — KES ${approvedAmount.toLocaleString()}`,
+      description: `Claim ${claim.claimNumber} ${action.toLowerCase().replace(/_/g, " ")} — ${claim.currency} ${approvedAmount.toLocaleString()}`,
       metadata: { claimId, action, approvedAmount },
     });
   } catch (err: unknown) {
@@ -263,8 +78,77 @@ export async function adjudicateClaimAction(formData: FormData) {
   if (errorMsg) {
     redirect(`/claims/${claimId}?error=${encodeURIComponent(errorMsg)}`);
   }
-  
+
   redirect(`/claims`);
+}
+
+/**
+ * PR-014 D1: raise a PAY_ABOVE_CONTRACT_RATE override for this claim. Once a
+ * senior approver actions it on /overrides, the decision may exceed the
+ * contract ceiling.
+ */
+export async function requestPriceOverrideAction(formData: FormData) {
+  const session = await requireRole(ROLES.OPS);
+  const tenantId = session.user.tenantId;
+  const claimId = formData.get("claimId") as string;
+  const justification = ((formData.get("justification") as string) || "").trim();
+  const requestedAmount = Number(formData.get("requestedAmount") || 0);
+
+  let errorMsg = "";
+  let okMsg = "";
+  try {
+    const assessment = await ClaimDecisionService.assessCeiling(tenantId, claimId);
+    const impact = assessment.ceiling != null ? Math.max(0, requestedAmount - assessment.ceiling) : requestedAmount;
+    await overrideService.request({
+      tenantId,
+      makerId: session.user.id,
+      overrideType: "PAY_ABOVE_CONTRACT_RATE",
+      entityType: "Claim",
+      entityId: claimId,
+      reasonCode: "OTHER",
+      justification,
+      preState: { requestedAmount, ceiling: assessment.ceiling, source: assessment.source },
+      financialImpact: impact,
+    });
+    okMsg = "Override request raised — it must be approved on the Overrides console before the amount can be approved.";
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message === "NEXT_REDIRECT") throw err;
+    errorMsg = err instanceof Error ? err.message : "An error occurred";
+  }
+
+  redirect(`/claims/${claimId}?${errorMsg ? `error=${encodeURIComponent(errorMsg)}` : `notice=${encodeURIComponent(okMsg)}`}`);
+}
+
+/**
+ * PR-016 #6 / PR-018 #4: void an approved-not-settled claim with compensating
+ * usage + GL reversals.
+ */
+export async function voidClaimAction(formData: FormData) {
+  const session = await requireRole(ROLES.OPS);
+  const claimId = formData.get("claimId") as string;
+  const reason = ((formData.get("reason") as string) || "").trim();
+
+  let errorMsg = "";
+  try {
+    if (reason.length < 5) throw new Error("A void reason is required (min 5 characters).");
+    const claim = await ClaimDecisionService.voidClaim(session.user.tenantId, claimId, {
+      actorId: session.user.id,
+      reason,
+    });
+    await writeAudit({
+      userId: session.user.id,
+      action: "CLAIM_VOID",
+      module: "CLAIMS",
+      description: `Claim ${claim.claimNumber} voided — ${reason}`,
+      metadata: { claimId, reason },
+    });
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message === "NEXT_REDIRECT") throw err;
+    errorMsg = err instanceof Error ? err.message : "An error occurred";
+  }
+
+  if (errorMsg) redirect(`/claims/${claimId}?error=${encodeURIComponent(errorMsg)}`);
+  redirect(`/claims/${claimId}`);
 }
 
 // ── Exception logging ──────────────────────────────────────────────────────

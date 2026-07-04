@@ -96,7 +96,7 @@ export function HRSidebar({ groupName, userRole }: { groupName: string; userRole
         <Link href="/hr/dashboard" className="mb-4 flex items-center pl-1 space-x-2">
           <div className="h-8 w-8 bg-brand-indigo rounded-full shrink-0" />
           <span className="text-lg font-bold font-heading text-brand-indigo leading-tight">
-            AiCare<br />
+            Medvex<br />
             <span className="text-xs font-semibold text-brand-text-muted font-body">{groupName}</span>
           </span>
         </Link>

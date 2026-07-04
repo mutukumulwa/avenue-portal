@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { ClaimsService } from "@/server/services/claims.service";
+import { preauthAdjudicationService } from "@/server/services/preauth-adjudication.service";
 
 export const preauthRouter = createTRPCRouter({
   list: protectedProcedure
@@ -63,10 +64,24 @@ export const preauthRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      return ClaimsService.adjudicatePreAuth(ctx.tenantId, input.preauthId, {
-        ...input,
-        reviewerId: ctx.session.user.id,
-      });
+      // W1.1: canonical PA decision stack — approvals always place a hold (PR-011).
+      if (input.action === "APPROVED") {
+        return preauthAdjudicationService.approveByHuman(
+          input.preauthId,
+          ctx.tenantId,
+          ctx.session.user.id,
+          input.approvedAmount ?? 0,
+          input.declineNotes,
+          input.validDays,
+        );
+      }
+      return preauthAdjudicationService.declineByHuman(
+        input.preauthId,
+        ctx.tenantId,
+        ctx.session.user.id,
+        input.declineReasonCode ?? "OTHER",
+        input.declineNotes ?? "",
+      );
     }),
 
   convertToClaim: protectedProcedure

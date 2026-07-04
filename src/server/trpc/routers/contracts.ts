@@ -45,7 +45,10 @@ export const contractsRouter = createTRPCRouter({
     )
     .query(async ({ ctx, input }) => {
       const where: Prisma.ProviderContractWhereInput = { tenantId: ctx.tenantId };
+      // PR-010 D2: voided contracts leave default listings/dropdowns; they are
+      // only returned when explicitly filtered for.
       if (input?.status) where.status = input.status;
+      else where.status = { not: "VOIDED" };
       if (input?.contractType) where.contractType = input.contractType;
       if (input?.providerId) where.providerId = input.providerId;
       if (input?.clientId) where.applicability = { some: { clientId: input.clientId } };

@@ -31,7 +31,7 @@ export function BrokerSidebar({ userRole }: { userRole: string }) {
         <Link href="/broker/dashboard" className="mb-4 flex items-center pl-2.5 space-x-2">
           <div className="h-8 w-8 bg-brand-indigo rounded-full" />
           <span className="self-center whitespace-nowrap text-xl font-bold font-heading text-brand-indigo">
-            AiCare | Broker
+            Medvex | Broker
           </span>
         </Link>
         <PortalSwitcher userRole={userRole} />

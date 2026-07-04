@@ -89,37 +89,109 @@ async function withContract(fd: FormData) {
 
 export async function submitForReviewAction(fd: FormData) {
   const { tenantId, userId, id } = await withContract(fd);
-  await guarded(id, () => ContractLifecycleService.submitForReview(tenantId, id, userId));
+  await guarded(id, () => ContractLifecycleService.submitForReview(tenantId, id, userId), "Contract submitted for review.");
 }
 export async function approveContractAction(fd: FormData) {
   const { tenantId, userId, id } = await withContract(fd);
-  await guarded(id, () => ContractLifecycleService.approve(tenantId, id, userId));
+  await guarded(id, () => ContractLifecycleService.approve(tenantId, id, userId), "Contract approved.");
 }
 export async function requestClarificationAction(fd: FormData) {
   const { tenantId, userId, id } = await withContract(fd);
   const comment = str(fd, "comment") ?? "Please clarify.";
-  await guarded(id, () => ContractLifecycleService.requestClarification(tenantId, id, userId, comment));
+  await guarded(id, () => ContractLifecycleService.requestClarification(tenantId, id, userId, comment), "Clarification requested.");
 }
 export async function returnToDraftAction(fd: FormData) {
   const { tenantId, userId, id } = await withContract(fd);
-  await guarded(id, () => ContractLifecycleService.returnToDraft(tenantId, id, userId, str(fd, "reason")));
+  await guarded(id, () => ContractLifecycleService.returnToDraft(tenantId, id, userId, str(fd, "reason")), "Contract returned to draft.");
 }
 export async function activateContractAction(fd: FormData) {
   const { tenantId, userId, id } = await withContract(fd);
   const allowUnsigned = str(fd, "allowUnsigned") === "on";
-  await guarded(id, () => ContractLifecycleService.activate(tenantId, id, userId, { allowUnsigned }));
+  // PR-009 #2: an APPROVED CONTRACT_BACKDATE override on this contract unblocks
+  // activation past the backdating horizon.
+  const backdateOverride = await prisma.overrideRecord.findFirst({
+    where: { tenantId, entityType: "ProviderContract", entityId: id, overrideType: "CONTRACT_BACKDATE", status: "APPROVED" },
+    select: { id: true },
+  });
+  await guarded(
+    id,
+    () => ContractLifecycleService.activate(tenantId, id, userId, { allowUnsigned, backdateOverrideId: backdateOverride?.id }),
+    "Contract activated.",
+  );
 }
 export async function suspendContractAction(fd: FormData) {
   const { tenantId, userId, id } = await withContract(fd);
-  await guarded(id, () => ContractLifecycleService.suspend(tenantId, id, userId, str(fd, "reason")));
+  await guarded(id, () => ContractLifecycleService.suspend(tenantId, id, userId, str(fd, "reason")), "Contract suspended.");
 }
 export async function reinstateContractAction(fd: FormData) {
   const { tenantId, userId, id } = await withContract(fd);
-  await guarded(id, () => ContractLifecycleService.reinstate(tenantId, id, userId, str(fd, "reason")));
+  await guarded(id, () => ContractLifecycleService.reinstate(tenantId, id, userId, str(fd, "reason")), "Contract reinstated.");
 }
 export async function terminateContractAction(fd: FormData) {
   const { tenantId, userId, id } = await withContract(fd);
-  await guarded(id, () => ContractLifecycleService.terminate(tenantId, id, userId, str(fd, "reason")));
+  await guarded(id, () => ContractLifecycleService.terminate(tenantId, id, userId, str(fd, "reason")), "Contract terminated.");
+}
+
+// ── PR-010: DRAFT header edit + void ─────────────────────────────────────
+export async function editContractHeaderAction(fd: FormData) {
+  const { tenantId, userId, id } = await withContract(fd);
+  const date = (k: string) => (str(fd, k) ? new Date(str(fd, k)!) : undefined);
+  await guarded(
+    id,
+    () =>
+      ContractLifecycleService.editDraftHeader(tenantId, id, userId, {
+        title: str(fd, "title"),
+        contractType: str(fd, "contractType"),
+        startDate: date("startDate"),
+        endDate: date("endDate"),
+        reviewDueDate: date("reviewDueDate"),
+        branchScope: str(fd, "branchScope"),
+        externalContractRef: str(fd, "externalContractRef"),
+        currency: str(fd, "currency"),
+        executionStatus: str(fd, "executionStatus"),
+        paymentTermDays: num(fd, "paymentTermDays"),
+        paymentTermType: str(fd, "paymentTermType"),
+        submissionWindowDays: num(fd, "submissionWindowDays"),
+        submissionWindowBasis: str(fd, "submissionWindowBasis"),
+        balanceBillingPolicy: str(fd, "balanceBillingPolicy"),
+        taxInclusive: str(fd, "taxInclusive"),
+        reconciliationCadence: str(fd, "reconciliationCadence"),
+        unlistedServiceRule: str(fd, "unlistedServiceRule"),
+        unlistedDiscountPct: num(fd, "unlistedDiscountPct"),
+        notes: str(fd, "notes"),
+      }),
+    "Contract header updated — validation re-run below.",
+  );
+}
+
+export async function voidContractAction(fd: FormData) {
+  const { tenantId, userId, id } = await withContract(fd);
+  const reason = str(fd, "reason") ?? "";
+  await guarded(id, () => ContractLifecycleService.voidContract(tenantId, id, userId, reason), "Contract voided.");
+}
+
+// ── PR-009 #3: raise the CONTRACT_BACKDATE override from the contract ────
+export async function requestBackdateOverrideAction(fd: FormData) {
+  const { session, tenantId, userId, id } = await withContract(fd);
+  void session;
+  const justification = (str(fd, "justification") ?? "").trim();
+  const { overrideService } = await import("@/server/services/override.service");
+  try {
+    await overrideService.request({
+      tenantId,
+      makerId: userId,
+      overrideType: "CONTRACT_BACKDATE",
+      entityType: "ProviderContract",
+      entityId: id,
+      reasonCode: "OTHER",
+      justification,
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Override request failed";
+    redirect(`/contracts/${id}?error=${encodeURIComponent(msg)}`);
+  }
+  revalidatePath(`/contracts/${id}`);
+  redirect(`/contracts/${id}?notice=${encodeURIComponent("CONTRACT_BACKDATE override requested — once approved on the Overrides console, Activate will succeed.")}`);
 }
 
 export async function renewContractAction(fd: FormData) {
@@ -148,16 +220,22 @@ export async function renewContractAction(fd: FormData) {
   redirect(`/contracts/${renewed!.id}`);
 }
 
-/** Run a transition; on failure redirect back to detail with the error surfaced. */
-async function guarded(id: string, fn: () => Promise<unknown>) {
+/**
+ * PR-009: the standard server-action result pattern for this module — run the
+ * transition; on failure redirect back with the service's message verbatim
+ * (?error=), on success confirm (?notice=). NEXT_REDIRECT must always
+ * re-throw, never be treated as a failure.
+ */
+async function guarded(id: string, fn: () => Promise<unknown>, successMsg?: string) {
   try {
     await fn();
   } catch (e) {
+    if (e instanceof Error && e.message === "NEXT_REDIRECT") throw e;
     const msg = e instanceof Error ? e.message : "Action failed";
     revalidatePath(`/contracts/${id}`);
     redirect(`/contracts/${id}?error=${encodeURIComponent(msg)}`);
   }
   revalidatePath(`/contracts/${id}`);
   revalidatePath("/contracts");
-  redirect(`/contracts/${id}`);
+  redirect(`/contracts/${id}${successMsg ? `?notice=${encodeURIComponent(successMsg)}` : ""}`);
 }

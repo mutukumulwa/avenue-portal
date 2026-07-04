@@ -94,7 +94,7 @@ export default async function MemberWalletPage() {
       <section className="rounded-[8px] border border-[#17A2B8]/25 bg-[#17A2B8]/5 p-4">
         <p className="text-sm font-bold text-brand-text-heading">Facility authorization rule</p>
         <p className="mt-1 text-sm text-brand-text-muted">
-          Service should only be treated as paid after AiCare records a confirmed payment callback. A screenshot or SMS alone is not confirmation.
+          Service should only be treated as paid after Medvex records a confirmed payment callback. A screenshot or SMS alone is not confirmation.
         </p>
       </section>
 

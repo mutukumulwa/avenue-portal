@@ -1,5 +1,9 @@
 import { prisma } from "@/lib/prisma";
-import type { GLSourceType } from "@prisma/client";
+import type { GLSourceType, Prisma } from "@prisma/client";
+
+// Postings may run inside the caller's transaction (PR-018 #1: GL rows commit
+// or roll back together with the state change they describe).
+type Db = Prisma.TransactionClient;
 
 // ── Standard chart of accounts for a health insurer ──────────────────────────
 
@@ -37,14 +41,16 @@ export const STANDARD_ACCOUNTS = [
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-async function getAccount(tenantId: string, code: string) {
-  const acc = await prisma.chartOfAccount.findUnique({ where: { tenantId_code: { tenantId, code } } });
+async function getAccount(tenantId: string, code: string, db: Db = prisma) {
+  const acc = await db.chartOfAccount.findUnique({ where: { tenantId_code: { tenantId, code } } });
+  // PR-018 #3: a missing account mapping is a configuration error that must
+  // block the posting operation loudly — never silently skip.
   if (!acc) throw new Error(`GL account ${code} not found — run Chart of Accounts setup first.`);
   return acc;
 }
 
-async function nextEntryNumber(tenantId: string) {
-  const count = await prisma.journalEntry.count({ where: { tenantId } });
+async function nextEntryNumber(tenantId: string, db: Db = prisma) {
+  const count = await db.journalEntry.count({ where: { tenantId } });
   return `JE-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
 }
 
@@ -60,12 +66,14 @@ async function postEntry(
     sourceId?: string;
     postedById?: string;
     lines: LineSpec[];
+    tx?: Db;
   }
 ) {
-  const entryNumber = await nextEntryNumber(tenantId);
-  const accounts = await Promise.all(opts.lines.map(l => getAccount(tenantId, l.accountCode)));
+  const db = opts.tx ?? prisma;
+  const entryNumber = await nextEntryNumber(tenantId, db);
+  const accounts = await Promise.all(opts.lines.map(l => getAccount(tenantId, l.accountCode, db)));
 
-  return prisma.journalEntry.create({
+  return db.journalEntry.create({
     data: {
       tenantId,
       entryNumber,
@@ -171,7 +179,7 @@ export class GLService {
    */
   static async postClaimApproved(tenantId: string, opts: {
     sourceId: string; reference: string; amount: number;
-    coContributionAmount?: number; postedById?: string;
+    coContributionAmount?: number; postedById?: string; tx?: Db;
   }) {
     const coContrib = opts.coContributionAmount ?? 0;
     const planShare = opts.amount - coContrib;
@@ -196,6 +204,61 @@ export class GLService {
       sourceId:   opts.sourceId,
       postedById: opts.postedById,
       lines,
+      tx: opts.tx,
+    });
+  }
+
+  /**
+   * Void of an approved-not-settled claim (PR-018 D3) — a reversing JE, never
+   * an edit of the original entry:
+   *   DR 2010 Claims Payable / CR 5010 Net Claims Incurred (+ CR 1150 when a
+   *   co-contribution receivable was raised).
+   */
+  static async postClaimVoidReversal(tenantId: string, opts: {
+    sourceId: string; reference: string; amount: number;
+    coContributionAmount?: number; postedById?: string; tx?: Db;
+  }) {
+    const coContrib = opts.coContributionAmount ?? 0;
+    const planShare = opts.amount - coContrib;
+    const lines: LineSpec[] = coContrib > 0
+      ? [
+          { accountCode: "2010", description: "Claims payable reversed (void)",             debit:  opts.amount },
+          { accountCode: "5010", description: "Claims incurred reversed (void)",            credit: planShare },
+          { accountCode: "1150", description: "Co-contribution receivable reversed (void)", credit: coContrib },
+        ]
+      : [
+          { accountCode: "2010", description: "Claims payable reversed (void)",  debit:  opts.amount },
+          { accountCode: "5010", description: "Claims incurred reversed (void)", credit: opts.amount },
+        ];
+    return postEntry(tenantId, {
+      description: `Claim voided — reversal of ${opts.reference}`,
+      reference:   opts.reference,
+      sourceType:  "CLAIM_VOID",
+      sourceId:    opts.sourceId,
+      postedById:  opts.postedById,
+      lines,
+      tx: opts.tx,
+    });
+  }
+
+  /**
+   * Settlement batch Mark Paid (PR-018 D1): one balanced JE per batch —
+   *   DR 2010 Claims Payable / CR 1010 Cash at Bank.
+   */
+  static async postSettlementBatchPaid(tenantId: string, opts: {
+    sourceId: string; reference: string; amount: number; postedById?: string; tx?: Db;
+  }) {
+    return postEntry(tenantId, {
+      description: `Provider settlement paid — ${opts.reference}`,
+      reference:   opts.reference,
+      sourceType:  "SETTLEMENT_PAID",
+      sourceId:    opts.sourceId,
+      postedById:  opts.postedById,
+      lines: [
+        { accountCode: "2010", description: "Claims payable settled", debit:  opts.amount },
+        { accountCode: "1010", description: "Bank — operating",       credit: opts.amount },
+      ],
+      tx: opts.tx,
     });
   }
 

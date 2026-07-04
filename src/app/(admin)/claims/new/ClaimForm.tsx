@@ -7,6 +7,7 @@ const PREAUTH_REQUIRED_CATEGORIES = new Set(["INPATIENT", "SURGICAL", "MATERNITY
 import { DiagnosisSearch, type SelectedDiagnosis } from "@/components/clinical/DiagnosisSearch";
 import { ProcedureLineItems, type ClaimLineItem } from "@/components/clinical/ProcedureSearch";
 import { SearchSelect } from "@/components/ui/SearchSelect";
+import { operatingTodayISO } from "@/lib/service-date";
 import { submitClaimAction } from "./actions";
 
 interface Member  { id: string; name: string; memberNumber: string; group: string; package: string; }
@@ -44,7 +45,18 @@ const STEPS = [
 const inputCls = "w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo transition-colors";
 const labelCls = "text-xs font-bold text-brand-text-muted uppercase block mb-1";
 
-export function ClaimForm({ members, providers }: { members: Member[]; providers: Provider[] }) {
+export interface ProviderBranchOption { id: string; name: string; code: string | null }
+
+export function ClaimForm({
+  members,
+  providers,
+  branchesByProvider = {},
+}: {
+  members: Member[];
+  providers: Provider[];
+  /** PR-007: active branches per provider — enables the optional branch selector. */
+  branchesByProvider?: Record<string, ProviderBranchOption[]>;
+}) {
   const [step, setStep]       = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState<string | null>(null);
@@ -52,6 +64,7 @@ export function ClaimForm({ members, providers }: { members: Member[]; providers
   // Step 1
   const [memberId, setMemberId]     = useState("");
   const [providerId, setProviderId] = useState("");
+  const [providerBranchId, setProviderBranchId] = useState("");
 
   // Step 2
   const [serviceType,     setServiceType]     = useState("OUTPATIENT");
@@ -72,9 +85,14 @@ export function ClaimForm({ members, providers }: { members: Member[]; providers
   const totalBilled      = useMemo(() => lineItems.reduce((s, l) => s + l.billedAmount, 0), [lineItems]);
   const primaryIcdCode   = diagnoses.find(d => d.isPrimary)?.code ?? "";
 
+  // PR-013: DOS is capped at today (operating timezone); Next stays disabled
+  // while a future date is entered. The server enforces the same rule.
+  const maxServiceDate = operatingTodayISO();
+  const dosIsFuture    = !!dateOfService && dateOfService > maxServiceDate;
+
   const canNext: boolean[] = [
     !!memberId && !!providerId,
-    !!serviceType && !!dateOfService,
+    !!serviceType && !!dateOfService && !dosIsFuture,
     diagnoses.length > 0,
     lineItems.length > 0 && totalBilled > 0,
   ];
@@ -86,6 +104,7 @@ export function ClaimForm({ members, providers }: { members: Member[]; providers
       await submitClaimAction({
         memberId,
         providerId,
+        providerBranchId: providerBranchId || undefined,
         serviceType:     serviceType     as never,
         benefitCategory: benefitCategory as never,
         dateOfService,
@@ -192,6 +211,19 @@ export function ClaimForm({ members, providers }: { members: Member[]; providers
                   <div><span className="text-brand-text-muted">County:</span> <strong>{selectedProvider.county || "—"}</strong></div>
                 </div>
               )}
+              {/* PR-007: optional branch for multi-branch providers — the
+                  contract engine prefers a branch-scoped ACTIVE contract. */}
+              {providerId && (branchesByProvider[providerId]?.length ?? 0) > 0 && (
+                <div className="mt-3">
+                  <label className={labelCls}>Branch (optional)</label>
+                  <select value={providerBranchId} onChange={e => setProviderBranchId(e.target.value)} className={inputCls}>
+                    <option value="">Whole facility — no specific branch</option>
+                    {branchesByProvider[providerId].map(b => (
+                      <option key={b.id} value={b.id}>{b.name}{b.code ? ` (${b.code})` : ""}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -222,7 +254,12 @@ export function ClaimForm({ members, providers }: { members: Member[]; providers
               </div>
               <div>
                 <label className={labelCls}>Date of Service *</label>
-                <input type="date" value={dateOfService} onChange={e => setDateOfService(e.target.value)} className={inputCls} />
+                <input type="date" value={dateOfService} max={maxServiceDate} onChange={e => setDateOfService(e.target.value)} className={inputCls} />
+                {dosIsFuture && (
+                  <p className="mt-1 text-[11px] font-semibold text-[#DC3545]">
+                    Date of service cannot be in the future.
+                  </p>
+                )}
               </div>
               <div>
                 <label className={labelCls}>Attending Doctor</label>

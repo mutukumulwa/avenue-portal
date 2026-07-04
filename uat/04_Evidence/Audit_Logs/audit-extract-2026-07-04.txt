@@ -1,0 +1,23 @@
+            action             |       entityType        |        createdAt        
+-------------------------------+-------------------------+-------------------------
+ CONTRACT:SUBMITTED_FOR_REVIEW | ProviderContract        | 2026-07-04 07:10:15.932
+ CONTRACT:APPROVED             | ProviderContract        | 2026-07-04 07:12:32.544
+ CONTRACT:RETURNED_TO_DRAFT    | ProviderContract        | 2026-07-04 07:14:03.963
+ CONTRACT:SUBMITTED_FOR_REVIEW | ProviderContract        | 2026-07-04 07:15:42.314
+ CONTRACT:APPROVED             | ProviderContract        | 2026-07-04 07:16:26.876
+ CONTRACT:ACTIVATED            | ProviderContract        | 2026-07-04 07:16:53.804
+ CLIENT_CREATED                |                         | 2026-07-04 07:18:09.999
+ GROUP_CREATED                 |                         | 2026-07-04 07:18:45.244
+ MEMBER_CREATED                |                         | 2026-07-04 07:19:27.148
+ MEMBERS_BULK_IMPORTED         |                         | 2026-07-04 07:20:42.157
+ PREAUTH_SUBMITTED             |                         | 2026-07-04 07:23:17.564
+ PREAUTH_UNDER_REVIEW          |                         | 2026-07-04 07:24:28.31
+ PREAUTH_APPROVED              |                         | 2026-07-04 07:24:43.709
+ CLAIM_SUBMITTED               |                         | 2026-07-04 07:46:02.747
+ CLAIM:APPROVED                | Claim                   | 2026-07-04 07:48:17.037
+ SETTLEMENT:BATCH_CREATED      | ProviderSettlementBatch | 2026-07-04 07:52:24.937
+ SETTLEMENT:BATCH_APPROVED     | ProviderSettlementBatch | 2026-07-04 07:53:38.696
+ SETTLEMENT:BATCH_SETTLED      | ProviderSettlementBatch | 2026-07-04 07:53:53.482
+ USER_INVITED                  |                         | 2026-07-04 07:55:53.222
+(19 rows)
+

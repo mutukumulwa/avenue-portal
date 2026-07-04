@@ -29,7 +29,7 @@ const TYPE_LABEL: Record<string, string> = {
   GOVERNMENT_SCHEME_CONTRACT: "Government Scheme",
 };
 
-const STATUS_FILTERS = ["ALL", "DRAFT", "UNDER_REVIEW", "APPROVED", "ACTIVE", "SUSPENDED", "EXPIRED"] as const;
+const STATUS_FILTERS = ["ALL", "DRAFT", "UNDER_REVIEW", "APPROVED", "ACTIVE", "SUSPENDED", "EXPIRED", "VOIDED"] as const;
 
 export default async function ContractsListPage({
   searchParams,
@@ -41,7 +41,13 @@ export default async function ContractsListPage({
   const tenantId = session.user.tenantId;
 
   const where: Prisma.ProviderContractWhereInput = { tenantId };
-  if (status && status !== "ALL") where.status = status as ProviderContractStatus;
+  if (status && status !== "ALL") {
+    where.status = status as ProviderContractStatus;
+  } else {
+    // PR-010 D2: voided contracts leave the default register (and "ALL");
+    // they remain reachable via the explicit VOIDED filter and in audit.
+    where.status = { not: "VOIDED" };
+  }
   if (q) {
     where.OR = [
       { contractNumber: { contains: q, mode: "insensitive" } },

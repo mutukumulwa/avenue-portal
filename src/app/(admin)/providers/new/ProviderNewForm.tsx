@@ -19,14 +19,34 @@ export function ProviderNewForm() {
 
   return (
     <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-6">
-      {state?.error && (
+      {state?.error && !state.duplicateOf && (
         <div className="mb-5 flex items-start gap-2 bg-[#DC3545]/5 border border-[#DC3545]/30 text-[#DC3545] rounded-lg px-4 py-3 text-sm">
           <AlertCircle size={16} className="shrink-0 mt-0.5" />
           <span>{state.error}</span>
         </div>
       )}
 
+      {/* PR-005 #3: duplicate-name warning — open the existing record or create anyway */}
+      {state?.duplicateOf && (
+        <div className="mb-5 bg-[#FFF8E1] border border-[#FFC107]/50 text-[#856404] rounded-lg px-4 py-3 text-sm space-y-1.5">
+          <p className="flex items-start gap-2 font-semibold">
+            <AlertCircle size={16} className="shrink-0 mt-0.5" />
+            A provider named “{state.duplicateOf.name}” already exists.
+          </p>
+          <p className="pl-6">
+            <a href={`/providers/${state.duplicateOf.id}`} className="font-bold underline">Open the existing record</a>
+            {" "}— for a facility chain, add a branch there instead (usually the right answer). If this really is a
+            different facility, tick “Create anyway” below and resubmit.
+          </p>
+        </div>
+      )}
+
       <form action={action} className="space-y-6">
+        {state?.duplicateOf && (
+          <label className="flex items-center gap-2 rounded-lg border border-[#FFC107]/50 bg-[#FFF8E1] px-4 py-2.5 text-sm font-semibold text-[#856404]">
+            <input type="checkbox" name="createAnyway" /> Create anyway — I confirm this is a different facility
+          </label>
+        )}
         {/* Basic Info */}
         <div>
           <h3 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Provider Details</h3>

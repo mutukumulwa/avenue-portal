@@ -46,19 +46,87 @@ function providerHasService(provider: NearbyProviderRow, serviceHint?: string) {
   return provider.servicesOffered.some((service) => service.toLowerCase().includes(needle));
 }
 
+/** PR-005 #3: typed duplicate-name signal so the UI can offer "open it / create anyway". */
+export class DuplicateProviderNameError extends Error {
+  constructor(public readonly existingId: string, public readonly existingName: string) {
+    super(`A provider named "${existingName}" already exists.`);
+    this.name = "DuplicateProviderNameError";
+  }
+}
+
 export class ProvidersService {
   static getMemberProcedureCatalog() {
     return Object.values(PROCEDURE_CATALOG);
   }
 
   /**
-   * List all providers for a tenant
+   * List all providers for a tenant (admin surfaces — every status visible).
    */
   static async getProviders(tenantId: string) {
     return prisma.provider.findMany({
       where: { tenantId },
       orderBy: { name: "asc" },
     });
+  }
+
+  // ── Provider status lifecycle (PR-006, ratified semantics) ────────────────
+  // PENDING   — registered, not yet activated: visible in admin lists and
+  //             contract capture, EXCLUDED from operational selection
+  //             (claims/PA/check-in/offline codes).
+  // ACTIVE    — selectable everywhere.
+  // SUSPENDED — blocks new encounters; existing claims remain settleable.
+  // EXPIRED   — blocks new encounters.
+
+  /** Statuses allowed for NEW encounters (claim wizard, PA, check-in, offline codes). */
+  static readonly ENCOUNTER_STATUSES = ["ACTIVE"] as const;
+  /** Statuses allowed for settlement of existing claims — only PENDING is excluded. */
+  static readonly SETTLEMENT_STATUSES = ["ACTIVE", "SUSPENDED", "EXPIRED"] as const;
+
+  /** Shared where-clause for operational (new-encounter) provider selection. */
+  static operationalWhere(tenantId: string) {
+    return { tenantId, contractStatus: { in: [...ProvidersService.ENCOUNTER_STATUSES] } };
+  }
+
+  /** True when a provider status permits starting a new encounter. */
+  static isOperational(contractStatus: string): boolean {
+    return (ProvidersService.ENCOUNTER_STATUSES as readonly string[]).includes(contractStatus);
+  }
+
+  /**
+   * Operational providers for encounter dropdowns — every new-encounter screen
+   * uses this one helper so future screens inherit the rule (PR-006 #3).
+   */
+  static async getOperationalProviders(tenantId: string) {
+    return prisma.provider.findMany({
+      where: ProvidersService.operationalWhere(tenantId),
+      orderBy: { name: "asc" },
+    });
+  }
+
+  /**
+   * Explicit status transition (activate / suspend / reactivate) with a
+   * mandatory reason. The actions layer audits the change with a diff.
+   */
+  static async setProviderStatus(
+    tenantId: string,
+    id: string,
+    status: "ACTIVE" | "SUSPENDED" | "PENDING",
+    reason: string,
+  ) {
+    const provider = await prisma.provider.findUnique({
+      where: { id, tenantId },
+      select: { contractStatus: true, name: true },
+    });
+    if (!provider) throw new Error("Provider not found");
+    if (provider.contractStatus === status) throw new Error(`Provider is already ${status}.`);
+    if (!reason || reason.trim().length < 5) {
+      throw new Error("A reason is required for a provider status change (min 5 characters).");
+    }
+    const updated = await prisma.provider.update({
+      where: { id },
+      data: { contractStatus: status },
+    });
+    return { updated, previousStatus: provider.contractStatus, name: provider.name };
   }
 
   /**
@@ -95,12 +163,18 @@ export class ProvidersService {
     geoLongitude?: number;
     isOpen24Hours?: boolean;
     operatingHours?: ProviderOperatingHoursInput;
+    /** PR-005 #3: duplicate names warn with a link to the existing record; an
+     * explicit create-anyway proceeds (real-world chains legitimately share
+     * names — branches are usually the right answer, see PR-007). */
+    allowDuplicateName?: boolean;
   }) {
-    // Prevent exact duplicate names within the same tenant
     const existing = await prisma.provider.findFirst({
       where: { tenantId, name: { equals: data.name.trim(), mode: "insensitive" } },
+      select: { id: true, name: true },
     });
-    if (existing) throw new Error(`A provider named "${data.name}" already exists.`);
+    if (existing && !data.allowDuplicateName) {
+      throw new DuplicateProviderNameError(existing.id, existing.name);
+    }
 
     return prisma.provider.create({
       data: {
@@ -131,7 +205,8 @@ export class ProvidersService {
    * Update an existing provider
    */
   static async updateProvider(tenantId: string, id: string, data: Partial<Parameters<typeof ProvidersService.createProvider>[1]>) {
-    const { contractStartDate, contractEndDate, operatingHours, ...rest } = data;
+    const { contractStartDate, contractEndDate, operatingHours, allowDuplicateName: _ignored, ...rest } = data;
+    void _ignored;
 
     return prisma.provider.update({
       where: { id, tenantId },

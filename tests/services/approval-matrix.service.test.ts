@@ -105,5 +105,61 @@ describe("ApprovalMatrixService — engine (G3.1)", () => {
       });
       expect(r?.matrix.id).toBe("high");
     });
+
+    // ── PR-017: FX-correct band matching ─────────────────────────────────────
+    it("converts a KES amount to UGX before band matching (PR-017 #1)", async () => {
+      db.approvalMatrix.findMany.mockResolvedValue([
+        rule({ id: "low", claimValueMin: 0, claimValueMax: 200_000, requiredRole: "CLAIMS_OFFICER" }),
+        rule({ id: "dual", claimValueMin: 200_001, claimValueMax: null, requiredRole: "MEDICAL_OFFICER", requiresDual: true }),
+      ]);
+      db.fxRate.findFirst.mockResolvedValue({ rate: 27 }); // 1 KES = 27 UGX
+      const r = await ApprovalMatrixService.resolve(T, {
+        actionType: "CLAIM_PAYMENT",
+        amount: 86_000,
+        currency: "KES", // ≈ UGX 2,322,000 — must hit the dual band, not "low"
+      });
+      expect(r?.matrix.id).toBe("dual");
+      expect(r?.steps).toHaveLength(2);
+      expect(r?.failSafe).toBe(false);
+      expect(r?.baseAmount).toBe(86_000 * 27);
+      expect(r?.fxRate).toBe(27);
+    });
+
+    it("missing FX rate fails safe to the most demanding rule (PR-017 D1)", async () => {
+      db.approvalMatrix.findMany.mockResolvedValue([
+        rule({ id: "low", claimValueMin: 0, claimValueMax: 200_000, requiredRole: "CLAIMS_OFFICER" }),
+        rule({ id: "dual", claimValueMin: 200_001, claimValueMax: null, requiredRole: "MEDICAL_OFFICER", requiresDual: true }),
+      ]);
+      db.fxRate.findFirst.mockResolvedValue(null); // no KES rate in force
+      const r = await ApprovalMatrixService.resolve(T, {
+        actionType: "CLAIM_PAYMENT",
+        amount: 100, // tiny — would band-match "low" if the identity leak survived
+        currency: "KES",
+      });
+      expect(r?.failSafe).toBe(true);
+      expect(r?.matrix.id).toBe("dual"); // never the lowest band
+      expect(r?.steps.length).toBeGreaterThan(1);
+    });
+
+    it("uses the rate effective at the decision date, not the latest row (PR-017 #4)", async () => {
+      db.approvalMatrix.findMany.mockResolvedValue([
+        rule({ id: "band", claimValueMin: 2_000_000, claimValueMax: null, requiredRole: "FINANCE_OFFICER" }),
+      ]);
+      const asOf = new Date("2026-03-01");
+      db.fxRate.findFirst.mockImplementation(async (args: any) => {
+        // The query must constrain effectiveFrom ≤ atDate — assert and answer
+        // with the rate that was in force then (25, not today's 29).
+        expect(args.where.effectiveFrom.lte).toEqual(asOf);
+        return { rate: 25 };
+      });
+      const r = await ApprovalMatrixService.resolve(T, {
+        actionType: "CLAIM_PAYMENT",
+        amount: 86_000,
+        currency: "KES",
+        atDate: asOf,
+      });
+      expect(r?.baseAmount).toBe(86_000 * 25);
+      expect(r?.matrix.id).toBe("band");
+    });
   });
 });

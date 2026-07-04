@@ -65,9 +65,12 @@ export const claimsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      return ClaimsService.adjudicateClaim(ctx.tenantId, input.claimId, {
+      // W1.1: canonical decision stack — matrix, ceiling, usage, holds, GL.
+      const { ClaimDecisionService } = await import("@/server/services/claim-decision.service");
+      return ClaimDecisionService.decide(ctx.tenantId, input.claimId, {
         ...input,
         reviewerId: ctx.session.user.id,
+        reviewerRole: ctx.session.user.role,
       });
     }),
 });

@@ -190,7 +190,11 @@ async function main() {
   // ═══════════════════════════════════════════════════════════
   // 2. USERS
   // ═══════════════════════════════════════════════════════════
-  const pw = await bcrypt.hash('MedvexAdmin2024!', 10)
+  // PR-003: the previous default password was rendered on the login page and is
+  // treated as burned. Override per environment via SEED_PASSWORD; rotate
+  // already-seeded environments with scripts/rotate-seed-password.ts.
+  const SEED_PASSWORD = process.env.SEED_PASSWORD || 'Mdx!Seed-2026#Rotate'
+  const pw = await bcrypt.hash(SEED_PASSWORD, 10)
   const userDefs = [
     { email: 'admin@medvex.co.ug',       firstName: 'James',    lastName: 'Kamau',    role: 'SUPER_ADMIN'        },
     { email: 'claims@medvex.co.ug',      firstName: 'Grace',    lastName: 'Wanjiku',  role: 'CLAIMS_OFFICER'     },
@@ -3951,8 +3955,24 @@ async function main() {
   console.log('\n⚙️  Seeding RBAC...')
   await seedRbac(prisma, tenantId)
 
+  // ═══════════════════════════════════════════════════════════
+  // Reference data absorbed from scripts/seed-reason-codes.ts (PR-001 #3):
+  // reason codes, override controls, service categories — one seed step,
+  // no separate script to forget.
+  // ═══════════════════════════════════════════════════════════
+  console.log('\n⚙️  Seeding reason codes, override controls, service categories...')
+  {
+    const { ReasonCodeService } = await import('../src/server/services/reason-codes.service')
+    const { OverrideControlService } = await import('../src/server/services/override-control.service')
+    const { ServiceCategoryService } = await import('../src/server/services/service-category.service')
+    const rc = await ReasonCodeService.seedForTenant(tenantId)
+    const oc = await OverrideControlService.seedForTenant(tenantId)
+    const sc = await ServiceCategoryService.seedForTenant(tenantId)
+    console.log(`✅ Reason codes: ${rc} · Override controls: ${oc} · Service categories: ${sc}`)
+  }
+
   console.log('\n🎉 Seed complete! All features populated.\n')
-  console.log('  Login: admin@medvex.co.ug / MedvexAdmin2024!')
+  console.log(`  Login: admin@medvex.co.ug / ${SEED_PASSWORD}`)
   console.log('')
   console.log('  Core:')
   console.log('  • Safaricom — 3 benefit tiers (Executive/Management/Staff) with different packages')
@@ -3978,9 +3998,9 @@ async function main() {
   console.log('  • Individual client: Patricia Wanjiru (clientType=INDIVIDUAL, Executive)')
   console.log('  • Self-funded scheme 1: EABL — KES 32M deposit, real claim deductions by claimId, admin fee')
   console.log('  • Self-funded scheme 2: Bamburi Cement — KES 3.8M balance below KES 5M minimum (low-balance demo)')
-  console.log('  • Fund admin: fund@medvex.co.ug / MedvexAdmin2024! — linked to all self-funded schemes')
-  console.log('  • Member: member@medvex.co.ug / MedvexAdmin2024! — linked to an active member')
-  console.log('  • Member demo logins: member.demo.low@medvex.co.ug, member.demo.nearcap@medvex.co.ug, member.demo.family@medvex.co.ug, member.demo.wallet@medvex.co.ug, member.demo.preauth@medvex.co.ug / MedvexAdmin2024!')
+  console.log('  • Fund admin: fund@medvex.co.ug — linked to all self-funded schemes (seed password)')
+  console.log('  • Member: member@medvex.co.ug — linked to an active member (seed password)')
+  console.log('  • Member demo logins: member.demo.low@medvex.co.ug, member.demo.nearcap@medvex.co.ug, member.demo.family@medvex.co.ug, member.demo.wallet@medvex.co.ug, member.demo.preauth@medvex.co.ug (seed password)')
   console.log('  • Admin sidebar: Self-Funded Schemes link under Finance → /fund/dashboard')
   console.log('  • Scheme transfer endorsement: KCB member → EABL (career change)')
   console.log('  • Tier change endorsement: Safaricom Staff → Management (promotion)')

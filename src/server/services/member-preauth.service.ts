@@ -3,6 +3,8 @@ import { ClaimsService } from "@/server/services/claims.service";
 import { MemberAppService } from "@/server/services/member-app.service";
 import { MemberNotificationService } from "@/server/services/member-notification.service";
 import { ProvidersService } from "@/server/services/providers.service";
+import { preauthAdjudicationService } from "@/server/services/preauth-adjudication.service";
+import { getSystemActorId } from "@/server/services/system-actor.service";
 import type { BenefitCategory, ServiceType } from "@prisma/client";
 
 const AUTO_APPROVE_CEILING = 15000;
@@ -252,12 +254,15 @@ export class MemberPreAuthService {
       warnings.length === 0;
 
     if (canAutoApprove) {
-      await ClaimsService.adjudicatePreAuth(tenantId, result.preauth.id, {
-        action: "APPROVED",
-        approvedAmount: Math.min(estimatedCost, remaining),
-        validDays: 14,
-        reviewerId: "AUTO",
-      });
+      // W1.1: canonical PA approval — always places the benefit hold (PR-011).
+      await preauthAdjudicationService.approveByHuman(
+        result.preauth.id,
+        tenantId,
+        await getSystemActorId(tenantId),
+        Math.min(estimatedCost, remaining),
+        undefined,
+        14,
+      );
       await MemberNotificationService.create({
         tenantId,
         memberId,
@@ -272,12 +277,13 @@ export class MemberPreAuthService {
     }
 
     if (estimatedCost > remaining && remaining <= 0) {
-      await ClaimsService.adjudicatePreAuth(tenantId, result.preauth.id, {
-        action: "DECLINED",
-        declineReasonCode: "BENEFIT_EXHAUSTED",
-        declineNotes: "The selected benefit does not have remaining balance for this request.",
-        reviewerId: "AUTO",
-      });
+      await preauthAdjudicationService.declineByHuman(
+        result.preauth.id,
+        tenantId,
+        await getSystemActorId(tenantId),
+        "BENEFIT_EXHAUSTED",
+        "The selected benefit does not have remaining balance for this request.",
+      );
       await MemberNotificationService.create({
         tenantId,
         memberId,

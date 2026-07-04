@@ -1,13 +1,13 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { notFound } from "next/navigation";
 import { ClaimsService } from "@/server/services/claims.service";
-import { claimAdjudicationService } from "@/server/services/claim-adjudication.service";
+import { ClaimDecisionService } from "@/server/services/claim-decision.service";
 import { prisma } from "@/lib/prisma";
-import { adjudicateClaimAction, resolveExceptionAction } from "./actions";
+import { adjudicateClaimAction, resolveExceptionAction, requestPriceOverrideAction, voidClaimAction } from "./actions";
 import { disburseReimbursementAction } from "./reimbursement-actions";
 import {
-  adjudicateLineAction, computeOutcomeAction, approveClaimAction,
-  approveSeniorClaimAction, initiateAppealAction, computeVarianceAction,
+  adjudicateLineAction, computeOutcomeAction,
+  initiateAppealAction, computeVarianceAction,
 } from "./adjudication-actions";
 import { ExceptionModal } from "./ExceptionModal";
 import { ArrowLeft, Clock, CheckCircle2, XCircle, AlertTriangle, Info, FlaskConical, Pill, ScanLine, Stethoscope, Scissors, HelpCircle, ShieldAlert, ShieldCheck, ShieldX, Percent, BarChart2, Scale, FileSignature } from "lucide-react";
@@ -31,9 +31,9 @@ export default async function ClaimDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; notice?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, notice } = await searchParams;
   const session = await requireRole(ROLES.OPS);
 
   const { id } = await params;
@@ -77,13 +77,20 @@ export default async function ClaimDetailPage({
   const allLinesDecided = claimLines.length > 0 && claimLines.every((l) => !!l.adjudicationDecision);
   const canComputeOutcome = allLinesDecided && canAdjudicate;
   const isOutcomeSet   = ["APPROVED","PARTIALLY_APPROVED","DECLINED"].includes(claim.status);
-  const needsSenior    = isOutcomeSet && !p9Claim?.seniorAdjudicatorId
-    && Number(claim.approvedAmount) > 100_000;
-  const canFinalize    = isOutcomeSet
-    && (Number(claim.approvedAmount) <= 100_000 || !!p9Claim?.seniorAdjudicatorId)
-    && !p9Claim?.settlementBatchId;
+  const canVoid        = ["APPROVED","PARTIALLY_APPROVED"].includes(claim.status) && !p9Claim?.settlementBatchId;
   const canAppeal      = ["DECLINED","PARTIALLY_APPROVED"].includes(claim.status);
   const diagnoses = claim.diagnoses as { code?: string; icdCode?: string; description: string; isPrimary?: boolean }[];
+
+  // PR-014 #2: show billed / engine payable / delta BEFORE submission so the
+  // adjudicator is never surprised by the enforcement block. PR-015: attached
+  // PA cover for the over-cover confirmation.
+  const [ceiling, paCoverage, priceOverrideApproved] = canAdjudicate
+    ? await Promise.all([
+        ClaimDecisionService.assessCeiling(tenantId, id),
+        ClaimsService.getPreauthCoverage(tenantId, id),
+        ClaimDecisionService.hasApprovedPriceOverride(tenantId, id),
+      ])
+    : [null, null, false];
 
   // Group structured claim lines by service category
   const linesByCategory = (claim.claimLines ?? []).reduce<Record<string, typeof claim.claimLines>>((acc, line) => {
@@ -102,6 +109,14 @@ export default async function ClaimDetailPage({
           <p className="text-sm font-semibold text-[#856404] flex-1">
             {error}
           </p>
+        </div>
+      )}
+
+      {/* Notice banner (success / preview feedback) */}
+      {notice && (
+        <div className="flex items-center gap-3 bg-[#28A745]/10 border border-[#28A745]/40 rounded-lg px-4 py-3">
+          <CheckCircle2 size={18} className="text-[#28A745] shrink-0" />
+          <p className="text-sm font-semibold text-[#1E7E34] flex-1">{notice}</p>
         </div>
       )}
 
@@ -482,13 +497,43 @@ export default async function ClaimDetailPage({
         </div>
       )}
 
-      {/* Adjudication form */}
+      {/* Adjudication form — the ONE approval path (W1.1) */}
       {canAdjudicate && (
         <div className="bg-white border-2 border-brand-indigo/20 rounded-lg p-6 shadow-sm">
           <h3 className="text-lg font-bold text-brand-text-heading font-heading flex items-center gap-2 mb-4">
             <AlertTriangle size={20} className="text-brand-indigo" />
             Adjudicate Claim
           </h3>
+
+          {/* PR-014 #2: enforcement preview — billed / payable ceiling / delta */}
+          {ceiling && ceiling.ceiling !== null ? (
+            <div className="mb-4 grid grid-cols-3 gap-4 rounded-lg bg-[#F8F9FA] border border-[#EEEEEE] px-4 py-3 text-sm">
+              <div>
+                <p className="text-xs text-brand-text-muted">Billed</p>
+                <p className="font-bold text-brand-text-heading mt-0.5">{claim.currency} {Number(claim.billedAmount).toLocaleString("en-UG")}</p>
+              </div>
+              <div>
+                <p className="text-xs text-brand-text-muted">Payable ceiling ({ceiling.source})</p>
+                <p className="font-bold text-brand-indigo mt-0.5">{claim.currency} {Math.round(ceiling.ceiling).toLocaleString("en-UG")}</p>
+              </div>
+              <div>
+                <p className="text-xs text-brand-text-muted">Delta vs billed</p>
+                <p className={`font-bold mt-0.5 ${Number(claim.billedAmount) - ceiling.ceiling > 0 ? "text-[#DC3545]" : "text-[#28A745]"}`}>
+                  {claim.currency} {Math.round(Number(claim.billedAmount) - ceiling.ceiling).toLocaleString("en-UG")}
+                </p>
+              </div>
+              {priceOverrideApproved && (
+                <p className="col-span-3 text-xs font-semibold text-[#856404]">
+                  An approved PAY ABOVE CONTRACT RATE override exists — the ceiling may be exceeded for this claim.
+                </p>
+              )}
+            </div>
+          ) : (
+            <div className="mb-4 rounded-lg bg-[#FFF8E1] border border-[#FFC107]/40 px-4 py-2.5 text-xs font-semibold text-[#856404]">
+              No contract ceiling — reviewer judgement applies to the approved amount.
+            </div>
+          )}
+
           <form action={adjudicateClaimAction} className="space-y-4">
             <input type="hidden" name="claimId" value={claim.id} />
 
@@ -503,10 +548,10 @@ export default async function ClaimDetailPage({
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-semibold text-brand-text-heading">
-                  Approved Amount (KES)
-                  {overbilledLines.length > 0 && (
+                  Approved Amount ({claim.currency})
+                  {ceiling?.ceiling != null && (
                     <span className="ml-2 text-xs font-normal text-[#856404]">
-                      — contracted: {Math.round(contractedTotal).toLocaleString("en-UG")}
+                      — ceiling: {Math.round(ceiling.ceiling).toLocaleString("en-UG")}
                     </span>
                   )}
                 </label>
@@ -514,7 +559,7 @@ export default async function ClaimDetailPage({
                   name="approvedAmount"
                   type="number"
                   step="0.01"
-                  defaultValue={overbilledLines.length > 0 ? Math.round(contractedTotal) : Number(claim.billedAmount)}
+                  defaultValue={ceiling?.ceiling != null ? Math.round(Math.min(ceiling.ceiling, Number(claim.billedAmount))) : Number(claim.billedAmount)}
                   className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-brand-indigo transition-colors"
                 />
               </div>
@@ -525,12 +570,65 @@ export default async function ClaimDetailPage({
               <textarea name="notes" rows={3} className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-brand-indigo transition-colors resize-none" placeholder="Provide a reason for your decision..." />
             </div>
 
+            {/* PR-015: over-cover confirmation for PA-attached claims */}
+            {paCoverage && paCoverage.attachedCount > 0 && (
+              <div className="rounded-lg border border-[#FFC107]/40 bg-[#FFF8E1] px-4 py-3 space-y-2">
+                <p className="text-xs font-semibold text-[#856404]">
+                  Attached pre-auth cover: {claim.currency} {paCoverage.approvedCover.toLocaleString("en-UG")} · billed {claim.currency} {paCoverage.billedAmount.toLocaleString("en-UG")}.
+                  Approving above the cover requires explicit confirmation (recorded in the adjudication log).
+                </p>
+                <label className="flex items-center gap-2 text-xs font-semibold text-brand-text-heading">
+                  <input type="checkbox" name="overCoverConfirmed" className="rounded border-[#EEEEEE]" />
+                  Approve above pre-auth cover
+                </label>
+                <input
+                  name="overCoverNote"
+                  type="text"
+                  placeholder="Confirmation note (why the over-cover approval is justified)"
+                  className="w-full border border-[#EEEEEE] rounded-md px-3 py-1.5 text-xs outline-none focus:border-brand-indigo"
+                />
+              </div>
+            )}
+
             <div className="flex justify-end pt-2">
               <button type="submit" className="bg-brand-indigo hover:bg-brand-secondary text-white px-8 py-3 rounded-full font-semibold transition-colors shadow-sm">
                 Submit Decision
               </button>
             </div>
           </form>
+
+          {/* PR-014 D1: override affordance when a ceiling exists */}
+          {ceiling?.ceiling != null && !priceOverrideApproved && (
+            <details className="mt-4 rounded-lg border border-[#EEEEEE] bg-[#F8F9FA] px-4 py-3">
+              <summary className="cursor-pointer text-xs font-bold text-brand-indigo">
+                Need to pay above the contract ceiling? Raise a PAY ABOVE CONTRACT RATE override
+              </summary>
+              <form action={requestPriceOverrideAction} className="mt-3 space-y-2">
+                <input type="hidden" name="claimId" value={claim.id} />
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    name="requestedAmount"
+                    type="number"
+                    step="0.01"
+                    required
+                    placeholder={`Requested amount (${claim.currency})`}
+                    className="border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo"
+                  />
+                  <input
+                    name="justification"
+                    type="text"
+                    required
+                    minLength={20}
+                    placeholder="Justification (min 20 characters)"
+                    className="border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo"
+                  />
+                </div>
+                <button type="submit" className="text-xs font-bold text-white bg-[#856404] px-4 py-2 rounded-full hover:opacity-90 transition-opacity">
+                  Request Override (senior approval required)
+                </button>
+              </form>
+            </details>
+          )}
         </div>
       )}
 
@@ -663,8 +761,8 @@ export default async function ClaimDetailPage({
         </div>
       )}
 
-      {/* ── Process 9: Finalize + senior approval + appeal ────── */}
-      {(isOutcomeSet || canFinalize || needsSenior || canAppeal) && (
+      {/* ── Decided-claim workflow: outcome, void, appeal ────── */}
+      {(isOutcomeSet || canVoid || canAppeal) && (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-4">
           <h2 className="font-bold text-brand-text-heading text-sm font-heading border-b border-[#EEEEEE] pb-2">
             Adjudication Workflow
@@ -676,32 +774,20 @@ export default async function ClaimDetailPage({
                 Outcome: {claim.status.replace(/_/g," ")}
               </span>
               <span className="text-brand-text-muted">
-                Net approved: <strong>KES {Number(claim.approvedAmount).toLocaleString("en-UG")}</strong>
+                Net approved: <strong>{claim.currency} {Number(claim.approvedAmount).toLocaleString("en-UG")}</strong>
               </span>
             </div>
           )}
 
-          {needsSenior && (
-            <div className="bg-[#FFC107]/10 border border-[#FFC107]/30 rounded-[8px] p-3 flex items-center justify-between">
-              <p className="text-xs text-[#856404] font-semibold">
-                Senior approval required (net &gt; KES 100,000)
-              </p>
-              <form action={approveSeniorClaimAction}>
-                <input type="hidden" name="claimId" value={id} />
-                <button type="submit"
-                  className="bg-[#856404] text-white px-4 py-1.5 rounded-full text-xs font-semibold hover:opacity-90 transition-opacity">
-                  Senior Approve
-                </button>
-              </form>
-            </div>
-          )}
-
-          {canFinalize && (
-            <form action={approveClaimAction}>
+          {/* PR-016 #6 / PR-018 #4: void with compensating usage + GL reversal */}
+          {canVoid && (
+            <form action={voidClaimAction} className="flex gap-2 items-center">
               <input type="hidden" name="claimId" value={id} />
+              <input name="reason" type="text" required minLength={5} placeholder="Void reason (usage and GL will be reversed)"
+                className="flex-1 border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-brand-indigo focus:outline-none" />
               <button type="submit"
-                className="bg-brand-indigo text-white px-5 py-2 rounded-full text-sm font-semibold hover:bg-brand-secondary transition-colors flex items-center gap-2">
-                <CheckCircle2 size={14} /> Finalize &amp; Queue for Settlement
+                className="border border-[#DC3545] text-[#DC3545] px-4 py-2 rounded-full text-sm font-semibold hover:bg-[#DC3545]/10 transition-colors whitespace-nowrap">
+                Void Claim
               </button>
             </form>
           )}

@@ -1,5 +1,6 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
+import { ProvidersService } from "@/server/services/providers.service";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { ReimbursementClaimForm } from "./ReimbursementClaimForm";
@@ -25,7 +26,8 @@ export default async function ReimbursementClaimPage({
       orderBy: [{ group: { name: "asc" } }, { firstName: "asc" }],
     }),
     prisma.provider.findMany({
-      where: { tenantId },
+      // PR-006: only operational providers are selectable for new encounters.
+      where: ProvidersService.operationalWhere(tenantId),
       select: { id: true, name: true, type: true, county: true },
       orderBy: { name: "asc" },
     }),

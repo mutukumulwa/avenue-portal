@@ -1,0 +1,9 @@
+Evidence: S6/S7/S8 seeding via UI — 2026-07-04 (SUPER_ADMIN)
+
+S6 /clients/new: "UAT CIC General Insurance" INSURER KES prefix CIC slug uat-cic → redirect to /clients; list row "UAT CIC General Insurance uat-cic Insurer KES 0 — ACTIVE".
+S7 /groups/new: "UAT Lifecare Staff Ltd", Healthcare, UAT-REG-2026-001, contact UAT HR Contact hr@uat-lifecare-staff.co.ug, package Medvex Essential, effective 2026-07-01 → groups list "UAT Lifecare Staff Ltd ... Medvex Essential 0 01/07/2027 ACTIVE".
+S8a /members/new: Ursula UAT-Principal, F, 1988-03-15, ID CM88031500UAT → MVX-2026-00250 ACTIVE (list total 250).
+S8b /members/import: group=UAT Lifecare Staff (NOTE dropdown offered only Bamburi/Patricia/Safaricom/UAT — 4 of 7 groups);
+  CSV 3 rows (Samuel UAT-Spouse SPOUSE principalIdNumber=CM88031500UAT; Wanjiru UAT-Child CHILD same; Peter UAT-Principal2 PRINCIPAL)
+  → Parse & Validate → "Confirm — Import 3 members" → MVX-2026-00251..253 all ACTIVE (list total 253).
+360°: /members/[Ursula] → Family Unit "3 members" (principal+spouse+child correct ages), card valid Jul 2026 — Jul 2027, tabs Overview/Benefits/Dependants(2)/Claims(0)/Card/Activity/Correspondence.

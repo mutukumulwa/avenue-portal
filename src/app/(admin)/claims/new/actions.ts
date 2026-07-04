@@ -6,6 +6,9 @@ import { prisma } from "@/lib/prisma";
 import { writeAudit } from "@/lib/audit";
 import { FraudService } from "@/server/services/fraud.service";
 import { AutoAdjudicationService } from "@/server/services/auto-adjudication.service";
+import { ClaimsService } from "@/server/services/claims.service";
+import { ProvidersService } from "@/server/services/providers.service";
+import { assertServiceDateNotFuture } from "@/lib/service-date";
 import type { ServiceType, BenefitCategory, ClaimLineCategory } from "@prisma/client";
 
 interface LineItemInput {
@@ -28,6 +31,7 @@ interface DiagnosisInput {
 export async function submitClaimAction(data: {
   memberId: string;
   providerId: string;
+  providerBranchId?: string; // PR-007: optional branch for multi-branch providers
   serviceType: ServiceType;
   benefitCategory: BenefitCategory;
   dateOfService: string;
@@ -40,6 +44,9 @@ export async function submitClaimAction(data: {
   const session = await requireRole(ROLES.OPS);
 
   const tenantId = session.user.tenantId;
+
+  // ── Service-date gate (PR-013, shared server-side rule) ──────────────────
+  assertServiceDateNotFuture(new Date(data.dateOfService));
 
   // ── Eligibility gate ──────────────────────────────────────────────────────
   const member = await prisma.member.findUnique({
@@ -58,6 +65,28 @@ export async function submitClaimAction(data: {
     throw new Error(
       `Cannot submit claim: group "${member.group.name}" is ${member.group.status}.`
     );
+  }
+
+  // ── Provider gate (PR-006, server-enforced) ──────────────────────────────
+  const gateProvider = await prisma.provider.findUnique({
+    where: { id: data.providerId, tenantId },
+    select: { contractStatus: true, name: true },
+  });
+  if (!gateProvider) throw new Error("Provider not found");
+  if (!ProvidersService.isOperational(gateProvider.contractStatus)) {
+    throw new Error(
+      `Provider "${gateProvider.name}" is ${gateProvider.contractStatus} — claims can only be submitted against ACTIVE providers.`
+    );
+  }
+  if (data.providerBranchId) {
+    const branch = await prisma.providerBranch.findUnique({
+      where: { id: data.providerBranchId },
+      select: { providerId: true, isActive: true, tenantId: true },
+    });
+    if (!branch || branch.tenantId !== tenantId || branch.providerId !== data.providerId) {
+      throw new Error("Selected branch does not belong to the selected provider.");
+    }
+    if (!branch.isActive) throw new Error("Selected branch is deactivated — pick an active branch.");
   }
   // ── Pre-auth gate ─────────────────────────────────────────────────────────
   const PREAUTH_REQUIRED: BenefitCategory[] = ["INPATIENT", "SURGICAL", "MATERNITY"];
@@ -89,12 +118,17 @@ export async function submitClaimAction(data: {
   const count = await prisma.claim.count({ where: { tenantId } });
   const claimNumber = `CLM-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
 
+  // PR-017 D2: stamp the claim currency at intake.
+  const currency = await ClaimsService.resolveClaimCurrency(tenantId, data.providerId, data.memberId);
+
   const claim = await prisma.claim.create({
     data: {
       tenantId,
       claimNumber,
+      currency,
       memberId:        data.memberId,
       providerId:      data.providerId,
+      providerBranchId: data.providerBranchId || null,
       // Attach the approved PA (WP-C1): FK lives on PreAuthorization.claimId.
       preauths:        approvedPA ? { connect: [{ id: approvedPA.id }] } : undefined,
       serviceType:     data.serviceType,

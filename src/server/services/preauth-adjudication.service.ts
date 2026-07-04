@@ -12,6 +12,7 @@
 import { prisma } from "@/lib/prisma";
 import { TRPCError } from "@trpc/server";
 import { auditChainService } from "./audit-chain.service";
+import { BenefitUsageService } from "./benefit-usage.service";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
@@ -183,21 +184,14 @@ export const preauthAdjudicationService = {
     pass("WAITING_PERIOD");
 
     // ── Gate 5: Cost within remaining cap ─────────────────────
-    const usage = pa.member.benefitUsages[0];
-    if (usage) {
-      const benefitConfig = await prisma.benefitConfig.findUnique({
-        where: { id: usage.benefitConfigId },
-        select: { annualSubLimit: true },
-      });
-      if (benefitConfig?.annualSubLimit) {
-        const limit     = Number(benefitConfig.annualSubLimit);
-        const used      = Number(usage.amountUsed);
-        const held      = Number(usage.activeHoldAmount);
-        const remaining = limit - used - held;
-        if (estimatedCost > remaining) {
-          return routeHuman("BENEFIT_CAP",
-            `Estimated cost KES ${estimatedCost.toLocaleString()} exceeds remaining cap KES ${remaining.toLocaleString()} (used ${used.toLocaleString()} + held ${held.toLocaleString()})`);
-        }
+    // PR-011 #4: the check is scoped to the benefit config for the PA's
+    // category (the previous "latest usage row, any category" read could gate
+    // against the wrong benefit) and computes limit − used − held.
+    const balance = await BenefitUsageService.availableLimit(prisma, pa.memberId, pa.benefitCategory);
+    if (balance) {
+      if (estimatedCost > balance.available) {
+        return routeHuman("BENEFIT_CAP",
+          `Estimated cost KES ${estimatedCost.toLocaleString()} exceeds remaining cap KES ${balance.available.toLocaleString()} (used ${balance.used.toLocaleString()} + held ${balance.held.toLocaleString()})`);
       }
     }
     pass("BENEFIT_CAP");
@@ -372,6 +366,12 @@ export const preauthAdjudicationService = {
 
   // ── 3. Benefit hold management ────────────────────────────────────────────
 
+  /**
+   * PR-011: every PA approval places exactly one hold. The BenefitUsage row is
+   * **upserted** and scoped to the benefit config for the PA's category (the
+   * previous `updateMany` no-opped for members without a row and was unscoped
+   * by benefit config).
+   */
   async createBenefitHold(
     preAuthId: string,
     tenantId: string,
@@ -381,21 +381,23 @@ export const preauthAdjudicationService = {
     expiresAt: Date,
   ) {
     await prisma.$transaction(async (tx) => {
+      const existing = await tx.benefitHold.findUnique({ where: { preAuthId } });
+      // If an ACTIVE hold already exists for this PA, adjust by the delta so a
+      // re-approval never double-reserves.
+      const previouslyHeld = existing && existing.status === "ACTIVE" ? Number(existing.heldAmount) : 0;
+
       await tx.benefitHold.upsert({
         where: { preAuthId },
-        update: { heldAmount, expiresAt, status: "ACTIVE" },
+        update: { heldAmount, expiresAt, status: "ACTIVE", releasedAt: null },
         create: { tenantId, memberId, preAuthId, benefitCategory, heldAmount, expiresAt },
       });
 
-      // Increment activeHoldAmount on the current BenefitUsage period
-      await tx.benefitUsage.updateMany({
-        where: {
-          memberId,
-          periodStart: { lte: new Date() },
-          periodEnd:   { gte: new Date() },
-        },
-        data: { activeHoldAmount: { increment: heldAmount } },
-      });
+      const delta = heldAmount - previouslyHeld;
+      if (delta > 0) {
+        await BenefitUsageService.placeHold(tx, memberId, benefitCategory, delta);
+      } else if (delta < 0) {
+        await BenefitUsageService.releaseHold(tx, memberId, benefitCategory, -delta);
+      }
     });
   },
 
@@ -408,46 +410,20 @@ export const preauthAdjudicationService = {
         where: { preAuthId },
         data: { status: "RELEASED", releasedAt: new Date() },
       });
-      await tx.benefitUsage.updateMany({
-        where: {
-          memberId:    hold.memberId,
-          periodStart: { lte: new Date() },
-          periodEnd:   { gte: new Date() },
-        },
-        data: { activeHoldAmount: { decrement: Number(hold.heldAmount) } },
-      });
+      await BenefitUsageService.releaseHold(tx, hold.memberId, hold.benefitCategory, Number(hold.heldAmount));
     });
   },
 
-  async convertHoldToClaim(preAuthId: string, claimId: string, tenantId: string) {
-    const hold = await prisma.benefitHold.findUnique({ where: { preAuthId } });
-    if (!hold || hold.status !== "ACTIVE") return;
-
-    await prisma.$transaction(async (tx) => {
-      // Mark hold converted — actual consumption update happens in claims service
-      await tx.benefitHold.update({
-        where: { preAuthId },
-        data: { status: "CONVERTED", convertedToClaimId: claimId, releasedAt: new Date() },
-      });
-      // Release hold amount (claim approval will post actual consumption)
-      await tx.benefitUsage.updateMany({
-        where: {
-          memberId:    hold.memberId,
-          periodStart: { lte: new Date() },
-          periodEnd:   { gte: new Date() },
-        },
-        data: { activeHoldAmount: { decrement: Number(hold.heldAmount) } },
-      });
-      // Link PA → claim
-      await tx.preAuthorization.update({
-        where: { id: preAuthId },
-        data: { claimId, convertedAt: new Date(), status: "CONVERTED_TO_CLAIM" },
-      });
-    });
-  },
+  // NOTE (W1.1): the legacy `convertHoldToClaim` (which set the retired
+  // CONVERTED_TO_CLAIM status) is deleted. Hold conversion at claim decision
+  // time is owned by ClaimDecisionService.decide.
 
   // ── 4. Release expired holds (called by preauth escalation job) ──────────
 
+  /**
+   * PR-011 #3: past validUntil the hold is released, `activeHoldAmount`
+   * restored, and the unattached APPROVED PA is marked EXPIRED.
+   */
   async releaseExpiredHolds(tenantId: string): Promise<number> {
     const expired = await prisma.benefitHold.findMany({
       where: { tenantId, status: "ACTIVE", expiresAt: { lt: new Date() } },
@@ -455,6 +431,10 @@ export const preauthAdjudicationService = {
 
     for (const hold of expired) {
       await preauthAdjudicationService.releaseBenefitHold(hold.preAuthId, tenantId);
+      await prisma.preAuthorization.updateMany({
+        where: { id: hold.preAuthId, status: "APPROVED", claimId: null },
+        data: { status: "EXPIRED" },
+      });
     }
     return expired.length;
   },
@@ -468,17 +448,41 @@ export const preauthAdjudicationService = {
 
   // ── 6. Human review decision ──────────────────────────────────────────────
 
+  /**
+   * THE canonical human pre-auth approval (W1.1): status-guarded, always
+   * places the benefit hold (PR-011), snapshots the remaining benefit, and
+   * annotates any limit shortfall so the reviewer's decision is explainable.
+   */
   async approveByHuman(
     preAuthId: string,
     tenantId: string,
     reviewerId: string,
     approvedAmount: number,
     notes?: string,
+    validDays?: number,
   ) {
     const pa = await prisma.preAuthorization.findUnique({ where: { id: preAuthId, tenantId } });
     if (!pa) throw new TRPCError({ code: "NOT_FOUND", message: "PA not found" });
+    if (!["SUBMITTED", "UNDER_REVIEW"].includes(pa.status)) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `Pre-authorization cannot be decided in its current status (${pa.status.replace(/_/g, " ")}).`,
+      });
+    }
+    if (!(approvedAmount > 0)) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Approved amount must be greater than zero." });
+    }
 
-    const validUntil = new Date(Date.now() + PA_VALIDITY_DAYS * 24 * 60 * 60 * 1000);
+    // PR-011 #2 (human path): show the shortfall when the approval exceeds the
+    // member's available limit (limit − used − held).
+    const balance = await BenefitUsageService.availableLimit(prisma, pa.memberId, pa.benefitCategory);
+    let reviewNotes = notes;
+    if (balance && approvedAmount > balance.available) {
+      const short = `Limit shortfall: approved ${approvedAmount.toLocaleString()} vs available ${balance.available.toLocaleString()} (limit ${balance.limit.toLocaleString()} − used ${balance.used.toLocaleString()} − held ${balance.held.toLocaleString()}).`;
+      reviewNotes = reviewNotes ? `${reviewNotes} ${short}` : short;
+    }
+
+    const validUntil = new Date(Date.now() + (validDays ?? PA_VALIDITY_DAYS) * 24 * 60 * 60 * 1000);
     // Issue the GOP on manual approval too (G5.5), within the guaranteed amount.
     const gopCount = await prisma.preAuthorization.count({ where: { tenantId, gopNumber: { not: null } } });
     const gopNumber = `GOP-${new Date().getFullYear()}-${String(gopCount + 1).padStart(5, "0")}`;
@@ -494,7 +498,8 @@ export const preauthAdjudicationService = {
         validUntil,
         gopNumber,
         gopIssuedAt:    new Date(),
-        reviewNotes: notes,
+        benefitRemaining: balance ? Math.max(0, balance.available - approvedAmount) : null,
+        reviewNotes,
       } as never,
     });
 
@@ -524,6 +529,12 @@ export const preauthAdjudicationService = {
   ) {
     const pa = await prisma.preAuthorization.findUnique({ where: { id: preAuthId, tenantId } });
     if (!pa) throw new TRPCError({ code: "NOT_FOUND", message: "PA not found" });
+    if (!["SUBMITTED", "UNDER_REVIEW"].includes(pa.status)) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `Pre-authorization cannot be decided in its current status (${pa.status.replace(/_/g, " ")}).`,
+      });
+    }
 
     await prisma.preAuthorization.update({
       where: { id: preAuthId },
@@ -596,6 +607,19 @@ export const preauthAdjudicationService = {
   // ── 8. Cancel a PA and release hold ──────────────────────────────────────
 
   async cancelPreAuth(preAuthId: string, tenantId: string, actorId: string, reason: string) {
+    const existing = await prisma.preAuthorization.findUnique({
+      where: { id: preAuthId, tenantId },
+      select: { status: true },
+    });
+    if (!existing) throw new TRPCError({ code: "NOT_FOUND", message: "PA not found" });
+    if (["UTILISED", "CONVERTED_TO_CLAIM", "CANCELLED"].includes(existing.status)) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: `A ${existing.status.replace(/_/g, " ")} pre-authorization cannot be cancelled.`,
+      });
+    }
+
+    // Hold released in the same operation (PR-011 #3: cancel ⇒ release).
     await preauthAdjudicationService.releaseBenefitHold(preAuthId, tenantId);
 
     await prisma.preAuthorization.update({

@@ -34,31 +34,31 @@ export class SmsQueryService {
 
     if (keyword === "BAL" || keyword === "BALANCE") {
       await logLowBandwidthLookup({ tenantId: snapshot.tenantId, memberId: snapshot.memberId, channel: "SMS", action: "BENEFIT_BALANCE", phone });
-      return `AiCare: ${formatKes(snapshot.benefitSummary.totalRemaining)} benefit remaining of ${formatKes(snapshot.benefitSummary.totalLimit)}. Renewal ${formatDate(snapshot.renewalDate)}.`;
+      return `Medvex: ${formatKes(snapshot.benefitSummary.totalRemaining)} benefit remaining of ${formatKes(snapshot.benefitSummary.totalLimit)}. Renewal ${formatDate(snapshot.renewalDate)}.`;
     }
 
     if (keyword === "VISITS" || keyword === "VISIT") {
       await logLowBandwidthLookup({ tenantId: snapshot.tenantId, memberId: snapshot.memberId, channel: "SMS", action: "RECENT_VISITS", phone });
-      if (snapshot.recentEncounters.length === 0) return "AiCare: No recent visible visits found.";
-      return `AiCare visits: ${snapshot.recentEncounters.map((visit) => `${formatDate(visit.dateOfService)} ${visit.providerName}`).join("; ")}`;
+      if (snapshot.recentEncounters.length === 0) return "Medvex: No recent visible visits found.";
+      return `Medvex visits: ${snapshot.recentEncounters.map((visit) => `${formatDate(visit.dateOfService)} ${visit.providerName}`).join("; ")}`;
     }
 
     if (keyword === "RENEWAL") {
       await logLowBandwidthLookup({ tenantId: snapshot.tenantId, memberId: snapshot.memberId, channel: "SMS", action: "RENEWAL_DATE", phone });
-      return `AiCare: Your scheme renewal date is ${formatDate(snapshot.renewalDate)}.`;
+      return `Medvex: Your scheme renewal date is ${formatDate(snapshot.renewalDate)}.`;
     }
 
     if (keyword === "LOC" || keyword === "PROVIDER") {
       const area = rest.join(" ").trim();
-      if (!area) return "AiCare: Reply LOC followed by area, e.g. LOC Westlands.";
+      if (!area) return "Medvex: Reply LOC followed by area, e.g. LOC Westlands.";
 
       const result = await MemberAppService.getLowBandwidthProvidersByArea({ phone, area, tenantSlug: input.tenantSlug });
       await logLowBandwidthLookup({ tenantId: snapshot.tenantId, memberId: snapshot.memberId, channel: "SMS", action: "PROVIDER_SEARCH", phone, metadata: { area } });
-      if (!result || result.providers.length === 0) return `AiCare: No active providers found for ${area}. Call Medvex support for help.`;
-      return `AiCare providers near ${area}: ${result.providers.map((provider) => `${provider.name}${provider.phone ? ` ${provider.phone}` : ""}`).join("; ")}`;
+      if (!result || result.providers.length === 0) return `Medvex: No active providers found for ${area}. Call Medvex support for help.`;
+      return `Medvex providers near ${area}: ${result.providers.map((provider) => `${provider.name}${provider.phone ? ` ${provider.phone}` : ""}`).join("; ")}`;
     }
 
     await logLowBandwidthLookup({ tenantId: snapshot.tenantId, memberId: snapshot.memberId, channel: "SMS", action: "HELP", phone });
-    return "AiCare: Use BAL for balance, VISITS for recent visits, RENEWAL for renewal date, or LOC area for providers.";
+    return "Medvex: Use BAL for balance, VISITS for recent visits, RENEWAL for renewal date, or LOC area for providers.";
   }
 }

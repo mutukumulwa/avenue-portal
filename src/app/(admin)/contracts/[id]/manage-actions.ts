@@ -22,148 +22,201 @@ function back(id: string) {
   redirect(`/contracts/${id}`);
 }
 
+/**
+ * PR-009: every child-entity mutation surfaces its server error on the
+ * contract page (?error=) instead of dying silently in the action layer.
+ */
+async function guardedManage(fd: FormData, fn: () => Promise<void>) {
+  try {
+    await fn();
+  } catch (e) {
+    if (e instanceof Error && e.message === "NEXT_REDIRECT") throw e;
+    const msg = e instanceof Error ? e.message : "Action failed";
+    const id = s(fd, "contractId");
+    if (id) redirect(`/contracts/${id}?error=${encodeURIComponent(msg)}`);
+    throw e;
+  }
+}
+
+
+/**
+ * PR-020: contract child-entity mutations (pricing rules, exclusions,
+ * applicability, tariff lines, capitation, packages — add and remove) are
+ * auditable business state changes.
+ */
+async function auditManage(userId: string, contract: { id: string; contractNumber: string }, action: string, detail: string) {
+  const { writeAudit } = await import("@/lib/audit");
+  await writeAudit({
+    userId,
+    action,
+    module: "CONTRACTS",
+    description: `Contract ${contract.contractNumber}: ${detail}`,
+    metadata: { contractId: contract.id },
+  });
+}
+
 // ── Applicability (§5.4) ──
 export async function addApplicabilityAction(fd: FormData) {
-  const session = await requireRole(ROLES.UNDERWRITING);
-  const c = await ownedContract(fd, session.user.tenantId);
-  const clientId = s(fd, "clientId");
-  if (!clientId) redirect(`/contracts/${c.id}?error=Select+a+payer`);
-  await prisma.contractApplicability.create({
-    data: {
-      contractId: c.id,
-      clientId: clientId!,
-      benefitCategory: s(fd, "benefitCategory") as never,
-      memberCategory: s(fd, "memberCategory"),
-      inclusionType: (s(fd, "inclusionType") as EligibilityRule) ?? "INCLUDE",
-    },
+  return guardedManage(fd, async () => {    const session = await requireRole(ROLES.UNDERWRITING);
+    const c = await ownedContract(fd, session.user.tenantId);
+    const clientId = s(fd, "clientId");
+    if (!clientId) redirect(`/contracts/${c.id}?error=Select+a+payer`);
+    await prisma.contractApplicability.create({
+      data: {
+        contractId: c.id,
+        clientId: clientId!,
+        benefitCategory: s(fd, "benefitCategory") as never,
+        memberCategory: s(fd, "memberCategory"),
+        inclusionType: (s(fd, "inclusionType") as EligibilityRule) ?? "INCLUDE",
+      },
+    });
+    await auditManage(session.user.id, c, "CONTRACT_APPLICABILITY_ADDED", "applicability row added");
+    back(c.id);
   });
-  back(c.id);
 }
 
 export async function removeApplicabilityAction(fd: FormData) {
-  const session = await requireRole(ROLES.UNDERWRITING);
-  const c = await ownedContract(fd, session.user.tenantId);
-  const id = s(fd, "applicabilityId");
-  if (id) await prisma.contractApplicability.update({ where: { id }, data: { isActive: false } });
-  back(c.id);
+  return guardedManage(fd, async () => {    const session = await requireRole(ROLES.UNDERWRITING);
+    const c = await ownedContract(fd, session.user.tenantId);
+    const id = s(fd, "applicabilityId");
+    if (id) await prisma.contractApplicability.update({ where: { id }, data: { isActive: false } });
+    await auditManage(session.user.id, c, "CONTRACT_APPLICABILITY_REMOVED", "applicability row removed");
+    back(c.id);
+  });
 }
 
 // ── Branch coverage (§5.1 LISTED) ──
 export async function attachBranchAction(fd: FormData) {
-  const session = await requireRole(ROLES.UNDERWRITING);
-  const c = await ownedContract(fd, session.user.tenantId);
-  const branchId = s(fd, "branchId");
-  if (branchId) {
-    await prisma.contractBranch.upsert({
-      where: { contractId_branchId: { contractId: c.id, branchId } },
-      create: { contractId: c.id, branchId },
-      update: {},
-    });
-  }
-  back(c.id);
+  return guardedManage(fd, async () => {    const session = await requireRole(ROLES.UNDERWRITING);
+    const c = await ownedContract(fd, session.user.tenantId);
+    const branchId = s(fd, "branchId");
+    if (branchId) {
+      await prisma.contractBranch.upsert({
+        where: { contractId_branchId: { contractId: c.id, branchId } },
+        create: { contractId: c.id, branchId },
+        update: {},
+      });
+    }
+    await auditManage(session.user.id, c, "CONTRACT_BRANCH_ATTACHED", "branch attached to LISTED scope");
+    back(c.id);
+  });
 }
 
 export async function detachBranchAction(fd: FormData) {
-  const session = await requireRole(ROLES.UNDERWRITING);
-  const c = await ownedContract(fd, session.user.tenantId);
-  const id = s(fd, "contractBranchId");
-  if (id) await prisma.contractBranch.delete({ where: { id } });
-  back(c.id);
+  return guardedManage(fd, async () => {    const session = await requireRole(ROLES.UNDERWRITING);
+    const c = await ownedContract(fd, session.user.tenantId);
+    const id = s(fd, "contractBranchId");
+    if (id) await prisma.contractBranch.delete({ where: { id } });
+    await auditManage(session.user.id, c, "CONTRACT_BRANCH_DETACHED", "branch detached");
+    back(c.id);
+  });
 }
 
 export async function createProviderBranchAction(fd: FormData) {
-  const session = await requireRole(ROLES.UNDERWRITING);
-  const c = await ownedContract(fd, session.user.tenantId);
-  const name = s(fd, "name");
-  if (name) await prisma.providerBranch.create({ data: { tenantId: session.user.tenantId, providerId: c.providerId, name, code: s(fd, "code") } });
-  back(c.id);
+  return guardedManage(fd, async () => {    const session = await requireRole(ROLES.UNDERWRITING);
+    const c = await ownedContract(fd, session.user.tenantId);
+    const name = s(fd, "name");
+    if (name) await prisma.providerBranch.create({ data: { tenantId: session.user.tenantId, providerId: c.providerId, name, code: s(fd, "code") } });
+    await auditManage(session.user.id, c, "PROVIDER_BRANCH_CREATED", "provider branch created from contract workspace");
+    back(c.id);
+  });
 }
 
 // ── Tariff lines (§5.6) ──
 export async function addTariffLineAction(fd: FormData) {
-  const session = await requireRole(ROLES.UNDERWRITING);
-  const c = await ownedContract(fd, session.user.tenantId);
-  const serviceName = s(fd, "serviceName");
-  if (!serviceName) redirect(`/contracts/${c.id}?error=Service+name+required`);
-  const rateMissing = s(fd, "rateMissing") === "on";
-  const rate = n(fd, "agreedRate");
-  if (!rateMissing && (rate == null || rate <= 0)) redirect(`/contracts/${c.id}?error=Enter+a+rate+or+mark+rate-missing`);
-  await prisma.providerTariff.create({
-    data: {
-      providerId: c.providerId,
-      contractId: c.id,
-      serviceName: serviceName!,
-      cptCode: s(fd, "cptCode"),
-      agreedRate: rate ?? 0,
-      currency: c.currency,
-      rateType: (s(fd, "rateType") as TariffRateType) ?? "FIXED",
-      unitOfMeasure: (s(fd, "unitOfMeasure") as UnitOfMeasure) ?? "PER_ITEM",
-      requiresPreauth: s(fd, "requiresPreauth") === "on",
-      requiresReferral: s(fd, "requiresReferral") === "on",
-      maxQuantityPerVisit: n(fd, "maxQuantityPerVisit"),
-      rateMissing,
-      effectiveFrom: c.startDate,
-    },
+  return guardedManage(fd, async () => {    const session = await requireRole(ROLES.UNDERWRITING);
+    const c = await ownedContract(fd, session.user.tenantId);
+    const serviceName = s(fd, "serviceName");
+    if (!serviceName) redirect(`/contracts/${c.id}?error=Service+name+required`);
+    const rateMissing = s(fd, "rateMissing") === "on";
+    const rate = n(fd, "agreedRate");
+    if (!rateMissing && (rate == null || rate <= 0)) redirect(`/contracts/${c.id}?error=Enter+a+rate+or+mark+rate-missing`);
+    await prisma.providerTariff.create({
+      data: {
+        providerId: c.providerId,
+        contractId: c.id,
+        serviceName: serviceName!,
+        cptCode: s(fd, "cptCode"),
+        agreedRate: rate ?? 0,
+        currency: c.currency,
+        rateType: (s(fd, "rateType") as TariffRateType) ?? "FIXED",
+        unitOfMeasure: (s(fd, "unitOfMeasure") as UnitOfMeasure) ?? "PER_ITEM",
+        requiresPreauth: s(fd, "requiresPreauth") === "on",
+        requiresReferral: s(fd, "requiresReferral") === "on",
+        maxQuantityPerVisit: n(fd, "maxQuantityPerVisit"),
+        rateMissing,
+        effectiveFrom: c.startDate,
+      },
+    });
+    await auditManage(session.user.id, c, "CONTRACT_TARIFF_ADDED", "tariff line added");
+    back(c.id);
   });
-  back(c.id);
 }
 
 export async function deactivateTariffAction(fd: FormData) {
-  const session = await requireRole(ROLES.UNDERWRITING);
-  const c = await ownedContract(fd, session.user.tenantId);
-  const id = s(fd, "tariffId");
-  if (id) await prisma.providerTariff.update({ where: { id }, data: { isActive: false } });
-  back(c.id);
+  return guardedManage(fd, async () => {    const session = await requireRole(ROLES.UNDERWRITING);
+    const c = await ownedContract(fd, session.user.tenantId);
+    const id = s(fd, "tariffId");
+    if (id) await prisma.providerTariff.update({ where: { id }, data: { isActive: false } });
+    await auditManage(session.user.id, c, "CONTRACT_TARIFF_REMOVED", "tariff line deactivated");
+    back(c.id);
+  });
 }
 
 // ── Exclusions (§5.9) ──
 export async function addExclusionAction(fd: FormData) {
-  const session = await requireRole(ROLES.UNDERWRITING);
-  const c = await ownedContract(fd, session.user.tenantId);
-  const serviceName = s(fd, "serviceName");
-  if (serviceName) {
-    await prisma.providerContractExclusion.create({
-      data: { contractId: c.id, serviceName, cptCode: s(fd, "cptCode"), reason: s(fd, "reason"), level: "TARIFF_LINE" },
-    });
-  }
-  back(c.id);
+  return guardedManage(fd, async () => {    const session = await requireRole(ROLES.UNDERWRITING);
+    const c = await ownedContract(fd, session.user.tenantId);
+    const serviceName = s(fd, "serviceName");
+    if (serviceName) {
+      await prisma.providerContractExclusion.create({
+        data: { contractId: c.id, serviceName, cptCode: s(fd, "cptCode"), reason: s(fd, "reason"), level: "TARIFF_LINE" },
+      });
+    }
+    await auditManage(session.user.id, c, "CONTRACT_EXCLUSION_ADDED", "exclusion added");
+    back(c.id);
+  });
 }
 
 // ── Pricing rules — rule builder (§5.7 / §11.5) ──
 export async function addPricingRuleAction(fd: FormData) {
-  const session = await requireRole(ROLES.UNDERWRITING);
-  const c = await ownedContract(fd, session.user.tenantId);
-  const ruleKind = s(fd, "ruleKind") as PricingRuleKind | undefined;
-  if (!ruleKind) redirect(`/contracts/${c.id}?error=Pick+a+rule+kind`);
-  // Build kind-specific params from the simple builder fields.
-  const params: Record<string, unknown> = {};
-  const rate = n(fd, "rate");
-  const pct = n(fd, "pct");
-  const poolId = s(fd, "poolId");
-  const carveOuts = s(fd, "carveOutDescriptions");
-  if (rate != null) params.rate = rate;
-  if (pct != null) params.pct = pct;
-  if (poolId) params.poolId = poolId;
-  if (carveOuts) params.carveOutDescriptions = carveOuts.split(",").map(x => x.trim()).filter(Boolean);
-  await prisma.pricingRule.create({
-    data: {
-      tenantId: session.user.tenantId,
-      contractId: c.id,
-      scope: (s(fd, "scope") as ContractRuleScope) ?? "CONTRACT",
-      ruleKind: ruleKind!,
-      params: params as never,
-      priority: n(fd, "priority") ?? 100,
-    },
+  return guardedManage(fd, async () => {    const session = await requireRole(ROLES.UNDERWRITING);
+    const c = await ownedContract(fd, session.user.tenantId);
+    const ruleKind = s(fd, "ruleKind") as PricingRuleKind | undefined;
+    if (!ruleKind) redirect(`/contracts/${c.id}?error=Pick+a+rule+kind`);
+    // Build kind-specific params from the simple builder fields.
+    const params: Record<string, unknown> = {};
+    const rate = n(fd, "rate");
+    const pct = n(fd, "pct");
+    const poolId = s(fd, "poolId");
+    const carveOuts = s(fd, "carveOutDescriptions");
+    if (rate != null) params.rate = rate;
+    if (pct != null) params.pct = pct;
+    if (poolId) params.poolId = poolId;
+    if (carveOuts) params.carveOutDescriptions = carveOuts.split(",").map(x => x.trim()).filter(Boolean);
+    await prisma.pricingRule.create({
+      data: {
+        tenantId: session.user.tenantId,
+        contractId: c.id,
+        scope: (s(fd, "scope") as ContractRuleScope) ?? "CONTRACT",
+        ruleKind: ruleKind!,
+        params: params as never,
+        priority: n(fd, "priority") ?? 100,
+      },
+    });
+    await auditManage(session.user.id, c, "CONTRACT_PRICING_RULE_ADDED", "pricing rule added");
+    back(c.id);
   });
-  back(c.id);
 }
 
 export async function deactivatePricingRuleAction(fd: FormData) {
-  const session = await requireRole(ROLES.UNDERWRITING);
-  const c = await ownedContract(fd, session.user.tenantId);
-  const id = s(fd, "ruleId");
-  if (id) await prisma.pricingRule.update({ where: { id }, data: { isActive: false } });
-  back(c.id);
+  return guardedManage(fd, async () => {    const session = await requireRole(ROLES.UNDERWRITING);
+    const c = await ownedContract(fd, session.user.tenantId);
+    const id = s(fd, "ruleId");
+    if (id) await prisma.pricingRule.update({ where: { id }, data: { isActive: false } });
+    await auditManage(session.user.id, c, "CONTRACT_PRICING_RULE_REMOVED", "pricing rule deactivated");
+    back(c.id);
+  });
 }
 
 // ── Capitation setup (WP-E4, TPA-confirmed) ──
@@ -172,73 +225,79 @@ export async function deactivatePricingRuleAction(fd: FormData) {
 // workstream.
 
 export async function addCapitationRuleAction(fd: FormData) {
-  const session = await requireRole(ROLES.UNDERWRITING);
-  const c = await ownedContract(fd, session.user.tenantId);
+  return guardedManage(fd, async () => {    const session = await requireRole(ROLES.UNDERWRITING);
+    const c = await ownedContract(fd, session.user.tenantId);
 
-  const amount = n(fd, "amount");
-  const per = s(fd, "per");
-  if (amount == null || amount <= 0) redirect(`/contracts/${c.id}?error=Capitation+amount+must+be+positive`);
-  if (per !== "MEMBER_PER_MONTH" && per !== "MEMBER_PER_YEAR") {
-    redirect(`/contracts/${c.id}?error=Pick+a+capitation+period`);
-  }
-  const carveOutCodes = (s(fd, "carveOutCodes") ?? "")
-    .split(",").map((x) => x.trim()).filter(Boolean);
+    const amount = n(fd, "amount");
+    const per = s(fd, "per");
+    if (amount == null || amount <= 0) redirect(`/contracts/${c.id}?error=Capitation+amount+must+be+positive`);
+    if (per !== "MEMBER_PER_MONTH" && per !== "MEMBER_PER_YEAR") {
+      redirect(`/contracts/${c.id}?error=Pick+a+capitation+period`);
+    }
+    const carveOutCodes = (s(fd, "carveOutCodes") ?? "")
+      .split(",").map((x) => x.trim()).filter(Boolean);
 
-  await prisma.pricingRule.create({
-    data: {
-      tenantId: session.user.tenantId,
-      contractId: c.id,
-      scope: "CONTRACT",
-      ruleKind: "CAPITATION",
-      params: {
-        amount,
-        currency: s(fd, "currency") ?? c.currency,
-        per,
-        poolId: s(fd, "poolId") ?? `CAP-${c.contractNumber}`,
-        ...(carveOutCodes.length ? { carveOutCodes } : {}),
-      } as never,
-      priority: 10, // capitation outranks line pricing
-    },
+    await prisma.pricingRule.create({
+      data: {
+        tenantId: session.user.tenantId,
+        contractId: c.id,
+        scope: "CONTRACT",
+        ruleKind: "CAPITATION",
+        params: {
+          amount,
+          currency: s(fd, "currency") ?? c.currency,
+          per,
+          poolId: s(fd, "poolId") ?? `CAP-${c.contractNumber}`,
+          ...(carveOutCodes.length ? { carveOutCodes } : {}),
+        } as never,
+        priority: 10, // capitation outranks line pricing
+      },
+    });
+    await auditManage(session.user.id, c, "CONTRACT_CAPITATION_ADDED", "capitation setup added");
+    back(c.id);
   });
-  back(c.id);
 }
 
 export async function addContractPackageAction(fd: FormData) {
-  const session = await requireRole(ROLES.UNDERWRITING);
-  const c = await ownedContract(fd, session.user.tenantId);
+  return guardedManage(fd, async () => {    const session = await requireRole(ROLES.UNDERWRITING);
+    const c = await ownedContract(fd, session.user.tenantId);
 
-  const name = s(fd, "name");
-  const packagePrice = n(fd, "packagePrice");
-  if (!name) redirect(`/contracts/${c.id}?error=Package+name+required`);
-  const parse = (k: string) => (s(fd, k) ?? "").split("\n").map((x) => x.trim()).filter(Boolean);
+    const name = s(fd, "name");
+    const packagePrice = n(fd, "packagePrice");
+    if (!name) redirect(`/contracts/${c.id}?error=Package+name+required`);
+    const parse = (k: string) => (s(fd, k) ?? "").split("\n").map((x) => x.trim()).filter(Boolean);
 
-  await prisma.contractPackage.create({
-    data: {
-      tenantId: session.user.tenantId,
-      contractId: c.id,
-      name: name!,
-      code: s(fd, "code"),
-      // Capitation-covered packages may carry no per-episode price (0 =
-      // covered by the capitation amount); carve-out packages price separately.
-      packagePrice: packagePrice ?? 0,
-      currency: s(fd, "currency") ?? c.currency,
-      triggerType: "SERVICE_DESCRIPTION",
-      triggerCodes: parse("triggerCodes"),
-      components: {
-        create: [
-          ...parse("includedComponents").map((d) => ({ type: "INCLUDED" as const, description: d })),
-          ...parse("excludedComponents").map((d) => ({ type: "EXCLUDED" as const, description: d })),
-        ],
+    await prisma.contractPackage.create({
+      data: {
+        tenantId: session.user.tenantId,
+        contractId: c.id,
+        name: name!,
+        code: s(fd, "code"),
+        // Capitation-covered packages may carry no per-episode price (0 =
+        // covered by the capitation amount); carve-out packages price separately.
+        packagePrice: packagePrice ?? 0,
+        currency: s(fd, "currency") ?? c.currency,
+        triggerType: "SERVICE_DESCRIPTION",
+        triggerCodes: parse("triggerCodes"),
+        components: {
+          create: [
+            ...parse("includedComponents").map((d) => ({ type: "INCLUDED" as const, description: d })),
+            ...parse("excludedComponents").map((d) => ({ type: "EXCLUDED" as const, description: d })),
+          ],
+        },
       },
-    },
+    });
+    await auditManage(session.user.id, c, "CONTRACT_PACKAGE_ADDED", "package added");
+    back(c.id);
   });
-  back(c.id);
 }
 
 export async function deactivateContractPackageAction(fd: FormData) {
-  const session = await requireRole(ROLES.UNDERWRITING);
-  const c = await ownedContract(fd, session.user.tenantId);
-  const id = s(fd, "packageId");
-  if (id) await prisma.contractPackage.update({ where: { id }, data: { isActive: false } });
-  back(c.id);
+  return guardedManage(fd, async () => {    const session = await requireRole(ROLES.UNDERWRITING);
+    const c = await ownedContract(fd, session.user.tenantId);
+    const id = s(fd, "packageId");
+    if (id) await prisma.contractPackage.update({ where: { id }, data: { isActive: false } });
+    await auditManage(session.user.id, c, "CONTRACT_PACKAGE_REMOVED", "package deactivated");
+    back(c.id);
+  });
 }

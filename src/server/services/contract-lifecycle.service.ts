@@ -18,7 +18,7 @@ const MODULE = "PROVIDER_CONTRACT";
  * (auto-activate at startDate, auto-expire past endDate) use the same map.
  */
 const TRANSITIONS: Record<ProviderContractStatus, ProviderContractStatus[]> = {
-  DRAFT: ["UNDER_REVIEW", "ARCHIVED"],
+  DRAFT: ["UNDER_REVIEW", "ARCHIVED", "VOIDED"], // VOIDED reachable from DRAFT only (PR-010 D2)
   UNDER_REVIEW: ["APPROVED", "DRAFT", "PENDING_CLARIFICATION"],
   PENDING_CLARIFICATION: ["UNDER_REVIEW", "DRAFT"],
   APPROVED: ["ACTIVE", "DRAFT"], // withdraw-to-draft before activation only
@@ -28,7 +28,18 @@ const TRANSITIONS: Record<ProviderContractStatus, ProviderContractStatus[]> = {
   TERMINATED: ["ARCHIVED"],
   SUPERSEDED: ["ARCHIVED"],
   ARCHIVED: [],
+  VOIDED: [], // terminal — never-delete convention
 };
+
+/** Header/commercial fields editable while a contract is in DRAFT (PR-010 D1). */
+export const DRAFT_EDITABLE_FIELDS = [
+  "title", "contractType", "startDate", "endDate", "reviewDueDate",
+  "branchScope", "externalContractRef", "currency", "executionStatus",
+  "paymentTermDays", "paymentTermType", "submissionWindowDays", "submissionWindowBasis",
+  "balanceBillingPolicy", "taxInclusive", "reconciliationCadence",
+  "unlistedServiceRule", "unlistedDiscountPct", "notes",
+] as const;
+export type DraftEditableField = (typeof DRAFT_EDITABLE_FIELDS)[number];
 
 export interface ValidationIssue {
   rule: string; // e.g. "V1"
@@ -158,6 +169,82 @@ export class ContractLifecycleService {
     // the mutating tx commits. We call it here (post-mutation) via the outer prisma.
     void tx;
     await auditChainService.append({ actorId, action, module: MODULE, entityType: "ProviderContract", entityId: contractId, payload, tenantId, description });
+  }
+
+  /**
+   * PR-010 #1: edit header/commercial fields while DRAFT (or answering
+   * clarification). Server-enforced — no edits in UNDER_REVIEW/APPROVED/
+   * ACTIVE/SUSPENDED even via direct invocation. Writes an audit event with a
+   * field-level before/after diff.
+   */
+  static async editDraftHeader(
+    tenantId: string,
+    contractId: string,
+    userId: string,
+    fields: Partial<Record<DraftEditableField, unknown>>,
+  ) {
+    const c = await prisma.providerContract.findUnique({ where: { id: contractId, tenantId } });
+    if (!c) throw new Error("Contract not found");
+    if (!["DRAFT", "PENDING_CLARIFICATION"].includes(c.status)) {
+      throw new Error(
+        `Header terms can only be edited in DRAFT (current: ${c.status.replace(/_/g, " ")}). ` +
+        "Withdraw the contract to draft first, or capture a superseding version.",
+      );
+    }
+
+    // Whitelist + diff.
+    const data: Record<string, unknown> = {};
+    const diff: Record<string, { before: unknown; after: unknown }> = {};
+    for (const key of DRAFT_EDITABLE_FIELDS) {
+      if (!(key in fields)) continue;
+      const after = fields[key];
+      const before = (c as Record<string, unknown>)[key];
+      const beforeCmp = before instanceof Date ? before.toISOString() : before;
+      const afterCmp = after instanceof Date ? after.toISOString() : after;
+      if (beforeCmp === afterCmp) continue;
+      data[key] = after;
+      diff[key] = {
+        before: before instanceof Date ? before.toISOString().slice(0, 10) : before,
+        after: after instanceof Date ? after.toISOString().slice(0, 10) : after,
+      };
+    }
+    if (Object.keys(data).length === 0) return c;
+
+    if (data.startDate && data.endDate && (data.endDate as Date) <= (data.startDate as Date)) {
+      throw new Error("End date must be after the start date.");
+    }
+
+    const updated = await prisma.providerContract.update({ where: { id: contractId }, data: data as never });
+    await this.logEvent(
+      prisma as never, tenantId, userId, "CONTRACT:HEADER_EDITED", contractId,
+      { diff },
+      `Contract ${c.contractNumber} header edited in ${c.status}: ${Object.keys(diff).join(", ")}`,
+    );
+    return updated;
+  }
+
+  /**
+   * PR-010 D2: DRAFT → VOIDED (terminal). Never-delete convention — the record
+   * stays for audit but leaves default lists and selection dropdowns. Requires
+   * a reason.
+   */
+  static async voidContract(tenantId: string, contractId: string, userId: string, reason: string) {
+    const c = await prisma.providerContract.findUnique({ where: { id: contractId, tenantId } });
+    if (!c) throw new Error("Contract not found");
+    this.assertTransition(c.status, "VOIDED");
+    if (!reason || reason.trim().length < 5) {
+      throw new Error("A void reason is required (min 5 characters).");
+    }
+    const updated = await prisma.providerContract.update({
+      where: { id: contractId },
+      data: { status: "VOIDED", notes: c.notes ? `${c.notes}\n\nVOIDED: ${reason}` : `VOIDED: ${reason}` },
+    });
+    await this.logEvent(
+      prisma as never, tenantId, userId, "CONTRACT:VOIDED", contractId,
+      { reason, from: c.status },
+      `Contract ${c.contractNumber} voided: ${reason}`,
+    );
+    return updated;
   }
 
   /** DRAFT → UNDER_REVIEW. Records the submitter (maker) for later maker≠checker. */

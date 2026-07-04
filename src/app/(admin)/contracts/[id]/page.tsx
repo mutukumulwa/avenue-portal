@@ -2,8 +2,9 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, AlertTriangle, CheckCircle2, FileSignature, GitBranch } from "lucide-react";
+import { ArrowLeft, AlertTriangle, CheckCircle2, FileSignature, GitBranch, Pencil } from "lucide-react";
 import { ContractLifecycleService } from "@/server/services/contract-lifecycle.service";
+import { PendingButton } from "@/components/ui/PendingButton";
 import { ManagePanel } from "./ManagePanel";
 import { FeeSchedule } from "./FeeSchedule";
 import { CapitationPanel } from "./CapitationPanel";
@@ -17,6 +18,9 @@ import {
   reinstateContractAction,
   terminateContractAction,
   renewContractAction,
+  editContractHeaderAction,
+  voidContractAction,
+  requestBackdateOverrideAction,
 } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -32,6 +36,7 @@ const STATUS_STYLES: Record<string, string> = {
   TERMINATED: "bg-[#DC3545]/10 text-[#DC3545]",
   SUPERSEDED: "bg-[#6C757D]/10 text-[#6C757D]",
   ARCHIVED: "bg-[#6C757D]/10 text-[#6C757D]",
+  VOIDED: "bg-[#6C757D]/15 text-[#6C757D] line-through",
 };
 
 function Term({ k, v }: { k: string; v: React.ReactNode }) {
@@ -57,7 +62,8 @@ function ActionButton({
     <form action={action} className="inline">
       <input type="hidden" name="id" value={id} />
       {extra}
-      <button type="submit" className={`rounded-lg px-3 py-1.5 text-sm font-medium ${cls}`}>{label}</button>
+      {/* PR-009: pending state + single-flight while the action runs */}
+      <PendingButton className={`rounded-lg px-3 py-1.5 text-sm font-medium ${cls}`}>{label}</PendingButton>
     </form>
   );
 }
@@ -67,11 +73,11 @@ export default async function ContractDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; notice?: string }>;
 }) {
   const session = await requireRole(ROLES.UNDERWRITING);
   const { id } = await params;
-  const { error } = await searchParams;
+  const { error, notice } = await searchParams;
   const tenantId = session.user.tenantId;
 
   const c = await prisma.providerContract.findUnique({
@@ -113,8 +119,30 @@ export default async function ContractDetailPage({
       </Link>
 
       {error && (
-        <div className="mb-4 flex items-center gap-2 rounded-lg bg-[#DC3545]/10 px-4 py-3 text-sm text-[#DC3545]">
-          <AlertTriangle className="w-4 h-4" /> {error}
+        <div className="mb-4 rounded-lg bg-[#DC3545]/10 px-4 py-3 text-sm text-[#DC3545]">
+          <p className="flex items-center gap-2"><AlertTriangle className="w-4 h-4 shrink-0" /> {error}</p>
+          {/* PR-009 #3: the backdate error names its remedy — offer it inline. */}
+          {error.includes("CONTRACT_BACKDATE") && (
+            <form action={requestBackdateOverrideAction} className="mt-3 flex flex-wrap items-center gap-2">
+              <input type="hidden" name="id" value={id} />
+              <input
+                name="justification"
+                required
+                minLength={20}
+                placeholder="Justification for backdated activation (min 20 chars)"
+                className="flex-1 min-w-64 rounded-lg border border-[#DC3545]/30 bg-white px-3 py-1.5 text-sm text-[#000523]"
+              />
+              <PendingButton className="rounded-lg bg-[#856404] px-3 py-1.5 text-sm font-medium text-white hover:opacity-90">
+                Raise CONTRACT_BACKDATE override
+              </PendingButton>
+            </form>
+          )}
+        </div>
+      )}
+
+      {notice && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg bg-[#28A745]/10 px-4 py-3 text-sm text-[#1E7E34]">
+          <CheckCircle2 className="w-4 h-4 shrink-0" /> {notice}
         </div>
       )}
 
@@ -155,7 +183,17 @@ export default async function ContractDetailPage({
       <div className="mb-6 flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white p-3">
         <span className="text-xs font-medium text-[#6C757D] mr-1">Actions:</span>
         {c.status === "DRAFT" && (
-          <ActionButton action={submitForReviewAction} id={c.id} label="Submit for review" cls="bg-[#17A2B8] text-white hover:bg-[#138496]" />
+          <>
+            <ActionButton action={submitForReviewAction} id={c.id} label="Submit for review" cls="bg-[#17A2B8] text-white hover:bg-[#138496]" />
+            {/* PR-010 D2: dead drafts are voided with a reason, never deleted */}
+            <form action={voidContractAction} className="inline-flex items-center gap-2 ml-auto">
+              <input type="hidden" name="id" value={c.id} />
+              <input name="reason" required minLength={5} placeholder="Void reason…" className="rounded-lg border border-gray-200 px-2 py-1.5 text-sm" />
+              <PendingButton className="rounded-lg px-3 py-1.5 text-sm font-medium border border-[#DC3545] text-[#DC3545] hover:bg-[#DC3545]/10">
+                Void contract
+              </PendingButton>
+            </form>
+          </>
         )}
         {c.status === "UNDER_REVIEW" && (
           <>
@@ -225,6 +263,84 @@ export default async function ContractDetailPage({
             </form>
           )}
         </div>
+      )}
+
+      {/* PR-010 #1: header terms editable while DRAFT — mirrors /contracts/new,
+          pre-filled; saving re-runs the validation panel and audits the diff. */}
+      {["DRAFT", "PENDING_CLARIFICATION"].includes(c.status) && (
+        <details className="mb-6 rounded-xl border border-[#FFC107]/40 bg-[#FFF8E1]/60">
+          <summary className="cursor-pointer px-4 py-3 text-sm font-semibold text-[#856404] flex items-center gap-2">
+            <Pencil className="w-4 h-4" /> Edit header &amp; commercial terms (DRAFT)
+          </summary>
+          <form action={editContractHeaderAction} className="grid grid-cols-2 sm:grid-cols-3 gap-3 p-4 pt-1 text-sm">
+            <input type="hidden" name="id" value={c.id} />
+            <label className="text-xs text-[#6C757D]">Title
+              <input name="title" defaultValue={c.title} className="block w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm" />
+            </label>
+            <label className="text-xs text-[#6C757D]">Start date
+              <input type="date" name="startDate" defaultValue={c.startDate.toISOString().slice(0, 10)} className="block w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm" />
+            </label>
+            <label className="text-xs text-[#6C757D]">End date
+              <input type="date" name="endDate" defaultValue={c.endDate.toISOString().slice(0, 10)} className="block w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm" />
+            </label>
+            <label className="text-xs text-[#6C757D]">Contract type
+              <select name="contractType" defaultValue={c.contractType} className="block w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm">
+                {["MASTER_SERVICE_AGREEMENT", "RATE_SCHEDULE", "PACKAGE_AGREEMENT", "CASE_RATE_AGREEMENT", "RECONCILIATION_AGREEMENT", "ADDENDUM", "GOVERNMENT_SCHEME_CONTRACT"].map(t => (
+                  <option key={t} value={t}>{t.replace(/_/g, " ")}</option>
+                ))}
+              </select>
+            </label>
+            <label className="text-xs text-[#6C757D]">Execution status
+              <select name="executionStatus" defaultValue={c.executionStatus} className="block w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm">
+                {["UNSIGNED", "PROVIDER_ONLY", "FULLY_EXECUTED"].map(t => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
+              </select>
+            </label>
+            <label className="text-xs text-[#6C757D]">Branch scope
+              <select name="branchScope" defaultValue={c.branchScope} className="block w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm">
+                {["ALL_BRANCHES", "LISTED"].map(t => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
+              </select>
+            </label>
+            <label className="text-xs text-[#6C757D]">Currency
+              <input name="currency" defaultValue={c.currency} className="block w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm" />
+            </label>
+            <label className="text-xs text-[#6C757D]">Payment term (days)
+              <input type="number" name="paymentTermDays" defaultValue={c.paymentTermDays} className="block w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm" />
+            </label>
+            <label className="text-xs text-[#6C757D]">Payment term type
+              <select name="paymentTermType" defaultValue={c.paymentTermType} className="block w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm">
+                {["CALENDAR", "BUSINESS"].map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </label>
+            <label className="text-xs text-[#6C757D]">Submission window (days)
+              <input type="number" name="submissionWindowDays" defaultValue={c.submissionWindowDays ?? ""} className="block w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm" />
+            </label>
+            <label className="text-xs text-[#6C757D]">Balance billing
+              <select name="balanceBillingPolicy" defaultValue={c.balanceBillingPolicy ?? ""} className="block w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm">
+                <option value="">—</option>
+                {["PROHIBITED", "ALLOWED_NONCOVERED_WITH_CONSENT", "ALLOWED"].map(t => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
+              </select>
+            </label>
+            <label className="text-xs text-[#6C757D]">Unlisted service rule
+              <select name="unlistedServiceRule" defaultValue={c.unlistedServiceRule} className="block w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm">
+                {["PAY_AS_BILLED", "DISCOUNT_OFF_BILLED", "REJECT", "REFER_FOR_REVIEW"].map(t => <option key={t} value={t}>{t.replace(/_/g, " ")}</option>)}
+              </select>
+            </label>
+            <label className="text-xs text-[#6C757D]">Unlisted discount %
+              <input type="number" step="0.1" name="unlistedDiscountPct" defaultValue={c.unlistedDiscountPct != null ? Number(c.unlistedDiscountPct) : ""} className="block w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm" />
+            </label>
+            <label className="text-xs text-[#6C757D]">External ref
+              <input name="externalContractRef" defaultValue={c.externalContractRef ?? ""} className="block w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm" />
+            </label>
+            <label className="text-xs text-[#6C757D] col-span-2">Notes
+              <input name="notes" defaultValue={c.notes ?? ""} className="block w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm" />
+            </label>
+            <div className="col-span-2 sm:col-span-3">
+              <PendingButton className="rounded-lg bg-[#06B9AB] px-4 py-2 text-sm font-medium text-white hover:opacity-90">
+                Save header changes
+              </PendingButton>
+            </div>
+          </form>
+        </details>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

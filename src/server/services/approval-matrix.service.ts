@@ -44,6 +44,15 @@ export interface ResolvedRule {
   matrix: ApprovalMatrix & { steps: ApprovalStep[] };
   steps: ResolvedStep[];
   baseAmount: number | null;
+  /** Rate used to normalise the request amount (1 when already base). */
+  fxRate: number;
+  /**
+   * PR-017 D1 fail-safe: true when the request carried a non-base currency but
+   * no FX rate was in force — band matching is impossible, so the resolver
+   * returns the *highest-requirement* rule and the caller must route to the
+   * multi-level/manual path, never the lowest band.
+   */
+  failSafe: boolean;
 }
 
 export class ApprovalMatrixService {
@@ -98,11 +107,17 @@ export class ApprovalMatrixService {
   static async resolve(tenantId: string, input: ResolveInput): Promise<ResolvedRule | null> {
     const atDate = input.atDate ?? new Date();
 
-    // Normalise the request amount to base (UGX) for band comparison.
+    // Normalise the request amount to base (UGX) for band comparison — using
+    // the rate in force at the decision date (PR-017 D1).
     let baseAmount: number | null = null;
+    let fxRate = 1;
+    let fxMissing = false;
     if (input.amount != null) {
-      const norm = await FxService.normalise(tenantId, input.amount, input.currency ?? "UGX", atDate);
+      const currency = input.currency ?? "UGX";
+      const norm = await FxService.normalise(tenantId, input.amount, currency, atDate);
       baseAmount = norm.baseAmount;
+      fxRate = norm.rate;
+      fxMissing = norm.identity && currency !== "UGX";
     }
 
     const candidates = await prisma.approvalMatrix.findMany({
@@ -118,6 +133,33 @@ export class ApprovalMatrixService {
       include: { steps: true },
       orderBy: { effectiveFrom: "desc" }, // most recent version first for tie-breaks
     });
+
+    // ── FX fail-safe (PR-017 D1) ─────────────────────────────────────────────
+    // A missing rate means the amount cannot be banded. Never fall through to
+    // the lowest band: return the candidate with the *most demanding* approval
+    // path (most steps, then highest band floor) flagged failSafe so the
+    // caller opens a multi-level ApprovalRequest / manual review.
+    if (fxMissing) {
+      const dimensionOk = candidates.filter((rule) => {
+        if (rule.serviceType && input.serviceType && rule.serviceType !== input.serviceType) return false;
+        if (rule.benefitCategory && input.benefitCategory && rule.benefitCategory !== input.benefitCategory) return false;
+        return true;
+      });
+      if (dimensionOk.length === 0) return null;
+      const mostDemanding = [...dimensionOk].sort((a, b) => {
+        const stepsA = this.expandSteps(a).length;
+        const stepsB = this.expandSteps(b).length;
+        if (stepsA !== stepsB) return stepsB - stepsA;
+        return Number(b.claimValueMin ?? 0) - Number(a.claimValueMin ?? 0);
+      })[0];
+      return {
+        matrix: mostDemanding,
+        steps: this.expandSteps(mostDemanding),
+        baseAmount: null,
+        fxRate: 1,
+        failSafe: true,
+      };
+    }
 
     let best: { score: number; rule: (typeof candidates)[number] } | null = null;
 
@@ -151,6 +193,8 @@ export class ApprovalMatrixService {
       matrix: best.rule,
       steps: this.expandSteps(best.rule),
       baseAmount,
+      fxRate,
+      failSafe: false,
     };
   }
 }

@@ -1,0 +1,504 @@
+
+> aicare@0.1.0 worker
+> tsx src/server/jobs/worker.ts
+
+Starting background workers...
+(node:7144) [DEP0205] DeprecationWarning: `module.register()` is deprecated. Use `module.registerHooks()` instead.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+[preauth-escalation] Scanning for overdue pre-authorizations…
+[commission-reconciliation] Reconciling broker commissions for 2026-07
+[Worker] System job sync-reconcile-cmr50gfcy006zg0vqjzbu14rj failed: PrismaClientKnownRequestError: 
+Invalid `prisma.syncOperation.findUnique()` invocation in
+/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/services/sync.service.ts:106:43
+
+  103  * a non-PENDING op is a no-op. Returns the terminal state.
+  104  */
+  105 static async reconcile(operationId: string): Promise<{ state: string; reason?: string }> {
+→ 106   const op = await prisma.syncOperation.findUnique(
+Database `arthurmulwa` does not exist on the database server
+    at Gr.handleRequestError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:237:13)
+    at Gr.handleAndLogRequestError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:183:12)
+    at Gr.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:152:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async a (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:938:24)
+    at async SyncService.reconcile (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/services/sync.service.ts:106:16)
+    at async Worker.import_bullmq.Worker.connection.connection (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/worker.ts:110:23)
+    at async <anonymous> (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/bullmq/src/classes/worker.ts:1000:26) {
+  code: 'P1003',
+  meta: {
+    modelName: 'SyncOperation',
+    driverAdapterError: DriverAdapterError: DatabaseDoesNotExist
+        at PrismaPgAdapter.onError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:678:11)
+        at PrismaPgAdapter.performIO (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:673:12)
+        at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        at async PrismaPgAdapter.queryRaw (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:604:30)
+        at async e.interpretNode (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:186:26)
+        at async e.interpretNode (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:213:41)
+        at async e.interpretNode (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:272:41)
+        at async e.run (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:94:23)
+        at async e.execute (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/core/engines/client/LocalExecutor.ts:81:12)
+        at async jt.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/core/engines/client/ClientEngine.ts:503:22)
+        at async Object.singleLoader (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:112:26) {
+      cause: [Object]
+    }
+  },
+  clientVersion: '7.7.0'
+}
+[Worker] Clinical job repeat:e09fa1bc8afe4fb47ab00bcec25c3cf6:1782910800000 failed: PrismaClientKnownRequestError: 
+Invalid `prisma.tenant.findMany()` invocation in
+/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/preauth-escalation.job.ts:17:39
+
+  14 console.info("[preauth-escalation] Scanning for overdue pre-authorizations…");
+  15 
+  16 const now = new Date();
+→ 17 const tenants = await prisma.tenant.findMany(
+Database `arthurmulwa` does not exist on the database server
+    at Gr.handleRequestError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:237:13)
+    at Gr.handleAndLogRequestError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:183:12)
+    at Gr.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:152:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async a (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:938:24)
+    at async runPreauthEscalationJob (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/preauth-escalation.job.ts:17:19)
+    at async Worker.import_bullmq.Worker.connection.connection (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/worker.ts:154:19)
+    at async <anonymous> (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/bullmq/src/classes/worker.ts:1000:26) {
+  code: 'P1003',
+  meta: {
+    modelName: 'Tenant',
+    driverAdapterError: DriverAdapterError: DatabaseDoesNotExist
+        at PrismaPgAdapter.onError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:678:11)
+        at PrismaPgAdapter.performIO (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:673:12)
+        at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        at async PrismaPgAdapter.queryRaw (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:604:30)
+        at async e.interpretNode (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:186:26)
+        at async e.interpretNode (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:272:41)
+        at async e.run (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:94:23)
+        at async e.execute (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/core/engines/client/LocalExecutor.ts:81:12)
+        at async jt.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/core/engines/client/ClientEngine.ts:503:22)
+        at async Object.singleLoader (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:112:26)
+        at async Gr.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:149:14)
+        at async a (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:938:24)
+        at async runPreauthEscalationJob (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/preauth-escalation.job.ts:17:19)
+        at async Worker.import_bullmq.Worker.connection.connection (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/worker.ts:154:19)
+        at async <anonymous> (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/bullmq/src/classes/worker.ts:1000:26) {
+      cause: [Object]
+    }
+  },
+  clientVersion: '7.7.0'
+}
+[Worker] Billing job repeat:73cfd52d3952010a225a77226f14f6c7:1782946800000 failed: PrismaClientKnownRequestError: 
+Invalid `prisma.payment.findMany()` invocation in
+/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/services/commission.service.ts:454:43
+
+  451 const periodEnd = lastDayOfPeriod(period);
+  452 const limit = params.limit ?? 500;
+  453 
+→ 454 const payments = await prisma.payment.findMany(
+Database `arthurmulwa` does not exist on the database server
+    at Gr.handleRequestError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:237:13)
+    at Gr.handleAndLogRequestError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:183:12)
+    at Gr.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:152:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async a (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:938:24)
+    at async CommissionService.reconcilePayments (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/services/commission.service.ts:454:22)
+    at async runCommissionReconciliationJob (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/commission-reconciliation.job.ts:7:18)
+    at async Worker.import_bullmq.Worker.connection.connection (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/worker.ts:67:20)
+    at async <anonymous> (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/bullmq/src/classes/worker.ts:1000:26) {
+  code: 'P1003',
+  meta: {
+    modelName: 'Payment',
+    driverAdapterError: DriverAdapterError: DatabaseDoesNotExist
+        at PrismaPgAdapter.onError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:678:11)
+        at PrismaPgAdapter.performIO (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:673:12)
+        at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        at async PrismaPgAdapter.queryRaw (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:604:30)
+        at async e.interpretNode (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:186:26)
+        at async e.interpretNode (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:128:29)
+        at async e.interpretNode (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:272:41)
+        at async e.run (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:94:23)
+        at async e.execute (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/core/engines/client/LocalExecutor.ts:81:12)
+        at async jt.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/core/engines/client/ClientEngine.ts:503:22)
+        at async Object.singleLoader (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:112:26)
+        at async Gr.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:149:14)
+        at async a (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:938:24)
+        at async CommissionService.reconcilePayments (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/services/commission.service.ts:454:22)
+        at async runCommissionReconciliationJob (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/commission-reconciliation.job.ts:7:18)
+        at async Worker.import_bullmq.Worker.connection.connection (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/worker.ts:67:20) {
+      cause: [Object]
+    }
+  },
+  clientVersion: '7.7.0'
+}
+[preauth-escalation] Scanning for overdue pre-authorizations…
+[commission-reconciliation] Reconciling broker commissions for 2026-07
+[Worker] System job repeat:a6fd63f39352106ea3ce4c753b62a141:1782910800000 failed: PrismaClientKnownRequestError: 
+Invalid `prisma.tenant.findMany()` invocation in
+/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/intake-allocation.job.ts:11:39
+
+   8 import { intakeService } from "../services/intake.service";
+   9 
+  10 export async function runIntakeAllocationJob() {
+→ 11   const tenants = await prisma.tenant.findMany(
+Database `arthurmulwa` does not exist on the database server
+    at Gr.handleRequestError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:237:13)
+    at Gr.handleAndLogRequestError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:183:12)
+    at Gr.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:152:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async a (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:938:24)
+    at async runIntakeAllocationJob (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/intake-allocation.job.ts:11:19)
+    at async Worker.import_bullmq.Worker.connection.connection (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/worker.ts:98:20)
+    at async <anonymous> (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/bullmq/src/classes/worker.ts:1000:26) {
+  code: 'P1003',
+  meta: {
+    modelName: 'Tenant',
+    driverAdapterError: DriverAdapterError: DatabaseDoesNotExist
+        at PrismaPgAdapter.onError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:678:11)
+        at PrismaPgAdapter.performIO (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:673:12)
+        at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        at async PrismaPgAdapter.queryRaw (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:604:30)
+        at async e.interpretNode (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:186:26)
+        at async e.interpretNode (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:272:41)
+        at async e.run (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:94:23)
+        at async e.execute (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/core/engines/client/LocalExecutor.ts:81:12)
+        at async jt.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/core/engines/client/ClientEngine.ts:503:22)
+        at async Object.singleLoader (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:112:26)
+        at async Gr.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:149:14)
+        at async a (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:938:24)
+        at async runIntakeAllocationJob (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/intake-allocation.job.ts:11:19)
+        at async Worker.import_bullmq.Worker.connection.connection (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/worker.ts:98:20)
+        at async <anonymous> (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/bullmq/src/classes/worker.ts:1000:26) {
+      cause: [Object]
+    }
+  },
+  clientVersion: '7.7.0'
+}
+[Worker] Clinical job repeat:e09fa1bc8afe4fb47ab00bcec25c3cf6:1782910800000 failed: PrismaClientKnownRequestError: 
+Invalid `prisma.tenant.findMany()` invocation in
+/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/preauth-escalation.job.ts:17:39
+
+  14 console.info("[preauth-escalation] Scanning for overdue pre-authorizations…");
+  15 
+  16 const now = new Date();
+→ 17 const tenants = await prisma.tenant.findMany(
+Database `arthurmulwa` does not exist on the database server
+    at Gr.handleRequestError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:237:13)
+    at Gr.handleAndLogRequestError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:183:12)
+    at Gr.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:152:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async a (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:938:24)
+    at async runPreauthEscalationJob (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/preauth-escalation.job.ts:17:19)
+    at async Worker.import_bullmq.Worker.connection.connection (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/worker.ts:154:19)
+    at async <anonymous> (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/bullmq/src/classes/worker.ts:1000:26) {
+  code: 'P1003',
+  meta: {
+    modelName: 'Tenant',
+    driverAdapterError: DriverAdapterError: DatabaseDoesNotExist
+        at PrismaPgAdapter.onError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:678:11)
+        at PrismaPgAdapter.performIO (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:673:12)
+        at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        at async PrismaPgAdapter.queryRaw (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:604:30)
+        at async e.interpretNode (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:186:26)
+        at async e.interpretNode (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:272:41)
+        at async e.run (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:94:23)
+        at async e.execute (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/core/engines/client/LocalExecutor.ts:81:12)
+        at async jt.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/core/engines/client/ClientEngine.ts:503:22)
+        at async Object.singleLoader (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:112:26)
+        at async Gr.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:149:14)
+        at async a (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:938:24)
+        at async runPreauthEscalationJob (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/preauth-escalation.job.ts:17:19)
+        at async Worker.import_bullmq.Worker.connection.connection (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/worker.ts:154:19)
+        at async <anonymous> (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/bullmq/src/classes/worker.ts:1000:26) {
+      cause: [Object]
+    }
+  },
+  clientVersion: '7.7.0'
+}
+[Worker] Billing job repeat:73cfd52d3952010a225a77226f14f6c7:1782946800000 failed: PrismaClientKnownRequestError: 
+Invalid `prisma.payment.findMany()` invocation in
+/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/services/commission.service.ts:454:43
+
+  451 const periodEnd = lastDayOfPeriod(period);
+  452 const limit = params.limit ?? 500;
+  453 
+→ 454 const payments = await prisma.payment.findMany(
+Database `arthurmulwa` does not exist on the database server
+    at Gr.handleRequestError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:237:13)
+    at Gr.handleAndLogRequestError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:183:12)
+    at Gr.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:152:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async a (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:938:24)
+    at async CommissionService.reconcilePayments (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/services/commission.service.ts:454:22)
+    at async runCommissionReconciliationJob (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/commission-reconciliation.job.ts:7:18)
+    at async Worker.import_bullmq.Worker.connection.connection (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/worker.ts:67:20)
+    at async <anonymous> (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/bullmq/src/classes/worker.ts:1000:26) {
+  code: 'P1003',
+  meta: {
+    modelName: 'Payment',
+    driverAdapterError: DriverAdapterError: DatabaseDoesNotExist
+        at PrismaPgAdapter.onError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:678:11)
+        at PrismaPgAdapter.performIO (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:673:12)
+        at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        at async PrismaPgAdapter.queryRaw (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:604:30)
+        at async e.interpretNode (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:186:26)
+        at async e.interpretNode (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:128:29)
+        at async e.interpretNode (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:272:41)
+        at async e.run (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:94:23)
+        at async e.execute (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/core/engines/client/LocalExecutor.ts:81:12)
+        at async jt.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/core/engines/client/ClientEngine.ts:503:22)
+        at async Object.singleLoader (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:112:26)
+        at async Gr.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:149:14)
+        at async a (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:938:24)
+        at async CommissionService.reconcilePayments (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/services/commission.service.ts:454:22)
+        at async runCommissionReconciliationJob (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/commission-reconciliation.job.ts:7:18)
+        at async Worker.import_bullmq.Worker.connection.connection (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/worker.ts:67:20) {
+      cause: [Object]
+    }
+  },
+  clientVersion: '7.7.0'
+}
+[Worker] System job repeat:60ee911b6815536b4c794e02c43b0d4f:1782910800000 failed: PrismaClientKnownRequestError: 
+Invalid `prisma.assessorWorkQueueItem.findMany()` invocation in
+/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/sla-breach.job.ts:14:55
+
+  11 const now = new Date();
+  12 
+  13 // Find items past deadline and not yet completed or already marked breached
+→ 14 const breached = await prisma.assessorWorkQueueItem.findMany(
+Database `arthurmulwa` does not exist on the database server
+    at Gr.handleRequestError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:237:13)
+    at Gr.handleAndLogRequestError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:183:12)
+    at Gr.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:152:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async a (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:938:24)
+    at async runSlaBreachJob (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/sla-breach.job.ts:14:20)
+    at async Worker.import_bullmq.Worker.connection.connection (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/worker.ts:102:20)
+    at async <anonymous> (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/bullmq/src/classes/worker.ts:1000:26) {
+  code: 'P1003',
+  meta: {
+    modelName: 'AssessorWorkQueueItem',
+    driverAdapterError: DriverAdapterError: DatabaseDoesNotExist
+        at PrismaPgAdapter.onError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:678:11)
+        at PrismaPgAdapter.performIO (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:673:12)
+        at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        at async PrismaPgAdapter.queryRaw (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:604:30)
+        at async e.interpretNode (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:186:26)
+        at async e.interpretNode (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:128:29)
+        at async e.interpretNode (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:272:41)
+        at async e.run (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:94:23)
+        at async e.execute (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/core/engines/client/LocalExecutor.ts:81:12)
+        at async jt.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/core/engines/client/ClientEngine.ts:503:22)
+        at async Object.singleLoader (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:112:26)
+        at async Gr.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:149:14)
+        at async a (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:938:24)
+        at async runSlaBreachJob (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/sla-breach.job.ts:14:20)
+        at async Worker.import_bullmq.Worker.connection.connection (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/worker.ts:102:20)
+        at async <anonymous> (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/bullmq/src/classes/worker.ts:1000:26) {
+      cause: [Object]
+    }
+  },
+  clientVersion: '7.7.0'
+}
+[Worker] System job repeat:21f8ccae97ca516c9ad31ea6d024e8a5:1782910800000 failed: PrismaClientKnownRequestError: 
+Invalid `prisma.approvalRequest.findMany()` invocation in
+/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/approval-escalation.job.ts:13:48
+
+  10 import { ApprovalMatrixService } from "../services/approval-matrix.service";
+  11 
+  12 export async function runApprovalEscalationJob(now: Date = new Date()) {
+→ 13   const pending = await prisma.approvalRequest.findMany(
+Database `arthurmulwa` does not exist on the database server
+    at Gr.handleRequestError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:237:13)
+    at Gr.handleAndLogRequestError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:183:12)
+    at Gr.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:152:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async a (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:938:24)
+    at async runApprovalEscalationJob (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/approval-escalation.job.ts:13:19)
+    at async Worker.import_bullmq.Worker.connection.connection (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/worker.ts:106:20)
+    at async <anonymous> (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/bullmq/src/classes/worker.ts:1000:26) {
+  code: 'P1003',
+  meta: {
+    modelName: 'ApprovalRequest',
+    driverAdapterError: DriverAdapterError: DatabaseDoesNotExist
+        at PrismaPgAdapter.onError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:678:11)
+        at PrismaPgAdapter.performIO (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:673:12)
+        at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        at async PrismaPgAdapter.queryRaw (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:604:30)
+        at async e.interpretNode (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:186:26)
+        at async e.interpretNode (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:128:29)
+        at async e.interpretNode (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:272:41)
+        at async e.run (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:94:23)
+        at async e.execute (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/core/engines/client/LocalExecutor.ts:81:12)
+        at async jt.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/core/engines/client/ClientEngine.ts:503:22)
+        at async Object.singleLoader (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:112:26)
+        at async Gr.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:149:14)
+        at async a (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:938:24)
+        at async runApprovalEscalationJob (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/approval-escalation.job.ts:13:19)
+        at async Worker.import_bullmq.Worker.connection.connection (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/worker.ts:106:20)
+        at async <anonymous> (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/bullmq/src/classes/worker.ts:1000:26) {
+      cause: [Object]
+    }
+  },
+  clientVersion: '7.7.0'
+}
+[lapse-detection] Starting...
+[Worker] System job repeat:afa345aa6de6b1e16327e01626386ecd:1782925200000 failed: PrismaClientKnownRequestError: 
+Invalid `prisma.tenant.findMany()` invocation in
+/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/lapse-detection.job.ts:14:39
+
+  11 export async function runLapseDetectionJob() {
+  12   console.info("[lapse-detection] Starting...");
+  13 
+→ 14   const tenants = await prisma.tenant.findMany(
+Database `arthurmulwa` does not exist on the database server
+    at Gr.handleRequestError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:237:13)
+    at Gr.handleAndLogRequestError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:183:12)
+    at Gr.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:152:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async a (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:938:24)
+    at async runLapseDetectionJob (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/lapse-detection.job.ts:14:19)
+    at async Worker.import_bullmq.Worker.connection.connection (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/worker.ts:126:20)
+    at async <anonymous> (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/bullmq/src/classes/worker.ts:1000:26) {
+  code: 'P1003',
+  meta: {
+    modelName: 'Tenant',
+    driverAdapterError: DriverAdapterError: DatabaseDoesNotExist
+        at PrismaPgAdapter.onError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:678:11)
+        at PrismaPgAdapter.performIO (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:673:12)
+        at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        at async PrismaPgAdapter.queryRaw (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:604:30)
+        at async e.interpretNode (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:186:26)
+        at async e.interpretNode (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:272:41)
+        at async e.run (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:94:23)
+        at async e.execute (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/core/engines/client/LocalExecutor.ts:81:12)
+        at async jt.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/core/engines/client/ClientEngine.ts:503:22)
+        at async Object.singleLoader (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:112:26)
+        at async Gr.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:149:14)
+        at async a (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:938:24)
+        at async runLapseDetectionJob (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/lapse-detection.job.ts:14:19)
+        at async Worker.import_bullmq.Worker.connection.connection (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/worker.ts:126:20)
+        at async <anonymous> (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/bullmq/src/classes/worker.ts:1000:26) {
+      cause: [Object]
+    }
+  },
+  clientVersion: '7.7.0'
+}
+[Worker] System job repeat:93a0e870b7b0a4d66fb25cddff15042f:1782928860000 failed: PrismaClientKnownRequestError: 
+Invalid `prisma.tenant.findMany()` invocation in
+/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/membership-activation.job.ts:19:39
+
+  16 const today = new Date();
+  17 today.setHours(23, 59, 59, 999); // include all of today
+  18 
+→ 19 const tenants = await prisma.tenant.findMany(
+Database `arthurmulwa` does not exist on the database server
+    at Gr.handleRequestError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:237:13)
+    at Gr.handleAndLogRequestError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:183:12)
+    at Gr.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:152:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async a (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:938:24)
+    at async runMembershipActivationJob (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/membership-activation.job.ts:19:19)
+    at async Worker.import_bullmq.Worker.connection.connection (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/worker.ts:122:20)
+    at async <anonymous> (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/bullmq/src/classes/worker.ts:1000:26) {
+  code: 'P1003',
+  meta: {
+    modelName: 'Tenant',
+    driverAdapterError: DriverAdapterError: DatabaseDoesNotExist
+        at PrismaPgAdapter.onError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:678:11)
+        at PrismaPgAdapter.performIO (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:673:12)
+        at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        at async PrismaPgAdapter.queryRaw (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:604:30)
+        at async e.interpretNode (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:186:26)
+        at async e.interpretNode (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:272:41)
+        at async e.run (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:94:23)
+        at async e.execute (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/core/engines/client/LocalExecutor.ts:81:12)
+        at async jt.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/core/engines/client/ClientEngine.ts:503:22)
+        at async Object.singleLoader (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:112:26)
+        at async Gr.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:149:14)
+        at async a (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:938:24)
+        at async runMembershipActivationJob (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/membership-activation.job.ts:19:19)
+        at async Worker.import_bullmq.Worker.connection.connection (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/worker.ts:122:20)
+        at async <anonymous> (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/bullmq/src/classes/worker.ts:1000:26) {
+      cause: [Object]
+    }
+  },
+  clientVersion: '7.7.0'
+}
+[Worker] System job repeat:ed06e5d9dcb6cbeb292ae219eb94766f:1782943200000 failed: PrismaClientKnownRequestError: 
+Invalid `prisma.tenant.findMany()` invocation in
+/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/quotation-expiry.job.ts:11:39
+
+   8 import { quotationBuilderService } from "../services/quotation-builder.service";
+   9 
+  10 export async function runQuotationExpiryJob() {
+→ 11   const tenants = await prisma.tenant.findMany(
+Database `arthurmulwa` does not exist on the database server
+    at Gr.handleRequestError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:237:13)
+    at Gr.handleAndLogRequestError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:183:12)
+    at Gr.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:152:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async a (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:938:24)
+    at async runQuotationExpiryJob (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/quotation-expiry.job.ts:11:19)
+    at async Worker.import_bullmq.Worker.connection.connection (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/worker.ts:118:20)
+    at async <anonymous> (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/bullmq/src/classes/worker.ts:1000:26) {
+  code: 'P1003',
+  meta: {
+    modelName: 'Tenant',
+    driverAdapterError: DriverAdapterError: DatabaseDoesNotExist
+        at PrismaPgAdapter.onError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:678:11)
+        at PrismaPgAdapter.performIO (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:673:12)
+        at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        at async PrismaPgAdapter.queryRaw (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:604:30)
+        at async e.interpretNode (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:186:26)
+        at async e.interpretNode (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:272:41)
+        at async e.run (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:94:23)
+        at async e.execute (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/core/engines/client/LocalExecutor.ts:81:12)
+        at async jt.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/core/engines/client/ClientEngine.ts:503:22)
+        at async Object.singleLoader (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:112:26)
+        at async Gr.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:149:14)
+        at async a (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:938:24)
+        at async runQuotationExpiryJob (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/quotation-expiry.job.ts:11:19)
+        at async Worker.import_bullmq.Worker.connection.connection (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/worker.ts:118:20)
+        at async <anonymous> (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/bullmq/src/classes/worker.ts:1000:26) {
+      cause: [Object]
+    }
+  },
+  clientVersion: '7.7.0'
+}
+[report-generation] Generating weekly reports for Thu Jun 04 2026 → Sat Jul 04 2026
+[report-generation] Generating weekly reports for Thu Jun 04 2026 → Sat Jul 04 2026
+[report-generation] ERROR: PrismaClientKnownRequestError: 
+Invalid `prisma.tenant.findMany()` invocation in
+/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/report-generation.job.ts:23:41
+
+  20 console.info(`[report-generation] Generating weekly reports for ${fromDate.toDateString()} → ${now.toDateString()}`);
+  21 
+  22 try {
+→ 23   const tenants = await prisma.tenant.findMany(
+Database `arthurmulwa` does not exist on the database server
+    at Gr.handleRequestError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:237:13)
+    at Gr.handleAndLogRequestError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:183:12)
+    at Gr.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:152:12)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async a (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:938:24)
+    at async runReportGenerationJob (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/report-generation.job.ts:23:21) {
+  code: 'P1003',
+  meta: {
+    modelName: 'Tenant',
+    driverAdapterError: DriverAdapterError: DatabaseDoesNotExist
+        at PrismaPgAdapter.onError (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:678:11)
+        at PrismaPgAdapter.performIO (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:673:12)
+        at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+        at async PrismaPgAdapter.queryRaw (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/adapter-pg/dist/index.js:604:30)
+        at async e.interpretNode (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:186:26)
+        at async e.interpretNode (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:272:41)
+        at async e.run (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client-engine-runtime/src/interpreter/query-interpreter.ts:94:23)
+        at async e.execute (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/core/engines/client/LocalExecutor.ts:81:12)
+        at async jt.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/core/engines/client/ClientEngine.ts:503:22)
+        at async Object.singleLoader (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:112:26)
+        at async Gr.request (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/RequestHandler.ts:149:14)
+        at async a (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/node_modules/@prisma/client/src/runtime/getPrismaClient.ts:938:24)
+        at async runReportGenerationJob (/Users/arthurmulwa/Library/Mobile Documents/com~apple~CloudDocs/Coding/avenue-portal/src/server/jobs/report-generation.job.ts:23:21) {
+      cause: [Object]
+    }
+  },
+  clientVersion: '7.7.0'
+}

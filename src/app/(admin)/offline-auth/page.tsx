@@ -1,5 +1,6 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
+import { ProvidersService } from "@/server/services/providers.service";
 import { OfflineAuthService } from "@/server/services/offline-auth.service";
 import { issueOfflineCodeAction, revokeOfflineCodeAction } from "./actions";
 import { KeyRound, PhoneCall, ShieldOff } from "lucide-react";
@@ -23,7 +24,8 @@ export default async function OfflineAuthPage({
   const [codes, providers] = await Promise.all([
     OfflineAuthService.listForTenant(tenantId),
     prisma.provider.findMany({
-      where: { tenantId },
+      // PR-006: only operational providers are selectable for new encounters.
+      where: ProvidersService.operationalWhere(tenantId),
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),

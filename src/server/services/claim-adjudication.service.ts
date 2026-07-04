@@ -1,14 +1,13 @@
 /**
- * claim-adjudication.service.ts — Process 9: Benefit Request (Claim) Adjudication
+ * claim-adjudication.service.ts — Process 9 supporting machinery
  *
- * Extends the existing ClaimsService with the Process 9 spec requirements:
  * - Contracted rate vs billed variance (fraud signal trigger)
  * - Per-line adjudication decisions (APPROVED / APPROVED_WITH_ADJUSTMENT / DECLINED)
  * - Double-capture detection (service-layer check; DB index deferred until seed data is clean)
- * - Senior approval threshold enforcement (KES 100,000 default)
- * - Atomic claim approval: closes BenefitHold → increments BenefitUsage.amountUsed
+ * - Claim outcome PREVIEW from line decisions (the actual decision is
+ *   ClaimDecisionService.decide — the single canonical stack, W1.1)
  * - Appeal workflow with different reviewer enforcement
- * - Provider settlement batch (maker-checker)
+ * - Provider settlement batch (maker-checker; Mark Paid posts voucher + GL, PR-018)
  * - Excel bulk claims import (ExcelJS)
  */
 
@@ -16,12 +15,8 @@ import { prisma } from "@/lib/prisma";
 import { TRPCError } from "@trpc/server";
 import { ClaimLineDecision, SettlementStatus } from "@prisma/client";
 import { auditChainService } from "./audit-chain.service";
-import { preauthAdjudicationService } from "./preauth-adjudication.service";
 import { ProviderContractsService } from "./provider-contracts.service";
-import { CostShareResolver } from "./cost-share.service";
-
-// Senior approval threshold in KES (configurable per scheme; this is the default)
-const SENIOR_APPROVAL_THRESHOLD_KES = 100_000;
+import { isFutureServiceDate, FUTURE_SERVICE_DATE_ERROR } from "@/lib/service-date";
 
 // Contracted-rate variance threshold that triggers a fraud signal (%)
 const VARIANCE_FRAUD_THRESHOLD_PCT = 0.20; // 20%
@@ -37,6 +32,12 @@ export const claimAdjudicationService = {
    * Returns { passed: true } or { passed: false, errors: string[] }.
    * Double-capture prevention is enforced here (service layer) since the DB
    * partial unique index is deferred until seed data is cleaned.
+   *
+   * PR-012: when validating an already-persisted claim (auto-adjudication,
+   * re-runs), pass `excludeClaimId` so the claim is never flagged as its own
+   * duplicate. True-duplicate contract: same tenant + provider + member +
+   * service date + benefit category, status not in (VOID, DECLINED) — declined
+   * claims do not block a corrected resubmission, voids never block.
    */
   async runHardGateValidation(
     tenantId: string,
@@ -49,44 +50,58 @@ export const claimAdjudicationService = {
       admissionDate?: Date;
       dischargeDate?: Date;
       gender?: string;
+      excludeClaimId?: string;
     },
   ): Promise<{ passed: boolean; errors: string[] }> {
     const errors: string[] = [];
+    const excludeSelf = claimData.excludeClaimId ? { id: { not: claimData.excludeClaimId } } : {};
 
     // Provider invoice uniqueness — hard constraint (@@unique in schema)
     // Already enforced by DB; re-check here for a clean error message
     if (claimData.invoiceNumber) {
       const dup = await prisma.claim.findFirst({
         where: {
+          tenantId,
           providerId:    claimData.providerId,
           invoiceNumber: claimData.invoiceNumber,
-          status:        { not: "VOID" },
+          status:        { notIn: ["VOID", "DECLINED"] },
+          ...excludeSelf,
         },
         select: { claimNumber: true },
       });
       if (dup) errors.push(`Duplicate provider invoice number — already recorded as claim ${dup.claimNumber}`);
     }
 
-    // Double-capture: (provider, member, date, category) for non-void, non-reimbursement claims
-    const doubleCap = await prisma.claim.findFirst({
+    // Double-capture: (provider, member, date, category) for non-void,
+    // non-declined, non-reimbursement claims — excluding the claim under evaluation.
+    const doubleCaps = await prisma.claim.findMany({
       where: {
+        tenantId,
         providerId:      claimData.providerId,
         memberId:        claimData.memberId,
         dateOfService:   claimData.dateOfService,
         benefitCategory: claimData.benefitCategory as never,
         isReimbursement: false,
-        status:          { not: "VOID" },
+        status:          { notIn: ["VOID", "DECLINED"] },
+        ...excludeSelf,
       },
       select: { claimNumber: true },
+      take: 5,
     });
-    if (doubleCap) errors.push(`Double-capture: claim for same provider/member/date/category already exists (${doubleCap.claimNumber})`);
+    if (doubleCaps.length > 0) {
+      errors.push(
+        `Double-capture: claim for same provider/member/date/category already exists (${doubleCaps.map((c) => c.claimNumber).join(", ")})`,
+      );
+    }
 
     // Temporal gates
     if (claimData.dischargeDate && claimData.admissionDate && claimData.dischargeDate < claimData.admissionDate) {
       errors.push("Discharge date cannot be before admission date");
     }
-    if (claimData.dateOfService > new Date()) {
-      errors.push("Service date cannot be in the future");
+    // PR-013: capture channels reject future DOS at creation; this remains a
+    // defence-in-depth assertion using the same operating-timezone boundary.
+    if (isFutureServiceDate(claimData.dateOfService)) {
+      errors.push(FUTURE_SERVICE_DATE_ERROR);
     }
 
     // Membership cover check
@@ -211,8 +226,16 @@ export const claimAdjudicationService = {
     });
   },
 
-  // ── 4. Compute overall claim outcome from line decisions ───────────────────
+  // ── 4. Compute overall claim outcome from line decisions (PREVIEW) ─────────
 
+  /**
+   * W1.1: preview-only. Computes the outcome the line decisions imply and the
+   * net approved amount, WITHOUT writing claim status — the operator carries
+   * the preview into the single "Submit Decision" form, and the canonical
+   * ClaimDecisionService.decide performs the actual state change with all
+   * money controls. (The pre-remediation version set the claim APPROVED here,
+   * which was one half of the duplicate decision stack.)
+   */
   async computeClaimOutcome(claimId: string, tenantId: string): Promise<{
     outcome: "APPROVED" | "PARTIALLY_APPROVED" | "DECLINED";
     netApprovedAmount: number;
@@ -232,132 +255,15 @@ export const claimAdjudicationService = {
     else if (approved.length > 0)                         outcome = "PARTIALLY_APPROVED";
     else                                                  outcome = "DECLINED";
 
-    await prisma.claim.update({
-      where: { id: claimId },
-      data: {
-        status:         outcome,
-        approvedAmount: netAmount,
-        decidedAt:      new Date(),
-      },
-    });
-
     return { outcome, netApprovedAmount: netAmount };
   },
 
-  // ── 5. Senior approval check ─────────────────────────────────────────────
-
-  async requiresSeniorApproval(claimId: string, tenantId: string): Promise<boolean> {
-    const claim = await prisma.claim.findUnique({
-      where: { id: claimId, tenantId },
-      select: { approvedAmount: true },
-    });
-    return Number(claim?.approvedAmount ?? 0) > SENIOR_APPROVAL_THRESHOLD_KES;
-  },
-
-  async approveSenior(claimId: string, tenantId: string, seniorId: string) {
-    const claim = await prisma.claim.findUnique({
-      where: { id: claimId, tenantId },
-      select: { adjudicatorId: true, status: true },
-    });
-    if (!claim) throw new TRPCError({ code: "NOT_FOUND", message: "Claim not found" });
-    if (!["APPROVED","PARTIALLY_APPROVED"].includes(claim.status)) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "Claim must be approved before senior sign-off" });
-    }
-    if (claim.adjudicatorId === seniorId) {
-      throw new TRPCError({ code: "FORBIDDEN", message: "Senior approver must differ from the adjudicator" });
-    }
-    await prisma.claim.update({
-      where: { id: claimId },
-      data: { seniorAdjudicatorId: seniorId },
-    });
-  },
-
-  // ── 6. Approve claim — atomic with BenefitHold + BenefitUsage ────────────
-
-  /**
-   * Final approval step:
-   * 1. If a PA hold exists — converts it (releases hold, replaces with actual consumption)
-   * 2. Increments BenefitUsage.amountUsed by the net approved amount
-   * 3. Queues the claim for settlement batch
-   * All three happen in a single Prisma transaction.
-   */
-  async approveClaim(claimId: string, tenantId: string, adjudicatorId: string) {
-    const claim = await prisma.claim.findUnique({
-      where: { id: claimId, tenantId },
-      select: {
-        preauths: { select: { id: true } }, memberId: true, approvedAmount: true,
-        status: true, adjudicatorId: true, benefitCategory: true,
-        claimNumber: true,
-      },
-    });
-    if (!claim) throw new TRPCError({ code: "NOT_FOUND", message: "Claim not found" });
-    if (!["APPROVED","PARTIALLY_APPROVED"].includes(claim.status)) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "Compute claim outcome before approving" });
-    }
-    if (claim.adjudicatorId && claim.adjudicatorId !== adjudicatorId) {
-      throw new TRPCError({ code: "FORBIDDEN", message: "Only the assigned adjudicator can finalize this claim" });
-    }
-
-    const netAmount = Number(claim.approvedAmount);
-
-    await prisma.$transaction(async (tx) => {
-      // Cost-share (G9.1): deductible + co-insurance split on the net amount
-      const costShare = await CostShareResolver.applyForClaim(
-        tx as never, claim.memberId, claim.benefitCategory, netAmount,
-      );
-
-      // Record adjudicator + member split
-      await tx.claim.update({
-        where: { id: claimId },
-        data: {
-          adjudicatorId,
-          paidAt: undefined, // paidAt set when settlement batch is processed
-          costShareDeductible:  costShare.deductibleApplied,
-          costShareCoInsurance: costShare.coInsuranceApplied,
-          memberLiability:      { increment: costShare.memberPays },
-        },
-      });
-
-      // Convert PA holds → actual consumption (a claim may carry several PAs, WP-C1)
-      for (const pa of claim.preauths) {
-        await preauthAdjudicationService.convertHoldToClaim(pa.id, claimId, tenantId);
-      }
-
-      // Increment BenefitUsage.amountUsed (atomic)
-      await tx.benefitUsage.updateMany({
-        where: {
-          memberId:    claim.memberId,
-          periodStart: { lte: new Date() },
-          periodEnd:   { gte: new Date() },
-        },
-        data: { amountUsed: { increment: netAmount } },
-      });
-
-      // Log adjudication
-      await tx.adjudicationLog.create({
-        data: {
-          claimId,
-          userId:     adjudicatorId,
-          action:     "APPROVED",
-          fromStatus: claim.status,
-          toStatus:   claim.status,
-          amount:     netAmount,
-          notes:      `Claim approved by adjudicator — KES ${netAmount.toLocaleString("en-UG")} payable`,
-        },
-      });
-    });
-
-    await auditChainService.append({
-      actorId:    adjudicatorId,
-      action:     "CLAIM:APPROVED",
-      module:     "CLAIM",
-      entityType: "Claim",
-      entityId:   claimId,
-      payload:    { netAmount, claimNumber: claim.claimNumber },
-      tenantId,
-      description: `Claim ${claim.claimNumber} approved — KES ${netAmount.toLocaleString("en-UG")}`,
-    });
-  },
+  // ── 5/6. RETIRED (W1.1) ────────────────────────────────────────────────────
+  // `requiresSeniorApproval`, `approveSenior` and `approveClaim` were the
+  // unguarded half of the duplicate decision stack (no approval matrix, no
+  // contract ceiling, no GL, usage increment that no-opped without a row and
+  // was unscoped by benefit config). The ONLY decision entry point is
+  // ClaimDecisionService.decide; a repo test asserts these exports stay gone.
 
   // ── 7. Initiate appeal ────────────────────────────────────────────────────
 
@@ -529,11 +435,8 @@ export const claimAdjudicationService = {
       data:  { status: "CHECKER_APPROVED", checkerId },
     });
 
-    // Mark claims as PAID
-    await prisma.claim.updateMany({
-      where: { settlementBatchId: batchId },
-      data:  { status: "PAID", paidAt: new Date() },
-    });
+    // PR-018: claims are NOT paid at checker approval — `markSettlementBatchPaid`
+    // sets PAID/paidAt, creates the PaymentVoucher and posts the GL entry.
 
     await auditChainService.append({
       actorId:    checkerId,
@@ -549,6 +452,13 @@ export const claimAdjudicationService = {
     return updated;
   },
 
+  /**
+   * Mark Paid (PR-018 D1): in ONE transaction — batch → SETTLED, every claim →
+   * PAID with `paidAt`, one PaymentVoucher (numbered, claim-level links), and
+   * one balanced JE (Dr Claims Payable / Cr Bank). Batch↔voucher↔JE resolvable
+   * both ways. A missing GL account mapping blocks settlement with a clear
+   * error — no silent skip, no unbalanced posting.
+   */
   async markSettlementBatchPaid(batchId: string, tenantId: string, userId: string) {
     const batch = await prisma.providerSettlementBatch.findUnique({ where: { id: batchId } });
     if (!batch || batch.tenantId !== tenantId) {
@@ -558,9 +468,51 @@ export const claimAdjudicationService = {
       throw new TRPCError({ code: "BAD_REQUEST", message: "Batch is not approved yet" });
     }
 
-    const updated = await prisma.providerSettlementBatch.update({
-      where: { id: batchId },
-      data: { status: "SETTLED", settledAt: new Date() },
+    const claims = await prisma.claim.findMany({
+      where: { settlementBatchId: batchId },
+      select: { id: true, approvedAmount: true },
+    });
+    const total = claims.reduce((s, c) => s + Number(c.approvedAmount), 0);
+    const paidAt = new Date();
+
+    const { GLService } = await import("./gl.service");
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const voucherCount = await tx.paymentVoucher.count({ where: { tenantId } });
+      const voucherNumber = `PV-${paidAt.getFullYear()}-${String(voucherCount + 1).padStart(5, "0")}`;
+
+      const je = await GLService.postSettlementBatchPaid(tenantId, {
+        sourceId: batchId,
+        reference: voucherNumber,
+        amount: total,
+        postedById: userId,
+        tx,
+      });
+
+      const voucher = await tx.paymentVoucher.create({
+        data: {
+          voucherNumber,
+          tenantId,
+          providerId: batch.providerId,
+          totalAmount: total,
+          claimCount: claims.length,
+          status: "PROCESSED",
+          processedAt: paidAt,
+          processedBy: userId,
+          settlementBatchId: batchId,
+          journalEntryId: je.id,
+        },
+      });
+
+      await tx.claim.updateMany({
+        where: { settlementBatchId: batchId },
+        data: { status: "PAID", paidAt, paymentVoucherId: voucher.id },
+      });
+
+      return tx.providerSettlementBatch.update({
+        where: { id: batchId },
+        data: { status: "SETTLED", settledAt: paidAt },
+      });
     });
 
     await auditChainService.append({
@@ -569,9 +521,9 @@ export const claimAdjudicationService = {
       module: "BILLING",
       entityType: "ProviderSettlementBatch",
       entityId: batchId,
-      payload: { totalAmount: Number(batch.totalAmount), userId },
+      payload: { totalAmount: total, claimCount: claims.length, userId },
       tenantId,
-      description: `Settlement batch marked as SETTLED — KES ${Number(batch.totalAmount).toLocaleString("en-UG")}`,
+      description: `Settlement batch marked as SETTLED — KES ${total.toLocaleString("en-UG")} across ${claims.length} claim(s), voucher + GL posted`,
     });
 
     return updated;

@@ -1,5 +1,6 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
+import { ProvidersService } from "@/server/services/providers.service";
 import { openCaseAction } from "../actions";
 import { BriefcaseMedical, ArrowLeft } from "lucide-react";
 import Link from "next/link";
@@ -12,7 +13,7 @@ export default async function NewCasePage() {
   const tenantId = session.user.tenantId;
 
   const [providers, members] = await Promise.all([
-    prisma.provider.findMany({ where: { tenantId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.provider.findMany({ where: ProvidersService.operationalWhere(tenantId), select: { id: true, name: true }, orderBy: { name: "asc" } }), // PR-006: operational only
     prisma.member.findMany({
       where: { tenantId, status: "ACTIVE" },
       select: { memberNumber: true, firstName: true, lastName: true },

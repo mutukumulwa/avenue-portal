@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { convertToClaimAction } from "./actions";
 import { preauthAdjudicationService } from "@/server/services/preauth-adjudication.service";
 import {
-  runAutoDecisionAction, approveByHumanAction, declineByHumanAction,
+  runAutoDecisionAction,
   releaseBenefitHoldAction, cancelPreAuthAction,
 } from "./preauth-process8-actions";
 import { PreAuthAdjudicationForm } from "./PreAuthAdjudicationForm";
@@ -400,11 +400,14 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
         </div>
       )}
 
-      {/* ── Process 8: Human review actions ──────────────────── */}
+      {/* ── Process 8: auto-decision + cancel ─────────────────── */}
+      {/* W1.1: the approve/decline forms that lived here were a SECOND decision
+          surface wired to the same PA; the single decision path is the
+          Adjudication form above (canonical service, always places the hold). */}
       {canAdjudicate && (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="font-bold text-brand-text-heading text-sm font-heading">Human Review Actions</h2>
+            <h2 className="font-bold text-brand-text-heading text-sm font-heading">Review Tools</h2>
             {!autoLog && (
               <form action={runAutoDecisionAction}>
                 <input type="hidden" name="preAuthId" value={id} />
@@ -415,45 +418,6 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
               </form>
             )}
           </div>
-
-          {/* Approve */}
-          <form action={approveByHumanAction} className="flex gap-2 items-center">
-            <input type="hidden" name="preAuthId" value={id} />
-            <div className="flex-1">
-              <input name="approvedAmount" type="number" required
-                placeholder={`Approved amount (est. KES ${Number(pa.estimatedCost).toLocaleString("en-UG")})`}
-                defaultValue={Number(pa.estimatedCost)}
-                className="w-full border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm" />
-            </div>
-            <input name="notes" type="text" placeholder="Approval notes (optional)"
-              className="flex-1 border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm" />
-            <button type="submit"
-              className="bg-[#28A745] text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-[#218838] transition-colors whitespace-nowrap flex items-center gap-1.5 shrink-0">
-              <CheckCircle2 size={14} /> Approve
-            </button>
-          </form>
-
-          {/* Decline */}
-          <form action={declineByHumanAction} className="flex gap-2 items-center">
-            <input type="hidden" name="preAuthId" value={id} />
-            <select name="reasonCode" required
-              className="border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm">
-              <option value="">Decline reason…</option>
-              <option value="NOT_COVERED">Not covered under package</option>
-              <option value="EXCLUDED_CONDITION">Excluded condition</option>
-              <option value="WAITING_PERIOD">Waiting period not elapsed</option>
-              <option value="BENEFIT_EXHAUSTED">Benefit limit exhausted</option>
-              <option value="CLINICAL_NECESSITY">Clinical necessity not established</option>
-              <option value="PROVIDER_OUT_OF_NETWORK">Provider not in network</option>
-              <option value="OTHER">Other</option>
-            </select>
-            <input name="notes" type="text" placeholder="Decline notes" required
-              className="flex-1 border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm" />
-            <button type="submit"
-              className="border border-[#DC3545] text-[#DC3545] px-4 py-2 rounded-full text-sm font-semibold hover:bg-[#DC3545]/10 transition-colors whitespace-nowrap flex items-center gap-1.5 shrink-0">
-              <XCircle size={14} /> Decline
-            </button>
-          </form>
 
           {/* Cancel */}
           <form action={cancelPreAuthAction} className="flex gap-2 items-center">

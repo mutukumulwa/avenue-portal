@@ -29,8 +29,13 @@ export default async function HRLayout({
     const session = await getCachedSession();
     const role = session?.user?.role;
     const allowed = ["HR_MANAGER", "SUPER_ADMIN"];
-    if (!session?.user || !allowed.includes(role as string)) {
+    // Same convention as every other portal guard (PR-019): missing session →
+    // /login; authenticated but unauthorised → /unauthorized (session intact).
+    if (!session?.user) {
       redirect("/login");
+    }
+    if (!allowed.includes(role as string)) {
+      redirect("/unauthorized");
     }
 
     // For SUPER_ADMIN visiting the HR portal, show a generic label

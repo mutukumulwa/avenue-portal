@@ -1,0 +1,18 @@
+Evidence: /login accessibility snapshot (localhost:3000, build 1cd23a8, 2026-07-04)
+Captured via preview_snapshot after preview_start.
+
+heading: "AiCare Platform"
+heading: "Sign In"
+paragraph: "Enter your Medvex credentials"
+paragraph: "Authorized users only. This is a private Medvex system. Access is monitored and logged; unauthorized use is prohibited and may be prosecuted."
+textbox: "name@medvex.co.ug" (email)
+textbox: password
+textbox: "6-digit code" — "Authenticator code (if 2FA enabled)"
+button: "Sign In"
+link: "Forgot password?"
+paragraph:
+  "Admin: admin@medvex.co.ug · HR: emily.wambui@safaricom.co.ke"
+  "Broker: broker@kaib.co.ke · Member: member@medvex.co.ug"
+  "Password: MedvexAdmin2024!"     <-- PR-003: live admin credentials disclosed to anonymous users
+
+Post-login verification: submitted admin@medvex.co.ug → landed http://localhost:3000/dashboard, h1 "Dashboard Overview".

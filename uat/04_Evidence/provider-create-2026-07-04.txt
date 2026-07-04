@@ -1,0 +1,7 @@
+Evidence: S1 provider creation via UI (2026-07-04, SUPER_ADMIN, localhost:3000)
+
+1) /providers/new filled: name "LifeCare Hospitals (UAT)", HOSPITAL, PARTNER, address "2nd Floor, Laiboni Centre, Lenana Rd, Nairobi", county Nairobi, contact "UAT Test Contact", +254730950000, uat-provider@lchafrica.com, paymentTermDays 10, services [Inpatient, Outpatient, Maternity, Surgery, Pharmacy, ICU].
+2) Clicked "Add Provider" → network: POST /providers/new → 200. NO redirect, NO toast, form still filled (PR-005).
+3) /providers list row: "LifeCare Hospitals (UAT) +254730950000 HOSPITAL PARTNER Nairobi PENDING 0 View" → record persisted, status PENDING.
+4) Detail /providers/cmr60l5lv0000huvq0z09dvxg: all fields persisted verbatim; cards: Contracts (0, "No active contract... every line left to reviewer judgement"), CPT Tariff Schedule (0), Health Vault shares (0), Practitioners (0), Recent Claims (0).
+5) No edit link, no activate control anywhere on the page; no /providers/[id]/edit route exists (PR-006). No branches section (PR-007).

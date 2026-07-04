@@ -11,23 +11,9 @@ export async function runAutoDecisionAction(formData: FormData) {
   revalidatePath(`/preauth/${preAuthId}`);
 }
 
-export async function approveByHumanAction(formData: FormData) {
-  const session = await requireRole(ROLES.CLINICAL);
-  const preAuthId      = formData.get("preAuthId") as string;
-  const approvedAmount = Number(formData.get("approvedAmount"));
-  const notes          = (formData.get("notes") as string) || undefined;
-  await preauthAdjudicationService.approveByHuman(preAuthId, session.user.tenantId, session.user.id, approvedAmount, notes);
-  revalidatePath(`/preauth/${preAuthId}`);
-}
-
-export async function declineByHumanAction(formData: FormData) {
-  const session = await requireRole(ROLES.CLINICAL);
-  const preAuthId  = formData.get("preAuthId") as string;
-  const reasonCode = formData.get("reasonCode") as string;
-  const notes      = formData.get("notes") as string;
-  await preauthAdjudicationService.declineByHuman(preAuthId, session.user.tenantId, session.user.id, reasonCode, notes);
-  revalidatePath(`/preauth/${preAuthId}`);
-}
+// W1.1: approveByHumanAction / declineByHumanAction removed — the single PA
+// decision surface is PreAuthAdjudicationForm → adjudicatePreAuthAction
+// (./actions.ts), which delegates to the same canonical service.
 
 export async function releaseBenefitHoldAction(formData: FormData) {
   const session = await requireRole(ROLES.CLINICAL);
