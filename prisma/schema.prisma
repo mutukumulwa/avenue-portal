@@ -4248,13 +4248,18 @@ model PaymentVoucher {
   createdAt     DateTime  @default(now())
 
   // PR-018 #2: batch ↔ voucher ↔ JE cross-links, resolvable both ways.
-  settlementBatchId String? @unique
+  // One-voucher-per-batch is enforced by the settlement status machine
+  // (markSettlementBatchPaid only runs on CHECKER_APPROVED and flips the batch
+  // to SETTLED in the same transaction) — a plain index keeps `prisma db push`
+  // warning-free so the Vercel production build's schema sync can apply it.
+  settlementBatchId String?
   journalEntryId    String?
 
   claims Claim[]
 
   @@index([tenantId])
   @@index([providerId])
+  @@index([settlementBatchId])
 }
 
 // ─── QUOTATIONS ─────────────────────────────────────────
