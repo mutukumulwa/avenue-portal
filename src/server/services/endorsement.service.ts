@@ -27,8 +27,9 @@ export class EndorsementsService {
     const daysRemaining = Math.max(0, Math.ceil(timeDiff / (1000 * 3600 * 24)));
     
     const dailyRate = Number(group.contributionRate) / 365;
-    
-    const adjustment = dailyRate * daysRemaining;
+
+    // PR-034: money is 2dp — never expose raw floating-point pro-rata.
+    const adjustment = Math.round(dailyRate * daysRemaining * 100) / 100;
 
     // Additional charge for addition, credit (negative) for deletion
     return type === "MEMBER_ADDITION" ? adjustment : -adjustment;
@@ -104,6 +105,14 @@ export class EndorsementsService {
       throw new Error("Only pending endorsements can be approved");
     }
 
+    // PR-033: maker-checker. An endorsement carries a billing adjustment —
+    // the user who raised it can never be the one who approves and applies it.
+    if (endorsement.requestedBy && endorsement.requestedBy !== "SYSTEM" && endorsement.requestedBy === approvedBy) {
+      throw new Error(
+        "Segregation of duties: you raised this endorsement, so a different user must review and approve it.",
+      );
+    }
+
     // Execute the changes
     if (endorsement.type === "MEMBER_ADDITION") {
       const details = endorsement.changeDetails as Record<string, string>;
@@ -177,8 +186,14 @@ export class EndorsementsService {
         });
 
       } catch (err) {
-        // GL not seeded or invoice error — swallow so endorsement still applies
-        console.error("Failed to post GL or Invoice config", err);
+        // NO swallow (PR-018 policy): an endorsement with a financial impact
+        // must not apply without its GL entry + adjustment invoice. Surface
+        // the error; the endorsement stays pending for retry once fixed.
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new Error(
+          `Endorsement not applied: posting the financial adjustment failed (${msg}). ` +
+          "Fix the GL/billing configuration and approve again.",
+        );
       }
     }
 

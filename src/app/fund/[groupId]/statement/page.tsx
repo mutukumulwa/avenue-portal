@@ -42,6 +42,13 @@ export default async function FundStatementPage({ params }: { params: Promise<{ 
   const deposits = txns.filter(t => ["DEPOSIT","TOP_UP","REFUND"].includes(t.type));
   const debits   = txns.filter(t => ["CLAIM_DEDUCTION","ADMIN_FEE","ADJUSTMENT"].includes(t.type));
 
+  // PR-035: the statement covers what it SHOWS. The header period is the
+  // actual transaction range (which can extend past the configured account
+  // period when activity continues), never a label that contradicts the rows.
+  const txnDates = txns.map(t => new Date(t.postedAt).getTime());
+  const periodFrom = txnDates.length ? new Date(Math.min(new Date(acc.periodStartDate).getTime(), ...txnDates)) : new Date(acc.periodStartDate);
+  const periodTo   = txnDates.length ? new Date(Math.max(new Date(acc.periodEndDate).getTime(),   ...txnDates)) : new Date(acc.periodEndDate);
+
   const totalIn    = deposits.reduce((s, t) => s + Number(t.amount), 0);
   const openingBal = txns.length > 0 ? Number(txns[0].balanceAfter) - (deposits[0] ? Number(deposits[0].amount) : 0) : 0;
   const closingBal = Number(acc.balance);
@@ -83,12 +90,12 @@ export default async function FundStatementPage({ params }: { params: Promise<{ 
             <p className="text-xs text-brand-text-muted mt-0.5">{group.members.length} active insured members</p>
           </div>
           <div className="text-right">
-            <p className="text-xs font-bold uppercase text-brand-text-muted">Period</p>
+            <p className="text-xs font-bold uppercase text-brand-text-muted">Period (all activity)</p>
             <p className="font-semibold text-brand-text-heading mt-0.5">
-              {new Date(acc.periodStartDate).toLocaleDateString("en-UG", { day: "numeric", month: "long", year: "numeric" })} –
+              {periodFrom.toLocaleDateString("en-UG", { day: "numeric", month: "long", year: "numeric" })} –
             </p>
             <p className="font-semibold text-brand-text-heading">
-              {new Date(acc.periodEndDate).toLocaleDateString("en-UG", { day: "numeric", month: "long", year: "numeric" })}
+              {periodTo.toLocaleDateString("en-UG", { day: "numeric", month: "long", year: "numeric" })}
             </p>
           </div>
         </div>

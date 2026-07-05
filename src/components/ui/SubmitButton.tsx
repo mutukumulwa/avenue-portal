@@ -4,21 +4,23 @@ import { useFormStatus } from "react-dom";
 import { Loader2 } from "lucide-react";
 import React from "react";
 
-export function SubmitButton({ 
-  children, 
+export function SubmitButton({
+  children,
   icon,
-  className 
-}: { 
+  className,
+  disabled = false,
+}: {
   children: React.ReactNode;
   icon?: React.ReactNode;
   className?: string;
+  disabled?: boolean;
 }) {
   const { pending } = useFormStatus();
 
   return (
-    <button 
+    <button
       type="submit"
-      disabled={pending}
+      disabled={pending || disabled}
       className={className || "bg-[#0B1437] hover:bg-[#142150] disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-3 rounded-full font-semibold transition-colors inline-flex items-center justify-center gap-2 whitespace-nowrap shrink-0 shadow-sm"}
     >
       {pending ? <Loader2 size={18} className="animate-spin" /> : icon}

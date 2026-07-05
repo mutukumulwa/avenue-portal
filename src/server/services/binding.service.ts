@@ -123,7 +123,12 @@ export const bindingService = {
    * Finds or creates the Group. Links underwriting decisions.
    * Returns members in PENDING_ACTIVATION (not yet active).
    */
-  async createMemberships(quotationId: string, tenantId: string, makerId: string) {
+  async createMemberships(
+    quotationId: string,
+    tenantId: string,
+    makerId: string,
+    opts?: { packageId?: string | null },
+  ) {
     const quotation = await prisma.quotation.findUnique({
       where: { id: quotationId, tenantId },
       include: {
@@ -134,6 +139,32 @@ export const bindingService = {
     if (!quotation) throw new TRPCError({ code: "NOT_FOUND", message: "Quotation not found" });
     if (quotation.status !== "ACCEPTED") {
       throw new TRPCError({ code: "BAD_REQUEST", message: "Quotation must be ACCEPTED before creating memberships" });
+    }
+
+    // ── PR-037 guards: fail with operator-readable messages, never a raw
+    // Prisma error. Broker quick-quotes carry no package and no census —
+    // both are hard prerequisites for real membership records.
+    if (!quotation.packageId && opts?.packageId) {
+      const pkg = await prisma.package.findFirst({ where: { id: opts.packageId, tenantId }, select: { id: true } });
+      if (!pkg) throw new TRPCError({ code: "BAD_REQUEST", message: "Selected benefit package not found" });
+      await prisma.quotation.update({ where: { id: quotationId }, data: { packageId: pkg.id } });
+      quotation.packageId = pkg.id;
+    }
+    if (!quotation.packageId) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message:
+          "This quotation has no benefit package. Select the package to bind under in the Create Memberships step " +
+          "(or assign one via the quotation's Build page) before creating memberships.",
+      });
+    }
+    if (quotation.lives.length === 0) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message:
+          "This quotation has no member census. Memberships are created from captured lives, not the headline member " +
+          "counts — add the lives on the quotation's Build page (census) before binding.",
+      });
     }
 
     // ── Find or create the Group ──────────────────────────────

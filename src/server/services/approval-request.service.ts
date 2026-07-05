@@ -104,6 +104,8 @@ export class ApprovalRequestService {
       currency?: string | null;
       serviceType?: ServiceType | null;
       benefitCategory?: BenefitCategory | null;
+      /** PR-025: the gated decision to auto-apply when the chain completes. */
+      payload?: Record<string, unknown> | null;
     },
   ) {
     const resolved = await ApprovalMatrixService.resolve(tenantId, {
@@ -130,6 +132,7 @@ export class ApprovalRequestService {
         makerId: input.makerId,
         status: "PENDING",
         currentLevel: 1,
+        payload: (input.payload ?? undefined) as never,
       },
     });
   }
@@ -186,6 +189,51 @@ export class ApprovalRequestService {
         },
       }),
     ]);
+
+    // ── PR-025: a completed chain APPLIES the decision it gated ────────────
+    // The chain's approvals ARE the matrix authorisation, so the stored
+    // decision executes with matrixSatisfied — every other control (ceiling,
+    // benefit, PA cover, GL) still runs. A control violation surfaces to the
+    // final approver verbatim and the request is marked REJECTED so the claim
+    // is not left in limbo.
+    if (nextStatus === "APPROVED" && req.entityType === "Claim" && req.actionType === "CLAIM_PAYMENT" && req.payload) {
+      const p = req.payload as {
+        action?: "APPROVED" | "PARTIALLY_APPROVED" | "DECLINED";
+        approvedAmount?: number; notes?: string | null;
+        overCoverConfirmation?: string | null;
+        reviewerId?: string; reviewerRole?: string | null;
+      };
+      if (p.action && p.reviewerId) {
+        const { ClaimDecisionService } = await import("./claim-decision.service");
+        try {
+          await ClaimDecisionService.decide(req.tenantId, req.entityId, {
+            action: p.action,
+            approvedAmount: p.approvedAmount,
+            notes: p.notes ?? undefined,
+            overCoverConfirmation: p.overCoverConfirmation ?? undefined,
+            reviewerId: p.reviewerId,
+            reviewerRole: p.reviewerRole ?? null,
+            matrixSatisfied: true,
+          });
+          await prisma.approvalRequest.update({
+            where: { id: requestId },
+            data: { appliedAt: new Date() },
+          });
+        } catch (err) {
+          await prisma.approvalRequest.update({
+            where: { id: requestId },
+            data: { status: "REJECTED" },
+          });
+          const msg = err instanceof Error ? err.message : String(err);
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              `Approval chain complete, but applying the decision failed a downstream control: ${msg} ` +
+              `The request was closed as REJECTED — correct the claim and resubmit the decision.`,
+          });
+        }
+      }
+    }
 
     return prisma.approvalRequest.findUnique({ where: { id: requestId } });
   }

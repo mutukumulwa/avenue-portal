@@ -1,0 +1,30 @@
+import { launch, login, BASE, sleep, shot, bodyText, clickText } from './w5lib.mjs'
+
+const b = await launch()
+const p = await b.newPage()
+console.log('underwriter →', await login(p, 'underwriter@medvex.co.ug'))
+await p.goto(BASE + '/claims/cmr6ev3cv000mwmvq6vthwjcy', { waitUntil: 'networkidle2' }); await sleep(1800)
+await p.evaluate(() => {
+  const s = document.querySelector('select[name="action"]'); s.value = 'APPROVED'; s.dispatchEvent(new Event('change', { bubbles: true }))
+  const a = document.querySelector('input[name="approvedAmount"]'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(a, '10000'); a.dispatchEvent(new Event('input', { bubbles: true }))
+  const n = document.querySelector('textarea[name="notes"]'); Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(n, 'Decision by underwriter (band-satisfying role) after matrix chain'); n.dispatchEvent(new Event('input', { bubbles: true }))
+})
+await sleep(400)
+console.log('resubmit:', await clickText(p, 'button', 'Submit Decision')); await sleep(3200)
+let t = await p.evaluate(() => document.body.innerText)
+console.log('STATUS:', JSON.stringify((t.match(/(APPROVED|CAPTURED|UNDER REVIEW|PENDING)/g) || []).slice(0, 4)))
+const ti = t.indexOf('ADJUDICATION TIMELINE')
+console.log('TIMELINE:', t.slice(ti, ti + 700).replace(/\n{2,}/g, '\n'))
+console.log('WORKFLOW:', (t.match(/Adjudication Workflow[^]*?(?=Contracted|Void|$)/) || [])[0]?.replace(/\n+/g, ' | ').slice(0, 250))
+await shot(p, 'w5-33-765-uw-decide')
+
+// aftermath: usage + PA + approvals queue empty?
+const p2 = await b.newPage()
+await login(p2, 'admin@medvex.co.ug')
+await p2.goto(BASE + '/members/cmr617noo0041huvqphul38x2', { waitUntil: 'networkidle2' }); await sleep(1400)
+t = await p2.evaluate(() => document.body.innerText)
+console.log('\nURSULA HEADER:', (t.match(/ANNUAL LIMIT[^]*?TOTAL CLAIMS\s*\d+/) || [])[0]?.replace(/\n+/g, ' | '))
+await p2.goto(BASE + '/approvals', { waitUntil: 'networkidle2' }); await sleep(1200)
+console.log('QUEUE:', (await bodyText(p2, 500)).includes('No approvals awaiting') ? 'empty' : 'HAS ITEMS')
+await b.close()
+console.log('DONE')

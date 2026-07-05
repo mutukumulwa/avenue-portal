@@ -6,10 +6,11 @@ import { auditChainService } from "./audit-chain.service";
 import { ContractEngine } from "./contract-engine/engine";
 import { ContractEngineIntegration } from "./contract-engine/persist";
 
-// Digital-contract engine gates are opt-in (spec §8.3): when enabled, a claim
-// the engine cannot fully price/match ROUTES with a named contract gate.
-// Provenance persistence runs regardless. Default OFF preserves existing flow.
-const CONTRACT_ENGINE_GATES = process.env.CONTRACT_ENGINE_GATES === "1";
+// Digital-contract engine gates (spec §8.3): a claim the engine cannot fully
+// price/match ROUTES with a named contract gate, and auto-approval executes at
+// the ENGINE-PRICED amount — never blindly at billed (PR-021). Default ON;
+// CONTRACT_ENGINE_GATES=0 opts out for non-production sandboxes only.
+const CONTRACT_ENGINE_GATES = process.env.CONTRACT_ENGINE_GATES !== "0";
 
 /**
  * Auto-adjudication (Medvex spec §3.7 / gap G3.7). Clean, low-risk claims that
@@ -26,6 +27,14 @@ export interface AutoAdjResult {
   failingGate?: string;
   reason: string;
   policyId: string | null;
+  /**
+   * PR-021: the contract-constrained amount an AUTO_APPROVE must execute at
+   * (engine payable, or billed capped to the enforceable ceiling). Never the
+   * raw billed amount when a pricing source exists.
+   */
+  approveAmount?: number;
+  /** Per-line engine payables for line stamping (real ClaimLine ids only). */
+  linePayables?: Map<string, number>;
 }
 
 // Fallback when no policy is configured: conservative — auto-approve clean
@@ -100,15 +109,56 @@ export class AutoAdjudicationService {
       }
     }
 
+    // ── PR-021: contract-constrained pricing gate ─────────────────────────
+    // Auto-approval must execute at a deterministic contract/tariff price,
+    // never blindly at billed. The engine verdict decides:
+    //   matched + fully priced      → approve at the engine's payable
+    //   matched + UNDER_REVIEW      → ROUTE (a line pended — human prices it)
+    //   matched + DECLINED          → ROUTE (a human confirms declines)
+    //   unmatched                   → billed capped to the FFS tariff ceiling;
+    //                                 no enforceable price at all → ROUTE.
+    let approveAmount = Number(claim.billedAmount);
+    let linePayables: Map<string, number> | undefined;
+    if (CONTRACT_ENGINE_GATES) {
+      const engine = await ContractEngine.evaluateClaimById(tenantId, claimId);
+      if (engine?.matched) {
+        if (engine.claimDecision === "UNDER_REVIEW") {
+          const firstPend = engine.lines.find(l => l.decision === "PENDED");
+          return { decision: "ROUTE", failingGate: "PRICING_COMPLETE", reason: `Engine could not fully price: ${firstPend?.reasonCode ?? engine.reasonCode ?? "line pended"}`, policyId };
+        }
+        if (engine.claimDecision === "DECLINED") {
+          return { decision: "ROUTE", failingGate: "ENGINE_DECLINED", reason: `Contract engine declines this claim (${engine.reasonCode ?? "all lines excluded/rejected"}) — route for human confirmation`, policyId };
+        }
+        approveAmount = engine.totals.payable;
+        linePayables = new Map(engine.lines.filter(l => !l.lineId.startsWith("case-rate") && !l.lineId.startsWith("package-") && !l.lineId.startsWith("proc-")).map(l => [l.lineId, l.payableAmount]));
+      } else {
+        const { ClaimDecisionService } = await import("./claim-decision.service");
+        const assessment = await ClaimDecisionService.assessCeiling(tenantId, claimId);
+        if (!assessment.deterministic || assessment.ceiling == null) {
+          return {
+            decision: "ROUTE",
+            failingGate: "NO_ENFORCEABLE_PRICE",
+            reason: "No contract or tariff prices this claim deterministically — reviewer judgement required",
+            policyId,
+          };
+        }
+        approveAmount = Math.min(Number(claim.billedAmount), assessment.ceiling);
+      }
+      if (!(approveAmount > 0)) {
+        return { decision: "ROUTE", failingGate: "ZERO_PAYABLE", reason: "Contract prices this claim at zero — route for human review", policyId };
+      }
+    }
+
     // Within the auto-approve ceiling — FX-normalised (PR-017 boundary sweep):
     // the policy ceiling is denominated in the policy's currency (seed default
     // UGX) while claims may carry KES; both sides convert to base before the
-    // comparison. A missing rate fails safe (routes).
+    // comparison. A missing rate fails safe (routes). The comparison runs on
+    // the amount that would actually be approved (PR-021).
     const ceiling = policy.maxAutoApproveAmount != null ? Number(policy.maxAutoApproveAmount) : null;
     if (ceiling != null) {
       const { FxService } = await import("./fx.service");
       const policyCurrency = (policyRow?.currency as string | undefined) ?? "UGX";
-      const claimNorm = await FxService.normalise(tenantId, Number(claim.billedAmount), claim.currency ?? "UGX");
+      const claimNorm = await FxService.normalise(tenantId, approveAmount, claim.currency ?? "UGX");
       const ceilingNorm = await FxService.normalise(tenantId, ceiling, policyCurrency);
       const claimFxMissing = claimNorm.identity && (claim.currency ?? "UGX") !== "UGX";
       const ceilingFxMissing = ceilingNorm.identity && policyCurrency !== "UGX";
@@ -124,27 +174,13 @@ export class AutoAdjudicationService {
         return {
           decision: "ROUTE",
           failingGate: "ABOVE_CEILING",
-          reason: `Billed ${claim.currency} ${Number(claim.billedAmount).toLocaleString()} (≈ UGX ${Math.round(claimNorm.baseAmount).toLocaleString()}) exceeds auto-approve ceiling ${policyCurrency} ${ceiling.toLocaleString()}`,
+          reason: `Payable ${claim.currency} ${approveAmount.toLocaleString()} (≈ UGX ${Math.round(claimNorm.baseAmount).toLocaleString()}) exceeds auto-approve ceiling ${policyCurrency} ${ceiling.toLocaleString()}`,
           policyId,
         };
       }
     }
 
-    // Digital-contract engine gates (opt-in). Named gates feed the same routing
-    // machinery: CONTRACT_MATCH (no matching contract family) and
-    // PRICING_COMPLETE (a line pended — rate-missing, unmapped, pre-auth, etc.).
-    if (CONTRACT_ENGINE_GATES) {
-      const engine = await ContractEngine.evaluateClaimById(tenantId, claimId);
-      if (engine && !engine.matched) {
-        return { decision: "ROUTE", failingGate: "CONTRACT_MATCH", reason: engine.reasonCode ?? "No contract matched", policyId };
-      }
-      if (engine && engine.claimDecision === "UNDER_REVIEW") {
-        const firstPend = engine.lines.find(l => l.decision === "PENDED");
-        return { decision: "ROUTE", failingGate: "PRICING_COMPLETE", reason: `Engine could not fully price: ${firstPend?.reasonCode ?? engine.reasonCode ?? "line pended"}`, policyId };
-      }
-    }
-
-    return { decision: "AUTO_APPROVE", reason: "All gates passed within policy", policyId };
+    return { decision: "AUTO_APPROVE", reason: "All gates passed within policy", policyId, approveAmount, linePayables };
   }
 
   /**
@@ -219,22 +255,32 @@ export class AutoAdjudicationService {
         return { ...result, executed: false };
       }
 
-      // AUTO_APPROVE — approve the payable lines at billed, then execute the
+      // AUTO_APPROVE — stamp lines at the ENGINE-PRICED payable when the
+      // contract engine priced them (PR-021), else at billed, then execute the
       // claim-level approval through the standard machinery.
       const undecided = await prisma.claimLine.findMany({
         where: { claimId, adjudicationDecision: null },
         select: { id: true, billedAmount: true },
       });
       for (const line of undecided) {
+        const payable = result.linePayables?.get(line.id);
         await prisma.claimLine.update({
           where: { id: line.id },
-          data: { adjudicationDecision: "APPROVED", approvedAmount: line.billedAmount },
+          data: { adjudicationDecision: "APPROVED", approvedAmount: payable ?? line.billedAmount },
         });
       }
 
+      // PR-021: the executed amount is the contract-constrained approveAmount;
+      // excluded-drug adjustments can only reduce it further.
+      const priceCapped = result.approveAmount ?? Number(claim.billedAmount);
       const approvedAmount =
-        claim.claimLines.length > 0 ? exclusions.payableAmount : Number(claim.billedAmount);
-      const action = exclusions.excludedCount > 0 ? ("PARTIALLY_APPROVED" as const) : ("APPROVED" as const);
+        claim.claimLines.length > 0 && exclusions.excludedCount > 0
+          ? Math.min(priceCapped, exclusions.payableAmount)
+          : priceCapped;
+      const action =
+        exclusions.excludedCount > 0 || approvedAmount < Number(claim.billedAmount) - 0.01
+          ? ("PARTIALLY_APPROVED" as const)
+          : ("APPROVED" as const);
 
       // W1.1: auto-approval executes through the canonical decision stack so
       // usage/holds/GL side-effects are identical to a human decision.

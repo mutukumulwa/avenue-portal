@@ -88,6 +88,15 @@ export async function submitClaimAction(data: {
     }
     if (!branch.isActive) throw new Error("Selected branch is deactivated — pick an active branch.");
   }
+  // ── Benefit-in-package gate (PR-024, server-enforced at intake) ──────────
+  const { BenefitUsageService } = await import("@/server/services/benefit-usage.service");
+  const benefitCfg = await BenefitUsageService.resolveConfig(prisma, data.memberId, data.benefitCategory);
+  if (!benefitCfg) {
+    throw new Error(
+      `Benefit "${data.benefitCategory.replace(/_/g, " ")}" is not in this member's package — ` +
+      `the claim could never be approved against it. Pick a benefit category from the member's package.`
+    );
+  }
   // ── Pre-auth gate ─────────────────────────────────────────────────────────
   const PREAUTH_REQUIRED: BenefitCategory[] = ["INPATIENT", "SURGICAL", "MATERNITY"];
   let approvedPA = null;
@@ -96,6 +105,9 @@ export async function submitClaimAction(data: {
       where: {
         tenantId,
         memberId:        data.memberId,
+        // A GOP is issued to ONE facility — a PA authorised for provider A
+        // must never silently attach to (and cap/cover) a claim at provider B.
+        providerId:      data.providerId,
         benefitCategory: data.benefitCategory,
         status:          "APPROVED",
         claimId:         null, // not already attached elsewhere (WP-C2)
@@ -105,8 +117,8 @@ export async function submitClaimAction(data: {
     });
     if (!approvedPA) {
       throw new Error(
-        `${data.benefitCategory.charAt(0) + data.benefitCategory.slice(1).toLowerCase()} claims require an approved pre-authorization. ` +
-        `Please submit a pre-auth request and obtain approval before submitting this claim.`
+        `${data.benefitCategory.charAt(0) + data.benefitCategory.slice(1).toLowerCase()} claims require an approved pre-authorization for this facility. ` +
+        `Please submit a pre-auth request (at this provider) and obtain approval before submitting this claim.`
       );
     }
   }

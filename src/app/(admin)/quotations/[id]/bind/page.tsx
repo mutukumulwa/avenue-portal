@@ -17,9 +17,16 @@ const STEP_STYLE = {
   blocked: "bg-[#F8F9FA] border-[#EEEEEE] text-brand-text-muted",
 };
 
-export default async function BindPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function BindPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ error?: string }>;
+}) {
   const session = await requireRole(ROLES.UNDERWRITING);
   const { id } = await params;
+  const { error } = await searchParams;
   const tenantId = session.user.tenantId;
 
   const quotation = await prisma.quotation.findUnique({
@@ -27,9 +34,19 @@ export default async function BindPage({ params }: { params: Promise<{ id: strin
     include: {
       acceptance: { include: { acceptedBy: { select: { firstName: true, lastName: true } } } },
       broker: { select: { name: true } },
+      _count: { select: { lives: true } },
     },
   });
   if (!quotation) notFound();
+
+  // PR-037: bind-time package selection for quotes captured without one.
+  const boundPackage = quotation.packageId
+    ? await prisma.package.findUnique({ where: { id: quotation.packageId }, select: { name: true } })
+    : null;
+  const packages = quotation.packageId
+    ? []
+    : await prisma.package.findMany({ where: { tenantId, status: "ACTIVE" }, select: { id: true, name: true }, orderBy: { name: "asc" } });
+  const livesCount = quotation._count.lives;
 
   // Members created from this quotation
   const members = await prisma.member.findMany({
@@ -78,6 +95,14 @@ export default async function BindPage({ params }: { params: Promise<{ id: strin
           </p>
         </div>
       </div>
+
+      {/* PR-037: bind-step failures render here, never as an application error */}
+      {error && (
+        <div className="bg-[#DC3545]/10 border border-[#DC3545]/30 rounded-[8px] p-3 flex items-start gap-2">
+          <AlertTriangle size={15} className="text-[#DC3545] mt-0.5 shrink-0" />
+          <p className="text-sm text-[#842029]">{error}</p>
+        </div>
+      )}
 
       {/* Progress steps */}
       <div className="grid grid-cols-4 gap-3">
@@ -168,13 +193,44 @@ export default async function BindPage({ params }: { params: Promise<{ id: strin
         {!hasMemberships && isAccepted && (
           <div className="space-y-3">
             <p className="text-sm text-brand-text-muted">
-              This will create <strong>{quotation.memberCount + quotation.dependentCount}</strong> member record(s) in{" "}
+              Memberships are created from the <strong>captured census</strong>: {livesCount} life/lives on file
+              {livesCount !== quotation.memberCount + quotation.dependentCount && (
+                <> (headline counts: {quotation.memberCount + quotation.dependentCount})</>
+              )}
+              , in{" "}
               <span className="font-mono text-xs bg-[#FFC107]/10 text-[#856404] px-1.5 py-0.5 rounded">PENDING_ACTIVATION</span>{" "}
               carrying over all underwriting decisions, exclusions, and waiting periods.
+              {" "}Package: <strong>{boundPackage?.name ?? "not assigned"}</strong>.
             </p>
-            <form action={createMembershipsAction}>
+
+            {livesCount === 0 && (
+              <div className="bg-[#FFC107]/10 border border-[#FFC107]/30 rounded-[8px] p-3 flex items-start gap-2">
+                <AlertTriangle size={15} className="text-[#856404] mt-0.5 shrink-0" />
+                <p className="text-xs text-[#856404]">
+                  No census lives are captured on this quotation yet. Add the member census on the{" "}
+                  <Link href={`/quotations/${id}/build`} className="underline font-semibold">Build page</Link>{" "}
+                  first — binding needs real lives, not just the headline counts.
+                </p>
+              </div>
+            )}
+
+            <form action={createMembershipsAction} className="space-y-3">
               <input type="hidden" name="quotationId" value={id} />
-              <SubmitButton className="bg-brand-indigo hover:bg-brand-secondary text-white px-5 py-2 rounded-full text-sm font-semibold transition-colors">
+              {!quotation.packageId && (
+                <div className="max-w-sm">
+                  <label className="block text-xs font-semibold text-brand-text-muted mb-1">Benefit package (required to bind)</label>
+                  <select name="packageId" required
+                    className="w-full border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-brand-indigo focus:outline-none">
+                    <option value="">Select package…</option>
+                    {packages.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <SubmitButton
+                disabled={livesCount === 0}
+                className="bg-brand-indigo hover:bg-brand-secondary text-white px-5 py-2 rounded-full text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
                 Create Memberships
               </SubmitButton>
             </form>

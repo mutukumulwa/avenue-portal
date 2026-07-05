@@ -73,6 +73,8 @@ export async function setProviderStatusAction(formData: FormData) {
   let noticeMsg = "";
   try {
     if (!["ACTIVE", "SUSPENDED", "PENDING"].includes(status)) throw new Error("Unknown provider status.");
+    // Defense in depth behind the form's native `required minLength={5}`.
+    if (reason.length < 5) throw new Error("A status-change reason (min 5 characters) is required.");
     const { previousStatus, name } = await ProvidersService.setProviderStatus(
       session.user.tenantId, providerId, status, reason,
     );

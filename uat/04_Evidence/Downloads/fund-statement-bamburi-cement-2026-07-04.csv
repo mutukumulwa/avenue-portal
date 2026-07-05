@@ -1,0 +1,16 @@
+STATEMENT,Bamburi Cement,,,,
+Period,2025-01-01,to,2025-12-31,,
+Closing Balance,,,,,4050000
+Total Deposited,,,,12250000,
+Total Claims,,,,-7600000,
+Admin Fees,,,,-600000,
+,,,,,
+Date,Type,Description,Reference,Amount (KES),Balance After (KES)
+2025-01-03,DEPOSIT,Opening deposit 2025,EFT-BAM-2025-001,12000000,12000000
+2025-02-01,CLAIM_DEDUCTION,Claims deductions Jan 2025,,-1850000,10150000
+2025-03-01,CLAIM_DEDUCTION,Claims deductions Feb 2025,,-2120000,8030000
+2025-04-01,ADMIN_FEE,Admin fee Q1 — 5% claims administration retainer,ADM-BAM-Q1,-200000,7830000
+2025-04-05,CLAIM_DEDUCTION,Claims deductions Mar 2025,,-2450000,5380000
+2025-04-20,CLAIM_DEDUCTION,Claims deductions Apr 2025 (partial),,-1180000,4200000
+2025-04-25,ADMIN_FEE,Admin fee Q2 — 5% claims administration retainer,ADM-BAM-Q2,-400000,3800000
+2026-07-04,DEPOSIT,Fund deposit,W5-DEP-001 EFT,250000,4050000

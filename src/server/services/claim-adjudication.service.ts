@@ -363,9 +363,12 @@ export const claimAdjudicationService = {
     });
     if (existing) throw new TRPCError({ code: "CONFLICT", message: "Settlement batch already exists for this provider and cycle" });
 
-    // Aggregate approved claims for this provider and cycle
-    const startDate = new Date(cycleYear, cycleMonth - 1, 1);
-    const endDate   = new Date(cycleYear, cycleMonth, 0, 23, 59, 59);
+    // PR-027: a settlement run scoops EVERY unsettled approved claim decided
+    // on or before the cycle end — never only claims decided inside the cycle
+    // month. Claims approved after their month's batch settled roll into the
+    // next run instead of stranding forever (one batch per provider+cycle is
+    // still enforced above).
+    const endDate = new Date(cycleYear, cycleMonth, 0, 23, 59, 59);
 
     const claims = await prisma.claim.findMany({
       where: {
@@ -374,13 +377,13 @@ export const claimAdjudicationService = {
         isReimbursement: false,
         status:          { in: ["APPROVED","PARTIALLY_APPROVED"] },
         settlementBatchId: null,
-        decidedAt:       { gte: startDate, lte: endDate },
+        decidedAt:       { lte: endDate },
       },
       select: { id: true, approvedAmount: true },
     });
 
     if (claims.length === 0) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "No approved claims found for this provider and cycle" });
+      throw new TRPCError({ code: "BAD_REQUEST", message: "No unsettled approved claims found for this provider up to the end of this cycle" });
     }
 
     const totalAmount = claims.reduce((s, c) => s + Number(c.approvedAmount), 0);

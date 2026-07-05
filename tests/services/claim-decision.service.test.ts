@@ -25,7 +25,7 @@ const db = vi.hoisted(() => {
     benefitUsage: { findUnique: vi.fn(async () => null), findMany: vi.fn(async (): Promise<any[]> => []), create: vi.fn(async (a: any) => a.data), update: vi.fn(async (a: any) => a.data) },
     benefitConfigSharedLimit: { findMany: vi.fn(async (): Promise<any[]> => []) },
     benefitHold: { findUnique: vi.fn(async () => null), update: vi.fn(async (a: any) => a.data), upsert: vi.fn(async () => ({})) },
-    preAuthorization: { updateMany: vi.fn(async () => ({ count: 1 })) },
+    preAuthorization: { updateMany: vi.fn(async () => ({ count: 1 })), update: vi.fn(async (a: any) => a.data) },
     approvalMatrix: { findMany: vi.fn(async (): Promise<any[]> => []) },
     approvalRequest: { findFirst: vi.fn(async () => null), create: vi.fn(async () => ({ id: "ar1" })) },
     fxRate: { findFirst: vi.fn(async () => null) },
@@ -195,7 +195,7 @@ describe("PR-011/016 — PA hold conversion + UTILISED", () => {
       }),
     );
 
-  it("approval converts the ACTIVE hold, restores activeHoldAmount, sets PA UTILISED, and usage is written exactly once", async () => {
+  it("PR-022: a partial-cover approval consumes only its share — hold reduced (stays ACTIVE), PA back to APPROVED with utilisedAmount advanced", async () => {
     withPa();
     db.benefitHold.findUnique.mockResolvedValue({
       preAuthId: "pa1", status: "ACTIVE", heldAmount: 85000, memberId: "m1", benefitCategory: "INPATIENT",
@@ -204,15 +204,16 @@ describe("PR-011/016 — PA hold conversion + UTILISED", () => {
 
     await decide({ approvedAmount: 3600 });
 
+    // Hold reduced by the consumed 3,600 — NOT converted; the remaining
+    // 81,400 reservation protects the rest of the episode.
     expect(db.benefitHold.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { preAuthId: "pa1" },
-        data: expect.objectContaining({ status: "CONVERTED", convertedToClaimId: "clm1" }),
+        data: expect.objectContaining({ heldAmount: 81400 }),
       }),
     );
-    // Hold fully released (consumed portion covered by the usage write).
     expect(db.benefitUsage.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ activeHoldAmount: { increment: -85000 } }) }),
+      expect.objectContaining({ data: expect.objectContaining({ activeHoldAmount: { increment: -3600 } }) }),
     );
     // Usage incremented exactly once with the approved amount.
     const usageWrites = db.benefitUsage.update.mock.calls.filter(
@@ -220,9 +221,38 @@ describe("PR-011/016 — PA hold conversion + UTILISED", () => {
     );
     expect(usageWrites).toHaveLength(1);
     expect(usageWrites[0][0].data.amountUsed).toEqual({ increment: 3600 });
-    // PA → UTILISED
-    expect(db.preAuthorization.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({ data: { status: "UTILISED" } }),
+    // PA returns to the pool with its consumption recorded.
+    expect(db.preAuthorization.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "pa1" },
+        data: expect.objectContaining({ status: "APPROVED", utilisedAmount: 3600, claimId: null }),
+      }),
+    );
+  });
+
+  it("PR-011/016: a full-cover approval converts the hold and sets the PA UTILISED", async () => {
+    withPa();
+    db.benefitHold.findUnique.mockResolvedValue({
+      preAuthId: "pa1", status: "ACTIVE", heldAmount: 85000, memberId: "m1", benefitCategory: "INPATIENT",
+    });
+    db.benefitUsage.findUnique.mockResolvedValue({ id: "bu1", amountUsed: 0, activeHoldAmount: 85000 });
+
+    await decide({ approvedAmount: 85000 });
+
+    expect(db.benefitHold.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { preAuthId: "pa1" },
+        data: expect.objectContaining({ status: "CONVERTED", convertedToClaimId: "clm1" }),
+      }),
+    );
+    expect(db.benefitUsage.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ activeHoldAmount: { increment: -85000 } }) }),
+    );
+    expect(db.preAuthorization.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "pa1" },
+        data: expect.objectContaining({ status: "UTILISED", utilisedAmount: 85000 }),
+      }),
     );
   });
 

@@ -3,6 +3,7 @@ import type { ClaimStatus, PreauthStatus, BenefitCategory, ServiceType, Prisma }
 import { FraudService } from "./fraud.service";
 import { ProviderContractsService, type ResolvedClaimRates } from "./provider-contracts.service";
 import { assertServiceDateNotFuture } from "@/lib/service-date";
+import { BenefitUsageService } from "./benefit-usage.service";
 
 export class ClaimsService {
   // ─── CLAIMS ─────────────────────────────────────────────
@@ -603,6 +604,17 @@ export class ClaimsService {
       tenantId,
     });
     // ────────────────────────────────────────────────────────────────────────
+
+    // ── Benefit-in-package gate (PR-024): validate at REQUEST time, not at
+    // claim decision. Approving a PA for a benefit the member doesn't hold
+    // creates a phantom hold and a claim that can never be approved.
+    const benefitCfg = await BenefitUsageService.resolveConfig(prisma, data.memberId, data.benefitCategory);
+    if (!benefitCfg) {
+      throw new Error(
+        `Benefit "${String(data.benefitCategory).replace(/_/g, " ")}" is not in this member's package — ` +
+        `a pre-authorization against it could never pay. Pick a benefit category from the member's package.`,
+      );
+    }
 
     const count = await prisma.preAuthorization.count({ where: { tenantId } });
     const preauthNumber = `PA-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;

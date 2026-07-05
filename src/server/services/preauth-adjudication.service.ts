@@ -473,6 +473,19 @@ export const preauthAdjudicationService = {
       throw new TRPCError({ code: "BAD_REQUEST", message: "Approved amount must be greater than zero." });
     }
 
+    // ── Benefit-in-package gate (PR-024): a PA for a benefit outside the
+    // member's package must be corrected or declined — approving it would
+    // place a phantom hold and dead-end the eventual claim.
+    const cfg = await BenefitUsageService.resolveConfig(prisma, pa.memberId, pa.benefitCategory);
+    if (!cfg) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message:
+          `Benefit "${String(pa.benefitCategory).replace(/_/g, " ")}" is not in the member's package — ` +
+          `this pre-authorization cannot be approved. Decline it, or re-submit under a benefit the member holds.`,
+      });
+    }
+
     // PR-011 #2 (human path): show the shortfall when the approval exceeds the
     // member's available limit (limit − used − held).
     const balance = await BenefitUsageService.availableLimit(prisma, pa.memberId, pa.benefitCategory);

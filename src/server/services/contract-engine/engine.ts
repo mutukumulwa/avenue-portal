@@ -22,6 +22,19 @@ function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
+/**
+ * Calendar-day bounds for effectivity windows. Claims carry date-only service
+ * dates (midnight) while rules/tariffs are stamped with creation timestamps —
+ * a rule captured at 07:15 must still govern services dated that same day, so
+ * "effective from" compares against end-of-day and "effective to" against
+ * start-of-day (PR-026 root cause).
+ */
+function dayBounds(d: Date): { startOfDay: Date; endOfDay: Date } {
+  const startOfDay = new Date(d); startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(d); endOfDay.setHours(23, 59, 59, 999);
+  return { startOfDay, endOfDay };
+}
+
 function normalize(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
 }
@@ -143,12 +156,13 @@ export class ContractEngine {
 
     // Load candidate tariff lines effective on the pricing date for this contract
     // (branch-specific or network-wide), plus mapping memories.
+    const { startOfDay, endOfDay } = dayBounds(pricingDate);
     const tariffs = await prisma.providerTariff.findMany({
       where: {
         contractId: contract.id,
         isActive: true,
-        effectiveFrom: { lte: pricingDate },
-        OR: [{ effectiveTo: null }, { effectiveTo: { gte: pricingDate } }],
+        effectiveFrom: { lte: endOfDay },
+        OR: [{ effectiveTo: null }, { effectiveTo: { gte: startOfDay } }],
         AND: [
           { OR: [{ branchId: ctx.providerBranchId ?? undefined }, { branchId: null }] },
           { OR: [{ clientId: ctx.clientId ?? null }, { clientId: null }] },
@@ -161,8 +175,9 @@ export class ContractEngine {
     const memoryByText = new Map<string, string>();
     for (const m of memories) memoryByText.set(m.normalizedText, m.tariffId);
 
-    // Load Phase-3 rule sets effective on the pricing date.
-    const dateWindow = { effectiveFrom: { lte: pricingDate }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: pricingDate } }] };
+    // Load Phase-3 rule sets effective on the pricing date (calendar-day
+    // bounds — see dayBounds, PR-026).
+    const dateWindow = { effectiveFrom: { lte: endOfDay }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: startOfDay } }] };
     const [packages, pricingRules, exclusions, preauthRules, documentationRules, externalTariffs] = await Promise.all([
       prisma.contractPackage.findMany({ where: { contractId: contract.id, isActive: true, ...dateWindow }, include: { components: true } }),
       prisma.pricingRule.findMany({ where: { contractId: contract.id, isActive: true, ...dateWindow } }),
@@ -187,6 +202,15 @@ export class ContractEngine {
 
     if (caseRateRule) {
       lineResults = this.applyCaseRate(ctx, contract, tariffs, memoryByText, caseRateRule, externalTariffMap);
+      // Carve-out lines priced itemised under a case rate are still subject to
+      // the contract's exclusion list (MRI/CT etc. are typically BOTH carved
+      // out of the rate AND excluded from cover).
+      for (const lr of lineResults) {
+        const input = inputById.get(lr.lineId);
+        if (input && lr.matchedRuleType !== "CASE_RATE_INCLUDED") {
+          this.applyExclusions(lr, input, contract, exclusions, tariffs, ctx);
+        }
+      }
     } else if (capitationRule) {
       const r = this.applyCapitation(ctx, capitationRule);
       lineResults = r.lines;

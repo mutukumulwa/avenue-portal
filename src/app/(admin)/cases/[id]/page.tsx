@@ -7,7 +7,7 @@ import {
 } from "./actions";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, BriefcaseMedical, Clock, FileCheck2, Ban, Stethoscope, FileSignature } from "lucide-react";
+import { ArrowLeft, BriefcaseMedical, Clock, FileCheck2, Ban, Stethoscope, FileSignature, AlertTriangle } from "lucide-react";
 
 const STATUS_BADGE: Record<string, string> = {
   OPEN: "bg-[#17A2B8]/10 text-[#17A2B8]",
@@ -18,9 +18,16 @@ const STATUS_BADGE: Record<string, string> = {
 
 const CATEGORIES = ["CONSULTATION", "LABORATORY", "PHARMACY", "IMAGING", "PROCEDURE", "OTHER"];
 
-export default async function CaseDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function CaseDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ error?: string }>;
+}) {
   const session = await requireRole(ROLES.OPS);
   const { id } = await params;
+  const { error } = await searchParams;
   const tenantId = session.user.tenantId;
 
   const c = await CaseService.getCaseDetail(tenantId, id);
@@ -51,6 +58,14 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
       <Link href="/cases" className="inline-flex items-center gap-1 text-sm text-brand-text-muted hover:text-brand-secondary">
         <ArrowLeft className="h-4 w-4" /> Back to open cases
       </Link>
+
+      {/* PR-032: guard violations render as a banner, never a crash overlay */}
+      {error && (
+        <div className="bg-[#DC3545]/10 border border-[#DC3545]/30 rounded-lg p-3 flex items-start gap-2">
+          <AlertTriangle size={15} className="text-[#DC3545] mt-0.5 shrink-0" />
+          <p className="text-sm text-[#842029]">{error}</p>
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -246,7 +261,11 @@ export default async function CaseDetailPage({ params }: { params: Promise<{ id:
             </form>
             <form action={closeAndFileAction}>
               <input type="hidden" name="caseId" value={c.id} />
-              <button type="submit" className="inline-flex items-center gap-2 rounded-full bg-brand-indigo px-6 py-2.5 font-semibold text-white shadow-sm hover:bg-brand-secondary">
+              <button
+                type="submit"
+                disabled={c.serviceEntries.filter((e) => !e.voided).length === 0}
+                title={c.serviceEntries.filter((e) => !e.voided).length === 0 ? "Add at least one service entry (or cancel the case)" : undefined}
+                className="inline-flex items-center gap-2 rounded-full bg-brand-indigo px-6 py-2.5 font-semibold text-white shadow-sm hover:bg-brand-secondary disabled:opacity-50 disabled:cursor-not-allowed">
                 <FileCheck2 size={16} /> Close &amp; file claim
               </button>
             </form>

@@ -1,0 +1,21 @@
+import { launch, login, BASE, sleep, shot } from './w5lib.mjs'
+
+const b = await launch()
+const p = await b.newPage()
+console.log('finance →', await login(p, 'finance@medvex.co.ug'))
+await p.goto(BASE + '/billing/gl/ledger', { waitUntil: 'networkidle2' }); await sleep(1800)
+await p.evaluate(() => {
+  const s = [...document.querySelectorAll('select')].find(s => s.getClientRects().length)
+  const o = [...s.options].find(o => /2010/.test(o.text))
+  s.value = o.value; s.dispatchEvent(new Event('change', { bubbles: true }))
+})
+await sleep(600)
+const btn = await p.evaluate(() => { const b = [...document.querySelectorAll('button')].find(b => /View Ledger/i.test(b.innerText)); if (b) { b.click(); return true } return false })
+console.log('view:', btn)
+await sleep(2500)
+const t = await p.evaluate(() => document.body.innerText)
+const i = t.indexOf('Claims Payable')
+console.log('== 2010 LEDGER ==\n', t.slice(i, i + 2400).replace(/\n{2,}/g, '\n'))
+await shot(p, 'w5-38-ledger-2010')
+await b.close()
+console.log('DONE')

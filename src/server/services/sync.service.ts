@@ -117,7 +117,7 @@ export class SyncService {
     let outcome: { state: "SYNCED" | "CONFLICT"; reason?: string };
     switch (op.entityType) {
       case "Claim":
-        outcome = await this.reconcileClaim(op.tenantId, op.payload as Record<string, unknown>, op.clientUuid);
+        outcome = await this.reconcileClaim(op.tenantId, op.payload as Record<string, unknown>, op.clientUuid, op.offlineAuthId);
         break;
       default:
         outcome = { state: "SYNCED" };
@@ -139,13 +139,13 @@ export class SyncService {
     tenantId: string,
     payload: Record<string, unknown>,
     clientUuid: string,
+    offlineAuthId?: string | null,
   ): Promise<{ state: "SYNCED" | "CONFLICT"; reason?: string }> {
     const memberNumber = payload.memberNumber as string | undefined;
     const providerCode = payload.providerCode as string | undefined;
     const serviceType = payload.serviceType as string | undefined;
     const lineItems = (payload.lineItems as Array<{ description: string; quantity: number; unitCost: number; serviceCategory?: string; cptCode?: string }>) ?? [];
     if (!memberNumber) return { state: "CONFLICT", reason: "Missing memberNumber" };
-    if (!providerCode) return { state: "CONFLICT", reason: "Missing providerCode" };
     if (!serviceType) return { state: "CONFLICT", reason: "Missing serviceType" };
     if (lineItems.length === 0) return { state: "CONFLICT", reason: "No line items" };
 
@@ -159,11 +159,31 @@ export class SyncService {
       return { state: "CONFLICT", reason: `Scheme ${member.group.status} at sync time` };
     }
 
-    const provider = await prisma.provider.findFirst({
-      where: { tenantId, slade360ProviderId: providerCode },
-      select: { id: true, contractStatus: true },
-    });
-    if (!provider) return { state: "CONFLICT", reason: "Provider not found at sync time" };
+    // PR-036: the work code IS the provider identity — the pack was issued to
+    // one facility, so the op resolves to that provider authoritatively. The
+    // free-text provider code is only a fallback for API-path ops without a
+    // work code (matched by Slade360 id, then case-insensitive name).
+    let provider: { id: string; contractStatus: string } | null = null;
+    if (offlineAuthId) {
+      const auth = await prisma.offlineWorkAuthorization.findUnique({
+        where: { id: offlineAuthId },
+        select: { provider: { select: { id: true, contractStatus: true } } },
+      });
+      provider = auth?.provider ?? null;
+    }
+    if (!provider && providerCode) {
+      provider = await prisma.provider.findFirst({
+        where: {
+          tenantId,
+          OR: [
+            { slade360ProviderId: providerCode },
+            { name: { equals: providerCode, mode: "insensitive" } },
+          ],
+        },
+        select: { id: true, contractStatus: true },
+      });
+    }
+    if (!provider) return { state: "CONFLICT", reason: "Provider not resolvable at sync time (no work-code facility, no Slade360/name match)" };
     if (["EXPIRED", "SUSPENDED"].includes(provider.contractStatus)) {
       return { state: "CONFLICT", reason: `Provider contract ${provider.contractStatus}` };
     }
@@ -248,14 +268,37 @@ export class SyncService {
     state: "SYNCED" | "CONFLICT",
     reason?: string,
   ): Promise<{ state: string; reason?: string }> {
-    await prisma.syncOperation.update({
+    const op = await prisma.syncOperation.update({
       where: { id: operationId },
       data: {
         state,
         syncedAt: state === "SYNCED" ? new Date() : null,
         conflictReason: state === "CONFLICT" ? (reason ?? "Conflict") : null,
       },
+      select: { tenantId: true, opKey: true, entityType: true },
     });
+
+    // PR-036: a CONFLICT op must be VISIBLE to operations, not just a row in
+    // SyncOperation — it lands in the Exception Register for supervisor
+    // review ("flagged for review — never lost" made true).
+    if (state === "CONFLICT") {
+      const actorId = await getSystemActorId(op.tenantId).catch(() => null);
+      if (actorId) {
+        await prisma.exceptionLog
+          .create({
+            data: {
+              tenantId: op.tenantId,
+              entityType: "CLAIM",
+              entityId: operationId,
+              entityRef: `SYNC ${op.opKey}`,
+              exceptionCode: "OTHER",
+              reason: `Offline ${op.entityType} op failed re-validation at sync: ${reason ?? "conflict"}. Correct the capture and resync, or action it manually.`,
+              raisedById: actorId,
+            },
+          })
+          .catch(() => undefined); // registry write must never mask the sync outcome
+      }
+    }
     return { state, reason };
   }
 }

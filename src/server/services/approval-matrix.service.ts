@@ -51,8 +51,15 @@ export interface ResolvedRule {
    * no FX rate was in force — band matching is impossible, so the resolver
    * returns the *highest-requirement* rule and the caller must route to the
    * multi-level/manual path, never the lowest band.
+   *
+   * PR-023: also true when the tenant governs this action but the amount falls
+   * outside every configured band (above the highest max, in a gap, or the
+   * dimensions are uncovered). The matrix fails CLOSED: the most demanding
+   * configured path governs. Amounts below the lowest configured band floor
+   * remain ungoverned by design (small-value operational lane).
    */
   failSafe: boolean;
+  failSafeReason?: "FX_MISSING" | "BAND_UNCOVERED";
 }
 
 export class ApprovalMatrixService {
@@ -146,22 +153,20 @@ export class ApprovalMatrixService {
         return true;
       });
       if (dimensionOk.length === 0) return null;
-      const mostDemanding = [...dimensionOk].sort((a, b) => {
-        const stepsA = this.expandSteps(a).length;
-        const stepsB = this.expandSteps(b).length;
-        if (stepsA !== stepsB) return stepsB - stepsA;
-        return Number(b.claimValueMin ?? 0) - Number(a.claimValueMin ?? 0);
-      })[0];
+      const mostDemanding = this.mostDemanding(dimensionOk);
       return {
         matrix: mostDemanding,
         steps: this.expandSteps(mostDemanding),
         baseAmount: null,
         fxRate: 1,
         failSafe: true,
+        failSafeReason: "FX_MISSING",
       };
     }
 
     let best: { score: number; rule: (typeof candidates)[number] } | null = null;
+    // PR-023: track the governed floor so out-of-band amounts fail CLOSED.
+    let lowestBandFloor: number | null = null;
 
     for (const rule of candidates) {
       // Amount band (normalise the rule's band to base for comparison).
@@ -172,6 +177,8 @@ export class ApprovalMatrixService {
         const max = rule.claimValueMax != null
           ? (await FxService.normalise(tenantId, Number(rule.claimValueMax), rule.currency, atDate)).baseAmount
           : null;
+        const floor = min ?? 0;
+        if (lowestBandFloor == null || floor < lowestBandFloor) lowestBandFloor = floor;
         if (min != null && baseAmount < min) continue;
         if (max != null && baseAmount > max) continue;
       }
@@ -188,7 +195,27 @@ export class ApprovalMatrixService {
       if (!best || score > best.score) best = { score, rule };
     }
 
-    if (!best) return null;
+    if (!best) {
+      // ── PR-023: fail CLOSED, never open ────────────────────────────────
+      // The tenant has active rules governing this action, but no band/
+      // dimension matched. Below the lowest configured floor is the intended
+      // ungoverned small-value lane; anything else (band gap, above the top
+      // band, uncovered service/benefit dimension) routes to the MOST
+      // DEMANDING configured path.
+      if (candidates.length === 0) return null; // action not governed at all
+      if (baseAmount != null && lowestBandFloor != null && baseAmount < lowestBandFloor) {
+        return null; // below every configured band — intentionally ungoverned
+      }
+      const mostDemanding = this.mostDemanding(candidates);
+      return {
+        matrix: mostDemanding,
+        steps: this.expandSteps(mostDemanding),
+        baseAmount,
+        fxRate,
+        failSafe: true,
+        failSafeReason: "BAND_UNCOVERED",
+      };
+    }
     return {
       matrix: best.rule,
       steps: this.expandSteps(best.rule),
@@ -196,5 +223,15 @@ export class ApprovalMatrixService {
       fxRate,
       failSafe: false,
     };
+  }
+
+  /** The rule with the most approval steps, then the highest band floor. */
+  private static mostDemanding<T extends ApprovalMatrix & { steps: ApprovalStep[] }>(rules: T[]): T {
+    return [...rules].sort((a, b) => {
+      const stepsA = this.expandSteps(a).length;
+      const stepsB = this.expandSteps(b).length;
+      if (stepsA !== stepsB) return stepsB - stepsA;
+      return Number(b.claimValueMin ?? 0) - Number(a.claimValueMin ?? 0);
+    })[0];
   }
 }

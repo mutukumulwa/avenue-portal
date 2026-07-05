@@ -46,7 +46,8 @@ export async function GET(
   // Prepend summary rows
   const summaryRows = [
     ["STATEMENT", group.name, "", "", "", ""],
-    ["Period", new Date(acc.periodStartDate).toISOString().split("T")[0], "to", new Date(acc.periodEndDate).toISOString().split("T")[0], "", ""],
+    // PR-035: export the ACTUAL activity range, matching the on-screen statement.
+    ["Period", new Date(Math.min(new Date(acc.periodStartDate).getTime(), ...acc.transactions.map((t) => new Date(t.postedAt).getTime()))).toISOString().split("T")[0], "to", new Date(Math.max(new Date(acc.periodEndDate).getTime(), ...acc.transactions.map((t) => new Date(t.postedAt).getTime()))).toISOString().split("T")[0], "", ""],
     ["Closing Balance", "", "", "", "", Number(acc.balance).toString()],
     ["Total Deposited", "", "", "", Number(acc.totalDeposited).toString(), ""],
     ["Total Claims", "", "", "", `-${Number(acc.totalClaims).toString()}`, ""],

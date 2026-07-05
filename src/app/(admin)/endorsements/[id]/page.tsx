@@ -35,10 +35,17 @@ const KEY_LABELS: Record<string, string> = {
   newValue: "New Value", docRef: "Document Reference", notes: "Notes",
 };
 
-export default async function EndorsementReviewPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EndorsementReviewPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ error?: string }>;
+}) {
   const session = await requireRole(ROLES.OPS);
 
   const { id } = await params;
+  const { error } = await searchParams;
   const endorsement = await EndorsementsService.getEndorsementById(session.user.tenantId, id);
   if (!endorsement) notFound();
 
@@ -62,6 +69,14 @@ export default async function EndorsementReviewPage({ params }: { params: Promis
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
+      {/* PR-033/PR-009: control violations surface here, never as a crash */}
+      {error && (
+        <div className="bg-[#DC3545]/10 border border-[#DC3545]/30 rounded-[8px] p-3 flex items-start gap-2">
+          <AlertTriangle size={15} className="text-[#DC3545] mt-0.5 shrink-0" />
+          <p className="text-sm text-[#842029]">{error}</p>
+        </div>
+      )}
+
       {/* Header */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm flex flex-wrap justify-between items-center gap-4">
         <div className="flex items-center gap-3">

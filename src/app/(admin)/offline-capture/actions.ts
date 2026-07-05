@@ -13,20 +13,43 @@ import { enqueueSyncReconcile } from "@/lib/queue";
 export async function ingestOfflineOpsAction(
   ops: IncomingOp[],
   offlineAuthCode?: string,
-): Promise<{ accepted: number; syncedOpKeys: string[]; conflicts: number }> {
+): Promise<{
+  accepted: number;
+  syncedOpKeys: string[];
+  conflicts: number;
+  /** PR-036: per-op TERMINAL state — the client shows the truth, never "synced" for a conflicted op. */
+  outcomes: Array<{ opKey: string; state: string; reason?: string }>;
+}> {
   const session = await requireRole(ROLES.OPS);
-  if (!Array.isArray(ops) || ops.length === 0) return { accepted: 0, syncedOpKeys: [], conflicts: 0 };
+  if (!Array.isArray(ops) || ops.length === 0) return { accepted: 0, syncedOpKeys: [], conflicts: 0, outcomes: [] };
 
   // WP-B4: the work code travels with the batch; invalid/missing ⇒ ops buffer
   // as reviewable CONFLICTs server-side (never dropped).
   const results = await SyncService.ingest(session.user.tenantId, ops, offlineAuthCode);
-  await Promise.all(
-    results.filter((r) => !r.duplicate && r.state === "PENDING").map((r) => enqueueSyncReconcile(r.id)),
-  );
+
+  // PR-036: reconcile the in-app batch SYNCHRONOUSLY so the operator gets the
+  // terminal verdict (claim created vs conflict + reason) in the same click.
+  // The provider-device API path (/api/v1/sync) keeps the worker queue.
+  const outcomes: Array<{ opKey: string; state: string; reason?: string }> = [];
+  for (const r of results) {
+    if (!r.duplicate && r.state === "PENDING") {
+      const { state, reason } = await SyncService.reconcile(r.id);
+      outcomes.push({ opKey: r.opKey, state, reason });
+    } else if (r.state === "CONFLICT") {
+      // Buffered as conflict at ingest (bad/missing work code) — still enqueue
+      // nothing; it is already terminal and registered.
+      outcomes.push({ opKey: r.opKey, state: "CONFLICT", reason: "Work code invalid/expired at ingest" });
+    } else {
+      outcomes.push({ opKey: r.opKey, state: r.state ?? "SYNCED" });
+    }
+  }
+  void enqueueSyncReconcile; // API-path helper retained
+
   return {
     accepted: results.length,
-    syncedOpKeys: results.map((r) => r.opKey),
-    conflicts: results.filter((r) => r.state === "CONFLICT").length,
+    syncedOpKeys: outcomes.filter((o) => o.state === "SYNCED").map((o) => o.opKey),
+    conflicts: outcomes.filter((o) => o.state === "CONFLICT").length,
+    outcomes,
   };
 }
 

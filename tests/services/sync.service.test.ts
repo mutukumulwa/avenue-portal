@@ -4,12 +4,16 @@ const db = vi.hoisted(() => ({
   syncOperation: {
     findUnique: vi.fn(),
     create: vi.fn(async (a: any) => ({ id: "op_" + a.data.opKey })),
-    update: vi.fn(async () => ({})),
+    update: vi.fn(async () => ({ tenantId: "t1", opKey: "k1", entityType: "Claim" })),
   },
   member: { findFirst: vi.fn() },
   provider: { findFirst: vi.fn() },
   benefitUsage: { findMany: vi.fn(async (): Promise<any[]> => []) },
   claim: { findFirst: vi.fn(async (): Promise<any> => null), count: vi.fn(async () => 0), create: vi.fn(async () => ({ id: "clm1" })) },
+  // PR-036: CONFLICT ops land in the Exception Register; work-code path
+  // resolves the provider from the issuing authorization.
+  exceptionLog: { create: vi.fn(async () => ({})) },
+  offlineWorkAuthorization: { findUnique: vi.fn(async (): Promise<any> => null) },
 }));
 
 const intake = vi.hoisted(() => ({
@@ -152,6 +156,30 @@ describe("SyncService — store-and-forward (G4)", () => {
     it("CONFLICTs on incomplete payloads", async () => {
       db.syncOperation.findUnique.mockResolvedValue(claimOp({ amount: 100 }));
       expect((await SyncService.reconcile("c1")).state).toBe("CONFLICT");
+    });
+
+    // ── PR-036 ──────────────────────────────────────────────────────────
+    it("PR-036: a CONFLICT op is written to the Exception Register (never invisible)", async () => {
+      db.syncOperation.findUnique.mockResolvedValue(claimOp(fullPayload()));
+      db.member.findFirst.mockResolvedValue(null);
+      const res = await SyncService.reconcile("c1");
+      expect(res.state).toBe("CONFLICT");
+      expect(db.exceptionLog.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ reason: expect.stringMatching(/failed re-validation/i) }),
+        }),
+      );
+    });
+
+    it("PR-036: the work code's facility resolves the provider (free-text code irrelevant)", async () => {
+      db.syncOperation.findUnique.mockResolvedValue({ ...claimOp(fullPayload({ providerCode: "GARBAGE" })), offlineAuthId: "auth1" });
+      db.offlineWorkAuthorization.findUnique.mockResolvedValue({ provider: { id: "pAuth", contractStatus: "ACTIVE" } });
+      db.provider.findFirst.mockResolvedValue(null); // free-text lookup would fail
+      const res = await SyncService.reconcile("c1");
+      expect(res.state).toBe("SYNCED");
+      expect(db.claim.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ providerId: "pAuth" }) }),
+      );
     });
   });
 });

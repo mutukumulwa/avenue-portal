@@ -50,10 +50,16 @@ export class CaseService {
     const count = await prisma.clinicalCase.count({ where: { tenantId: input.tenantId } });
     const caseNumber = `CASE-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
 
+    // PR-031: stamp the case with the SCHEME currency at open (same D2 rule
+    // the claim intake uses) — a KES scheme's episode must never display UGX.
+    const { ClaimsService } = await import("./claims.service");
+    const currency = await ClaimsService.resolveClaimCurrency(input.tenantId, input.providerId, input.memberId);
+
     return prisma.clinicalCase.create({
       data: {
         tenantId: input.tenantId,
         caseNumber,
+        currency,
         memberId: input.memberId,
         providerId: input.providerId,
         providerBranchId: input.providerBranchId ?? null,

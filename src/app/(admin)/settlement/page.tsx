@@ -195,7 +195,9 @@ export default async function SettlementPage({
               {batches.map((batch) => (
                 <tr key={batch.id} className="hover:bg-[#F8F9FA]">
                   <td className="px-5 py-3 font-semibold text-brand-text-heading">
-                    {batch.provider.name}
+                    <Link href={`/settlement/${batch.id}`} className="hover:text-brand-indigo hover:underline">
+                      {batch.provider.name}
+                    </Link>
                   </td>
                   <td className="px-5 py-3 text-brand-text-muted">
                     {new Date(batch.cycleYear, batch.cycleMonth - 1).toLocaleString("en-UG", { month: "short", year: "numeric" })}

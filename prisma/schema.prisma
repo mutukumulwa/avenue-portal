@@ -1600,6 +1600,12 @@ model ApprovalRequest {
   currentLevel Int                   @default(1)
   makerId      String
 
+  // PR-025: the pending decision this request gates (the full decision input).
+  // When the final level approves, the request APPLIES the decision itself —
+  // a completed chain must never be a no-op.
+  payload   Json?
+  appliedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -2496,6 +2502,10 @@ model PreAuthorization {
 
   // Approval details
   approvedAmount Decimal?
+  // PR-022: cover consumed so far by decided claims. A PA is only UTILISED
+  // when utilisedAmount reaches approvedAmount; a smaller claim consumes its
+  // share and the PA (with its remaining hold) stays available for the episode.
+  utilisedAmount Decimal   @default(0) @db.Decimal(14, 2)
   approvedBy     String?
   approvedAt     DateTime?
   validFrom      DateTime? // Validity period start

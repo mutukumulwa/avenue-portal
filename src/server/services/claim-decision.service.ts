@@ -53,6 +53,12 @@ export interface ClaimDecisionInput {
   overCoverConfirmation?: string | null;
   /** Skip matrix/SoD (auto-adjudication runs its own policy gates first). */
   systemDecision?: boolean;
+  /**
+   * PR-025: set when a completed approval-matrix chain is applying the
+   * decision it gated. Skips the matrix gate (the chain IS the matrix
+   * authorisation) — every other control still runs.
+   */
+  matrixSatisfied?: boolean;
 }
 
 export interface CeilingAssessment {
@@ -170,7 +176,7 @@ export class ClaimDecisionService {
         memberId: true, benefitCategory: true, serviceType: true,
         billedAmount: true, receivedAt: true, adjudicatorId: true,
         attendingDoctor: true, isReimbursement: true,
-        preauths: { select: { id: true, preauthNumber: true, approvedAmount: true, estimatedCost: true, status: true } },
+        preauths: { select: { id: true, preauthNumber: true, approvedAmount: true, estimatedCost: true, utilisedAmount: true, status: true } },
         member: { select: { group: { select: { clientId: true, fundingMode: true, selfFundedAccount: { select: { id: true, balance: true } } } } } },
       },
     });
@@ -214,8 +220,9 @@ export class ClaimDecisionService {
 
     const clientId = claim.member?.group?.clientId ?? null;
 
-    // 4 ── approval matrix, FX-correct (PR-017)
-    if (isApproval && !decision.systemDecision) {
+    // 4 ── approval matrix, FX-correct (PR-017), fail-closed (PR-023),
+    //      completing chains apply the gated decision (PR-025).
+    if (isApproval && !decision.systemDecision && !decision.matrixSatisfied) {
       const resolved = await ApprovalMatrixService.resolve(tenantId, {
         actionType: "CLAIM_PAYMENT",
         clientId,
@@ -230,17 +237,42 @@ export class ClaimDecisionService {
             ? ` (≈ UGX ${Math.round(resolved.baseAmount).toLocaleString()} @ ${resolved.fxRate})`
             : "");
 
-        if (resolved.failSafe) {
+        if (resolved.failSafe && resolved.failSafeReason === "FX_MISSING") {
           // Missing FX rate: route to the most demanding path + exception log.
           await this.logFxException(tenantId, claim.id, claim.claimNumber, claim.currency, decision.reviewerId);
         }
 
         if (resolved.steps.length > 1 || resolved.failSafe) {
-          const existing = await prisma.approvalRequest.findFirst({
-            where: { tenantId, entityType: "Claim", entityId: claimId, status: { in: ["PENDING", "ESCALATED"] } },
-            select: { id: true },
+          // PR-025: a fully APPROVED, not-yet-applied chain for this exact
+          // decision authorises it — consume the chain and proceed.
+          const completed = await prisma.approvalRequest.findFirst({
+            where: {
+              tenantId, entityType: "Claim", entityId: claimId,
+              actionType: "CLAIM_PAYMENT", status: "APPROVED", appliedAt: null,
+            },
+            orderBy: { updatedAt: "desc" },
+            select: { id: true, amount: true },
           });
-          if (!existing) {
+          const amountMatches = completed?.amount != null &&
+            Math.abs(Number(completed.amount) - approvedAmount) < EPSILON;
+
+          if (completed && amountMatches) {
+            await prisma.approvalRequest.update({
+              where: { id: completed.id },
+              data: { appliedAt: new Date() },
+            });
+            // Chain satisfied — fall through to the remaining gates.
+          } else {
+            const existing = await prisma.approvalRequest.findFirst({
+              where: { tenantId, entityType: "Claim", entityId: claimId, status: { in: ["PENDING", "ESCALATED"] } },
+              select: { id: true },
+            });
+            if (existing) {
+              throw new Error(
+                `An approval request for this claim is already in progress (Approvals console). ` +
+                `It will apply the decision automatically once the final level approves — do not resubmit.`,
+              );
+            }
             await ApprovalRequestService.create(tenantId, {
               actionType: "CLAIM_PAYMENT",
               entityType: "Claim",
@@ -251,24 +283,40 @@ export class ClaimDecisionService {
               currency: claim.currency,
               serviceType: claim.serviceType,
               benefitCategory: claim.benefitCategory,
+              // PR-025: persist the gated decision so the completing chain
+              // can apply it without operator re-entry.
+              payload: {
+                action: decision.action,
+                approvedAmount,
+                notes: decision.notes ?? null,
+                overCoverConfirmation: decision.overCoverConfirmation ?? null,
+                reviewerId: decision.reviewerId,
+                reviewerRole: decision.reviewerRole ?? null,
+              },
             });
+            if (resolved.failSafe && resolved.failSafeReason === "BAND_UNCOVERED") {
+              throw new Error(
+                `Approval matrix fail-closed: ${amountLabel} falls outside every configured approval band for this action — ` +
+                `it was routed to the most senior configured path. Action it in Approvals (and close the band gap in Settings → Approval Matrix).`,
+              );
+            }
+            throw new Error(
+              resolved.failSafe
+                ? `No FX rate is in force for ${claim.currency} — the claim was routed to the highest approval path as a fail-safe. Action it in Approvals (and capture the missing rate).`
+                : `This claim (${amountLabel}) needs ${resolved.steps.length}-level approval. A request has been opened — the decision will apply automatically when the final level approves.`,
+            );
           }
-          throw new Error(
-            resolved.failSafe
-              ? `No FX rate is in force for ${claim.currency} — the claim was routed to the highest approval path as a fail-safe. Action it in Approvals (and capture the missing rate).`
-              : `This claim (${amountLabel}) needs ${resolved.steps.length}-level approval. A request has been opened — action it in Approvals.`,
-          );
-        }
-
-        const step = resolved.steps[0];
-        if (!ApprovalMatrixService.roleAuthorised(decision.reviewerRole, step.requiredRole)) {
-          throw new Error(
-            `Approval matrix: this claim (${amountLabel}) requires ${step.requiredRole.replace(/_/g, " ")} or above. ` +
-            `Your role (${decision.reviewerRole ?? "unknown"}) is not authorised to approve it.`,
-          );
-        }
-        if (claim.adjudicatorId) {
-          ApprovalMatrixService.enforceSegregationOfDuties(claim.adjudicatorId, decision.reviewerId);
+        } else {
+          const step = resolved.steps[0];
+          if (!ApprovalMatrixService.roleAuthorised(decision.reviewerRole, step.requiredRole)) {
+            throw new Error(
+              `Approval matrix: this claim (${amountLabel}) requires ${step.requiredRole.replace(/_/g, " ")} or above. ` +
+              `Your role (${decision.reviewerRole ?? "unknown"}) is not authorised to approve it.`,
+            );
+          }
+          if (claim.adjudicatorId) {
+            ApprovalMatrixService.enforceSegregationOfDuties(claim.adjudicatorId, decision.reviewerId);
+          }
         }
       }
     }
@@ -320,11 +368,15 @@ export class ClaimDecisionService {
       }
     }
 
-    // 6 ── attached-PA cover cap (PR-015): warn + mandatory confirmation
+    // 6 ── attached-PA cover cap (PR-015): warn + mandatory confirmation.
+    // PR-022: the enforceable cover is the REMAINING cover (approved −
+    // already-utilised), so multi-claim episodes are capped correctly.
     let notes = decision.notes || undefined;
     if (isApproval && claim.preauths.length > 0) {
       const cover = claim.preauths.reduce(
-        (sum, pa) => sum + Number(pa.approvedAmount ?? pa.estimatedCost ?? 0), 0,
+        (sum, pa) =>
+          sum + Math.max(0, Number(pa.approvedAmount ?? pa.estimatedCost ?? 0) - Number(pa.utilisedAmount ?? 0)),
+        0,
       );
       if (approvedAmount > cover + EPSILON) {
         if (!decision.overCoverConfirmation) {
@@ -370,36 +422,58 @@ export class ClaimDecisionService {
         await BenefitUsageService.recordUsage(tx, claim.memberId, claim.benefitCategory, approvedAmount);
       }
 
-      // PA holds + PA status (PR-011/016 #3-4).
-      for (const pa of claim.preauths) {
-        const hold = await tx.benefitHold.findUnique({ where: { preAuthId: pa.id } });
-        if (hold && hold.status === "ACTIVE") {
-          if (isApproval) {
-            // Convert: consumed portion is covered by the usage write above;
-            // the remainder of the hold is released with it.
-            await tx.benefitHold.update({
-              where: { preAuthId: pa.id },
-              data: { status: "CONVERTED", convertedToClaimId: claimId, releasedAt: new Date() },
-            });
-            await BenefitUsageService.releaseHold(tx, hold.memberId, hold.benefitCategory, Number(hold.heldAmount));
+      // PA holds + PA status (PR-011/016 #3-4; PR-022 partial utilisation).
+      // Each PA is consumed only up to the claim's approved amount:
+      //  - fully consumed → hold CONVERTED, PA → UTILISED;
+      //  - partially consumed → hold reduced (stays ACTIVE), PA back to
+      //    APPROVED with utilisedAmount advanced and detached, so the rest of
+      //    the episode (e.g. the surgery after a pre-op consult) still has its
+      //    reservation and can attach the PA to the next claim.
+      if (isApproval) {
+        let toConsume = approvedAmount;
+        for (const pa of claim.preauths) {
+          if (!["APPROVED", "ATTACHED"].includes(pa.status)) continue;
+          const paCover = Number(pa.approvedAmount ?? pa.estimatedCost ?? 0);
+          const remainingCover = Math.max(0, paCover - Number(pa.utilisedAmount ?? 0));
+          const consumed = Math.min(remainingCover, Math.max(0, toConsume));
+          toConsume -= consumed;
+          const newUtilised = Number(pa.utilisedAmount ?? 0) + consumed;
+          const fullyConsumed = paCover - newUtilised <= EPSILON;
+
+          const hold = await tx.benefitHold.findUnique({ where: { preAuthId: pa.id } });
+          if (hold && hold.status === "ACTIVE") {
+            const holdRelease = Math.min(Number(hold.heldAmount), consumed);
+            const newHeld = Number(hold.heldAmount) - holdRelease;
+            if (fullyConsumed || newHeld <= EPSILON) {
+              // Convert the whole hold (any sliver left releases with it).
+              await tx.benefitHold.update({
+                where: { preAuthId: pa.id },
+                data: { status: "CONVERTED", convertedToClaimId: claimId, releasedAt: new Date() },
+              });
+              await BenefitUsageService.releaseHold(tx, hold.memberId, hold.benefitCategory, Number(hold.heldAmount));
+            } else {
+              await tx.benefitHold.update({
+                where: { preAuthId: pa.id },
+                data: { heldAmount: newHeld },
+              });
+              await BenefitUsageService.releaseHold(tx, hold.memberId, hold.benefitCategory, holdRelease);
+            }
           }
-          // DECLINED: hold stays ACTIVE — the PA returns to APPROVED below and
-          // can attach to a corrected claim within its validity.
-        }
-      }
-      if (claim.preauths.length > 0) {
-        if (isApproval) {
-          await tx.preAuthorization.updateMany({
-            where: { claimId, status: { in: ["APPROVED", "ATTACHED"] } },
-            data: { status: "UTILISED" },
-          });
-        } else {
-          // Detach + back to APPROVED for resubmission (PR-016 D4).
-          await tx.preAuthorization.updateMany({
-            where: { claimId, status: { in: ["APPROVED", "ATTACHED"] } },
-            data: { status: "APPROVED", claimId: null, attachedAt: null },
+
+          await tx.preAuthorization.update({
+            where: { id: pa.id },
+            data: fullyConsumed
+              ? { status: "UTILISED", utilisedAmount: newUtilised }
+              : { status: "APPROVED", utilisedAmount: newUtilised, claimId: null, attachedAt: null },
           });
         }
+      } else if (claim.preauths.length > 0) {
+        // DECLINED: hold stays ACTIVE — detach + back to APPROVED for
+        // resubmission (PR-016 D4).
+        await tx.preAuthorization.updateMany({
+          where: { claimId, status: { in: ["APPROVED", "ATTACHED"] } },
+          data: { status: "APPROVED", claimId: null, attachedAt: null },
+        });
       }
 
       const row = await tx.claim.update({

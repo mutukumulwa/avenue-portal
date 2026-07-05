@@ -72,7 +72,16 @@ export async function closeAndFileAction(formData: FormData) {
   const session = await requireRole(ROLES.OPS);
   const caseId = formData.get("caseId") as string;
 
-  const claim = await CaseService.closeAndFile(session.user.tenantId, caseId, session.user.id);
+  // PR-032: guard violations (empty case, already filed) surface as a banner
+  // on the case page — never as an unhandled server exception.
+  let claim;
+  try {
+    claim = await CaseService.closeAndFile(session.user.tenantId, caseId, session.user.id);
+  } catch (err) {
+    if (err instanceof Error && err.message === "NEXT_REDIRECT") throw err;
+    const msg = err instanceof Error ? err.message : "Close & file failed";
+    redirect(`/cases/${caseId}?error=${encodeURIComponent(msg)}`);
+  }
   await writeAudit({
     userId: session.user.id,
     action: "CASE_FILED",

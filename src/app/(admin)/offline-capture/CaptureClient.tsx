@@ -140,10 +140,19 @@ export function CaptureClient() {
         })),
         code ?? undefined,
       );
-      for (const opKey of res.syncedOpKeys) await Outbox.markState(opKey, "synced");
+      // PR-036: mark each op with its TERMINAL server state — an op that
+      // failed re-validation shows as a conflict with its reason, never as
+      // "synced".
+      for (const o of res.outcomes) {
+        await Outbox.markState(o.opKey, o.state === "SYNCED" ? "synced" : "conflict");
+      }
+      const conflictReasons = res.outcomes
+        .filter((o) => o.state !== "SYNCED")
+        .map((o) => o.reason)
+        .filter(Boolean);
       setConflictNote(
         res.conflicts > 0
-          ? `${res.conflicts} operation(s) buffered as conflicts — the work code was rejected server-side. They are reviewable, not lost.`
+          ? `${res.conflicts} operation(s) came back as CONFLICT — logged in the Exception Register for review, not lost.${conflictReasons[0] ? ` First reason: ${conflictReasons[0]}` : ""}`
           : null,
       );
       refresh();

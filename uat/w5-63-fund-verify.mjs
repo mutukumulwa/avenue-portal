@@ -1,0 +1,30 @@
+import { launch, login, BASE, sleep, shot, clickText, SHOTS } from './w5lib.mjs'
+
+const b = await launch()
+const p = await b.newPage()
+const cdp = await p.createCDPSession()
+await cdp.send('Page.setDownloadBehavior', { behavior: 'allow', downloadPath: SHOTS.replace('/Screenshots', '') + '/Downloads' }).catch(e => console.log('dl-setup:', e.message))
+console.log('fund →', await login(p, 'fund@medvex.co.ug'))
+await p.goto(BASE + '/fund/cmr60bv540033swvqz1tedol4', { waitUntil: 'networkidle2' }); await sleep(2000)
+let t = await p.evaluate(() => document.body.innerText)
+const li = t.indexOf('Fund Ledger')
+console.log('== LEDGER TOP ==\n', t.slice(li, li + 600).replace(/\n{2,}/g, '\n'))
+const bi = t.indexOf('CURRENT BALANCE')
+console.log('BALANCE AREA:', t.slice(bi, bi + 120).replace(/\n+/g, ' | '))
+await shot(p, 'w5-63-fund-ledger')
+
+// statement
+console.log('\nstatement:', await clickText(p, 'a', 'Statement') || await clickText(p, 'button', 'Statement'))
+await sleep(2500)
+console.log('URL:', p.url())
+t = await p.evaluate(() => document.body.innerText).catch(() => '(download or nav)')
+console.log('STATEMENT PAGE:', t.slice(100, 800).replace(/\n{2,}/g, '\n'))
+await shot(p, 'w5-63-statement')
+const exp = await clickText(p, 'button', 'Export') || await clickText(p, 'a', 'Export') || await clickText(p, 'button', 'CSV') || await clickText(p, 'button', 'Download')
+console.log('export click:', exp)
+await sleep(3000)
+await b.close()
+const fs = await import('fs')
+const dl = SHOTS.replace('/Screenshots', '') + '/Downloads'
+console.log('DOWNLOADS:', fs.existsSync(dl) ? fs.readdirSync(dl) : '(none)')
+console.log('DONE')

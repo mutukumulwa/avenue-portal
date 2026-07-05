@@ -11,13 +11,22 @@ const gate = vi.hoisted(() => ({ runHardGateValidation: vi.fn(async () => ({ pas
 const exclusions = vi.hoisted(() => ({
   applyToClaim: vi.fn(async () => ({ excludedCount: 0, excludedAmount: 0, payableAmount: 50000 })),
 }));
-const decisionSvc = vi.hoisted(() => ({ decide: vi.fn(async () => ({})) }));
+const decisionSvc = vi.hoisted(() => ({
+  decide: vi.fn(async () => ({})),
+  // PR-021 default: a deterministic tariff ceiling well above billed, so the
+  // baseline scenarios approve at billed exactly as before.
+  assessCeiling: vi.fn(async () => ({ ceiling: 1_000_000, deterministic: true, source: "Provider tariff schedule", enginePayable: null, contractNumber: null })),
+}));
+// PR-021: engine gates are always on — default to "no engine contract" so the
+// FFS assessCeiling fallback governs unless a test overrides.
+const engineMock = vi.hoisted(() => ({ evaluateClaimById: vi.fn(async (): Promise<any> => null) }));
 const audit = vi.hoisted(() => ({ append: vi.fn(async () => ({})) }));
 
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
 vi.mock("@/server/services/claim-adjudication.service", () => ({ claimAdjudicationService: gate }));
 vi.mock("@/server/services/drug-exclusion.service", () => ({ DrugExclusionService: exclusions }));
 vi.mock("@/server/services/claim-decision.service", () => ({ ClaimDecisionService: decisionSvc }));
+vi.mock("@/server/services/contract-engine/engine", () => ({ ContractEngine: engineMock }));
 vi.mock("@/server/services/audit-chain.service", () => ({ auditChainService: audit }));
 
 import { AutoAdjudicationService } from "@/server/services/auto-adjudication.service";
@@ -35,6 +44,8 @@ describe("AutoAdjudicationService.evaluateClaim (G3.7)", () => {
     db.autoAdjudicationPolicy.findMany.mockResolvedValue([]);
     db.claimFraudAlert.count.mockResolvedValue(0);
     gate.runHardGateValidation.mockResolvedValue({ passed: true, errors: [] });
+    engineMock.evaluateClaimById.mockResolvedValue(null);
+    decisionSvc.assessCeiling.mockResolvedValue({ ceiling: 1_000_000, deterministic: true, source: "Provider tariff schedule", enginePayable: null, contractNumber: null });
   });
 
   it("AUTO_APPROVEs a clean claim under the default policy", async () => {
@@ -107,6 +118,8 @@ describe("AutoAdjudicationService.processIntake — execution pipeline (G3.7/G9.
     db.claimLine.findMany.mockResolvedValue([{ id: "l1", billedAmount: 50000 }]);
     gate.runHardGateValidation.mockResolvedValue({ passed: true, errors: [] });
     exclusions.applyToClaim.mockResolvedValue({ excludedCount: 0, excludedAmount: 0, payableAmount: 50000 });
+    engineMock.evaluateClaimById.mockResolvedValue(null);
+    decisionSvc.assessCeiling.mockResolvedValue({ ceiling: 1_000_000, deterministic: true, source: "Provider tariff schedule", enginePayable: null, contractNumber: null });
   });
 
   it("AUTO_APPROVE executes through the standard adjudication machinery", async () => {
@@ -171,5 +184,45 @@ describe("AutoAdjudicationService.processIntake — execution pipeline (G3.7/G9.
     expect(r.decision).toBe("ROUTE");
     expect(r.failingGate).toBe("PIPELINE_ERROR");
     expect(r.executed).toBe(false);
+  });
+
+  // ── PR-021: the auto path is contract-constrained ─────────────────────────
+  it("PR-021: an engine-pended claim ROUTEs (never auto-pays refer-for-review services)", async () => {
+    engineMock.evaluateClaimById.mockResolvedValue({
+      matched: true, claimDecision: "UNDER_REVIEW", reasonCode: "SVC-002",
+      totals: { payable: 0 }, lines: [{ lineId: "l1", decision: "PENDED", reasonCode: "SVC-002", payableAmount: 0 }],
+    });
+    const r = await AutoAdjudicationService.processIntake("t1", "clm1", "u1");
+    expect(r.decision).toBe("ROUTE");
+    expect(r.failingGate).toBe("PRICING_COMPLETE");
+    expect(decisionSvc.decide).not.toHaveBeenCalled();
+  });
+
+  it("PR-021: an engine-priced claim auto-approves at the ENGINE payable, not billed", async () => {
+    db.claim.findUnique.mockResolvedValue(intakeClaim({ billedAmount: 86000 }));
+    db.claimLine.findMany.mockResolvedValue([{ id: "l1", billedAmount: 86000 }]);
+    engineMock.evaluateClaimById.mockResolvedValue({
+      matched: true, claimDecision: "PARTIALLY_APPROVED",
+      totals: { payable: 3600 },
+      lines: [{ lineId: "l1", decision: "APPROVED_WITH_ADJUSTMENT", payableAmount: 3600 }],
+    });
+    const r = await AutoAdjudicationService.processIntake("t1", "clm1", "u1");
+    expect(r.executed).toBe(true);
+    expect(decisionSvc.decide).toHaveBeenCalledWith("t1", "clm1", expect.objectContaining({
+      action: "PARTIALLY_APPROVED", approvedAmount: 3600,
+    }));
+    // Lines stamped at the engine payable, not billed.
+    expect(db.claimLine.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "l1" }, data: expect.objectContaining({ approvedAmount: 3600 }) }),
+    );
+  });
+
+  it("PR-021: no deterministic price at all ROUTEs (NO_ENFORCEABLE_PRICE)", async () => {
+    engineMock.evaluateClaimById.mockResolvedValue(null);
+    decisionSvc.assessCeiling.mockResolvedValue({ ceiling: null, deterministic: false, source: null, enginePayable: null, contractNumber: null } as any);
+    const r = await AutoAdjudicationService.processIntake("t1", "clm1", "u1");
+    expect(r.decision).toBe("ROUTE");
+    expect(r.failingGate).toBe("NO_ENFORCEABLE_PRICE");
+    expect(decisionSvc.decide).not.toHaveBeenCalled();
   });
 });

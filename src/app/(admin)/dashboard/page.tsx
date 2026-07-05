@@ -1,4 +1,4 @@
-import { requireRole, ROLES } from "@/lib/rbac";
+import { requireRole, ROLES, type UserRole } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { Users, Building2, Receipt, FileText, TrendingUp, Clock } from "lucide-react";
@@ -91,14 +91,19 @@ export default async function DashboardPage() {
   const totalApproved = Number(lrRaw[0]?.approved ?? 0);
   const lossRatio     = totalBilled > 0 ? totalApproved / totalBilled : 0;
 
+  // PR-028: every card/action mirrors the target page's own requireRole guard —
+  // the dashboard must never offer a link its user would bounce off.
+  const role = session.user.role as UserRole;
+  const can = (allowed: UserRole[]) => allowed.includes(role);
+
   const cards = [
-    { label: "Total Active Members", value: activeMembers.toLocaleString(), sub: "Enrolled & active", icon: Users, color: "text-brand-indigo", href: "/members" },
-    { label: "Active Corporate Groups", value: activeGroups.toLocaleString(), sub: "Policy groups", icon: Building2, color: "text-[#28A745]", href: "/groups" },
-    { label: "Pending Claims", value: pendingClaims.toLocaleString(), sub: "Requires adjudication", icon: Receipt, color: "text-[#DC3545]", href: "/claims" },
-    { label: "Pending Pre-Auths", value: pendingPreauths.toLocaleString(), sub: "Awaiting approval", icon: FileText, color: "text-[#17A2B8]", href: "/preauth" },
-    { label: "Claims This Month", value: recentClaims.toLocaleString(), sub: "Last 30 days", icon: TrendingUp, color: "text-brand-indigo", href: "/claims" },
-    { label: "Overdue Invoices", value: overdueInvoices.toLocaleString(), sub: "Payment overdue", icon: Clock, color: "text-[#FFC107]", href: "/billing" },
-  ];
+    { label: "Total Active Members", value: activeMembers.toLocaleString(), sub: "Enrolled & active", icon: Users, color: "text-brand-indigo", href: "/members", allowed: ROLES.OPS },
+    { label: "Active Corporate Groups", value: activeGroups.toLocaleString(), sub: "Policy groups", icon: Building2, color: "text-[#28A745]", href: "/groups", allowed: ROLES.OPS },
+    { label: "Pending Claims", value: pendingClaims.toLocaleString(), sub: "Requires adjudication", icon: Receipt, color: "text-[#DC3545]", href: "/claims", allowed: ROLES.OPS },
+    { label: "Pending Pre-Auths", value: pendingPreauths.toLocaleString(), sub: "Awaiting approval", icon: FileText, color: "text-[#17A2B8]", href: "/preauth", allowed: ROLES.CLINICAL },
+    { label: "Claims This Month", value: recentClaims.toLocaleString(), sub: "Last 30 days", icon: TrendingUp, color: "text-brand-indigo", href: "/claims", allowed: ROLES.OPS },
+    { label: "Overdue Invoices", value: overdueInvoices.toLocaleString(), sub: "Payment overdue", icon: Clock, color: "text-[#FFC107]", href: "/billing", allowed: ROLES.FINANCE },
+  ].filter((c) => can(c.allowed));
 
   return (
     <div className="space-y-6">
@@ -145,13 +150,13 @@ export default async function DashboardPage() {
           </div>
           <div className="p-4 grid grid-cols-2 gap-3">
             {[
-              { label: "New Claim", href: "/claims/new", bg: "bg-brand-indigo" },
-              { label: "New Pre-Auth", href: "/preauth/new", bg: "bg-[#17A2B8]" },
-              { label: "Enrol Member", href: "/members/new", bg: "bg-[#28A745]" },
-              { label: "New Endorsement", href: "/endorsements/new", bg: "bg-[#6C757D]" },
-              { label: "New Quotation", href: "/quotations/calculator", bg: "bg-brand-secondary" },
-              { label: "View Reports", href: "/reports", bg: "bg-[#FFC107]" },
-            ].map(a => (
+              { label: "New Claim", href: "/claims/new", bg: "bg-brand-indigo", allowed: ROLES.OPS },
+              { label: "New Pre-Auth", href: "/preauth/new", bg: "bg-[#17A2B8]", allowed: ROLES.CLINICAL },
+              { label: "Enrol Member", href: "/members/new", bg: "bg-[#28A745]", allowed: ROLES.OPS },
+              { label: "New Endorsement", href: "/endorsements/new", bg: "bg-[#6C757D]", allowed: ROLES.OPS },
+              { label: "New Quotation", href: "/quotations/calculator", bg: "bg-brand-secondary", allowed: ROLES.UNDERWRITING },
+              { label: "View Reports", href: "/reports", bg: "bg-[#FFC107]", allowed: ROLES.ANY_STAFF },
+            ].filter(a => can(a.allowed)).map(a => (
               <Link key={a.label} href={a.href}
                 className={`${a.bg} text-white text-xs font-bold py-2.5 px-3 rounded-full text-center hover:opacity-90 transition-opacity`}>
                 {a.label}
