@@ -153,7 +153,7 @@ export async function upsertNotificationTemplateAction(formData: FormData) {
     });
   }
 
-  revalidatePath("/settings");
+  revalidatePath("/settings/notifications");
 }
 
 export async function upsertIntegrationAction(formData: FormData) {
@@ -196,5 +196,5 @@ export async function upsertIntegrationAction(formData: FormData) {
     },
   });
 
-  revalidatePath("/settings");
+  revalidatePath("/settings/integrations");
 }

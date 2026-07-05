@@ -125,15 +125,22 @@ const NAV_GROUPS: NavGroup[] = [
 ];
 
 const SETUP_SUB: SubItem[] = [
-  { label: "Users & Access",    href: "/settings"                    },
-  { label: "Approval Matrix",   href: "/settings/approval-matrix"    },
-  { label: "Auto-Adjudication", href: "/settings/auto-adjudication"  },
-  { label: "Drug Exclusions",   href: "/settings/drug-exclusions"    },
-  { label: "Terminology",       href: "/settings/terminology"        },
-  { label: "FX Rates",          href: "/settings/fx-rates"           },
-  { label: "Security (2FA)",    href: "/settings/security"           },
-  { label: "Pricing Models",    href: "/settings/pricing-models"     },
-  { label: "Audit Log",         href: "/settings/audit-log"          },
+  // Access & security
+  { label: "Users & Access",         href: "/settings"                   },
+  { label: "Security (2FA)",         href: "/settings/security"          },
+  // Adjudication policy
+  { label: "Approval Matrix",        href: "/settings/approval-matrix"   },
+  { label: "Auto-Adjudication",      href: "/settings/auto-adjudication" },
+  { label: "Drug Exclusions",        href: "/settings/drug-exclusions"   },
+  // Financial configuration
+  { label: "Pricing Models",         href: "/settings/pricing-models"    },
+  { label: "FX Rates",               href: "/settings/fx-rates"          },
+  // Communications & connections
+  { label: "Notification Templates", href: "/settings/notifications"     },
+  { label: "Integrations",           href: "/settings/integrations"      },
+  { label: "Terminology",            href: "/settings/terminology"       },
+  // Oversight
+  { label: "Audit Log",              href: "/settings/audit-log"         },
 ];
 
 // ── Active-route resolution ──────────────────────────────────────────────────
