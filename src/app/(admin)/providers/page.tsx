@@ -3,15 +3,33 @@ import { prisma } from "@/lib/prisma";
 import { PlusCircle } from "lucide-react";
 import Link from "next/link";
 import { ProvidersTable } from "./ProvidersTable";
+import { Pagination } from "@/components/ui/Pagination";
 
-export default async function ProvidersPage() {
+export default async function ProvidersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ page?: string }>;
+}) {
   const session = await requireRole(ROLES.ADMIN_ONLY);
+  const tenantId = session.user.tenantId;
+  const PAGE_SIZE = 50;
+  const page = Math.max(1, Number((await searchParams).page) || 1);
 
-  const providers = await prisma.provider.findMany({
-    where: { tenantId: session.user.tenantId },
-    include: { _count: { select: { claims: true } } },
-    orderBy: { name: "asc" },
-  });
+  // Fetch one page of rows; keep the tier stat cards accurate across the whole
+  // network via a grouped count rather than counting the current page only.
+  const [providers, total, tierGroups] = await Promise.all([
+    prisma.provider.findMany({
+      where: { tenantId },
+      include: { _count: { select: { claims: true } } },
+      orderBy: { name: "asc" },
+      take: PAGE_SIZE,
+      skip: (page - 1) * PAGE_SIZE,
+    }),
+    prisma.provider.count({ where: { tenantId } }),
+    prisma.provider.groupBy({ by: ["tier"], where: { tenantId }, _count: true }),
+  ]);
+  const totalPages = Math.ceil(total / PAGE_SIZE);
+  const tierCount = (t: string) => tierGroups.find((g) => g.tier === t)?._count ?? 0;
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -29,9 +47,9 @@ export default async function ProvidersPage() {
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Medvex Own",        count: providers.filter(p => p.tier === "OWN").length,     color: "text-brand-indigo" },
-          { label: "Partner Facilities", count: providers.filter(p => p.tier === "PARTNER").length, color: "text-[#28A745]"    },
-          { label: "Panel Providers",   count: providers.filter(p => p.tier === "PANEL").length,   color: "text-[#17A2B8]"    },
+          { label: "Medvex Own",        count: tierCount("OWN"),     color: "text-brand-indigo" },
+          { label: "Partner Facilities", count: tierCount("PARTNER"), color: "text-[#28A745]"    },
+          { label: "Panel Providers",   count: tierCount("PANEL"),   color: "text-[#17A2B8]"    },
         ].map(s => (
           <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm">
             <p className="text-xs text-brand-text-muted font-bold uppercase">{s.label}</p>
@@ -52,6 +70,7 @@ export default async function ProvidersPage() {
           claimCount:     p._count.claims,
         }))}
       />
+      <Pagination page={page} totalPages={totalPages} total={total} params={{}} basePath="/providers" unit="providers" />
     </div>
   );
 }

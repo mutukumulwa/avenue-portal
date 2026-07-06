@@ -1,6 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+// Render the schedule in chunks so a 500+ line hospital contract doesn't
+// paint every row up-front (kinder to slow connections / low-end devices).
+const PAGE_SIZE = 50;
 import { Search } from "lucide-react";
 
 // Tier-grouped fee schedule (WP-E3). Headline first — it's what the TPA looks
@@ -57,6 +61,9 @@ export function FeeScheduleTabs({ groups, unmappedCount }: { groups: TierGroups;
   const tiers = TIER_ORDER.filter((t) => (groups[t] ?? []).length > 0);
   const [active, setActive] = useState<string>(tiers[0] ?? "HEADLINE");
   const [query, setQuery] = useState("");
+  const [visible, setVisible] = useState(PAGE_SIZE);
+  // reset the window when the tier or search changes
+  useEffect(() => setVisible(PAGE_SIZE), [active, query]);
 
   const lines = useMemo(() => {
     const list = groups[active] ?? [];
@@ -119,7 +126,7 @@ export function FeeScheduleTabs({ groups, unmappedCount }: { groups: TierGroups;
             </tr>
           </thead>
           <tbody className="divide-y divide-[#EEEEEE]">
-            {lines.map((l) => (
+            {lines.slice(0, visible).map((l) => (
               <tr key={l.id} className={l.rateMissing ? "bg-[#DC3545]/5" : "hover:bg-[#F8F9FA]"}>
                 <td className="px-3 py-2 font-mono text-xs text-[#6C757D]">{l.code ?? "—"}</td>
                 <td className="px-3 py-2 text-[#000523]">{l.name}</td>
@@ -141,6 +148,25 @@ export function FeeScheduleTabs({ groups, unmappedCount }: { groups: TierGroups;
           </tbody>
         </table>
       </div>
+      {lines.length > visible && (
+        <div className="mt-2 flex items-center justify-center gap-3 text-xs text-[#6C757D]">
+          <span>Showing {visible.toLocaleString()} of {lines.length.toLocaleString()}</span>
+          <button
+            type="button"
+            onClick={() => setVisible((v) => v + PAGE_SIZE)}
+            className="rounded-full border border-gray-200 px-3 py-1 font-semibold text-[#000523] hover:bg-[#F8F9FA]"
+          >
+            Load more
+          </button>
+          <button
+            type="button"
+            onClick={() => setVisible(lines.length)}
+            className="font-semibold text-[#06B9AB] hover:underline"
+          >
+            Show all
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -96,3 +96,26 @@ h1, h2, h3, h4, h5, h6 {
 .font-heading {
   font-synthesis: none;
 }
+
+/* ── Data-table internal scrolling ─────────────────────────────────
+   Long tables were stretching pages to arbitrary heights. Any table
+   whose wrapper opts into horizontal scroll (the app's data-table
+   convention, `<div class="overflow-x-auto"><table>…`) is capped so the
+   CONTAINER scrolls, not the whole page. `:has(> table)` scopes this to
+   real data tables and leaves every other overflow wrapper untouched.
+   Tables shorter than the cap never show a scrollbar (overflow: auto). */
+.overflow-x-auto:has(> table) {
+  max-height: min(70vh, 44rem);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+/* Keep the header row visible while the body scrolls. The fallback bg
+   sits on <thead> only, so any table that already colours its header row
+   keeps its own colour and transparent headers no longer show rows
+   bleeding through. */
+.overflow-x-auto:has(> table) > table > thead {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background-color: #e6e7e8;
+}

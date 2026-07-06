@@ -1,6 +1,7 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
+import { Pagination } from "@/components/ui/Pagination";
 import { FileSignature, Plus, AlertTriangle, FileUp, BarChart3, LayoutGrid } from "lucide-react";
 import type { Prisma, ProviderContractStatus } from "@prisma/client";
 
@@ -34,11 +35,13 @@ const STATUS_FILTERS = ["ALL", "DRAFT", "UNDER_REVIEW", "APPROVED", "ACTIVE", "S
 export default async function ContractsListPage({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string; q?: string }>;
+  searchParams: Promise<{ status?: string; q?: string; page?: string }>;
 }) {
   const session = await requireRole(ROLES.UNDERWRITING);
-  const { status, q } = await searchParams;
+  const { status, q, page: pageParam } = await searchParams;
   const tenantId = session.user.tenantId;
+  const PAGE_SIZE = 50;
+  const page = Math.max(1, Number(pageParam) || 1);
 
   const where: Prisma.ProviderContractWhereInput = { tenantId };
   if (status && status !== "ALL") {
@@ -56,15 +59,20 @@ export default async function ContractsListPage({
     ];
   }
 
-  const contracts = await prisma.providerContract.findMany({
-    where,
-    include: {
-      provider: { select: { name: true } },
-      _count: { select: { tariffLines: true } },
-    },
-    orderBy: { updatedAt: "desc" },
-    take: 200,
-  });
+  const [contracts, total] = await Promise.all([
+    prisma.providerContract.findMany({
+      where,
+      include: {
+        provider: { select: { name: true } },
+        _count: { select: { tariffLines: true } },
+      },
+      orderBy: { updatedAt: "desc" },
+      take: PAGE_SIZE,
+      skip: (page - 1) * PAGE_SIZE,
+    }),
+    prisma.providerContract.count({ where }),
+  ]);
+  const totalPages = Math.ceil(total / PAGE_SIZE);
 
   const now = new Date();
 
@@ -186,6 +194,7 @@ export default async function ContractsListPage({
           </tbody>
         </table>
       </div>
+      <Pagination page={page} totalPages={totalPages} total={total} params={{ status, q }} basePath="/contracts" unit="contracts" />
     </div>
   );
 }

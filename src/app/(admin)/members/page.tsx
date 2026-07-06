@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { PlusCircle, UserCircle2, Activity } from "lucide-react";
 import Link from "next/link";
 import { SearchFilterBar } from "@/components/ui/SearchFilterBar";
+import { Pagination } from "@/components/ui/Pagination";
 import { Suspense } from "react";
 import { measureAsync } from "@/lib/perf";
 
@@ -25,12 +26,14 @@ const RELATIONSHIP_OPTIONS = [
 export default async function MembersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; status?: string; relationship?: string }>;
+  searchParams: Promise<{ q?: string; status?: string; relationship?: string; page?: string }>;
 }) {
   const session = await requireRole(ROLES.OPS);
 
-  const { q, status, relationship } = await searchParams;
+  const { q, status, relationship, page: pageParam } = await searchParams;
   const tenantId = session.user.tenantId;
+  const PAGE_SIZE = 50;
+  const page = Math.max(1, Number(pageParam) || 1);
 
   const where = {
     tenantId,
@@ -52,7 +55,7 @@ export default async function MembersPage({
     } : {}),
   };
 
-  const [members, total] = await measureAsync("members.list.data", () =>
+  const [members, total, filteredTotal] = await measureAsync("members.list.data", () =>
     Promise.all([
       prisma.member.findMany({
         where,
@@ -63,13 +66,16 @@ export default async function MembersPage({
           group: { select: { id: true, name: true } },
         },
         orderBy: { createdAt: "desc" },
-        take: 200,
+        take: PAGE_SIZE,
+        skip: (page - 1) * PAGE_SIZE,
       }),
       prisma.member.count({
         where: { tenantId, ...(session.user.clientId ? { group: { clientId: session.user.clientId } } : {}) },
       }),
+      prisma.member.count({ where }),
     ])
   );
+  const totalPages = Math.ceil(filteredTotal / PAGE_SIZE);
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-4">
@@ -183,6 +189,7 @@ export default async function MembersPage({
           </table>
         </div>
       </div>
+      <Pagination page={page} totalPages={totalPages} total={filteredTotal} params={{ q, status, relationship }} basePath="/members" unit="members" />
     </div>
   );
 }
