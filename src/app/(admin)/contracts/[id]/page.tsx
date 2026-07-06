@@ -114,9 +114,17 @@ export default async function ContractDetailPage({
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      <Link href="/contracts" className="inline-flex items-center gap-1 text-sm text-[#6C757D] hover:text-[#06B9AB] mb-4">
-        <ArrowLeft className="w-4 h-4" /> Back to contracts
-      </Link>
+      {/* Breadcrumb — a contract belongs to a provider, so always offer the way
+          back to that provider (not just the global contracts list). */}
+      <div className="mb-4 flex items-center gap-1.5 text-sm text-[#6C757D]">
+        <Link href="/contracts" className="inline-flex items-center gap-1 hover:text-[#06B9AB]">
+          <ArrowLeft className="w-4 h-4" /> Contracts
+        </Link>
+        <span className="text-[#C7CBD1]">/</span>
+        <Link href={`/providers/${c.provider.id}`} className="max-w-[16rem] truncate hover:text-[#06B9AB]">
+          {c.provider.name}
+        </Link>
+      </div>
 
       {error && (
         <div className="mb-4 rounded-lg bg-[#DC3545]/10 px-4 py-3 text-sm text-[#DC3545]">
@@ -171,7 +179,9 @@ export default async function ContractDetailPage({
             </div>
             <p className="text-sm text-[#6C757D]">{c.title}</p>
             <p className="text-xs text-[#6C757D] mt-0.5">
-              {c.provider.name}
+              <Link href={`/providers/${c.provider.id}`} className="font-medium text-[#000523] hover:text-[#06B9AB] hover:underline">
+                {c.provider.name}
+              </Link>
               {c.provider.legalName && c.provider.legalName !== c.provider.name ? ` (${c.provider.legalName})` : ""}
               {" · "}{c.startDate.toISOString().slice(0, 10)} → {c.endDate.toISOString().slice(0, 10)}
             </p>
