@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { withApiKey } from "@/lib/apiAuth";
+import { withApiKey, getApiCredential } from "@/lib/apiAuth";
 
 async function postPreAuth(req: Request) {
   try {
     const body = await req.json();
     const { memberNumber, providerCode, benefitCategory, diagnoses, estimatedCost, notes } = body;
 
-    if (!memberNumber || !providerCode || !benefitCategory || !estimatedCost || !diagnoses) {
+    // A per-facility key attributes the pre-auth to its own provider (providerCode
+    // is then optional and cannot be spoofed to another facility). The operator
+    // key still resolves the provider from providerCode.
+    const credential = await getApiCredential(req);
+    const providerFromKey = credential?.kind === "provider" ? credential.providerId : null;
+
+    if (!memberNumber || (!providerCode && !providerFromKey) || !benefitCategory || !estimatedCost || !diagnoses) {
       return NextResponse.json({ error: "Missing required clinical parameters" }, { status: 400 });
     }
 
@@ -19,17 +25,21 @@ async function postPreAuth(req: Request) {
     if (!member) {
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
     }
-    
+
     if (member.status !== "ACTIVE") {
       return NextResponse.json({ error: "Member is not active" }, { status: 403 });
     }
 
-    const provider = await prisma.provider.findFirst({
-        where: { slade360ProviderId: providerCode }
-    });
+    const provider = providerFromKey
+      ? await prisma.provider.findFirst({ where: { id: providerFromKey } })
+      : await prisma.provider.findFirst({ where: { slade360ProviderId: providerCode } });
 
     if (!provider) {
         return NextResponse.json({ error: "Provider not found" }, { status: 404 });
+    }
+    // A facility key can only file for its own tenant's members.
+    if (provider.tenantId !== member.tenantId) {
+      return NextResponse.json({ error: "Provider and member belong to different tenants" }, { status: 403 });
     }
 
     // Auto-generate Preauth Number
