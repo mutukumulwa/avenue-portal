@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { withApiKey, getApiCredential, tenantScopeWhere } from "@/lib/apiAuth";
+import { withApiKey, getApiCredential } from "@/lib/apiAuth";
+import { ProviderEntitlementService } from "@/server/services/provider-entitlement.service";
 
 /**
  * GET /api/v1/benefits?memberNumber=AV-2025-00001
@@ -17,12 +18,17 @@ async function getBenefits(req: Request) {
       return NextResponse.json({ error: "Missing memberNumber parameter" }, { status: 400 });
     }
 
-    // E2E-D02: confine to the key's own tenant so a facility cannot read the
-    // benefit balances / PII of members outside its scope (404 otherwise).
+    // E2E-D02: a per-facility key may only read benefit balances / PII of
+    // members whose client its contracts cover (404 otherwise). Operator key
+    // spans the tenant.
     const credential = await getApiCredential(req);
+    const scope =
+      credential?.kind === "provider"
+        ? await ProviderEntitlementService.entitledMemberWhere(credential.providerId)
+        : {};
 
     const member = await prisma.member.findFirst({
-      where: { memberNumber, ...tenantScopeWhere(credential) },
+      where: { memberNumber, ...scope },
       select: {
         id:           true,
         memberNumber: true,

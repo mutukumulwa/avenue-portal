@@ -37,24 +37,15 @@ export async function validateApiKey(req: Request): Promise<boolean> {
 }
 
 /**
- * Prisma where-fragment confining a member/eligibility/benefits lookup to the
- * tenant the presented key belongs to. A per-facility key may only resolve
- * members of its own tenant — the same entitlement boundary the POST create
- * path enforces (provider.tenantId === member.tenantId). The operator/global
- * key spans the tenant, so no confinement is added. A null credential (which
- * withApiKey never passes through) confines to an impossible tenant so a
- * misuse fails closed rather than leaking every tenant.
- */
-export function tenantScopeWhere(credential: ApiCredential | null): { tenantId?: string } {
-  if (!credential) return { tenantId: "__unauthorized__" };
-  return credential.kind === "provider" ? { tenantId: credential.tenantId } : {};
-}
-
-/**
  * Prisma where-fragment confining a claim-status lookup to the facility the
  * presented key belongs to. A per-facility key may only read its own claims;
  * anything else returns the existing "not found" (404) shape. The operator key
- * spans the tenant. A null credential fails closed (see tenantScopeWhere).
+ * spans the tenant. A null credential (which withApiKey never passes through)
+ * fails closed via an impossible providerId rather than leaking every claim.
+ *
+ * Member reads (eligibility / benefits) use a richer client-entitlement scope —
+ * see ProviderEntitlementService — because in production clients are separated
+ * by Client/Group, not by tenant.
  */
 export function providerScopeWhere(credential: ApiCredential | null): { providerId?: string } {
   if (!credential) return { providerId: "__unauthorized__" };
