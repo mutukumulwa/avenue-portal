@@ -9,6 +9,7 @@ import { CostShareResolver } from "./cost-share.service";
 import { GLService } from "./gl.service";
 import { auditChainService } from "./audit-chain.service";
 import { getSystemActorId } from "./system-actor.service";
+import { MemberNotificationService } from "./member-notification.service";
 
 /**
  * claim-decision.service.ts — the ONE canonical claim decision stack
@@ -177,7 +178,7 @@ export class ClaimDecisionService {
         billedAmount: true, receivedAt: true, adjudicatorId: true,
         attendingDoctor: true, isReimbursement: true,
         preauths: { select: { id: true, preauthNumber: true, approvedAmount: true, estimatedCost: true, utilisedAmount: true, status: true } },
-        member: { select: { group: { select: { clientId: true, fundingMode: true, selfFundedAccount: { select: { id: true, balance: true } } } } } },
+        member: { select: { firstName: true, lastName: true, group: { select: { clientId: true, fundingMode: true, selfFundedAccount: { select: { id: true, balance: true } } } } } },
       },
     });
     if (!claim) throw new Error("Claim not found");
@@ -560,6 +561,28 @@ export class ClaimDecisionService {
       tenantId,
       description: `Claim ${claim.claimNumber} ${decision.action.toLowerCase().replace(/_/g, " ")} — ${claim.currency} ${approvedAmount.toLocaleString()}`,
     });
+
+    // Member notification — decision outcome. Canonical path, so this covers
+    // manual "Submit Decision", tRPC and auto-adjudication alike. Never throws.
+    {
+      const patientName = claim.member ? `${claim.member.firstName} ${claim.member.lastName}` : "Member";
+      const statusWord =
+        decision.action === "APPROVED" ? "approved"
+        : decision.action === "PARTIALLY_APPROVED" ? "partially approved"
+        : "declined";
+      await MemberNotificationService.notifyForClaim({
+        tenantId,
+        memberId: claim.memberId,
+        type: "CLAIM_STATUS",
+        priority: decision.action === "DECLINED" ? "HIGH" : "NORMAL",
+        title: `Claim ${statusWord}`,
+        body: isApproval
+          ? `${patientName} — claim ${claim.claimNumber} ${statusWord} for ${claim.currency} ${approvedAmount.toLocaleString()}.`
+          : `${patientName} — claim ${claim.claimNumber} was declined${decision.declineReasonCode ? ` (reason: ${decision.declineReasonCode})` : ""}.`,
+        href: "/member/utilization",
+        metadata: { claimId: claim.id, claimNumber: claim.claimNumber, event: decision.action },
+      });
+    }
 
     return updated;
   }

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { getExclusionRejectionRows } from "@/server/services/report-exclusions";
 import Link from "next/link";
 import { ArrowLeft, Download } from "lucide-react";
+import { ExportPDFButton } from "@/components/pdf/ExportPDFButton";
 
 const REPORT_TITLES: Record<string, string> = {
   // Existing
@@ -1617,15 +1618,14 @@ export default async function ReportDetailPage({
               <Download size={15} />
               Export CSV
             </a>
-            <a
-              href={`/api/reports/pdf?reportType=${reportType}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-[#DC3545] border border-[#DC3545]/30 rounded-full hover:bg-[#DC3545] hover:text-white transition-colors"
-            >
-              <Download size={15} />
-              Export PDF
-            </a>
+            <ExportPDFButton
+              title={title}
+              kpis={kpis}
+              headers={headers}
+              rows={data.map((row) => row.map((cell) => (typeof cell === "string" ? cell : cell.text)))}
+              filename={`medvex-${reportType}-${new Date().toISOString().split("T")[0]}.pdf`}
+              tenant="Medvex"
+            />
           </div>
         )}
       </div>

@@ -16,6 +16,7 @@ import { TRPCError } from "@trpc/server";
 import { ClaimLineDecision, SettlementStatus } from "@prisma/client";
 import { auditChainService } from "./audit-chain.service";
 import { ProviderContractsService } from "./provider-contracts.service";
+import { MemberNotificationService } from "./member-notification.service";
 import { isFutureServiceDate, FUTURE_SERVICE_DATE_ERROR } from "@/lib/service-date";
 
 // Contracted-rate variance threshold that triggers a fraud signal (%)
@@ -544,6 +545,10 @@ export const claimAdjudicationService = {
       tenantId,
       description: `Settlement batch marked as SETTLED — KES ${total.toLocaleString("en-UG")} across ${claims.length} claim(s), voucher + GL posted`,
     });
+
+    // Member notification — "claim paid" for every claim in the batch. Runs
+    // after the settlement commits (one batched write); never throws.
+    await MemberNotificationService.notifyPaidBatch(tenantId, batchId);
 
     return updated;
   },

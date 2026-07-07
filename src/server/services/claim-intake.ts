@@ -4,6 +4,7 @@ import { FraudService } from "@/server/services/fraud.service";
 import { AutoAdjudicationService } from "@/server/services/auto-adjudication.service";
 import { ClaimsService } from "@/server/services/claims.service";
 import { ProvidersService } from "@/server/services/providers.service";
+import { MemberNotificationService } from "@/server/services/member-notification.service";
 import { assertServiceDateNotFuture } from "@/lib/service-date";
 import type { ServiceType, BenefitCategory, ClaimLineCategory } from "@prisma/client";
 
@@ -172,6 +173,22 @@ export async function runClaimIntake(
       data: { status: "ATTACHED", attachedAt: new Date() },
     });
   }
+
+  // Member notification — "visit recorded". Fired before auto-adjudication so a
+  // received-then-decided claim notifies in the right order. Never throws.
+  await MemberNotificationService.notifyForClaim({
+    tenantId,
+    memberId: data.memberId,
+    type: "CLAIM_STATUS",
+    title: "Visit recorded",
+    body:
+      `${member.firstName} ${member.lastName} — ${gateProvider.name}: ` +
+      `${data.benefitCategory.replace(/_/g, " ").toLowerCase()} visit on ` +
+      `${new Date(data.dateOfService).toLocaleDateString("en-UG")} recorded (${claimNumber}). ` +
+      `Billed ${currency} ${billedAmount.toLocaleString()}. We'll notify you when it's assessed.`,
+    href: "/member/utilization",
+    metadata: { claimId: claim.id, claimNumber, event: "RECEIVED" },
+  });
 
   await FraudService.evaluateClaim(claim.id, tenantId);
 

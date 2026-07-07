@@ -2,16 +2,44 @@
 
 import { Download } from "lucide-react";
 import { useState } from "react";
-import { pdf } from "@react-pdf/renderer";
-import { ReportDocument, type ReportPdfData } from "./ReportDocument";
+import type { ReportPdfKpi } from "./ReportDocument";
 
-export function ExportPDFButton({ title, data, filename }: { title: string, data: ReportPdfData, filename: string }) {
+/**
+ * Client-side PDF export. Generates the report PDF in the browser via
+ * @react-pdf/renderer (lazy-loaded on click) and triggers a download.
+ * No server-side Puppeteer/Chromium — reliable on Vercel serverless.
+ */
+export function ExportPDFButton({
+  title,
+  kpis,
+  headers,
+  rows,
+  filename,
+  tenant,
+}: {
+  title: string;
+  kpis: ReportPdfKpi[];
+  headers: string[];
+  rows: string[][];
+  filename: string;
+  tenant?: string;
+}) {
   const [loading, setLoading] = useState(false);
 
   const handleExport = async () => {
     try {
       setLoading(true);
-      const blob = await pdf(<ReportDocument title={title} data={data} />).toBlob();
+      // Lazy-load the heavy PDF renderer only when the user actually exports.
+      const [{ pdf }, { ReportDocument }] = await Promise.all([
+        import("@react-pdf/renderer"),
+        import("./ReportDocument"),
+      ]);
+      const blob = await pdf(
+        <ReportDocument
+          title={title}
+          data={{ kpis, headers, rows, tenant, generatedAt: new Date().toLocaleDateString("en-UG") }}
+        />,
+      ).toBlob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -21,21 +49,22 @@ export function ExportPDFButton({ title, data, filename }: { title: string, data
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.error("PDF Export failed:", error);
-      alert("Failed to export PDF. Please ensure @react-pdf/renderer is installed.");
+      console.error("PDF export failed:", error);
+      alert("Could not generate the PDF. Please try the CSV export, or try again.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <button 
+    <button
+      type="button"
       onClick={handleExport}
       disabled={loading}
-      className="bg-white border border-[#EEEEEE] text-brand-text-heading hover:bg-[#F8F9FA] px-4 py-2 rounded-lg font-semibold transition-colors flex items-center gap-2 text-sm shadow-sm disabled:opacity-50"
+      className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-[#DC3545] border border-[#DC3545]/30 rounded-full hover:bg-[#DC3545] hover:text-white transition-colors disabled:opacity-50"
     >
-      <Download size={16} />
-      <span>{loading ? "Generating..." : "Export PDF"}</span>
+      <Download size={15} />
+      <span>{loading ? "Generating…" : "Export PDF"}</span>
     </button>
   );
 }
