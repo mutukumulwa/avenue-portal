@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { withApiKey } from "@/lib/apiAuth";
+import { withApiKey, getApiCredential, tenantScopeWhere } from "@/lib/apiAuth";
 
 async function getEligibility(req: Request) {
   try {
@@ -11,8 +11,12 @@ async function getEligibility(req: Request) {
       return NextResponse.json({ error: "Missing memberNumber parameter" }, { status: 400 });
     }
 
+    // E2E-D02: confine the lookup to the key's own tenant so a facility can only
+    // check members it is entitled to — a cross-tenant number returns 404.
+    const credential = await getApiCredential(req);
+
     const member = await prisma.member.findFirst({
-      where: { memberNumber },
+      where: { memberNumber, ...tenantScopeWhere(credential) },
       include: {
         group: { select: { name: true, status: true, tenantId: true } },
         package: { select: { name: true } },

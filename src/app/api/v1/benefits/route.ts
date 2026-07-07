@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { withApiKey } from "@/lib/apiAuth";
+import { withApiKey, getApiCredential, tenantScopeWhere } from "@/lib/apiAuth";
 
 /**
  * GET /api/v1/benefits?memberNumber=AV-2025-00001
@@ -17,8 +17,12 @@ async function getBenefits(req: Request) {
       return NextResponse.json({ error: "Missing memberNumber parameter" }, { status: 400 });
     }
 
+    // E2E-D02: confine to the key's own tenant so a facility cannot read the
+    // benefit balances / PII of members outside its scope (404 otherwise).
+    const credential = await getApiCredential(req);
+
     const member = await prisma.member.findFirst({
-      where: { memberNumber },
+      where: { memberNumber, ...tenantScopeWhere(credential) },
       select: {
         id:           true,
         memberNumber: true,

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { withApiKey, getApiCredential } from "@/lib/apiAuth";
+import { withApiKey, getApiCredential, providerScopeWhere } from "@/lib/apiAuth";
 import { ClaimLineCategory } from "@prisma/client";
 import { isFutureServiceDate, FUTURE_SERVICE_DATE_ERROR } from "@/lib/service-date";
 
@@ -188,8 +188,12 @@ async function getClaim(req: Request) {
       return NextResponse.json({ error: "Missing claimNumber parameter" }, { status: 400 });
     }
 
+    // E2E-D02: a facility key may only read its own claims. A claim belonging to
+    // another facility resolves to null and returns the existing 404 shape.
+    const credential = await getApiCredential(req);
+
     const claim = await prisma.claim.findFirst({
-      where: { claimNumber },
+      where: { claimNumber, ...providerScopeWhere(credential) },
       select: {
         claimNumber:   true,
         status:        true,
