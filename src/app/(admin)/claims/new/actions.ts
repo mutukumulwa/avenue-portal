@@ -158,7 +158,7 @@ export async function submitReimbursementClaimAction(data: {
     userId: session.user.id,
     action: "REIMBURSEMENT_SUBMITTED",
     module: "CLAIMS",
-    description: `Reimbursement claim ${claimNumber} submitted — KES ${billedAmount.toLocaleString()} (${data.benefitCategory})`,
+    description: `Reimbursement claim ${claimNumber} submitted — UGX ${billedAmount.toLocaleString()} (${data.benefitCategory})`,
     metadata: { claimNumber, memberId: data.memberId, billedAmount },
   });
 

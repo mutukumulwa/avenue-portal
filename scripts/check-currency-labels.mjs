@@ -24,10 +24,19 @@ const CORE_SURFACES = [
   "src/server/services/gl.service.ts",
   "src/server/services/claim-decision.service.ts",
   "src/server/services/claim-adjudication.service.ts",
+  // OBS-OC residual surfaces kept clean (labels use claim.currency or base UGX).
+  "src/app/(admin)/claims/page.tsx",
+  "src/app/(admin)/claims/[id]/page.tsx",
+  "src/app/(admin)/claims/new/ClaimForm.tsx",
+  "src/app/(admin)/fraud/[id]/page.tsx",
+  "src/components/clinical/ProcedureSearch.tsx",
+  "src/components/clinical/DiagnosisSearch.tsx",
 ];
 
 const PATTERNS = [
   { re: /KES\s*\$\{/, why: 'money template literal `KES ${...}` — use formatMoney(amount, currency)' },
+  { re: /KES\s*\{/, why: 'hardcoded JSX money label `KES {...}` — use {claim.currency} or base UGX' },
+  { re: /\(KES\)/, why: 'hardcoded "(KES)" column/field label — use the row currency or base UGX' },
   { re: /currency\s*[:=]\s*["']KES["']/, why: 'hardcoded currency: "KES" — default to base (UGX) or pass the row currency' },
 ];
 

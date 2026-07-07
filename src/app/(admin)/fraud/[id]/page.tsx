@@ -61,7 +61,7 @@ export default async function FraudCasePage({
     _count: { _all: true },
   });
 
-  const fmt    = (n: number) => `KES ${Math.round(n).toLocaleString("en-UG")}`;
+  const fmt    = (n: number) => `${claim.currency ?? "UGX"} ${Math.round(n).toLocaleString("en-UG")}`;
   const fmtDt  = (d: Date)   => new Date(d).toLocaleDateString("en-UG");
 
   const scoreColor = alert.score >= 80 ? "#DC3545" : alert.score >= 60 ? "#FFC107" : "#28A745";

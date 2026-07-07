@@ -110,7 +110,7 @@ export function CoContributionCollectionForm({ transaction }: Props) {
         <form onSubmit={handleCollect} className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-[#F8F9FA] rounded-lg p-4">
           <input type="hidden" name="transactionId" value={transaction.id} />
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-brand-text-muted uppercase">Amount (KES)</label>
+            <label className="text-xs font-semibold text-brand-text-muted uppercase">Amount (UGX)</label>
             <input
               name="amountCollected"
               type="number"

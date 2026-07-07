@@ -159,8 +159,8 @@ export default async function ClaimsPage({
                 <th className="px-6 py-4">Provider</th>
                 <th className="px-6 py-4">Service</th>
                 <th className="px-6 py-4">SLA</th>
-                <th className="px-6 py-4">Billed (KES)</th>
-                <th className="px-6 py-4">Approved (KES)</th>
+                <th className="px-6 py-4">Billed</th>
+                <th className="px-6 py-4">Approved</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4">Actions</th>
               </tr>
@@ -210,9 +210,9 @@ export default async function ClaimsPage({
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-brand-text-heading font-semibold">{Number(claim.billedAmount).toLocaleString()}</td>
+                    <td className="px-6 py-4 text-brand-text-heading font-semibold">{claim.currency} {Number(claim.billedAmount).toLocaleString()}</td>
                     <td className="px-6 py-4 font-semibold text-[#28A745]">
-                      {Number(claim.approvedAmount) > 0 ? Number(claim.approvedAmount).toLocaleString() : "—"}
+                      {Number(claim.approvedAmount) > 0 ? `${claim.currency} ${Number(claim.approvedAmount).toLocaleString()}` : "—"}
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-3 py-1 text-[10px] font-bold uppercase rounded-full inline-flex ${statusColor(claim.status)}`}>

@@ -123,7 +123,7 @@ function DescriptionInput({ value, category, onChange, onSelectCpt }: Descriptio
                   </div>
                   {r.averageCost != null && (
                     <span className="shrink-0 text-xs font-semibold text-[#28A745]">
-                      KES {r.averageCost.toLocaleString("en-UG")}
+                      UGX {r.averageCost.toLocaleString("en-UG")}
                     </span>
                   )}
                 </div>
@@ -341,7 +341,7 @@ export function ProcedureLineItems({ value, onChange, primaryIcdCode = "" }: Pro
 
                   {/* Unit cost */}
                   <div className="col-span-2">
-                    <label className="text-[10px] font-bold text-brand-text-muted uppercase block mb-0.5">Unit Cost (KES)</label>
+                    <label className="text-[10px] font-bold text-brand-text-muted uppercase block mb-0.5">Unit Cost (UGX)</label>
                     <input type="number" min={0} step={0.01} value={line.unitCost || ""}
                       onChange={e => updateLine(line.id, { unitCost: parseFloat(e.target.value) || 0 })}
                       placeholder="0.00" className={inputCls} />
@@ -375,7 +375,7 @@ export function ProcedureLineItems({ value, onChange, primaryIcdCode = "" }: Pro
       {value.length > 0 && (
         <div className="flex justify-between items-center pt-3 border-t border-[#EEEEEE]">
           <span className="text-xs font-bold text-brand-text-muted uppercase">Total Billed Amount</span>
-          <span className="text-lg font-bold text-brand-indigo">KES {total.toLocaleString("en-UG")}</span>
+          <span className="text-lg font-bold text-brand-indigo">UGX {total.toLocaleString("en-UG")}</span>
         </div>
       )}
 

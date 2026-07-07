@@ -213,7 +213,7 @@ export function ReimbursementClaimForm({ members, providers }: { members: Member
             <PlusCircle size={13} /> Add line
           </button>
           <p className="text-sm font-bold text-brand-text-heading">
-            Total: <span className="font-mono">KES {total.toLocaleString()}</span>
+            Total: <span className="font-mono">UGX {total.toLocaleString()}</span>
           </p>
         </div>
       </div>

@@ -276,8 +276,8 @@ export default async function ClaimDetailPage({
           <div className="text-sm text-[#856404]">
             <p className="font-bold">
               {overbilledLines.length} line{overbilledLines.length > 1 ? "s" : ""} billed above contracted rate.
-              {" "}Contracted total: <span className="font-mono">KES {Math.round(contractedTotal).toLocaleString("en-UG")}</span>
-              {" "}vs billed: <span className="font-mono">KES {Number(claim.billedAmount).toLocaleString("en-UG")}</span>.
+              {" "}Contracted total: <span className="font-mono">{claim.currency} {Math.round(contractedTotal).toLocaleString("en-UG")}</span>
+              {" "}vs billed: <span className="font-mono">{claim.currency} {Number(claim.billedAmount).toLocaleString("en-UG")}</span>.
             </p>
             <p className="mt-0.5 text-xs">Consider approving the contracted total or raising an exception for overages.</p>
           </div>
@@ -290,9 +290,9 @@ export default async function ClaimDetailPage({
           <h3 className="font-bold text-brand-text-heading font-heading">Service Line Items</h3>
           <div className="flex items-center gap-4 text-sm font-bold">
             {overbilledLines.length > 0 && (
-              <span className="text-[#856404]">Contracted: KES {Math.round(contractedTotal).toLocaleString("en-UG")}</span>
+              <span className="text-[#856404]">Contracted: {claim.currency} {Math.round(contractedTotal).toLocaleString("en-UG")}</span>
             )}
-            <span className="text-brand-indigo">Billed: KES {Number(claim.billedAmount).toLocaleString("en-UG")}</span>
+            <span className="text-brand-indigo">Billed: {claim.currency} {Number(claim.billedAmount).toLocaleString("en-UG")}</span>
           </div>
         </div>
 
@@ -309,7 +309,7 @@ export default async function ClaimDetailPage({
                       <CatIcon size={11} /> {meta.label}
                     </span>
                     <span className="text-xs font-semibold text-brand-text-muted">
-                      KES {catTotal.toLocaleString("en-UG")}
+                      {claim.currency} {catTotal.toLocaleString("en-UG")}
                     </span>
                   </div>
                   <table className="w-full text-sm">
@@ -350,7 +350,7 @@ export default async function ClaimDetailPage({
                                   )}
                                 </span>
                               ) : tv?.ruleApplied === "EXCLUDED" ? (
-                                <span className="text-[10px] font-bold text-[#DC3545] bg-[#DC3545]/10 px-1.5 py-0.5 rounded" title="Contractually excluded at this provider — pays KES 0">NOT COVERED</span>
+                                <span className="text-[10px] font-bold text-[#DC3545] bg-[#DC3545]/10 px-1.5 py-0.5 rounded" title="Contractually excluded at this provider — pays 0">NOT COVERED</span>
                               ) : tv?.ruleApplied === "UNLISTED_REJECT" ? (
                                 <span className="text-[10px] font-bold text-[#DC3545] bg-[#DC3545]/10 px-1.5 py-0.5 rounded" title="Contract does not pay unlisted services">NOT PAYABLE</span>
                               ) : tv?.ruleApplied === "UNLISTED_DISCOUNT" && tv.allowedUnit !== null ? (
@@ -904,7 +904,7 @@ export default async function ClaimDetailPage({
                 <div>
                   <p className="text-xs text-brand-text-muted">Total paid by member</p>
                   <p className="font-semibold text-brand-text-heading mt-0.5">
-                    KES {Number(reimbRequest.totalPaidByMember).toLocaleString("en-UG")}
+                    {claim.currency} {Number(reimbRequest.totalPaidByMember).toLocaleString("en-UG")}
                   </p>
                 </div>
                 <div>

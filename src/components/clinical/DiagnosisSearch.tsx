@@ -102,7 +102,7 @@ export function DiagnosisSearch({ value, onChange, max = 5 }: Props) {
               </div>
               {d.standardCharge && (
                 <span className="text-xs text-brand-text-muted shrink-0">
-                  KES {Number(d.standardCharge).toLocaleString("en-UG")}
+                  UGX {Number(d.standardCharge).toLocaleString("en-UG")}
                 </span>
               )}
               <button type="button" onClick={() => remove(d.code)}
@@ -143,7 +143,7 @@ export function DiagnosisSearch({ value, onChange, max = 5 }: Props) {
                       </div>
                       {r.standardCharge && (
                         <span className="shrink-0 text-xs font-semibold text-[#28A745] whitespace-nowrap">
-                          KES {Number(r.standardCharge).toLocaleString("en-UG")}
+                          UGX {Number(r.standardCharge).toLocaleString("en-UG")}
                         </span>
                       )}
                     </div>

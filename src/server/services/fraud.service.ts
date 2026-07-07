@@ -109,7 +109,7 @@ export class FraudService {
         rule: "High Value Without Pre-Authorization",
         score: 85,
         severity: "HIGH",
-        notes: `Claim billed at KES ${Number(claim.billedAmount).toLocaleString()} without a linked Pre-Authorization.`,
+        notes: `Claim billed at ${claim.currency} ${Number(claim.billedAmount).toLocaleString()} without a linked Pre-Authorization.`,
       });
     }
 
@@ -236,7 +236,7 @@ export class FraudService {
               rule: "Billed Amount Exceeds Contracted Tariff",
               score: 75,
               severity: "HIGH",
-              notes: `Line ${line.lineNumber} (CPT ${line.cptCode}): billed KES ${billed.toLocaleString()} vs agreed KES ${agreed.toLocaleString()} — ${pct}% over tariff.`,
+              notes: `Line ${line.lineNumber} (CPT ${line.cptCode}): billed ${claim.currency} ${billed.toLocaleString()} vs agreed ${claim.currency} ${agreed.toLocaleString()} — ${pct}% over tariff.`,
             });
             break; // one alert per claim is enough
           }
@@ -256,7 +256,7 @@ export class FraudService {
           rule: "Round-Number Billing Pattern",
           score: 55,
           severity: "MEDIUM",
-          notes: `${roundedLines.length} of ${claim.claimLines.length} claim lines are billed at exact KES ${CONFIG.roundNumberGranularity.toLocaleString()} multiples — may indicate estimated rather than actual charges.`,
+          notes: `${roundedLines.length} of ${claim.claimLines.length} claim lines are billed at exact ${claim.currency} ${CONFIG.roundNumberGranularity.toLocaleString()} multiples — may indicate estimated rather than actual charges.`,
         });
       }
     }
@@ -383,7 +383,7 @@ export class FraudService {
             ((params.estimatedCost - agreed) / agreed) * 100
           );
           warnings.push(
-            `Estimated cost (KES ${params.estimatedCost.toLocaleString()}) is ${pct}% above the contracted tariff for CPT ${proc.cptCode} (KES ${agreed.toLocaleString()}).`
+            `Estimated cost (UGX ${params.estimatedCost.toLocaleString()}) is ${pct}% above the contracted tariff for CPT ${proc.cptCode} (UGX ${agreed.toLocaleString()}).`
           );
         }
       }
@@ -515,7 +515,7 @@ export class FraudService {
       });
       if (claim && Number(claim.billedAmount) > 50_000) {
         warnings.push(
-          "RULE-COC-004: Zero co-contribution applied on a claim exceeding KES 50,000 — confirm a NONE-type rule is intentional for this benefit category and network tier."
+          "RULE-COC-004: Zero co-contribution applied on a claim exceeding UGX 50,000 — confirm a NONE-type rule is intentional for this benefit category and network tier."
         );
       }
     }
