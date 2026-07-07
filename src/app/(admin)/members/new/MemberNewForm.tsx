@@ -9,9 +9,17 @@ const labelCls = "text-xs font-bold text-brand-text-muted uppercase block mb-1";
 
 interface Props {
   groups: { id: string; name: string }[];
+  /** Set when adding a dependant from a principal's page (NW-D02). */
+  principal?: {
+    id: string;
+    name: string;
+    memberNumber: string;
+    groupId: string;
+    groupName: string;
+  } | null;
 }
 
-export function MemberNewForm({ groups }: Props) {
+export function MemberNewForm({ groups, principal }: Props) {
   const [state, action, pending] = useActionState(addMemberAction, null);
 
   return (
@@ -38,21 +46,44 @@ export function MemberNewForm({ groups }: Props) {
       )}
 
       <form action={action} className="space-y-6">
+        {/* NW-D02: carry the principal link so the dependant attaches to its family. */}
+        {principal && <input type="hidden" name="principalId" value={principal.id} />}
+
+        {principal && (
+          <div className="rounded-lg bg-brand-indigo/5 border border-brand-indigo/20 px-4 py-3 text-sm">
+            <p className="font-semibold text-brand-text-heading">
+              Dependant of {principal.name}{" "}
+              <span className="font-mono text-xs text-brand-text-muted">({principal.memberNumber})</span>
+            </p>
+            <p className="text-xs text-brand-text-muted mt-0.5">
+              This member will be linked to {principal.name} and enrolled in the same scheme
+              ({principal.groupName}).
+            </p>
+          </div>
+        )}
+
         {/* Group & Relationship */}
         <div>
           <h3 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Policy & Group</h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Group *</label>
-              <select required name="groupId" className={inputCls}>
-                <option value="">Select group…</option>
-                {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-              </select>
+              {principal ? (
+                <>
+                  <input type="hidden" name="groupId" value={principal.groupId} />
+                  <div className={`${inputCls} bg-[#F8F9FA] text-brand-text-muted`}>{principal.groupName}</div>
+                </>
+              ) : (
+                <select required name="groupId" className={inputCls}>
+                  <option value="">Select group…</option>
+                  {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                </select>
+              )}
             </div>
             <div>
               <label className={labelCls}>Relationship *</label>
-              <select required name="relationship" className={inputCls}>
-                <option value="PRINCIPAL">Principal</option>
+              <select required name="relationship" defaultValue={principal ? "SPOUSE" : "PRINCIPAL"} className={inputCls}>
+                {!principal && <option value="PRINCIPAL">Principal</option>}
                 <option value="SPOUSE">Spouse</option>
                 <option value="CHILD">Child</option>
                 <option value="PARENT">Parent</option>
@@ -115,7 +146,7 @@ export function MemberNewForm({ groups }: Props) {
             className="flex items-center gap-2 bg-brand-indigo hover:bg-brand-secondary text-white px-6 py-2 rounded-full font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save size={16} />
-            {pending ? "Registering…" : "Register Member"}
+            {pending ? "Registering…" : principal ? "Add Dependent" : "Register Member"}
           </button>
         </div>
       </form>

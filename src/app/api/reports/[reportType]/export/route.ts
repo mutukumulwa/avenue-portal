@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getAnalyticsAccessScope, type AnalyticsAccessScope } from "@/lib/analytics-access";
 import { prisma } from "@/lib/prisma";
+import { getExclusionRejectionRows } from "@/server/services/report-exclusions";
 
 function escapeCsv(value: string): string {
   if (value.includes(",") || value.includes('"') || value.includes("\n")) {
@@ -479,18 +480,13 @@ async function fetchReportData(
     // ── Tranche 3 ────────────────────────────────────────────────────────────
 
     case "exclusion-rejected": {
-      const rows = await prisma.claim.findMany({
-        where: { tenantId, status: { in: ["DECLINED", "VOID", "APPEAL_DECLINED"] } },
-        select: { claimNumber: true, status: true, billedAmount: true, declineReasonCode: true, decidedAt: true, benefitCategory: true,
-          member: { select: { memberNumber: true, firstName: true, lastName: true } },
-          provider: { select: { name: true } } },
-        orderBy: { decidedAt: "desc" },
-      });
+      // NW-D03: shared line-aware source (also surfaces excluded lines inside
+      // approved/partially-approved claims) — identical to the on-screen report.
+      const rows = await getExclusionRejectionRows(tenantId);
       return {
-        headers: ["Claim No.", "Member", "Provider", "Category", "Status", "Decline Reason", "Billed (KES)", "Decided"],
-        rows: rows.map(r => [r.claimNumber, `${r.member.firstName} ${r.member.lastName} (${r.member.memberNumber})`,
-          r.provider.name, r.benefitCategory, r.status, r.declineReasonCode ?? "",
-          Number(r.billedAmount).toString(), r.decidedAt ? new Date(r.decidedAt).toISOString().split("T")[0] : ""]),
+        headers: ["Claim No.", "Member", "Provider", "Category", "Item", "Status", "Reason", "Disallowed (KES)", "Decided"],
+        rows: rows.map(r => [r.claimNumber, r.member, r.provider, r.category, r.scope, r.status,
+          r.reason, r.disallowed.toString(), r.decidedAt ? new Date(r.decidedAt).toISOString().split("T")[0] : ""]),
       };
     }
 

@@ -507,10 +507,19 @@ export const claimAdjudicationService = {
         },
       });
 
-      await tx.claim.updateMany({
-        where: { settlementBatchId: batchId },
-        data: { status: "PAID", paidAt, paymentVoucherId: voucher.id },
-      });
+      // NW-D05: record the amount actually paid per claim (= approved payable),
+      // so member "plan paid" and provider statements reflect settled money.
+      for (const c of claims) {
+        await tx.claim.update({
+          where: { id: c.id },
+          data: {
+            status: "PAID",
+            paidAt,
+            paidAmount: Number(c.approvedAmount),
+            paymentVoucherId: voucher.id,
+          },
+        });
+      }
 
       return tx.providerSettlementBatch.update({
         where: { id: batchId },

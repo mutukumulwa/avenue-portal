@@ -14,6 +14,7 @@ const PORTAL_ROLES = new Set<UserRole>([
   "MEMBER_USER",
   "HR_MANAGER",
   "FUND_ADMINISTRATOR",
+  "PROVIDER_USER",
 ]);
 
 export async function inviteUserAction(
@@ -30,6 +31,7 @@ export async function inviteUserAction(
   const groupId   = (formData.get("groupId")   as string | null) || null;
   const brokerId  = (formData.get("brokerId")  as string | null) || null;
   const memberId  = (formData.get("memberId")  as string | null) || null;
+  const providerId = (formData.get("providerId") as string | null) || null;
   const fundGroupIds = formData.getAll("fundGroupIds").map(String).filter(Boolean);
 
   if (!email || !firstName || !lastName || !role || !password) {
@@ -52,6 +54,12 @@ export async function inviteUserAction(
   if (role === "MEMBER_USER" && !memberId) return { error: "Select the member profile for this user." };
   if (role === "FUND_ADMINISTRATOR" && fundGroupIds.length === 0) {
     return { error: "Select at least one self-funded scheme for this fund administrator." };
+  }
+  if (role === "PROVIDER_USER" && !providerId) return { error: "Select the facility for this provider user." };
+
+  if (role === "PROVIDER_USER" && providerId) {
+    const provider = await prisma.provider.findFirst({ where: { id: providerId, tenantId: session.user.tenantId }, select: { id: true } });
+    if (!provider) return { error: "Facility not found." };
   }
 
   if (role === "BROKER_USER" && brokerId) {
@@ -89,6 +97,7 @@ export async function inviteUserAction(
       ...(role === "HR_MANAGER" && groupId ? { groupId } : {}),
       ...(role === "BROKER_USER" && brokerId ? { brokerId } : {}),
       ...(role === "MEMBER_USER" && memberId ? { memberId } : {}),
+      ...(role === "PROVIDER_USER" && providerId ? { providerId } : {}),
       ...(role === "FUND_ADMINISTRATOR"
         ? { managedFundGroups: { connect: fundGroupIds.map(id => ({ id })) } }
         : {}),

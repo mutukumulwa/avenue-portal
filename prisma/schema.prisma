@@ -29,6 +29,7 @@ model Tenant {
   claims                         Claim[]
   preauths                       PreAuthorization[]
   providers                      Provider[]
+  providerApiKeys                ProviderApiKey[]
   providerContracts              ProviderContract[]
   brokers                        Broker[]
   endorsements                   Endorsement[]
@@ -278,6 +279,7 @@ enum UserRole {
   MEMBER_USER
   HR_MANAGER
   FUND_ADMINISTRATOR // Employer finance officer managing self-funded scheme(s)
+  PROVIDER_USER // Facility reception/clinician: eligibility, claim capture, own settlements (confined to one Provider)
 }
 
 model User {
@@ -311,6 +313,10 @@ model User {
   member   Member? @relation(fields: [memberId], references: [id])
   groupId  String?
   group    Group?  @relation("HRManagerGroup", fields: [groupId], references: [id])
+  // Provider portal confinement: PROVIDER_USER accounts are bound to one facility
+  // and only ever see that provider's members-eligibility, claims and settlements.
+  providerId String?
+  provider   Provider? @relation("ProviderPortalUser", fields: [providerId], references: [id])
 
   managedFundGroups           Group[]                          @relation("FundAdminGroups")
   auditLogs                   AuditLog[]
@@ -2796,9 +2802,36 @@ model Provider {
   offlineDataPacks   OfflineDataPack[]
   clinicalCases      ClinicalCase[]
   lettersOfUndertaking LetterOfUndertaking[]
+  portalUsers        User[]                    @relation("ProviderPortalUser")
+  apiKeys            ProviderApiKey[]
 
   @@index([tenantId])
   @@index([tenantId, tier])
+}
+
+// Provider-scoped API credential for HMS / facility-system integration (B2B).
+// Facilities with a hospital management system post claims/eligibility to
+// /api/v1/* using their own key; the key resolves to exactly one Provider so
+// every submission is attributed to that facility. Only a bcrypt hash of the
+// key is stored; the plaintext is shown once at generation.
+model ProviderApiKey {
+  id          String    @id @default(cuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+  providerId  String
+  provider    Provider  @relation(fields: [providerId], references: [id])
+  label       String // human label, e.g. "Slade360 production"
+  keyPrefix   String // first 12 chars of the plaintext key, for display/lookup
+  keyHash     String // bcrypt hash of the full key
+  isActive    Boolean   @default(true)
+  lastUsedAt  DateTime?
+  createdById String?
+  createdAt   DateTime  @default(now())
+  revokedAt   DateTime?
+
+  @@index([tenantId])
+  @@index([providerId])
+  @@index([keyPrefix])
 }
 
 // A physical branch/facility of a provider network (spec §5.2). Branch-level

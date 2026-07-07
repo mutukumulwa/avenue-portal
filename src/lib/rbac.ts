@@ -12,7 +12,8 @@ export type UserRole =
   | "BROKER_USER"
   | "MEMBER_USER"
   | "HR_MANAGER"
-  | "FUND_ADMINISTRATOR";
+  | "FUND_ADMINISTRATOR"
+  | "PROVIDER_USER";
 
 // ── Role sets used across pages / actions ────────────────────────────────────
 
@@ -37,6 +38,8 @@ export const ROLES = {
   HR:           ["HR_MANAGER", "SUPER_ADMIN"] as UserRole[],
   /** Self-funded scheme fund administrator (employer finance officer) */
   FUND:         ["FUND_ADMINISTRATOR", "SUPER_ADMIN"] as UserRole[],
+  /** Provider facility portal (reception/clinician), confined to one provider */
+  PROVIDER:     ["PROVIDER_USER"] as UserRole[],
 };
 
 /**

@@ -23,6 +23,9 @@ export async function addMemberAction(
     phone:        formData.get("phone")        as string,
     email:        formData.get("email")        as string,
     relationship: formData.get("relationship") as "PRINCIPAL" | "SPOUSE" | "CHILD" | "PARENT",
+    // NW-D02: link a dependant to its principal when the form was opened from a
+    // principal's "Add Dependent" action (/members/new?principalId=…).
+    principalId:  (formData.get("principalId") as string | null)?.trim() || undefined,
   };
 
   let memberNumber: string | undefined;

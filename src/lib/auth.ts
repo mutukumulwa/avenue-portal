@@ -80,6 +80,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
                 clientId: true,
                 groupId: true,
                 memberId: true,
+                providerId: true,
                 totpSecret: true,
                 totpEnabled: true,
               },
@@ -127,6 +128,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             clientId: user.clientId ?? undefined,
             groupId: user.groupId ?? undefined,
             memberId: user.memberId ?? undefined,
+            providerId: user.providerId ?? undefined,
             permissions,
             sessionVersion: bumped.sessionVersion,
           };
@@ -143,6 +145,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.clientId = user.clientId;
         token.groupId = user.groupId;
         token.memberId = user.memberId;
+        token.providerId = user.providerId;
         token.permissions = user.permissions;
         token.sessionVersion = user.sessionVersion;
         return token;
@@ -165,6 +168,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.clientId = token.clientId as string | undefined;
         session.user.groupId = token.groupId as string | undefined;
         session.user.memberId = token.memberId as string | undefined;
+        session.user.providerId = token.providerId as string | undefined;
         session.user.permissions = token.permissions as string[] | undefined;
       }
       return session;

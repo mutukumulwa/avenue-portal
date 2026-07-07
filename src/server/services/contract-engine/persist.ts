@@ -1,6 +1,18 @@
 import { prisma } from "@/lib/prisma";
 import { ContractEngine } from "./engine";
-import type { EngineClaimResult } from "./types";
+import type { EngineClaimResult, LineDecision } from "./types";
+import type { ClaimLineDecision } from "@prisma/client";
+
+// Map the engine's per-line decision to the persisted ClaimLineDecision enum.
+// PENDED lines stay undecided (null) so a human reviewer still owns them.
+function toLineDecision(d: LineDecision): ClaimLineDecision | null {
+  switch (d) {
+    case "AUTO_APPROVED":            return "APPROVED";
+    case "APPROVED_WITH_ADJUSTMENT": return "APPROVED_WITH_ADJUSTMENT";
+    case "DECLINED":                 return "DECLINED";
+    default:                         return null; // PENDED
+  }
+}
 
 // ─── CONTRACT ENGINE ADJUDICATION INTEGRATION (spec §8.3) ────────────────────
 // Persists the engine's per-line decision provenance onto ClaimLine and the
@@ -33,9 +45,10 @@ export class ContractEngineIntegration {
       if (result.reasonCode) codes.add(result.reasonCode);
       for (const l of result.lines) if (l.reasonCode) codes.add(l.reasonCode);
       const reasonRows = codes.size
-        ? await prisma.adjudicationReasonCode.findMany({ where: { tenantId, code: { in: [...codes] } }, select: { id: true, code: true } })
+        ? await prisma.adjudicationReasonCode.findMany({ where: { tenantId, code: { in: [...codes] } }, select: { id: true, code: true, internalDescription: true, providerDescription: true } })
         : [];
       const reasonIdByCode = new Map(reasonRows.map(r => [r.code, r.id]));
+      const reasonTextByCode = new Map(reasonRows.map(r => [r.code, r.providerDescription || r.internalDescription]));
 
       // Only real ClaimLines carry provenance; synthetic engine lines
       // (case-rate / package-*) are reflected in the claim-level fields.
@@ -45,6 +58,11 @@ export class ContractEngineIntegration {
       await prisma.$transaction(async tx => {
         for (const l of result.lines) {
           if (!realLineIds.has(l.lineId)) continue;
+          const lineDecision = toLineDecision(l.decision);
+          const declineText =
+            l.decision === "DECLINED"
+              ? (l.reasonCode ? `${l.reasonCode}${reasonTextByCode.get(l.reasonCode) ? ` — ${reasonTextByCode.get(l.reasonCode)}` : ""}` : (l.matchedRuleType ?? "Not payable under contract"))
+              : null;
           await tx.claimLine.update({
             where: { id: l.lineId },
             data: {
@@ -53,6 +71,10 @@ export class ContractEngineIntegration {
               matchedRuleType: l.matchedRuleType,
               matchedRuleId: l.matchedRuleId,
               payableSource: l.payableSource,
+              // NW-D04: persist the engine's per-line decision + reason so the
+              // rejections report and line UI can surface excluded lines.
+              ...(lineDecision ? { adjudicationDecision: lineDecision } : {}),
+              declineReason: declineText,
               reasonCodeId: l.reasonCode ? reasonIdByCode.get(l.reasonCode) ?? null : null,
               contractedAmount: l.contractedAmount ?? null,
               shortfallAmount: l.shortfallAmount,

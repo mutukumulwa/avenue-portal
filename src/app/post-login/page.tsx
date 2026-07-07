@@ -13,6 +13,7 @@ export default async function PostLoginPage() {
     if (role === "MEMBER_USER") redirect("/member/dashboard");
     if (role === "HR_MANAGER") redirect("/hr/dashboard");
     if (role === "FUND_ADMINISTRATOR") redirect("/fund/dashboard");
+    if (role === "PROVIDER_USER") redirect("/provider/dashboard");
 
     redirect("/dashboard");
   });

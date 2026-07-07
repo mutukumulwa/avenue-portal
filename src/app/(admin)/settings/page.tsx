@@ -9,7 +9,7 @@ export default async function SettingsPage() {
 
   const tenantId = session.user.tenantId;
 
-  const [users, groups, brokers, members, fundGroups] = await Promise.all([
+  const [users, groups, brokers, members, fundGroups, providers] = await Promise.all([
     prisma.user.findMany({
       where: { tenantId },
       select: { id: true, firstName: true, lastName: true, email: true, role: true, isActive: true, lastLoginAt: true },
@@ -24,6 +24,7 @@ export default async function SettingsPage() {
       take: 250,
     }),
     prisma.group.findMany({ where: { tenantId, fundingMode: "SELF_FUNDED" }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.provider.findMany({ where: { tenantId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
 
   const roleColor = (role: string) => {
@@ -58,6 +59,7 @@ export default async function SettingsPage() {
               groupName: m.group.name,
             }))}
             fundGroups={fundGroups}
+            providers={providers}
           />
         </div>
         <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">

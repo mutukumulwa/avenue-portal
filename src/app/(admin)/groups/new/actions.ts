@@ -24,7 +24,13 @@ export async function enrollGroupAction(formData: FormData) {
       effectiveDate: formData.get("effectiveDate") as string,
     };
 
-    const group = await GroupsService.createGroup(tenantId, data, session.user.clientId);
+    // NW-D01: a scheme is bound to the Client picked on the form. A client-confined
+    // operator can only ever use their own client; an operator-level user chooses,
+    // and resolveSchemeClientId() still falls back to the tenant default if blank.
+    const selectedClientId =
+      session.user.clientId || ((formData.get("clientId") as string | null)?.trim() || undefined);
+
+    const group = await GroupsService.createGroup(tenantId, data, selectedClientId);
 
     await writeAudit({
       userId: session.user.id,

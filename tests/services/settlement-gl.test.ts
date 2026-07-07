@@ -13,6 +13,7 @@ const db = vi.hoisted(() => {
     },
     claim: {
       findMany: vi.fn(async (): Promise<any[]> => []),
+      update: vi.fn(async (a: any) => ({ id: a.where.id, ...a.data })),
       updateMany: vi.fn(async () => ({ count: 2 })),
     },
     paymentVoucher: {
@@ -68,11 +69,19 @@ describe("markSettlementBatchPaid (PR-018 D1)", () => {
     expect(voucher.totalAmount).toBe(50000);
     expect(voucher.claimCount).toBe(2);
 
-    // Claims paid, stamped, voucher-linked.
-    expect(db.claim.updateMany).toHaveBeenCalledWith(
+    // Claims paid, stamped, voucher-linked — and paidAmount = approved payable
+    // per claim (NW-D05, so member "plan paid" + statements reflect settled money).
+    expect(db.claim.update).toHaveBeenCalledTimes(2);
+    expect(db.claim.update).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { settlementBatchId: "batch1" },
-        data: expect.objectContaining({ status: "PAID", paymentVoucherId: "pv1", paidAt: expect.any(Date) }),
+        where: { id: "c1" },
+        data: expect.objectContaining({ status: "PAID", paymentVoucherId: "pv1", paidAt: expect.any(Date), paidAmount: 30000 }),
+      }),
+    );
+    expect(db.claim.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "c2" },
+        data: expect.objectContaining({ status: "PAID", paidAmount: 20000 }),
       }),
     );
 
@@ -87,7 +96,7 @@ describe("markSettlementBatchPaid (PR-018 D1)", () => {
     await expect(
       claimAdjudicationService.markSettlementBatchPaid("batch1", T, "finance1"),
     ).rejects.toThrow(/GL account .* not found/);
-    expect(db.claim.updateMany).not.toHaveBeenCalled();
+    expect(db.claim.update).not.toHaveBeenCalled();
   });
 
   it("only CHECKER_APPROVED batches can be marked paid", async () => {
@@ -107,7 +116,7 @@ describe("approveSettlementBatch — checker step (PR-018)", () => {
       totalAmount: 50000, makerId: "maker",
     });
     await claimAdjudicationService.approveSettlementBatch("batch1", T, "checker");
-    expect(db.claim.updateMany).not.toHaveBeenCalled();
+    expect(db.claim.update).not.toHaveBeenCalled();
     expect(db.providerSettlementBatch.update).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ status: "CHECKER_APPROVED" }) }),
     );

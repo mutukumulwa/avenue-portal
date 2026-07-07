@@ -20,6 +20,7 @@ export const KNOWN_AUDITING_TOKENS = [
   "writeAudit(",
   "auditChainService.append(",
   "auditManage(",
+  "runClaimIntake(", // shared claim-intake path — writes CLAIM_SUBMITTED audit internally
   "ClaimDecisionService.decide(",
   "ClaimDecisionService.voidClaim(",
   "preauthAdjudicationService.",

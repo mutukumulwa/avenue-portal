@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { withApiKey } from "@/lib/apiAuth";
+import { withApiKey, getApiCredential } from "@/lib/apiAuth";
 import { ClaimLineCategory } from "@prisma/client";
 import { isFutureServiceDate, FUTURE_SERVICE_DATE_ERROR } from "@/lib/service-date";
 
@@ -23,7 +23,13 @@ async function postClaim(req: Request) {
       preauthReference,
     } = body;
 
-    if (!memberNumber || !providerCode || !serviceType || !dateOfService || !diagnoses || !lineItems) {
+    // A per-facility key attributes the claim to its own provider (providerCode
+    // is then optional and cannot be spoofed to another facility). The operator
+    // key still resolves the provider from providerCode.
+    const credential = await getApiCredential(req);
+    const providerFromKey = credential?.kind === "provider" ? credential.providerId : null;
+
+    if (!memberNumber || (!providerCode && !providerFromKey) || !serviceType || !dateOfService || !diagnoses || !lineItems) {
       return NextResponse.json(
         { error: "Missing required fields: memberNumber, providerCode, serviceType, dateOfService, diagnoses, lineItems" },
         { status: 400 }
@@ -57,12 +63,16 @@ async function postClaim(req: Request) {
       return NextResponse.json({ error: `Group status is ${member.group.status} — not eligible` }, { status: 403 });
     }
 
-    const provider = await prisma.provider.findFirst({
-      where: { slade360ProviderId: providerCode },
-    });
+    const provider = providerFromKey
+      ? await prisma.provider.findFirst({ where: { id: providerFromKey } })
+      : await prisma.provider.findFirst({ where: { slade360ProviderId: providerCode } });
 
     if (!provider) {
       return NextResponse.json({ error: "Provider not found" }, { status: 404 });
+    }
+    // A facility key can only file for its own tenant's members.
+    if (provider.tenantId !== member.tenantId) {
+      return NextResponse.json({ error: "Provider and member belong to different tenants" }, { status: 403 });
     }
 
     if (["EXPIRED", "SUSPENDED"].includes(provider.contractStatus)) {
@@ -137,6 +147,16 @@ async function postClaim(req: Request) {
         data: { status: "ATTACHED", attachedAt: new Date() },
       });
     }
+
+    // Run the same intake pipeline as the portal channels (fraud + engine
+    // adjudication) so HMS-submitted claims are evaluated identically. The
+    // system actor stands in for the API caller for audit attribution.
+    const { FraudService } = await import("@/server/services/fraud.service");
+    const { AutoAdjudicationService } = await import("@/server/services/auto-adjudication.service");
+    const { getSystemActorId } = await import("@/server/services/system-actor.service");
+    const systemActorId = await getSystemActorId(member.tenantId);
+    await FraudService.evaluateClaim(claim.id, member.tenantId);
+    await AutoAdjudicationService.processIntake(member.tenantId, claim.id, systemActorId);
 
     return NextResponse.json(
       {

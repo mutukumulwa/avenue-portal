@@ -6,9 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { writeAudit } from "@/lib/audit";
 import { FraudService } from "@/server/services/fraud.service";
 import { AutoAdjudicationService } from "@/server/services/auto-adjudication.service";
-import { ClaimsService } from "@/server/services/claims.service";
-import { ProvidersService } from "@/server/services/providers.service";
-import { assertServiceDateNotFuture } from "@/lib/service-date";
+import { runClaimIntake } from "@/server/services/claim-intake";
 import type { ServiceType, BenefitCategory, ClaimLineCategory } from "@prisma/client";
 
 interface LineItemInput {
@@ -43,152 +41,9 @@ export async function submitClaimAction(data: {
 }) {
   const session = await requireRole(ROLES.OPS);
 
-  const tenantId = session.user.tenantId;
-
-  // ── Service-date gate (PR-013, shared server-side rule) ──────────────────
-  assertServiceDateNotFuture(new Date(data.dateOfService));
-
-  // ── Eligibility gate ──────────────────────────────────────────────────────
-  const member = await prisma.member.findUnique({
-    where: { id: data.memberId, tenantId },
-    include: { group: { select: { status: true, name: true } } },
-  });
-  if (!member) throw new Error("Member not found");
-
-  const BLOCKED = ["SUSPENDED", "LAPSED", "TERMINATED"];
-  if (BLOCKED.includes(member.status)) {
-    throw new Error(
-      `Cannot submit claim: member ${member.firstName} ${member.lastName} is ${member.status}.`
-    );
-  }
-  if (member.group && BLOCKED.includes(member.group.status)) {
-    throw new Error(
-      `Cannot submit claim: group "${member.group.name}" is ${member.group.status}.`
-    );
-  }
-
-  // ── Provider gate (PR-006, server-enforced) ──────────────────────────────
-  const gateProvider = await prisma.provider.findUnique({
-    where: { id: data.providerId, tenantId },
-    select: { contractStatus: true, name: true },
-  });
-  if (!gateProvider) throw new Error("Provider not found");
-  if (!ProvidersService.isOperational(gateProvider.contractStatus)) {
-    throw new Error(
-      `Provider "${gateProvider.name}" is ${gateProvider.contractStatus} — claims can only be submitted against ACTIVE providers.`
-    );
-  }
-  if (data.providerBranchId) {
-    const branch = await prisma.providerBranch.findUnique({
-      where: { id: data.providerBranchId },
-      select: { providerId: true, isActive: true, tenantId: true },
-    });
-    if (!branch || branch.tenantId !== tenantId || branch.providerId !== data.providerId) {
-      throw new Error("Selected branch does not belong to the selected provider.");
-    }
-    if (!branch.isActive) throw new Error("Selected branch is deactivated — pick an active branch.");
-  }
-  // ── Benefit-in-package gate (PR-024, server-enforced at intake) ──────────
-  const { BenefitUsageService } = await import("@/server/services/benefit-usage.service");
-  const benefitCfg = await BenefitUsageService.resolveConfig(prisma, data.memberId, data.benefitCategory);
-  if (!benefitCfg) {
-    throw new Error(
-      `Benefit "${data.benefitCategory.replace(/_/g, " ")}" is not in this member's package — ` +
-      `the claim could never be approved against it. Pick a benefit category from the member's package.`
-    );
-  }
-  // ── Pre-auth gate ─────────────────────────────────────────────────────────
-  const PREAUTH_REQUIRED: BenefitCategory[] = ["INPATIENT", "SURGICAL", "MATERNITY"];
-  let approvedPA = null;
-  if (PREAUTH_REQUIRED.includes(data.benefitCategory)) {
-    approvedPA = await prisma.preAuthorization.findFirst({
-      where: {
-        tenantId,
-        memberId:        data.memberId,
-        // A GOP is issued to ONE facility — a PA authorised for provider A
-        // must never silently attach to (and cap/cover) a claim at provider B.
-        providerId:      data.providerId,
-        benefitCategory: data.benefitCategory,
-        status:          "APPROVED",
-        claimId:         null, // not already attached elsewhere (WP-C2)
-        validUntil:      { gte: new Date() },
-      },
-      select: { id: true, preauthNumber: true },
-    });
-    if (!approvedPA) {
-      throw new Error(
-        `${data.benefitCategory.charAt(0) + data.benefitCategory.slice(1).toLowerCase()} claims require an approved pre-authorization for this facility. ` +
-        `Please submit a pre-auth request (at this provider) and obtain approval before submitting this claim.`
-      );
-    }
-  }
-  // ─────────────────────────────────────────────────────────────────────────
-
-  const billedAmount = data.lineItems.reduce((s, l) => s + l.billedAmount, 0);
-
-  // Build claim number
-  const count = await prisma.claim.count({ where: { tenantId } });
-  const claimNumber = `CLM-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
-
-  // PR-017 D2: stamp the claim currency at intake.
-  const currency = await ClaimsService.resolveClaimCurrency(tenantId, data.providerId, data.memberId);
-
-  const claim = await prisma.claim.create({
-    data: {
-      tenantId,
-      claimNumber,
-      currency,
-      memberId:        data.memberId,
-      providerId:      data.providerId,
-      providerBranchId: data.providerBranchId || null,
-      // Attach the approved PA (WP-C1): FK lives on PreAuthorization.claimId.
-      preauths:        approvedPA ? { connect: [{ id: approvedPA.id }] } : undefined,
-      serviceType:     data.serviceType,
-      benefitCategory: data.benefitCategory,
-      dateOfService:   new Date(data.dateOfService),
-      admissionDate:   data.admissionDate ? new Date(data.admissionDate) : null,
-      dischargeDate:   data.dischargeDate ? new Date(data.dischargeDate) : null,
-      attendingDoctor: data.attendingDoctor || null,
-      diagnoses:       data.diagnoses as never,
-      procedures:      data.lineItems as never,
-      billedAmount,
-      status:          "RECEIVED",
-      claimLines: {
-        create: data.lineItems.map((l, i) => ({
-          lineNumber:      i + 1,
-          serviceCategory: l.serviceCategory,
-          description:     l.description,
-          cptCode:         l.cptCode || null,
-          icdCode:         l.icdCode || null,
-          quantity:        l.quantity,
-          unitCost:        l.unitCost,
-          billedAmount:    l.billedAmount,
-        })),
-      },
-    },
-  });
-
-  // Stamp attachment state on the connected PA (WP-C2).
-  if (approvedPA) {
-    await prisma.preAuthorization.update({
-      where: { id: approvedPA.id },
-      data: { status: "ATTACHED", attachedAt: new Date() },
-    });
-  }
-
-  await FraudService.evaluateClaim(claim.id, session.user.tenantId);
-
-  // Intake pipeline (G3.7/G9.5): drug exclusions + auto-adjudication.
-  // Runs after fraud evaluation so open alerts gate auto-approval.
-  await AutoAdjudicationService.processIntake(tenantId, claim.id, session.user.id);
-
-  await writeAudit({
-    userId: session.user.id,
-    action: "CLAIM_SUBMITTED",
-    module: "CLAIMS",
-    description: `Claim ${claimNumber} submitted — KES ${billedAmount.toLocaleString()} (${data.benefitCategory})`,
-    metadata: { claimNumber, memberId: data.memberId, billedAmount },
-  });
+  // Single shared intake path — same gates/fraud/auto-adjudication as the
+  // provider facility portal and B2B channels (see claim-intake.ts).
+  await runClaimIntake(session.user.tenantId, session.user.id, data);
 
   redirect("/claims");
 }

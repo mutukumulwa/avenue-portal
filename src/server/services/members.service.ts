@@ -61,6 +61,27 @@ export class MembersService {
 
     if (!group) throw new Error("Group not found");
 
+    // NW-D02: when a dependant is linked to a principal, validate the principal
+    // and enrol the dependant into the principal's own scheme (a dependant must
+    // never land in a different group than the family they belong to).
+    let effectiveGroup = group;
+    if (data.principalId) {
+      const principal = await prisma.member.findFirst({
+        where: { id: data.principalId, tenantId },
+        select: { id: true, relationship: true, groupId: true, group: true },
+      });
+      if (!principal) throw new Error("Principal member not found for this dependant.");
+      if (principal.relationship !== "PRINCIPAL") {
+        throw new Error("Dependants can only be linked to a PRINCIPAL member.");
+      }
+      if (data.relationship === "PRINCIPAL") {
+        throw new Error("A member linked to a principal cannot itself be a PRINCIPAL.");
+      }
+      // Inherit the principal's scheme.
+      effectiveGroup = principal.group;
+      data.groupId = principal.groupId;
+    }
+
     // ── Duplicate detection ───────────────────────────────────────────────────
     // 1. National ID uniqueness (skip if blank)
     if (data.idNumber?.trim()) {
@@ -115,14 +136,15 @@ export class MembersService {
     });
     // ─────────────────────────────────────────────────────────────────────────
 
-    // Generate member number (client-configurable prefix, G9.6)
-    const memberNumber = await nextMemberNumber(tenantId);
+    // Generate member number (client-configurable prefix, G9.6). NW-D01: derive
+    // the prefix from the owning Client so members inherit e.g. NWSC-… not MVX-…
+    const memberNumber = await nextMemberNumber(tenantId, effectiveGroup.clientId);
 
     const member = await prisma.member.create({
       data: {
         tenantId,
         memberNumber,
-        groupId: group.id,
+        groupId: effectiveGroup.id,
         firstName: data.firstName,
         lastName: data.lastName,
         idNumber: data.idNumber,
@@ -132,8 +154,8 @@ export class MembersService {
         email: data.email,
         relationship: data.relationship || "PRINCIPAL",
         principalId: data.principalId,
-        packageId: group.packageId,
-        packageVersionId: group.packageVersionId,
+        packageId: effectiveGroup.packageId,
+        packageVersionId: effectiveGroup.packageVersionId,
         enrollmentDate: new Date(),
         status: "ACTIVE", // For milestone simplicity
       },

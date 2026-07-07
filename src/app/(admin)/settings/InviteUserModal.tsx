@@ -16,6 +16,7 @@ const ROLES = [
   { value: "BROKER_USER",     label: "Broker User"      },
   { value: "MEMBER_USER",     label: "Member User"      },
   { value: "FUND_ADMINISTRATOR", label: "Fund Administrator" },
+  { value: "PROVIDER_USER",   label: "Provider (Facility)" },
 ];
 
 interface InviteUserModalProps {
@@ -23,9 +24,10 @@ interface InviteUserModalProps {
   brokers?: { id: string; name: string }[];
   members?: { id: string; name: string; memberNumber: string; groupName: string }[];
   fundGroups?: { id: string; name: string }[];
+  providers?: { id: string; name: string }[];
 }
 
-export function InviteUserModal({ groups = [], brokers = [], members = [], fundGroups = [] }: InviteUserModalProps) {
+export function InviteUserModal({ groups = [], brokers = [], members = [], fundGroups = [], providers = [] }: InviteUserModalProps) {
   const [open, setOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState("");
   const [state, action, pending] = useActionState(inviteUserAction, null);
@@ -121,6 +123,16 @@ export function InviteUserModal({ groups = [], brokers = [], members = [], fundG
                       <option key={m.id} value={m.id}>{m.name} · {m.memberNumber} · {m.groupName}</option>
                     ))}
                   </select>
+                </div>
+              )}
+              {selectedRole === "PROVIDER_USER" && (
+                <div>
+                  <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Facility</label>
+                  <select name="providerId" required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo bg-white">
+                    <option value="">Select facility…</option>
+                    {providers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                  <p className="text-[10px] text-brand-text-muted mt-1">This user will only see this facility&apos;s eligibility, claims and settlements.</p>
                 </div>
               )}
               {selectedRole === "FUND_ADMINISTRATOR" && (

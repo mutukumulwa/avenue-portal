@@ -1,6 +1,7 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { getAnalyticsAccessScope, type AnalyticsAccessScope } from "@/lib/analytics-access";
 import { prisma } from "@/lib/prisma";
+import { getExclusionRejectionRows } from "@/server/services/report-exclusions";
 import Link from "next/link";
 import { ArrowLeft, Download } from "lucide-react";
 
@@ -841,39 +842,31 @@ async function getFundUtilisationData(tenantId: string) {
 // ── TRANCHE 3: Analytical ─────────────────────────────────────────────────────
 
 async function getExclusionRejectedData(tenantId: string) {
-  const rows = await prisma.claim.findMany({
-    where: { tenantId, status: { in: ["DECLINED", "VOID", "APPEAL_DECLINED"] } },
-    select: {
-      claimNumber: true, status: true, billedAmount: true,
-      declineReasonCode: true, declineNotes: true, decidedAt: true,
-      benefitCategory: true,
-      member: { select: { memberNumber: true, firstName: true, lastName: true } },
-      provider: { select: { name: true } },
-    },
-    orderBy: { decidedAt: "desc" },
-    take: 200,
-  });
+  // NW-D03: line-aware — includes excluded/declined lines inside approved &
+  // partially-approved claims, not just wholly-declined claims.
+  const rows = await getExclusionRejectionRows(tenantId);
   const byReason = new Map<string, number>();
   rows.forEach(r => {
-    const reason = r.declineReasonCode ?? "OTHER";
+    const reason = r.reason?.split(" — ")[0] || "OTHER";
     byReason.set(reason, (byReason.get(reason) ?? 0) + 1);
   });
   const topReason = [...byReason.entries()].sort((a, b) => b[1] - a[1])[0];
   const kpis = [
     { label: "Total Excluded/Declined", value: rows.length.toLocaleString() },
-    { label: "Total Billed (KES)",      value: rows.reduce((s, r) => s + Number(r.billedAmount), 0).toLocaleString() },
+    { label: "Total Disallowed (KES)",  value: rows.reduce((s, r) => s + r.disallowed, 0).toLocaleString() },
     { label: "Top Decline Reason",      value: topReason ? `${topReason[0]} (${topReason[1]})` : "—" },
     { label: "Unique Reason Codes",     value: byReason.size.toLocaleString() },
   ];
-  const headers = ["Claim No.", "Member", "Provider", "Category", "Status", "Decline Reason", "Billed (KES)", "Decided"];
+  const headers = ["Claim No.", "Member", "Provider", "Category", "Item", "Status", "Reason", "Disallowed (KES)", "Decided"];
   const data = rows.map(r => [
     r.claimNumber,
-    `${r.member.firstName} ${r.member.lastName} (${r.member.memberNumber})`,
-    r.provider.name,
-    r.benefitCategory.replace(/_/g, " "),
-    r.status.replace(/_/g, " "),
-    r.declineReasonCode ?? "—",
-    Number(r.billedAmount).toLocaleString(),
+    r.member,
+    r.provider,
+    r.category,
+    r.scope,
+    r.status,
+    r.reason,
+    r.disallowed.toLocaleString(),
     r.decidedAt ? new Date(r.decidedAt).toLocaleDateString("en-UG") : "—",
   ]);
   return { kpis, headers, data };

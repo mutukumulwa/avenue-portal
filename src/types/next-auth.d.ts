@@ -9,6 +9,7 @@ declare module "next-auth" {
       role?: string;
       groupId?: string;
       memberId?: string;
+      providerId?: string;
       permissions?: string[];
     } & DefaultSession["user"];
   }
@@ -20,6 +21,7 @@ declare module "next-auth" {
     role?: string;
     groupId?: string;
     memberId?: string;
+    providerId?: string;
     permissions?: string[];
     sessionVersion?: number;
   }
@@ -33,6 +35,7 @@ declare module "next-auth/jwt" {
     role?: string;
     groupId?: string;
     memberId?: string;
+    providerId?: string;
     permissions?: string[];
     sessionVersion?: number;
   }

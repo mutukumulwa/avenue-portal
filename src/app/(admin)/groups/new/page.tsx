@@ -2,6 +2,7 @@ import { Save, ArrowLeft, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { enrollGroupAction } from "./actions";
 import { PackagesService } from "@/server/services/packages.service";
+import { ClientsService } from "@/server/services/clients.service";
 import { requireRole, ROLES } from "@/lib/rbac";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 
@@ -15,6 +16,17 @@ export default async function GroupEnrollmentHero({
   
   const tenantId = session.user.tenantId;
   const packages = await PackagesService.getPackages(tenantId);
+
+  // NW-D01: let the operator choose which Client (payer) owns this scheme. When
+  // the session is confined to a single client, that client is forced.
+  const confinedClientId = session.user.clientId;
+  const allClients = await ClientsService.list(tenantId);
+  const selectableClients = allClients.filter(
+    (c) => c.status !== "TERMINATED" && (!confinedClientId || c.id === confinedClientId),
+  );
+  const confinedClient = confinedClientId
+    ? allClients.find((c) => c.id === confinedClientId)
+    : undefined;
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -78,6 +90,26 @@ export default async function GroupEnrollmentHero({
 
           <div className="space-y-4">
              <h3 className="text-lg font-bold text-brand-text-heading font-['Sora']">Coverage Details</h3>
+             <div className="space-y-2">
+                <label className="text-sm font-semibold text-brand-text-heading">Client (Payer)</label>
+                {confinedClient ? (
+                  <>
+                    <input type="hidden" name="clientId" value={confinedClient.id} />
+                    <div className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 bg-[#F8F9FA] text-[#848E9F]">
+                      {confinedClient.name}
+                    </div>
+                  </>
+                ) : (
+                  <select required name="clientId" className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-[#0B1437] transition-colors">
+                    {selectableClients.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}{c.slug === "default" ? " (default)" : ""}{c.memberNumberPrefix ? ` · ${c.memberNumberPrefix}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <p className="text-[11px] text-[#848E9F]">The payer/employer that owns this scheme. Members enrolled here inherit this client&apos;s member-number prefix.</p>
+             </div>
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-[#F8F9FA] p-4 rounded-lg border border-[#EEEEEE]">
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-brand-text-heading">Select Package</label>

@@ -28,6 +28,10 @@ export async function nextMemberNumber(
   clientId?: string | null,
 ): Promise<string> {
   const prefix = await resolveMemberPrefix(tenantId, clientId);
-  const count = await prisma.member.count({ where: { tenantId } });
+  // Sequence is per-prefix so each client/payer gets its own clean series
+  // (e.g. NWSC-2026-00001), independent of other clients' member counts.
+  const count = await prisma.member.count({
+    where: { tenantId, memberNumber: { startsWith: `${prefix}-` } },
+  });
   return `${prefix}-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
 }
