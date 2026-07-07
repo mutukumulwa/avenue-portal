@@ -387,12 +387,32 @@ export const claimAdjudicationService = {
         settlementBatchId: null,
         decidedAt:       { lte: endDate },
       },
-      select: { id: true, approvedAmount: true },
+      select: { id: true, approvedAmount: true, currency: true },
     });
 
     if (claims.length === 0) {
       throw new TRPCError({ code: "BAD_REQUEST", message: "No unsettled approved claims found for this provider up to the end of this cycle" });
     }
+
+    // OBS-2 Ticket 4: a settlement batch settles ONE transaction currency. Raw
+    // summing across UGX + KES would produce a meaningless total and under- or
+    // over-pay the provider, so a mixed-currency scoop is blocked here (Phase 1:
+    // maker creates one batch per currency). Full multi-currency settlement
+    // accounting is deferred to a finance-approved Phase 2.
+    const currencies = Array.from(new Set(claims.map((c) => c.currency || "UGX")));
+    if (currencies.length > 1) {
+      const breakdown = currencies
+        .map((cur) => `${cur} (${claims.filter((c) => (c.currency || "UGX") === cur).length})`)
+        .join(", ");
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message:
+          `This provider has unsettled claims in ${currencies.length} currencies — ${breakdown}. ` +
+          `A settlement batch must be a single currency; settle each currency in its own batch. ` +
+          `Capture missing FX rates in Settings → FX Rates if these should be normalised.`,
+      });
+    }
+    const batchCurrency = currencies[0] ?? "UGX";
 
     const totalAmount = claims.reduce((s, c) => s + Number(c.approvedAmount), 0);
 
@@ -402,6 +422,7 @@ export const claimAdjudicationService = {
           tenantId, providerId, cycleMonth, cycleYear,
           status:      "MAKER_SUBMITTED",
           totalAmount,
+          currency:    batchCurrency,
           claimCount:  claims.length,
           makerId,
         },
@@ -423,7 +444,7 @@ export const claimAdjudicationService = {
       entityId:   batch.id,
       payload:    { totalAmount, claimCount: claims.length, providerId, cycleMonth, cycleYear },
       tenantId,
-      description: `Settlement batch created for ${cycleMonth}/${cycleYear} — KES ${totalAmount.toLocaleString("en-UG")} across ${claims.length} claim(s)`,
+      description: `Settlement batch created for ${cycleMonth}/${cycleYear} — ${batchCurrency} ${totalAmount.toLocaleString("en-UG")} across ${claims.length} claim(s)`,
     });
 
     return batch;
@@ -457,7 +478,7 @@ export const claimAdjudicationService = {
       entityId:   batchId,
       payload:    { totalAmount: Number(batch.totalAmount), checkerId },
       tenantId,
-      description: `Settlement batch approved — KES ${Number(batch.totalAmount).toLocaleString("en-UG")}`,
+      description: `Settlement batch approved — ${batch.currency} ${Number(batch.totalAmount).toLocaleString("en-UG")}`,
     });
 
     return updated;
@@ -471,6 +492,7 @@ export const claimAdjudicationService = {
    * error — no silent skip, no unbalanced posting.
    */
   async markSettlementBatchPaid(batchId: string, tenantId: string, userId: string) {
+    const startedAt = Date.now(); // D4: settlement timing observability
     const batch = await prisma.providerSettlementBatch.findUnique({ where: { id: batchId } });
     if (!batch || batch.tenantId !== tenantId) {
       throw new TRPCError({ code: "NOT_FOUND", message: "Settlement batch not found" });
@@ -481,9 +503,32 @@ export const claimAdjudicationService = {
 
     const claims = await prisma.claim.findMany({
       where: { settlementBatchId: batchId },
-      select: { id: true, approvedAmount: true },
+      select: { id: true, approvedAmount: true, approvedBaseAmount: true, currency: true },
     });
+
+    // OBS-2 Ticket 4: defence in depth — a batch must be single-currency (the
+    // creation gate enforces this, but legacy batches predate it). Never sum
+    // raw amounts across currencies at pay time.
+    const claimCurrencies = Array.from(new Set(claims.map((c) => c.currency || "UGX")));
+    if (claimCurrencies.length > 1) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message:
+          `This batch mixes ${claimCurrencies.length} currencies (${claimCurrencies.join(", ")}) and cannot be paid as one voucher. ` +
+          `Void it and recreate one batch per currency.`,
+      });
+    }
+    const batchCurrency = claimCurrencies[0] ?? batch.currency ?? "UGX";
+    // Transaction-currency total (what the provider is paid, in `batchCurrency`).
     const total = claims.reduce((s, c) => s + Number(c.approvedAmount), 0);
+    // OBS-2 Ticket 6: the GL settlement JE clears the Claims Payable liability
+    // that approval booked in BASE currency, so it posts the base total (Σ
+    // approvedBaseAmount). Legacy claims without a snapshot fall back to their
+    // transaction amount so the JE still balances.
+    const baseTotal = claims.reduce(
+      (s, c) => s + (Number(c.approvedBaseAmount) || Number(c.approvedAmount)),
+      0,
+    );
     const paidAt = new Date();
 
     const { GLService } = await import("./gl.service");
@@ -495,7 +540,7 @@ export const claimAdjudicationService = {
       const je = await GLService.postSettlementBatchPaid(tenantId, {
         sourceId: batchId,
         reference: voucherNumber,
-        amount: total,
+        amount: baseTotal, // base-currency liability clearing
         postedById: userId,
         tx,
       });
@@ -506,6 +551,9 @@ export const claimAdjudicationService = {
           tenantId,
           providerId: batch.providerId,
           totalAmount: total,
+          currency: batchCurrency,
+          baseCurrency: "UGX",
+          baseTotalAmount: baseTotal,
           claimCount: claims.length,
           status: "PROCESSED",
           processedAt: paidAt,
@@ -531,7 +579,13 @@ export const claimAdjudicationService = {
 
       return tx.providerSettlementBatch.update({
         where: { id: batchId },
-        data: { status: "SETTLED", settledAt: paidAt },
+        data: {
+          status: "SETTLED",
+          settledAt: paidAt,
+          currency: batchCurrency,
+          baseCurrency: "UGX",
+          baseTotalAmount: baseTotal,
+        },
       });
     }, { maxWait: 15000, timeout: 60000 });
 
@@ -541,9 +595,16 @@ export const claimAdjudicationService = {
       module: "BILLING",
       entityType: "ProviderSettlementBatch",
       entityId: batchId,
-      payload: { totalAmount: total, claimCount: claims.length, userId },
+      payload: {
+        totalAmount: total,
+        baseTotalAmount: baseTotal,
+        currency: batchCurrency,
+        claimCount: claims.length,
+        durationMs: Date.now() - startedAt,
+        userId,
+      },
       tenantId,
-      description: `Settlement batch marked as SETTLED — KES ${total.toLocaleString("en-UG")} across ${claims.length} claim(s), voucher + GL posted`,
+      description: `Settlement batch marked as SETTLED — ${batchCurrency} ${total.toLocaleString("en-UG")} across ${claims.length} claim(s), voucher + GL posted`,
     });
 
     // Member notification — "claim paid" for every claim in the batch. Runs

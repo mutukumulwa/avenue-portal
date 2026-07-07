@@ -27,6 +27,7 @@ export const KNOWN_AUDITING_TOKENS = [
   "claimAdjudicationService.createSettlementBatch(",
   "claimAdjudicationService.approveSettlementBatch(",
   "claimAdjudicationService.markSettlementBatchPaid(",
+  "TenantSettingsService.updateClaimControls(", // writes TENANT_CLAIM_CONTROL_UPDATED audit internally
   "overrideService.request(",
   "overrideService.approve(",
   "overrideService.reject(",

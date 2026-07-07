@@ -2223,6 +2223,17 @@ model Claim {
   paidAmount      Decimal @default(0)
   memberLiability Decimal @default(0) // Total member pays (copay + excess)
 
+  // ── OBS-2 Ticket 5: FX snapshot pinned at decision time ──────────────────
+  // For a non-base (≠ UGX) claim, the approved/billed amounts are normalised to
+  // base currency at the decision-date rate and stored so GL, settlement and
+  // reports never re-infer a historical rate. UGX claims keep base == txn at
+  // rate 1. A non-base claim with no in-force rate fails closed before approval.
+  baseCurrency       String    @default("UGX")
+  approvedBaseAmount Decimal   @default(0) @db.Decimal(19, 4)
+  billedBaseAmount   Decimal?  @db.Decimal(19, 4)
+  fxRateToBase       Decimal?  @db.Decimal(19, 8)
+  fxRateDate         DateTime?
+
   // Benefit allocation
   benefitCategory BenefitCategory
   benefitUsageId  String?
@@ -4284,6 +4295,10 @@ model PaymentVoucher {
   tenantId      String? // PR-018: tenant scope (nullable for legacy rows)
   providerId    String
   totalAmount   Decimal
+  // OBS-2 Ticket 4/6: denomination of totalAmount + UGX base equivalent.
+  currency        String  @default("UGX")
+  baseCurrency    String  @default("UGX")
+  baseTotalAmount Decimal @default(0) @db.Decimal(19, 4)
   claimCount    Int
   status        String    @default("PENDING") // PENDING, APPROVED, PROCESSED
   processedAt   DateTime?
@@ -5787,6 +5802,12 @@ model ProviderSettlementBatch {
   cycleYear   Int
   status      SettlementStatus @default(PENDING)
   totalAmount Decimal          @default(0) @db.Decimal(19, 4)
+  // OBS-2 Ticket 4: every batch settles in ONE transaction currency (mixed
+  // currencies are blocked at creation). `baseTotalAmount` carries the UGX
+  // equivalent for base-currency GL/reporting (populated in Ticket 6).
+  currency        String  @default("UGX")
+  baseCurrency    String  @default("UGX")
+  baseTotalAmount Decimal @default(0) @db.Decimal(19, 4)
   claimCount  Int              @default(0)
   makerId     String
   checkerId   String?

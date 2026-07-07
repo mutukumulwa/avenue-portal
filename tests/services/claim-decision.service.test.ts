@@ -27,7 +27,11 @@ const db = vi.hoisted(() => {
     benefitHold: { findUnique: vi.fn(async () => null), update: vi.fn(async (a: any) => a.data), upsert: vi.fn(async () => ({})) },
     preAuthorization: { updateMany: vi.fn(async () => ({ count: 1 })), update: vi.fn(async (a: any) => a.data) },
     approvalMatrix: { findMany: vi.fn(async (): Promise<any[]> => []) },
-    approvalRequest: { findFirst: vi.fn(async () => null), create: vi.fn(async () => ({ id: "ar1" })) },
+    approvalRequest: { findFirst: vi.fn(async () => null), create: vi.fn(async () => ({ id: "ar1" })), update: vi.fn(async (a: any) => a.data) },
+    // OBS-7 fraud gate: default tenant config leaves the gate OFF, and no
+    // unresolved fraud alerts, so decide() proceeds exactly as before.
+    tenant: { findUnique: vi.fn(async () => ({ config: {} })) },
+    claimFraudAlert: { findMany: vi.fn(async (): Promise<any[]> => []) },
     fxRate: { findFirst: vi.fn(async () => null) },
     overrideRecord: { findFirst: vi.fn(async () => null) },
     coContributionTransaction: { findUnique: vi.fn(async () => null) },
@@ -115,6 +119,9 @@ beforeEach(() => {
   db.benefitConfigSharedLimit.findMany.mockResolvedValue([]);
   db.benefitHold.findUnique.mockResolvedValue(null);
   db.approvalMatrix.findMany.mockResolvedValue([]);
+  // OBS-2 Ticket 5: KES claims normalise at an in-force rate. Default 1 keeps
+  // base == transaction for the non-FX suites; the FX suites override it.
+  db.fxRate.findFirst.mockResolvedValue({ rate: 1 });
   db.overrideRecord.findFirst.mockResolvedValue(null);
   engine.evaluateClaimById.mockResolvedValue(null);
   claimsSvc.resolveClaimContractRates.mockResolvedValue({ contract: null, lines: [] });
@@ -400,6 +407,85 @@ describe("PR-017 — FX-correct approval matrix", () => {
     expect(db.exceptionLog.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ reason: expect.stringContaining("FX rate missing") }) }),
     );
+  });
+});
+
+describe("OBS-7 — fraud approval gate (integration)", () => {
+  const gateOn = () =>
+    db.tenant.findUnique.mockResolvedValue({
+      config: {
+        claims: {
+          requireFraudClearanceBeforeApproval: true,
+          fraudApprovalSeverityThreshold: "MEDIUM",
+          fraudApprovalGateMode: "CLEAR_ALERT_ONLY",
+        },
+      },
+    });
+
+  it("gate ON + open HIGH alert blocks approval before any GL / usage side effect", async () => {
+    gateOn();
+    db.claimFraudAlert.findMany.mockResolvedValue([{ id: "a1", severity: "HIGH", rule: "Velocity Check" }]);
+    await expect(decide({ approvedAmount: 3600 })).rejects.toThrow(/Fraud control/);
+    expect(db.journalEntry.create).not.toHaveBeenCalled();
+    expect(db.benefitUsage.create).not.toHaveBeenCalled();
+    expect(db.claim.update).not.toHaveBeenCalled();
+  });
+
+  it("gate ON but DECLINE is still allowed", async () => {
+    gateOn();
+    db.claimFraudAlert.findMany.mockResolvedValue([{ id: "a1", severity: "CRITICAL", rule: "x" }]);
+    await expect(
+      decide({ action: "DECLINED", approvedAmount: 0, declineReasonCode: "FRAUD_SUSPECTED" }),
+    ).resolves.toBeTruthy();
+  });
+
+  it("gate ON but alert resolved (none unresolved) → approval proceeds and posts GL", async () => {
+    gateOn();
+    db.claimFraudAlert.findMany.mockResolvedValue([]);
+    await expect(decide({ approvedAmount: 3600 })).resolves.toBeTruthy();
+    expect(db.journalEntry.create).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("OBS-2 — FX snapshot at approval (Ticket 5/6)", () => {
+  it("UGX claim: base == transaction, rate 1, no FX lookup", async () => {
+    db.claim.findUnique.mockResolvedValue(baseClaim({ currency: "UGX" }));
+    await decide({ approvedAmount: 3600 });
+    const data = db.claim.update.mock.calls[0][0].data;
+    expect(data.baseCurrency).toBe("UGX");
+    expect(data.approvedBaseAmount).toBe(3600);
+    expect(data.fxRateToBase).toBe(1);
+    expect(data.fxRateDate).toBeNull();
+    // GL posts the base amount.
+    const je = db.journalEntry.create.mock.calls[0][0].data;
+    const dr = je.lines.create.reduce((s: number, l: any) => s + (l.debit ?? 0), 0);
+    expect(dr).toBe(3600);
+  });
+
+  it("KES claim with a rate persists the base amount and posts GL in UGX", async () => {
+    db.claim.findUnique.mockResolvedValue(baseClaim({ currency: "KES" }));
+    db.fxRate.findFirst.mockResolvedValue({ rate: 27 });
+    await decide({ approvedAmount: 3600 });
+    const data = db.claim.update.mock.calls[0][0].data;
+    expect(data.approvedBaseAmount).toBe(97200); // 3600 × 27
+    expect(data.fxRateToBase).toBe(27);
+    expect(data.fxRateDate).toBeInstanceOf(Date);
+    // GL is in base: Dr/Cr = 97,200 UGX, not 3,600 raw KES.
+    const je = db.journalEntry.create.mock.calls[0][0].data;
+    const dr = je.lines.create.reduce((s: number, l: any) => s + (l.debit ?? 0), 0);
+    const cr = je.lines.create.reduce((s: number, l: any) => s + (l.credit ?? 0), 0);
+    expect(dr).toBe(97200);
+    expect(cr).toBe(97200);
+  });
+
+  it("KES claim with NO in-force rate fails closed before any side effect", async () => {
+    db.claim.findUnique.mockResolvedValue(baseClaim({ currency: "KES" }));
+    db.fxRate.findFirst.mockResolvedValue(null); // missing rate, no matrix rule
+    await expect(decide({ approvedAmount: 3600 })).rejects.toThrow(/FX fail-closed/);
+    expect(db.journalEntry.create).not.toHaveBeenCalled();
+    expect(db.claim.update).not.toHaveBeenCalled();
+    // ExceptionLog captures the missing-rate block.
+    expect(db.exceptionLog.create).toHaveBeenCalled();
   });
 });
 

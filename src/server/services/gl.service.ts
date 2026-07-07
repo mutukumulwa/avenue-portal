@@ -196,8 +196,9 @@ export class GLService {
         ];
 
     return postEntry(tenantId, {
+      // GL is kept in base currency (UGX). Labels use the base denomination.
       description: coContrib > 0
-        ? `Claim approved — ${opts.reference} (plan KES ${planShare.toLocaleString()} + member KES ${coContrib.toLocaleString()})`
+        ? `Claim approved — ${opts.reference} (plan UGX ${planShare.toLocaleString()} + member UGX ${coContrib.toLocaleString()})`
         : `Claim approved — ${opts.reference}`,
       reference:  opts.reference,
       sourceType: "CLAIM_APPROVED",

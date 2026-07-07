@@ -10,6 +10,8 @@ import { GLService } from "./gl.service";
 import { auditChainService } from "./audit-chain.service";
 import { getSystemActorId } from "./system-actor.service";
 import { MemberNotificationService } from "./member-notification.service";
+import { ClaimControlService } from "./claim-control.service";
+import { FxService, BASE_CURRENCY } from "./fx.service";
 
 /**
  * claim-decision.service.ts — the ONE canonical claim decision stack
@@ -221,6 +223,28 @@ export class ClaimDecisionService {
 
     const clientId = claim.member?.group?.clientId ?? null;
 
+    // 3½ ── OBS-7 fraud approval gate (Outstanding-Conditions Ticket 2).
+    // A tenant-controlled money-control: a claim with an unresolved fraud alert
+    // at/above the configured severity cannot become payable until the alert is
+    // cleared (or a fraud-clearance dual approval completes). Runs before the
+    // matrix and every state-changing side effect, so a blocked claim leaves no
+    // GL, fund, usage, or notification trace. Auto-adjudication (systemDecision)
+    // runs its own `requireCleanFraud` policy gate and is excluded here; the
+    // control this adds is human approval FINALISATION.
+    if (isApproval && !decision.systemDecision) {
+      await ClaimControlService.enforceFraudGate(tenantId, {
+        claimId: claim.id,
+        claimNumber: claim.claimNumber,
+        currency: claim.currency,
+        serviceType: claim.serviceType,
+        benefitCategory: claim.benefitCategory,
+        action: decision.action,
+        approvedAmount,
+        clientId,
+        reviewerId: decision.reviewerId,
+      });
+    }
+
     // 4 ── approval matrix, FX-correct (PR-017), fail-closed (PR-023),
     //      completing chains apply the gated decision (PR-025).
     if (isApproval && !decision.systemDecision && !decision.matrixSatisfied) {
@@ -397,6 +421,36 @@ export class ClaimDecisionService {
     }
     if (ceilingNote) notes = notes ? `${notes} ${ceilingNote}` : ceilingNote;
 
+    // 6½ ── OBS-2 Ticket 5: FX snapshot pinned at the decision date.
+    // Base currency is UGX. A non-base claim is normalised to base at the
+    // decision-date rate; the base amount/rate/date are persisted so GL,
+    // settlement and reports never re-infer a historical rate. FAIL CLOSED:
+    // a non-base claim with no in-force rate is blocked here — before any GL,
+    // fund, usage or notification side effect — rather than silently posting a
+    // raw foreign amount into a UGX ledger (the OBS-2 defect). UGX claims keep
+    // base == transaction at rate 1.
+    const decisionDate = new Date();
+    let approvedBaseAmount = approvedAmount;
+    let billedBaseAmount: number | null = Number(claim.billedAmount);
+    let fxRateToBase = 1;
+    let fxRateDate: Date | null = null;
+    if (isApproval && claim.currency !== BASE_CURRENCY) {
+      const fx = await FxService.normalise(tenantId, approvedAmount, claim.currency, decisionDate);
+      if (fx.identity) {
+        // identity === true for a non-base currency means no rate was found.
+        await this.logFxException(tenantId, claim.id, claim.claimNumber, claim.currency, decision.reviewerId);
+        throw new Error(
+          `FX fail-closed: no in-force ${claim.currency}→${BASE_CURRENCY} rate on ${decisionDate.toISOString().slice(0, 10)}. ` +
+          `Capture the rate in Settings → FX Rates before approving this ${claim.currency} claim — the ledger must not sum foreign amounts as ${BASE_CURRENCY}.`,
+        );
+      }
+      approvedBaseAmount = Math.round(fx.baseAmount * 100) / 100;
+      fxRateToBase = fx.rate;
+      fxRateDate = decisionDate;
+      const billedFx = await FxService.normalise(tenantId, Number(claim.billedAmount), claim.currency, decisionDate);
+      billedBaseAmount = Math.round(billedFx.baseAmount * 100) / 100;
+    }
+
     // 7–10 ── the decision transaction
     const account = claim.member?.group?.selfFundedAccount ?? null;
     const isSelfFunded = claim.member?.group?.fundingMode === "SELF_FUNDED" && !!account;
@@ -482,6 +536,12 @@ export class ClaimDecisionService {
         data: {
           status: decision.action,
           approvedAmount: isApproval ? approvedAmount : 0,
+          // OBS-2 Ticket 5: base-currency snapshot (UGX at decision-date rate).
+          baseCurrency: BASE_CURRENCY,
+          approvedBaseAmount: isApproval ? approvedBaseAmount : 0,
+          billedBaseAmount,
+          fxRateToBase,
+          fxRateDate,
           copayAmount: isApproval ? copay : 0,
           memberLiability: isApproval ? memberLiability : 0,
           costShareDeductible: costShare?.deductibleApplied ?? 0,
@@ -506,26 +566,31 @@ export class ClaimDecisionService {
       });
 
       // GL posting (PR-018 #1): inside the decision transaction, no swallow.
+      // OBS-2 Ticket 6: the ledger is kept in base currency (UGX). A non-base
+      // claim posts its base-normalised amount (approvedBaseAmount), never the
+      // raw transaction amount — so KES + UGX claims can never be summed as one.
       if (isApproval && approvedAmount > 0) {
         const coTx = await tx.coContributionTransaction.findUnique({
           where: { claimId },
           select: { finalAmount: true },
         });
+        const coBase = coTx ? Math.round(Number(coTx.finalAmount) * fxRateToBase * 100) / 100 : 0;
         await GLService.postClaimApproved(tenantId, {
           sourceId: claimId,
           reference: claim.claimNumber,
-          amount: approvedAmount,
-          coContributionAmount: coTx ? Number(coTx.finalAmount) : 0,
+          amount: approvedBaseAmount,
+          coContributionAmount: coBase,
           postedById: decision.reviewerId,
           tx,
         });
 
-        // Self-funded scheme drawdown (PR-018 D2) — same transaction.
+        // Self-funded scheme drawdown (PR-018 D2) — same transaction. The fund
+        // is denominated in base currency, so it draws down the base amount.
         if (isSelfFunded && account) {
-          const newBalance = Number(account.balance) - approvedAmount;
+          const newBalance = Number(account.balance) - approvedBaseAmount;
           await tx.selfFundedAccount.update({
             where: { id: account.id },
-            data: { balance: newBalance, totalClaims: { increment: approvedAmount } },
+            data: { balance: newBalance, totalClaims: { increment: approvedBaseAmount } },
           });
           await tx.fundTransaction.create({
             data: {
@@ -533,7 +598,7 @@ export class ClaimDecisionService {
               selfFundedAccountId: account.id,
               claimId,
               type: "CLAIM_DEDUCTION",
-              amount: approvedAmount,
+              amount: approvedBaseAmount,
               balanceAfter: newBalance,
               description: `Claim ${claim.claimNumber} — ${decision.action.replace(/_/g, " ").toLowerCase()}`,
               postedById: decision.reviewerId,
@@ -601,6 +666,7 @@ export class ClaimDecisionService {
       select: {
         id: true, claimNumber: true, status: true, currency: true,
         memberId: true, benefitCategory: true, approvedAmount: true,
+        approvedBaseAmount: true, fxRateToBase: true,
         settlementBatchId: true,
         member: { select: { group: { select: { fundingMode: true, selfFundedAccount: { select: { id: true, balance: true } } } } } },
       },
@@ -613,6 +679,11 @@ export class ClaimDecisionService {
       throw new Error("Claim is already queued/settled in a settlement batch — reverse it through settlement, not a void.");
     }
     const amount = Number(claim.approvedAmount);
+    // OBS-2 Ticket 6: the reversal must mirror the approval JE, which posted the
+    // base amount. Older claims (pre-snapshot) have approvedBaseAmount 0 → fall
+    // back to the transaction amount so their reversal still balances.
+    const baseAmount = Number(claim.approvedBaseAmount) || amount;
+    const rate = claim.fxRateToBase != null ? Number(claim.fxRateToBase) : 1;
 
     const updated = await prisma.$transaction(async (tx) => {
       if (amount > 0) {
@@ -621,20 +692,21 @@ export class ClaimDecisionService {
           where: { claimId },
           select: { finalAmount: true },
         });
+        const coBase = coTx ? Math.round(Number(coTx.finalAmount) * rate * 100) / 100 : 0;
         await GLService.postClaimVoidReversal(tenantId, {
           sourceId: claimId,
           reference: claim.claimNumber,
-          amount,
-          coContributionAmount: coTx ? Number(coTx.finalAmount) : 0,
+          amount: baseAmount,
+          coContributionAmount: coBase,
           postedById: opts.actorId,
           tx,
         });
         const account = claim.member?.group?.selfFundedAccount;
         if (claim.member?.group?.fundingMode === "SELF_FUNDED" && account) {
-          const newBalance = Number(account.balance) + amount;
+          const newBalance = Number(account.balance) + baseAmount;
           await tx.selfFundedAccount.update({
             where: { id: account.id },
-            data: { balance: newBalance, totalClaims: { decrement: amount } },
+            data: { balance: newBalance, totalClaims: { decrement: baseAmount } },
           });
           await tx.fundTransaction.create({
             data: {
@@ -642,7 +714,7 @@ export class ClaimDecisionService {
               selfFundedAccountId: account.id,
               claimId,
               type: "REFUND",
-              amount,
+              amount: baseAmount,
               balanceAfter: newBalance,
               description: `Claim ${claim.claimNumber} voided — drawdown reversed`,
               postedById: opts.actorId,

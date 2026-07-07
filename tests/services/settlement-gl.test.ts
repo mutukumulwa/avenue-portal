@@ -9,6 +9,7 @@ const db = vi.hoisted(() => {
   const state: any = {
     providerSettlementBatch: {
       findUnique: vi.fn(),
+      create: vi.fn(async (a: any) => ({ id: "batchNew", ...a.data })),
       update: vi.fn(async (a: any) => ({ id: a.where.id, ...a.data })),
     },
     claim: {
@@ -92,6 +93,31 @@ describe("markSettlementBatchPaid (PR-018 D1)", () => {
     );
   });
 
+  it("OBS-2 Ticket 6: a KES batch posts the BASE total to GL and stamps voucher base fields", async () => {
+    db.providerSettlementBatch.findUnique.mockResolvedValue({
+      id: "batch1", tenantId: T, providerId: "prov1", status: "CHECKER_APPROVED",
+      totalAmount: 50000, claimCount: 2, makerId: "maker", currency: "KES",
+    });
+    db.claim.findMany.mockResolvedValue([
+      { id: "c1", approvedAmount: 30000, approvedBaseAmount: 810000, currency: "KES" }, // ×27
+      { id: "c2", approvedAmount: 20000, approvedBaseAmount: 540000, currency: "KES" },
+    ]);
+
+    await claimAdjudicationService.markSettlementBatchPaid("batch1", T, "finance1");
+
+    // GL clears the base-currency liability: 1,350,000 UGX, not 50,000 raw KES.
+    const je = db.journalEntry.create.mock.calls[0][0].data;
+    expect(je.lines.create.find((l: any) => l.debit === 1350000).accountId).toBe("acc-2010");
+    expect(je.lines.create.find((l: any) => l.credit === 1350000).accountId).toBe("acc-1010");
+
+    // Voucher carries the KES transaction total + the UGX base total.
+    const voucher = db.paymentVoucher.create.mock.calls[0][0].data;
+    expect(voucher.totalAmount).toBe(50000);
+    expect(voucher.currency).toBe("KES");
+    expect(voucher.baseTotalAmount).toBe(1350000);
+    expect(voucher.baseCurrency).toBe("UGX");
+  });
+
   it("blocks with a config error when a GL account mapping is missing (no silent skip)", async () => {
     db.chartOfAccount.findUnique.mockResolvedValue(null);
     await expect(
@@ -108,6 +134,49 @@ describe("markSettlementBatchPaid (PR-018 D1)", () => {
     await expect(
       claimAdjudicationService.markSettlementBatchPaid("batch1", T, "finance1"),
     ).rejects.toThrow(/not approved/);
+  });
+});
+
+describe("createSettlementBatch — currency guardrail (OBS-2 Ticket 4)", () => {
+  beforeEach(() => {
+    db.providerSettlementBatch.findUnique.mockResolvedValue(null); // no existing batch
+  });
+
+  it("single-currency scoop creates a batch stamped with that currency", async () => {
+    db.claim.findMany.mockResolvedValue([
+      { id: "c1", approvedAmount: 30000, currency: "UGX" },
+      { id: "c2", approvedAmount: 20000, currency: "UGX" },
+    ]);
+    await claimAdjudicationService.createSettlementBatch(T, "prov1", 7, 2026, "maker1");
+    expect(db.providerSettlementBatch.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ currency: "UGX", totalAmount: 50000 }) }),
+    );
+  });
+
+  it("blocks a mixed-currency scoop and creates no batch", async () => {
+    db.claim.findMany.mockResolvedValue([
+      { id: "c1", approvedAmount: 30000, currency: "UGX" },
+      { id: "c2", approvedAmount: 20000, currency: "KES" },
+    ]);
+    await expect(
+      claimAdjudicationService.createSettlementBatch(T, "prov1", 7, 2026, "maker1"),
+    ).rejects.toThrow(/single currency|2 currencies/i);
+    expect(db.providerSettlementBatch.create).not.toHaveBeenCalled();
+  });
+
+  it("mark-paid refuses a legacy batch whose claims span currencies (defence in depth)", async () => {
+    db.providerSettlementBatch.findUnique.mockResolvedValue({
+      id: "batch1", tenantId: T, providerId: "prov1", status: "CHECKER_APPROVED",
+      totalAmount: 50000, claimCount: 2, makerId: "maker", currency: "UGX",
+    });
+    db.claim.findMany.mockResolvedValue([
+      { id: "c1", approvedAmount: 30000, currency: "UGX" },
+      { id: "c2", approvedAmount: 20000, currency: "KES" },
+    ]);
+    await expect(
+      claimAdjudicationService.markSettlementBatchPaid("batch1", T, "finance1"),
+    ).rejects.toThrow(/mixes 2 currencies/i);
+    expect(db.journalEntry.create).not.toHaveBeenCalled();
   });
 });
 

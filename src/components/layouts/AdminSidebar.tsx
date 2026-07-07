@@ -133,6 +133,7 @@ const SETUP_SUB: SubItem[] = [
   // Adjudication policy
   { label: "Approval Matrix",        href: "/settings/approval-matrix"   },
   { label: "Auto-Adjudication",      href: "/settings/auto-adjudication" },
+  { label: "Claim Money Controls",   href: "/settings/claim-controls"    },
   { label: "Drug Exclusions",        href: "/settings/drug-exclusions"   },
   // Financial configuration
   { label: "Pricing Models",         href: "/settings/pricing-models"    },

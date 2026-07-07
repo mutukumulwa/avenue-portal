@@ -2,6 +2,7 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { notFound } from "next/navigation";
 import { ClaimsService } from "@/server/services/claims.service";
 import { ClaimDecisionService } from "@/server/services/claim-decision.service";
+import { TenantSettingsService } from "@/server/services/tenant-settings.service";
 import { prisma } from "@/lib/prisma";
 import { adjudicateClaimAction, resolveExceptionAction, requestPriceOverrideAction, voidClaimAction } from "./actions";
 import { disburseReimbursementAction } from "./reimbursement-actions";
@@ -92,6 +93,23 @@ export default async function ClaimDetailPage({
       ])
     : [null, null, false];
 
+  // OBS-7 fraud gate preview: when the tenant requires fraud clearance, surface
+  // the unresolved alerts at/above threshold that will block an approval, so the
+  // adjudicator sees the reason before hitting Submit (and can send it to the
+  // Fraud console). Advisory only — the enforcement lives in the decision stack.
+  const claimControls = await TenantSettingsService.getClaimControls(tenantId);
+  const blockingFraudAlerts =
+    claimControls.requireFraudClearanceBeforeApproval && canAdjudicate
+      ? (
+          await prisma.claimFraudAlert.findMany({
+            where: { tenantId, claimId: id, resolved: false },
+            select: { id: true, rule: true, severity: true },
+          })
+        ).filter((a) =>
+          TenantSettingsService.severityAtLeast(a.severity, claimControls.fraudApprovalSeverityThreshold),
+        )
+      : [];
+
   // Group structured claim lines by service category
   const linesByCategory = (claim.claimLines ?? []).reduce<Record<string, typeof claim.claimLines>>((acc, line) => {
     const cat = (line as { serviceCategory?: string }).serviceCategory ?? "OTHER";
@@ -169,6 +187,16 @@ export default async function ClaimDetailPage({
           <div className="mt-2 space-y-1 text-sm">
             <div className="flex justify-between"><span className="text-brand-text-body">Billed</span><span className="font-bold text-brand-text-heading">{claim.currency} {Number(claim.billedAmount).toLocaleString()}</span></div>
             <div className="flex justify-between"><span className="text-brand-text-body">Approved</span><span className="font-bold text-[#28A745]">{claim.currency} {Number(claim.approvedAmount).toLocaleString()}</span></div>
+            {/* OBS-2 Ticket 5: base (UGX) equivalent for a non-base claim, pinned at the decision-date rate. */}
+            {claim.currency !== (claim.baseCurrency ?? "UGX") && Number(claim.approvedBaseAmount) > 0 && (
+              <div className="flex justify-between text-xs">
+                <span className="text-brand-text-muted">≈ base ({claim.baseCurrency ?? "UGX"})</span>
+                <span className="font-medium text-brand-text-muted">
+                  {claim.baseCurrency ?? "UGX"} {Number(claim.approvedBaseAmount).toLocaleString()}
+                  {claim.fxRateToBase ? ` @ ${Number(claim.fxRateToBase)}` : ""}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between"><span className="text-brand-text-body">Copay</span><span className="font-semibold text-brand-text-heading">{claim.currency} {Number(claim.copayAmount).toLocaleString()}</span></div>
           </div>
         </div>
@@ -531,6 +559,23 @@ export default async function ClaimDetailPage({
           ) : (
             <div className="mb-4 rounded-lg bg-[#FFF8E1] border border-[#FFC107]/40 px-4 py-2.5 text-xs font-semibold text-[#856404]">
               No contract ceiling — reviewer judgement applies to the approved amount.
+            </div>
+          )}
+
+          {/* OBS-7: fraud-clearance gate banner — approval is blocked until cleared */}
+          {blockingFraudAlerts.length > 0 && (
+            <div className="mb-4 rounded-lg border border-brand-error/40 bg-brand-error/10 px-4 py-3 text-sm text-brand-error">
+              <p className="font-bold">Fraud clearance required before approval</p>
+              <p className="mt-1 text-brand-error/90">
+                This claim has {blockingFraudAlerts.length} unresolved fraud alert(s) at or above{" "}
+                {claimControls.fraudApprovalSeverityThreshold} severity:{" "}
+                {Array.from(new Set(blockingFraudAlerts.map((a) => a.rule))).join(", ")}. Approval
+                will be blocked until the Fraud team clears the alert(s)
+                {claimControls.fraudApprovalGateMode === "CLEAR_ALERT_OR_DUAL_APPROVAL"
+                  ? " or a fraud-clearance approval completes."
+                  : "."}{" "}
+                Declining the claim is still allowed.
+              </p>
             </div>
           )}
 
