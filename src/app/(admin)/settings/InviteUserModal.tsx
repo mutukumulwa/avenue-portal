@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { inviteUserAction } from "./actions";
 import { X } from "lucide-react";
 
@@ -28,9 +29,20 @@ interface InviteUserModalProps {
 }
 
 export function InviteUserModal({ groups = [], brokers = [], members = [], fundGroups = [], providers = [] }: InviteUserModalProps) {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState("");
   const [state, action, pending] = useActionState(inviteUserAction, null);
+
+  // OBS-1: on a successful invite, close the modal and refresh so the Users &
+  // Access list re-renders immediately (previously it stayed blank until reload).
+  useEffect(() => {
+    if (state?.ok) {
+      setOpen(false);
+      setSelectedRole("");
+      router.refresh();
+    }
+  }, [state, router]);
 
   return (
     <>

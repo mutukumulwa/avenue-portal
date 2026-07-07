@@ -3,7 +3,9 @@ import { prisma } from "@/lib/prisma";
 import { Banknote } from "lucide-react";
 
 function money(n: number) {
-  return `KES ${Math.round(n).toLocaleString("en-UG")}`;
+  // OBS-2: settlement is a base-currency (UGX) ledger; align with the admin
+  // settlement + adjudicate panels instead of a hardcoded "KES".
+  return `UGX ${Math.round(n).toLocaleString("en-UG")}`;
 }
 
 const TONE: Record<string, string> = {

@@ -25,6 +25,9 @@ const db = vi.hoisted(() => {
     },
     journalEntry: { count: vi.fn(async () => 0), create: vi.fn(async (a: any) => ({ id: "je1", ...a.data })) },
     auditLog: { findFirst: vi.fn(async () => null), create: vi.fn(async () => ({})) },
+    // PR-V02: settle now writes set-based (updateMany + one raw UPDATE) instead
+    // of a per-claim loop, so the transaction cannot time out on large batches.
+    $executeRaw: vi.fn(async () => 2),
     $transaction: vi.fn(async (fn: any) => fn(state)),
   };
   return state;
@@ -69,21 +72,19 @@ describe("markSettlementBatchPaid (PR-018 D1)", () => {
     expect(voucher.totalAmount).toBe(50000);
     expect(voucher.claimCount).toBe(2);
 
-    // Claims paid, stamped, voucher-linked — and paidAmount = approved payable
-    // per claim (NW-D05, so member "plan paid" + statements reflect settled money).
-    expect(db.claim.update).toHaveBeenCalledTimes(2);
-    expect(db.claim.update).toHaveBeenCalledWith(
+    // PR-V02: claims are settled with set-based writes (no per-claim loop, so a
+    // 46-claim batch can't blow the interactive-transaction timeout). One
+    // updateMany stamps the constant fields for the whole batch...
+    expect(db.claim.update).not.toHaveBeenCalled();
+    expect(db.claim.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: "c1" },
-        data: expect.objectContaining({ status: "PAID", paymentVoucherId: "pv1", paidAt: expect.any(Date), paidAmount: 30000 }),
+        where: { settlementBatchId: "batch1" },
+        data: expect.objectContaining({ status: "PAID", paymentVoucherId: "pv1", paidAt: expect.any(Date) }),
       }),
     );
-    expect(db.claim.update).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { id: "c2" },
-        data: expect.objectContaining({ status: "PAID", paidAmount: 20000 }),
-      }),
-    );
+    // ...and one raw UPDATE sets paidAmount = approvedAmount per row (NW-D05, so
+    // member "plan paid" + statements reflect settled money).
+    expect(db.$executeRaw).toHaveBeenCalledTimes(1);
 
     // Batch settled.
     expect(db.providerSettlementBatch.update).toHaveBeenCalledWith(
@@ -96,7 +97,8 @@ describe("markSettlementBatchPaid (PR-018 D1)", () => {
     await expect(
       claimAdjudicationService.markSettlementBatchPaid("batch1", T, "finance1"),
     ).rejects.toThrow(/GL account .* not found/);
-    expect(db.claim.update).not.toHaveBeenCalled();
+    expect(db.claim.updateMany).not.toHaveBeenCalled();
+    expect(db.$executeRaw).not.toHaveBeenCalled();
   });
 
   it("only CHECKER_APPROVED batches can be marked paid", async () => {

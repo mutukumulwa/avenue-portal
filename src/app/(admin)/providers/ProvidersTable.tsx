@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, Search } from "lucide-react";
 
@@ -27,17 +28,27 @@ const tierColor = (tier: string) => {
 const contractColor = (s: string) =>
   s === "ACTIVE" ? "bg-[#28A745]/10 text-[#28A745]" : "bg-[#DC3545]/10 text-[#DC3545]";
 
-export function ProvidersTable({ providers }: { providers: Provider[] }) {
-  const [q, setQ] = useState("");
+export function ProvidersTable({ providers, initialQuery = "" }: { providers: Provider[]; initialQuery?: string }) {
+  const router = useRouter();
+  const [q, setQ] = useState(initialQuery);
 
-  const filtered = q.trim()
-    ? providers.filter(p =>
-        p.name.toLowerCase().includes(q.toLowerCase()) ||
-        p.type.toLowerCase().includes(q.toLowerCase()) ||
-        p.tier.toLowerCase().includes(q.toLowerCase()) ||
-        (p.county ?? "").toLowerCase().includes(q.toLowerCase())
-      )
-    : providers;
+  // Keep the box in sync when the server re-renders with a new query (back/forward).
+  useEffect(() => { setQ(initialQuery); }, [initialQuery]);
+
+  // PR-V01: search the WHOLE network server-side. Debounce so each keystroke
+  // doesn't hammer the server; skip when the box already matches the URL query
+  // (prevents a re-render → re-push loop). The page re-queries with ?q=.
+  useEffect(() => {
+    const trimmed = q.trim();
+    if (trimmed === initialQuery) return;
+    const t = setTimeout(() => {
+      router.push(trimmed ? `/providers?q=${encodeURIComponent(trimmed)}` : "/providers");
+    }, 350);
+    return () => clearTimeout(t);
+  }, [q, initialQuery, router]);
+
+  // Rows are already filtered server-side; render them as-is.
+  const filtered = providers;
 
   return (
     <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">

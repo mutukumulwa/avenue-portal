@@ -67,7 +67,9 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Override Queue",     href: "/overrides",          icon: TriangleAlert,  roles: OPS        },
       { label: "Cross-Border Care",  href: "/cross-border",       icon: Globe2,         roles: OPS        },
       { label: "Wellness",           href: "/wellness",           icon: HeartPulse,     roles: OPS        },
-      { label: "Exceptions",         href: "/settings/exceptions",icon: TriangleAlert,  roles: OPS        },
+      // OBS-6: /settings/exceptions is ADMIN_ONLY-guarded — showing it to OPS
+      // gave claims/medical officers a nav link that only led to Access Denied.
+      { label: "Exceptions",         href: "/settings/exceptions",icon: TriangleAlert,  roles: ADMIN_ONLY },
       { label: "Secure Check-Ins",   href: "/check-ins",          icon: Fingerprint,    roles: OPS        },
       { label: "Providers",          href: "/providers",          icon: Building,       roles: ADMIN_ONLY },
       { label: "Contracts",          href: "/contracts",          icon: FileSignature,  roles: UNDERWRITING },

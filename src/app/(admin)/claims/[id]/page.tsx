@@ -167,9 +167,9 @@ export default async function ClaimDetailPage({
         <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm">
           <p className="text-xs text-brand-text-muted font-bold uppercase tracking-wide">Financial Summary</p>
           <div className="mt-2 space-y-1 text-sm">
-            <div className="flex justify-between"><span className="text-brand-text-body">Billed</span><span className="font-bold text-brand-text-heading">KES {Number(claim.billedAmount).toLocaleString()}</span></div>
-            <div className="flex justify-between"><span className="text-brand-text-body">Approved</span><span className="font-bold text-[#28A745]">KES {Number(claim.approvedAmount).toLocaleString()}</span></div>
-            <div className="flex justify-between"><span className="text-brand-text-body">Copay</span><span className="font-semibold text-brand-text-heading">KES {Number(claim.copayAmount).toLocaleString()}</span></div>
+            <div className="flex justify-between"><span className="text-brand-text-body">Billed</span><span className="font-bold text-brand-text-heading">{claim.currency} {Number(claim.billedAmount).toLocaleString()}</span></div>
+            <div className="flex justify-between"><span className="text-brand-text-body">Approved</span><span className="font-bold text-[#28A745]">{claim.currency} {Number(claim.approvedAmount).toLocaleString()}</span></div>
+            <div className="flex justify-between"><span className="text-brand-text-body">Copay</span><span className="font-semibold text-brand-text-heading">{claim.currency} {Number(claim.copayAmount).toLocaleString()}</span></div>
           </div>
         </div>
       </div>
@@ -654,13 +654,13 @@ export default async function ClaimDetailPage({
               <div>
                 <p className="text-xs text-brand-text-muted">Billed amount</p>
                 <p className="font-semibold text-brand-text-heading mt-0.5">
-                  KES {Number(claim.billedAmount).toLocaleString("en-UG")}
+                  {claim.currency} {Number(claim.billedAmount).toLocaleString("en-UG")}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-brand-text-muted">Contracted rate</p>
+                <p className="text-xs text-brand-text-muted">Contracted (tariffed lines)</p>
                 <p className="font-semibold text-brand-text-heading mt-0.5">
-                  KES {Number(p9Claim.contractedRate).toLocaleString("en-UG")}
+                  {claim.currency} {Number(p9Claim.contractedRate).toLocaleString("en-UG")}
                 </p>
               </div>
               <div>

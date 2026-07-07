@@ -51,6 +51,18 @@ export async function ContractPanel({ tenantId, claimId }: { tenantId: string; c
         )}
       </div>
 
+      {/* OBS-4: when no digital contract is linked, the engine reports payable 0
+          here — which contradicts the tariff-priced ceiling the adjudicator
+          actually uses below. Make the caveat explicit so nobody reads this as
+          "nothing is payable". */}
+      {!result.contractId && (
+        <div className="mb-4 rounded-lg border border-[#17A2B8]/30 bg-[#17A2B8]/5 px-3 py-2 text-xs text-[#0c6472]">
+          No <span className="font-semibold">digital contract</span> is linked to this claim, so the engine can&apos;t price it here.
+          The claim is still priced from the provider&apos;s tariff schedule during adjudication — use the{" "}
+          <span className="font-semibold">Adjudicate</span> panel below for the payable amount and contract ceiling.
+        </div>
+      )}
+
       {/* Claim-level banner */}
       <div className="mb-4 flex flex-wrap items-center gap-3 text-xs">
         <span className={`rounded-full px-2.5 py-0.5 font-medium ${DECISION_STYLE[result.claimDecision === "PARTIALLY_APPROVED" ? "APPROVED_WITH_ADJUSTMENT" : result.claimDecision] ?? "bg-gray-100 text-gray-600"}`}>

@@ -155,14 +155,21 @@ export const claimAdjudicationService = {
       claim.member?.group?.clientId, // per-client tariff resolution (G5.4)
     );
 
-    let totalBilled     = 0;
+    // OBS-5: compare like-for-like. Only lines that resolved a contracted rate
+    // can be "billed above contract"; untariffed lines (no agreed rate) are
+    // governed by the contract's unlisted → manual-review rule, not by an
+    // upcoding variance. The previous code summed ALL billed against the
+    // contracted total of only the tariffed lines, so a 3,500 tariffed
+    // consultation next to an 8,000 lab + 5,000 pharmacy read as 371% "over"
+    // and false-flagged essentially every mixed outpatient claim.
+    let billedForContractedLines = 0;
     let totalContracted = 0;
     let hasContractedRate = false;
 
     for (const line of claim.claimLines) {
-      totalBilled += Number(line.billedAmount);
       const rate = rates.find(r => r.lineId === line.id);
       if (rate?.agreedRate != null) {
+        billedForContractedLines += Number(line.billedAmount);
         totalContracted += rate.agreedRate * line.quantity;
         hasContractedRate = true;
       }
@@ -170,7 +177,7 @@ export const claimAdjudicationService = {
 
     if (!hasContractedRate || totalContracted === 0) return null;
 
-    const variancePct = (totalBilled - totalContracted) / totalContracted;
+    const variancePct = (billedForContractedLines - totalContracted) / totalContracted;
 
     await prisma.claim.update({
       where: { id: claimId },
@@ -189,12 +196,12 @@ export const claimAdjudicationService = {
           rule:     "CONTRACTED_RATE_VARIANCE",
           score:    Math.min(100, Math.round(variancePct * 200)),
           severity: variancePct > 0.5 ? "HIGH" : "MEDIUM",
-          notes:    `Billed KES ${totalBilled.toLocaleString("en-UG")} vs contracted KES ${totalContracted.toLocaleString("en-UG")} (${(variancePct * 100).toFixed(1)}% over)`,
+          notes:    `Tariffed lines billed ${claim.currency} ${billedForContractedLines.toLocaleString("en-UG")} vs contracted ${claim.currency} ${totalContracted.toLocaleString("en-UG")} (${(variancePct * 100).toFixed(1)}% over)`,
         },
       });
     }
 
-    return { totalBilled, totalContracted, variancePct };
+    return { billedForContractedLines, totalContracted, variancePct };
   },
 
   // ── 3. Per-line adjudication ────────────────────────────────────────────────
@@ -507,25 +514,25 @@ export const claimAdjudicationService = {
         },
       });
 
-      // NW-D05: record the amount actually paid per claim (= approved payable),
-      // so member "plan paid" and provider statements reflect settled money.
-      for (const c of claims) {
-        await tx.claim.update({
-          where: { id: c.id },
-          data: {
-            status: "PAID",
-            paidAt,
-            paidAmount: Number(c.approvedAmount),
-            paymentVoucherId: voucher.id,
-          },
-        });
-      }
+      // PR-V02: settle the batch with SET-BASED writes. The previous per-claim
+      // `tx.claim.update()` loop issued one round-trip per claim; on a normal
+      // monthly batch (46 claims) against a remote Postgres it blew past the 5s
+      // interactive-transaction limit and stranded the batch at CHECKER_APPROVED.
+      // Two statements now, regardless of batch size:
+      //   1) constant fields for every claim in the batch, then
+      //   2) paidAmount = approvedAmount per row (NW-D05: member "plan paid" and
+      //      provider statements reflect the money actually settled).
+      await tx.claim.updateMany({
+        where: { settlementBatchId: batchId },
+        data: { status: "PAID", paidAt, paymentVoucherId: voucher.id },
+      });
+      await tx.$executeRaw`UPDATE "Claim" SET "paidAmount" = "approvedAmount" WHERE "settlementBatchId" = ${batchId}`;
 
       return tx.providerSettlementBatch.update({
         where: { id: batchId },
         data: { status: "SETTLED", settledAt: paidAt },
       });
-    });
+    }, { maxWait: 15000, timeout: 60000 });
 
     await auditChainService.append({
       actorId: userId,

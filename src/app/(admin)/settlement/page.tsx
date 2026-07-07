@@ -1,5 +1,6 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
+import { safeActionError } from "@/lib/safe-action-error";
 import { ProvidersService } from "@/server/services/providers.service";
 import { claimAdjudicationService } from "@/server/services/claim-adjudication.service";
 import { CheckCircle2, Clock, AlertTriangle, DollarSign } from "lucide-react";
@@ -23,9 +24,8 @@ async function approveSettlementBatchAction(formData: FormData) {
     const session = await requireRole(ROLES.FINANCE);
     const batchId = formData.get("batchId") as string;
     await claimAdjudicationService.approveSettlementBatch(batchId, session.user.tenantId, session.user.id);
-  } catch (err: any) {
-    if (err.message === "NEXT_REDIRECT") throw err;
-    errorMsg = err instanceof Error ? err.message : "An error occurred";
+  } catch (err) {
+    errorMsg = safeActionError(err, "settlement");
   }
 
   if (errorMsg) {
@@ -49,9 +49,8 @@ async function createSettlementBatchAction(formData: FormData) {
     await claimAdjudicationService.createSettlementBatch(
       session.user.tenantId, providerId, cycleMonth, cycleYear, session.user.id,
     );
-  } catch (err: any) {
-    if (err.message === "NEXT_REDIRECT") throw err;
-    errorMsg = err instanceof Error ? err.message : "An error occurred";
+  } catch (err) {
+    errorMsg = safeActionError(err, "settlement");
   }
 
   if (errorMsg) {
@@ -71,9 +70,8 @@ async function markSettlementBatchPaidAction(formData: FormData) {
     const session = await requireRole(ROLES.FINANCE);
     const batchId = formData.get("batchId") as string;
     await claimAdjudicationService.markSettlementBatchPaid(batchId, session.user.tenantId, session.user.id);
-  } catch (err: any) {
-    if (err.message === "NEXT_REDIRECT") throw err;
-    errorMsg = err instanceof Error ? err.message : "An error occurred";
+  } catch (err) {
+    errorMsg = safeActionError(err, "settlement");
   }
 
   if (errorMsg) {
@@ -110,7 +108,10 @@ export default async function SettlementPage({
   const currentMonth = now.getMonth() + 1;
   const currentYear  = now.getFullYear();
 
-  const fmt = (n: number) => `KES ${Math.round(n).toLocaleString("en-UG")}`;
+  // OBS-2: platform base currency is UGX; the adjudicate panel + engine already
+  // label amounts UGX. Settlement previously hardcoded "KES", producing the
+  // KES/UGX split the UAT flagged on the same money.
+  const fmt = (n: number) => `UGX ${Math.round(n).toLocaleString("en-UG")}`;
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">

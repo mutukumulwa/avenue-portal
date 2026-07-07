@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { ApprovalRequestService } from "@/server/services/approval-request.service";
 import { writeAudit } from "@/lib/audit";
+import { safeActionError } from "@/lib/safe-action-error";
 
 export async function decideApprovalAction(formData: FormData) {
   const session = await requireRole(ROLES.OPS);
@@ -28,9 +29,8 @@ export async function decideApprovalAction(formData: FormData) {
       description: `${decision} approval request ${requestId} (now ${result?.status})`,
       metadata: { requestId, status: result?.status ?? null },
     });
-  } catch (err: any) {
-    if (err.message === "NEXT_REDIRECT") throw err;
-    errorMsg = err instanceof Error ? err.message : "Failed to record decision";
+  } catch (err) {
+    errorMsg = safeActionError(err, "approvals");
   }
 
   if (errorMsg) redirect(`/approvals?error=${encodeURIComponent(errorMsg)}`);

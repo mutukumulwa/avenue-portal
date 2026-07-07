@@ -1,7 +1,6 @@
 "use server";
 
 import { requireRole, ROLES } from "@/lib/rbac";
-import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { writeAudit } from "@/lib/audit";
 import { validatePassword } from "@/lib/password-policy";
@@ -18,9 +17,9 @@ const PORTAL_ROLES = new Set<UserRole>([
 ]);
 
 export async function inviteUserAction(
-  _prev: { error?: string } | null,
+  _prev: { error?: string; ok?: boolean } | null,
   formData: FormData
-): Promise<{ error: string }> {
+): Promise<{ error?: string; ok?: boolean }> {
   const session = await requireRole(ROLES.ADMIN_ONLY);
 
   const email     = (formData.get("email")     as string).trim().toLowerCase();
@@ -112,7 +111,11 @@ export async function inviteUserAction(
     metadata: { newUserId: user.id, role, linkedPortal: PORTAL_ROLES.has(role), fundSchemeCount: fundGroupIds.length },
   });
 
-  redirect("/settings");
+  // OBS-1: return a success flag instead of navigating. A server redirect inside
+  // a useActionState action left the Users & Access pane blank until a manual
+  // reload; the modal now closes + router.refresh()es on `ok`.
+  revalidatePath("/settings");
+  return { ok: true };
 }
 
 export async function updateUserAccessAction(formData: FormData) {

@@ -3,6 +3,7 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { safeActionError } from "@/lib/safe-action-error";
 import { ClaimsService } from "@/server/services/claims.service";
 import { ClaimDecisionService } from "@/server/services/claim-decision.service";
 import { overrideService } from "@/server/services/override.service";
@@ -70,9 +71,8 @@ export async function adjudicateClaimAction(formData: FormData) {
       description: `Claim ${claim.claimNumber} ${action.toLowerCase().replace(/_/g, " ")} — ${claim.currency} ${approvedAmount.toLocaleString()}`,
       metadata: { claimId, action, approvedAmount },
     });
-  } catch (err: unknown) {
-    if (err instanceof Error && err.message === "NEXT_REDIRECT") throw err;
-    errorMsg = err instanceof Error ? err.message : "An error occurred";
+  } catch (err) {
+    errorMsg = safeActionError(err, "claim-decision");
   }
 
   if (errorMsg) {
@@ -111,9 +111,8 @@ export async function requestPriceOverrideAction(formData: FormData) {
       financialImpact: impact,
     });
     okMsg = "Override request raised — it must be approved on the Overrides console before the amount can be approved.";
-  } catch (err: unknown) {
-    if (err instanceof Error && err.message === "NEXT_REDIRECT") throw err;
-    errorMsg = err instanceof Error ? err.message : "An error occurred";
+  } catch (err) {
+    errorMsg = safeActionError(err, "claim-decision");
   }
 
   redirect(`/claims/${claimId}?${errorMsg ? `error=${encodeURIComponent(errorMsg)}` : `notice=${encodeURIComponent(okMsg)}`}`);
@@ -142,9 +141,8 @@ export async function voidClaimAction(formData: FormData) {
       description: `Claim ${claim.claimNumber} voided — ${reason}`,
       metadata: { claimId, reason },
     });
-  } catch (err: unknown) {
-    if (err instanceof Error && err.message === "NEXT_REDIRECT") throw err;
-    errorMsg = err instanceof Error ? err.message : "An error occurred";
+  } catch (err) {
+    errorMsg = safeActionError(err, "claim-decision");
   }
 
   if (errorMsg) redirect(`/claims/${claimId}?error=${encodeURIComponent(errorMsg)}`);
