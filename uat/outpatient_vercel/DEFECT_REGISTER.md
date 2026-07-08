@@ -1,10 +1,10 @@
 # Defect Register — Outpatient Front-End UAT (Vercel)
 
-> **2026-07-08 — Remediation pass complete (per `DEFECT_AND_ISSUE_REMEDIATION_PLAN.md`).** All open defects/observations are fixed in code (`FIXED-VERIFIED-LOCAL`), pending live re-verification on the next Vercel deploy. Summary:
+> **2026-07-08 — Remediation pass complete + deployed + live-verified (per `DEFECT_AND_ISSUE_REMEDIATION_PLAN.md`).** Deployed to Vercel production `avenue-portal.vercel.app` (`dpl_A4BWgjQD…`, commit `cb01636`); D02/D04 exploit curls + money-spine GL re-run live. Summary:
 > | ID | Sev | Status (2026-07-08) | Evidence |
 > |----|-----|--------------------|----------|
-> | **E2E-D02** provider API read scoping | Critical | **FIXED-VERIFIED-LOCAL** | `eligibility`/`benefits`/`claims` GET scoped via `ProviderEntitlementService` + `providerScopeWhere`; `tests/api/provider-read-scope.test.ts` (13 cases). |
-> | **E2E-D04** preauth create scoping | Critical | **FIXED-VERIFIED-LOCAL** | `POST /api/v1/preauth` now key-scoped (provider from key, entitlement + same-tenant, spoof→403); `tests/api/provider-preauth-scope.test.ts` (8 cases). |
+> | **E2E-D02** provider API read scoping | Critical | **FIXED-VERIFIED-LIVE** | Live prod: out-of-scope NWSC member → 404 (was PII+DOB), cross-facility IHK claim → 404, garbage key → 401; in-scope Safaricom/KCB → 200. `tests/api/provider-read-scope.test.ts` (13). |
+> | **E2E-D04** preauth create scoping | Critical | **FIXED-VERIFIED-LIVE** | Live prod: out-of-scope preauth (± spoofed providerCode) → 404, **0 rows written** (DB-confirmed); no-auth→401, empty→400. `tests/api/provider-preauth-scope.test.ts` (8). |
 > | **E2E-D01** member full-name search | Medium | **FIXED-VERIFIED-LOCAL** | `memberSearchClause` token-AND search; `tests/lib/member-search.test.ts` (8 cases). |
 > | **E2E-OBS-MEMSEL** invite selector cap | Low | **FIXED-VERIFIED-LOCAL** | Async `MemberSearchPicker` → `GET /api/admin/members/search` (scoped, unlinked-only); removed 250-cap preload; server-side scope re-check in `inviteUserAction`. |
 > | **E2E-OBS-CUR / OBS-2** residual KES labels | Low/Med | **FIXED-VERIFIED-LOCAL** | Global de-KES sweep (271 labels / 64 files); guard now scans 622 files (`npm run currency:guard`). |

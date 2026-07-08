@@ -1,6 +1,20 @@
 # GO / NO-GO — Comprehensive Outpatient Front-End UAT (Vercel)
 
-**Verdict: 🟢 GO (pending live re-verification on next deploy)** — updated 2026-07-08 after the full remediation pass (`DEFECT_AND_ISSUE_REMEDIATION_PLAN.md`). Both Critical provider-API IDOR blockers (**E2E-D02** read scope, **E2E-D04** preauth write scope) are fixed in code with regression tests, and every remaining Medium/Low/condition item (E2E-D01 search, OBS-MEMSEL invite, OBS-CUR/OBS-2 currency+FX, OBS-7 fraud gate, OBS-6 nav) is resolved. Code gates: `typecheck` clean · **542/542 vitest** · `currency:guard` (622 files) OK · no lint regressions. **The GO becomes final once these fixes are deployed to Vercel and the D02/D04 exploit curls + the money spine are re-run live** (the last standing verification step, per §16 of the remediation plan).
+**Verdict: 🟢 GO — deployed and live-verified 2026-07-08.** After the full remediation pass (`DEFECT_AND_ISSUE_REMEDIATION_PLAN.md`), the fixes were deployed to Vercel **production** (`avenue-portal.vercel.app`, deployment `dpl_A4BWgjQD…`, commit `cb01636`, READY) and the D02/D04 exploit paths + the money-spine end-state were re-run **live**. Both Critical provider-API IDOR blockers are closed, every Medium/Low/condition item is resolved, and the money spine's GL is intact.
+
+> **Live production re-verification (2026-07-08, commit `cb01636`)** — run with a temporary Aga Khan provider key (minted for the test, deleted after):
+> | Live check (avenue-portal.vercel.app) | Result |
+> |---|---|
+> | **E2E-D02** eligibility, out-of-scope NWSC member `NWSC-2026-01768` | **404 "Member not found"** (was 200 + full PII incl. DOB) ✅ |
+> | **E2E-D02** in-scope Safaricom/KCB members (`AVH-DEMO-SAF-0023-S`, `AVH-2024-00010`) | 200 (correct — same Default Client Aga Khan is contracted to) ✅ |
+> | **E2E-D02** cross-facility claim `CLM-2026-00284` (IHK) via Aga Khan key | **404 "Claim not found"** (was 200 + PII + amounts) ✅ |
+> | **E2E-D02** garbage key | 401 ✅ |
+> | **E2E-D04** preauth for out-of-scope member (± spoofed `providerCode`) | **404, zero rows written** (DB-confirmed 0 new PreAuthorization in the window) ✅ |
+> | **E2E-D04** no-auth / empty body controls | 401 / 400 ✅ |
+> | **Money spine** GL trial balance (live DB) | **Balanced** — debits = credits = 9,266,180, imbalance 0 ✅ |
+> | **Money spine** settlement chains (live DB) | Every SETTLED batch ↔ PROCESSED voucher (matching total) ↔ **balanced JE** ↔ PAID claim; all UGX (e.g. PV-2026-00005 UGX 10,500 balanced) ✅ |
+>
+> Code gates before deploy: `typecheck` clean · **542/542 vitest** · `currency:guard` (622 files) OK · no lint regressions.
 
 > **2026-07-08 remediation scoreboard**
 > | Blocker / condition | Prior | Now |
