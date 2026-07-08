@@ -565,6 +565,13 @@ export default async function ClaimDetailPage({
                   {claim.currency} {Math.round(Number(claim.billedAmount) - ceiling.ceiling).toLocaleString("en-UG")}
                 </p>
               </div>
+              {ceiling.hasUnpricedLines && (
+                <p className="col-span-3 text-xs font-semibold text-[#856404]">
+                  BD-07: one or more line(s) are uncoded/unlisted with no contracted rate — they are EXCLUDED from the payable ceiling above.
+                  Correct the coding so the tariff binds, adjust the line to a documented amount, or raise a PAY ABOVE CONTRACT RATE override to pay them.
+                  Approving the full billed amount is not permitted.
+                </p>
+              )}
               {priceOverrideApproved && (
                 <p className="col-span-3 text-xs font-semibold text-[#856404]">
                   An approved PAY ABOVE CONTRACT RATE override exists — the ceiling may be exceeded for this claim.

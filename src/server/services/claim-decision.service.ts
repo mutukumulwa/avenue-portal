@@ -82,6 +82,17 @@ export interface CeilingAssessment {
   contractNumber: string | null;
   /** True when there IS an active contract but nothing on the claim is priced. */
   unpriced?: boolean;
+  /**
+   * BD-07: true when SOME lines priced but at least one OTHER line resolved to
+   * NO enforceable contracted price (uncoded/unlisted → refer / rate-missing)
+   * and was therefore EXCLUDED from the ceiling. The ceiling is the sum of the
+   * priced lines only; paying the excluded line(s) needs a documented
+   * PAY_ABOVE_CONTRACT_RATE override. Distinct from `unpriced` (the all-lines-
+   * unpriced, deterministic-0 case). Closes the BD-04/BD-07 bypass where an
+   * uncoded line bundled with a priced one rode into the payable ceiling at
+   * full billed and was approvable with no override.
+   */
+  hasUnpricedLines?: boolean;
 }
 
 const EPSILON = 0.01;
@@ -101,17 +112,17 @@ export class ClaimDecisionService {
     if (engine?.matched) {
       let ceiling = 0;
       let anyDeterministic = false;
-      const billedById = new Map<string, number>();
-      const claimLines = await prisma.claimLine.findMany({
-        where: { claimId },
-        select: { id: true, billedAmount: true },
-      });
-      for (const l of claimLines) billedById.set(l.id, Number(l.billedAmount));
+      let anyUnpriced = false;
 
       for (const line of engine.lines) {
         if (line.decision === "PENDED") {
-          // Reviewer judgement — the billed amount is the loosest bound.
-          ceiling += billedById.get(line.lineId) ?? 0;
+          // BD-07: a PENDED line (REFER_FOR_REVIEW / rate-missing) has NO
+          // enforceable contracted price, so it must contribute 0 to the
+          // ceiling — NOT its full billed amount. Folding billed in let an
+          // uncoded line bundled with a priced one be approved at full billed
+          // with no PAY_ABOVE_CONTRACT_RATE override (the proven CLM-2026-00295
+          // bypass). The unpriced remainder is routed to an explicit override.
+          anyUnpriced = true;
         } else {
           ceiling += line.payableAmount;
           anyDeterministic = true;
@@ -129,6 +140,7 @@ export class ClaimDecisionService {
           deterministic: true,
           enginePayable: engine.totals.payable,
           contractNumber: engine.contractNumber,
+          hasUnpricedLines: anyUnpriced,
         };
       }
     }
@@ -138,13 +150,20 @@ export class ClaimDecisionService {
     if (rates.length > 0) {
       let ceiling = 0;
       let hasEnforceableLines = false;
+      let anyUnpriced = false;
       for (const r of rates) {
         const cappedQty = r.maxQuantityPerVisit != null ? Math.min(r.quantity, r.maxQuantityPerVisit) : r.quantity;
         if (r.allowedUnit !== null) {
           hasEnforceableLines = true;
           ceiling += r.allowedUnit * cappedQty;
         } else {
-          ceiling += r.unitCost * cappedQty; // REFER_FOR_REVIEW — reviewer judgement
+          // BD-07: allowedUnit === null means NO_CONTRACT / REFER_FOR_REVIEW —
+          // the line has no enforceable contracted price, so it contributes 0
+          // to the ceiling (NOT its full billed unitCost). Folding billed in
+          // let an uncoded/unlisted line bundled with a priced one be approved
+          // at full billed with no override. (PAY_AS_BILLED / DISCOUNT unlisted
+          // rules resolve to a NON-null allowedUnit and are unaffected.)
+          anyUnpriced = true;
         }
       }
       if (hasEnforceableLines) {
@@ -156,6 +175,7 @@ export class ClaimDecisionService {
           deterministic: true,
           enginePayable: null,
           contractNumber: contract?.contractNumber ?? null,
+          hasUnpricedLines: anyUnpriced,
         };
       }
 

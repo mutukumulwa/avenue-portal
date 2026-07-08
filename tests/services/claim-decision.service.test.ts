@@ -302,7 +302,10 @@ describe("PR-014 — contract price ceiling", () => {
     expect(assessment.deterministic).toBe(true);
   });
 
-  it("PENDED (REFER_FOR_REVIEW) lines stay reviewer judgement — capped at billed, not blocked", async () => {
+  it("BD-07: a PENDED (uncoded/unlisted) line contributes 0 to the ceiling — NOT its billed amount", async () => {
+    // Proven CLM-2026-00295 shape: one priced line + one uncoded line that pends
+    // for review. Folding the pended line's billed amount into the ceiling is the
+    // BD-07 bypass — it must be EXCLUDED so the ceiling is the priced sum only.
     engine.evaluateClaimById.mockResolvedValue({
       matched: true,
       contractNumber: "PC-2026-001",
@@ -312,12 +315,10 @@ describe("PR-014 — contract price ceiling", () => {
         { lineId: "l2", decision: "PENDED", payableAmount: 0 },
       ],
     });
-    db.claimLine.findMany.mockResolvedValue([
-      { id: "l1", billedAmount: 6000 },
-      { id: "l2", billedAmount: 80000 },
-    ]);
     const assessment = await ClaimDecisionService.assessCeiling(T, "clm1");
-    expect(assessment.ceiling).toBe(81000); // 1000 payable + 80000 billed (pended)
+    expect(assessment.ceiling).toBe(1000); // priced line only; the pended 80,000 excluded
+    expect(assessment.hasUnpricedLines).toBe(true);
+    expect(assessment.deterministic).toBe(true);
   });
 
   it("an approved PAY_ABOVE_CONTRACT_RATE override lets the decision exceed the ceiling", async () => {
@@ -333,7 +334,7 @@ describe("PR-014 — contract price ceiling", () => {
     await expect(decide({ approvedAmount: 86000 })).resolves.toBeTruthy();
   });
 
-  it("FFS tariff fallback preserves the pre-existing ceiling behaviour", async () => {
+  it("BD-07 (FFS): an unpriced tariff line (allowedUnit null) contributes 0 — priced lines only", async () => {
     claimsSvc.resolveClaimContractRates.mockResolvedValue({
       contract: { contractNumber: "PC-2026-002", unlistedServiceRule: "REFER_FOR_REVIEW", unlistedDiscountPct: null },
       lines: [
@@ -342,7 +343,24 @@ describe("PR-014 — contract price ceiling", () => {
       ],
     });
     const assessment = await ClaimDecisionService.assessCeiling(T, "clm1");
-    expect(assessment.ceiling).toBe(8000); // 1500×2 + 5000 judgement line
+    expect(assessment.ceiling).toBe(3000); // 1500×2 only; the uncoded 5,000 line excluded
+    expect(assessment.hasUnpricedLines).toBe(true);
+  });
+
+  it("FFS: a PAY_AS_BILLED unlisted rule (non-null allowedUnit) still prices deterministically", async () => {
+    // Regression guard for the BD-07 fix: legitimate unlisted rules that resolve
+    // to a real allowedUnit (pay-as-billed / discount-off-billed) must NOT be
+    // zeroed — only genuinely-unpriced (allowedUnit === null) lines are excluded.
+    claimsSvc.resolveClaimContractRates.mockResolvedValue({
+      contract: { contractNumber: "PC-2026-003", unlistedServiceRule: "PAY_AS_BILLED", unlistedDiscountPct: null },
+      lines: [
+        { lineId: "l1", cptCode: "99213", allowedUnit: 1500, quantity: 1, maxQuantityPerVisit: null, unitCost: 2000, requiresPreauth: false, quantityExceeded: false },
+        { lineId: "l2", cptCode: null, allowedUnit: 5000, quantity: 1, maxQuantityPerVisit: null, unitCost: 5000, requiresPreauth: false, quantityExceeded: false },
+      ],
+    });
+    const assessment = await ClaimDecisionService.assessCeiling(T, "clm1");
+    expect(assessment.ceiling).toBe(6500); // 1500 + 5000 pay-as-billed (both priced)
+    expect(assessment.hasUnpricedLines).toBeFalsy();
   });
 });
 
@@ -609,5 +627,81 @@ describe("assessCeiling — unpriced active contract (BD-04)", () => {
       }),
     ).rejects.toThrow(/no line resolved to a contracted price|uncoded or unlisted/i);
     expect(db.claim.update).not.toHaveBeenCalled();
+  });
+});
+
+// BD-07: a MIXED claim (some lines priced, at least one uncoded/unlisted) must
+// NOT let the uncoded line's billed amount ride into the payable ceiling. The
+// ceiling is the priced sum only; approving the full billed amount is blocked
+// and routed to a PAY_ABOVE_CONTRACT_RATE override. Proven end-to-end on prod
+// as CLM-2026-00295 (consultation priced 3,500 + uncoded bundle billed 80,000
+// → payable ceiling had inflated to 83,500 and Approve(Full) was accepted).
+describe("BD-07 — mixed coded + uncoded claim (money-control regression)", () => {
+  beforeEach(() => {
+    db.claim.findUnique.mockResolvedValue(
+      baseClaim({ currency: "UGX", benefitCategory: "OUTPATIENT", serviceType: "OUTPATIENT", billedAmount: 83500 }),
+    );
+    db.overrideRecord.findFirst.mockResolvedValue(null);
+  });
+
+  const mixedEngine = () =>
+    engine.evaluateClaimById.mockResolvedValue({
+      matched: true,
+      contractNumber: "PC-2026-001",
+      totals: { payable: 3500, billed: 83500 },
+      lines: [
+        { lineId: "l1", decision: "AUTO_APPROVED", payableAmount: 3500 }, // CONSULTATION 99213
+        { lineId: "l2", decision: "PENDED", payableAmount: 0 },           // uncoded bundle, billed 80,000
+      ],
+    });
+
+  const decideMixed = (over: Partial<any> = {}) =>
+    ClaimDecisionService.decide(T, "clm1", {
+      action: "APPROVED",
+      approvedAmount: 3500,
+      reviewerId: "u1",
+      reviewerRole: "CLAIMS_OFFICER",
+      ...over,
+    });
+
+  it("engine branch: ceiling excludes the uncoded line — 3,500, not 83,500", async () => {
+    mixedEngine();
+    const a = await ClaimDecisionService.assessCeiling(T, "clm1");
+    expect(a.ceiling).toBe(3500);
+    expect(a.hasUnpricedLines).toBe(true);
+    expect(a.deterministic).toBe(true);
+  });
+
+  it("engine branch: full-billed approval (83,500) is BLOCKED and routed to an override", async () => {
+    mixedEngine();
+    await expect(decideMixed({ approvedAmount: 83500 })).rejects.toThrow(
+      /payable ceiling[\s\S]*3,500[\s\S]*PAY_ABOVE_CONTRACT_RATE/,
+    );
+    expect(db.claim.update).not.toHaveBeenCalled();
+  });
+
+  it("engine branch: approving the priced portion (3,500) succeeds with no override", async () => {
+    mixedEngine();
+    await expect(decideMixed({ approvedAmount: 3500 })).resolves.toBeTruthy();
+    expect(db.claim.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: "APPROVED", approvedAmount: 3500 }) }),
+    );
+  });
+
+  it("FFS branch: an uncoded tariff line is likewise excluded and blocks full-billed", async () => {
+    engine.evaluateClaimById.mockResolvedValue(null); // no engine → FFS tariff path
+    claimsSvc.resolveClaimContractRates.mockResolvedValue({
+      contract: { contractNumber: "PC-2026-002" },
+      lines: [
+        { lineId: "l1", cptCode: "99213", agreedRate: 3500, allowedUnit: 3500, quantity: 1, maxQuantityPerVisit: null, unitCost: 6000, requiresPreauth: false, quantityExceeded: false },
+        { lineId: "l2", cptCode: null, agreedRate: null, allowedUnit: null, quantity: 1, maxQuantityPerVisit: null, unitCost: 80000, requiresPreauth: false, quantityExceeded: false },
+      ],
+    });
+    const a = await ClaimDecisionService.assessCeiling(T, "clm1");
+    expect(a.ceiling).toBe(3500); // priced line only
+    expect(a.hasUnpricedLines).toBe(true);
+
+    await expect(decideMixed({ approvedAmount: 83500 })).rejects.toThrow(/payable ceiling[\s\S]*3,500/);
+    await expect(decideMixed({ approvedAmount: 3500 })).resolves.toBeTruthy();
   });
 });
