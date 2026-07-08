@@ -6,6 +6,7 @@ import { SearchFilterBar } from "@/components/ui/SearchFilterBar";
 import { Pagination } from "@/components/ui/Pagination";
 import { Suspense } from "react";
 import { measureAsync } from "@/lib/perf";
+import { memberSearchClause } from "@/lib/member-search";
 
 const STATUS_OPTIONS = [
   { value: "ACTIVE",             label: "Active"              },
@@ -42,17 +43,9 @@ export default async function MembersPage({
     ...(session.user.clientId ? { group: { clientId: session.user.clientId } } : {}),
     ...(status       ? { status: status as never }       : {}),
     ...(relationship  ? { relationship: relationship as never } : {}),
-    ...(q ? {
-      OR: [
-        { firstName:    { contains: q, mode: "insensitive" as const } },
-        { lastName:     { contains: q, mode: "insensitive" as const } },
-        { memberNumber: { contains: q, mode: "insensitive" as const } },
-        { email:        { contains: q, mode: "insensitive" as const } },
-        { phone:        { contains: q, mode: "insensitive" as const } },
-        { idNumber:     { contains: q, mode: "insensitive" as const } },
-        { group: { name: { contains: q, mode: "insensitive" as const } } },
-      ],
-    } : {}),
+    // E2E-D01: token-aware search so a full-name query ("Mark Kato") matches
+    // firstName + lastName in either order.
+    ...memberSearchClause(q),
   };
 
   const [members, total, filteredTotal] = await measureAsync("members.list.data", () =>

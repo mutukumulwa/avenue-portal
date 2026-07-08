@@ -23,9 +23,9 @@ export default async function FundOverviewPage() {
   });
 
   const fmt = (n: number) => {
-    if (Math.abs(n) >= 1_000_000) return `KES ${(n / 1_000_000).toFixed(1)}M`;
-    if (Math.abs(n) >= 1_000)     return `KES ${(n / 1_000).toFixed(0)}K`;
-    return `KES ${Math.round(n).toLocaleString("en-UG")}`;
+    if (Math.abs(n) >= 1_000_000) return `UGX ${(n / 1_000_000).toFixed(1)}M`;
+    if (Math.abs(n) >= 1_000)     return `UGX ${(n / 1_000).toFixed(0)}K`;
+    return `UGX ${Math.round(n).toLocaleString("en-UG")}`;
   };
 
   const totalBalance  = accounts.reduce((s, a) => s + Number(a.balance), 0);

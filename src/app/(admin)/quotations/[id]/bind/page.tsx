@@ -77,7 +77,7 @@ export default async function BindPage({
   const isMaker   = hasMemberships && members[0].bindingMakerId === userId;
   const isChecker = !isMaker; // same user can't be both
 
-  const fmt = (n: number) => `KES ${Math.round(n).toLocaleString("en-UG")}`;
+  const fmt = (n: number) => `UGX ${Math.round(n).toLocaleString("en-UG")}`;
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">

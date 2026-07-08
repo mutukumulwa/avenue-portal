@@ -4,6 +4,7 @@ import { useActionState, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { inviteUserAction } from "./actions";
 import { X } from "lucide-react";
+import { MemberSearchPicker } from "@/components/ui/MemberSearchPicker";
 
 const ROLES = [
   { value: "CLAIMS_OFFICER",  label: "Claims Officer"  },
@@ -23,12 +24,11 @@ const ROLES = [
 interface InviteUserModalProps {
   groups?: { id: string; name: string }[];
   brokers?: { id: string; name: string }[];
-  members?: { id: string; name: string; memberNumber: string; groupName: string }[];
   fundGroups?: { id: string; name: string }[];
   providers?: { id: string; name: string }[];
 }
 
-export function InviteUserModal({ groups = [], brokers = [], members = [], fundGroups = [], providers = [] }: InviteUserModalProps) {
+export function InviteUserModal({ groups = [], brokers = [], fundGroups = [], providers = [] }: InviteUserModalProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState("");
@@ -129,12 +129,9 @@ export function InviteUserModal({ groups = [], brokers = [], members = [], fundG
               {selectedRole === "MEMBER_USER" && (
                 <div>
                   <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Member Profile</label>
-                  <select name="memberId" required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo bg-white">
-                    <option value="">Select member…</option>
-                    {members.map(m => (
-                      <option key={m.id} value={m.id}>{m.name} · {m.memberNumber} · {m.groupName}</option>
-                    ))}
-                  </select>
+                  {/* E2E-OBS-MEMSEL: async scoped lookup over the full roster (was a ~250-cap select). */}
+                  <MemberSearchPicker />
+                  <p className="text-[10px] text-brand-text-muted mt-1">Search any unlinked member across the roster by name, member number or scheme.</p>
                 </div>
               )}
               {selectedRole === "PROVIDER_USER" && (

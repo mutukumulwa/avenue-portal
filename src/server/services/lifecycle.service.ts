@@ -251,7 +251,7 @@ export const lifecycleService = {
       entityId:   memberId,
       payload:    { refundAmount, isCoolingOff: true },
       tenantId,
-      description: `Member ${member.memberNumber} cancelled within cooling-off window — full refund KES ${refundAmount.toLocaleString("en-UG")}`,
+      description: `Member ${member.memberNumber} cancelled within cooling-off window — full refund UGX ${refundAmount.toLocaleString("en-UG")}`,
     });
   },
 
@@ -308,7 +308,7 @@ export const lifecycleService = {
       entityId:   memberId,
       payload:    { refundAmount, remainingDays },
       tenantId,
-      description: `Member ${member.memberNumber} cancelled — pro-rata refund KES ${refundAmount.toLocaleString("en-UG")} (${remainingDays}d remaining)`,
+      description: `Member ${member.memberNumber} cancelled — pro-rata refund UGX ${refundAmount.toLocaleString("en-UG")} (${remainingDays}d remaining)`,
     });
   },
 
@@ -491,7 +491,7 @@ export const lifecycleService = {
       entityId:   memberId,
       payload:    { proRataRefund, dependantsSuspended: member.dependents.length },
       tenantId,
-      description: `Member ${member.memberNumber} deceased — ${member.dependents.length} dependant(s) suspended, pro-rata refund KES ${proRataRefund.toLocaleString("en-UG")}`,
+      description: `Member ${member.memberNumber} deceased — ${member.dependents.length} dependant(s) suspended, pro-rata refund UGX ${proRataRefund.toLocaleString("en-UG")}`,
     });
   },
 

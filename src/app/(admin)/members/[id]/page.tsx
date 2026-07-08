@@ -280,9 +280,9 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
       {/* KPI summary bar */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Annual Limit (KES)", value: totalLimit.toLocaleString(), color: "text-brand-indigo" },
-          { label: "Utilised (KES)", value: totalUsed.toLocaleString(), color: "text-[#FFC107]" },
-          { label: "Remaining (KES)", value: Math.max(0, totalLimit - totalUsed).toLocaleString(), color: "text-[#28A745]" },
+          { label: "Annual Limit (UGX)", value: totalLimit.toLocaleString(), color: "text-brand-indigo" },
+          { label: "Utilised (UGX)", value: totalUsed.toLocaleString(), color: "text-[#FFC107]" },
+          { label: "Remaining (UGX)", value: Math.max(0, totalLimit - totalUsed).toLocaleString(), color: "text-[#28A745]" },
           { label: "Total Claims", value: member.claims.length.toString(), color: "text-[#17A2B8]" },
         ].map(s => (
           <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-[8px] p-4 shadow-sm">
@@ -385,7 +385,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
             <p className="text-xs text-[#6C757D]">
               <strong>{cancellationRecord.isCoolingOff ? "Cooling-off cancellation" : "Standard cancellation"}</strong> ·
               Effective {new Date(cancellationRecord.effectiveDate).toLocaleDateString("en-UG")} ·
-              Refund: KES {Number(cancellationRecord.refundAmount).toLocaleString("en-UG")}
+              Refund: UGX {Number(cancellationRecord.refundAmount).toLocaleString("en-UG")}
             </p>
           </div>
         )}

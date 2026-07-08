@@ -69,7 +69,17 @@ export async function inviteUserAction(
   }
 
   if (role === "MEMBER_USER" && memberId) {
-    const member = await prisma.member.findUnique({ where: { id: memberId, tenantId: session.user.tenantId }, select: { id: true } });
+    // Scope-check the posted memberId server-side (defence in depth): it must
+    // belong to the actor's tenant and — for a client-confined admin — their
+    // client, so a manually-posted out-of-scope id cannot be linked.
+    const member = await prisma.member.findFirst({
+      where: {
+        id: memberId,
+        tenantId: session.user.tenantId,
+        ...(session.user.clientId ? { group: { clientId: session.user.clientId } } : {}),
+      },
+      select: { id: true },
+    });
     if (!member) return { error: "Member profile not found." };
     const linked = await prisma.user.findFirst({ where: { tenantId: session.user.tenantId, memberId } });
     if (linked) return { error: "This member already has a portal user." };

@@ -67,13 +67,13 @@ export async function MemberClaimHistory({ memberId, limit = 5 }: Props) {
               <div key={i} className="space-y-1">
                 <p className="text-[10px] font-bold uppercase text-brand-text-muted">{u.benefitConfig.category.replace(/_/g, " ")}</p>
                 <p className="text-xs font-semibold text-brand-text-heading">
-                  KES {used.toLocaleString()} / {limit.toLocaleString()}
+                  UGX {used.toLocaleString()} / {limit.toLocaleString()}
                 </p>
                 <div className="h-1.5 bg-[#EEEEEE] rounded-full overflow-hidden">
                   <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
                 </div>
                 <p className="text-[10px] text-brand-text-muted">
-                  KES {(limit - used).toLocaleString()} remaining
+                  UGX {(limit - used).toLocaleString()} remaining
                 </p>
               </div>
             );
@@ -98,9 +98,9 @@ export async function MemberClaimHistory({ memberId, limit = 5 }: Props) {
               </p>
             </div>
             <div className="text-right">
-              <p className="font-bold text-brand-text-heading font-mono">KES {Number(c.billedAmount).toLocaleString()}</p>
+              <p className="font-bold text-brand-text-heading font-mono">UGX {Number(c.billedAmount).toLocaleString()}</p>
               {Number(c.approvedAmount) > 0 && (
-                <p className="text-[11px] text-[#28A745]">Approved: KES {Number(c.approvedAmount).toLocaleString()}</p>
+                <p className="text-[11px] text-[#28A745]">Approved: UGX {Number(c.approvedAmount).toLocaleString()}</p>
               )}
               <p className={`text-[10px] font-bold uppercase mt-0.5 ${STATUS_COLOR[c.status] ?? "text-brand-text-muted"}`}>
                 {c.status.replace(/_/g, " ")}

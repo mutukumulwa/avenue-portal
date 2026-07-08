@@ -500,7 +500,7 @@ export const intakeService = {
     // Check all escalation thresholds
     const projectedGross = schemeParams?.projectedGrossKes ?? 0;
     if (projectedGross > ESCALATION_GROSS_KES) {
-      escalationReasons.push(`Projected gross contribution KES ${projectedGross.toLocaleString()} exceeds KES ${ESCALATION_GROSS_KES.toLocaleString()} threshold`);
+      escalationReasons.push(`Projected gross contribution UGX ${projectedGross.toLocaleString()} exceeds UGX ${ESCALATION_GROSS_KES.toLocaleString()} threshold`);
     }
 
     const maxMultiplier = quotation.decisions.reduce(

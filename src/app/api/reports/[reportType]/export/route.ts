@@ -53,7 +53,7 @@ async function fetchReportData(
         orderBy: { createdAt: "desc" },
       });
       return {
-        headers: ["Claim No.", "Member", "Provider", "Category", "Billed (KES)", "Approved (KES)", "Status", "Date"],
+        headers: ["Claim No.", "Member", "Provider", "Category", "Billed (UGX)", "Approved (UGX)", "Status", "Date"],
         rows: data.map((r) => [
           r.claimNumber,
           `${r.member.firstName} ${r.member.lastName}`,
@@ -106,7 +106,7 @@ async function fetchReportData(
         orderBy: { createdAt: "desc" },
       });
       return {
-        headers: ["PA No.", "Member", "Provider", "Category", "Service Type", "Estimated (KES)", "Approved (KES)", "Status", "Date"],
+        headers: ["PA No.", "Member", "Provider", "Category", "Service Type", "Estimated (UGX)", "Approved (UGX)", "Status", "Date"],
         rows: data.map((r) => [
           r.preauthNumber,
           `${r.member.firstName} ${r.member.lastName}`,
@@ -133,7 +133,7 @@ async function fetchReportData(
         orderBy: { createdAt: "desc" },
       });
       return {
-        headers: ["Invoice No.", "Group", "Period", "Members", "Total (KES)", "Paid (KES)", "Balance (KES)", "Status", "Due Date"],
+        headers: ["Invoice No.", "Group", "Period", "Members", "Total (UGX)", "Paid (UGX)", "Balance (UGX)", "Status", "Due Date"],
         rows: data.map((r) => [
           r.invoiceNumber,
           r.group.name,
@@ -159,7 +159,7 @@ async function fetchReportData(
         orderBy: { amountUsed: "desc" },
       });
       return {
-        headers: ["Member No.", "Name", "Group", "Benefit", "Limit (KES)", "Used (KES)", "Remaining (KES)", "Period Start", "Period End"],
+        headers: ["Member No.", "Name", "Group", "Benefit", "Limit (UGX)", "Used (UGX)", "Remaining (UGX)", "Period Start", "Period End"],
         rows: data.map((r) => {
           const limit = Number(r.benefitConfig.annualSubLimit);
           const used  = Number(r.amountUsed);
@@ -189,7 +189,7 @@ async function fetchReportData(
         orderBy: { createdAt: "desc" },
       });
       return {
-        headers: ["Endorsement No.", "Group", "Type", "Status", "Effective Date", "Adjustment (KES)", "Created"],
+        headers: ["Endorsement No.", "Group", "Type", "Status", "Effective Date", "Adjustment (UGX)", "Created"],
         rows: data.map((r) => [
           r.endorsementNumber,
           r.group.name,
@@ -214,7 +214,7 @@ async function fetchReportData(
         orderBy: { createdAt: "desc" },
       });
       return {
-        headers: ["Quote No.", "Group / Prospect", "Members", "Annual Premium (KES)", "Status", "Valid Until", "Created"],
+        headers: ["Quote No.", "Group / Prospect", "Members", "Annual Premium (UGX)", "Status", "Valid Until", "Created"],
         rows: data.map((r) => [
           r.quoteNumber,
           r.group?.name ?? r.prospectName ?? "",
@@ -253,7 +253,7 @@ async function fetchReportData(
 
       const sorted = Array.from(byCode.entries()).sort(([, a], [, b]) => b.count - a.count);
       return {
-        headers: ["ICD Code", "Condition", "Cases", "Total Approved (KES)", "Avg Cost (KES)", "Groups Affected"],
+        headers: ["ICD Code", "Condition", "Cases", "Total Approved (UGX)", "Avg Cost (UGX)", "Groups Affected"],
         rows: sorted.map(([code, v]) => [
           code,
           v.description,
@@ -275,7 +275,7 @@ async function fetchReportData(
         orderBy: { dueDate: "asc" },
       });
       return {
-        headers: ["Invoice No.", "Group", "Period", "Due Date", "Total (KES)", "Paid (KES)", "Balance (KES)", "Status", "Days Overdue"],
+        headers: ["Invoice No.", "Group", "Period", "Due Date", "Total (UGX)", "Paid (UGX)", "Balance (UGX)", "Status", "Days Overdue"],
         rows: rows.map(r => {
           const days = Math.max(0, Math.floor((today.getTime() - new Date(r.dueDate).getTime()) / 86400000));
           return [r.invoiceNumber, r.group.name, r.period, new Date(r.dueDate).toISOString().split("T")[0],
@@ -293,7 +293,7 @@ async function fetchReportData(
         orderBy: [{ provider: { name: "asc" } }, { dateOfService: "desc" }],
       });
       return {
-        headers: ["Provider", "Claim No.", "Member", "Category", "Date", "Billed (KES)", "Approved (KES)", "Paid (KES)", "Status"],
+        headers: ["Provider", "Claim No.", "Member", "Category", "Date", "Billed (UGX)", "Approved (UGX)", "Paid (UGX)", "Status"],
         rows: rows.map(r => [r.provider.name, r.claimNumber, `${r.member.firstName} ${r.member.lastName} (${r.member.memberNumber})`,
           r.benefitCategory, new Date(r.dateOfService).toISOString().split("T")[0],
           Number(r.billedAmount).toString(), Number(r.approvedAmount).toString(), Number(r.paidAmount).toString(), r.status]),
@@ -311,7 +311,7 @@ async function fetchReportData(
         orderBy: [{ group: { name: "asc" } }, { lastName: "asc" }],
       });
       return {
-        headers: ["Member No.", "Name", "Group", "Package", "Claims", "Billed (KES)", "Approved (KES)", "Co-Contrib Owed (KES)", "Co-Contrib Paid (KES)"],
+        headers: ["Member No.", "Name", "Group", "Package", "Claims", "Billed (UGX)", "Approved (UGX)", "Co-Contrib Owed (UGX)", "Co-Contrib Paid (UGX)"],
         rows: members.map(m => [
           m.memberNumber, `${m.firstName} ${m.lastName}`, m.group.name, m.package.name,
           m.claims.length.toString(),
@@ -335,7 +335,7 @@ async function fetchReportData(
         .map(u => ({ ...u, pct: Number(u.benefitConfig.annualSubLimit) > 0 ? (Number(u.amountUsed) / Number(u.benefitConfig.annualSubLimit)) * 100 : 0 }))
         .filter(u => u.pct >= 80).sort((a, b) => b.pct - a.pct);
       return {
-        headers: ["Member No.", "Name", "Group", "Category", "Limit (KES)", "Used (KES)", "Utilisation %", "Flag"],
+        headers: ["Member No.", "Name", "Group", "Category", "Limit (UGX)", "Used (UGX)", "Utilisation %", "Flag"],
         rows: flagged.map(u => [u.member.memberNumber, `${u.member.firstName} ${u.member.lastName}`, u.member.group.name,
           u.benefitConfig.category, Number(u.benefitConfig.annualSubLimit).toString(), Number(u.amountUsed).toString(),
           u.pct.toFixed(1), u.pct >= 100 ? "EXCEEDED" : "WARNING"]),
@@ -351,7 +351,7 @@ async function fetchReportData(
         orderBy: { admissionDate: "desc" },
       });
       return {
-        headers: ["Claim No.", "Member", "Group", "Provider", "Admission Date", "Discharge Date", "LOS", "Billed (KES)", "Status"],
+        headers: ["Claim No.", "Member", "Group", "Provider", "Admission Date", "Discharge Date", "LOS", "Billed (UGX)", "Status"],
         rows: rows.map(r => [r.claimNumber, `${r.member.firstName} ${r.member.lastName} (${r.member.memberNumber})`, r.member.group.name,
           r.provider.name, r.admissionDate ? new Date(r.admissionDate).toISOString().split("T")[0] : "",
           r.dischargeDate ? new Date(r.dischargeDate).toISOString().split("T")[0] : "",
@@ -368,7 +368,7 @@ async function fetchReportData(
         orderBy: { dateOfService: "desc" },
       });
       return {
-        headers: ["Claim No.", "Member", "Group", "Provider", "Date", "Category", "Billed (KES)", "Status"],
+        headers: ["Claim No.", "Member", "Group", "Provider", "Date", "Category", "Billed (UGX)", "Status"],
         rows: rows.map(r => [r.claimNumber, `${r.member.firstName} ${r.member.lastName} (${r.member.memberNumber})`, r.member.group.name,
           r.provider.name, new Date(r.dateOfService).toISOString().split("T")[0],
           r.benefitCategory, Number(r.billedAmount).toString(), r.status]),
@@ -389,7 +389,7 @@ async function fetchReportData(
         return { name: g.name, premium, claims, ratio: premium > 0 ? (claims / premium) * 100 : 0 };
       }).filter(r => r.premium > 0).sort((a, b) => b.ratio - a.ratio);
       return {
-        headers: ["Group", "Premium (KES)", "Claims (KES)", "Loss Ratio %", "Rating"],
+        headers: ["Group", "Premium (UGX)", "Claims (UGX)", "Loss Ratio %", "Rating"],
         rows: rows.map(r => [r.name, r.premium.toString(), r.claims.toString(), r.ratio.toFixed(1),
           r.ratio > 100 ? "LOSS" : r.ratio > 80 ? "HIGH" : r.ratio > 60 ? "MODERATE" : "PROFITABLE"]),
       };
@@ -410,7 +410,7 @@ async function fetchReportData(
         byKey.set(key, row);
       }
       return {
-        headers: ["Group", "Category", "Claims", "Billed (KES)", "Approved (KES)", "Declined", "Approval Rate %"],
+        headers: ["Group", "Category", "Claims", "Billed (UGX)", "Approved (UGX)", "Declined", "Approval Rate %"],
         rows: [...byKey.values()].sort((a, b) => b.billed - a.billed).map(r => [
           r.group, r.category, r.count.toString(), r.billed.toString(), r.approved.toString(), r.declined.toString(),
           r.count > 0 ? ((( r.count - r.declined) / r.count) * 100).toFixed(1) : "0"]),
@@ -424,7 +424,7 @@ async function fetchReportData(
         select: { invoiceNumber: true, dueDate: true, balance: true, status: true, group: { select: { name: true } } },
       });
       return {
-        headers: ["Invoice No.", "Group", "Due Date", "Days Overdue", "Balance (KES)", "Bucket", "Status"],
+        headers: ["Invoice No.", "Group", "Due Date", "Days Overdue", "Balance (UGX)", "Bucket", "Status"],
         rows: invoices.map(inv => {
           const days = Math.max(0, Math.floor((today.getTime() - new Date(inv.dueDate).getTime()) / 86400000));
           const bucket = days <= 30 ? "0-30" : days <= 60 ? "31-60" : days <= 90 ? "61-90" : "91+";
@@ -443,7 +443,7 @@ async function fetchReportData(
         orderBy: { createdAt: "desc" },
       });
       return {
-        headers: ["Broker", "Period", "Rate %", "Amount (KES)", "Status", "Earned", "Paid"],
+        headers: ["Broker", "Period", "Rate %", "Amount (UGX)", "Status", "Earned", "Paid"],
         rows: rows.map(r => [r.broker.name, r.period, Number(r.commissionRate).toFixed(1),
           Number(r.commissionAmount).toString(), r.paymentStatus,
           new Date(r.createdAt).toISOString().split("T")[0],
@@ -459,7 +459,7 @@ async function fetchReportData(
         orderBy: { createdAt: "desc" },
       });
       return {
-        headers: ["Invoice No.", "Group", "Period", "Total (KES)", "Stamp Duty", "Training Levy", "PHCF", "Tax Total"],
+        headers: ["Invoice No.", "Group", "Period", "Total (UGX)", "Stamp Duty", "Training Levy", "PHCF", "Tax Total"],
         rows: rows.map(r => [r.invoiceNumber, r.group.name, r.period, Number(r.totalAmount).toString(),
           Number(r.stampDuty).toString(), Number(r.trainingLevy).toString(), Number(r.phcf).toString(), Number(r.taxTotal).toString()]),
       };
@@ -470,7 +470,7 @@ async function fetchReportData(
         where: { tenantId }, include: { group: { select: { name: true } } },
       });
       return {
-        headers: ["Group", "Balance (KES)", "Deposited (KES)", "Claims (KES)", "Admin Fees (KES)", "Period Start", "Period End"],
+        headers: ["Group", "Balance (UGX)", "Deposited (UGX)", "Claims (UGX)", "Admin Fees (UGX)", "Period Start", "Period End"],
         rows: accounts.map(a => [a.group.name, Number(a.balance).toString(), Number(a.totalDeposited).toString(),
           Number(a.totalClaims).toString(), Number(a.totalAdminFees).toString(),
           new Date(a.periodStartDate).toISOString().split("T")[0], new Date(a.periodEndDate).toISOString().split("T")[0]]),
@@ -484,7 +484,7 @@ async function fetchReportData(
       // approved/partially-approved claims) — identical to the on-screen report.
       const rows = await getExclusionRejectionRows(tenantId);
       return {
-        headers: ["Claim No.", "Member", "Provider", "Category", "Item", "Status", "Reason", "Disallowed (KES)", "Decided"],
+        headers: ["Claim No.", "Member", "Provider", "Category", "Item", "Status", "Reason", "Disallowed (UGX)", "Decided"],
         rows: rows.map(r => [r.claimNumber, r.member, r.provider, r.category, r.scope, r.status,
           r.reason, r.disallowed.toString(), r.decidedAt ? new Date(r.decidedAt).toISOString().split("T")[0] : ""]),
       };
@@ -578,7 +578,7 @@ async function fetchReportData(
         .sort((a, b) => b.mlr - a.mlr);
 
       return {
-        headers: ["Scheme", "Period", "Contribution (KES)", "Claims (KES)", "MLR %", "Trailing 12M MLR %", "Open Alerts"],
+        headers: ["Scheme", "Period", "Contribution (UGX)", "Claims (UGX)", "MLR %", "Trailing 12M MLR %", "Open Alerts"],
         rows: rows.map((row) => [
           row.name,
           row.period,
@@ -627,7 +627,7 @@ async function fetchReportData(
         .sort((a, b) => b.mlr - a.mlr);
 
       return {
-        headers: ["Scheme", "Period", "Contribution (KES)", "Claims (KES)", "Surplus/Deficit (KES)", "MLR %", "Trailing 12M MLR %", "Status"],
+        headers: ["Scheme", "Period", "Contribution (UGX)", "Claims (UGX)", "Surplus/Deficit (UGX)", "MLR %", "Trailing 12M MLR %", "Status"],
         rows: rows.map((row) => [
           row.name,
           row.period,
@@ -657,7 +657,7 @@ async function fetchReportData(
       });
       if (!latest) {
         return {
-          headers: ["Provider", "Tier", "Period", "Claims", "Members", "Adjusted Cost (KES)", "Avg Cost (KES)", "CMI", "Rejection Rate %"],
+          headers: ["Provider", "Tier", "Period", "Claims", "Members", "Adjusted Cost (UGX)", "Avg Cost (UGX)", "CMI", "Rejection Rate %"],
           rows: [],
         };
       }
@@ -666,7 +666,7 @@ async function fetchReportData(
         orderBy: { adjustedCost: "desc" },
       });
       return {
-        headers: ["Provider", "Tier", "Period", "Claims", "Members", "Adjusted Cost (KES)", "Avg Cost (KES)", "CMI", "Rejection Rate %"],
+        headers: ["Provider", "Tier", "Period", "Claims", "Members", "Adjusted Cost (UGX)", "Avg Cost (UGX)", "CMI", "Rejection Rate %"],
         rows: scorecards.map((row) => [
           row.providerName,
           row.providerTier ?? "UNKNOWN",
@@ -699,7 +699,7 @@ async function fetchReportData(
       const now = new Date();
 
       return {
-        headers: ["Scheme", "Intermediary", "Members", "Renewal Date", "Days", "Trailing MLR %", "Target MLR %", "Recommended Contribution (KES)", "Adjustment %"],
+        headers: ["Scheme", "Intermediary", "Members", "Renewal Date", "Days", "Trailing MLR %", "Target MLR %", "Recommended Contribution (UGX)", "Adjustment %"],
         rows: analyses.map((analysis) => {
           const group = groupById.get(analysis.groupId);
           const renewalDate = new Date(analysis.renewalDate);
@@ -780,7 +780,7 @@ async function fetchReportData(
         select: { claimNumber: true, approvedAmount: true, provider: { select: { name: true } }, decidedAt: true },
       });
       return {
-        headers: ["Reference", "Counterparty", "Amount (KES)", "Type", "Age Bucket", "Date"],
+        headers: ["Reference", "Counterparty", "Amount (UGX)", "Type", "Age Bucket", "Date"],
         rows: [
           ...invoices.map(i => [i.invoiceNumber, i.group.name, Number(i.balance).toFixed(2), "Debtor", bucket(i.dueDate), new Date(i.dueDate).toISOString().split("T")[0]]),
           ...unsettled.map(c => [c.claimNumber, c.provider.name, Number(c.approvedAmount ?? 0).toFixed(2), "Creditor", "—", c.decidedAt ? new Date(c.decidedAt).toISOString().split("T")[0] : ""]),
@@ -792,7 +792,7 @@ async function fetchReportData(
       const cardInv  = await prisma.invoice.findMany({ where: { tenantId, notes: { contains: "Card" } }, select: { invoiceNumber: true, totalAmount: true, createdAt: true, group: { select: { name: true } } } });
       const reinInv  = await prisma.invoice.findMany({ where: { tenantId, notes: { contains: "Reinstate" } }, select: { invoiceNumber: true, totalAmount: true, createdAt: true, group: { select: { name: true } } } });
       return {
-        headers: ["Invoice No.", "Scheme", "Fee Type", "Amount (KES)", "Date"],
+        headers: ["Invoice No.", "Scheme", "Fee Type", "Amount (UGX)", "Date"],
         rows: [
           ...cardInv.map(i => [i.invoiceNumber, i.group.name, "Card Issuance", Number(i.totalAmount).toFixed(2), new Date(i.createdAt).toISOString().split("T")[0]]),
           ...reinInv.map(i => [i.invoiceNumber, i.group.name, "Reinstatement", Number(i.totalAmount).toFixed(2), new Date(i.createdAt).toISOString().split("T")[0]]),
@@ -807,7 +807,7 @@ async function fetchReportData(
         orderBy: { postedAt: "desc" },
       });
       return {
-        headers: ["Scheme", "Calc Method", "Amount (KES)", "Date", "Description"],
+        headers: ["Scheme", "Calc Method", "Amount (UGX)", "Date", "Description"],
         rows: txs.map(t => [t.selfFundedAccount.group.name, t.selfFundedAccount.group.adminFeeMethod ?? "—", Number(t.amount).toFixed(2), new Date(t.postedAt).toISOString().split("T")[0], t.description ?? ""]),
       };
     }
@@ -846,7 +846,7 @@ async function fetchReportData(
       }
       const avg = (a: number[]) => a.length > 0 ? a.reduce((s,v)=>s+v,0)/a.length : 0;
       return {
-        headers: ["CPT Code", "Description", "Avg Contracted (KES)", "Avg Billed (KES)", "Avg Approved (KES)", "Billed vs Contracted", "Count"],
+        headers: ["CPT Code", "Description", "Avg Contracted (UGX)", "Avg Billed (UGX)", "Avg Approved (UGX)", "Billed vs Contracted", "Count"],
         rows: Object.entries(byCpt).sort(([a],[b])=>a.localeCompare(b)).map(([c,v]) => {
           const ab = avg(v.billed), at = avg(v.tariff);
           return [c, v.desc.slice(0,60), at > 0 ? at.toFixed(2) : "—", ab.toFixed(2), avg(v.approved).toFixed(2),
@@ -862,7 +862,7 @@ async function fetchReportData(
         orderBy: { createdAt: "desc" }, take: 500,
       });
       return {
-        headers: ["Quote No.", "Status", "Client Type", "Lives", "Premium (KES)", "Renewal", "Broker", "Date"],
+        headers: ["Quote No.", "Status", "Client Type", "Lives", "Premium (UGX)", "Renewal", "Broker", "Date"],
         rows: qs.map(q => [q.quoteNumber, q.status, q.clientType ?? "—", q.memberCount.toString(),
           q.finalPremium ? Number(q.finalPremium).toFixed(2) : "—", q.isRenewal ? "Yes" : "No",
           q.broker?.name ?? "Direct", new Date(q.createdAt).toISOString().split("T")[0]]),

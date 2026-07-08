@@ -237,7 +237,7 @@ function BenefitsTab({ member }: { member: Member }) {
         <div className="flex justify-between items-end mb-2">
           <p className="text-sm font-bold text-brand-text-heading">Overall Utilisation</p>
           <p className="text-sm font-semibold text-brand-text-muted">
-            KES {fmt(totalUsed)} / {fmt(totalLimit)}
+            UGX {fmt(totalUsed)} / {fmt(totalLimit)}
           </p>
         </div>
         <div className="h-3 bg-[#E6E7E8] rounded-full overflow-hidden">
@@ -248,7 +248,7 @@ function BenefitsTab({ member }: { member: Member }) {
         </div>
         <div className="flex justify-between mt-2 text-xs text-brand-text-muted">
           <span>{overallPct.toFixed(1)}% utilised</span>
-          <span>KES {fmt(Math.max(0, totalLimit - totalUsed))} remaining</span>
+          <span>UGX {fmt(Math.max(0, totalLimit - totalUsed))} remaining</span>
         </div>
       </div>
 
@@ -277,7 +277,7 @@ function BenefitsTab({ member }: { member: Member }) {
                   <td className="px-5 py-3 font-semibold text-brand-text-heading">
                     {b.category.replace(/_/g, " ")}
                   </td>
-                  <td className="px-5 py-3">KES {fmt(limit)}</td>
+                  <td className="px-5 py-3">UGX {fmt(limit)}</td>
                   <td className="px-5 py-3">
                     {b.copayPercentage > 0 ? (
                       <span className="bg-[#FFC107]/10 text-[#856404] px-2 py-0.5 rounded-full text-[10px] font-bold">
@@ -295,10 +295,10 @@ function BenefitsTab({ member }: { member: Member }) {
                     ) : "—"}
                   </td>
                   <td className="px-5 py-3 font-semibold text-brand-text-heading">
-                    {used > 0 ? `KES ${fmt(used)}` : "—"}
+                    {used > 0 ? `UGX ${fmt(used)}` : "—"}
                   </td>
                   <td className={`px-5 py-3 font-semibold ${pct >= 90 ? "text-[#DC3545]" : "text-[#28A745]"}`}>
-                    KES {fmt(Math.max(0, limit - used))}
+                    UGX {fmt(Math.max(0, limit - used))}
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2">
@@ -436,8 +436,8 @@ function ClaimsTab({ member }: { member: Member }) {
                   <td className="px-5 py-3 font-mono text-xs font-semibold text-brand-text-heading">{c.claimNumber}</td>
                   <td className="px-5 py-3">{c.provider.name}</td>
                   <td className="px-5 py-3 text-xs uppercase font-bold text-brand-text-muted">{c.serviceType.replace(/_/g, " ")}</td>
-                  <td className="px-5 py-3 font-semibold">KES {fmt(c.billedAmount)}</td>
-                  <td className="px-5 py-3 text-[#28A745] font-semibold">{c.approvedAmount > 0 ? `KES ${fmt(c.approvedAmount)}` : "—"}</td>
+                  <td className="px-5 py-3 font-semibold">UGX {fmt(c.billedAmount)}</td>
+                  <td className="px-5 py-3 text-[#28A745] font-semibold">{c.approvedAmount > 0 ? `UGX ${fmt(c.approvedAmount)}` : "—"}</td>
                   <td className="px-5 py-3 text-xs text-brand-text-muted">{fmtDate(c.createdAt)}</td>
                   <td className="px-5 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${statusPill(c.status)}`}>{c.status.replace(/_/g, " ")}</span>
@@ -474,8 +474,8 @@ function ClaimsTab({ member }: { member: Member }) {
                 <tr key={p.id} className="hover:bg-[#F8F9FA]">
                   <td className="px-5 py-3 font-mono text-xs font-semibold text-brand-text-heading">{p.preauthNumber}</td>
                   <td className="px-5 py-3">{p.provider.name}</td>
-                  <td className="px-5 py-3 font-semibold">KES {fmt(p.estimatedCost)}</td>
-                  <td className="px-5 py-3 text-[#28A745] font-semibold">{p.approvedAmount ? `KES ${fmt(p.approvedAmount)}` : "—"}</td>
+                  <td className="px-5 py-3 font-semibold">UGX {fmt(p.estimatedCost)}</td>
+                  <td className="px-5 py-3 text-[#28A745] font-semibold">{p.approvedAmount ? `UGX ${fmt(p.approvedAmount)}` : "—"}</td>
                   <td className="px-5 py-3 text-xs text-brand-text-muted">{fmtDate(p.createdAt)}</td>
                   <td className="px-5 py-3">
                     <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${statusPill(p.status)}`}>{p.status.replace(/_/g, " ")}</span>

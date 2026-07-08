@@ -42,7 +42,7 @@ export default async function SettlementBatchPage({ params }: { params: Promise<
       })
     : null;
 
-  const fmt = (n: number) => `KES ${Math.round(n).toLocaleString("en-UG")}`;
+  const fmt = (n: number) => `UGX ${Math.round(n).toLocaleString("en-UG")}`;
   const cycle = new Date(batch.cycleYear, batch.cycleMonth - 1).toLocaleString("en-UG", { month: "long", year: "numeric" });
 
   return (

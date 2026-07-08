@@ -95,7 +95,7 @@ export function PreAuthNewForm({ members, providers }: Props) {
               <input name="expectedDateOfService" type="date" className={inputCls} />
             </div>
             <div>
-              <label className={labelCls}>Estimated Cost (KES)</label>
+              <label className={labelCls}>Estimated Cost (UGX)</label>
               <input required name="estimatedCost" type="number" min="0" step="0.01" className={inputCls} placeholder="0.00" />
             </div>
           </div>

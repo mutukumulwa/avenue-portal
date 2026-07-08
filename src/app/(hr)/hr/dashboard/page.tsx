@@ -101,7 +101,7 @@ export default async function HRDashboard() {
     { label: "Total Active Members", value: totalActiveMembers, icon: Users },
     { label: "Added This Month", value: membersAddedThisMonth, icon: CheckCircle },
     { label: "Pending Endorsements", value: pendingEndorsements, icon: FileText },
-    { label: "Outstanding Balance", value: `KES ${outstandingBalance.toLocaleString()}`, icon: Receipt },
+    { label: "Outstanding Balance", value: `UGX ${outstandingBalance.toLocaleString()}`, icon: Receipt },
   ];
 
   return (

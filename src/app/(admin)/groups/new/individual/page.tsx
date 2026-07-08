@@ -75,7 +75,7 @@ export default async function IndividualClientEnrollPage() {
                 <option value="">Select package…</option>
                 {packages.map(p => (
                   <option key={p.id} value={p.id}>
-                    {p.name} — KES {Number(p.contributionAmount).toLocaleString()}/yr
+                    {p.name} — UGX {Number(p.contributionAmount).toLocaleString()}/yr
                   </option>
                 ))}
               </select>

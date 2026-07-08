@@ -50,7 +50,7 @@ export default async function BrokerSubmissionsPage() {
               <th className="px-6 py-4">Group</th>
               <th className="px-6 py-4">Type</th>
               <th className="px-6 py-4">Effective Date</th>
-              <th className="px-6 py-4">Pro-Rata (KES)</th>
+              <th className="px-6 py-4">Pro-Rata (UGX)</th>
               <th className="px-6 py-4">Status</th>
               <th className="px-6 py-4">Actions</th>
             </tr>

@@ -141,7 +141,7 @@ export default async function EndorsementsPage({
                   <td className="px-6 py-4">
                     {Number(end.proratedAmount) !== 0 ? (
                       <span className={`font-semibold ${Number(end.proratedAmount) > 0 ? "text-[#28A745]" : "text-[#DC3545]"}`}>
-                        {Number(end.proratedAmount) > 0 ? "+" : ""}KES {Math.abs(Number(end.proratedAmount)).toLocaleString("en-UG")}
+                        {Number(end.proratedAmount) > 0 ? "+" : ""}UGX {Math.abs(Number(end.proratedAmount)).toLocaleString("en-UG")}
                       </span>
                     ) : (
                       <span className="text-brand-text-muted text-xs">—</span>

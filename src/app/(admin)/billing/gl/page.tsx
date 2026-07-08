@@ -92,9 +92,9 @@ export default async function GLPage({
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
             { label: "Total Accounts",   value: accountCount,                             color: "text-brand-indigo",  Icon: BookOpen     },
-            { label: "Gross Revenue",    value: `KES ${pl.totalRevenue.toLocaleString("en-UG")}`,   color: "text-[#28A745]",    Icon: TrendingUp   },
-            { label: "Total Expenses",   value: `KES ${pl.totalExpenses.toLocaleString("en-UG")}`,  color: "text-[#DC3545]",    Icon: TrendingDown },
-            { label: "Net Profit/(Loss)",value: `KES ${pl.netProfit.toLocaleString("en-UG")}`,      color: pl.netProfit >= 0 ? "text-[#28A745]" : "text-[#DC3545]", Icon: DollarSign },
+            { label: "Gross Revenue",    value: `UGX ${pl.totalRevenue.toLocaleString("en-UG")}`,   color: "text-[#28A745]",    Icon: TrendingUp   },
+            { label: "Total Expenses",   value: `UGX ${pl.totalExpenses.toLocaleString("en-UG")}`,  color: "text-[#DC3545]",    Icon: TrendingDown },
+            { label: "Net Profit/(Loss)",value: `UGX ${pl.netProfit.toLocaleString("en-UG")}`,      color: pl.netProfit >= 0 ? "text-[#28A745]" : "text-[#DC3545]", Icon: DollarSign },
           ].map(s => (
             <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-lg p-4 shadow-sm">
               <p className="text-[10px] font-bold uppercase text-brand-text-muted flex items-center gap-1">
@@ -131,7 +131,7 @@ export default async function GLPage({
               <div className="px-6 py-4 border-b border-[#EEEEEE] flex justify-between items-center">
                 <h2 className="font-bold text-brand-text-heading font-heading">Trial Balance</h2>
                 <span className={`text-xs font-semibold ${Math.abs(totalDebits - totalCredits) < 0.01 ? "text-[#28A745]" : "text-[#DC3545]"}`}>
-                  {Math.abs(totalDebits - totalCredits) < 0.01 ? "✓ Balanced" : `⚠ Out of balance by KES ${Math.abs(totalDebits - totalCredits).toLocaleString("en-UG")}`}
+                  {Math.abs(totalDebits - totalCredits) < 0.01 ? "✓ Balanced" : `⚠ Out of balance by UGX ${Math.abs(totalDebits - totalCredits).toLocaleString("en-UG")}`}
                 </span>
               </div>
               <table className="w-full text-sm">
@@ -140,8 +140,8 @@ export default async function GLPage({
                     <th className="px-5 py-2.5 text-left w-16">Code</th>
                     <th className="px-5 py-2.5 text-left">Account</th>
                     <th className="px-5 py-2.5 text-left">Type</th>
-                    <th className="px-5 py-2.5 text-right">Debit (KES)</th>
-                    <th className="px-5 py-2.5 text-right">Credit (KES)</th>
+                    <th className="px-5 py-2.5 text-right">Debit (UGX)</th>
+                    <th className="px-5 py-2.5 text-right">Credit (UGX)</th>
                     <th className="px-5 py-2.5 text-right">Net Balance</th>
                   </tr>
                 </thead>
@@ -205,7 +205,7 @@ export default async function GLPage({
               <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
                 <div className="px-6 py-3 border-b border-[#EEEEEE] bg-[#28A745]/5 flex justify-between items-center">
                   <h3 className="font-bold text-[#28A745] font-heading flex items-center gap-2"><TrendingUp size={15} /> Revenue</h3>
-                  <span className="font-bold text-[#28A745]">KES {pl.totalRevenue.toLocaleString("en-UG")}</span>
+                  <span className="font-bold text-[#28A745]">UGX {pl.totalRevenue.toLocaleString("en-UG")}</span>
                 </div>
                 <table className="w-full text-sm">
                   <tbody className="divide-y divide-[#EEEEEE]">
@@ -214,7 +214,7 @@ export default async function GLPage({
                         <td className="px-5 py-2.5 font-mono text-xs text-brand-text-muted w-16">{a.code}</td>
                         <td className="px-5 py-2.5 text-brand-text-heading">{a.name}</td>
                         <td className="px-5 py-2.5 text-right font-semibold text-[#28A745]">
-                          {a.netBalance !== 0 ? `KES ${a.netBalance.toLocaleString("en-UG")}` : "—"}
+                          {a.netBalance !== 0 ? `UGX ${a.netBalance.toLocaleString("en-UG")}` : "—"}
                         </td>
                       </tr>
                     ))}
@@ -226,7 +226,7 @@ export default async function GLPage({
               <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
                 <div className="px-6 py-3 border-b border-[#EEEEEE] bg-[#DC3545]/5 flex justify-between items-center">
                   <h3 className="font-bold text-[#DC3545] font-heading flex items-center gap-2"><TrendingDown size={15} /> Expenses</h3>
-                  <span className="font-bold text-[#DC3545]">KES {pl.totalExpenses.toLocaleString("en-UG")}</span>
+                  <span className="font-bold text-[#DC3545]">UGX {pl.totalExpenses.toLocaleString("en-UG")}</span>
                 </div>
                 <table className="w-full text-sm">
                   <tbody className="divide-y divide-[#EEEEEE]">
@@ -235,7 +235,7 @@ export default async function GLPage({
                         <td className="px-5 py-2.5 font-mono text-xs text-brand-text-muted w-16">{a.code}</td>
                         <td className="px-5 py-2.5 text-brand-text-heading">{a.name}</td>
                         <td className="px-5 py-2.5 text-right font-semibold text-[#DC3545]">
-                          {a.netBalance !== 0 ? `KES ${a.netBalance.toLocaleString("en-UG")}` : "—"}
+                          {a.netBalance !== 0 ? `UGX ${a.netBalance.toLocaleString("en-UG")}` : "—"}
                         </td>
                       </tr>
                     ))}
@@ -248,7 +248,7 @@ export default async function GLPage({
                 <div className="flex justify-between items-center">
                   <span className="font-bold text-brand-text-heading font-heading text-lg">Net Profit / (Loss)</span>
                   <span className={`text-2xl font-bold ${pl.netProfit >= 0 ? "text-[#28A745]" : "text-[#DC3545]"}`}>
-                    {pl.netProfit < 0 ? "(" : ""}KES {Math.abs(pl.netProfit).toLocaleString("en-UG")}{pl.netProfit < 0 ? ")" : ""}
+                    {pl.netProfit < 0 ? "(" : ""}UGX {Math.abs(pl.netProfit).toLocaleString("en-UG")}{pl.netProfit < 0 ? ")" : ""}
                   </span>
                 </div>
                 <p className="text-xs text-brand-text-muted mt-1">Based on all posted journal entries to date. Excludes manual adjustments not yet entered.</p>

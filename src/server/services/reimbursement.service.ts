@@ -147,7 +147,7 @@ export const reimbursementService = {
         submittedWithinWindow, mpesaVerified: mpesaVerified ?? false,
       },
       tenantId,
-      description: `Reimbursement claim ${claimNumber} submitted — KES ${totalPaidByMember.toLocaleString()} — proof: ${proofType}`,
+      description: `Reimbursement claim ${claimNumber} submitted — UGX ${totalPaidByMember.toLocaleString()} — proof: ${proofType}`,
     });
 
     if (!submittedWithinWindow) {
@@ -219,7 +219,7 @@ export const reimbursementService = {
       entityId:   claimId,
       payload:    { disbursedAmount, disbursementRef, claimNumber: claim.claimNumber },
       tenantId,
-      description: `Reimbursement disbursed for ${claim.claimNumber}: KES ${disbursedAmount.toLocaleString()} ref ${disbursementRef}`,
+      description: `Reimbursement disbursed for ${claim.claimNumber}: UGX ${disbursedAmount.toLocaleString()} ref ${disbursementRef}`,
     });
 
     return { disbursedAmount, disbursementRef };

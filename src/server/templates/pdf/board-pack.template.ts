@@ -14,9 +14,9 @@ export interface BoardPackData {
 }
 
 function fmt(n: number) {
-  if (n >= 1_000_000) return `KES ${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000)     return `KES ${(n / 1_000).toFixed(0)}K`;
-  return `KES ${Math.round(n).toLocaleString()}`;
+  if (n >= 1_000_000) return `UGX ${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000)     return `UGX ${(n / 1_000).toFixed(0)}K`;
+  return `UGX ${Math.round(n).toLocaleString()}`;
 }
 
 function pct(n: number) { return `${(n * 100).toFixed(1)}%`; }

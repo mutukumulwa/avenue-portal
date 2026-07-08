@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { UserCheck, Search, CheckCircle2, XCircle } from "lucide-react";
 
 function money(n: number) {
-  return `KES ${Math.round(n).toLocaleString("en-UG")}`;
+  return `UGX ${Math.round(n).toLocaleString("en-UG")}`;
 }
 
 const ELIGIBLE_STATUSES = ["ACTIVE"];

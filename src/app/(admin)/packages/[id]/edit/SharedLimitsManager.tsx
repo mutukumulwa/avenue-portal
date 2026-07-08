@@ -100,7 +100,7 @@ export function SharedLimitsManager({
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Limit (KES)</label>
+              <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Limit (UGX)</label>
               <input
                 type="number" name="limitAmount" min="0"
                 className="w-full border p-2 rounded text-sm"
@@ -155,7 +155,7 @@ export function SharedLimitsManager({
               <div>
                 <h3 className="font-bold text-brand-text-heading">{sl.name}</h3>
                 <div className="flex items-center gap-3 text-xs text-gray-500 mt-1">
-                  <span className="font-semibold text-gray-700">KES {sl.limitAmount.toLocaleString()}</span>
+                  <span className="font-semibold text-gray-700">UGX {sl.limitAmount.toLocaleString()}</span>
                   <span>•</span>
                   <span>Applies to {sl.appliesTo}</span>
                 </div>

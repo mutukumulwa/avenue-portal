@@ -33,7 +33,7 @@ export async function GET(
   const acc  = group.selfFundedAccount;
   const txns = acc.transactions;
 
-  const headers = ["Date", "Type", "Description", "Reference", "Amount (KES)", "Balance After (KES)"];
+  const headers = ["Date", "Type", "Description", "Reference", "Amount (UGX)", "Balance After (UGX)"];
   const rows    = txns.map(t => [
     new Date(t.postedAt).toISOString().split("T")[0],
     t.type,

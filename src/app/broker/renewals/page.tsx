@@ -61,7 +61,7 @@ export default async function BrokerRenewalsPage() {
               <th className="px-6 py-4">Group</th>
               <th className="px-6 py-4">Package</th>
               <th className="px-6 py-4">Members</th>
-              <th className="px-6 py-4">Annual Premium (KES)</th>
+              <th className="px-6 py-4">Annual Premium (UGX)</th>
               <th className="px-6 py-4">Renewal Date</th>
               <th className="px-6 py-4">Urgency</th>
             </tr>

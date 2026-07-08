@@ -79,8 +79,8 @@ export function CoContributionRulesManager({ packageId, rules, annualCap }: Prop
         <div className="text-sm">
           {annualCap ? (
             <span className="text-brand-text-body">
-              Annual caps — Individual: <span className="font-bold text-brand-text-heading">KES {Number(annualCap.individualCap).toLocaleString()}</span>
-              {annualCap.familyCap && <> · Family: <span className="font-bold text-brand-text-heading">KES {Number(annualCap.familyCap).toLocaleString()}</span></>}
+              Annual caps — Individual: <span className="font-bold text-brand-text-heading">UGX {Number(annualCap.individualCap).toLocaleString()}</span>
+              {annualCap.familyCap && <> · Family: <span className="font-bold text-brand-text-heading">UGX {Number(annualCap.familyCap).toLocaleString()}</span></>}
             </span>
           ) : (
             <span className="text-brand-text-muted italic text-sm">No annual cap configured</span>
@@ -99,13 +99,13 @@ export function CoContributionRulesManager({ packageId, rules, annualCap }: Prop
       {showCapForm && (
         <form onSubmit={handleCapSave} className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-[#F8F9FA] border border-[#EEEEEE] rounded-lg p-4">
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-brand-text-muted uppercase">Individual Annual Cap (KES)</label>
+            <label className="text-xs font-semibold text-brand-text-muted uppercase">Individual Annual Cap (UGX)</label>
             <input name="individualCap" type="number" step="0.01" min="1" required
               defaultValue={annualCap ? Number(annualCap.individualCap) : ""}
               className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo" />
           </div>
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-brand-text-muted uppercase">Family Annual Cap (KES) — optional</label>
+            <label className="text-xs font-semibold text-brand-text-muted uppercase">Family Annual Cap (UGX) — optional</label>
             <input name="familyCap" type="number" step="0.01" min="1"
               defaultValue={annualCap?.familyCap ? Number(annualCap.familyCap) : ""}
               className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo" />
@@ -148,13 +148,13 @@ export function CoContributionRulesManager({ packageId, rules, annualCap }: Prop
                 <td className="px-4 py-3 text-brand-text-body">{TIER_LABELS[r.networkTier] ?? r.networkTier}</td>
                 <td className="px-4 py-3 text-brand-text-body">{TYPE_LABELS[r.type] ?? r.type}</td>
                 <td className="px-4 py-3 font-mono text-brand-text-heading">
-                  {r.type === "FIXED_AMOUNT" && `KES ${Number(r.fixedAmount ?? 0).toLocaleString()}`}
+                  {r.type === "FIXED_AMOUNT" && `UGX ${Number(r.fixedAmount ?? 0).toLocaleString()}`}
                   {r.type === "PERCENTAGE"   && `${Number(r.percentage ?? 0)}%`}
-                  {r.type === "HYBRID"       && `${Number(r.percentage ?? 0)}% / KES ${Number(r.fixedAmount ?? 0).toLocaleString()} floor`}
+                  {r.type === "HYBRID"       && `${Number(r.percentage ?? 0)}% / UGX ${Number(r.fixedAmount ?? 0).toLocaleString()} floor`}
                   {r.type === "NONE"         && "—"}
                 </td>
                 <td className="px-4 py-3 font-mono text-brand-text-body">
-                  {r.perVisitCap ? `KES ${Number(r.perVisitCap).toLocaleString()}` : "—"}
+                  {r.perVisitCap ? `UGX ${Number(r.perVisitCap).toLocaleString()}` : "—"}
                 </td>
                 <td className="px-4 py-3">
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${r.isActive ? "bg-[#28A745]/10 text-[#28A745]" : "bg-[#6C757D]/10 text-[#6C757D]"}`}>
@@ -223,7 +223,7 @@ export function CoContributionRulesManager({ packageId, rules, annualCap }: Prop
           {(selectedType === "FIXED_AMOUNT" || selectedType === "HYBRID") && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-brand-text-muted uppercase">Fixed Amount (KES)</label>
+                <label className="text-xs font-semibold text-brand-text-muted uppercase">Fixed Amount (UGX)</label>
                 <input name="fixedAmount" type="number" step="0.01" min="0"
                   required={selectedType === "FIXED_AMOUNT"}
                   className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo bg-white" />
@@ -245,7 +245,7 @@ export function CoContributionRulesManager({ packageId, rules, annualCap }: Prop
 
           {selectedType !== "NONE" && (
             <div className="space-y-1 max-w-xs">
-              <label className="text-xs font-semibold text-brand-text-muted uppercase">Per-Visit Cap (KES) — optional</label>
+              <label className="text-xs font-semibold text-brand-text-muted uppercase">Per-Visit Cap (UGX) — optional</label>
               <input name="perVisitCap" type="number" step="0.01" min="0"
                 className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo bg-white" />
             </div>

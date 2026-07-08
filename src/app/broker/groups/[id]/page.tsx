@@ -35,7 +35,7 @@ export default async function BrokerGroupDetailPage({ params }: { params: Promis
       <div className="grid md:grid-cols-3 gap-4">
         <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm"><p className="text-xs font-bold uppercase text-brand-text-muted">Members</p><p className="text-2xl font-bold text-brand-indigo">{group._count.members}</p></div>
         <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm"><p className="text-xs font-bold uppercase text-brand-text-muted">Endorsements</p><p className="text-2xl font-bold text-[#17A2B8]">{group._count.endorsements}</p></div>
-        <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm"><p className="text-xs font-bold uppercase text-brand-text-muted">Annual Limit</p><p className="text-2xl font-bold text-[#28A745]">KES {Number(group.package.annualLimit).toLocaleString()}</p></div>
+        <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm"><p className="text-xs font-bold uppercase text-brand-text-muted">Annual Limit</p><p className="text-2xl font-bold text-[#28A745]">UGX {Number(group.package.annualLimit).toLocaleString()}</p></div>
       </div>
       <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-[#EEEEEE]"><h2 className="font-bold text-brand-text-heading">Active Members</h2></div>

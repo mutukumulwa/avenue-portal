@@ -16,7 +16,7 @@ import { BenefitUsageService } from "./benefit-usage.service";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
-// Auto-approve ceiling (KES) — cases above this route to human review
+// Auto-approve ceiling (UGX) — cases above this route to human review
 const AUTO_APPROVE_CEILING_KES = 50_000;
 
 // Procedures on the never-auto list always require human review
@@ -191,7 +191,7 @@ export const preauthAdjudicationService = {
     if (balance) {
       if (estimatedCost > balance.available) {
         return routeHuman("BENEFIT_CAP",
-          `Estimated cost KES ${estimatedCost.toLocaleString()} exceeds remaining cap KES ${balance.available.toLocaleString()} (used ${balance.used.toLocaleString()} + held ${balance.held.toLocaleString()})`);
+          `Estimated cost UGX ${estimatedCost.toLocaleString()} exceeds remaining cap UGX ${balance.available.toLocaleString()} (used ${balance.used.toLocaleString()} + held ${balance.held.toLocaleString()})`);
       }
     }
     pass("BENEFIT_CAP");
@@ -199,7 +199,7 @@ export const preauthAdjudicationService = {
     // ── Gate 6: Auto-approve ceiling ──────────────────────────
     if (estimatedCost > AUTO_APPROVE_CEILING_KES) {
       return routeHuman("AUTO_APPROVE_CEILING",
-        `Estimated cost KES ${estimatedCost.toLocaleString()} exceeds auto-approve ceiling KES ${AUTO_APPROVE_CEILING_KES.toLocaleString()}`);
+        `Estimated cost UGX ${estimatedCost.toLocaleString()} exceeds auto-approve ceiling UGX ${AUTO_APPROVE_CEILING_KES.toLocaleString()}`);
     }
     pass("AUTO_APPROVE_CEILING");
 
@@ -529,7 +529,7 @@ export const preauthAdjudicationService = {
       entityId:   preAuthId,
       payload:    { approvedAmount, reviewerId },
       tenantId,
-      description: `PA ${pa.preauthNumber} approved by human reviewer KES ${approvedAmount.toLocaleString()}`,
+      description: `PA ${pa.preauthNumber} approved by human reviewer UGX ${approvedAmount.toLocaleString()}`,
     });
   },
 

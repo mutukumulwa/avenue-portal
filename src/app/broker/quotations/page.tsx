@@ -54,7 +54,7 @@ export default async function BrokerQuotationsPage() {
               <th className="px-6 py-4">Quote No.</th>
               <th className="px-6 py-4">Prospect</th>
               <th className="px-6 py-4">Members</th>
-              <th className="px-6 py-4">Final Premium (KES)</th>
+              <th className="px-6 py-4">Final Premium (UGX)</th>
               <th className="px-6 py-4">Valid Until</th>
               <th className="px-6 py-4">Status</th>
               <th className="px-6 py-4">Actions</th>

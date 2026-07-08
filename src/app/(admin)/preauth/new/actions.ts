@@ -44,7 +44,7 @@ export async function submitPreAuthAction(
     userId: session.user.id,
     action: "PREAUTH_SUBMITTED",
     module: "PREAUTH",
-    description: `Pre-auth submitted for member ${memberId.slice(0, 8)} — ${benefitCategory}, KES ${estimatedCost.toLocaleString()}`,
+    description: `Pre-auth submitted for member ${memberId.slice(0, 8)} — ${benefitCategory}, UGX ${estimatedCost.toLocaleString()}`,
     metadata: { memberId, benefitCategory, estimatedCost },
   });
 

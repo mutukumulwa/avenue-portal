@@ -53,7 +53,7 @@ function DiagTariffForm({
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div>
-          <label className={lbl}>Bundled Rate (KES)</label>
+          <label className={lbl}>Bundled Rate (UGX)</label>
           <input
             name="bundledRate"
             type="number"
@@ -64,7 +64,7 @@ function DiagTariffForm({
           />
         </div>
         <div>
-          <label className={lbl}>Per-Day Rate (KES)</label>
+          <label className={lbl}>Per-Day Rate (UGX)</label>
           <input
             name="perDayRate"
             type="number"
@@ -161,8 +161,8 @@ export function ProviderDiagnosisTariffsCard({
           <tr className="bg-[#F8F9FA] text-[10px] font-bold uppercase text-brand-text-muted border-b border-[#EEEEEE]">
             <th className="px-5 py-2.5 text-left">ICD-10</th>
             <th className="px-5 py-2.5 text-left">Diagnosis</th>
-            <th className="px-5 py-2.5 text-right">Bundled (KES)</th>
-            <th className="px-5 py-2.5 text-right">Per Day (KES)</th>
+            <th className="px-5 py-2.5 text-right">Bundled (UGX)</th>
+            <th className="px-5 py-2.5 text-right">Per Day (UGX)</th>
             <th className="px-5 py-2.5 text-left">Effective</th>
             <th className="px-5 py-2.5 w-16" />
           </tr>

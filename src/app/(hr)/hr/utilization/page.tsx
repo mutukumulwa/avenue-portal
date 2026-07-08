@@ -59,8 +59,8 @@ export default async function HRUtilizationPage() {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {[
           { label: "Total Claims", value: totalClaimsCount.toLocaleString(), icon: FileText, color: "text-[#17A2B8]" },
-          { label: "Total Invoiced (Premium)", value: `KES ${totalPremium.toLocaleString()}`, icon: ShieldCheck, color: "text-brand-indigo" },
-          { label: "Total Approved Spend", value: `KES ${totalApproved.toLocaleString()}`, icon: Activity, color: "text-[#28A745]" },
+          { label: "Total Invoiced (Premium)", value: `UGX ${totalPremium.toLocaleString()}`, icon: ShieldCheck, color: "text-brand-indigo" },
+          { label: "Total Approved Spend", value: `UGX ${totalApproved.toLocaleString()}`, icon: Activity, color: "text-[#28A745]" },
           { 
             label: "Fund Utilization (Loss Ratio)", 
             value: `${lossRatio.toFixed(1)}%`, 
@@ -89,7 +89,7 @@ export default async function HRUtilizationPage() {
               <div key={c.benefitCategory}>
                 <div className="flex justify-between items-end mb-1">
                   <span className="text-sm font-semibold">{c.benefitCategory}</span>
-                  <span className="text-sm font-bold text-brand-indigo">KES {Number(c._sum.approvedAmount || 0).toLocaleString()}</span>
+                  <span className="text-sm font-bold text-brand-indigo">UGX {Number(c._sum.approvedAmount || 0).toLocaleString()}</span>
                 </div>
                 <div className="w-full bg-[#EEEEEE] rounded-full h-2">
                   <div 

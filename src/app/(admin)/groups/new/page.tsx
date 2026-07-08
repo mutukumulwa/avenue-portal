@@ -115,7 +115,7 @@ export default async function GroupEnrollmentHero({
                   <label className="text-sm font-semibold text-brand-text-heading">Select Package</label>
                   <select required name="packageId" className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-[#0B1437] transition-colors">
                     {packages.map((pkg) => (
-                       <option key={pkg.id} value={pkg.id}>{pkg.name} (Max KES {Number(pkg.annualLimit).toLocaleString()})</option>
+                       <option key={pkg.id} value={pkg.id}>{pkg.name} (Max UGX {Number(pkg.annualLimit).toLocaleString()})</option>
                     ))}
                   </select>
                 </div>

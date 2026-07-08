@@ -70,9 +70,9 @@ export default async function BillingPage() {
       {/* Summary */}
       <div className="grid grid-cols-3 gap-4">
         {[
-          { label: "Total Billed (KES)", value: totalBilled.toLocaleString(), color: "text-brand-indigo" },
-          { label: "Total Collected (KES)", value: totalCollected.toLocaleString(), color: "text-[#28A745]" },
-          { label: "Outstanding (KES)", value: totalOutstanding.toLocaleString(), color: "text-[#DC3545]" },
+          { label: "Total Billed (UGX)", value: totalBilled.toLocaleString(), color: "text-brand-indigo" },
+          { label: "Total Collected (UGX)", value: totalCollected.toLocaleString(), color: "text-[#28A745]" },
+          { label: "Outstanding (UGX)", value: totalOutstanding.toLocaleString(), color: "text-[#DC3545]" },
         ].map((s) => (
           <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm">
             <p className="text-xs text-brand-text-muted font-bold uppercase">{s.label}</p>
@@ -94,8 +94,8 @@ export default async function BillingPage() {
                 <th className="px-6 py-4">Group</th>
                 <th className="px-6 py-4">Period</th>
                 <th className="px-6 py-4">Members</th>
-                <th className="px-6 py-4">Total (KES)</th>
-                <th className="px-6 py-4">Balance (KES)</th>
+                <th className="px-6 py-4">Total (UGX)</th>
+                <th className="px-6 py-4">Balance (UGX)</th>
                 <th className="px-6 py-4">Due Date</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4">Actions</th>
@@ -189,7 +189,7 @@ export default async function BillingPage() {
             <thead>
               <tr className="bg-[#E6E7E8] text-[#6C757D] font-semibold text-sm border-b border-[#EEEEEE]">
                 <th className="px-6 py-4">Group</th>
-                <th className="px-6 py-4">Amount (KES)</th>
+                <th className="px-6 py-4">Amount (UGX)</th>
                 <th className="px-6 py-4">Method</th>
                 <th className="px-6 py-4">Reference</th>
                 <th className="px-6 py-4">Date</th>

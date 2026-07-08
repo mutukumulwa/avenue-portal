@@ -76,7 +76,7 @@ export default function QuotationCalculatorPage() {
   const finalPremium     = baseAnnualPremium * (1 + totalLoadingPct / 100) * (1 - totalDiscountPct / 100);
   const ratePerMember    = totalLives > 0 ? finalPremium / totalLives : 0;
 
-  const fmt = (n: number) => `KES ${Math.round(n).toLocaleString()}`;
+  const fmt = (n: number) => `UGX ${Math.round(n).toLocaleString()}`;
 
   const inputCls = "w-full border border-[#EEEEEE] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-brand-indigo";
 
@@ -264,9 +264,9 @@ export default function QuotationCalculatorPage() {
                   <div className="flex justify-between items-start">
                     <div>
                       <p className="font-bold text-brand-text-heading">{pkg.name}</p>
-                      <p className="text-xs text-brand-text-muted mt-0.5">Annual limit: KES {pkg.annualLimit.toLocaleString()}</p>
+                      <p className="text-xs text-brand-text-muted mt-0.5">Annual limit: UGX {pkg.annualLimit.toLocaleString()}</p>
                     </div>
-                    <p className="font-bold text-brand-indigo">KES {pkg.ratePerMember.toLocaleString()} / member</p>
+                    <p className="font-bold text-brand-indigo">UGX {pkg.ratePerMember.toLocaleString()} / member</p>
                   </div>
                 </button>
               ))}
@@ -365,9 +365,9 @@ export default function QuotationCalculatorPage() {
                 { label: "Package",                          value: selectedPkg?.name ?? "—" },
                 { label: "Pricing Mode",                     value: form.useAgeBands ? "Age-Banded" : "Flat Rate" },
                 { label: "Total Lives",                      value: String(totalLives) },
-                { label: "Blended Rate / Member (KES)",      value: Math.round(ratePerMember).toLocaleString() },
-                { label: "Base Annual Contribution (KES)",   value: Math.round(baseAnnualPremium).toLocaleString() },
-                { label: "Final Annual Contribution (KES)",  value: Math.round(finalPremium).toLocaleString() },
+                { label: "Blended Rate / Member (UGX)",      value: Math.round(ratePerMember).toLocaleString() },
+                { label: "Base Annual Contribution (UGX)",   value: Math.round(baseAnnualPremium).toLocaleString() },
+                { label: "Final Annual Contribution (UGX)",  value: Math.round(finalPremium).toLocaleString() },
                 { label: "Valid for",                        value: "30 days from generation" },
               ].map((f) => (
                 <div key={f.label} className="flex justify-between border-b border-[#F8F9FA] pb-2">

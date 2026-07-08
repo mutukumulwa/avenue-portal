@@ -139,8 +139,8 @@ export async function generateAdminFeeInvoiceAction(formData: FormData): Promise
         stampDuty: 0, trainingLevy: 0, phcf: 0, taxTotal: 0,
         dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
         notes: `Admin fee — ${fullGroup.adminFeeMethod === "FLAT_PER_INSURED"
-          ? `KES ${Number(fullGroup.adminFeeRate).toLocaleString()} × ${fullGroup.members.length} insured`
-          : `${fullGroup.adminFeeRate}% of KES ${Number(acc.totalClaims).toLocaleString()} claims paid`}`,
+          ? `UGX ${Number(fullGroup.adminFeeRate).toLocaleString()} × ${fullGroup.members.length} insured`
+          : `${fullGroup.adminFeeRate}% of UGX ${Number(acc.totalClaims).toLocaleString()} claims paid`}`,
       },
     });
 

@@ -86,7 +86,7 @@ export function DebitNoteDocument({ data }: { data: DebitNoteData }) {
 
           <View style={s.tableHeader}>
             <Text style={[s.tableHeaderText, s.col1]}>Description</Text>
-            <Text style={[s.tableHeaderText, s.col2]}>Amount (KES)</Text>
+            <Text style={[s.tableHeaderText, s.col2]}>Amount (UGX)</Text>
           </View>
 
           {/* Base Premium */}
@@ -94,7 +94,7 @@ export function DebitNoteDocument({ data }: { data: DebitNoteData }) {
             <View style={s.col1}>
               <Text style={{ fontWeight: "bold" }}>Basic Premium</Text>
               <Text style={{ color: "#6C757D", fontSize: 9, marginTop: 2 }}>
-                {data.memberCount} member{data.memberCount !== 1 ? "s" : ""} × KES {data.ratePerMember.toLocaleString()} per member
+                {data.memberCount} member{data.memberCount !== 1 ? "s" : ""} × UGX {data.ratePerMember.toLocaleString()} per member
               </Text>
             </View>
             <Text style={s.col2}>{basePremium.toLocaleString()}</Text>
@@ -130,7 +130,7 @@ export function DebitNoteDocument({ data }: { data: DebitNoteData }) {
           {/* Total */}
           <View style={s.totalRow}>
             <Text style={s.totalLabel}>Total Due</Text>
-            <Text style={s.totalValue}>KES {data.totalAmount.toLocaleString()}</Text>
+            <Text style={s.totalValue}>UGX {data.totalAmount.toLocaleString()}</Text>
           </View>
         </View>
 

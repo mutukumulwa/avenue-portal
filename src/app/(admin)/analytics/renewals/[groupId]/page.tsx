@@ -27,9 +27,9 @@ function numberParam(value: string | undefined, fallback: number) {
 }
 
 function formatMoney(value: number) {
-  if (Math.abs(value) >= 1_000_000) return `KES ${(value / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(value) >= 1_000) return `KES ${(value / 1_000).toFixed(0)}K`;
-  return `KES ${Math.round(value).toLocaleString("en-UG")}`;
+  if (Math.abs(value) >= 1_000_000) return `UGX ${(value / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(value) >= 1_000) return `UGX ${(value / 1_000).toFixed(0)}K`;
+  return `UGX ${Math.round(value).toLocaleString("en-UG")}`;
 }
 
 function formatPercent(value: number) {
@@ -425,7 +425,7 @@ export default async function RenewalWorkspacePage({
                   <p className="text-xs text-brand-text-muted mt-0.5">
                     Rate adj: {(Number(s.proposedRateAdj) * 100).toFixed(1)}% ·
                     Projected MLR: {(Number(s.projectedMlr) * 100).toFixed(1)}% ·
-                    Contribution: KES {Number(s.projectedContribution).toLocaleString("en-UG")}
+                    Contribution: UGX {Number(s.projectedContribution).toLocaleString("en-UG")}
                   </p>
                 </div>
                 <div className="flex items-center gap-2">

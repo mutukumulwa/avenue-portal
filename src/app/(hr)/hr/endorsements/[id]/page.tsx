@@ -79,7 +79,7 @@ export default async function HREndorsementDetailPage({ params }: { params: Prom
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-3">
           <h2 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2">Financial Impact</h2>
           <p className="text-3xl font-bold text-brand-indigo">
-            KES {Number(endorsement.proratedAmount ?? 0).toLocaleString("en-UG")}
+            UGX {Number(endorsement.proratedAmount ?? 0).toLocaleString("en-UG")}
           </p>
           <p className="text-sm text-brand-text-muted">
             Positive amounts are debits. Negative amounts are credits against the group account.

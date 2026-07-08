@@ -60,7 +60,7 @@ export default async function PreAuthPage() {
                 <th className="px-6 py-4">Member</th>
                 <th className="px-6 py-4">Provider</th>
                 <th className="px-6 py-4">Service</th>
-                <th className="px-6 py-4">Estimated Cost (KES)</th>
+                <th className="px-6 py-4">Estimated Cost (UGX)</th>
                 <th className="px-6 py-4">Benefit</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4">Actions</th>

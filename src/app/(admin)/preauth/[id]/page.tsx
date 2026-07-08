@@ -107,9 +107,9 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
         <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 shadow-sm">
           <p className="text-xs text-brand-text-muted font-bold uppercase tracking-wide">Financials</p>
           <div className="mt-2 space-y-1 text-sm">
-            <div className="flex justify-between"><span className="text-brand-text-body">Estimated Cost</span><span className="font-bold text-brand-text-heading">KES {Number(pa.estimatedCost).toLocaleString()}</span></div>
+            <div className="flex justify-between"><span className="text-brand-text-body">Estimated Cost</span><span className="font-bold text-brand-text-heading">UGX {Number(pa.estimatedCost).toLocaleString()}</span></div>
             {pa.approvedAmount && (
-              <div className="flex justify-between"><span className="text-brand-text-body">Approved</span><span className="font-bold text-[#28A745]">KES {Number(pa.approvedAmount).toLocaleString()}</span></div>
+              <div className="flex justify-between"><span className="text-brand-text-body">Approved</span><span className="font-bold text-[#28A745]">UGX {Number(pa.approvedAmount).toLocaleString()}</span></div>
             )}
             {pa.validUntil && (
               <div className="flex justify-between"><span className="text-brand-text-body">Valid Until</span><span className="font-semibold text-brand-text-heading">{new Date(pa.validUntil).toLocaleDateString()}</span></div>
@@ -140,7 +140,7 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
             {Array.isArray(procedures) && procedures.map((p, i) => (
               <li key={i} className="flex justify-between items-start text-sm border-b border-[#EEEEEE] pb-2 last:border-0">
                 <span className="text-brand-text-body">{p.description}</span>
-                <span className="font-semibold text-brand-text-heading">KES {(p.total ?? 0).toLocaleString()}</span>
+                <span className="font-semibold text-brand-text-heading">UGX {(p.total ?? 0).toLocaleString()}</span>
               </li>
             ))}
           </ul>
@@ -326,10 +326,10 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
           {benefitBalance && (
             <div className="grid grid-cols-4 gap-3 text-sm">
               {[
-                { label: "Annual Limit",   value: `KES ${Number(benefitBalance.limit).toLocaleString("en-UG")}`,     color: "text-brand-text-heading" },
-                { label: "Consumed",       value: `KES ${Number(benefitBalance.used).toLocaleString("en-UG")}`,      color: "text-[#DC3545]" },
-                { label: "Active Holds",   value: `KES ${Number(benefitBalance.held).toLocaleString("en-UG")}`,      color: "text-[#856404]" },
-                { label: "Available",      value: `KES ${Number(benefitBalance.remaining).toLocaleString("en-UG")}`, color: "text-[#28A745] font-bold" },
+                { label: "Annual Limit",   value: `UGX ${Number(benefitBalance.limit).toLocaleString("en-UG")}`,     color: "text-brand-text-heading" },
+                { label: "Consumed",       value: `UGX ${Number(benefitBalance.used).toLocaleString("en-UG")}`,      color: "text-[#DC3545]" },
+                { label: "Active Holds",   value: `UGX ${Number(benefitBalance.held).toLocaleString("en-UG")}`,      color: "text-[#856404]" },
+                { label: "Available",      value: `UGX ${Number(benefitBalance.remaining).toLocaleString("en-UG")}`, color: "text-[#28A745] font-bold" },
               ].map(({ label, value, color }) => (
                 <div key={label}>
                   <p className="text-xs text-brand-text-muted">{label}</p>
@@ -342,7 +342,7 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
             <div className="flex items-center justify-between bg-[#FFC107]/10 border border-[#FFC107]/30 rounded-[6px] p-3">
               <div>
                 <p className="text-sm font-semibold text-[#856404]">
-                  Pending Authorization Hold: KES {Number(hold.heldAmount).toLocaleString("en-UG")}
+                  Pending Authorization Hold: UGX {Number(hold.heldAmount).toLocaleString("en-UG")}
                 </p>
                 <p className="text-xs text-brand-text-muted mt-0.5">
                   Expires: {new Date(hold.expiresAt).toLocaleDateString("en-UG")}

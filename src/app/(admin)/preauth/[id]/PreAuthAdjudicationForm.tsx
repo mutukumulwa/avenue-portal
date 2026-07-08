@@ -127,7 +127,7 @@ export function PreAuthAdjudicationForm({ preauthId, estimatedCost, serviceType,
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>
-                Approved Amount (KES) {isPartial && <span className="text-[#FFC107] font-normal">— partial</span>}
+                Approved Amount (UGX) {isPartial && <span className="text-[#FFC107] font-normal">— partial</span>}
               </label>
               <input
                 name="approvedAmount"

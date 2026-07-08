@@ -74,7 +74,7 @@ export function NewInvoiceModal({ groups }: { groups: Group[] }) {
                   <input name="memberCount" type="number" min="1" required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo" />
                 </div>
                 <div>
-                  <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Rate / Member (KES)</label>
+                  <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Rate / Member (UGX)</label>
                   <input name="ratePerMember" type="number" min="0" step="0.01" required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo" />
                 </div>
               </div>

@@ -45,7 +45,7 @@ export default async function BuildQuotePage({ params }: { params: Promise<{ id:
   if (!quotation) notFound();
 
   const fmt = (n: number) =>
-    `KES ${Math.round(n).toLocaleString("en-UG", { minimumFractionDigits: 0 })}`;
+    `UGX ${Math.round(n).toLocaleString("en-UG", { minimumFractionDigits: 0 })}`;
 
   const hasLineItems = quotation.lineItems.length > 0;
   const canIssue = quotation.status === "DRAFT" && hasLineItems;
@@ -144,12 +144,12 @@ export default async function BuildQuotePage({ params }: { params: Promise<{ id:
               <p className="text-xs font-semibold text-brand-text-muted uppercase tracking-wide">Ancillary Fees</p>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[11px] text-brand-text-muted mb-1">Card fee / life (KES)</label>
+                  <label className="block text-[11px] text-brand-text-muted mb-1">Card fee / life (UGX)</label>
                   <input name="cardIssuanceFeePerLife" type="number" min={0} placeholder="0"
                     className="w-full border border-[#EEEEEE] rounded-[6px] px-2 py-1.5 text-sm" />
                 </div>
                 <div>
-                  <label className="block text-[11px] text-brand-text-muted mb-1">Welcome pack / life (KES)</label>
+                  <label className="block text-[11px] text-brand-text-muted mb-1">Welcome pack / life (UGX)</label>
                   <input name="welcomePackFeePerLife" type="number" min={0} placeholder="0"
                     className="w-full border border-[#EEEEEE] rounded-[6px] px-2 py-1.5 text-sm" />
                 </div>
@@ -216,7 +216,7 @@ export default async function BuildQuotePage({ params }: { params: Promise<{ id:
                   <thead>
                     <tr className="bg-[#E6E7E8] text-[#6C757D] text-xs font-semibold border-b border-[#EEEEEE]">
                       <th className="px-5 py-3">Description</th>
-                      <th className="px-5 py-3 text-right">Amount (KES)</th>
+                      <th className="px-5 py-3 text-right">Amount (UGX)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#EEEEEE]">

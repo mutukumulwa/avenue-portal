@@ -68,7 +68,7 @@ async function fetchRowsForReport(
       });
       return {
         title: TITLES[reportType],
-        headers: ["Invoice No.", "Group", "Balance (KES)", "Status", "Due Date"],
+        headers: ["Invoice No.", "Group", "Balance (UGX)", "Status", "Due Date"],
         rows: rows.map(r => [r.invoiceNumber, r.group.name, Number(r.balance).toLocaleString("en-UG"), r.status, new Date(r.dueDate).toLocaleDateString("en-UG")]),
       };
     }

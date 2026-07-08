@@ -61,7 +61,7 @@ export default async function MemberReinstatementPage() {
               <p className="text-xl font-bold text-brand-text-heading mt-1">{monthsLapsed}</p>
             </div>
             <div className="bg-[#F8F9FA] p-3 rounded">
-              <p className="text-brand-text-muted text-xs font-bold uppercase">Estimated catch-up (KES)</p>
+              <p className="text-brand-text-muted text-xs font-bold uppercase">Estimated catch-up (UGX)</p>
               <p className="text-xl font-bold text-brand-text-heading mt-1">{estimatedCatchUp.toLocaleString()}</p>
             </div>
           </div>
@@ -82,7 +82,7 @@ export default async function MemberReinstatementPage() {
           </div>
           <p className="text-sm text-brand-text-body">
             Your reinstatement request was submitted on {new Date(pending.requestDate).toLocaleDateString("en-UG")}.
-            Estimated catch-up: <strong>KES {Number(pending.catchUpAmount).toLocaleString()}</strong> for {pending.periodsCovered} month(s).
+            Estimated catch-up: <strong>UGX {Number(pending.catchUpAmount).toLocaleString()}</strong> for {pending.periodsCovered} month(s).
             Your scheme administrator will review it shortly.
           </p>
         </div>
@@ -111,7 +111,7 @@ export default async function MemberReinstatementPage() {
                   </div>
                   <p className="text-brand-text-muted mt-1">
                     Requested {new Date(r.requestDate).toLocaleDateString("en-UG")} ·{" "}
-                    {r.periodsCovered} month(s) · KES {Number(r.catchUpAmount).toLocaleString()}
+                    {r.periodsCovered} month(s) · UGX {Number(r.catchUpAmount).toLocaleString()}
                   </p>
                   {r.declineReason && (
                     <p className="text-[#DC3545] text-xs mt-1">Declined: {r.declineReason}</p>

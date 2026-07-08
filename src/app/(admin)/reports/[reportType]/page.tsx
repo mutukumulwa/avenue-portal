@@ -87,11 +87,11 @@ async function getClaimsData(tenantId: string) {
   const approved = rows.reduce((s, r) => s + Number(r.approvedAmount ?? 0), 0);
   const kpis = [
     { label: "Total Claims",        value: rows.length.toLocaleString() },
-    { label: "Total Billed (KES)",  value: total.toLocaleString() },
-    { label: "Total Approved (KES)",value: approved.toLocaleString() },
+    { label: "Total Billed (UGX)",  value: total.toLocaleString() },
+    { label: "Total Approved (UGX)",value: approved.toLocaleString() },
     { label: "Loss Ratio",          value: total > 0 ? `${((approved / total) * 100).toFixed(1)}%` : "—" },
   ];
-  const headers = ["Claim No.", "Member", "Provider", "Category", "Billed (KES)", "Approved (KES)", "Status", "Date"];
+  const headers = ["Claim No.", "Member", "Provider", "Category", "Billed (UGX)", "Approved (UGX)", "Status", "Date"];
   const data = rows.map(r => [
     r.claimNumber,
     `${r.member.firstName} ${r.member.lastName}`,
@@ -158,7 +158,7 @@ async function getPreauthData(tenantId: string) {
     { label: "Declined",        value: declined.toLocaleString() },
     { label: "Approval Rate",   value: rows.length > 0 ? `${((approved / rows.length) * 100).toFixed(1)}%` : "—" },
   ];
-  const headers = ["PA No.", "Member", "Provider", "Category", "Estimated (KES)", "Approved (KES)", "Status", "Date"];
+  const headers = ["PA No.", "Member", "Provider", "Category", "Estimated (UGX)", "Approved (UGX)", "Status", "Date"];
   const data = rows.map(r => [
     r.preauthNumber,
     `${r.member.firstName} ${r.member.lastName}`,
@@ -188,11 +188,11 @@ async function getBillingData(tenantId: string) {
   const totalCollected = rows.reduce((s, r) => s + Number(r.paidAmount), 0);
   const kpis = [
     { label: "Total Invoices",      value: rows.length.toLocaleString() },
-    { label: "Total Billed (KES)",  value: totalBilled.toLocaleString() },
-    { label: "Collected (KES)",     value: totalCollected.toLocaleString() },
-    { label: "Outstanding (KES)",   value: (totalBilled - totalCollected).toLocaleString() },
+    { label: "Total Billed (UGX)",  value: totalBilled.toLocaleString() },
+    { label: "Collected (UGX)",     value: totalCollected.toLocaleString() },
+    { label: "Outstanding (UGX)",   value: (totalBilled - totalCollected).toLocaleString() },
   ];
-  const headers = ["Invoice No.", "Group", "Period", "Members", "Total (KES)", "Paid (KES)", "Balance (KES)", "Status"];
+  const headers = ["Invoice No.", "Group", "Period", "Members", "Total (UGX)", "Paid (UGX)", "Balance (UGX)", "Status"];
   const data = rows.map(r => [
     r.invoiceNumber,
     r.group.name,
@@ -221,11 +221,11 @@ async function getUtilizationData(tenantId: string) {
   const totalLimit = rows.reduce((s, r) => s + Number(r.benefitConfig.annualSubLimit), 0);
   const kpis = [
     { label: "Records",          value: rows.length.toLocaleString() },
-    { label: "Total Used (KES)", value: totalUsed.toLocaleString() },
-    { label: "Total Limit (KES)",value: totalLimit.toLocaleString() },
+    { label: "Total Used (UGX)", value: totalUsed.toLocaleString() },
+    { label: "Total Limit (UGX)",value: totalLimit.toLocaleString() },
     { label: "Utilization %",    value: totalLimit > 0 ? `${((totalUsed / totalLimit) * 100).toFixed(1)}%` : "—" },
   ];
-  const headers = ["Member No.", "Name", "Group", "Benefit", "Limit (KES)", "Used (KES)", "Remaining (KES)", "Period"];
+  const headers = ["Member No.", "Name", "Group", "Benefit", "Limit (UGX)", "Used (UGX)", "Remaining (UGX)", "Period"];
   const data = rows.map(r => {
     const limit = Number(r.benefitConfig.annualSubLimit);
     const used  = Number(r.amountUsed);
@@ -261,9 +261,9 @@ async function getEndorsementsData(tenantId: string) {
     { label: "Total Endorsements",   value: rows.length.toLocaleString() },
     { label: "Applied",              value: applied.toLocaleString() },
     { label: "Submitted / Review",   value: rows.filter(r => ["SUBMITTED", "UNDER_REVIEW"].includes(r.status)).length.toLocaleString() },
-    { label: "Net Adjustment (KES)", value: totalAdj.toLocaleString() },
+    { label: "Net Adjustment (UGX)", value: totalAdj.toLocaleString() },
   ];
-  const headers = ["Endorsement No.", "Group", "Type", "Status", "Effective Date", "Adj. (KES)", "Created"];
+  const headers = ["Endorsement No.", "Group", "Type", "Status", "Effective Date", "Adj. (UGX)", "Created"];
   const data = rows.map(r => [
     r.endorsementNumber,
     r.group.name,
@@ -294,9 +294,9 @@ async function getQuotationsData(tenantId: string) {
     { label: "Total Quotes",           value: rows.length.toLocaleString() },
     { label: "Accepted",               value: accepted.toLocaleString() },
     { label: "Win Rate",               value: rows.length > 0 ? `${((accepted / rows.length) * 100).toFixed(1)}%` : "—" },
-    { label: "Accepted Premium (KES)", value: totalPremium.toLocaleString() },
+    { label: "Accepted Premium (UGX)", value: totalPremium.toLocaleString() },
   ];
-  const headers = ["Quote No.", "Group / Prospect", "Members", "Annual Premium (KES)", "Status", "Valid Until", "Created"];
+  const headers = ["Quote No.", "Group / Prospect", "Members", "Annual Premium (UGX)", "Status", "Valid Until", "Created"];
   const data = rows.map(r => [
     r.quoteNumber,
     r.group?.name ?? r.prospectName ?? "—",
@@ -360,11 +360,11 @@ async function getChronicDiseaseData(tenantId: string) {
   const kpis = [
     { label: "Unique Conditions", value: totalConditions.toLocaleString() },
     { label: "Top Condition",     value: topCondition },
-    { label: "Total Spend (KES)", value: totalSpend.toLocaleString() },
+    { label: "Total Spend (UGX)", value: totalSpend.toLocaleString() },
     { label: "Avg Cost / Case",   value: sorted.length > 0 ? Math.round(totalSpend / sorted.reduce((s, [, v]) => s + v.count, 0)).toLocaleString() : "—" },
   ];
 
-  const headers = ["ICD Code", "Condition / Diagnosis", "Cases", "Total Approved (KES)", "Avg Cost (KES)", "Groups Affected"];
+  const headers = ["ICD Code", "Condition / Diagnosis", "Cases", "Total Approved (UGX)", "Avg Cost (UGX)", "Groups Affected"];
   const data = sorted.map(([code, v]) => [
     code,
     v.description,
@@ -393,11 +393,11 @@ async function getOutstandingBillsData(tenantId: string) {
   const overdue = rows.filter(r => r.status === "OVERDUE");
   const kpis = [
     { label: "Outstanding Invoices",    value: rows.length.toLocaleString() },
-    { label: "Total Outstanding (KES)", value: totalOutstanding.toLocaleString() },
+    { label: "Total Outstanding (UGX)", value: totalOutstanding.toLocaleString() },
     { label: "Overdue",                 value: overdue.length.toLocaleString() },
-    { label: "Overdue Amount (KES)",    value: overdue.reduce((s, r) => s + Number(r.balance), 0).toLocaleString() },
+    { label: "Overdue Amount (UGX)",    value: overdue.reduce((s, r) => s + Number(r.balance), 0).toLocaleString() },
   ];
-  const headers = ["Invoice No.", "Group", "Period", "Due Date", "Total (KES)", "Paid (KES)", "Balance (KES)", "Status", "Days Overdue"];
+  const headers = ["Invoice No.", "Group", "Period", "Due Date", "Total (UGX)", "Paid (UGX)", "Balance (UGX)", "Status", "Days Overdue"];
   const today = new Date();
   const data = rows.map(r => {
     const due = new Date(r.dueDate);
@@ -435,10 +435,10 @@ async function getProviderStatementsData(tenantId: string): Promise<ReportResult
   const kpis = [
     { label: "Claims",                value: rows.length.toLocaleString() },
     { label: "Providers",             value: providers.toLocaleString() },
-    { label: "Total Approved (KES)",  value: totalApproved.toLocaleString() },
-    { label: "Total Paid (KES)",      value: totalPaid.toLocaleString() },
+    { label: "Total Approved (UGX)",  value: totalApproved.toLocaleString() },
+    { label: "Total Paid (UGX)",      value: totalPaid.toLocaleString() },
   ];
-  const headers = ["Provider", "Claim No.", "Member", "Category", "Date of Service", "Billed (KES)", "Approved (KES)", "Paid (KES)", "Status"];
+  const headers = ["Provider", "Claim No.", "Member", "Category", "Date of Service", "Billed (UGX)", "Approved (UGX)", "Paid (UGX)", "Status"];
   const data: Cell[][] = rows.map(r => [
     { text: r.provider.name, href: `/analytics/providers/${r.provider.id}?from=report` },
     r.claimNumber,
@@ -474,11 +474,11 @@ async function getMemberStatementsData(tenantId: string) {
 
   const kpis = [
     { label: "Members",              value: members.length.toLocaleString() },
-    { label: "Total Billed (KES)",   value: members.reduce((s, m) => s + m.claims.reduce((c, cl) => c + Number(cl.billedAmount), 0), 0).toLocaleString() },
-    { label: "Total Approved (KES)", value: members.reduce((s, m) => s + m.claims.reduce((c, cl) => c + Number(cl.approvedAmount), 0), 0).toLocaleString() },
+    { label: "Total Billed (UGX)",   value: members.reduce((s, m) => s + m.claims.reduce((c, cl) => c + Number(cl.billedAmount), 0), 0).toLocaleString() },
+    { label: "Total Approved (UGX)", value: members.reduce((s, m) => s + m.claims.reduce((c, cl) => c + Number(cl.approvedAmount), 0), 0).toLocaleString() },
     { label: "Co-Contrib Collected", value: members.reduce((s, m) => s + m.coContributionTransactions.reduce((c, t) => c + Number(t.amountCollected ?? 0), 0), 0).toLocaleString() },
   ];
-  const headers = ["Member No.", "Name", "Group", "Package", "Claims", "Total Billed (KES)", "Approved (KES)", "Co-Contrib Owed (KES)", "Co-Contrib Paid (KES)"];
+  const headers = ["Member No.", "Name", "Group", "Package", "Claims", "Total Billed (UGX)", "Approved (UGX)", "Co-Contrib Owed (UGX)", "Co-Contrib Paid (UGX)"];
   const data = members.map(m => {
     const billed   = m.claims.reduce((s, c) => s + Number(c.billedAmount), 0);
     const approved = m.claims.reduce((s, c) => s + Number(c.approvedAmount), 0);
@@ -526,7 +526,7 @@ async function getExceededLimitsData(tenantId: string) {
     { label: "Avg Utilisation",  value: flagged.length > 0 ? `${(flagged.reduce((s, u) => s + u.pct, 0) / flagged.length).toFixed(1)}%` : "—" },
     { label: "Max Utilisation",  value: flagged[0] ? `${flagged[0].pct.toFixed(1)}%` : "—" },
   ];
-  const headers = ["Member No.", "Name", "Group", "Benefit Category", "Limit (KES)", "Used (KES)", "Utilisation %", "Status"];
+  const headers = ["Member No.", "Name", "Group", "Benefit Category", "Limit (UGX)", "Used (UGX)", "Utilisation %", "Status"];
   const data = flagged.map(u => [
     u.member.memberNumber,
     `${u.member.firstName} ${u.member.lastName}`,
@@ -557,11 +557,11 @@ async function getAdmissionsData(tenantId: string) {
   const avgLOS        = rows.filter(r => r.lengthOfStay).reduce((s, r) => s + (r.lengthOfStay ?? 0), 0) / Math.max(1, rows.filter(r => r.lengthOfStay).length);
   const kpis = [
     { label: "Total Admissions",    value: rows.length.toLocaleString() },
-    { label: "Total Billed (KES)",  value: totalBilled.toLocaleString() },
+    { label: "Total Billed (UGX)",  value: totalBilled.toLocaleString() },
     { label: "Avg Length of Stay",  value: `${avgLOS.toFixed(1)} days` },
     { label: "Unique Providers",    value: new Set(rows.map(r => r.provider.name)).size.toLocaleString() },
   ];
-  const headers = ["Claim No.", "Member", "Group", "Provider", "Admission Date", "Discharge Date", "LOS (Days)", "Billed (KES)", "Status"];
+  const headers = ["Claim No.", "Member", "Group", "Provider", "Admission Date", "Discharge Date", "LOS (Days)", "Billed (UGX)", "Status"];
   const data = rows.map(r => [
     r.claimNumber,
     `${r.member.firstName} ${r.member.lastName} (${r.member.memberNumber})`,
@@ -599,9 +599,9 @@ async function getAdmissionVisitsData(tenantId: string) {
     { label: "Total OPD Visits",   value: rows.length.toLocaleString() },
     { label: "Unique Members",     value: byMember.size.toLocaleString() },
     { label: "Avg Visits / Member",value: avgVisits.toFixed(1) },
-    { label: "Total Billed (KES)", value: totalBilled.toLocaleString() },
+    { label: "Total Billed (UGX)", value: totalBilled.toLocaleString() },
   ];
-  const headers = ["Claim No.", "Member", "Group", "Provider", "Date", "Category", "Billed (KES)", "Status"];
+  const headers = ["Claim No.", "Member", "Group", "Provider", "Date", "Category", "Billed (UGX)", "Status"];
   const data = rows.map(r => [
     r.claimNumber,
     `${r.member.firstName} ${r.member.lastName} (${r.member.memberNumber})`,
@@ -648,11 +648,11 @@ async function getLossRatioData(tenantId: string): Promise<ReportResult> {
 
   const kpis = [
     { label: "Groups",              value: rows.length.toLocaleString() },
-    { label: "Total Premium (KES)", value: totalPremium.toLocaleString() },
-    { label: "Total Claims (KES)",  value: totalClaims.toLocaleString() },
+    { label: "Total Premium (UGX)", value: totalPremium.toLocaleString() },
+    { label: "Total Claims (UGX)",  value: totalClaims.toLocaleString() },
     { label: "Overall Loss Ratio",  value: `${overallRatio.toFixed(1)}%` },
   ];
-  const headers = ["Group", "Premium Collected (KES)", "Claims Approved (KES)", "Loss Ratio %", "Rating"];
+  const headers = ["Group", "Premium Collected (UGX)", "Claims Approved (UGX)", "Loss Ratio %", "Rating"];
   const data: Cell[][] = rows.map(r => [
     { text: r.name, href: `/analytics/schemes/${r.id}?from=report` },
     r.premium.toLocaleString(),
@@ -688,11 +688,11 @@ async function getClaimsExperienceData(tenantId: string): Promise<ReportResult> 
 
   const kpis = [
     { label: "Groups × Categories",  value: rows.length.toLocaleString() },
-    { label: "Total Billed (KES)",   value: rows.reduce((s, r) => s + r.billed, 0).toLocaleString() },
-    { label: "Total Approved (KES)", value: rows.reduce((s, r) => s + r.approved, 0).toLocaleString() },
+    { label: "Total Billed (UGX)",   value: rows.reduce((s, r) => s + r.billed, 0).toLocaleString() },
+    { label: "Total Approved (UGX)", value: rows.reduce((s, r) => s + r.approved, 0).toLocaleString() },
     { label: "Total Declined",       value: rows.reduce((s, r) => s + r.declined, 0).toLocaleString() },
   ];
-  const headers = ["Group", "Benefit Category", "Claims", "Billed (KES)", "Approved (KES)", "Declined", "Approval Rate %"];
+  const headers = ["Group", "Benefit Category", "Claims", "Billed (UGX)", "Approved (UGX)", "Declined", "Approval Rate %"];
   const data: Cell[][] = rows.map(r => [
     { text: r.group, href: `/analytics/schemes/${r.groupId}?from=report` },
     r.category.replace(/_/g, " "),
@@ -724,12 +724,12 @@ async function getAgeingAnalysisData(tenantId: string) {
   }).sort((a, b) => b.days - a.days);
 
   const kpis = [
-    { label: "0-30 Days (KES)",  value: buckets["0-30"].toLocaleString() },
-    { label: "31-60 Days (KES)", value: buckets["31-60"].toLocaleString() },
-    { label: "61-90 Days (KES)", value: buckets["61-90"].toLocaleString() },
-    { label: "91+ Days (KES)",   value: buckets["91+"].toLocaleString() },
+    { label: "0-30 Days (UGX)",  value: buckets["0-30"].toLocaleString() },
+    { label: "31-60 Days (UGX)", value: buckets["31-60"].toLocaleString() },
+    { label: "61-90 Days (UGX)", value: buckets["61-90"].toLocaleString() },
+    { label: "91+ Days (UGX)",   value: buckets["91+"].toLocaleString() },
   ];
-  const headers = ["Invoice No.", "Group", "Due Date", "Days Overdue", "Balance (KES)", "Bucket", "Status"];
+  const headers = ["Invoice No.", "Group", "Due Date", "Days Overdue", "Balance (UGX)", "Bucket", "Status"];
   const data = bucketed.map(r => [
     r.invoiceNumber,
     r.group.name,
@@ -757,11 +757,11 @@ async function getCommissionStatementsData(tenantId: string) {
   const totalPaid   = rows.filter(r => r.paymentStatus === "PAID").reduce((s, r) => s + Number(r.commissionAmount), 0);
   const kpis = [
     { label: "Commission Records",   value: rows.length.toLocaleString() },
-    { label: "Total Earned (KES)",   value: totalEarned.toLocaleString() },
-    { label: "Total Paid (KES)",     value: totalPaid.toLocaleString() },
-    { label: "Outstanding (KES)",    value: (totalEarned - totalPaid).toLocaleString() },
+    { label: "Total Earned (UGX)",   value: totalEarned.toLocaleString() },
+    { label: "Total Paid (UGX)",     value: totalPaid.toLocaleString() },
+    { label: "Outstanding (UGX)",    value: (totalEarned - totalPaid).toLocaleString() },
   ];
-  const headers = ["Broker", "Period", "Rate %", "Amount (KES)", "Status", "Earned Date", "Paid Date"];
+  const headers = ["Broker", "Period", "Rate %", "Amount (UGX)", "Status", "Earned Date", "Paid Date"];
   const data = rows.map(r => [
     r.broker.name,
     r.period,
@@ -791,12 +791,12 @@ async function getLeviesTaxesData(tenantId: string) {
   const totalPhcf     = rows.reduce((s, r) => s + Number(r.phcf), 0);
   const totalTax      = rows.reduce((s, r) => s + Number(r.taxTotal), 0);
   const kpis = [
-    { label: "Stamp Duty (KES)",      value: totalStamp.toLocaleString() },
-    { label: "Training Levy (KES)",   value: totalLevy.toLocaleString() },
-    { label: "PHCF (KES)",            value: totalPhcf.toLocaleString() },
+    { label: "Stamp Duty (UGX)",      value: totalStamp.toLocaleString() },
+    { label: "Training Levy (UGX)",   value: totalLevy.toLocaleString() },
+    { label: "PHCF (UGX)",            value: totalPhcf.toLocaleString() },
     { label: "Total Tax Collected",   value: totalTax.toLocaleString() },
   ];
-  const headers = ["Invoice No.", "Group", "Period", "Total Invoice (KES)", "Stamp Duty", "Training Levy", "PHCF", "Tax Total"];
+  const headers = ["Invoice No.", "Group", "Period", "Total Invoice (UGX)", "Stamp Duty", "Training Levy", "PHCF", "Tax Total"];
   const data = rows.map(r => [
     r.invoiceNumber,
     r.group.name,
@@ -823,11 +823,11 @@ async function getFundUtilisationData(tenantId: string) {
   const totalBalance   = accounts.reduce((s, a) => s + Number(a.balance), 0);
   const kpis = [
     { label: "Self-Funded Schemes",  value: accounts.length.toLocaleString() },
-    { label: "Total Deposited (KES)",value: totalDeposited.toLocaleString() },
-    { label: "Claims Deducted (KES)",value: totalClaims.toLocaleString() },
-    { label: "Current Balance (KES)",value: totalBalance.toLocaleString() },
+    { label: "Total Deposited (UGX)",value: totalDeposited.toLocaleString() },
+    { label: "Claims Deducted (UGX)",value: totalClaims.toLocaleString() },
+    { label: "Current Balance (UGX)",value: totalBalance.toLocaleString() },
   ];
-  const headers = ["Group", "Current Balance (KES)", "Total Deposited (KES)", "Claims Deducted (KES)", "Admin Fees (KES)", "Period Start", "Period End"];
+  const headers = ["Group", "Current Balance (UGX)", "Total Deposited (UGX)", "Claims Deducted (UGX)", "Admin Fees (UGX)", "Period Start", "Period End"];
   const data = accounts.map(a => [
     a.group.name,
     Number(a.balance).toLocaleString(),
@@ -854,11 +854,11 @@ async function getExclusionRejectedData(tenantId: string) {
   const topReason = [...byReason.entries()].sort((a, b) => b[1] - a[1])[0];
   const kpis = [
     { label: "Total Excluded/Declined", value: rows.length.toLocaleString() },
-    { label: "Total Disallowed (KES)",  value: rows.reduce((s, r) => s + r.disallowed, 0).toLocaleString() },
+    { label: "Total Disallowed (UGX)",  value: rows.reduce((s, r) => s + r.disallowed, 0).toLocaleString() },
     { label: "Top Decline Reason",      value: topReason ? `${topReason[0]} (${topReason[1]})` : "—" },
     { label: "Unique Reason Codes",     value: byReason.size.toLocaleString() },
   ];
-  const headers = ["Claim No.", "Member", "Provider", "Category", "Item", "Status", "Reason", "Disallowed (KES)", "Decided"];
+  const headers = ["Claim No.", "Member", "Provider", "Category", "Item", "Status", "Reason", "Disallowed (UGX)", "Decided"];
   const data = rows.map(r => [
     r.claimNumber,
     r.member,
@@ -900,10 +900,10 @@ async function getClaimsPerOperatorData(tenantId: string) {
   const kpis = [
     { label: "Active Operators",    value: rows.length.toLocaleString() },
     { label: "Total Decisions",     value: rows.reduce((s, r) => s + r.total, 0).toLocaleString() },
-    { label: "Total Approved (KES)",value: rows.reduce((s, r) => s + r.totalKES, 0).toLocaleString() },
+    { label: "Total Approved (UGX)",value: rows.reduce((s, r) => s + r.totalKES, 0).toLocaleString() },
     { label: "Most Active",         value: rows[0]?.name ?? "—" },
   ];
-  const headers = ["Operator", "Role", "Total Decisions", "Approved", "Declined", "Approval Rate %", "Total Approved (KES)"];
+  const headers = ["Operator", "Role", "Total Decisions", "Approved", "Declined", "Approval Rate %", "Total Approved (UGX)"];
   const data = rows.map(r => [
     r.name,
     r.role.replace(/_/g, " "),
@@ -995,7 +995,7 @@ async function getAnalyticsPortfolioMlrData(tenantId: string, scope?: AnalyticsA
     { label: "Schemes >80% MLR",    value: rows.filter(r => r.mlr > 0.8).length.toLocaleString() },
     { label: "Open Alerts",         value: rows.reduce((s, r) => s + r.alerts, 0).toLocaleString() },
   ];
-  const headers = ["Scheme", "Period", "Contribution (KES)", "Claims (KES)", "MLR %", "Trailing 12M MLR", "Open Alerts"];
+  const headers = ["Scheme", "Period", "Contribution (UGX)", "Claims (UGX)", "MLR %", "Trailing 12M MLR", "Open Alerts"];
   const data: Cell[][] = rows.map(r => [
     { text: r.name, href: `/analytics/schemes/${r.groupId}?from=report` },
     r.period,
@@ -1051,11 +1051,11 @@ async function getAnalyticsSchemeProfitabilityData(tenantId: string, scope?: Ana
 
   const kpis = [
     { label: "Schemes",              value: rows.length.toLocaleString() },
-    { label: "Total Contribution",   value: `KES ${(rows.reduce((s, r) => s + r.contribution, 0) / 1_000_000).toFixed(1)}M` },
-    { label: "Total Claims",         value: `KES ${(rows.reduce((s, r) => s + r.claims, 0) / 1_000_000).toFixed(1)}M` },
-    { label: "Net Surplus",          value: `KES ${(rows.reduce((s, r) => s + r.surplus, 0) / 1_000_000).toFixed(1)}M` },
+    { label: "Total Contribution",   value: `UGX ${(rows.reduce((s, r) => s + r.contribution, 0) / 1_000_000).toFixed(1)}M` },
+    { label: "Total Claims",         value: `UGX ${(rows.reduce((s, r) => s + r.claims, 0) / 1_000_000).toFixed(1)}M` },
+    { label: "Net Surplus",          value: `UGX ${(rows.reduce((s, r) => s + r.surplus, 0) / 1_000_000).toFixed(1)}M` },
   ];
-  const headers = ["Scheme", "Period", "Contribution (KES)", "Claims (KES)", "Surplus/Deficit (KES)", "MLR %", "Trailing 12M MLR", "Status"];
+  const headers = ["Scheme", "Period", "Contribution (UGX)", "Claims (UGX)", "Surplus/Deficit (UGX)", "MLR %", "Trailing 12M MLR", "Status"];
   const data: Cell[][] = rows.map(r => [
     { text: r.name, href: `/analytics/schemes/${r.groupId}?from=report` },
     r.period,
@@ -1087,7 +1087,7 @@ async function getAnalyticsProviderPerformanceData(tenantId: string, scope?: Ana
   if (!latest) {
     return {
       kpis: [{ label: "Status", value: "No scorecard data" }],
-      headers: ["Provider", "Period", "Claims", "Members", "Adjusted Cost (KES)", "Avg Cost (KES)", "CMI", "Rejection Rate"],
+      headers: ["Provider", "Period", "Claims", "Members", "Adjusted Cost (UGX)", "Avg Cost (UGX)", "CMI", "Rejection Rate"],
       data: [],
     };
   }
@@ -1100,10 +1100,10 @@ async function getAnalyticsProviderPerformanceData(tenantId: string, scope?: Ana
   const kpis = [
     { label: "Providers Ranked",    value: scorecards.length.toLocaleString() },
     { label: "Period",              value: latest.period },
-    { label: "Total Adjusted Cost", value: `KES ${(scorecards.reduce((s, r) => s + Number(r.adjustedCost), 0) / 1_000_000).toFixed(1)}M` },
+    { label: "Total Adjusted Cost", value: `UGX ${(scorecards.reduce((s, r) => s + Number(r.adjustedCost), 0) / 1_000_000).toFixed(1)}M` },
     { label: "Avg CMI",             value: (scorecards.reduce((s, r) => s + Number(r.caseMixIndex), 0) / Math.max(1, scorecards.length)).toFixed(2) },
   ];
-  const headers = ["Provider", "Tier", "Period", "Claims", "Members", "Adjusted Cost (KES)", "Avg Cost (KES)", "CMI", "Rejection Rate %"];
+  const headers = ["Provider", "Tier", "Period", "Claims", "Members", "Adjusted Cost (UGX)", "Avg Cost (UGX)", "CMI", "Rejection Rate %"];
   const data: Cell[][] = scorecards.map(r => [
     { text: r.providerName, href: `/analytics/providers/${r.providerId}?from=report` },
     r.providerTier ?? "UNKNOWN",
@@ -1169,7 +1169,7 @@ async function getAnalyticsRenewalRecommendationsData(tenantId: string, scope?: 
     r.daysToRenewal.toString(),
     `${(r.trailing12Mlr * 100).toFixed(1)}%`,
     `${(r.targetMlr * 100).toFixed(1)}%`,
-    `KES ${r.recommendedContribution.toLocaleString()}`,
+    `UGX ${r.recommendedContribution.toLocaleString()}`,
     `${(r.recommendedAdjustmentPct * 100).toFixed(1)}%`,
   ]);
   return { kpis, headers, data };
@@ -1256,7 +1256,7 @@ async function getDebtorsCreditorsData(tenantId: string): Promise<ReportResult> 
   const debtorRows = invoices.map(i => [
     i.invoiceNumber,
     i.group.name,
-    `KES ${Number(i.balance).toLocaleString("en-UG")}`,
+    `UGX ${Number(i.balance).toLocaleString("en-UG")}`,
     bucket(i.dueDate),
     new Date(i.dueDate).toLocaleDateString("en-UG"),
   ]);
@@ -1274,7 +1274,7 @@ async function getDebtorsCreditorsData(tenantId: string): Promise<ReportResult> 
   const creditorRows = unsettledClaims.map(c => [
     c.claimNumber,
     c.provider.name,
-    `KES ${Number(c.approvedAmount ?? 0).toLocaleString("en-UG")}`,
+    `UGX ${Number(c.approvedAmount ?? 0).toLocaleString("en-UG")}`,
     "Provider Payable",
     c.decidedAt ? new Date(c.decidedAt).toLocaleDateString("en-UG") : "—",
   ]);
@@ -1284,12 +1284,12 @@ async function getDebtorsCreditorsData(tenantId: string): Promise<ReportResult> 
 
   return {
     kpis: [
-      { label: "Total Receivables (KES)", value: totalDebtors.toLocaleString("en-UG") },
-      { label: "Total Payables (KES)",    value: totalCreditors.toLocaleString("en-UG") },
-      { label: "Net Position (KES)",      value: (totalDebtors - totalCreditors).toLocaleString("en-UG") },
+      { label: "Total Receivables (UGX)", value: totalDebtors.toLocaleString("en-UG") },
+      { label: "Total Payables (UGX)",    value: totalCreditors.toLocaleString("en-UG") },
+      { label: "Net Position (UGX)",      value: (totalDebtors - totalCreditors).toLocaleString("en-UG") },
       { label: "Unsettled Claim Batches", value: unsettledClaims.length.toString() },
     ],
-    headers: ["Reference", "Counterparty", "Amount (KES)", "Type / Age Bucket", "Date"],
+    headers: ["Reference", "Counterparty", "Amount (UGX)", "Type / Age Bucket", "Date"],
     data: [...debtorRows, ...creditorRows],
   };
 }
@@ -1314,12 +1314,12 @@ async function getFeesStatementData(tenantId: string): Promise<ReportResult> {
 
   const cardRows = cardFeeInvoices.map(i => [
     i.invoiceNumber, i.group.name, "Card Issuance",
-    `KES ${Number(i.totalAmount).toLocaleString("en-UG")}`,
+    `UGX ${Number(i.totalAmount).toLocaleString("en-UG")}`,
     new Date(i.createdAt).toLocaleDateString("en-UG"),
   ]);
   const reinstateRows = reinstateFeeInvoices.map(i => [
     i.invoiceNumber, i.group.name, "Reinstatement",
-    `KES ${Number(i.totalAmount).toLocaleString("en-UG")}`,
+    `UGX ${Number(i.totalAmount).toLocaleString("en-UG")}`,
     new Date(i.createdAt).toLocaleDateString("en-UG"),
   ]);
 
@@ -1328,12 +1328,12 @@ async function getFeesStatementData(tenantId: string): Promise<ReportResult> {
 
   return {
     kpis: [
-      { label: "Card Fees",          value: `KES ${cardFeeInvoices.reduce((s, i) => s + Number(i.totalAmount), 0).toLocaleString("en-UG")}` },
-      { label: "Reinstatement Fees", value: `KES ${reinstateFeeInvoices.reduce((s, i) => s + Number(i.totalAmount), 0).toLocaleString("en-UG")}` },
-      { label: "Total Fees",         value: `KES ${total.toLocaleString("en-UG")}` },
+      { label: "Card Fees",          value: `UGX ${cardFeeInvoices.reduce((s, i) => s + Number(i.totalAmount), 0).toLocaleString("en-UG")}` },
+      { label: "Reinstatement Fees", value: `UGX ${reinstateFeeInvoices.reduce((s, i) => s + Number(i.totalAmount), 0).toLocaleString("en-UG")}` },
+      { label: "Total Fees",         value: `UGX ${total.toLocaleString("en-UG")}` },
       { label: "Records",            value: all.length.toString() },
     ],
-    headers: ["Invoice No.", "Scheme", "Fee Type", "Amount (KES)", "Date"],
+    headers: ["Invoice No.", "Scheme", "Fee Type", "Amount (UGX)", "Date"],
     data: all,
   };
 }
@@ -1357,16 +1357,16 @@ async function getAdminFeeData(tenantId: string): Promise<ReportResult> {
   return {
     kpis: [
       { label: "Admin Fee Transactions", value: feeTransactions.length.toString() },
-      { label: "Total Admin Fees (KES)", value: `KES ${total.toLocaleString("en-UG")}` },
+      { label: "Total Admin Fees (UGX)", value: `UGX ${total.toLocaleString("en-UG")}` },
       { label: "Self-Funded Schemes",    value: new Set(feeTransactions.map(t => t.selfFundedAccount.group.name)).size.toString() },
-      { label: "Avg Fee (KES)",          value: feeTransactions.length > 0 ? `KES ${(total / feeTransactions.length).toLocaleString("en-UG")}` : "—" },
+      { label: "Avg Fee (UGX)",          value: feeTransactions.length > 0 ? `UGX ${(total / feeTransactions.length).toLocaleString("en-UG")}` : "—" },
     ],
-    headers: ["Scheme", "Calc Method", "Fee Rate", "Amount (KES)", "Date", "Description"],
+    headers: ["Scheme", "Calc Method", "Fee Rate", "Amount (UGX)", "Date", "Description"],
     data: feeTransactions.map(t => [
       t.selfFundedAccount.group.name,
       t.selfFundedAccount.group.adminFeeMethod ?? "—",
       t.selfFundedAccount.group.adminFeeRate ? `${Number(t.selfFundedAccount.group.adminFeeRate)}` : "—",
-      `KES ${Number(t.amount).toLocaleString("en-UG")}`,
+      `UGX ${Number(t.amount).toLocaleString("en-UG")}`,
       new Date(t.postedAt).toLocaleDateString("en-UG"),
       t.description ?? "—",
     ]),
@@ -1473,9 +1473,9 @@ async function getComparisonServicesData(tenantId: string): Promise<ReportResult
       const variance = avgContracted > 0 ? ((avgBilled - avgContracted) / avgContracted * 100).toFixed(1) + "%" : "—";
       return [
         code, v.desc.slice(0, 60),
-        `KES ${avgContracted > 0 ? Math.round(avgContracted).toLocaleString("en-UG") : "—"}`,
-        `KES ${Math.round(avgBilled).toLocaleString("en-UG")}`,
-        `KES ${avgApproved > 0 ? Math.round(avgApproved).toLocaleString("en-UG") : "—"}`,
+        `UGX ${avgContracted > 0 ? Math.round(avgContracted).toLocaleString("en-UG") : "—"}`,
+        `UGX ${Math.round(avgBilled).toLocaleString("en-UG")}`,
+        `UGX ${avgApproved > 0 ? Math.round(avgApproved).toLocaleString("en-UG") : "—"}`,
         variance,
         v.billed.length.toString(),
       ];
@@ -1522,15 +1522,15 @@ async function getQuotationFunnelData(tenantId: string): Promise<ReportResult> {
       { label: "Total Quotations",   value: total.toString() },
       { label: "Accepted",           value: accepted.toString() },
       { label: "Conversion Rate",    value: convRate },
-      { label: "Pipeline Value (KES)", value: `KES ${Math.round(totalValue).toLocaleString("en-UG")}` },
+      { label: "Pipeline Value (UGX)", value: `UGX ${Math.round(totalValue).toLocaleString("en-UG")}` },
     ],
-    headers: ["Quote No.", "Status", "Client Type", "Lives", "Premium (KES)", "Renewal", "Broker", "Date"],
+    headers: ["Quote No.", "Status", "Client Type", "Lives", "Premium (UGX)", "Renewal", "Broker", "Date"],
     data: quotations.map(q => [
       q.quoteNumber,
       q.status.replace(/_/g, " "),
       q.clientType ?? "—",
       q.memberCount.toString(),
-      q.finalPremium ? `KES ${Number(q.finalPremium).toLocaleString("en-UG")}` : "—",
+      q.finalPremium ? `UGX ${Number(q.finalPremium).toLocaleString("en-UG")}` : "—",
       q.isRenewal ? "Yes" : "No",
       q.broker?.name ?? "Direct",
       new Date(q.createdAt).toLocaleDateString("en-UG"),

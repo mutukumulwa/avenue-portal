@@ -112,7 +112,7 @@ export default async function FundStatementPage({ params }: { params: Promise<{ 
             <div key={r.label} className={`flex justify-between text-sm ${r.bold ? "font-bold border-t border-[#EEEEEE] pt-2 mt-2" : ""}`}>
               <span className={r.bold ? "text-brand-text-heading" : "text-brand-text-body"}>{r.label}</span>
               <span className={`font-mono ${r.color ?? (r.bold ? "text-brand-text-heading" : "text-brand-text-body")}`}>
-                {r.sign}KES {r.value.toLocaleString("en-UG")}
+                {r.sign}UGX {r.value.toLocaleString("en-UG")}
               </span>
             </div>
           ))}
@@ -127,7 +127,7 @@ export default async function FundStatementPage({ params }: { params: Promise<{ 
             <thead>
               <tr className="text-[10px] font-bold uppercase text-brand-text-muted border-b border-[#EEEEEE]">
                 <th className="pb-2 text-left">Benefit Category</th>
-                <th className="pb-2 text-right">Amount (KES)</th>
+                <th className="pb-2 text-right">Amount (UGX)</th>
                 <th className="pb-2 text-right">% of Claims</th>
               </tr>
             </thead>
@@ -158,8 +158,8 @@ export default async function FundStatementPage({ params }: { params: Promise<{ 
               <th className="px-4 py-2 text-left">Type</th>
               <th className="px-4 py-2 text-left">Description</th>
               <th className="px-4 py-2 text-left">Reference</th>
-              <th className="px-4 py-2 text-right">Amount (KES)</th>
-              <th className="px-4 py-2 text-right">Balance (KES)</th>
+              <th className="px-4 py-2 text-right">Amount (UGX)</th>
+              <th className="px-4 py-2 text-right">Balance (UGX)</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#EEEEEE]">

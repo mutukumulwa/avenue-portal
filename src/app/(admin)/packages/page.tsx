@@ -32,7 +32,7 @@ export default async function PackagesPage() {
               <tr className="bg-[#E6E7E8] text-[#6C757D] font-semibold text-sm border-b border-[#EEEEEE]">
                 <th className="px-6 py-4">Package Name</th>
                 <th className="px-6 py-4">Type</th>
-                <th className="px-6 py-4">Annual Limit (KES)</th>
+                <th className="px-6 py-4">Annual Limit (UGX)</th>
                 <th className="px-6 py-4">Contribution</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4">Actions</th>

@@ -55,20 +55,20 @@ export function CoContributionCollectionForm({ transaction }: Props) {
           <div className="flex gap-6">
             <span className="text-brand-text-muted">Member share</span>
             <span className="font-bold text-brand-text-heading font-mono">
-              KES {finalAmount.toLocaleString("en-UG")}
+              UGX {finalAmount.toLocaleString("en-UG")}
             </span>
           </div>
           <div className="flex gap-6">
             <span className="text-brand-text-muted">Plan share</span>
             <span className="font-bold text-[#28A745] font-mono">
-              KES {Number(transaction.planShare).toLocaleString("en-UG")}
+              UGX {Number(transaction.planShare).toLocaleString("en-UG")}
             </span>
           </div>
           {Number(transaction.amountCollected ?? 0) > 0 && (
             <div className="flex gap-6">
               <span className="text-brand-text-muted">Collected</span>
               <span className="font-bold text-[#17A2B8] font-mono">
-                KES {Number(transaction.amountCollected).toLocaleString("en-UG")}
+                UGX {Number(transaction.amountCollected).toLocaleString("en-UG")}
               </span>
             </div>
           )}

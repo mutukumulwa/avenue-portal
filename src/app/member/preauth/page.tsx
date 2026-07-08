@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 
 const currency = new Intl.NumberFormat("en-UG", {
   style: "currency",
-  currency: "KES",
+  currency: "UGX",
   maximumFractionDigits: 0,
 });
 

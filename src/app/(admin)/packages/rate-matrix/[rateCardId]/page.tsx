@@ -84,7 +84,7 @@ export default async function RateMatrixDetailPage({ params }: { params: Promise
     }
   }
 
-  const fmt = (n: number) => `KES ${Math.round(n).toLocaleString("en-UG")}`;
+  const fmt = (n: number) => `UGX ${Math.round(n).toLocaleString("en-UG")}`;
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-5">
@@ -107,7 +107,7 @@ export default async function RateMatrixDetailPage({ params }: { params: Promise
         <form action={addRowAction} className="flex gap-3 items-end">
           <input type="hidden" name="rateCardId" value={rateCardId} />
           <div>
-            <label className="block text-xs font-semibold text-brand-text-muted mb-1">Limit Band (KES)</label>
+            <label className="block text-xs font-semibold text-brand-text-muted mb-1">Limit Band (UGX)</label>
             <input name="limitBand" type="text" required placeholder="e.g. 1000000"
               className="border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm font-mono w-36 focus:ring-1 focus:ring-brand-indigo focus:outline-none" />
           </div>
@@ -134,7 +134,7 @@ export default async function RateMatrixDetailPage({ params }: { params: Promise
           <table className="text-sm text-left min-w-full">
             <thead>
               <tr className="bg-[#E6E7E8] border-b border-[#EEEEEE]">
-                <th className="px-4 py-3 text-xs font-semibold text-[#6C757D]">Limit Band (KES)</th>
+                <th className="px-4 py-3 text-xs font-semibold text-[#6C757D]">Limit Band (UGX)</th>
                 {FAMILY_SIZES.map((fs) => (
                   <th key={fs} className="px-3 py-3 text-xs font-semibold text-brand-indigo text-center">{fs}</th>
                 ))}

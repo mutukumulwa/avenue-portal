@@ -55,15 +55,15 @@ export function SelfFundedPanel({ groupId, account, minimumBalance }: Props) {
           <div>
             <p className="text-xs font-bold uppercase text-brand-text-muted">Fund Balance</p>
             <p className={`text-2xl font-bold font-mono ${isEmpty ? "text-[#DC3545]" : isLow ? "text-[#856404]" : "text-[#28A745]"}`}>
-              KES {balance.toLocaleString("en-UG")}
+              UGX {balance.toLocaleString("en-UG")}
             </p>
-            {isLow && <p className="text-xs text-[#856404] mt-0.5">Below minimum balance of KES {minimumBalance.toLocaleString()}</p>}
+            {isLow && <p className="text-xs text-[#856404] mt-0.5">Below minimum balance of UGX {minimumBalance.toLocaleString()}</p>}
           </div>
         </div>
         {account && (
           <div className="text-right text-sm space-y-1">
-            <div className="flex items-center gap-1.5 text-[#28A745]"><TrendingUp size={13} /> KES {Number(account.totalDeposited).toLocaleString()} deposited</div>
-            <div className="flex items-center gap-1.5 text-[#DC3545]"><TrendingDown size={13} /> KES {Number(account.totalClaims).toLocaleString()} claims</div>
+            <div className="flex items-center gap-1.5 text-[#28A745]"><TrendingUp size={13} /> UGX {Number(account.totalDeposited).toLocaleString()} deposited</div>
+            <div className="flex items-center gap-1.5 text-[#DC3545]"><TrendingDown size={13} /> UGX {Number(account.totalClaims).toLocaleString()} claims</div>
           </div>
         )}
       </div>
@@ -83,7 +83,7 @@ export function SelfFundedPanel({ groupId, account, minimumBalance }: Props) {
               </select>
             </div>
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-brand-text-muted uppercase">Amount (KES)</label>
+              <label className="text-xs font-semibold text-brand-text-muted uppercase">Amount (UGX)</label>
               <input name="amount" type="number" min="1" step="0.01" required
                 className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo bg-white" />
             </div>

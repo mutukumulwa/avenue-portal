@@ -94,7 +94,7 @@ export function RateTableEditor({ pricingModelId, initialData }: { pricingModelI
               <th className="p-3 font-bold">Max Age</th>
               <th className="p-3 font-bold">Gender</th>
               <th className="p-3 font-bold">Family Size</th>
-              <th className="p-3 font-bold">Base Rate (KES)</th>
+              <th className="p-3 font-bold">Base Rate (UGX)</th>
               <th className="p-3 font-bold text-right">Actions</th>
             </tr>
           </thead>

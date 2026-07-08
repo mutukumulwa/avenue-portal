@@ -10,9 +10,9 @@ import Link from "next/link";
  */
 
 function fmt(n: number) {
-  if (n >= 1_000_000) return `KES ${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000)     return `KES ${(n / 1_000).toFixed(0)}K`;
-  return `KES ${Math.round(n).toLocaleString("en-UG")}`;
+  if (n >= 1_000_000) return `UGX ${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000)     return `UGX ${(n / 1_000).toFixed(0)}K`;
+  return `UGX ${Math.round(n).toLocaleString("en-UG")}`;
 }
 
 const TIER_STYLE: Record<string, string> = {

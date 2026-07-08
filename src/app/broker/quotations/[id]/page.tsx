@@ -74,7 +74,7 @@ export default async function BrokerQuotationDetailPage({ params }: { params: Pr
           <div>
             <p className="text-xs font-bold uppercase text-brand-text-muted">Final Premium</p>
             <p className="font-bold text-brand-indigo mt-1">
-              KES {Number(quotation.finalPremium ?? 0).toLocaleString("en-UG")}
+              UGX {Number(quotation.finalPremium ?? 0).toLocaleString("en-UG")}
             </p>
           </div>
           <div>

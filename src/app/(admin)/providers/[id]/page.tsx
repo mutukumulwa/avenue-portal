@@ -356,7 +356,7 @@ export default async function ProviderDetailPage({
             <tr className="bg-[#F8F9FA] text-[10px] font-bold uppercase text-brand-text-muted border-b border-[#EEEEEE]">
               <th className="px-5 py-2.5">Claim No.</th>
               <th className="px-5 py-2.5">Member</th>
-              <th className="px-5 py-2.5 text-right">Billed (KES)</th>
+              <th className="px-5 py-2.5 text-right">Billed (UGX)</th>
               <th className="px-5 py-2.5">Status</th>
               <th className="px-5 py-2.5">Date</th>
             </tr>

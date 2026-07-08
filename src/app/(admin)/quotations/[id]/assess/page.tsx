@@ -285,7 +285,7 @@ export default async function AssessPage({ params }: { params: Promise<{ id: str
               <form action={submitForPricingAction} className="grid grid-cols-2 gap-4">
                 <input type="hidden" name="quotationId" value={id} />
                 <div>
-                  <label className="block text-xs font-semibold text-brand-text-muted mb-1">Projected gross contribution (KES)</label>
+                  <label className="block text-xs font-semibold text-brand-text-muted mb-1">Projected gross contribution (UGX)</label>
                   <input name="projectedGrossKes" type="number" min={0} placeholder="e.g. 1200000"
                     className="w-full border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm" />
                 </div>

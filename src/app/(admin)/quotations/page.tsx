@@ -154,7 +154,7 @@ export default async function QuotationsPage({
                 <th className="px-6 py-4">Prospect / Group</th>
                 <th className="px-6 py-4">Broker</th>
                 <th className="px-6 py-4">Lives</th>
-                <th className="px-6 py-4">Final Contribution (KES)</th>
+                <th className="px-6 py-4">Final Contribution (UGX)</th>
                 <th className="px-6 py-4">Valid Until</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4">Actions</th>

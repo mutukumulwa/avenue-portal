@@ -1,69 +1,73 @@
 #!/usr/bin/env node
 /**
- * Static currency-label guard (Outstanding-Conditions Ticket 3 / OBS-2).
+ * Static currency-label guard (Outstanding-Conditions Ticket 3 / OBS-2 /
+ * E2E-OBS-CUR).
  *
- * Fails the build if a CORE outpatient money surface hardcodes the KES
- * denomination for an operational label. It targets the two real antipatterns:
+ * Base currency is UGX. Operational money surfaces must render the row's actual
+ * currency (or base UGX) via the shared helpers in src/lib/utils.ts — never a
+ * hardcoded KES denomination. This guard recursively scans the application and
+ * fails the build if any surface reintroduces a hardcoded operational "KES"
+ * label. It targets only the real antipatterns:
  *
  *   1. money template literals:      `KES ${amount.toLocaleString()}`
- *   2. hardcoded formatter currency: currency: "KES"  /  currency="KES"
+ *   2. JSX money labels:             KES {amount}
+ *   3. column/field labels:          (KES)
+ *   4. hardcoded formatter currency: currency: "KES"  /  currency="KES"
  *
  * Legitimate uses are intentionally NOT flagged: passing an explicit currency
- * argument (formatMoney(x, "KES")), a currency-selector <option value="KES">,
- * comments, and Kenya-specific seed/demo modules (not in the core list).
- *
- * Base currency is UGX; core financial surfaces must render the row's actual
- * currency (or base) via the shared helpers in src/lib/utils.ts.
+ * argument (formatMoney(x, "KES")), a currency-selector <option value="KES">, a
+ * "KES" entry in a currency list, comments, and Kenya-specific seed/demo/test
+ * modules (skipped by path).
  */
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 
-// Curated list of core money surfaces kept clean. Grow this as surfaces are
-// migrated to the shared formatter; do NOT add Kenya-specific seed modules.
-const CORE_SURFACES = [
-  "src/lib/utils.ts",
-  "src/server/services/gl.service.ts",
-  "src/server/services/claim-decision.service.ts",
-  "src/server/services/claim-adjudication.service.ts",
-  // OBS-OC residual surfaces kept clean (labels use claim.currency or base UGX).
-  "src/app/(admin)/claims/page.tsx",
-  "src/app/(admin)/claims/[id]/page.tsx",
-  "src/app/(admin)/claims/new/ClaimForm.tsx",
-  "src/app/(admin)/fraud/[id]/page.tsx",
-  "src/components/clinical/ProcedureSearch.tsx",
-  "src/components/clinical/DiagnosisSearch.tsx",
-];
+const ROOTS = ["src/app", "src/components", "src/server", "src/lib"];
+const SKIP_DIR = /(^|\/)(node_modules|\.next|__tests__)(\/|$)/;
+const SKIP_FILE = /\.(test|spec)\.(t|j)sx?$/;
+const SKIP_PATH = /(seed|demo|fixture|mock)/i;
 
 const PATTERNS = [
-  { re: /KES\s*\$\{/, why: 'money template literal `KES ${...}` — use formatMoney(amount, currency)' },
-  { re: /KES\s*\{/, why: 'hardcoded JSX money label `KES {...}` — use {claim.currency} or base UGX' },
+  { re: /KES \$\{/, why: 'money template literal `KES ${...}` — use formatMoney(amount, currency) or base UGX' },
+  { re: /KES \{/, why: 'hardcoded JSX money label `KES {...}` — use {row.currency} or base UGX' },
   { re: /\(KES\)/, why: 'hardcoded "(KES)" column/field label — use the row currency or base UGX' },
-  { re: /currency\s*[:=]\s*["']KES["']/, why: 'hardcoded currency: "KES" — default to base (UGX) or pass the row currency' },
+  { re: /currency:\s*"KES"/, why: 'hardcoded currency: "KES" — default to base (UGX) or pass the row currency' },
+  { re: /currency="KES"/, why: 'hardcoded currency="KES" — default to base (UGX) or pass the row currency' },
 ];
 
-let failures = 0;
-for (const file of CORE_SURFACES) {
-  let text;
-  try {
-    text = readFileSync(file, "utf8");
-  } catch {
-    console.warn(`[currency-guard] skip (not found): ${file}`);
-    continue;
+function walk(dir, out = []) {
+  let entries;
+  try { entries = readdirSync(dir); } catch { return out; }
+  for (const name of entries) {
+    const p = join(dir, name);
+    if (SKIP_DIR.test(p)) continue;
+    if (statSync(p).isDirectory()) walk(p, out);
+    else if (/\.(t|j)sx?$/.test(p) && !SKIP_FILE.test(p) && !SKIP_PATH.test(p)) out.push(p);
   }
-  text.split("\n").forEach((line, i) => {
-    const trimmed = line.trim();
-    // Skip comment-only lines.
-    if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")) return;
-    for (const { re, why } of PATTERNS) {
-      if (re.test(line)) {
-        console.error(`[currency-guard] ${file}:${i + 1} — ${why}\n    ${trimmed}`);
-        failures++;
+  return out;
+}
+
+let failures = 0;
+let scanned = 0;
+for (const root of ROOTS) {
+  for (const file of walk(root)) {
+    scanned++;
+    const text = readFileSync(file, "utf8");
+    text.split("\n").forEach((line, i) => {
+      const trimmed = line.trim();
+      if (trimmed.startsWith("//") || trimmed.startsWith("*") || trimmed.startsWith("/*")) return;
+      for (const { re, why } of PATTERNS) {
+        if (re.test(line)) {
+          console.error(`[currency-guard] ${file}:${i + 1} — ${why}\n    ${trimmed}`);
+          failures++;
+        }
       }
-    }
-  });
+    });
+  }
 }
 
 if (failures > 0) {
-  console.error(`\n[currency-guard] FAILED — ${failures} hardcoded KES label(s) on core money surfaces.`);
+  console.error(`\n[currency-guard] FAILED — ${failures} hardcoded KES label(s) on operational money surfaces.`);
   process.exit(1);
 }
-console.log(`[currency-guard] OK — ${CORE_SURFACES.length} core money surfaces clean.`);
+console.log(`[currency-guard] OK — ${scanned} source files scanned, no hardcoded KES operational labels.`);

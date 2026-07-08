@@ -35,7 +35,7 @@ export default async function BrokerSubmissionDetailPage({ params }: { params: P
           <div><span className="text-brand-text-muted">Status</span><p className="font-bold text-brand-text-heading">{endorsement.status.replace(/_/g, " ")}</p></div>
           <div><span className="text-brand-text-muted">Effective Date</span><p className="font-bold text-brand-text-heading">{new Date(endorsement.effectiveDate).toLocaleDateString("en-UG")}</p></div>
           <div><span className="text-brand-text-muted">Member</span><p className="font-bold text-brand-text-heading">{endorsement.member ? `${endorsement.member.firstName} ${endorsement.member.lastName}` : "Not linked"}</p></div>
-          <div><span className="text-brand-text-muted">Pro-Rata</span><p className="font-bold text-brand-text-heading">KES {Number(endorsement.proratedAmount ?? 0).toLocaleString()}</p></div>
+          <div><span className="text-brand-text-muted">Pro-Rata</span><p className="font-bold text-brand-text-heading">UGX {Number(endorsement.proratedAmount ?? 0).toLocaleString()}</p></div>
         </div>
         {details && (
           <pre className="bg-[#F8F9FA] border border-[#EEEEEE] rounded-md p-3 text-xs overflow-x-auto">

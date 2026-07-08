@@ -51,7 +51,7 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
   const loadingAmt  = annualPremium * totalLoadingPct  / 100;
   const discountAmt = annualPremium * totalDiscountPct / 100;
 
-  const fmt = (n: number) => `KES ${Math.round(n).toLocaleString("en-UG")}`;
+  const fmt = (n: number) => `UGX ${Math.round(n).toLocaleString("en-UG")}`;
   const canSend    = q.status === "DRAFT";
   const canAction  = q.status === "SENT";
   const canExpire  = q.status === "DRAFT" || q.status === "SENT";

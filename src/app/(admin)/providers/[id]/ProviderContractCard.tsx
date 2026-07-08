@@ -58,7 +58,7 @@ export function ProviderContractCard(props: Props) {
             { label: "Contract Start", value: props.contractStartDate ? new Date(props.contractStartDate).toLocaleDateString("en-UG") : "—" },
             { label: "Contract End",   value: props.contractEndDate   ? new Date(props.contractEndDate).toLocaleDateString("en-UG")   : "—" },
             { label: "Payment Terms",  value: `Net ${props.paymentTermDays} days` },
-            { label: "Credit Limit",   value: props.creditLimit != null ? `KES ${Number(props.creditLimit).toLocaleString("en-UG")}` : "—" },
+            { label: "Credit Limit",   value: props.creditLimit != null ? `UGX ${Number(props.creditLimit).toLocaleString("en-UG")}` : "—" },
           ].map(f => (
             <div key={f.label} className="flex justify-between">
               <span className="text-brand-text-muted">{f.label}</span>
@@ -115,7 +115,7 @@ export function ProviderContractCard(props: Props) {
             <input type="date" name="contractEndDate" defaultValue={props.contractEndDate?.slice(0, 10) ?? ""} className={inp} />
           </div>
           <div className="col-span-2">
-            <label className={lbl}>Credit Limit (KES)</label>
+            <label className={lbl}>Credit Limit (UGX)</label>
             <input type="number" step="0.01" name="creditLimit" defaultValue={props.creditLimit ?? ""} className={inp} placeholder="Leave blank for unlimited" />
           </div>
         </div>

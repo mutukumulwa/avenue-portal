@@ -41,8 +41,8 @@ export default async function HRInvoicesPage() {
               <tr className="bg-[#F8F9FA] border-b border-[#EEEEEE] text-brand-text-muted font-heading text-xs uppercase tracking-wider">
                 <th className="px-6 py-4 font-bold">Invoice No.</th>
                 <th className="px-6 py-4 font-bold">Period</th>
-                <th className="px-6 py-4 font-bold text-right">Total Amount (KES)</th>
-                <th className="px-6 py-4 font-bold text-right">Balance Due (KES)</th>
+                <th className="px-6 py-4 font-bold text-right">Total Amount (UGX)</th>
+                <th className="px-6 py-4 font-bold text-right">Balance Due (UGX)</th>
                 <th className="px-6 py-4 font-bold">Due Date</th>
                 <th className="px-6 py-4 font-bold">Status</th>
                 <th className="px-6 py-4"></th>

@@ -8,7 +8,7 @@ import Link from "next/link";
  * Accepts an Excel file (.xlsx) matching the canonical template.
  * The template columns are:
  *   MemberNumber | ProviderName | DateOfService | DiagnosisCode |
- *   CPTCode | BilledAmount (KES) | InvoiceNumber
+ *   CPTCode | BilledAmount (UGX) | InvoiceNumber
  *
  * Parsing, validation, and import happen server-side via the
  * /api/claims/import route. Valid rows are imported as RECEIVED

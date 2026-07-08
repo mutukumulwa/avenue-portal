@@ -193,9 +193,9 @@ function pct(value: number) {
 }
 
 function moneyShort(value: number) {
-  if (value >= 1_000_000) return `KES ${(value / 1_000_000).toFixed(1)}M`;
-  if (value >= 1_000) return `KES ${(value / 1_000).toFixed(0)}K`;
-  return `KES ${value.toLocaleString()}`;
+  if (value >= 1_000_000) return `UGX ${(value / 1_000_000).toFixed(1)}M`;
+  if (value >= 1_000) return `UGX ${(value / 1_000).toFixed(0)}K`;
+  return `UGX ${value.toLocaleString()}`;
 }
 
 export class AnalyticsRefreshService {

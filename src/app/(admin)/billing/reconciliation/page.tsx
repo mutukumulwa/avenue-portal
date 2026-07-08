@@ -35,7 +35,7 @@ export default async function ReconciliationPage() {
           <table className="text-xs border-collapse">
             <thead>
               <tr className="bg-[#E6E7E8]">
-                {["A: Date", "B: Description", "C: Reference", "D: Debit (KES)", "E: Credit (KES)", "F: Balance (KES)"].map((h) => (
+                {["A: Date", "B: Description", "C: Reference", "D: Debit (UGX)", "E: Credit (UGX)", "F: Balance (UGX)"].map((h) => (
                   <th key={h} className="border border-[#EEEEEE] px-3 py-2 text-left font-bold text-brand-text-heading whitespace-nowrap">{h}</th>
                 ))}
               </tr>

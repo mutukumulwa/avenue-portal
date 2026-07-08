@@ -172,7 +172,7 @@ export function ProviderClaimForm({
         </div>
         <div className="flex justify-between items-center pt-3 mt-2 border-t border-[#EEEEEE]">
           <span className="text-xs font-bold uppercase text-brand-text-muted">Total billed</span>
-          <span className="text-lg font-bold text-brand-indigo">KES {total.toLocaleString("en-UG")}</span>
+          <span className="text-lg font-bold text-brand-indigo">UGX {total.toLocaleString("en-UG")}</span>
         </div>
       </div>
 

@@ -183,7 +183,7 @@ export default async function DashboardPage() {
                   <p className="text-xs text-brand-text-muted">{c.firstName} {c.lastName} · {c.providerName}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-xs font-semibold text-brand-text-heading">KES {Number(c.billedAmount).toLocaleString()}</p>
+                  <p className="text-xs font-semibold text-brand-text-heading">UGX {Number(c.billedAmount).toLocaleString()}</p>
                   <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
                     c.status === "APPROVED" || c.status === "PAID" ? "bg-[#28A745]/10 text-[#28A745]" :
                     c.status === "DECLINED" ? "bg-[#DC3545]/10 text-[#DC3545]" :

@@ -34,7 +34,7 @@ export default async function ReinstatementQueuePage() {
                 <th className="px-5 py-3">Group</th>
                 <th className="px-5 py-3">Lapsed Date</th>
                 <th className="px-5 py-3">Months</th>
-                <th className="px-5 py-3">Catch-up (KES)</th>
+                <th className="px-5 py-3">Catch-up (UGX)</th>
                 <th className="px-5 py-3">Requested</th>
                 <th className="px-5 py-3">Action</th>
               </tr>

@@ -102,11 +102,11 @@ export default async function FundSchemePage({ params }: { params: Promise<{ gro
             <div>
               <p className="text-xs font-bold uppercase text-brand-text-muted">Current Fund Balance</p>
               <p className={`text-3xl font-bold font-mono mt-0.5 ${isLow ? "text-[#DC3545]" : "text-[#28A745]"}`}>
-                KES {balance.toLocaleString("en-UG")}
+                UGX {balance.toLocaleString("en-UG")}
               </p>
               {isLow && (
                 <p className="text-xs text-[#DC3545] mt-1">
-                  ⚠ Below minimum balance of KES {minBalance.toLocaleString("en-UG")} — top up required
+                  ⚠ Below minimum balance of UGX {minBalance.toLocaleString("en-UG")} — top up required
                 </p>
               )}
             </div>
@@ -118,9 +118,9 @@ export default async function FundSchemePage({ params }: { params: Promise<{ gro
       {/* KPI row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Total Deposited",  value: `KES ${deposited.toLocaleString("en-UG")}`, icon: Wallet,       color: "text-brand-indigo" },
-          { label: "Claims Deducted",  value: `KES ${claimed.toLocaleString("en-UG")}`,   icon: TrendingDown, color: "text-[#DC3545]"    },
-          { label: "Admin Fees",       value: `KES ${fees.toLocaleString("en-UG")}`,      icon: FileText,     color: "text-[#856404]"    },
+          { label: "Total Deposited",  value: `UGX ${deposited.toLocaleString("en-UG")}`, icon: Wallet,       color: "text-brand-indigo" },
+          { label: "Claims Deducted",  value: `UGX ${claimed.toLocaleString("en-UG")}`,   icon: TrendingDown, color: "text-[#DC3545]"    },
+          { label: "Admin Fees",       value: `UGX ${fees.toLocaleString("en-UG")}`,      icon: FileText,     color: "text-[#856404]"    },
           { label: "Active Lives",     value: group.members.length.toString(),             icon: Users,        color: "text-[#17A2B8]"    },
         ].map(k => {
           const Icon = k.icon;
@@ -150,7 +150,7 @@ export default async function FundSchemePage({ params }: { params: Promise<{ gro
                   <div key={cat}>
                     <div className="flex justify-between text-xs mb-1">
                       <span className="font-semibold text-brand-text-heading">{cat.replace(/_/g, " ")}</span>
-                      <span className="text-brand-text-muted font-mono">KES {amt.toLocaleString("en-UG")} ({pct.toFixed(1)}%)</span>
+                      <span className="text-brand-text-muted font-mono">UGX {amt.toLocaleString("en-UG")} ({pct.toFixed(1)}%)</span>
                     </div>
                     <div className="h-1.5 bg-[#EEEEEE] rounded-full overflow-hidden">
                       <div className="h-full bg-brand-indigo rounded-full" style={{ width: `${pct}%` }} />
@@ -206,8 +206,8 @@ export default async function FundSchemePage({ params }: { params: Promise<{ gro
                 <th className="px-4 py-2 text-left">Type</th>
                 <th className="px-4 py-2 text-left">Description</th>
                 <th className="px-4 py-2 text-left">Ref</th>
-                <th className="px-4 py-2 text-right">Amount (KES)</th>
-                <th className="px-4 py-2 text-right">Balance After (KES)</th>
+                <th className="px-4 py-2 text-right">Amount (UGX)</th>
+                <th className="px-4 py-2 text-right">Balance After (UGX)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#EEEEEE]">

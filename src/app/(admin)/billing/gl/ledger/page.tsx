@@ -121,7 +121,7 @@ export default async function AccountLedgerPage({
               <p className={`text-2xl font-bold mt-1 ${
                 (ledger.lines.at(-1)?.balance ?? 0) < 0 ? "text-[#DC3545]" : "text-brand-indigo"
               }`}>
-                KES {(ledger.lines.at(-1)?.balance ?? openingBalance).toLocaleString("en-UG")}
+                UGX {(ledger.lines.at(-1)?.balance ?? openingBalance).toLocaleString("en-UG")}
               </p>
               <p className="text-xs text-brand-text-muted mt-0.5">{ledger.lines.length} transaction{ledger.lines.length !== 1 ? "s" : ""}</p>
             </div>
@@ -135,9 +135,9 @@ export default async function AccountLedgerPage({
                   <th className="px-5 py-2.5 text-left">Entry No.</th>
                   <th className="px-5 py-2.5 text-left">Description</th>
                   <th className="px-5 py-2.5 text-left">Source</th>
-                  <th className="px-5 py-2.5 text-right">Debit (KES)</th>
-                  <th className="px-5 py-2.5 text-right">Credit (KES)</th>
-                  <th className="px-5 py-2.5 text-right">Balance (KES)</th>
+                  <th className="px-5 py-2.5 text-right">Debit (UGX)</th>
+                  <th className="px-5 py-2.5 text-right">Credit (UGX)</th>
+                  <th className="px-5 py-2.5 text-right">Balance (UGX)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#EEEEEE]">

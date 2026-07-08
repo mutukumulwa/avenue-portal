@@ -61,9 +61,9 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
       {/* KPI row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Annual Limit (KES)", value: Number(pkg.annualLimit).toLocaleString(), color: "text-brand-indigo" },
+          { label: "Annual Limit (UGX)", value: Number(pkg.annualLimit).toLocaleString(), color: "text-brand-indigo" },
           { label: "Contribution (KES/yr)", value: Number(pkg.contributionAmount).toLocaleString(), color: "text-[#28A745]" },
-          { label: "Total Sub-Limit (KES)", value: totalSubLimit.toLocaleString(), color: "text-[#17A2B8]" },
+          { label: "Total Sub-Limit (UGX)", value: totalSubLimit.toLocaleString(), color: "text-[#17A2B8]" },
           { label: "Benefit Categories", value: currentBenefits.length.toString(), color: "text-[#6C757D]" },
         ].map(s => (
           <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-[8px] p-4 shadow-sm">
@@ -129,7 +129,7 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
                     )}
                   </div>
                 </div>
-                <span className="font-bold text-brand-indigo text-sm">KES {Number(b.annualSubLimit).toLocaleString()}</span>
+                <span className="font-bold text-brand-indigo text-sm">UGX {Number(b.annualSubLimit).toLocaleString()}</span>
               </div>
             ))}
             {currentBenefits.length === 0 && (

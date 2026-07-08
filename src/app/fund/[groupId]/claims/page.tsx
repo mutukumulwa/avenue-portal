@@ -71,8 +71,8 @@ export default async function FundClaimsPage({ params }: { params: Promise<{ gro
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: "Total Claims",         value: claims.length.toString(),             color: "text-brand-indigo" },
-          { label: "Paid from Fund (KES)", value: totalApproved.toLocaleString("en-UG"),color: "text-[#DC3545]"    },
-          { label: "Pending (KES)",        value: totalPending.toLocaleString("en-UG"), color: "text-[#856404]"    },
+          { label: "Paid from Fund (UGX)", value: totalApproved.toLocaleString("en-UG"),color: "text-[#DC3545]"    },
+          { label: "Pending (UGX)",        value: totalPending.toLocaleString("en-UG"), color: "text-[#856404]"    },
           { label: "Declined",             value: declined.toString(),                  color: "text-[#6C757D]"    },
         ].map(k => (
           <div key={k.label} className="bg-white border border-[#EEEEEE] rounded-[8px] p-4 shadow-sm">
@@ -92,8 +92,8 @@ export default async function FundClaimsPage({ params }: { params: Promise<{ gro
               <th className="px-4 py-3 text-left">Provider</th>
               <th className="px-4 py-3 text-left">Category</th>
               <th className="px-4 py-3 text-left">Date</th>
-              <th className="px-4 py-3 text-right">Billed (KES)</th>
-              <th className="px-4 py-3 text-right">Approved (KES)</th>
+              <th className="px-4 py-3 text-right">Billed (UGX)</th>
+              <th className="px-4 py-3 text-right">Approved (UGX)</th>
               <th className="px-4 py-3 text-left">Status</th>
               <th className="px-4 py-3 text-left">Fund Deducted</th>
             </tr>
@@ -135,7 +135,7 @@ export default async function FundClaimsPage({ params }: { params: Promise<{ gro
                   </td>
                   <td className="px-4 py-3 text-xs">
                     {fundDeducted
-                      ? <span className="text-[#28A745] font-bold">✓ KES {c.fundTransactions.reduce((s, t) => s + Number(t.amount), 0).toLocaleString("en-UG")}</span>
+                      ? <span className="text-[#28A745] font-bold">✓ UGX {c.fundTransactions.reduce((s, t) => s + Number(t.amount), 0).toLocaleString("en-UG")}</span>
                       : <span className="text-brand-text-muted">—</span>}
                   </td>
                 </tr>

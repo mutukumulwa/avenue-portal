@@ -9,7 +9,9 @@ export default async function SettingsPage() {
 
   const tenantId = session.user.tenantId;
 
-  const [users, groups, brokers, members, fundGroups, providers] = await Promise.all([
+  // E2E-OBS-MEMSEL: the member picker now searches /api/admin/members/search on
+  // demand, so we no longer preload a capped member roster into the modal.
+  const [users, groups, brokers, fundGroups, providers] = await Promise.all([
     prisma.user.findMany({
       where: { tenantId },
       select: { id: true, firstName: true, lastName: true, email: true, role: true, isActive: true, lastLoginAt: true },
@@ -17,12 +19,6 @@ export default async function SettingsPage() {
     }),
     prisma.group.findMany({ where: { tenantId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
     prisma.broker.findMany({ where: { tenantId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
-    prisma.member.findMany({
-      where: { tenantId, user: null },
-      select: { id: true, firstName: true, lastName: true, memberNumber: true, group: { select: { name: true } } },
-      orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
-      take: 250,
-    }),
     prisma.group.findMany({ where: { tenantId, fundingMode: "SELF_FUNDED" }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
     prisma.provider.findMany({ where: { tenantId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
@@ -52,12 +48,6 @@ export default async function SettingsPage() {
           <InviteUserModal
             groups={groups}
             brokers={brokers}
-            members={members.map(m => ({
-              id: m.id,
-              name: `${m.firstName} ${m.lastName}`,
-              memberNumber: m.memberNumber,
-              groupName: m.group.name,
-            }))}
             fundGroups={fundGroups}
             providers={providers}
           />

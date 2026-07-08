@@ -199,7 +199,7 @@ export async function runClaimIntake(
     userId: actorUserId,
     action: "CLAIM_SUBMITTED",
     module: "CLAIMS",
-    description: `Claim ${claimNumber} submitted — KES ${billedAmount.toLocaleString()} (${data.benefitCategory})`,
+    description: `Claim ${claimNumber} submitted — UGX ${billedAmount.toLocaleString()} (${data.benefitCategory})`,
     metadata: { claimNumber, memberId: data.memberId, billedAmount },
   });
 

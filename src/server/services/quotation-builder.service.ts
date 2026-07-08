@@ -207,7 +207,7 @@ export const quotationBuilderService = {
       prisma.quotationLineItem.create({ data: {
         tenantId, quotationId,
         lineType: "STAMP_DUTY",
-        description: `Stamp Duty (KES ${STAMP_DUTY_PER_MEMBER_YEAR}/member × ${totalLives} lives)`,
+        description: `Stamp Duty (UGX ${STAMP_DUTY_PER_MEMBER_YEAR}/member × ${totalLives} lives)`,
         baseAmount: totalLives * STAMP_DUTY_PER_MEMBER_YEAR,
         netAmount:  stampDuty,
         displayOrder: LINE_ORDER.STAMP_DUTY,
@@ -243,7 +243,7 @@ export const quotationBuilderService = {
       ancillaryLines.push({
         tenantId, quotationId,
         lineType: "CARD_ISSUANCE_FEE",
-        description: `Card issuance fee (${totalLives} lives × KES ${cardFee})`,
+        description: `Card issuance fee (${totalLives} lives × UGX ${cardFee})`,
         baseAmount: cardFee * totalLives,
         netAmount:  cardFee * totalLives,
         displayOrder: LINE_ORDER.CARD_ISSUANCE_FEE,
@@ -254,7 +254,7 @@ export const quotationBuilderService = {
       ancillaryLines.push({
         tenantId, quotationId,
         lineType: "SMART_CARD_FEE",
-        description: `Smart card fee (${totalLives} lives × KES ${opts.smartCardFeePerLife})`,
+        description: `Smart card fee (${totalLives} lives × UGX ${opts.smartCardFeePerLife})`,
         baseAmount: fee,
         netAmount: fee,
         displayOrder: LINE_ORDER.SMART_CARD_FEE,
@@ -265,7 +265,7 @@ export const quotationBuilderService = {
       ancillaryLines.push({
         tenantId, quotationId,
         lineType: "WELCOME_PACK_FEE",
-        description: `Welcome pack fee (${totalLives} lives × KES ${opts.welcomePackFeePerLife})`,
+        description: `Welcome pack fee (${totalLives} lives × UGX ${opts.welcomePackFeePerLife})`,
         baseAmount: fee,
         netAmount: fee,
         displayOrder: LINE_ORDER.WELCOME_PACK_FEE,
@@ -303,7 +303,7 @@ export const quotationBuilderService = {
       entityId: quotationId,
       payload: { totalContribution, lineCount: baseLines.length + loadingLines.length + discountLines.length + 3 },
       tenantId,
-      description: `Quotation ${quotation.quoteNumber} pricing built — total KES ${totalContribution.toLocaleString()}`,
+      description: `Quotation ${quotation.quoteNumber} pricing built — total UGX ${totalContribution.toLocaleString()}`,
     });
 
     return { totalContribution, lineCount: await prisma.quotationLineItem.count({ where: { quotationId } }) };

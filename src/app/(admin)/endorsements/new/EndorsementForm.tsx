@@ -174,7 +174,7 @@ export function EndorsementForm({
                   {new Date(selectedGroup.renewalDate).toLocaleDateString("en-UG")}
                 </p>
                 <p className="text-xs text-brand-text-muted">
-                  Rate: KES {selectedGroup.contributionRate.toLocaleString()} / member / yr
+                  Rate: UGX {selectedGroup.contributionRate.toLocaleString()} / member / yr
                 </p>
               </div>
             )}
@@ -191,10 +191,10 @@ export function EndorsementForm({
             <Calculator size={18} className={proRata.isCredit ? "text-[#28A745] mt-0.5" : "text-brand-indigo mt-0.5"} />
             <div>
               <p className="text-sm font-bold text-brand-text-heading">
-                Pro-Rata {proRata.isCredit ? "Credit" : "Charge"}: KES {proRata.amount.toLocaleString()}
+                Pro-Rata {proRata.isCredit ? "Credit" : "Charge"}: UGX {proRata.amount.toLocaleString()}
               </p>
               <p className="text-xs text-brand-text-muted mt-0.5">
-                {proRata.daysRemaining} days remaining × KES {(selectedGroup!.contributionRate / 365).toFixed(2)}/day.
+                {proRata.daysRemaining} days remaining × UGX {(selectedGroup!.contributionRate / 365).toFixed(2)}/day.
                 {proRata.isCredit ? " This amount will be credited to the group's next invoice." : " This amount will be added to the group's next invoice."}
               </p>
             </div>
@@ -343,7 +343,7 @@ export function EndorsementForm({
             {selectedGroup && (
               <div className="bg-[#F8F9FA] rounded-[8px] p-3 text-sm">
                 <p className="text-brand-text-muted text-xs font-bold uppercase mb-1">Current Package</p>
-                <p className="font-semibold text-brand-text-heading">Rate: KES {selectedGroup.contributionRate.toLocaleString()} / member / yr</p>
+                <p className="font-semibold text-brand-text-heading">Rate: UGX {selectedGroup.contributionRate.toLocaleString()} / member / yr</p>
               </div>
             )}
             <div className="grid md:grid-cols-2 gap-4">
@@ -352,7 +352,7 @@ export function EndorsementForm({
                   <option value="">— Select new package —</option>
                   {packages.map(p => (
                     <option key={p.id} value={p.id}>
-                      {p.name} — KES {p.contributionAmount.toLocaleString()}/yr
+                      {p.name} — UGX {p.contributionAmount.toLocaleString()}/yr
                     </option>
                   ))}
                 </select>
@@ -385,7 +385,7 @@ export function EndorsementForm({
                   ))}
                 </select>
               </Field>
-              <Field label="New Sub-Limit (KES)">
+              <Field label="New Sub-Limit (UGX)">
                 <input name="newLimit" type="number" min="0" className={inputCls()} placeholder="0" />
               </Field>
               <Field label="Notes">
@@ -439,13 +439,13 @@ export function EndorsementForm({
                   ))}
                 </select>
               </Field>
-              <Field label="Old Annual Salary (KES)">
+              <Field label="Old Annual Salary (UGX)">
                 <input name="oldSalary" type="number" min="0" className={inputCls()} required />
               </Field>
-              <Field label="New Annual Salary (KES)">
+              <Field label="New Annual Salary (UGX)">
                 <input name="newSalary" type="number" min="0" className={inputCls()} required />
               </Field>
-              <Field label="New Annual Contribution (KES)">
+              <Field label="New Annual Contribution (UGX)">
                 <input name="newContribution" type="number" min="0" className={inputCls()} required />
               </Field>
             </div>

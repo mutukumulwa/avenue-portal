@@ -28,8 +28,8 @@ function formatMetric(value: number, metricKey?: string | null) {
   if (metricKey.toLowerCase().includes("mlr") || metricKey.toLowerCase().includes("rate") || Math.abs(value) <= 1) {
     return `${(value * 100).toFixed(1)}%`;
   }
-  if (Math.abs(value) >= 1_000_000) return `KES ${(value / 1_000_000).toFixed(1)}M`;
-  if (Math.abs(value) >= 1_000) return `KES ${(value / 1_000).toFixed(0)}K`;
+  if (Math.abs(value) >= 1_000_000) return `UGX ${(value / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(value) >= 1_000) return `UGX ${(value / 1_000).toFixed(0)}K`;
   return value.toLocaleString();
 }
 

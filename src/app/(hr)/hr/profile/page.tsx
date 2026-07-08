@@ -108,7 +108,7 @@ export default async function HRProfilePage() {
              <div className="grid grid-cols-2 gap-4">
                <div>
                   <div className="text-xs font-bold text-brand-text-muted uppercase tracking-wider mb-1">Overall Limit</div>
-                  <div className="font-semibold text-brand-text-heading">KES {Number(group.package.annualLimit).toLocaleString()}</div>
+                  <div className="font-semibold text-brand-text-heading">UGX {Number(group.package.annualLimit).toLocaleString()}</div>
                </div>
                <div>
                   <div className="text-xs font-bold text-brand-text-muted uppercase tracking-wider mb-1">Payment Frequency</div>

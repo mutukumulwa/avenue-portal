@@ -54,7 +54,7 @@ export function ClaimsTrendChart({ data }: { data: MonthlyRow[] }) {
 export function PremiumVsClaimsChart({ data }: { data: MonthlyRow[] }) {
   return (
     <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5">
-      <h2 className="font-bold text-brand-text-heading font-heading mb-4">Premium Billed vs Claims Approved (KES)</h2>
+      <h2 className="font-bold text-brand-text-heading font-heading mb-4">Premium Billed vs Claims Approved (UGX)</h2>
       <ClientOnly>
         <ResponsiveContainer width="100%" height={220}>
           <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
@@ -63,7 +63,7 @@ export function PremiumVsClaimsChart({ data }: { data: MonthlyRow[] }) {
             <YAxis tick={{ fontSize: 11, fill: "#6C757D" }} axisLine={false} tickLine={false} tickFormatter={currency} />
             <Tooltip
               contentStyle={{ borderRadius: 8, border: "1px solid #EEEEEE", fontSize: 12 }}
-              formatter={(v: number) => [`KES ${Number(v).toLocaleString()}`, ""]}
+              formatter={(v: number) => [`UGX ${Number(v).toLocaleString()}`, ""]}
             />
             <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 12 }} />
             <Line type="monotone" dataKey="billed"   stroke="#0B1437" strokeWidth={2} dot={false} name="Billed" />

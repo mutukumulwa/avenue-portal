@@ -57,8 +57,8 @@ export async function runReportGenerationJob() {
 
       console.info(`[report-generation] ${tenant.name}:`);
       console.info(`  Members: ${memberCount} active, ${groupCount} groups`);
-      console.info(`  Claims (30d): ${claimsSummary.total}, billed KES ${claimsSummary.totalBilled.toLocaleString()}`);
-      console.info(`  Billing (30d): ${billingSummary.total} invoices, collected KES ${billingSummary.totalCollected.toLocaleString()}`);
+      console.info(`  Claims (30d): ${claimsSummary.total}, billed UGX ${claimsSummary.totalBilled.toLocaleString()}`);
+      console.info(`  Billing (30d): ${billingSummary.total} invoices, collected UGX ${billingSummary.totalCollected.toLocaleString()}`);
 
       // In production: store these snapshots in a ReportCache table or push to an S3/MinIO bucket as JSON/PDF.
 

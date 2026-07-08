@@ -51,7 +51,7 @@ export async function createInvoiceAction(
     userId: session.user.id,
     action: "INVOICE_CREATED",
     module: "BILLING",
-    description: `Invoice ${invoiceNumber} created — KES ${totalAmount.toLocaleString()} for ${period}`,
+    description: `Invoice ${invoiceNumber} created — UGX ${totalAmount.toLocaleString()} for ${period}`,
     metadata: { invoiceId: invoice.id, groupId, period },
   });
 

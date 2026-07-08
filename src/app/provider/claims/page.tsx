@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { FilePlus2 } from "lucide-react";
 
 function money(n: number) {
-  return `KES ${Math.round(n).toLocaleString("en-UG")}`;
+  return `UGX ${Math.round(n).toLocaleString("en-UG")}`;
 }
 
 const STATUS_TONE: Record<string, string> = {

@@ -134,7 +134,7 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: "Active Members",          value: activeMembers,                      icon: Users,    color: "text-brand-indigo"  },
-          { label: "Annual Contribution (KES)", value: annualContribution.toLocaleString("en-UG"), icon: CreditCard, color: "text-[#28A745]" },
+          { label: "Annual Contribution (UGX)", value: annualContribution.toLocaleString("en-UG"), icon: CreditCard, color: "text-[#28A745]" },
           { label: "Total Members",            value: group._count.members,              icon: Receipt,  color: "text-[#17A2B8]"      },
           { label: "Endorsements",             value: group._count.endorsements,         icon: FileText, color: "text-[#6C757D]"      },
         ].map(s => {
@@ -163,7 +163,7 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
             // When tiers exist each tier owns its package — don't show a misleading single package
             ...(!hasTiers ? [
               { label: "Package",                value: group.package.name },
-              { label: "Contribution (KES)",     value: Number(group.contributionRate).toLocaleString("en-UG") },
+              { label: "Contribution (UGX)",     value: Number(group.contributionRate).toLocaleString("en-UG") },
             ] : [
               { label: "Benefit Structure",      value: `${group.benefitTiers.length} tier${group.benefitTiers.length !== 1 ? "s" : ""} — see below` },
             ]),
@@ -290,7 +290,7 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
               <th className="px-5 py-3">Invoice No.</th>
               <th className="px-5 py-3">Period</th>
               <th className="px-5 py-3">Members</th>
-              <th className="px-5 py-3">Amount (KES)</th>
+              <th className="px-5 py-3">Amount (UGX)</th>
               <th className="px-5 py-3">Due Date</th>
               <th className="px-5 py-3">Status</th>
             </tr>

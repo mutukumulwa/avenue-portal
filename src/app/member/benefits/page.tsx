@@ -5,8 +5,8 @@ import { redirect } from "next/navigation";
 
 function formatMoney(value: number | null) {
   if (value === null) return "Private";
-  if (value >= 1_000_000) return `KES ${(value / 1_000_000).toFixed(1)}M`;
-  return `KES ${Math.round(value).toLocaleString("en-UG")}`;
+  if (value >= 1_000_000) return `UGX ${(value / 1_000_000).toFixed(1)}M`;
+  return `UGX ${Math.round(value).toLocaleString("en-UG")}`;
 }
 
 function formatDate(value: Date) {

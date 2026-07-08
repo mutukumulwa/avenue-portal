@@ -81,7 +81,7 @@ export default async function EditPackagePage({ params }: { params: Promise<{ id
               <input name="description" type="text" defaultValue={pkg.description ?? ""} className={inputCls} />
             </div>
             <div>
-              <label className={labelCls}>Annual Limit (KES)</label>
+              <label className={labelCls}>Annual Limit (UGX)</label>
               <input name="annualLimit" type="number" min="0" defaultValue={Number(pkg.annualLimit)} required className={inputCls} />
             </div>
             <div>
@@ -124,7 +124,7 @@ export default async function EditPackagePage({ params }: { params: Promise<{ id
               <thead>
                 <tr className="bg-[#E6E7E8] text-[#6C757D] font-semibold">
                   <th className="px-3 py-2 text-left">Category</th>
-                  <th className="px-3 py-2 text-left">Annual Sub-Limit (KES)</th>
+                  <th className="px-3 py-2 text-left">Annual Sub-Limit (UGX)</th>
                   <th className="px-3 py-2 text-left">Co-Pay %</th>
                   <th className="px-3 py-2 text-left">Waiting Period (days)</th>
                 </tr>

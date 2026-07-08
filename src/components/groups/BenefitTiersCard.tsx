@@ -71,7 +71,7 @@ function TierForm({
           <select name="packageId" required defaultValue={initial?.packageId} className={inputCls}>
             <option value="">Select package…</option>
             {packages.map(p => (
-              <option key={p.id} value={p.id}>{p.name} (KES {p.annualLimit.toLocaleString()} limit)</option>
+              <option key={p.id} value={p.id}>{p.name} (UGX {p.annualLimit.toLocaleString()} limit)</option>
             ))}
           </select>
         </div>
@@ -199,7 +199,7 @@ export function BenefitTiersCard({ groupId, tiers, packages }: Props) {
                       )}
                     </div>
                     <p className="text-xs text-brand-text-muted mt-0.5">
-                      {tier.package.name} · KES {tier.contributionRate.toLocaleString()}/yr · {tier._count.members} member{tier._count.members !== 1 ? "s" : ""}
+                      {tier.package.name} · UGX {tier.contributionRate.toLocaleString()}/yr · {tier._count.members} member{tier._count.members !== 1 ? "s" : ""}
                     </p>
                     {tier.description && <p className="text-xs text-brand-text-muted">{tier.description}</p>}
                   </div>

@@ -44,12 +44,12 @@ export default function PackageBuilder() {
 
           <div className="border-t border-[#EEEEEE] pt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-brand-text-heading">Overall Annual Limit (KES)</label>
+              <label className="text-sm font-semibold text-brand-text-heading">Overall Annual Limit (UGX)</label>
               <input required name="annualLimit" type="number" defaultValue="500000" className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-[#0B1437] transition-colors" />
             </div>
             
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-brand-text-heading">Annual Premium Contribution (KES)</label>
+              <label className="text-sm font-semibold text-brand-text-heading">Annual Premium Contribution (UGX)</label>
               <input required name="contributionAmount" type="number" defaultValue="25000" className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-[#0B1437] transition-colors" />
             </div>
 
@@ -74,7 +74,7 @@ export default function PackageBuilder() {
               ] as const).map((b) => (
                 <div key={b.key} className="space-y-3 bg-[#F8F9FA] p-4 rounded-lg border border-[#EEEEEE]">
                   <div className="space-y-2">
-                    <label className="text-sm font-semibold text-brand-text-heading">{b.label} Sub-Limit (KES)</label>
+                    <label className="text-sm font-semibold text-brand-text-heading">{b.label} Sub-Limit (UGX)</label>
                     <input required name={b.limitName} type="number" defaultValue={b.limitDefault} className="w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-[#0B1437] transition-colors" />
                   </div>
                   {/* WP-F1/D8: how this benefit pays providers */}
