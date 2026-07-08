@@ -53,6 +53,19 @@ export const GUARD_RULES = [
     why: "The pre-2026-07 seed password was published on the login page and is burned (PR-003). It must not appear anywhere in shipped code.",
   },
   {
+    name: "in-source-default-api-secret",
+    // BD-06: an operator/API auth key must come from the environment and fail
+    // closed when unset — it must never fall back to an in-source default, or
+    // that default ships as a live, guessable credential. Catches both the
+    // `process.env.API_KEY || "…"` fail-open pattern and the two burned defaults
+    // (av-slade360-dev-key, av-local-secret). Assigning API_KEY *to* a fallback
+    // (`process.env.X || process.env.API_KEY`) is fine — only a string literal
+    // default trips the first alternative.
+    pattern: /process\.env\.API_KEY\s*\|\|\s*['"`]|av-slade360-dev-key|av-local-secret/,
+    roots: ["src"],
+    why: "A guessable in-source default auth secret ships as a live credential whenever the env var is unset (BD-06). API auth keys must be environment-only and fail closed.",
+  },
+  {
     name: "seeded-account-email-in-ui",
     pattern: new RegExp(SEEDED_ACCOUNT_EMAILS.map((e) => e.replace(/[.@]/g, "\\$&")).join("|"), "i"),
     roots: ["src"],

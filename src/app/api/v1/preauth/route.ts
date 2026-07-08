@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { withApiKey, getApiCredential } from "@/lib/apiAuth";
+import { withApiKey, getApiCredential, operatorTenantWhere } from "@/lib/apiAuth";
 import { ProviderEntitlementService } from "@/server/services/provider-entitlement.service";
 
 async function postPreAuth(req: Request) {
@@ -35,10 +35,11 @@ async function postPreAuth(req: Request) {
 
     // Confine member lookup to the provider's contracted clients/groups for a
     // facility key (deny-by-default entitlement). Out-of-scope members return the
-    // same 404 as a missing member — no PII leaked. Operator key spans the tenant.
+    // same 404 as a missing member — no PII leaked. The operator key is confined
+    // to its bound tenant (BD-06 / operatorTenantWhere).
     const scope = providerFromKey
       ? await ProviderEntitlementService.entitledMemberWhere(providerFromKey)
-      : {};
+      : operatorTenantWhere(credential);
 
     const member = await prisma.member.findFirst({
       where: { memberNumber, ...scope },

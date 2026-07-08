@@ -65,4 +65,4 @@ if (hits.length > 0) {
   process.exit(1);
 }
 
-console.log("✓ Brand/secret guard passed (avenue, rendered AiCare, burned password, seeded emails in UI).");
+console.log("✓ Brand/secret guard passed (avenue, rendered AiCare, burned password, default API secret, seeded emails in UI).");

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { withApiKey, getApiCredential } from "@/lib/apiAuth";
+import { withApiKey, getApiCredential, operatorTenantWhere } from "@/lib/apiAuth";
 import { ProviderEntitlementService } from "@/server/services/provider-entitlement.service";
 
 /**
@@ -19,13 +19,13 @@ async function getBenefits(req: Request) {
     }
 
     // E2E-D02: a per-facility key may only read benefit balances / PII of
-    // members whose client its contracts cover (404 otherwise). Operator key
-    // spans the tenant.
+    // members whose client its contracts cover (404 otherwise). The operator key
+    // is confined to its bound tenant (BD-06 / operatorTenantWhere).
     const credential = await getApiCredential(req);
     const scope =
       credential?.kind === "provider"
         ? await ProviderEntitlementService.entitledMemberWhere(credential.providerId)
-        : {};
+        : operatorTenantWhere(credential);
 
     const member = await prisma.member.findFirst({
       where: { memberNumber, ...scope },

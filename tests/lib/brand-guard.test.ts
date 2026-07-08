@@ -55,6 +55,33 @@ describe("brand/secret guard rules (PR-003, PR-004)", () => {
     expect(scanText("Welcome back to the Medvex platform.", "src/app/(admin)/dashboard/page.tsx")).toHaveLength(0);
   });
 
+  it("fails on an in-source default API secret (BD-06 fail-open pattern + burned defaults)", () => {
+    const burnedOperatorDefault = ["av", "slade360", "dev", "key"].join("-");
+    const burnedUploadDefault = ["av", "local", "secret"].join("-");
+    const failOpen = scanText(
+      `const K = process.env.API_KEY || "${burnedOperatorDefault}";`,
+      "src/lib/apiAuth.ts",
+    );
+    expect(failOpen.map((f: { rule: string }) => f.rule)).toContain("in-source-default-api-secret");
+    // the burned literals are caught on their own too (e.g. the upload route)
+    expect(
+      scanText(`authHeader.includes(process.env.API_KEY || "${burnedUploadDefault}")`, "src/app/api/v1/upload/route.ts")
+        .map((f: { rule: string }) => f.rule),
+    ).toContain("in-source-default-api-secret");
+  });
+
+  it("allows reading API_KEY from the env without a string-literal default", () => {
+    const clean = [
+      "const opKey = process.env.API_KEY?.trim();",
+      "const fallback = process.env.LEGACY_KEY || process.env.API_KEY;",
+    ].join("\n");
+    expect(
+      scanText(clean, "src/lib/apiAuth.ts").filter(
+        (f: { rule: string }) => f.rule === "in-source-default-api-secret",
+      ),
+    ).toHaveLength(0);
+  });
+
   it("covers every seeded login account in the email rule", () => {
     for (const email of SEEDED_ACCOUNT_EMAILS) {
       const findings = scanText(`contact: "${email}"`, "src/app/member/support/page.tsx");

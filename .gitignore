@@ -33,6 +33,8 @@ artifacts/next-dev-*.log
 
 # env files (can opt-in for committing if needed)
 .env*
+# ...but the placeholder template IS committed as the canonical env convention.
+!.env.example
 
 # vercel
 .vercel

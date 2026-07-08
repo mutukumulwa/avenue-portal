@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { withApiKey, getApiCredential, providerScopeWhere } from "@/lib/apiAuth";
+import { withApiKey, getApiCredential, providerScopeWhere, operatorTenantWhere } from "@/lib/apiAuth";
 import { ClaimLineCategory } from "@prisma/client";
 import { isFutureServiceDate, FUTURE_SERVICE_DATE_ERROR } from "@/lib/service-date";
 
@@ -41,8 +41,10 @@ async function postClaim(req: Request) {
       return NextResponse.json({ error: FUTURE_SERVICE_DATE_ERROR }, { status: 422 });
     }
 
+    // BD-06: an operator key bound to a tenant may only file for that tenant's
+    // members (no-op for provider keys and for an unbound operator).
     const member = await prisma.member.findFirst({
-      where: { memberNumber },
+      where: { memberNumber, ...operatorTenantWhere(credential) },
       select: {
         id:       true,
         tenantId: true,
@@ -193,7 +195,7 @@ async function getClaim(req: Request) {
     const credential = await getApiCredential(req);
 
     const claim = await prisma.claim.findFirst({
-      where: { claimNumber, ...providerScopeWhere(credential) },
+      where: { claimNumber, ...providerScopeWhere(credential), ...operatorTenantWhere(credential) },
       select: {
         claimNumber:   true,
         status:        true,
