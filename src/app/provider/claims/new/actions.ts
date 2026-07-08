@@ -33,6 +33,37 @@ export async function submitProviderClaimAction(
   });
   if (!member) return { error: `No member found for “${memberNumber}”.` };
 
+  // BD-02 / OBS-5: a provider claim POST that 503'd after creating the claim (RSC
+  // instability, now fixed in Workstream A) could be re-submitted and duplicate
+  // the claim. Soft-block an identical claim (same facility/member/date/total)
+  // captured in the last 2 minutes: surface the existing claim number instead of
+  // silently creating a second one. This does NOT block a legitimate repeat visit
+  // later in the day — only a rapid re-submit of the same encounter. Adjudication-
+  // time double-capture routing (the existing control) still applies beyond it.
+  const billedTotal = lines.reduce(
+    (s, l) => s + Math.max(1, Number(l.quantity) || 1) * (Number(l.unitCost) || 0),
+    0,
+  );
+  const recentDuplicate = await prisma.claim.findFirst({
+    where: {
+      tenantId,
+      providerId,
+      memberId: member.id,
+      dateOfService: new Date(input.dateOfService),
+      billedAmount: billedTotal,
+      createdAt: { gte: new Date(Date.now() - 2 * 60 * 1000) },
+    },
+    select: { claimNumber: true },
+    orderBy: { createdAt: "desc" },
+  });
+  if (recentDuplicate) {
+    return {
+      error:
+        `An identical claim (${recentDuplicate.claimNumber}) for this member, date and amount was just submitted from this facility. ` +
+        `It is already in the queue — refresh your claims list rather than submitting again. If this is a genuine second encounter, adjust a line and resubmit.`,
+    };
+  }
+
   try {
     await runClaimIntake(tenantId, session.user.id, {
       memberId: member.id,

@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole, ROLES } from "@/lib/rbac";
 import { InviteUserModal } from "./InviteUserModal";
-import { ROLE_PERMISSIONS } from "@/lib/constants";
+import { ROLE_PERMISSIONS, STAFF_ROLES, isPortalRole } from "@/lib/constants";
 import { updateUserAccessAction } from "./actions";
 
 export default async function SettingsPage() {
@@ -83,13 +83,26 @@ export default async function SettingsPage() {
                   <td className="px-5 py-3">
                     <form action={updateUserAccessAction} className="flex flex-wrap items-center gap-2">
                       <input type="hidden" name="userId" value={u.id} />
-                      <select name="role" defaultValue={u.role} className="border border-[#EEEEEE] rounded-md px-2 py-1 text-xs bg-white">
-                        {Object.keys(ROLE_PERMISSIONS).map(role => (
-                          <option key={role} value={role}>{role.replace(/_/g, " ")}</option>
-                        ))}
-                        <option value="HR_MANAGER">HR MANAGER</option>
-                        <option value="FUND_ADMINISTRATOR">FUND ADMINISTRATOR</option>
-                      </select>
+                      {isPortalRole(u.role) ? (
+                        // BD-01: portal roles are facility/member/group-scoped and
+                        // cannot be re-bound inline — lock the role (preserve it via
+                        // a hidden field) so Save can only toggle active/inactive.
+                        <>
+                          <input type="hidden" name="role" value={u.role} />
+                          <span
+                            className="border border-[#EEEEEE] rounded-md px-2 py-1 text-xs bg-[#F8F9FA] text-brand-text-muted"
+                            title="Portal roles are scoped to a facility / member / group and are managed through Invite User."
+                          >
+                            {u.role.replace(/_/g, " ")} (locked)
+                          </span>
+                        </>
+                      ) : (
+                        <select name="role" defaultValue={u.role} className="border border-[#EEEEEE] rounded-md px-2 py-1 text-xs bg-white">
+                          {STAFF_ROLES.map(role => (
+                            <option key={role} value={role}>{role.replace(/_/g, " ")}</option>
+                          ))}
+                        </select>
+                      )}
                       <select name="isActive" defaultValue={String(u.isActive)} className="border border-[#EEEEEE] rounded-md px-2 py-1 text-xs bg-white">
                         <option value="true">Active</option>
                         <option value="false">Inactive</option>

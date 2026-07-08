@@ -122,6 +122,57 @@ export class ProviderContractsService {
       if (t.cptCode && !tariffMap.has(t.cptCode)) tariffMap.set(t.cptCode, t);
     }
 
+    // BD-04: a contracted service billed WITHOUT its CPT must still bind to the
+    // tariff — otherwise a provider escapes the ceiling just by omitting the
+    // code. Match uncoded/unmatched lines by exact (case-insensitive) service
+    // description against the tariff's serviceName / standardDescription /
+    // providerDescription. Precedence below is identical to the CPT path
+    // (client-specific → contract-scoped → tariff-type → latest), so this is a
+    // deterministic resolution, not a guess.
+    const norm = (s?: string | null) => s?.trim().toLowerCase() ?? "";
+    const descTerms = Array.from(
+      new Set(lines.map(l => norm(l.description)).filter(d => d.length > 0)),
+    );
+    const descTariffs = descTerms.length
+      ? await prisma.providerTariff.findMany({
+          where: {
+            providerId,
+            isActive: true,
+            AND: [
+              { effectiveFrom: { lte: dateOfService } },
+              { OR: [{ effectiveTo: null }, { effectiveTo: { gte: dateOfService } }] },
+              { OR: [{ contractId: contract?.id ?? "__none__" }, { contractId: null }] },
+              { OR: [{ clientId: clientId ?? null }, { clientId: null }] },
+              {
+                OR: descTerms.flatMap(d => [
+                  { serviceName: { equals: d, mode: "insensitive" as const } },
+                  { standardDescription: { equals: d, mode: "insensitive" as const } },
+                  { providerDescription: { equals: d, mode: "insensitive" as const } },
+                ]),
+              },
+            ],
+          },
+        })
+      : [];
+    descTariffs.sort((a, b) => {
+      const aClient = a.clientId ? 0 : 1;
+      const bClient = b.clientId ? 0 : 1;
+      if (aClient !== bClient) return aClient - bClient;
+      const aContract = a.contractId ? 0 : 1;
+      const bContract = b.contractId ? 0 : 1;
+      if (aContract !== bContract) return aContract - bContract;
+      const pa = TARIFF_PRIORITY[a.tariffType] ?? 9;
+      const pb = TARIFF_PRIORITY[b.tariffType] ?? 9;
+      if (pa !== pb) return pa - pb;
+      return b.effectiveFrom.getTime() - a.effectiveFrom.getTime();
+    });
+    const descTariffMap = new Map<string, (typeof descTariffs)[number]>();
+    for (const t of descTariffs) {
+      for (const key of [norm(t.serviceName), norm(t.standardDescription), norm(t.providerDescription)]) {
+        if (key && !descTariffMap.has(key)) descTariffMap.set(key, t);
+      }
+    }
+
     const exclusions = contract
       ? await prisma.providerContractExclusion.findMany({ where: { contractId: contract.id } })
       : [];
@@ -150,8 +201,10 @@ export class ProviderContractsService {
         return { ...base, agreedRate: null, allowedUnit: 0, ruleApplied: "EXCLUDED" as const, variance: null, variancePct: null };
       }
 
-      // 2. On a tariff schedule.
-      const tariff = l.cptCode ? tariffMap.get(l.cptCode) : undefined;
+      // 2. On a tariff schedule — matched by CPT, else by exact service
+      //    description (BD-04: CPT-less lines still bind to the contracted rate).
+      const tariff =
+        (l.cptCode ? tariffMap.get(l.cptCode) : undefined) ?? descTariffMap.get(norm(l.description));
       if (tariff) {
         const agreedRate = Number(tariff.agreedRate);
         const variance = l.unitCost - agreedRate;

@@ -4,7 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Lock, Mail, AlertCircle } from "lucide-react";
 import { Suspense, useState } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 function safeCallbackUrl(value: string | null) {
   if (
@@ -24,7 +24,6 @@ function LoginForm() {
   const [totp, setTotp] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -50,7 +49,14 @@ function LoginForm() {
 
     const callbackUrl = safeCallbackUrl(searchParams.get("callbackUrl"));
 
-    router.replace(callbackUrl ?? "/post-login");
+    // BD-03: navigate with a full document load, not a client-side router push.
+    // `/post-login` is now an HTTP redirect route handler (not an RSC page), so
+    // the browser must GET it and follow the 307 — a client `router.replace`
+    // would try to prefetch it as an RSC payload, the exact path that 503'd and
+    // stranded logins. `window.location` also guarantees the freshly-minted
+    // session cookie is sent on the redirect request.
+    setLoading(true);
+    window.location.assign(callbackUrl ?? "/post-login");
   };
 
   return (

@@ -534,7 +534,22 @@ export default async function ClaimDetailPage({
           </h3>
 
           {/* PR-014 #2: enforcement preview — billed / payable ceiling / delta */}
-          {ceiling && ceiling.ceiling !== null ? (
+          {ceiling?.unpriced ? (
+            // BD-04: active contract but nothing priced (uncoded/unlisted). The
+            // approved amount defaults to 0 and full-billed approval is blocked
+            // server-side — this banner tells the reviewer the real remedy.
+            <div className="mb-4 rounded-lg border border-[#DC3545]/40 bg-[#DC3545]/5 px-4 py-3 text-sm">
+              <p className="font-bold text-[#DC3545]">No enforceable contract price found</p>
+              <p className="mt-1 text-brand-text-body">
+                This claim is under an active contract ({ceiling.contractNumber}), but no line resolved to a
+                contracted rate — the service is uncoded or unlisted. Approval defaults to{" "}
+                <span className="font-semibold">0</span>. Correct the CPT/service coding so the tariff binds,
+                adjust the line to a documented amount, or raise a{" "}
+                <span className="font-semibold">PAY ABOVE CONTRACT RATE</span> override. Approving the full
+                billed amount is not permitted.
+              </p>
+            </div>
+          ) : ceiling && ceiling.ceiling !== null ? (
             <div className="mb-4 grid grid-cols-3 gap-4 rounded-lg bg-[#F8F9FA] border border-[#EEEEEE] px-4 py-3 text-sm">
               <div>
                 <p className="text-xs text-brand-text-muted">Billed</p>

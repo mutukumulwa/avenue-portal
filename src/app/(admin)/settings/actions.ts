@@ -7,14 +7,9 @@ import { validatePassword } from "@/lib/password-policy";
 import bcrypt from "bcryptjs";
 import { Prisma, type UserRole } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { ALL_USER_ROLES, PORTAL_ROLES as PORTAL_ROLE_LIST, isPortalRole } from "@/lib/constants";
 
-const PORTAL_ROLES = new Set<UserRole>([
-  "BROKER_USER",
-  "MEMBER_USER",
-  "HR_MANAGER",
-  "FUND_ADMINISTRATOR",
-  "PROVIDER_USER",
-]);
+const PORTAL_ROLES = new Set<UserRole>(PORTAL_ROLE_LIST as readonly UserRole[]);
 
 export async function inviteUserAction(
   _prev: { error?: string; ok?: boolean } | null,
@@ -136,8 +131,40 @@ export async function updateUserAccessAction(formData: FormData) {
 
   if (!userId || !role) return;
 
+  // BD-01: the inline control is a status/staff-role toggle — never a path to
+  // mint or strip a scoped portal role. Load the target's current binding and
+  // validate the posted role against it (defence in depth; the UI already locks
+  // portal rows, but a hand-crafted POST must not escalate a facility user).
+  const target = await prisma.user.findFirst({
+    where: { id: userId, tenantId: session.user.tenantId },
+    select: { role: true, providerId: true, memberId: true, brokerId: true, groupId: true },
+  });
+  if (!target) return;
+
+  const roleUnchanged = role === target.role;
+
+  // 1. Reject unknown roles outright.
+  if (!ALL_USER_ROLES.includes(role)) {
+    throw new Error("Invalid role.");
+  }
+  // 2. Cannot change a scoped portal user's role here (would drop/rewire their
+  //    facility/member/group binding silently). Active toggle stays allowed.
+  if (isPortalRole(target.role) && !roleUnchanged) {
+    throw new Error(
+      `${target.role.replace(/_/g, " ")} is a scoped portal role — change it through Invite User so the facility/member/group binding is set correctly.`,
+    );
+  }
+  // 3. Cannot convert a staff user INTO a portal role here (no binding captured).
+  if (isPortalRole(role) && !roleUnchanged) {
+    throw new Error(
+      `${role.replace(/_/g, " ")} must be assigned through Invite User so its facility/member/group scope is bound.`,
+    );
+  }
+
   await prisma.user.update({
     where: { id: userId, tenantId: session.user.tenantId },
+    // Never rewrite role to something the checks above didn't clear: when the
+    // row is a locked portal user, `role` equals the preserved current role.
     data: { role, isActive },
   });
 

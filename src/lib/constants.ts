@@ -10,6 +10,44 @@ export const ROLE_PERMISSIONS = {
   MEMBER_USER: ["MEMBER_PORTAL_ONLY"],
 };
 
+// BD-01: role governance for the inline "Update Access" control on /settings.
+//
+// Portal roles are *scoped* — each is bound to a concrete Provider / Member /
+// Broker / Group / Fund at invite time. The inline dropdown cannot capture that
+// binding, so it must never mint or strip a portal role: a facility user was
+// rendering as SUPER_ADMIN (its role was absent from the option list) and a
+// careless Save could POST role=SUPER_ADMIN and escalate them to full admin.
+//
+// The inline control is therefore limited to STAFF roles. Portal users are
+// locked (role preserved; only active/inactive toggles) and re-binding a portal
+// role goes through the Invite/User-management flow.
+export const PORTAL_ROLES = [
+  "BROKER_USER",
+  "MEMBER_USER",
+  "HR_MANAGER",
+  "FUND_ADMINISTRATOR",
+  "PROVIDER_USER",
+] as const;
+
+export const STAFF_ROLES = [
+  "SUPER_ADMIN",
+  "CLAIMS_OFFICER",
+  "FINANCE_OFFICER",
+  "UNDERWRITER",
+  "CUSTOMER_SERVICE",
+  "MEDICAL_OFFICER",
+  "REPORTS_VIEWER",
+] as const;
+
+export const ALL_USER_ROLES = [...STAFF_ROLES, ...PORTAL_ROLES] as const;
+
+export function isPortalRole(role: string): boolean {
+  return (PORTAL_ROLES as readonly string[]).includes(role);
+}
+export function isStaffRole(role: string): boolean {
+  return (STAFF_ROLES as readonly string[]).includes(role);
+}
+
 // Major Ugandan districts (Medvex operates in Uganda). Replaces the legacy
 // Kenyan-county list (§D / D-8). Used as a geography reference / dropdown source.
 export const UGANDA_DISTRICTS = [

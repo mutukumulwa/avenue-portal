@@ -366,10 +366,27 @@ export const claimAdjudicationService = {
     cycleYear: number,
     makerId: string,
   ) {
-    const existing = await prisma.providerSettlementBatch.findUnique({
-      where: { tenantId_providerId_cycleMonth_cycleYear: { tenantId, providerId, cycleMonth, cycleYear } },
+    // BD-05: allow supplementary runs for the same provider+cycle so that
+    // claims approved AFTER the month's batch settled are not stranded. An OPEN
+    // batch (not yet paid/rejected) still blocks a second run — settle or reject
+    // it first, to keep maker/checker and voucher/GL reconciliation unambiguous.
+    const priorBatches = await prisma.providerSettlementBatch.findMany({
+      where: { tenantId, providerId, cycleMonth, cycleYear },
+      select: { sequence: true, status: true },
+      orderBy: { sequence: "desc" },
     });
-    if (existing) throw new TRPCError({ code: "CONFLICT", message: "Settlement batch already exists for this provider and cycle" });
+    const openBatch = priorBatches.find(
+      (b) => !["SETTLED", "REJECTED"].includes(b.status),
+    );
+    if (openBatch) {
+      throw new TRPCError({
+        code: "CONFLICT",
+        message:
+          `An open settlement batch for this provider and cycle is still in progress (status ${openBatch.status.replace(/_/g, " ")}). ` +
+          `Settle or reject it before creating a supplementary run.`,
+      });
+    }
+    const nextSequence = priorBatches.length > 0 ? Math.max(...priorBatches.map((b) => b.sequence)) + 1 : 1;
 
     // PR-027: a settlement run scoops EVERY unsettled approved claim decided
     // on or before the cycle end — never only claims decided inside the cycle
@@ -391,7 +408,13 @@ export const claimAdjudicationService = {
     });
 
     if (claims.length === 0) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "No unsettled approved claims found for this provider up to the end of this cycle" });
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message:
+          nextSequence > 1
+            ? "No unsettled approved claims found for this provider — every approved claim up to this cycle is already in a settled batch. Nothing to settle in a supplementary run."
+            : "No unsettled approved claims found for this provider up to the end of this cycle",
+      });
     }
 
     // OBS-2 Ticket 4: a settlement batch settles ONE transaction currency. Raw
@@ -420,6 +443,7 @@ export const claimAdjudicationService = {
       const newBatch = await tx.providerSettlementBatch.create({
         data: {
           tenantId, providerId, cycleMonth, cycleYear,
+          sequence:    nextSequence,
           status:      "MAKER_SUBMITTED",
           totalAmount,
           currency:    batchCurrency,
@@ -442,9 +466,9 @@ export const claimAdjudicationService = {
       module:     "BILLING",
       entityType: "ProviderSettlementBatch",
       entityId:   batch.id,
-      payload:    { totalAmount, claimCount: claims.length, providerId, cycleMonth, cycleYear },
+      payload:    { totalAmount, claimCount: claims.length, providerId, cycleMonth, cycleYear, sequence: nextSequence },
       tenantId,
-      description: `Settlement batch created for ${cycleMonth}/${cycleYear} — ${batchCurrency} ${totalAmount.toLocaleString("en-UG")} across ${claims.length} claim(s)`,
+      description: `Settlement batch created for ${cycleMonth}/${cycleYear}${nextSequence > 1 ? ` (Run ${nextSequence})` : ""} — ${batchCurrency} ${totalAmount.toLocaleString("en-UG")} across ${claims.length} claim(s)`,
     });
 
     return batch;

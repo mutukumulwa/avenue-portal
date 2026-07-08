@@ -43,7 +43,8 @@ export default async function SettlementBatchPage({ params }: { params: Promise<
     : null;
 
   const fmt = (n: number) => `UGX ${Math.round(n).toLocaleString("en-UG")}`;
-  const cycle = new Date(batch.cycleYear, batch.cycleMonth - 1).toLocaleString("en-UG", { month: "long", year: "numeric" });
+  const cycle = new Date(batch.cycleYear, batch.cycleMonth - 1).toLocaleString("en-UG", { month: "long", year: "numeric" })
+    + (batch.sequence > 1 ? ` · Run ${batch.sequence}` : "");
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">

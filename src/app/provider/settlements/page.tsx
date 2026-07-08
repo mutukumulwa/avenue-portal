@@ -23,7 +23,7 @@ export default async function ProviderSettlements() {
     prisma.providerSettlementBatch.findMany({
       where: { tenantId, providerId: provider.id },
       select: {
-        id: true, status: true, totalAmount: true, cycleMonth: true, cycleYear: true, settledAt: true, createdAt: true,
+        id: true, status: true, totalAmount: true, cycleMonth: true, cycleYear: true, sequence: true, settledAt: true, createdAt: true,
         _count: { select: { claims: true } },
       },
       orderBy: { createdAt: "desc" },
@@ -70,7 +70,10 @@ export default async function ProviderSettlements() {
             <tbody>
               {batches.map((b) => (
                 <tr key={b.id} className="border-b border-[#F4F4F4] last:border-0">
-                  <td className="px-5 py-2.5 font-semibold">{MONTHS[b.cycleMonth] ?? b.cycleMonth} {b.cycleYear}</td>
+                  <td className="px-5 py-2.5 font-semibold">
+                    {MONTHS[b.cycleMonth] ?? b.cycleMonth} {b.cycleYear}
+                    {b.sequence > 1 && <span className="ml-1 text-[10px] font-bold text-brand-indigo">· Run {b.sequence}</span>}
+                  </td>
                   <td className="px-5 py-2.5 text-right">{b._count.claims}</td>
                   <td className="px-5 py-2.5 text-right font-mono text-xs">{money(Number(b.totalAmount))}</td>
                   <td className="px-5 py-2.5 font-mono text-xs">{voucherByBatch.get(b.id) ?? "—"}</td>

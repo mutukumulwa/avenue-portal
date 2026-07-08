@@ -5800,6 +5800,10 @@ model ProviderSettlementBatch {
   providerId  String
   cycleMonth  Int
   cycleYear   Int
+  // BD-05: multiple settlement runs per provider+cycle. Run 1 is the normal
+  // monthly batch; later-approved claims for the same cycle settle in a
+  // supplementary run (sequence 2, 3, …). Existing rows default to 1.
+  sequence    Int              @default(1)
   status      SettlementStatus @default(PENDING)
   totalAmount Decimal          @default(0) @db.Decimal(19, 4)
   // OBS-2 Ticket 4: every batch settles in ONE transaction currency (mixed
@@ -5819,7 +5823,7 @@ model ProviderSettlementBatch {
   provider Provider @relation(fields: [providerId], references: [id])
   claims   Claim[]
 
-  @@unique([tenantId, providerId, cycleMonth, cycleYear])
+  @@unique([tenantId, providerId, cycleMonth, cycleYear, sequence])
   @@index([tenantId, status])
   @@index([tenantId, providerId])
 }

@@ -9,6 +9,7 @@ const db = vi.hoisted(() => {
   const state: any = {
     providerSettlementBatch: {
       findUnique: vi.fn(),
+      findMany: vi.fn(async (): Promise<any[]> => []),
       create: vi.fn(async (a: any) => ({ id: "batchNew", ...a.data })),
       update: vi.fn(async (a: any) => ({ id: a.where.id, ...a.data })),
     },
@@ -139,7 +140,9 @@ describe("markSettlementBatchPaid (PR-018 D1)", () => {
 
 describe("createSettlementBatch — currency guardrail (OBS-2 Ticket 4)", () => {
   beforeEach(() => {
-    db.providerSettlementBatch.findUnique.mockResolvedValue(null); // no existing batch
+    // BD-05: prior-run lookup is now a findMany (supplementary runs); empty = no
+    // batch yet for this provider+cycle.
+    db.providerSettlementBatch.findMany.mockResolvedValue([]);
   });
 
   it("single-currency scoop creates a batch stamped with that currency", async () => {

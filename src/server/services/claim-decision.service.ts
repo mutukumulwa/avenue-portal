@@ -65,12 +65,23 @@ export interface ClaimDecisionInput {
 }
 
 export interface CeilingAssessment {
-  /** null = no enforceable ceiling (reviewer judgement) */
+  /**
+   * The enforceable payable ceiling.
+   *   number → hard cap the approval is checked against.
+   *   null   → genuinely NO contract for this service/date; reviewer judgement
+   *            applies (unchanged legacy behaviour).
+   * BD-04: when an active contract exists but produced NO enforceable price
+   * (uncoded/unlisted lines that resolve to refer-for-review), this is a
+   * deterministic `0` with `unpriced: true` — NOT null. That closes the bypass
+   * where omitting a CPT flipped the claim to "no ceiling → default full billed".
+   */
   ceiling: number | null;
   source: string | null;
   deterministic: boolean;
   enginePayable: number | null;
   contractNumber: string | null;
+  /** True when there IS an active contract but nothing on the claim is priced. */
+  unpriced?: boolean;
 }
 
 const EPSILON = 0.01;
@@ -145,6 +156,23 @@ export class ClaimDecisionService {
           deterministic: true,
           enginePayable: null,
           contractNumber: contract?.contractNumber ?? null,
+        };
+      }
+
+      // BD-04: there IS an active contract but not one line resolved to an
+      // enforceable price (missing/altered codes, or unlisted → refer). Do NOT
+      // fall through to `null` (which the UI reads as "no contract → default
+      // full billed"). Return a deterministic 0 ceiling so any positive approval
+      // is blocked until the coding/pricing is corrected or a documented
+      // PAY_ABOVE_CONTRACT_RATE override is approved.
+      if (contract) {
+        return {
+          ceiling: 0,
+          source: `Contract ${contract.contractNumber} — no enforceable price (uncoded/unlisted line(s))`,
+          deterministic: true,
+          enginePayable: null,
+          contractNumber: contract.contractNumber,
+          unpriced: true,
         };
       }
     }
@@ -378,13 +406,26 @@ export class ClaimDecisionService {
       if (assessment.ceiling != null && approvedAmount > assessment.ceiling + EPSILON) {
         const overridden = await this.hasApprovedPriceOverride(tenantId, claimId);
         if (!overridden) {
+          // BD-04: unpriced active-contract claim — steer the operator to the
+          // real remedy (fix the coding, or a documented override), never a
+          // silent full-billed approval.
+          if (assessment.unpriced) {
+            throw new Error(
+              `Contract enforcement: this claim is under an active contract (${assessment.contractNumber ?? ""}) but no line resolved to a contracted price ` +
+              `— the service is uncoded or unlisted, so there is no enforceable rate. ` +
+              `Correct the CPT/service coding so the tariff can bind, adjust the line to a documented amount, or raise a PAY_ABOVE_CONTRACT_RATE override (requires senior approval). ` +
+              `Approving the full billed amount is not permitted.`,
+            );
+          }
           throw new Error(
             `Contract enforcement: approved amount (${claim.currency} ${approvedAmount.toLocaleString()}) exceeds the payable ceiling of ` +
             `${claim.currency} ${Math.round(assessment.ceiling).toLocaleString()} under ${assessment.source}. ` +
             `Reduce the amount, or raise a PAY_ABOVE_CONTRACT_RATE override from the decision panel (requires senior approval).`,
           );
         }
-        ceilingNote = `Approved above contract ceiling ${claim.currency} ${Math.round(assessment.ceiling).toLocaleString()} under an approved PAY_ABOVE_CONTRACT_RATE override.`;
+        ceilingNote = assessment.unpriced
+          ? `Approved on an unpriced active-contract claim under an approved PAY_ABOVE_CONTRACT_RATE override (${assessment.source}).`
+          : `Approved above contract ceiling ${claim.currency} ${Math.round(assessment.ceiling).toLocaleString()} under an approved PAY_ABOVE_CONTRACT_RATE override.`;
       } else if (assessment.ceiling != null) {
         const shortfall = Number(claim.billedAmount) - assessment.ceiling;
         if (shortfall > EPSILON) {

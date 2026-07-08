@@ -552,3 +552,62 @@ describe("PR-018 — GL posting + self-funded drawdown", () => {
     await expect(ClaimDecisionService.voidClaim(T, "clm1", { actorId: "u1", reason: "x" })).rejects.toThrow(/settlement/);
   });
 });
+
+// BD-04: an active contract with NO enforceable line (CPT-less / unlisted) must
+// yield a deterministic 0 ceiling flagged `unpriced` — NOT null (which the UI
+// reads as "no contract → default full billed"). This closes the bypass.
+describe("assessCeiling — unpriced active contract (BD-04)", () => {
+  it("returns ceiling 0 + unpriced when the contract exists but no line is priced", async () => {
+    engine.evaluateClaimById.mockResolvedValue(null); // no engine contract
+    claimsSvc.resolveClaimContractRates.mockResolvedValue({
+      contract: { contractNumber: "PC-2026-001" },
+      lines: [
+        { lineId: "l1", allowedUnit: null, unitCost: 80000, quantity: 1, maxQuantityPerVisit: null },
+      ],
+    });
+
+    const res = await ClaimDecisionService.assessCeiling(T, "clm1");
+    expect(res.ceiling).toBe(0);
+    expect(res.unpriced).toBe(true);
+    expect(res.contractNumber).toBe("PC-2026-001");
+  });
+
+  it("still returns null (reviewer judgement) when there is genuinely no contract", async () => {
+    engine.evaluateClaimById.mockResolvedValue(null);
+    claimsSvc.resolveClaimContractRates.mockResolvedValue({
+      contract: null,
+      lines: [
+        { lineId: "l1", allowedUnit: null, unitCost: 80000, quantity: 1, maxQuantityPerVisit: null },
+      ],
+    });
+
+    const res = await ClaimDecisionService.assessCeiling(T, "clm1");
+    expect(res.ceiling).toBeNull();
+    expect(res.unpriced).toBeFalsy();
+  });
+
+  it("blocks a full-billed approval on an unpriced active-contract claim", async () => {
+    memberWithConfig();
+    db.claim.findUnique.mockResolvedValue(
+      baseClaim({ currency: "UGX", benefitCategory: "OUTPATIENT", serviceType: "OUTPATIENT", billedAmount: 80000 }),
+    );
+    engine.evaluateClaimById.mockResolvedValue(null);
+    claimsSvc.resolveClaimContractRates.mockResolvedValue({
+      contract: { contractNumber: "PC-2026-001" },
+      lines: [
+        { lineId: "l1", allowedUnit: null, unitCost: 80000, quantity: 1, maxQuantityPerVisit: null, requiresPreauth: false, quantityExceeded: false, cptCode: null },
+      ],
+    });
+    db.overrideRecord.findFirst.mockResolvedValue(null); // no override
+
+    await expect(
+      ClaimDecisionService.decide(T, "clm1", {
+        action: "APPROVED",
+        approvedAmount: 80000,
+        reviewerId: "u1",
+        reviewerRole: "CLAIMS_OFFICER",
+      }),
+    ).rejects.toThrow(/no line resolved to a contracted price|uncoded or unlisted/i);
+    expect(db.claim.update).not.toHaveBeenCalled();
+  });
+});

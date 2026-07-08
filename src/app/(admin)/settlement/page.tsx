@@ -156,6 +156,11 @@ export default async function SettlementPage({
             <DollarSign size={14} /> Create Batch
           </button>
         </form>
+        <p className="text-xs text-brand-text-muted">
+          Scoops every unsettled approved claim for the provider up to the end of the cycle. If the cycle already has a
+          settled batch, this creates a supplementary run (Run 2, 3…) for claims approved since — provided no earlier
+          run for that cycle is still open.
+        </p>
       </div>
 
       {/* Status filter */}
@@ -202,6 +207,11 @@ export default async function SettlementPage({
                   </td>
                   <td className="px-5 py-3 text-brand-text-muted">
                     {new Date(batch.cycleYear, batch.cycleMonth - 1).toLocaleString("en-UG", { month: "short", year: "numeric" })}
+                    {batch.sequence > 1 && (
+                      <span className="ml-1.5 text-[10px] font-bold uppercase text-brand-indigo bg-brand-indigo/10 px-1.5 py-0.5 rounded">
+                        Run {batch.sequence}
+                      </span>
+                    )}
                   </td>
                   <td className="px-5 py-3 text-brand-text-muted">{batch.claimCount}</td>
                   <td className="px-5 py-3 font-semibold font-mono text-brand-text-heading">
