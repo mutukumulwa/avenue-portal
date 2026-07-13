@@ -398,11 +398,13 @@ export class ProviderContractsService {
             providerId: old.providerId,
             contractId: renewed.id,
             cptCode: t.cptCode,
+            providerServiceCode: t.providerServiceCode,
             serviceName: t.serviceName,
             agreedRate: Math.round(Number(t.agreedRate) * factor * 100) / 100,
             tariffType: t.tariffType,
             requiresPreauth: t.requiresPreauth,
             maxQuantityPerVisit: t.maxQuantityPerVisit,
+            serviceCategoryId: t.serviceCategoryId,
             effectiveFrom: opts.startDate,
           })),
         });

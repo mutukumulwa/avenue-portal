@@ -2,6 +2,7 @@
 
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
+import { ServiceCategoryService } from "@/server/services/service-category.service";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { EligibilityRule, TariffRateType, UnitOfMeasure, PricingRuleKind, ContractRuleScope } from "@prisma/client";
@@ -131,6 +132,11 @@ export async function addTariffLineAction(fd: FormData) {
     const rateMissing = s(fd, "rateMissing") === "on";
     const rate = n(fd, "agreedRate");
     if (!rateMissing && (rate == null || rate <= 0)) redirect(`/contracts/${c.id}?error=Enter+a+rate+or+mark+rate-missing`);
+    const serviceCategoryId = await ServiceCategoryService.resolveCategoryId(session.user.tenantId, {
+      cptCode: s(fd, "cptCode"),
+      providerServiceCode: s(fd, "providerServiceCode"),
+      serviceName: serviceName!,
+    });
     await prisma.providerTariff.create({
       data: {
         providerId: c.providerId,
@@ -145,6 +151,7 @@ export async function addTariffLineAction(fd: FormData) {
         requiresReferral: s(fd, "requiresReferral") === "on",
         maxQuantityPerVisit: n(fd, "maxQuantityPerVisit"),
         rateMissing,
+        serviceCategoryId,
         effectiveFrom: c.startDate,
       },
     });

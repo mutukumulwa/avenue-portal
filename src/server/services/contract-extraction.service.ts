@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { ProviderContractsService } from "./provider-contracts.service";
+import { ServiceCategoryService } from "./service-category.service";
 
 // ─── CONTRACT MARKDOWN EXTRACTION (spec §12, Phase 4) ────────────────────────
 // A deterministic, rule-based extractor over the OCR→markdown corpus. It is
@@ -267,6 +268,9 @@ export class ContractExtractionService {
     const selected = candidates.filter((_, i) => (keep ? keep.has(i) : true));
 
     const contractNumber = await ProviderContractsService.nextContractNumber(tenantId);
+    // Canonical-category assignment (WP-E2): resolve each kept candidate to a
+    // seeded category so the fee schedule tiers it instead of dumping in Other.
+    const categoryIdByCode = await ServiceCategoryService.tenantCategoryIdByCode(tenantId);
     const contract = await prisma.$transaction(async tx => {
       const c = await tx.providerContract.create({
         data: {
@@ -286,18 +290,22 @@ export class ContractExtractionService {
       });
       if (selected.length > 0) {
         await tx.providerTariff.createMany({
-          data: selected.map(cand => ({
-            providerId: input.providerId,
-            contractId: c.id,
-            serviceName: cand.description,
-            standardDescription: cand.description,
-            providerDescription: cand.sourceRef.rawText,
-            agreedRate: cand.amount ?? 0, // rateMissing rows carry 0 + rateMissing flag
-            currency: input.currency,
-            rateMissing: cand.rateMissing,
-            sourceRef: cand.sourceRef as never,
-            effectiveFrom: input.startDate,
-          })),
+          data: selected.map(cand => {
+            const catCode = ServiceCategoryService.categoryCodeForTariff({ serviceName: cand.description });
+            return {
+              providerId: input.providerId,
+              contractId: c.id,
+              serviceName: cand.description,
+              standardDescription: cand.description,
+              providerDescription: cand.sourceRef.rawText,
+              agreedRate: cand.amount ?? 0, // rateMissing rows carry 0 + rateMissing flag
+              currency: input.currency,
+              rateMissing: cand.rateMissing,
+              serviceCategoryId: catCode ? categoryIdByCode.get(catCode) ?? null : null,
+              sourceRef: cand.sourceRef as never,
+              effectiveFrom: input.startDate,
+            };
+          }),
         });
       }
       await tx.contractExtraction.update({ where: { id: extractionId }, data: { status: "COMMITTED", contractId: c.id } });

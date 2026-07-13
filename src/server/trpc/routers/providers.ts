@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { prisma } from "@/lib/prisma";
+import { ServiceCategoryService } from "@/server/services/service-category.service";
 
 export const providersRouter = createTRPCRouter({
   getAll: protectedProcedure.query(async ({ ctx }) => {
@@ -94,11 +95,16 @@ export const providersRouter = createTRPCRouter({
         effectiveTo: z.string().optional(),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const serviceCategoryId = await ServiceCategoryService.resolveCategoryId(ctx.tenantId, {
+        cptCode: input.cptCode,
+        serviceName: input.serviceName,
+      });
       return prisma.providerTariff.create({
         data: {
           ...input,
           agreedRate: input.agreedRate,
+          serviceCategoryId,
           effectiveFrom: new Date(input.effectiveFrom),
           effectiveTo: input.effectiveTo ? new Date(input.effectiveTo) : undefined,
         },
