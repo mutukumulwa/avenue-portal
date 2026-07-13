@@ -3,7 +3,6 @@ import { prisma } from '../src/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { GLService } from '../src/server/services/gl.service'
 import { AnalyticsRefreshService } from '../src/server/services/analytics-refresh.service'
-import { seedRbac } from './seeds/rbac'
 
 async function main() {
   console.log('🌱 Starting comprehensive seed...')
@@ -3953,22 +3952,20 @@ async function main() {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // RBAC — seed roles, permissions, and migrate existing assignments
+  // Per-tenant provisioning (default client, RBAC, chart of accounts, reason
+  // codes, override controls, service-category taxonomy). Single source of
+  // truth: TenantProvisioningService.provisionTenant — the same call the
+  // /settings/tenants onboarding UI runs, so no tenant launches un-provisioned
+  // (docs/TENANT_ONBOARDING_PLAN.md). Runs AFTER all seed users exist so the
+  // RBAC enum→assignment migration covers every one of them. The early
+  // default-client block and mid-seed seedChartOfAccounts stay: mid-seed demo
+  // data needs them, and re-running here is idempotent.
   // ═══════════════════════════════════════════════════════════
-  console.log('\n⚙️  Seeding RBAC...')
-  await seedRbac(prisma, tenantId)
-
-  // ═══════════════════════════════════════════════════════════
-  // Per-tenant reference data (reason codes, override controls, service-category
-  // taxonomy). Single source of truth: TenantProvisioningService.provisionTenant
-  // — the same call any tenant-onboarding path must run so no tenant launches
-  // without its taxonomy (else the fee schedule dumps every line into "Other").
-  // ═══════════════════════════════════════════════════════════
-  console.log('\n⚙️  Provisioning tenant reference data (reason codes, override controls, service categories)...')
+  console.log('\n⚙️  Provisioning tenant (default client, RBAC, chart of accounts, reference catalogs)...')
   {
     const { TenantProvisioningService } = await import('../src/server/services/tenant-provisioning.service')
-    const { reasonCodes, overrideControls, serviceCategories } = await TenantProvisioningService.provisionTenant(tenantId)
-    console.log(`✅ Reason codes: ${reasonCodes} · Override controls: ${overrideControls} · Service categories: ${serviceCategories}`)
+    const { reasonCodes, overrideControls, serviceCategories, roles, glAccounts } = await TenantProvisioningService.provisionTenant(tenantId)
+    console.log(`✅ Reason codes: ${reasonCodes} · Override controls: ${overrideControls} · Service categories: ${serviceCategories} · Roles: ${roles} · GL accounts: ${glAccounts}`)
   }
 
   console.log('\n🎉 Seed complete! All features populated.\n')

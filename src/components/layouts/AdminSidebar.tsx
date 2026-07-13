@@ -144,6 +144,8 @@ const SETUP_SUB: SubItem[] = [
   { label: "Terminology",            href: "/settings/terminology"       },
   // Oversight
   { label: "Audit Log",              href: "/settings/audit-log"         },
+  // Platform (slug-gated to the platform operator tenant — the page enforces)
+  { label: "Tenants",                href: "/settings/tenants"           },
 ];
 
 // ── Active-route resolution ──────────────────────────────────────────────────

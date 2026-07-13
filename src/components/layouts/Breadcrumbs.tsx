@@ -20,6 +20,7 @@ const SEGMENT_LABELS: Record<string, string> = {
   quotations:   "Quotations",
   reports:      "Reports",
   settings:     "Settings",
+  tenants:      "Tenants",
   exceptions:   "Exceptions",
   "new":        "New",
   // Analytics
