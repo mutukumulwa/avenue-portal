@@ -10,6 +10,9 @@ async function main() {
 
   // ═══════════════════════════════════════════════════════════
   // 1. TENANT
+  // Any path that creates a Tenant must also run
+  // TenantProvisioningService.provisionTenant(tenant.id) — see the provisioning
+  // step near the end of this seed. It is idempotent, so ordering is flexible.
   // ═══════════════════════════════════════════════════════════
   const tenant = await prisma.tenant.upsert({
     where:  { slug: 'medvex' },
@@ -3956,19 +3959,16 @@ async function main() {
   await seedRbac(prisma, tenantId)
 
   // ═══════════════════════════════════════════════════════════
-  // Reference data absorbed from scripts/seed-reason-codes.ts (PR-001 #3):
-  // reason codes, override controls, service categories — one seed step,
-  // no separate script to forget.
+  // Per-tenant reference data (reason codes, override controls, service-category
+  // taxonomy). Single source of truth: TenantProvisioningService.provisionTenant
+  // — the same call any tenant-onboarding path must run so no tenant launches
+  // without its taxonomy (else the fee schedule dumps every line into "Other").
   // ═══════════════════════════════════════════════════════════
-  console.log('\n⚙️  Seeding reason codes, override controls, service categories...')
+  console.log('\n⚙️  Provisioning tenant reference data (reason codes, override controls, service categories)...')
   {
-    const { ReasonCodeService } = await import('../src/server/services/reason-codes.service')
-    const { OverrideControlService } = await import('../src/server/services/override-control.service')
-    const { ServiceCategoryService } = await import('../src/server/services/service-category.service')
-    const rc = await ReasonCodeService.seedForTenant(tenantId)
-    const oc = await OverrideControlService.seedForTenant(tenantId)
-    const sc = await ServiceCategoryService.seedForTenant(tenantId)
-    console.log(`✅ Reason codes: ${rc} · Override controls: ${oc} · Service categories: ${sc}`)
+    const { TenantProvisioningService } = await import('../src/server/services/tenant-provisioning.service')
+    const { reasonCodes, overrideControls, serviceCategories } = await TenantProvisioningService.provisionTenant(tenantId)
+    console.log(`✅ Reason codes: ${reasonCodes} · Override controls: ${overrideControls} · Service categories: ${serviceCategories}`)
   }
 
   console.log('\n🎉 Seed complete! All features populated.\n')

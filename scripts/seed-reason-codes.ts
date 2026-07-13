@@ -1,15 +1,18 @@
+// Provision reference data for existing tenants (idempotent). Pass one or more
+// tenant ids to target them; with no args, provisions every tenant. Useful for
+// repairing tenants that predate a catalog.
+//   npx tsx --env-file=.env scripts/seed-reason-codes.ts [tenantId ...]
 import { prisma } from "@/lib/prisma";
-import { ReasonCodeService } from "@/server/services/reason-codes.service";
-import { OverrideControlService } from "@/server/services/override-control.service";
-import { ServiceCategoryService } from "@/server/services/service-category.service";
+import { TenantProvisioningService } from "@/server/services/tenant-provisioning.service";
 
 async function main() {
-  const tenants = await prisma.tenant.findMany({ select: { id: true, name: true } });
+  const argIds = process.argv.slice(2);
+  const tenants = argIds.length
+    ? await prisma.tenant.findMany({ where: { id: { in: argIds } }, select: { id: true, name: true } })
+    : await prisma.tenant.findMany({ select: { id: true, name: true } });
   for (const t of tenants) {
-    const n = await ReasonCodeService.seedForTenant(t.id);
-    const oc = await OverrideControlService.seedForTenant(t.id);
-    const sc = await ServiceCategoryService.seedForTenant(t.id);
-    console.log(`Seeded ${n} reason codes + ${oc} override controls + ${sc} service categories for tenant ${t.name} (${t.id})`);
+    const { reasonCodes, overrideControls, serviceCategories } = await TenantProvisioningService.provisionTenant(t.id);
+    console.log(`Provisioned tenant ${t.name} (${t.id}): ${reasonCodes} reason codes + ${overrideControls} override controls + ${serviceCategories} service categories`);
   }
 }
 
