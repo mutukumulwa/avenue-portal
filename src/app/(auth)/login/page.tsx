@@ -32,12 +32,23 @@ function LoginForm() {
     setLoading(true);
     const startedAt = performance.now();
 
-    const result = await signIn("credentials", {
-      email,
-      password,
-      totp,
-      redirect: false,
-    });
+    // OBS-K1: an upstream rate-limit can swallow the sign-in request entirely.
+    // Bound the wait and surface a human-readable message instead of hanging.
+    let result: Awaited<ReturnType<typeof signIn>> | undefined;
+    try {
+      result = await Promise.race([
+        signIn("credentials", { email, password, totp, redirect: false }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("SIGNIN_TIMEOUT")), 20_000),
+        ),
+      ]);
+    } catch {
+      setLoading(false);
+      setError(
+        "We couldn't reach the sign-in service. This can happen after several rapid attempts — wait a minute, then try again.",
+      );
+      return;
+    }
 
     setLoading(false);
     console.info(`[perf] login.signIn: ${(performance.now() - startedAt).toFixed(1)}ms`);
