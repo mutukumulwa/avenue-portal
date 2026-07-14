@@ -73,8 +73,14 @@ export class OfflinePackService {
     });
     if (!provider || provider.tenantId !== tenantId) throw new Error("Facility not found");
 
+    // FG-C1: the pack must contain only members this facility is entitled to
+    // (its contracted clients/groups) — NOT the whole tenant. Reuse the same
+    // entitlement fragment the B2B eligibility API uses (deny-by-default; also
+    // honours WP-A6 group-level applicability once applied).
+    const { ProviderEntitlementService } = await import("./provider-entitlement.service");
+    const entitledWhere = await ProviderEntitlementService.entitledMemberWhere(providerId);
     const members = await prisma.member.findMany({
-      where: { tenantId, status: "ACTIVE" },
+      where: { AND: [{ tenantId, status: "ACTIVE" }, entitledWhere] },
       select: {
         id: true, memberNumber: true, firstName: true, lastName: true, status: true,
         packageVersionId: true,
