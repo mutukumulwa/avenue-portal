@@ -51,6 +51,27 @@ export async function runClaimIntake(
   actorUserId: string,
   data: ClaimIntakeInput,
 ) {
+  // ── Line-amount positivity gate (BB2-DEF-01 defence in depth) ─────────────
+  // No intake rail may materialise a non-positive or inconsistent line amount,
+  // whatever the caller validated. This is the canonical intake path, so the
+  // guard lives here in addition to any rail-specific validation.
+  if (!data.lineItems || data.lineItems.length === 0) {
+    throw new Error("At least one service line is required.");
+  }
+  for (const l of data.lineItems) {
+    if (!Number.isInteger(l.quantity) || l.quantity < 1) {
+      throw new Error(`Line "${l.description}": quantity must be a whole number of at least 1.`);
+    }
+    if (!Number.isFinite(l.unitCost) || l.unitCost <= 0) {
+      throw new Error(`Line "${l.description}": unit cost must be greater than 0.`);
+    }
+    if (Math.abs(l.billedAmount - l.quantity * l.unitCost) > 0.01) {
+      throw new Error(
+        `Line "${l.description}": billed amount (${l.billedAmount}) does not equal quantity × unit cost.`,
+      );
+    }
+  }
+
   // ── Service-date gate (PR-013) ────────────────────────────────────────────
   assertServiceDateNotFuture(new Date(data.dateOfService));
 
