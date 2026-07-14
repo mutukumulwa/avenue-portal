@@ -54,11 +54,14 @@ export default async function ClaimDetailPage({
   // Build a lookup map: lineId → variance data
   const tariffMap = new Map(tariffVariances.map(v => [v.lineId, v]));
   const overbilledLines = tariffVariances.filter(v => v.variance !== null && v.variance > 0);
+  // OBS-B7: the preview must use the same arithmetic as the enforced ceiling
+  // (assessCeiling / BD-07): a line with no contracted rate contributes 0 —
+  // NOT its billed amount. Unpriced lines are surfaced separately.
+  const unpricedPreviewCount = tariffVariances.filter((v) => v.agreedRate === null).length;
   const contractedTotal = tariffVariances.reduce((sum, v) => {
-    const l = claim.claimLines.find(l => l.id === v.lineId);
-    if (!l) return sum;
-    const contracted = v.agreedRate !== null ? v.agreedRate * l.quantity : Number(l.unitCost) * l.quantity;
-    return sum + contracted;
+    if (v.agreedRate === null) return sum;
+    const l = claim.claimLines.find((l) => l.id === v.lineId);
+    return l ? sum + v.agreedRate * l.quantity : sum;
   }, 0);
 
   const canCapture    = ["RECEIVED", "INCURRED"].includes(claim.status);
@@ -276,9 +279,15 @@ export default async function ClaimDetailPage({
           <div className="text-sm text-[#856404]">
             <p className="font-bold">
               {overbilledLines.length} line{overbilledLines.length > 1 ? "s" : ""} billed above contracted rate.
-              {" "}Contracted total: <span className="font-mono">{claim.currency} {Math.round(contractedTotal).toLocaleString("en-UG")}</span>
+              {" "}Contracted total (priced lines only): <span className="font-mono">{claim.currency} {Math.round(contractedTotal).toLocaleString("en-UG")}</span>
               {" "}vs billed: <span className="font-mono">{claim.currency} {Number(claim.billedAmount).toLocaleString("en-UG")}</span>.
             </p>
+            {unpricedPreviewCount > 0 && (
+              <p className="mt-0.5 text-xs">
+                {unpricedPreviewCount} line{unpricedPreviewCount > 1 ? "s have" : " has"} no contracted
+                rate and {unpricedPreviewCount > 1 ? "are" : "is"} excluded from the enforceable ceiling (BD-07).
+              </p>
+            )}
             <p className="mt-0.5 text-xs">Consider approving the contracted total or raising an exception for overages.</p>
           </div>
         </div>
@@ -290,7 +299,7 @@ export default async function ClaimDetailPage({
           <h3 className="font-bold text-brand-text-heading font-heading">Service Line Items</h3>
           <div className="flex items-center gap-4 text-sm font-bold">
             {overbilledLines.length > 0 && (
-              <span className="text-[#856404]">Contracted: {claim.currency} {Math.round(contractedTotal).toLocaleString("en-UG")}</span>
+              <span className="text-[#856404]">Contracted (priced): {claim.currency} {Math.round(contractedTotal).toLocaleString("en-UG")}</span>
             )}
             <span className="text-brand-indigo">Billed: {claim.currency} {Number(claim.billedAmount).toLocaleString("en-UG")}</span>
           </div>
