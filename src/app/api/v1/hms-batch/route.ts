@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { withApiKey } from "@/lib/apiAuth";
+import { withApiKey, getApiCredential } from "@/lib/apiAuth";
 import { HmsBatchService } from "@/server/services/hms-batch.service";
 
 /**
@@ -16,12 +16,20 @@ async function postHmsBatch(req: Request) {
     const body = await req.json();
     HmsBatchService.validate(body);
 
-    // TODO(G8): map the API key → operator tenant. Single-operator scaffold
-    // resolves the sole tenant (mirrors /api/v1/sync).
-    const tenant = await prisma.tenant.findFirst({ select: { id: true } });
-    if (!tenant) return NextResponse.json({ error: "No operator tenant" }, { status: 500 });
+    // FG-C3: bind the batch to the authenticated key. A per-facility key can
+    // only file for its OWN facility (providerFromKey); the payload facilityCode
+    // cannot retarget another facility. An operator key still resolves the
+    // facility from the payload.
+    const credential = await getApiCredential(req);
+    const providerFromKey = credential?.kind === "provider" ? credential.providerId : null;
 
-    const report = await HmsBatchService.apply(tenant.id, body);
+    // OBS-D2/G8: prefer the key's tenant; fall back to the single-operator
+    // scaffold only for an unbound operator key.
+    const tenantId =
+      credential?.tenantId ?? (await prisma.tenant.findFirst({ select: { id: true } }))?.id;
+    if (!tenantId) return NextResponse.json({ error: "No operator tenant" }, { status: 500 });
+
+    const report = await HmsBatchService.apply(tenantId, body, providerFromKey ?? undefined);
     return NextResponse.json({ success: true, ...report });
   } catch (err) {
     return NextResponse.json(

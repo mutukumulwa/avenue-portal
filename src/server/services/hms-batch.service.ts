@@ -64,6 +64,12 @@ export class HmsBatchService {
       if (!e.description) throw new Error(`entries[${i}]: description is required`);
       if (!e.entryDate || Number.isNaN(Date.parse(e.entryDate))) throw new Error(`entries[${i}]: valid entryDate is required`);
       if (typeof e.unitAmount !== "number" || e.unitAmount < 0) throw new Error(`entries[${i}]: unitAmount must be a non-negative number`);
+      // FG-C4: quantity is optional (defaults to 1) but, when present, must be a
+      // positive whole number — reject 0, negative, and decimal at the envelope
+      // so it never poison-throws mid-apply (parity with the intake rails).
+      if (e.quantity !== undefined && (!Number.isInteger(e.quantity) || e.quantity < 1)) {
+        throw new Error(`entries[${i}]: quantity must be a positive whole number`);
+      }
       if (!e.caseNumber && !e.memberNumber) throw new Error(`entries[${i}]: caseNumber or memberNumber is required`);
     }
   }
@@ -72,25 +78,50 @@ export class HmsBatchService {
    * Apply a validated batch. Idempotent by (batchRef, line hash). Returns a
    * per-batch report; unmatched lines become ExceptionLog rows.
    */
-  static async apply(tenantId: string, batch: HmsBatch) {
-    const provider = await prisma.provider.findFirst({
+  static async apply(tenantId: string, batch: HmsBatch, providerFromKey?: string) {
+    let provider: { id: string; name: string; smartProviderId: string | null } | null;
+    if (providerFromKey) {
+      // FG-C3: a per-facility key files ONLY for its own facility. Resolve the
+      // provider from the KEY, not the payload; a facilityCode naming a different
+      // facility is rejected (never silently retargeted onto another facility's
+      // cases). An absent or self-referential facilityCode is fine.
+      provider = await prisma.provider.findFirst({
+        where: { id: providerFromKey, tenantId },
+        select: { id: true, name: true, smartProviderId: true },
+      });
+      if (!provider) throw new Error("API key does not resolve to a provider in this tenant");
+      if (
+        batch.facilityCode &&
+        batch.facilityCode !== provider.id &&
+        batch.facilityCode !== provider.name &&
+        batch.facilityCode !== provider.smartProviderId
+      ) {
+        throw new Error(
+          `facilityCode "${batch.facilityCode}" does not match this facility's API key — a facility can only submit its own batch.`,
+        );
+      }
+    } else {
+      // Operator key (spans the tenant): resolve the facility from the payload.
       // facilityCode = provider id, exact name, or the HMS/SMART provider code.
-      where: {
-        tenantId,
-        OR: [
-          { id: batch.facilityCode },
-          { name: batch.facilityCode },
-          { smartProviderId: batch.facilityCode },
-        ],
-      },
-      select: { id: true, name: true },
-    });
-    if (!provider) throw new Error(`Unknown facility "${batch.facilityCode}"`);
+      provider = await prisma.provider.findFirst({
+        where: {
+          tenantId,
+          OR: [
+            { id: batch.facilityCode },
+            { name: batch.facilityCode },
+            { smartProviderId: batch.facilityCode },
+          ],
+        },
+        select: { id: true, name: true, smartProviderId: true },
+      });
+      if (!provider) throw new Error(`Unknown facility "${batch.facilityCode}"`);
+    }
 
     const systemActorId = await getSystemActorId(tenantId);
     let applied = 0;
     let duplicates = 0;
     let unmatched = 0;
+    let rejected = 0;
 
     for (const entry of batch.entries) {
       const ref = `${batch.batchRef}#${lineHash(entry)}`;
@@ -146,22 +177,44 @@ export class HmsBatchService {
       }
 
       const category = CATEGORIES.has(entry.category ?? "") ? (entry.category as ClaimLineCategory) : "OTHER";
-      await CaseService.addServiceEntry({
-        tenantId,
-        caseId: targetCase.id,
-        entryDate: new Date(entry.entryDate),
-        category,
-        serviceCode: entry.serviceCode ?? null,
-        description: entry.description,
-        quantity: entry.quantity ?? 1,
-        unitAmount: entry.unitAmount,
-        source: "HMS_BATCH",
-        hmsBatchRef: ref,
-      });
-      applied++;
+      // FG-C4: a single line that fails re-validation at write time (e.g. the
+      // case closed between match and write) must be quarantined individually —
+      // never abort the whole batch (poison line). Safe lines already applied
+      // stay applied; the failing line lands in the Exception Register.
+      try {
+        await CaseService.addServiceEntry({
+          tenantId,
+          caseId: targetCase.id,
+          entryDate: new Date(entry.entryDate),
+          category,
+          serviceCode: entry.serviceCode ?? null,
+          description: entry.description,
+          quantity: entry.quantity ?? 1,
+          unitAmount: entry.unitAmount,
+          source: "HMS_BATCH",
+          hmsBatchRef: ref,
+        });
+        applied++;
+      } catch (e) {
+        rejected++;
+        await prisma.exceptionLog.create({
+          data: {
+            tenantId,
+            entityType: "CASE",
+            entityId: ref,
+            entityRef: entry.caseNumber ?? entry.memberNumber ?? "unknown",
+            exceptionCode: "OTHER",
+            reason: "HMS_BATCH_REJECTED",
+            notes:
+              `Batch ${batch.batchRef} @ ${provider.name}: "${entry.description}" matched a case but failed at write: ` +
+              `${e instanceof Error ? e.message : "unknown error"}. Correct the line and resync.`,
+            raisedById: systemActorId,
+          },
+        }).catch(() => undefined); // registry write must never mask the batch outcome
+      }
     }
 
-    return { batchRef: batch.batchRef, facility: provider.name, total: batch.entries.length, applied, duplicates, unmatched };
+    return { batchRef: batch.batchRef, facility: provider.name, total: batch.entries.length, applied, duplicates, unmatched, rejected };
   }
 
   /**
