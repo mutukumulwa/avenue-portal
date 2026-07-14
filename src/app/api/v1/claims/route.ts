@@ -1,27 +1,63 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withApiKey, getApiCredential, providerScopeWhere, operatorTenantWhere } from "@/lib/apiAuth";
-import { ClaimLineCategory } from "@prisma/client";
+import { ClaimLineCategory, ServiceType, Prisma } from "@prisma/client";
+import { z } from "zod";
 import { isFutureServiceDate, FUTURE_SERVICE_DATE_ERROR } from "@/lib/service-date";
+
+// BB2-DEF-01/02: strict intake validation. Invalid input must produce a 400
+// with a field-level message — never a 201 with bad money, never a raw 500.
+const LineItemSchema = z.object({
+  description:     z.string().trim().min(1, "description is required").max(300),
+  quantity:        z.number().int("quantity must be a whole number").min(1, "quantity must be at least 1").max(1000),
+  unitCost:        z.number().positive("unitCost must be greater than 0").finite().max(1_000_000_000),
+  cptCode:         z.string().trim().max(20).optional(),
+  serviceCategory: z.nativeEnum(ClaimLineCategory).optional(),
+});
+
+const DiagnosisSchema = z.union([
+  z.string().trim().min(1).max(20),
+  z.object({
+    code:        z.string().trim().min(1, "diagnosis code is required").max(20),
+    description: z.string().trim().max(300).optional(),
+    isPrimary:   z.boolean().optional(),
+  }),
+]);
+
+const PostClaimSchema = z.object({
+  memberNumber:     z.string().trim().min(1),
+  providerCode:     z.string().trim().min(1).optional(),
+  serviceType:      z.nativeEnum(ServiceType),
+  dateOfService:    z.string().refine((s) => !Number.isNaN(Date.parse(s)), "dateOfService must be a valid date"),
+  diagnoses:        z.array(DiagnosisSchema).min(1, "at least one diagnosis is required").max(20),
+  lineItems:        z.array(LineItemSchema).min(1, "at least one line item is required").max(100),
+  preauthReference: z.string().trim().max(60).optional(),
+  externalRef:      z.string().trim().min(1).max(100).optional(),   // BB2-DEF-03 idempotency key
+});
 
 /**
  * POST /api/v1/claims
  *
  * Submits a claim from a provider facility system (SMART / Slade360).
- * Body: { memberNumber, providerCode, serviceType, dateOfService, diagnoses, lineItems, preauthReference? }
+ * Body: { memberNumber, providerCode, serviceType, dateOfService, diagnoses, lineItems, preauthReference?, externalRef? }
  */
 async function postClaim(req: Request) {
   try {
-    const body = await req.json();
-    const {
-      memberNumber,
-      providerCode,
-      serviceType,
-      dateOfService,
-      diagnoses,
-      lineItems,
-      preauthReference,
-    } = body;
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+
+    const parsed = PostClaimSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
+        { status: 400 }
+      );
+    }
+    const { memberNumber, providerCode, serviceType, dateOfService, preauthReference } = parsed.data;
 
     // A per-facility key attributes the claim to its own provider (providerCode
     // is then optional and cannot be spoofed to another facility). The operator
@@ -29,11 +65,8 @@ async function postClaim(req: Request) {
     const credential = await getApiCredential(req);
     const providerFromKey = credential?.kind === "provider" ? credential.providerId : null;
 
-    if (!memberNumber || (!providerCode && !providerFromKey) || !serviceType || !dateOfService || !diagnoses || !lineItems) {
-      return NextResponse.json(
-        { error: "Missing required fields: memberNumber, providerCode, serviceType, dateOfService, diagnoses, lineItems" },
-        { status: 400 }
-      );
+    if (!providerCode && !providerFromKey) {
+      return NextResponse.json({ error: "providerCode is required when using an operator key" }, { status: 400 });
     }
 
     // PR-013: no intake channel accepts a future date of service.
@@ -81,6 +114,69 @@ async function postClaim(req: Request) {
       return NextResponse.json({ error: `Provider contract is ${provider.contractStatus}` }, { status: 403 });
     }
 
+    // OBS-A3: normalise diagnoses to the canonical stored shape
+    // { code, description, isPrimary } so the claim page renders them.
+    const normalizedDiagnoses = parsed.data.diagnoses.map((d, i) =>
+      typeof d === "string"
+        ? { code: d, description: d, isPrimary: i === 0 }
+        : { code: d.code, description: d.description ?? d.code, isPrimary: d.isPrimary ?? i === 0 }
+    );
+
+    // BB2-DEF-03: idempotent replay — an externalRef (body field or
+    // Idempotency-Key header) matching a prior claim from this facility
+    // returns the original claim instead of creating a second one.
+    const idemKey = parsed.data.externalRef ?? req.headers.get("idempotency-key")?.trim() ?? null;
+    if (idemKey) {
+      const existing = await prisma.claim.findFirst({
+        where: { tenantId: member.tenantId, providerId: provider.id, externalRef: idemKey },
+        select: { claimNumber: true, status: true, billedAmount: true },
+      });
+      if (existing) {
+        return NextResponse.json(
+          {
+            success:     true,
+            duplicate:   true,
+            claimNumber: existing.claimNumber,
+            status:      existing.status,
+            billedAmount: Number(existing.billedAmount),
+            message:     "Duplicate submission — original claim returned (idempotent replay).",
+          },
+          { status: 200 }
+        );
+      }
+    }
+
+    // Sum line items (validated: every quantity ≥ 1, every unitCost > 0).
+    const totalBilled = parsed.data.lineItems.reduce((s, l) => s + l.quantity * l.unitCost, 0);
+
+    // BB2-DEF-03 fallback: without an idempotency key, block an identical claim
+    // (same facility/member/service-date/total) captured in the last 2 minutes —
+    // the same window the provider portal enforces (BD-02).
+    const recentDuplicate = await prisma.claim.findFirst({
+      where: {
+        tenantId:      member.tenantId,
+        providerId:    provider.id,
+        memberId:      member.id,
+        dateOfService: new Date(dateOfService),
+        billedAmount:  totalBilled,
+        createdAt:     { gte: new Date(Date.now() - 2 * 60 * 1000) },
+      },
+      select: { claimNumber: true },
+      orderBy: { createdAt: "desc" },
+    });
+    if (recentDuplicate) {
+      return NextResponse.json(
+        {
+          error:
+            `Duplicate submission: an identical claim (${recentDuplicate.claimNumber}) for this member, ` +
+            `service date and amount was received in the last 2 minutes. If this is a genuine distinct ` +
+            `encounter, adjust a line or retry after 2 minutes. To make retries safe, send an Idempotency-Key header.`,
+          claimNumber: recentDuplicate.claimNumber,
+        },
+        { status: 409 }
+      );
+    }
+
     // Resolve optional pre-auth linkage
     let preauthId: string | undefined;
     if (preauthReference) {
@@ -96,51 +192,71 @@ async function postClaim(req: Request) {
     const count = await prisma.claim.count({ where: { tenantId: member.tenantId } });
     const claimNumber = `CLM-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
 
-    // Sum line items
-    const totalBilled = (lineItems as { quantity: number; unitCost: number }[]).reduce(
-      (sum, l) => sum + l.quantity * l.unitCost,
-      0
-    );
-
     // PR-017 D2: stamp the claim currency at intake.
     const { ClaimsService } = await import("@/server/services/claims.service");
     const currency = await ClaimsService.resolveClaimCurrency(member.tenantId, provider.id, member.id);
 
-    const claim = await prisma.claim.create({
-      data: {
-        tenantId:      member.tenantId,
-        claimNumber,
-        currency,
-        memberId:      member.id,
-        providerId:    provider.id,
-        // Attach the resolved PA (WP-C1): FK lives on PreAuthorization.claimId.
-        preauths:      preauthId ? { connect: [{ id: preauthId }] } : undefined,
-        source:        "SMART",
-        serviceType,
-        dateOfService: new Date(dateOfService),
-        diagnoses,
-        procedures:    [],
-        billedAmount:  totalBilled,
-        approvedAmount: 0,
-        copayAmount:   0,
-        status:        "RECEIVED",
-        benefitCategory: "OUTPATIENT", // default; adjudicator may override
-        claimLines: {
-          create: (lineItems as { description: string; quantity: number; unitCost: number; cptCode?: string; serviceCategory?: string }[]).map(
-            (l, idx) => ({
-              lineNumber:      idx + 1,
-              description:     l.description,
-              quantity:        l.quantity,
-              unitCost:        l.unitCost,
-              billedAmount:    l.quantity * l.unitCost,
-              approvedAmount:  0,
-              serviceCategory: (l.serviceCategory as ClaimLineCategory) ?? ClaimLineCategory.OTHER,
-              cptCode:         l.cptCode ?? null,
-            })
-          ),
-        },
+    const claimData = {
+      tenantId:      member.tenantId,
+      claimNumber,
+      currency,
+      externalRef:   idemKey,
+      memberId:      member.id,
+      providerId:    provider.id,
+      // Attach the resolved PA (WP-C1): FK lives on PreAuthorization.claimId.
+      preauths:      preauthId ? { connect: [{ id: preauthId }] } : undefined,
+      source:        "SMART" as const,
+      serviceType,
+      dateOfService: new Date(dateOfService),
+      diagnoses:     normalizedDiagnoses,
+      procedures:    [],
+      billedAmount:  totalBilled,
+      approvedAmount: 0,
+      copayAmount:   0,
+      status:        "RECEIVED" as const,
+      benefitCategory: "OUTPATIENT" as const, // default; adjudicator may override
+      claimLines: {
+        create: parsed.data.lineItems.map((l, idx) => ({
+          lineNumber:      idx + 1,
+          description:     l.description,
+          quantity:        l.quantity,
+          unitCost:        l.unitCost,
+          billedAmount:    l.quantity * l.unitCost,
+          approvedAmount:  0,
+          serviceCategory: l.serviceCategory ?? ClaimLineCategory.OTHER,
+          cptCode:         l.cptCode ?? null,
+          icdCode:         normalizedDiagnoses[0].code,
+        })),
       },
-    });
+    };
+
+    let claim;
+    try {
+      claim = await prisma.claim.create({ data: claimData });
+    } catch (e) {
+      // BB2-DEF-03: a concurrent retry raced past the pre-check and hit the
+      // unique index — resolve it as an idempotent replay, not an error.
+      if (idemKey && e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+        const existing = await prisma.claim.findFirst({
+          where: { tenantId: member.tenantId, providerId: provider.id, externalRef: idemKey },
+          select: { claimNumber: true, status: true, billedAmount: true },
+        });
+        if (existing) {
+          return NextResponse.json(
+            {
+              success:     true,
+              duplicate:   true,
+              claimNumber: existing.claimNumber,
+              status:      existing.status,
+              billedAmount: Number(existing.billedAmount),
+              message:     "Duplicate submission — original claim returned (idempotent replay).",
+            },
+            { status: 200 }
+          );
+        }
+      }
+      throw e;
+    }
 
     // Stamp attachment state on the connected PA (WP-C2).
     if (preauthId) {

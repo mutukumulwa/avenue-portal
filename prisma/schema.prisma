@@ -2301,7 +2301,7 @@ model Claim {
   // Integration references
   smartClaimRef    String? // SMART claim reference
   slade360ClaimRef String? // Slade360 eClaim reference
-  externalRef      String? // Any external reference
+  externalRef      String? // Any external reference / BB2-DEF-03 B2B idempotency key (unique per tenant+provider)
 
   hasException     Boolean           @default(false)
   claimLines       ClaimLine[]
@@ -2321,6 +2321,10 @@ model Claim {
   @@unique([tenantId, claimNumber])
   // Provider-scoped invoice uniqueness — prevents same provider submitting same invoice twice
   @@unique([providerId, invoiceNumber])
+  // BB2-DEF-03: idempotent B2B retries — a facility replaying the same externalRef
+  // returns the original claim (NULLs are distinct in Postgres, so untagged claims
+  // are unaffected).
+  @@unique([tenantId, providerId, externalRef])
   // Double-capture detection index — (provider, member, date, category) lookups at adjudication
   @@index([tenantId, providerId, memberId, dateOfService, benefitCategory])
   @@index([tenantId])
