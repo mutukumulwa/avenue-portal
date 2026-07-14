@@ -18,6 +18,7 @@ import { auditChainService } from "./audit-chain.service";
 import { ProviderContractsService } from "./provider-contracts.service";
 import { MemberNotificationService } from "./member-notification.service";
 import { isFutureServiceDate, FUTURE_SERVICE_DATE_ERROR } from "@/lib/service-date";
+import { TenantSettingsService } from "./tenant-settings.service";
 
 // Contracted-rate variance threshold that triggers a fraud signal (%)
 const VARIANCE_FRAUD_THRESHOLD_PCT = 0.20; // 20%
@@ -417,15 +418,46 @@ export const claimAdjudicationService = {
       });
     }
 
+    // OBS-H1: fraud quarantine — when the tenant requires fraud clearance, a
+    // claim carrying an unresolved fraud alert at/above the configured threshold
+    // must not be scooped into a settlement batch until it is cleared in the
+    // Fraud console. Cleared claims roll into the next run automatically.
+    const controls = await TenantSettingsService.getClaimControls(tenantId);
+    let quarantinedIds: string[] = [];
+    let scoop = claims;
+    if (controls.requireFraudClearanceBeforeApproval) {
+      const alerts = await prisma.claimFraudAlert.findMany({
+        where: { tenantId, claimId: { in: claims.map((c) => c.id) }, resolved: false },
+        select: { claimId: true, severity: true },
+      });
+      const blocked = new Set(
+        alerts
+          .filter((a) => TenantSettingsService.severityAtLeast(a.severity, controls.fraudApprovalSeverityThreshold))
+          .map((a) => a.claimId),
+      );
+      quarantinedIds = claims.filter((c) => blocked.has(c.id)).map((c) => c.id);
+      scoop = claims.filter((c) => !blocked.has(c.id));
+    }
+
+    if (scoop.length === 0) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message:
+          `All ${quarantinedIds.length} otherwise-eligible claim(s) carry unresolved fraud alert(s) at/above ` +
+          `${controls.fraudApprovalSeverityThreshold} severity and are quarantined from settlement. ` +
+          `Clear them in the Fraud console, then create the run again.`,
+      });
+    }
+
     // OBS-2 Ticket 4: a settlement batch settles ONE transaction currency. Raw
     // summing across UGX + KES would produce a meaningless total and under- or
     // over-pay the provider, so a mixed-currency scoop is blocked here (Phase 1:
     // maker creates one batch per currency). Full multi-currency settlement
     // accounting is deferred to a finance-approved Phase 2.
-    const currencies = Array.from(new Set(claims.map((c) => c.currency || "UGX")));
+    const currencies = Array.from(new Set(scoop.map((c) => c.currency || "UGX")));
     if (currencies.length > 1) {
       const breakdown = currencies
-        .map((cur) => `${cur} (${claims.filter((c) => (c.currency || "UGX") === cur).length})`)
+        .map((cur) => `${cur} (${scoop.filter((c) => (c.currency || "UGX") === cur).length})`)
         .join(", ");
       throw new TRPCError({
         code: "BAD_REQUEST",
@@ -437,7 +469,7 @@ export const claimAdjudicationService = {
     }
     const batchCurrency = currencies[0] ?? "UGX";
 
-    const totalAmount = claims.reduce((s, c) => s + Number(c.approvedAmount), 0);
+    const totalAmount = scoop.reduce((s, c) => s + Number(c.approvedAmount), 0);
 
     const batch = await prisma.$transaction(async (tx) => {
       const newBatch = await tx.providerSettlementBatch.create({
@@ -447,13 +479,13 @@ export const claimAdjudicationService = {
           status:      "MAKER_SUBMITTED",
           totalAmount,
           currency:    batchCurrency,
-          claimCount:  claims.length,
+          claimCount:  scoop.length,
           makerId,
         },
       });
 
       await tx.claim.updateMany({
-        where: { id: { in: claims.map((c) => c.id) } },
+        where: { id: { in: scoop.map((c) => c.id) } },
         data:  { settlementBatchId: newBatch.id },
       });
 
@@ -466,9 +498,9 @@ export const claimAdjudicationService = {
       module:     "BILLING",
       entityType: "ProviderSettlementBatch",
       entityId:   batch.id,
-      payload:    { totalAmount, claimCount: claims.length, providerId, cycleMonth, cycleYear, sequence: nextSequence },
+      payload:    { totalAmount, claimCount: scoop.length, providerId, cycleMonth, cycleYear, sequence: nextSequence, quarantinedClaimIds: quarantinedIds },
       tenantId,
-      description: `Settlement batch created for ${cycleMonth}/${cycleYear}${nextSequence > 1 ? ` (Run ${nextSequence})` : ""} — ${batchCurrency} ${totalAmount.toLocaleString("en-UG")} across ${claims.length} claim(s)`,
+      description: `Settlement batch created for ${cycleMonth}/${cycleYear}${nextSequence > 1 ? ` (Run ${nextSequence})` : ""} — ${batchCurrency} ${totalAmount.toLocaleString("en-UG")} across ${scoop.length} claim(s)${quarantinedIds.length > 0 ? ` (${quarantinedIds.length} fraud-quarantined)` : ""}`,
     });
 
     return batch;
@@ -529,6 +561,31 @@ export const claimAdjudicationService = {
       where: { settlementBatchId: batchId },
       select: { id: true, approvedAmount: true, approvedBaseAmount: true, currency: true },
     });
+
+    // OBS-H1 defence in depth: a claim flagged AFTER batch creation must still
+    // block the money moment. Clearing the alert in the Fraud console unblocks
+    // Mark Paid.
+    const controls = await TenantSettingsService.getClaimControls(tenantId);
+    if (controls.requireFraudClearanceBeforeApproval && claims.length > 0) {
+      const alerts = await prisma.claimFraudAlert.findMany({
+        where: { tenantId, claimId: { in: claims.map((c) => c.id) }, resolved: false },
+        select: { claimId: true, severity: true },
+      });
+      const blocked = new Set(
+        alerts
+          .filter((a) => TenantSettingsService.severityAtLeast(a.severity, controls.fraudApprovalSeverityThreshold))
+          .map((a) => a.claimId),
+      );
+      if (blocked.size > 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            `Fraud control: ${blocked.size} claim(s) in this batch carry unresolved fraud alert(s) at/above ` +
+            `${controls.fraudApprovalSeverityThreshold} severity. Clear the alert(s) in the Fraud console, ` +
+            `then Mark Paid again.`,
+        });
+      }
+    }
 
     // OBS-2 Ticket 4: defence in depth — a batch must be single-currency (the
     // creation gate enforces this, but legacy batches predate it). Never sum

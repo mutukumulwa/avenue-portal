@@ -27,6 +27,10 @@ const db = vi.hoisted(() => {
     },
     journalEntry: { count: vi.fn(async () => 0), create: vi.fn(async (a: any) => ({ id: "je1", ...a.data })) },
     auditLog: { findFirst: vi.fn(async () => null), create: vi.fn(async () => ({})) },
+    // OBS-H1: settlement now reads the fraud-gate setting (config null → gate off,
+    // behaviour unchanged) and checks for unresolved fraud alerts.
+    tenant: { findUnique: vi.fn(async () => ({ config: null })) },
+    claimFraudAlert: { findMany: vi.fn(async (): Promise<any[]> => []) },
     // PR-V02: settle now writes set-based (updateMany + one raw UPDATE) instead
     // of a per-claim loop, so the transaction cannot time out on large batches.
     $executeRaw: vi.fn(async () => 2),

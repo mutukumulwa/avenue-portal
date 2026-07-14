@@ -17,6 +17,10 @@ const db = vi.hoisted(() => {
       updateMany: vi.fn(async () => ({ count: 1 })),
     },
     auditLog: { findFirst: vi.fn(async () => null), create: vi.fn(async () => ({})) },
+    // OBS-H1: createSettlementBatch now reads the fraud-gate setting (config null
+    // → gate off, behaviour unchanged) and checks for unresolved fraud alerts.
+    tenant: { findUnique: vi.fn(async () => ({ config: null })) },
+    claimFraudAlert: { findMany: vi.fn(async (): Promise<any[]> => []) },
     $transaction: vi.fn(async (fn: any) => fn(state)),
   };
   return state;
