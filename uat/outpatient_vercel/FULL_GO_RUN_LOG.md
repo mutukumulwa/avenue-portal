@@ -15,7 +15,27 @@
 > cross-facility case write (payload facilityCode picks provider; key never checked); cross-rail parity gap
 > vs claims rail; live on HMS launch. **FG-C4 (Medium)** — no per-line quarantine (poison line 400s whole
 > batch) + quantity-validation gap. Conservation/idempotency/attribution-matching PASS. HMS rail dormant on
-> prod (1 case/0 open, 0 HMS entries, 0 configs, 0 keys). **FG-C3+FG-C4 FIXED (WP-A9, 9da68a0).**
+> prod (1 case/0 open, 0 HMS entries, 0 configs, 0 keys). **FG-C3+FG-C4 FIXED (WP-A9).**
+> **DEPLOYED all 9 WPs to prod 2026-07-14** (build 2ba6f76 READY; WP-A2 unique index applied out-of-band
+> via Supabase then re-triggered). **D-gate: D-1 PASS (rails 401), D-14 PASS (FG-C1 offline pack = 247 not
+> 2,997, NWSC excluded — live on prod).** Remaining D probes (D-4/5/6/12/15 API-key, D-8 fraud toggle, D-11
+> N3 apply) BLOCKED on Workstream B (Arthur: Vercel env API_KEY, fraud gate, N3 sign-off).
+> **C5 settlement-concurrency ASSESSED → FG-C7 (HIGH, money spine, latent):** Mark Paid not atomic
+> (check-then-act outside tx; no voucher uniqueness; no GL sourceId dedupe) → concurrent/retried Mark Paid
+> double-pays (2 vouchers + 2 JEs, provider paid twice). Batch creation (I1) SAFE via unique constraint.
+> No prod occurrence yet. Clean code-only fix = atomic status-claim updateMany as first tx write.
+> **FG-C7 FIXED (WP-A10, 6cb44ba, branch — NOT deployed).** **C6 F/G ASSESSED → SYSTEMIC finding SYS-1:**
+> check-then-act state transitions across all approval surfaces → FG-C8 (PA decision → phantom hold, Med),
+> FG-C9 (case double-file → two claims/potential double-pay, Med). Same root cause as FG-C6/FG-C7. All fix
+> with the WP-A10 atomic status-claim pattern. Family F check-in NOT examined (residual).
+> **C7 → FG-C10 (Med, worker-only hold expiry); worker infra sound. C8 spot-check → SYS-1 also in
+> binding/amendment; member-payment guarded. C9 scale NOT run (residual).**
+> **DISCOVERY PASS C5–C8 DONE.** Open: FG-C5/C6/C8/C9/C10 (Med) + SYS-1 sweep; FG-C7 fixed (WP-A10, undeployed).
+> Residuals: Family F check-in, worker-pause war-game (N4-7), full Family R, C9 scale.
+> **BATCH FIXED (branch, undeployed):** WP-A11 (`3114df9`) SYS-1 sweep = FG-C6/C8/C9 atomic status-claim;
+> WP-A12 (`a7c4a42`) = FG-C5 enrollment gate (under-block half). FG-C10 + FG-C5 over-block DEFERRED. 670 green.
+> Branch = WP-A1-A9 deployed + WP-A10/A11/A12 undeployed. **NEXT: deploy the branch to prod (push to main,
+> no schema change this time) → re-verify FG-C7/C6/C8/C9/C5 + run remaining D-gate; then FG-C10 + residuals.**
 > **C4 membership ASSESSED** (code+DB): **FG-C5 (Medium)** — claim eligibility is current-status, not
 > point-in-time as-of-service-date (no enrollmentDate≤serviceDate gate; 171 prod claims predate enrollment;
 > terminated status over-blocks historical claims — J9 spine). **FG-C6 (Medium)** — endorsement approval is a
@@ -277,6 +297,53 @@ quarantine + quantity-validation gap) and two Low observations. The conservation
 *matching* logic (D1/D2-02..06) is sound. Recommend a WP for FG-C3 + FG-C4 (mirror the claims-rail
 providerFromKey fix + per-line quarantine) before issuing any facility HMS keys.
 
+## DEPLOY + D-GATE (fix build) — 2026-07-14
+
+**Deployed all 9 code WPs (A1–A9) to prod.** Pushed `fix/full-go-workstream-a` → main (`17215fb`). First
+prod build **failed** at `prisma db push` (refuses the WP-A2 unique index without `--accept-data-loss`;
+`db-sync.mjs` omits it by policy — same as historical BD-05). Applied `Claim_tenantId_providerId_externalRef_key`
+to prod Supabase via `apply_migration` (0 conflicts verified), re-triggered with empty commit `2ba6f76` →
+**build `dpl_6nDKmF3xHcznuQZW1WGDgQCG53iW` READY**, live on avenue-portal.vercel.app.
+
+### D-gate results (runnable-now probes)
+- **D-1 (BD-06 fail-closed) — ✅ PASS.** All three API rails on the new build 401 with no key / bogus key /
+  both header forms: `POST /api/v1/claims` → 401×3, `/api/v1/hms-batch` → 401×2, `/api/v1/sync` → 401.
+- **D-14 (FG-C1 offline pack scope, WP-A8) — ✅ PASS (marquee live proof).** As admin, issued offline code
+  OWA-9YWCZ4 for **Aga Khan** (client-level entitled to the Default Client) and unlocked the pack →
+  **"Pack: 247 members · 544 tariffs"** (DB `OfflineDataPack.memberCount = 247`). Pre-fix this was the whole
+  tenant (~2,997 incl. all 2,750 NWSC); now it is the Default Client's entitled members only (≈249; 2 fewer
+  for inactive/package-filtered), **NWSC excluded**. FG-C1 is fixed in the running prod build. Test code revoked.
+
+### B1 done + operator-key D-probes (2026-07-14) — ✅
+Arthur set `API_KEY` + `OPERATOR_TENANT_ID` in Vercel Production and redeployed (`dpl_317ubCBaYfZaufTQcvdsT1vJvCX5`).
+Verified live with the operator key (since rotated):
+- **D-12 / B1 — ✅ PASS.** Operator key `GET /api/v1/claims?claimNumber=CLM-2026-00297` → **200** with the
+  claim body (Mark Kato, Aga Khan, approved 3,500). Channel live + reads Medvex; retired `av-slade360-dev-key`
+  and bogus keys still **401**.
+- **D-4 (BB2-DEF-01) — ✅ PASS.** `unitCost:-5000` → **400** `{"lineItems":["unitCost must be greater than 0"]}`, no claim written.
+- **D-5 (BB2-DEF-02) — ✅ PASS.** malformed `diagnoses:[{notCode}]` → **400** validation (not 500).
+- Valid input, unresolvable providerCode → **404 "Provider not found"** (confirms validation passes clean
+  input; the block is provider resolution).
+- **D-6 (BB2-DEF-03 idempotency) — DEFERRED (needs a facility key).** The operator POST resolves the provider
+  ONLY by `slade360ProviderId`, and **0/195 prod providers have one** → the operator key cannot create a
+  claim, so the 201→replay path can't be exercised on this rail. Unit-tested (5 tests) + the unique index
+  `Claim_tenantId_providerId_externalRef_key` is live in prod. Test via a per-facility key with D-15.
+
+**OBS-B1: operator WRITE channel inert on prod** — no provider has `slade360ProviderId`, and the operator
+claims POST matches providers only by that field, so operator-key claim *creation* always 404s. Reads work.
+Not a defect in the WP fixes; the intended write path is per-facility keys. Populate `slade360ProviderId`
+(or rely on facility keys) before using the operator write channel.
+
+### D-gate probes still BLOCKED
+- **D-6 + D-15 (FG-C3/FG-C4 HMS batch)** — need a **per-facility ProviderApiKey** (resolves provider from the
+  key). Issue one via `/settings` (or provider portal), then test idempotency + HMS cross-facility rejection.
+- **D-8 (OBS-H1 settlement-side fraud gate)** — needs the fraud gate turned ON for the tenant (**B3**,
+  `/settings/claim-controls`). Not flipped (changes live adjudication behaviour — Arthur's call).
+- **D-11 (N3 group-scoping)** — needs the WP-A6 apply script run after business sign-off (**B5**).
+- **D-2/D-3/D-7/D-9/D-13** (ceiling, login/supplementary run, ceiling preview, throttle, money spine) — UI
+  re-confirms of already-verified BB2 controls; runnable but deferred (lower marginal value; my changes to
+  those surfaces are display-only or default-off).
+
 ## C4 — Family J: Membership, Endorsement & Effective-Date Hardening
 
 **Method:** endorsement/eligibility code path + prod DB state. Prod: 6 endorsements (2 APPLIED), 0 terminated
@@ -333,6 +400,154 @@ evidenced by 171 pre-enrollment claims) and **FG-C6** (endorsement approval doub
 SoD and no-silent-apply controls hold. Neither is a live Critical/High, but both are real hardening gaps;
 candidates for a WP (point-in-time eligibility is the more significant, and would also require a data-model
 addition for termination-effective dates).
+
+## C5 — Family I/O: Settlement Under Uncertainty & Concurrent Finance
+
+**Method:** settlement concurrency by code path + prod DB. This is the money spine — the verdict's spine
+question "can money leave only with required approvals / exactly once?".
+
+### [FG-C7] Mark Paid is not atomic → concurrent/retried Mark Paid double-pays — 🔴 High (money spine; latent)
+- **Code:** `markSettlementBatchPaid` (`claim-adjudication.service.ts:550`) guards status with a **check-then-act
+  OUTSIDE the transaction**: `if (batch.status !== "CHECKER_APPROVED") throw` (read at line ~556), then a
+  `$transaction` creates the voucher + JE and, as its LAST step, `providerSettlementBatch.update({ where:{id} })`
+  → **status SETTLED with NO status guard in the where**. Inside the transaction: `GLService.postSettlementBatchPaid`
+  → `postEntry` **unconditionally** `journalEntry.create` (no `sourceId` idempotency, gl.service.ts:76), and
+  `PaymentVoucher` has **no unique constraint** on `settlementBatchId` or `voucherNumber` (only `@@index`).
+- **Race (I4 / O2):** two Mark Paid calls on the same CHECKER_APPROVED batch — two finance sessions, or a
+  single uncertain-network **retry** (the exact I4 script: "interrupt the response, retry once") — both read
+  CHECKER_APPROVED, both enter their transaction, and **each creates a PaymentVoucher + a balanced JE
+  (Dr 2010 Claims Payable / Cr 1010 Bank)**. Nothing blocks the second: no voucher uniqueness, no GL
+  `sourceId` dedupe, the batch update is unconditional. Result: **two vouchers + doubled bank credit for one
+  batch → the provider is paid twice** and Claims Payable is over-cleared. GL trial balance still nets to zero
+  (each JE is balanced), so a balance check won't catch it — only a per-batch voucher/JE count would.
+- **Severity High (Critical-adjacent):** on the money spine, no guard, realistic triggers (retry after an
+  uncertain response; two checkers). Requires a concurrency window (not deterministic) and **no prod
+  occurrence yet** (0 batches with >1 voucher), so latent — but it breaks "money leaves exactly once".
+- **Fix (code-only):** make the status transition the atomic gate — as the FIRST write inside the transaction:
+  `const claimed = await tx.providerSettlementBatch.updateMany({ where:{ id, tenantId, status:"CHECKER_APPROVED" }, data:{ status:"SETTLED", settledAt, ... } }); if (claimed.count !== 1) throw "batch no longer awaiting payment";`
+  then create the voucher/JE. The loser's `updateMany` matches 0 rows (row-locked behind the winner) → throws →
+  rolls back before any voucher/JE. Optional defence-in-depth (schema): unique `PaymentVoucher.settlementBatchId`
+  and unique GL `(tenantId, sourceType, sourceId)` — but the atomic claim is the primary, no-schema fix.
+
+### [I1] Concurrent batch creation — ✅ SAFE (with a minor UX note)
+`createSettlementBatch` computes `nextSequence` then creates inside a transaction; the
+`@@unique([tenantId, providerId, cycleMonth, cycleYear, sequence])` constraint means two makers racing the
+same provider/cycle both compute the same sequence → the loser hits **P2002 inside its transaction and rolls
+back** (no batch, no claim reassignment) → claims belong to one batch only. **OBS-C5:** the loser surfaces a
+raw P2002/constraint error, not the friendly "another run was just created — refresh" message I1 expects.
+Low. (Contrast FG-C7: batch creation is DB-guarded; Mark Paid is not.)
+
+**C5 net:** one **High** — **FG-C7**, the first money-spine concurrency defect (Mark Paid double-pay under
+retry/concurrency), latent but NO-GO-class for settlement. Batch creation (I1) is safe via the unique
+constraint. FG-C7 is a clean code-only fix (atomic status-claim) — recommend prioritising it as a WP.
+
+## C6 — Family F/G: Check-In Binding, PA/LOU/Hold & Case Lifecycle Races
+
+**Headline: a SYSTEMIC concurrency class.** Every state-transition/approval surface uses **check-then-act**
+— read status with a plain `findUnique`, validate it *outside* any transaction, then an **unconditional**
+`update({ where:{ id } })` — so two concurrent actors both pass the guard and both fire side effects. Same
+root cause as **FG-C6** (endorsement), **FG-C7** (settlement Mark Paid — fixed WP-A10), and now the two below.
+
+### [FG-C8] PA manual decision is not atomic → dual decision + phantom benefit hold — 🟠 Medium (G2)
+- `approveByHuman` / `declineByHuman` (`preauth-adjudication.service.ts:503/552`) check
+  `status ∈ {SUBMITTED,UNDER_REVIEW}` outside a transaction, then `preAuthorization.update({ where:{ id } })`
+  unconditionally. Two Medical officers deciding the same PA concurrently (G2.2) both pass → last-write-wins on
+  status. If the **approve** places the benefit hold (`createBenefitHold`) and the **decline** wins the status,
+  the PA reads DECLINED but the **ACTIVE benefit hold persists** (decline doesn't release a hold placed after
+  it read) → phantom reservation reducing the member's available limit.
+- Not-a-defect part (✅): the hold itself is **exactly-once** — `benefitHold` is unique on `preAuthId` and
+  `createBenefitHold` applies only the delta, so a re-approval never double-reserves (G2.4 holds).
+- **Fix:** atomic status-claim `updateMany({ where:{ id, status:{in:[SUBMITTED,UNDER_REVIEW]} }, data:{ status } })`
+  as the first write; if `count!==1` throw a friendly stale-state error (the FG-C7 pattern). Release any hold on decline.
+
+### [FG-C9] Case closeAndFile is not atomic → two claims from one case — 🟠 Medium (G3)
+- `closeAndFile` (`case.service.ts:192`) checks `c.claims.length > 0` outside the transaction, computes
+  `claimNumber` from a pre-transaction `claim.count`, and the in-transaction case-status update
+  (`clinicalCase.update({ where:{ id } })`, line 278) is unconditional. `Claim.caseId` is **non-unique**
+  ("one-case-many-claims by design"). Two concurrent closes both read `claims:[]`; if the second reads the
+  count *after* the first commits it gets a different claimNumber → **two claims filed from one case** (the
+  `@@unique([tenantId,claimNumber])` only catches the same-count sub-race). Each claim carries the case's full
+  service set → a duplicate that can be adjudicated+settled → **potential double-pay**, mitigated only by the
+  **advisory** cross-rail double-capture detection (OBS-H1: advisory, doesn't gate). Violates the D5/G3 "one
+  case → one claim" rule.
+- **Fix:** atomically claim the case inside the transaction —
+  `updateMany({ where:{ id, tenantId, status:{ in:[OPEN,PENDING_CLOSURE] } }, data:{ status:"CLOSED_FILED", ... } })`,
+  proceed only if `count===1`, then create the claim; or add a partial-unique index on `Claim.caseId` (schema).
+
+### [SYS-1] Systemic: check-then-act state transitions (observation, ranks the above)
+The decision/approval/close surfaces share one pattern: status validated outside the transaction + an
+unconditional update. It has already produced **FG-C6, FG-C7, FG-C8, FG-C9**. FG-C7 (double-pay) was the most
+severe and is fixed with the atomic status-claim (`updateMany(where status=…) → count===1`); **the same
+2-line pattern should be applied to endorsement approve (FG-C6), PA decide (FG-C8), and case file (FG-C9)** —
+and worth an audit sweep of every `findUnique → validate → update({where:{id}})` on a state machine.
+
+### PASS / residual
+- **I1-style DB guards hold where they exist:** benefit-hold exactly-once (benefitHold unique + delta),
+  and the same-count double-file sub-race is caught by the claimNumber unique.
+- **Family F (check-in challenge replay / one-time / facility-bound binding)** — NOT yet examined this pass;
+  carry as a residual (needs the secure-checkin flow driven with challenge replay/expiry/cross-facility).
+
+**C6 net:** two Mediums (FG-C8 PA decision, FG-C9 case double-file) that are instances of the **SYS-1**
+systemic check-then-act class (root cause shared with FG-C6/FG-C7). All fixable with the same atomic
+status-claim pattern already proven in WP-A10. Family F check-in untested.
+
+## C8 — Family R: Portfolio Operations (spot-check) & C9 — Scale
+
+**C8 (spot-check, not exhaustive):** confirmed **SYS-1 reaches portfolio ops** — `binding.service.ts`
+(quotation `status!=="SENT"`/`"ACCEPTED"` then `update`, lines 46/140 → concurrent quote-accept/double-bind)
+and `amendment.service.ts` (endorsement `status!=="DRAFT"` then `update`, line 222) are the same check-then-act
+shape. **Guarded exception (✅):** `member-payment.service.ts` (M-Pesa co-contribution) is idempotent via
+`MemberCoContributionPayment.checkoutRequestId @unique` + `idempotencyKey`, so the money-**in** rail is safe
+under callback replay. The rest of Family R (billing/admin-fee, bank recon, commission payout, wallet
+callbacks, cross-border FX, DSAR, wellness/health-vault) is **residual** — broad per-module UAT not done this
+pass; expect more SYS-1 instances + module-specific checks.
+
+**C9 (scale):** NOT run — needs the load harness (Outstanding-Conditions Ticket 6) executed in an approved
+window; running load against prod is out of scope here. The verdict's standing scale condition survives.
+
+## C — Consolidated discovery result (C5–C8)
+
+**Dominant theme = SYS-1: a systemic check-then-act concurrency class** across every state-transition surface
+(status read outside the tx + unconditional `update({where:{id}})`). Instances found: settlement Mark Paid
+(**FG-C7, High — fixed WP-A10**), endorsement approve (**FG-C6**), PA decide (**FG-C8**), case file
+(**FG-C9**), quotation accept/bind + amendment (C8 spot-check). Surfaces WITH a DB-uniqueness guard are safe:
+settlement-batch sequence, claimNumber, benefitHold(preAuthId), M-Pesa checkoutRequestId. Plus one worker
+gap (**FG-C10**, silent hold-expiry) and the C4 Mediums (**FG-C5** point-in-time eligibility, **FG-C6**
+endorsement concurrency).
+
+**Open findings after C5–C8:** FG-C5 (Med), FG-C6 (Med), FG-C7 (High — FIXED WP-A10, undeployed), FG-C8
+(Med), FG-C9 (Med), FG-C10 (Med), + SYS-1 audit sweep. **Recommended batch:** apply the WP-A10 atomic
+status-claim pattern to FG-C6/FG-C8/FG-C9 (+ binding/amendment), add live hold-expiry (FG-C10) and the
+enrollment-date intake gate (FG-C5, code half), in ONE fix+deploy pass, then re-verify.
+
+## C7 — Family N: Worker, Jobs, Time & Operational Visibility
+
+**Architecture positives (✅):** BullMQ (Redis) with **idempotent recurring scheduling** (dedup by jobId →
+restart doesn't double-register, N6) and a **heartbeat** (`worker:heartbeat`, TTL 180s + 60s log line) so a
+dead worker is detectable at the ops layer (N4 detectability). Fraud evaluation is **synchronous** on the
+intake rails (not worker-dependent), so a down worker doesn't skip fraud flags.
+
+### [FG-C10] Benefit-hold expiry is silently worker-only — 🟠 Medium (N8)
+- `releaseExpiredHolds` (`preauth-adjudication.service.ts:427`, sets expired PAs → EXPIRED and releases their
+  holds) is invoked **only** by `preauth-escalation.job.ts:78` (the worker). `BenefitUsageService.availableLimit`
+  computes `available = limit − used − activeHoldAmount` from the **stored** `activeHoldAmount` with **no live
+  `validUntil` check**. So if the worker is down (or the job lags), **expired holds are never released** →
+  `activeHoldAmount` stays inflated → the member's available benefit is silently **over-reserved**, and claims
+  can be wrongly declined "insufficient balance" for cover that should have freed. The plan flags worker
+  dependence for *expiry* as at-least-High; it **fails safe** (over-reserves, never overpays) and the
+  heartbeat gives ops detectability, so Medium here — but it's a genuine silent-degradation gap.
+- **Fix:** exclude holds past `validUntil` **live** when computing available balance (defence in depth), so
+  hold expiry doesn't depend solely on the worker; the worker job then only reconciles the stored total.
+
+### Residual (needs a worker-pause UAT env — can't pause the prod worker)
+Backlog drains **exactly once** in deterministic order (no duplicate notifications/accruals/expiry/decisions,
+N5); worker restart ×2 double-register check (N6); **time edges** — Africa/Kampala midnight, month/year end,
+leap day, clock skew (N7); and whether the app SURFACES degraded/stale state in the UI (not just the
+heartbeat) when the worker is absent (N4). These require pausing the worker in an approved UAT environment.
+
+**C7 net:** one Medium (FG-C10, silent worker-only hold expiry). Worker infra (idempotent scheduling +
+heartbeat + synchronous fraud) is sound. The worker-pause war-game (N4/N5/N6/N7) is a residual needing env
+control not available on prod.
 
 ## Chronological
 - Loaded /uat skill, resumed BB2 engagement for Workstream C.
