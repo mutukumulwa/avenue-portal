@@ -750,3 +750,49 @@ WP-A9 ─┘   (HMS batch key-binding + per-line quarantine)      │
 Note: **all nine code work packages (WP-A1…A9) are committed on branch `fix/full-go-workstream-a`** — Workstream A has nothing outstanding. WP-A8 and WP-A9 were added mid-engagement from the C2/C3 assessments (FG-C1, FG-C3/FG-C4). Re-verify probes **D-14** (offline pack excludes NWSC) and **D-15** (HMS batch key-binding + quarantine) cover them on the fix build.
 
 Estimated effort: Workstream A ≈ 1 focused day (A1+A2 are one sitting; A4 the largest). Workstream C ≈ 3–4 tester-days across the nine campaigns. Workstream D ≈ half a day.
+
+---
+
+## 8. Deferred to a follow-up fork (backlog, 2026-07-14)
+
+The Workstream C residual UAT (C5–C8) surfaced a systemic concurrency class (SYS-1). The high/medium
+instances were fixed and deployed across WP-A10/A11/A12 (FG-C7, FG-C6, FG-C8, FG-C9, FG-C5 under-block).
+The following are **deliberately deferred to a new fork** — each needs a data-model change and/or a product
+decision, so they don't belong in the shipped batch:
+
+### WP-B1 (fork) — FG-C10: live benefit-hold expiry
+**Problem.** `releaseExpiredHolds` (`preauth-adjudication.service.ts:427`) runs **only** in the worker
+(`preauth-escalation.job:78`), and `BenefitUsageService.availableLimit` (`benefit-usage.service.ts:218`)
+computes `held` from the stored `activeHoldAmount` with no live `validUntil` check. A down/lagging worker
+silently over-reserves benefit (claims wrongly declined "insufficient balance"). It **fails safe** (never
+overpays), which is why it was NOT rushed into the batch — the fix touches the core balance calc and a bug
+there would *under*-reserve (overspend). **Design carefully:** compute `held` (or a defensive adjustment)
+from `benefitHold` rows where `status=ACTIVE AND expiresAt > now()`, reconcile against the stored
+`activeHoldAmount`, and prove with tests that it can never yield a *larger* available balance than today
+(i.e. never enables overspend). Blast radius: adjudication, PA approval, offline pack, eligibility.
+
+### WP-B2 (fork) — FG-C5 over-block half: point-in-time termination
+**Problem.** Eligibility resolves by **current** `member.status`, so a TERMINATED/SUSPENDED member's claim
+for a service date when they *were* covered is wrongly declined (J7), and (conversely) there is no
+coverage-*end* concept. The under-block half (pre-`enrollmentDate` reject) shipped in WP-A12. This half needs
+a **coverage-end / termination-effective-date data model** (a `Member.coverageEndDate` or a membership-period
+table) so intake/adjudication can ask "was the member covered *on the service date*", not "are they covered
+now". **Product decision required:** is point-in-time termination in scope, and what is the coverage-history
+model? Then gate `dateOfService` within `[enrollmentDate, coverageEndDate]`.
+
+### WP-B3 (fork) — SYS-1 remnants: binding & amendment
+The C8 spot-check found the same check-then-act pattern in `binding.service.ts` (quotation
+`status!=="SENT"`/`"ACCEPTED"` → `update`, lines 46/140 → concurrent quote-accept/double-bind) and
+`amendment.service.ts` (endorsement `status!=="DRAFT"` → `update`, line 222). Apply the WP-A10/A11 atomic
+status-claim pattern (`updateMany({ where:{ id, status:{ in:[…] } } }) → count===1 else throw`). Also worth a
+one-off **audit sweep** of every `findUnique → validate status → update({ where:{ id } })` on a state machine.
+
+### Residual UAT not run (needs env/load control)
+- **Family F** — check-in / encounter binding (one-time, time-bound, facility-bound challenge; replay/expiry/cross-facility).
+- **Family N worker-pause war-game** (N4–N7) — pause the worker in an approved UAT env; verify degraded-state
+  is surfaced in the UI, backlog drains exactly-once, restart doesn't double-register, and the time edges
+  (Africa/Kampala midnight, month/year end, leap day, clock skew).
+- **Family R** (full per-module) — billing/admin-fee, bank recon, commission payout, wallet callbacks,
+  cross-border FX, DSAR, wellness/health-vault.
+- **C9 scale** — the 2,997-member book under the §5 load portfolio (Outstanding-Conditions Ticket 6 harness),
+  off-peak. Standing scale condition in the verdict until run.

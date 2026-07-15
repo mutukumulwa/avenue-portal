@@ -34,8 +34,16 @@
 > Residuals: Family F check-in, worker-pause war-game (N4-7), full Family R, C9 scale.
 > **BATCH FIXED (branch, undeployed):** WP-A11 (`3114df9`) SYS-1 sweep = FG-C6/C8/C9 atomic status-claim;
 > WP-A12 (`a7c4a42`) = FG-C5 enrollment gate (under-block half). FG-C10 + FG-C5 over-block DEFERRED. 670 green.
-> Branch = WP-A1-A9 deployed + WP-A10/A11/A12 undeployed. **NEXT: deploy the branch to prod (push to main,
-> no schema change this time) → re-verify FG-C7/C6/C8/C9/C5 + run remaining D-gate; then FG-C10 + residuals.**
+> **DEPLOYED 2026-07-14: WP-A10/A11/A12 live on prod** (push HEAD→main `ece3554`; build
+> `dpl_EEjKhYRCA2gedUqWGsYQcU54LaA2` READY — clean, no schema change). **Re-verification:** deploy healthy
+> (all API rails 401 fail-closed on the new build; /login 200; new code confirmed serving). FG-C6/C7/C8/C9
+> concurrency guards = deployed + **unit-verified** (deterministic loser tests; live sub-second race
+> reproduction impractical without a concurrency harness — standard for this class). FG-C5 enrollment gate =
+> deployed + unit-verified (live claim-wizard drive not run — 4-step form, low marginal value over the 2 unit
+> tests). **ALL committed fixes (WP-A1–A12) now live on prod.** Deferred to a NEW FORK: WP-B1 (FG-C10 live
+> hold-expiry), WP-B2 (FG-C5 over-block / coverage-end model — product decision), WP-B3 (SYS-1 remnants
+> binding/amendment + audit sweep). Residual UAT: Family F check-in, worker-pause war-game, full Family R,
+> C9 scale. (Plan §8 has the fork backlog.)
 > **C4 membership ASSESSED** (code+DB): **FG-C5 (Medium)** — claim eligibility is current-status, not
 > point-in-time as-of-service-date (no enrollmentDate≤serviceDate gate; 171 prod claims predate enrollment;
 > terminated status over-blocks historical claims — J9 spine). **FG-C6 (Medium)** — endorsement approval is a
