@@ -44,6 +44,35 @@
 > hold-expiry), WP-B2 (FG-C5 over-block / coverage-end model — product decision), WP-B3 (SYS-1 remnants
 > binding/amendment + audit sweep). Residual UAT: Family F check-in, worker-pause war-game, full Family R,
 > C9 scale. (Plan §8 has the fork backlog.)
+> **FORK B DONE (branch `fix/full-go-fork-b`, NOT deployed) 2026-07-15:** WP-B3 (`7444eb5`), WP-B1 (`636ab42`),
+> WP-B2 (`810ca87`) — 706 vitest green, tsc clean, brand+currency guards pass. **WP-B3 FG-C11** = SYS-1 atomic
+> status-claim on binding (captureAcceptance SENT→ACCEPTED; createMemberships `groupId`-null double-bind claim +
+> orphan-group drop — the quotation enum has no post-ACCEPTED state), amendment (submit/approve/**apply**
+> [claim-first + revert-on-failure]/reject), and the sweep-found `approveSettlementBatch` maker-checker gate; 12
+> loser tests. **WP-B1 FG-C10** = live hold-expiry reconciliation `held=max(0, stored−expired-active,
+> live-active)` across availableLimit/remainingAfter/offline-pack/sync/PA-balance (proven never-under-reserve;
+> worker `releaseExpiredHolds` unchanged). **WP-B2 FG-C5 over-block** = coverage-period model
+> (`MemberCoveragePeriod`); intake + B2B API resolve coverage as-of the SERVICE date (API cover-start parity gap
+> also closed); product decision = coverage-period table; backfill script; fail-open + `ignoreOpenPeriods`
+> safety; lifecycle terminations close periods, binding opens them.
+> **DEPLOY PENDING (needs human go):** `git push origin HEAD:main`; WP-B2 additionally needs the
+> `MemberCoveragePeriod` table (db push adds it — new table, no unique index → no `--accept-data-loss` issue) +
+> `npx tsx --env-file=.env scripts/backfill-coverage-periods.ts` run against the test-env Supabase before the
+> coverage gate goes live (fail-open means no breakage if left unbackfilled).
+>
+> **SYS-1 audit sweep (WP-B3) — documented triage.** Swept every `findUnique → validate status →
+> update({where:{id}})` on a state machine. FIXED this fork: binding, amendment, `approveSettlementBatch`.
+> Already atomic / DB-guarded (no action): settlement pay `markSettlementBatchPaid` (FG-C7), endorsement approve
+> (FG-C6), PA decide (FG-C8), case-file (FG-C9), benefit-hold exactly-once (`benefitHold` unique+delta),
+> member-payment M-Pesa (`checkoutRequestId` @unique + idempotencyKey — do NOT touch). Remaining same-pattern but
+> LOWER-risk (idempotent status sets / single-actor maker-checker; NONE double-fire an irreversible financial
+> side effect): `reinstatement.approveReinstatement`, `rbac` role-approve, `override` approve,
+> `contract-lifecycle` submit/approve/suspend, `contract-reconciliation`, `terminology` approve/reject,
+> `cross-border`, `fraud-engine` assign/resolve, `analytics` alert ack/resolve, `dpo` DSAR, `providers` /
+> `provider-contracts` setStatus, `clients` deactivate, `onboarding` KYC, `wellness` (idempotent),
+> `offline-auth` / `secure-checkin` (own lifecycles). **Recommendation:** a focused SYS-1-followup WP to harden
+> the maker-checker ones (reinstatement / rbac / override / contract-lifecycle) — NOT a GO blocker since the
+> money / irreversible steps are already atomic.
 > **C4 membership ASSESSED** (code+DB): **FG-C5 (Medium)** — claim eligibility is current-status, not
 > point-in-time as-of-service-date (no enrollmentDate≤serviceDate gate; 171 prod claims predate enrollment;
 > terminated status over-blocks historical claims — J9 spine). **FG-C6 (Medium)** — endorsement approval is a
