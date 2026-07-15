@@ -4,6 +4,7 @@ import { withApiKey, getApiCredential, providerScopeWhere, operatorTenantWhere }
 import { ClaimLineCategory, ServiceType, Prisma } from "@prisma/client";
 import { z } from "zod";
 import { isFutureServiceDate, FUTURE_SERVICE_DATE_ERROR } from "@/lib/service-date";
+import { coverageService, isCoverageEnded } from "@/server/services/coverage.service";
 
 // BB2-DEF-01/02: strict intake validation. Invalid input must produce a 400
 // with a field-level message — never a 201 with bad money, never a raw 500.
@@ -79,10 +80,11 @@ async function postClaim(req: Request) {
     const member = await prisma.member.findFirst({
       where: { memberNumber, ...operatorTenantWhere(credential) },
       select: {
-        id:       true,
-        tenantId: true,
-        status:   true,
-        group:    { select: { status: true } },
+        id:             true,
+        tenantId:       true,
+        status:         true,
+        enrollmentDate: true,
+        group:          { select: { status: true } },
       },
     });
 
@@ -90,11 +92,34 @@ async function postClaim(req: Request) {
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
     }
 
-    const BLOCKED = ["SUSPENDED", "LAPSED", "TERMINATED"];
-    if (BLOCKED.includes(member.status)) {
-      return NextResponse.json({ error: `Member status is ${member.status} — not eligible` }, { status: 403 });
+    // FG-C5 point-in-time coverage — cross-rail parity with runClaimIntake. When
+    // coverage periods exist they are the authoritative as-of-SERVICE-date window
+    // (a terminated member's in-window historical claim is eligible; a date outside
+    // the window is not); otherwise fall back to the legacy current-status +
+    // cover-start gate. (This rail had NO cover-start gate before — parity gap closed.)
+    const svcDate = new Date(dateOfService);
+    const coverage = await coverageService.evaluate(prisma, member.id, svcDate, {
+      ignoreOpenPeriods: isCoverageEnded(member.status),
+    });
+    if (coverage.hasPeriods) {
+      if (!coverage.covered) {
+        return NextResponse.json({ error: "Member was not covered on the service date" }, { status: 403 });
+      }
+      if (["SUSPENDED", "LAPSED"].includes(member.status)) {
+        return NextResponse.json({ error: `Member status is ${member.status} — not eligible` }, { status: 403 });
+      }
+    } else {
+      if (["SUSPENDED", "LAPSED", "TERMINATED"].includes(member.status)) {
+        return NextResponse.json({ error: `Member status is ${member.status} — not eligible` }, { status: 403 });
+      }
+      if (member.enrollmentDate && svcDate < member.enrollmentDate) {
+        return NextResponse.json(
+          { error: "Service date is before the member's coverage start — not covered" },
+          { status: 403 },
+        );
+      }
     }
-    if (BLOCKED.includes(member.group.status)) {
+    if (["SUSPENDED", "LAPSED", "TERMINATED"].includes(member.group.status)) {
       return NextResponse.json({ error: `Group status is ${member.group.status} — not eligible` }, { status: 403 });
     }
 

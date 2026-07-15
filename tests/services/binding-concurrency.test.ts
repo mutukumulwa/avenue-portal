@@ -26,6 +26,7 @@ const db = vi.hoisted(() => {
     },
     membershipExclusion: { create: vi.fn(async () => ({})) },
     waitingPeriodApplication: { create: vi.fn(async () => ({})) },
+    memberCoveragePeriod: { findFirst: vi.fn(async () => null), create: vi.fn(async () => ({})) },
     $transaction: vi.fn(async (fn: any) => fn(state)),
   };
   return state;

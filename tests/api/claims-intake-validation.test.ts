@@ -12,6 +12,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const prismaMock = vi.hoisted(() => ({
   member: { findFirst: vi.fn() },
+  memberCoveragePeriod: { findMany: vi.fn(async () => []) },
   provider: { findFirst: vi.fn() },
   claim: { findFirst: vi.fn(), count: vi.fn(), create: vi.fn() },
   preAuthorization: { findFirst: vi.fn(), update: vi.fn() },

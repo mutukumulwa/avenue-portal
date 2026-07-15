@@ -959,6 +959,7 @@ model Member {
   wellnessActivities             WellnessActivity[]
   clinicalCases                  ClinicalCase[]
   lettersOfUndertaking           LetterOfUndertaking[]
+  coveragePeriods                MemberCoveragePeriod[]
 
   @@unique([tenantId, memberNumber])
   @@index([tenantId])
@@ -968,6 +969,27 @@ model Member {
   @@index([groupId, status, enrollmentDate])
   @@index([principalId])
   @@index([idNumber])
+}
+
+// ─── POINT-IN-TIME COVERAGE (FG-C5) ─────────────────────
+// Coverage history as explicit periods, so eligibility can ask "was the member
+// covered ON the service date" instead of resolving by current status. A member
+// has one open period (endDate NULL) while active; termination/expiry/lapse
+// closes it (endDate = effective date); reinstatement opens a new one. Supports
+// gaps and re-enrolment (multiple non-overlapping periods).
+model MemberCoveragePeriod {
+  id        String    @id @default(cuid())
+  tenantId  String
+  memberId  String
+  startDate DateTime
+  endDate   DateTime? // null = currently open / covered
+  reason    String? // BINDING | ACTIVATION | REINSTATEMENT | TERMINATED | EXPIRED | LAPSED | BACKFILL
+  createdAt DateTime  @default(now())
+
+  member Member @relation(fields: [memberId], references: [id])
+
+  @@index([memberId, startDate])
+  @@index([tenantId, memberId])
 }
 
 // ─── SECURE MEMBER CHECK-IN ─────────────────────────────

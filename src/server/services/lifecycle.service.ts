@@ -15,6 +15,7 @@ import { CancellationType, TerminationType } from "@prisma/client";
 import { auditChainService } from "./audit-chain.service";
 import { blacklistService } from "./blacklist.service";
 import { preauthAdjudicationService } from "./preauth-adjudication.service";
+import { coverageService } from "./coverage.service";
 
 // ─── CONFIGURABLE DEFAULTS ────────────────────────────────────────────────────
 
@@ -224,6 +225,7 @@ export const lifecycleService = {
         where: { id: memberId },
         data:  { status: "CANCELLED_COOLING_OFF" },
       });
+      await coverageService.closeOpenPeriods(tx, memberId, new Date(), "CANCELLED_COOLING_OFF");
 
       await tx.membershipCancellationRecord.create({
         data: {
@@ -284,6 +286,7 @@ export const lifecycleService = {
         where: { id: memberId },
         data:  { status: "TERMINATED" },
       });
+      await coverageService.closeOpenPeriods(tx, memberId, new Date(), "TERMINATED");
 
       await tx.membershipCancellationRecord.create({
         data: {
@@ -332,6 +335,7 @@ export const lifecycleService = {
         where: { id: memberId },
         data:  { status: "TERMINATED_FRAUD" },
       });
+      await coverageService.closeOpenPeriods(tx, memberId, new Date(), "TERMINATED_FRAUD");
 
       await tx.membershipTerminationRecord.create({
         data: {
@@ -404,6 +408,7 @@ export const lifecycleService = {
         where: { id: memberId },
         data:  { status: "TERMINATED_BREACH" },
       });
+      await coverageService.closeOpenPeriods(tx, memberId, new Date(), "TERMINATED_BREACH");
 
       await tx.membershipTerminationRecord.create({
         data: {
@@ -458,6 +463,7 @@ export const lifecycleService = {
         where: { id: memberId },
         data:  { status: "TERMINATED_DEATH" },
       });
+      await coverageService.closeOpenPeriods(tx, memberId, new Date(), "TERMINATED_DEATH");
 
       await tx.membershipTerminationRecord.create({
         data: {

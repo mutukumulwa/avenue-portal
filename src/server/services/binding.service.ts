@@ -7,6 +7,7 @@ import { resolveSchemeClientId } from "./clientResolve";
 import { resolveMemberPrefix } from "./member-numbering.service";
 import { niraService } from "./integrations/nira.service";
 import { pdfService } from "./pdf.service";
+import { coverageService } from "./coverage.service";
 import { renderQuotationHtml } from "../templates/pdf/quotation.template";
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -350,6 +351,12 @@ export const bindingService = {
       });
       lifeIdToMemberId.set(life.id, member.id);
       createdMembers.push(member.id);
+    }
+
+    // FG-C5: open a coverage period per new member from cover start, so claim
+    // eligibility resolves by the service date. Idempotent per member.
+    for (const newMemberId of createdMembers) {
+      await coverageService.openPeriod(prisma, tenantId, newMemberId, coverStart, "BINDING");
     }
 
     await auditChainService.append({

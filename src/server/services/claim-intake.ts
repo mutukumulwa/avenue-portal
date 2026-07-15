@@ -5,6 +5,7 @@ import { AutoAdjudicationService } from "@/server/services/auto-adjudication.ser
 import { ClaimsService } from "@/server/services/claims.service";
 import { ProvidersService } from "@/server/services/providers.service";
 import { MemberNotificationService } from "@/server/services/member-notification.service";
+import { coverageService, isCoverageEnded } from "@/server/services/coverage.service";
 import { assertServiceDateNotFuture } from "@/lib/service-date";
 import type { ServiceType, BenefitCategory, ClaimLineCategory } from "@prisma/client";
 
@@ -82,27 +83,43 @@ export async function runClaimIntake(
   });
   if (!member) throw new Error("Member not found");
 
-  const BLOCKED = ["SUSPENDED", "LAPSED", "TERMINATED"];
-  if (BLOCKED.includes(member.status)) {
-    throw new Error(`Cannot submit claim: member ${member.firstName} ${member.lastName} is ${member.status}.`);
+  // ── Point-in-time coverage gate (FG-C5) ──────────────────────────────────
+  // When coverage periods exist they are the authoritative as-of-SERVICE-date
+  // window: a terminated/expired member's in-window historical claim files, while
+  // a service date before cover-start or after cover-end does not — resolved as
+  // of the service date, not "now". Members with no periods yet (pre-backfill, or
+  // a creation path not wired to coverage) fall back to the legacy current-status
+  // + cover-start (enrollmentDate) gate so nothing is wrongly blocked meanwhile.
+  const serviceDate = new Date(data.dateOfService);
+  const who = `${member.firstName} ${member.lastName}`;
+  const coverage = await coverageService.evaluate(prisma, member.id, serviceDate, {
+    ignoreOpenPeriods: isCoverageEnded(member.status),
+  });
+  if (coverage.hasPeriods) {
+    if (!coverage.covered) {
+      throw new Error(
+        `Service date ${serviceDate.toLocaleDateString("en-UG")} is outside ${who}'s coverage window ` +
+          `— the member was not covered on that date.`,
+      );
+    }
+    // Termination/expiry are handled by the window; once coverage is confirmed for
+    // the service date, only the transient hold states block a current claim.
+    if (["SUSPENDED", "LAPSED"].includes(member.status)) {
+      throw new Error(`Cannot submit claim: member ${who} is ${member.status}.`);
+    }
+  } else {
+    if (["SUSPENDED", "LAPSED", "TERMINATED"].includes(member.status)) {
+      throw new Error(`Cannot submit claim: member ${who} is ${member.status}.`);
+    }
+    if (member.enrollmentDate && serviceDate < member.enrollmentDate) {
+      throw new Error(
+        `Service date ${serviceDate.toLocaleDateString("en-UG")} is before ${who}'s coverage start ` +
+          `(${new Date(member.enrollmentDate).toLocaleDateString("en-UG")}) — the member was not covered on that date.`,
+      );
+    }
   }
-  if (member.group && BLOCKED.includes(member.group.status)) {
+  if (member.group && ["SUSPENDED", "LAPSED", "TERMINATED"].includes(member.group.status)) {
     throw new Error(`Cannot submit claim: group "${member.group.name}" is ${member.group.status}.`);
-  }
-
-  // ── Coverage-start gate (FG-C5, point-in-time eligibility) ────────────────
-  // A claim's service date must fall on or after the member's coverage start
-  // (`enrollmentDate`, which mirrors the endorsement effective date). A
-  // pre-enrollment service date was never covered, so it must not file — the
-  // current-status check alone let pre-coverage claims through. (The
-  // termination-side of point-in-time eligibility needs a coverage-end model
-  // and is a separate change.)
-  if (member.enrollmentDate && new Date(data.dateOfService) < member.enrollmentDate) {
-    throw new Error(
-      `Service date ${new Date(data.dateOfService).toLocaleDateString("en-UG")} is before ` +
-        `${member.firstName} ${member.lastName}'s coverage start ` +
-        `(${new Date(member.enrollmentDate).toLocaleDateString("en-UG")}) — the member was not covered on that date.`,
-    );
   }
 
   // ── Provider gate (PR-006, server-enforced) ──────────────────────────────
