@@ -11,15 +11,15 @@
 
 The CONDITIONAL GO verdict gates a full GO on exactly three things (GO/NO-GO §"Path to full GO"):
 
-1. **Fix the Medium findings** — BB2-DEF-01, BB2-DEF-02, BB2-DEF-03, OBS-B7, OBS-H1 (+ the carried N3 modelling condition and OBS-K1/OBS-A3 hygiene items).
-2. **Clear the untested residual** — Families C (offline), D (HMS UI), F/G (binding/races), J (membership), I/O (settlement concurrency/session), N (worker/time), R (portfolio ops), the Family-K remainder, and scale/load.
+1. **Fix the Medium findings** — BB2-DEF-01, BB2-DEF-02, BB2-DEF-03, OBS-B7, OBS-H1 (+ the carried N3 modelling condition and OBS-K1/OBS-A3 hygiene items), and **FG-C1** (offline pack scope — WP-A8, surfaced by the C2 assessment; Medium now, latent High).
+2. **Clear the untested residual** — Families C (offline — *assessed 2026-07-14: exactly-once verified, FG-C1 raised → fixed WP-A8*), D (HMS — *assessed 2026-07-14: FG-C3 High + FG-C4 raised → fixed WP-A9; UI integration-honesty check still pending*), F/G (binding/races), J (membership), I/O (settlement concurrency/session), N (worker/time), R (portfolio ops), the Family-K remainder (*cleared 2026-07-14*), and scale/load.
 3. **Re-run the entry gate + a settlement-side fraud probe on the fix build.**
 
 This plan is organised as four workstreams:
 
 | Workstream | What | Who executes |
 |---|---|---|
-| **A** | Code fixes (7 work packages, WP-A1…WP-A7) | Implementation agent |
+| **A** | Code fixes (9 work packages, WP-A1…WP-A9; WP-A8 from C2 offline FG-C1, WP-A9 from C3 HMS FG-C3/FG-C4) | Implementation agent |
 | **B** | Ops / configuration (Vercel env, tenant settings, DB verify) | Arthur (dashboard actions) + agent (verification) |
 | **C** | Residual UAT campaigns | UAT agent via the `/uat` skill |
 | **D** | Re-verification gate + full-GO checklist | UAT agent |
@@ -543,6 +543,123 @@ Known-safe callers: the provider action already coerces `quantity ≥ 1`, filter
 
 ---
 
+### WP-A8 — FG-C1: scope the offline data pack to the facility's entitled members
+
+**Problem (found in Workstream C2, 2026-07-14).** `OfflinePackService.buildPayload` (`src/server/services/offline-pack.service.ts:76`) builds the offline pack roster from **every active member in the tenant** — `where: { tenantId, status: "ACTIVE" }` — filtered only by `PackageProviderEligibility` (a package-level table that is **empty in prod**, and whose no-rules default is *include*). So a facility's encrypted offline pack contains the **entire tenant roster** (2,997 members incl. all 2,750 NWSC self-funded members that are isolated on every other rail) plus their benefit balances. This is the same class of defect as E2E-D02 (which scoped the B2B eligibility API by client) but on the offline rail, and strictly broader (tenant-wide, not client-wide). Currently gated because `/offline-capture` is `ROLES.OPS`-only and no external API returns the pack — but it is a latent High: the offline capability's stated purpose is facility devices, at which point this leaks the whole tenant. Fix it now while touching the offline rail.
+
+**Canonical owner to reuse — do NOT write a new scoping query.** `ProviderEntitlementService.entitledMemberWhere(providerId)` (`src/server/services/provider-entitlement.service.ts:29`) already returns the exact `Prisma.MemberWhereInput` fragment that confines a member query to a provider's contracted clients/groups (deny-by-default: a provider with no active INCLUDE applicability resolves no members). The B2B eligibility/benefits API already uses it. It also honours the group-level applicability that WP-A6 introduces, so this fix inherits N3 isolation automatically once WP-A6 is applied.
+
+**File to change:** `src/server/services/offline-pack.service.ts`.
+
+**Change 1 — scope the roster query.** Replace the members query (lines 76–82):
+```ts
+    const members = await prisma.member.findMany({
+      where: { tenantId, status: "ACTIVE" },
+      select: {
+        id: true, memberNumber: true, firstName: true, lastName: true, status: true,
+        packageVersionId: true,
+      },
+    });
+```
+with:
+```ts
+    // FG-C1: the pack must contain only members this facility is entitled to
+    // (its contracted clients/groups) — NOT the whole tenant. Reuse the same
+    // entitlement fragment the B2B eligibility API uses (deny-by-default; also
+    // honours WP-A6 group-level applicability once applied).
+    const { ProviderEntitlementService } = await import("./provider-entitlement.service");
+    const entitledWhere = await ProviderEntitlementService.entitledMemberWhere(providerId);
+    const members = await prisma.member.findMany({
+      where: { AND: [{ tenantId, status: "ACTIVE" }, entitledWhere] },
+      select: {
+        id: true, memberNumber: true, firstName: true, lastName: true, status: true,
+        packageVersionId: true,
+      },
+    });
+```
+Leave the existing `PackageProviderEligibility` filter (lines 84–103), the balances query, and the tariff query unchanged — they are narrower, per-package/per-provider filters that still apply on top of the entitlement gate.
+
+**Change 2 — regenerate the packs already sitting in the DB.** Existing `OfflineDataPack` rows were generated with the old tenant-wide roster and are stale/over-scoped. After deploy, run the existing regeneration job so live packs are rebuilt with the scoped roster:
+- The job is `src/server/jobs/offline-pack.job.ts` (`regenerateActivePacks`). Trigger it via the worker, or (ops) revoke any outstanding work codes so no stale pack remains unlockable. Note in the PR which path was taken. (In prod today there are **0** issued codes/packs, so there may be nothing to regenerate — verify with the DB query in the acceptance criteria before assuming work is needed.)
+
+**Tests to add:** new file `tests/services/offline-pack-scope.test.ts` (mock `@/lib/prisma`; follow `tests/api/provider-read-scope.test.ts` for the entitlement-fragment fake). Cases:
+1. Provider entitled to client X → roster includes members of client X's groups, EXCLUDES a member of client Y. (Assert the `member.findMany` `where` contains the entitlement `AND` clause and that a Y-member is filtered.)
+2. Provider with no active INCLUDE applicability → roster is empty (deny-by-default; `entitledMemberWhere` returns the impossible `{ id: "__no_provider_entitlement__" }`).
+3. Group-level applicability (one group under a shared client) → roster includes that group only, not sibling groups (the N3 shape).
+
+**Acceptance criteria:**
+- Unit tests green; full suite green; `tsc` clean.
+- Behavioural proof (staging or a scoped local DB): issue an offline code for a provider entitled only to the Default Client, unlock the pack, and confirm `memberCount` ≈ the Default Client's entitled members (≤ 249 on current prod data) and that **no NWSC member** appears. Cross-check with:
+  ```sql
+  -- entitled count for a given provider (expected pack roster size, pre-package-filter)
+  SELECT count(*) FROM "Member" m JOIN "Group" g ON g.id=m."groupId"
+  WHERE m."tenantId"='cmr3ae8v30000nlvqxrqlfn38' AND m.status='ACTIVE'
+    AND g."clientId" IN (
+      SELECT DISTINCT ca."clientId" FROM "ContractApplicability" ca
+      JOIN "ProviderContract" pc ON pc.id=ca."contractId"
+      WHERE pc."providerId"='<providerId>' AND pc.status='ACTIVE'
+        AND ca."isActive" AND ca."inclusionType"='INCLUDE' AND ca."groupId" IS NULL);
+  ```
+- **Do NOT** generate a live pack purely to demonstrate the bug pre-fix — it materialises the full roster as encrypted PII. The pre-fix exposure is already proven by code + the empty `PackageProviderEligibility` table (0 rows) in `FULL_GO_DEFECT_REGISTER.md` (FG-C1).
+
+**Related low-severity items from C2 (fix opportunistically, not blocking):**
+- **OBS-C3:** `src/app/api/v1/sync/route.ts:35` resolves the tenant via `prisma.tenant.findFirst()` (TODO G8) instead of the API key's tenant — benign in single-tenant, a latent cross-tenant bug. Bind it to the key's credential before onboarding a second operator tenant.
+- **OBS-C2:** `/offline-capture` is `ROLES.OPS`-only, so the facility-facing offline capture the design implies does not exist for `PROVIDER_USER`. Product decision required (is offline capture internal-ops-only, or should it be exposed to facilities?) before building the external pack-pull — and the external pack-pull MUST carry this WP-A8 scoping.
+
+---
+
+### WP-A9 — FG-C3 + FG-C4: bind the HMS batch to the key's facility, and quarantine per line
+
+**Problem (found in Workstream C3, 2026-07-14).** The HMS batch rail (`POST /api/v1/hms-batch` → `HmsBatchService`) has two gaps:
+- **FG-C3 (High, latent).** `postHmsBatch` (`src/app/api/v1/hms-batch/route.ts`) authenticates with `withApiKey` but **never reads the credential**; `HmsBatchService.apply` resolves the target provider **entirely from the payload `facilityCode`**. A valid facility-A key can therefore post `facilityCode: "<Facility B>"` + an enumerable `caseNumber` and append service entries to **Facility B's open cases**. This is the cross-rail parity gap: the claims rail forces `providerFromKey` and ignores body `providerCode` (E2E-D02/BD-06); the HMS rail missed it. Latent today (0 active keys → 401) but live the moment per-facility HMS keys are issued, with no defence-in-depth. (Test-plan D2-01: *"Facility A key sends Facility B code → rejected before case lookup".*)
+- **FG-C4 (Medium).** `validate()` doesn't check `quantity`, so a `quantity: 0/-n` line passes validation, matches a case, then throws in `CaseService.addServiceEntry` (`case.service.ts:115`). `apply()` has no per-line try/catch, so the throw 400s the **whole batch** *after* earlier lines already committed (each `addServiceEntry` is its own transaction) — and on retry the poison line throws again, blocking every later line. Decimal quantity (1.5) is also silently accepted.
+
+**Files to change:** `src/app/api/v1/hms-batch/route.ts` and `src/server/services/hms-batch.service.ts`.
+
+**Change 1 — route: bind to the key (FG-C3) and prefer the key's tenant (OBS-D2).** Import `getApiCredential` alongside `withApiKey`, and replace the tenant-resolution + apply block:
+```ts
+    const body = await req.json();
+    HmsBatchService.validate(body);
+
+    // FG-C3: bind the batch to the authenticated key. A per-facility key can
+    // only file for its OWN facility (providerFromKey); the payload facilityCode
+    // cannot retarget another facility. An operator key still resolves the
+    // facility from the payload.
+    const credential = await getApiCredential(req);
+    const providerFromKey = credential?.kind === "provider" ? credential.providerId : null;
+
+    // OBS-D2/G8: prefer the key's tenant; fall back to the single-operator
+    // scaffold only for an unbound operator key.
+    const tenantId =
+      credential?.tenantId ?? (await prisma.tenant.findFirst({ select: { id: true } }))?.id;
+    if (!tenantId) return NextResponse.json({ error: "No operator tenant" }, { status: 500 });
+
+    const report = await HmsBatchService.apply(tenantId, body, providerFromKey ?? undefined);
+    return NextResponse.json({ success: true, ...report });
+```
+
+**Change 2 — service `validate()`: reject bad quantity (FG-C4).** After the `unitAmount` check, before the case/member-ref check:
+```ts
+      // FG-C4: quantity is optional (defaults to 1) but, when present, must be a
+      // positive whole number — reject 0, negative, and decimal at the envelope
+      // so it never poison-throws mid-apply (parity with the intake rails).
+      if (e.quantity !== undefined && (!Number.isInteger(e.quantity) || e.quantity < 1)) {
+        throw new Error(`entries[${i}]: quantity must be a positive whole number`);
+      }
+```
+
+**Change 3 — service `apply()`: resolve provider from the key (FG-C3).** Change the signature to `apply(tenantId, batch, providerFromKey?)` and replace the provider-resolution block: when `providerFromKey` is set, look the provider up by `{ id: providerFromKey, tenantId }`, select `smartProviderId` too, and reject a payload `facilityCode` that names a different facility (matches the committed implementation on branch `fix/full-go-workstream-a`); otherwise keep the operator OR-match on `facilityCode`.
+
+**Change 4 — service `apply()`: per-line quarantine + `rejected` count (FG-C4).** Add `let rejected = 0;`, wrap the per-line `CaseService.addServiceEntry(...)` in try/catch — on throw, `rejected++` and create an `ExceptionLog` (`reason: "HMS_BATCH_REJECTED"`, `.catch(() => undefined)` so the registry write can't mask the outcome) — and add `rejected` to the returned report so `total = applied + duplicates + unmatched + rejected`.
+
+**Tests to add** (extend `tests/services/hms-batch.service.test.ts`): quantity 0/negative/decimal rejected by `validate`; a provider key files only for its own facility; a provider key with a mismatched `facilityCode` throws and writes nothing; an operator key still resolves from the payload; a line that throws at write is quarantined (`rejected` counted, `HMS_BATCH_REJECTED` logged, other lines still apply, conservation holds).
+
+**Acceptance criteria:** unit tests green; full suite green; `tsc` + guards clean. Route still 401s without a key (fail-closed preserved). **Add re-verify probe D-15** (once a facility key exists on staging: facility-A key + `facilityCode:<B>` → rejected, no B case mutation; facility-A key + own facility → applies; a `quantity:0` line → 400 at validate; a write-time failure → quarantined not batch-fatal).
+
+**Status: IMPLEMENTED + committed** on branch `fix/full-go-workstream-a` (`9da68a0`), 662/662 suite green, tsc + guards clean, route 401-smoke verified. Pending deploy + D-15.
+
+---
+
 ## 3. Workstream B — Ops / configuration (after Workstream A is deployed)
 
 These are dashboard/UI actions. **B1 and B2 are performed by Arthur** (no Vercel env MCP/CLI is available in this environment); the agent verifies each with the probe listed.
@@ -596,6 +713,8 @@ Run AFTER Workstreams A (deployed) and B. Every probe is black-box against prod.
 | D-11 | N3 (post B5) | Provider A key eligibility probe for a NO-group member and a YES-group member | 404 / 200 respectively |
 | D-12 | Operator channel (B1) | Operator key read + write within Medvex; same key against non-Medvex data | 200 in-tenant; 403/404 out-of-tenant; regression: facility keys unaffected |
 | D-13 | Money spine smoke | One intake→adjudicate→maker/checker→Mark Paid cycle + GL trial balance | Balanced; only approved amounts post |
+| D-14 | FG-C1 (WP-A8) offline pack scope | Issue an offline code for a provider entitled only to the Default Client; unlock the pack | `memberCount` ≈ entitled members only (≤ 249 on current data); **no NWSC member** in the roster; a no-entitlement provider yields an empty roster |
+| D-15 | FG-C3/FG-C4 (WP-A9) HMS batch | With a facility-A key: post `facilityCode:<B>`; post own facility; post a `quantity:0` line; force a write-time failure | Facility-B target **rejected**, no B case mutation; own-facility batch applies; `quantity:0` → 400 at validate; write-time failure quarantined (`rejected`+`HMS_BATCH_REJECTED`), batch not aborted |
 
 ---
 
@@ -603,9 +722,9 @@ Run AFTER Workstreams A (deployed) and B. Every probe is black-box against prod.
 
 Declare **GO** only when every box is ticked with evidence linked in the run log:
 
-- [ ] WP-A1…WP-A7 merged to `main`, all gates green (`typecheck`, `vitest`, brand+currency guards), deployed (Vercel READY).
+- [ ] WP-A1…WP-A9 merged to `main`, all gates green (`typecheck`, `vitest`, brand+currency guards), deployed (Vercel READY). (All nine — WP-A1…A9 — already committed on branch `fix/full-go-workstream-a`; none outstanding.)
 - [ ] B1–B5 completed and verified (operator channel live + scoped; fraud gate ON for Medvex; `externalRef` column + index in prod; N3 matrix applied or signed off as accepted-risk).
-- [ ] D-1 … D-13 all PASS with fresh evidence.
+- [ ] D-1 … D-15 all PASS with fresh evidence.
 - [ ] C1–C9 executed; zero open Critical/High; any new Mediums have a recorded disposition (fix or accepted-risk with owner + date).
 - [ ] Conservation tie-out (plan §25) re-run at the end of the C campaigns: every submitted event → exactly one outcome, at most one payment; GL trial balance balanced.
 - [ ] Updated `FULL_GO_GO_NO_GO.md` issued with the verdict, signed evidence links, and the surviving-conditions list (should be empty or explicitly accepted).
@@ -620,11 +739,14 @@ If any automatic NO-GO condition from plan §28 fires at any point, the standing
 WP-A1 ─┐
 WP-A2 ─┤ (same file as A1 — implement A1 first, A2 on top)
 WP-A3 ─┤
-WP-A4 ─┼─→ gates green → push main → Vercel deploy ─→ B1..B4 ─→ D-1..D-13 (entry + Mediums)
-WP-A5 ─┤                                                │
-WP-A7 ─┘                                                ├─→ C1..C9 (residual campaigns)
-WP-A6 (scripts; B5 sign-off gates the apply step) ──────┘         │
-                                                                  └─→ §6 checklist → FULL GO
+WP-A4 ─┤
+WP-A5 ─┤
+WP-A6 ─┼─→ gates green → push main → Vercel deploy ─→ B1..B4 ─→ D-1..D-15 (entry + Mediums)
+WP-A7 ─┤   (WP-A6 scripts; B5 sign-off gates the apply step)  │
+WP-A8 ─┤   (offline pack scope; benefits from WP-A6)          ├─→ C1..C9 (residual campaigns)
+WP-A9 ─┘   (HMS batch key-binding + per-line quarantine)      │
+                                                              └─→ §6 checklist → FULL GO
 ```
+Note: **all nine code work packages (WP-A1…A9) are committed on branch `fix/full-go-workstream-a`** — Workstream A has nothing outstanding. WP-A8 and WP-A9 were added mid-engagement from the C2/C3 assessments (FG-C1, FG-C3/FG-C4). Re-verify probes **D-14** (offline pack excludes NWSC) and **D-15** (HMS batch key-binding + quarantine) cover them on the fix build.
 
 Estimated effort: Workstream A ≈ 1 focused day (A1+A2 are one sitting; A4 the largest). Workstream C ≈ 3–4 tester-days across the nine campaigns. Workstream D ≈ half a day.

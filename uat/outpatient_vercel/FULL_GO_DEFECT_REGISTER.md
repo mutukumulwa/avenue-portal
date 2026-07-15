@@ -1,0 +1,59 @@
+# FULL GO — Workstream C (Residual UAT) — Defect / Observation Register
+
+Run: 2026-07-14 · Target: prod https://avenue-portal.vercel.app (current build, pre-Workstream-A) ·
+DB: Supabase `otivyuroqraiijayvkze` (AiCare), tenant medvex `cmr3ae8v30000nlvqxrqlfn38`.
+Evidence: `FULL_GO_RUN_LOG.md`, `evidence/`.
+
+## Findings this pass
+
+| ID | Sev | Family/Test | Title | Evidence → Observed vs Expected | Impact | Status |
+|---|---|---|---|---|---|---|
+| **N3** (confirmed) | Medium | K — privacy scope | Shared-client sibling-group exposure, quantified | "Medvex — Default Client" (INSURER) pools **6 unrelated employers** (Safaricom 78, KCB 53, EABL 46, Bamburi 38, Twiga 33, Patricia 1 = **249 members**). **190** providers hold an active client-level (groupId NULL) INCLUDE; **0** group-level rows exist. Entitlement scopes by Client → any of the 190 providers can read any of the 249 members' PII across all 6 employers. Exp: employer-level isolation. | Cross-employer PII readability over the B2B eligibility/benefits API. No financial leakage. NWSC (2,750) correctly isolated as its own Client. | OPEN — fix tooling built (WP-A6), gated on business decision |
+| **OBS-Q1** | Low (seed-data) | Q — conservation tie-out | 98 PAID provider claims with no settlement batch / voucher / GL | 98 non-reimbursement claims are `status=PAID` with `settlementBatchId` NULL — all `source=MANUAL`, all `createdAt=2026-07-02`, `paidAt` spread 2025-02 → 2026-08. They bypassed `markSettlementBatchPaid`, so no PaymentVoucher and no settlement JE exist for them. Exp: a paid provider claim rides a settled batch. | Seed/demo data marked PAID directly. Not a live-pipeline defect (BB2 proved the pipeline GL-balances), but it **breaks any "paid claims vs GL settlements" conservation tie-out** and inflates paid-claims reporting. | OPEN (data hygiene) |
+| **OBS-Q2** | Low (seed-data) | Q / J — date validity | Future-dated claims in prod | **4** claims have `paidAt` in the future (> today); **8** claims have `dateOfService` in the future. The intake gate (PR-013) blocks future service dates on every live rail, so these were seed-inserted directly. | Nonsensical dates pollute prod reporting/aging; confirms prod is loaded with synthetic seed data that bypassed intake validation. | OPEN (data hygiene) |
+| **FG-C3** | **High** (latent — HMS launch) | D — HMS batch attribution | HMS batch not bound to the API key's facility | `POST /api/v1/hms-batch` never reads the credential; `HmsBatchService.apply` resolves the provider from payload `facilityCode` (hms-batch.service.ts:76) and matches `providerId:<that>`. A facility A key can post `facilityCode:<Facility B>` + an enumerable `caseNumber` and append service entries to **Facility B's open cases**. Exp: reject/ignore mismatched facility — force provider from the key (the claims-rail providerFromKey fix; D2-01). | Cross-facility case/charge pollution → wrong closure claim. Cross-rail parity gap. Gated today (0 active keys, operator off → 401), but **live on HMS launch** (facility keys are the point) with no defence-in-depth. Fix before issuing HMS keys. | **FIXED (WP-A9, `9da68a0`)** on branch `fix/full-go-workstream-a`; pending deploy + D-15 |
+| **FG-C4** | Medium | D — HMS batch robustness | No per-line quarantine — a poison line aborts the whole batch | `HmsBatchService.validate` doesn't check `quantity`; a `quantity:0/-n` line passes validate, then throws in `addServiceEntry` (case.service.ts:115). `apply()` has no per-line try/catch → 400 for the whole batch *after* earlier lines committed (own `$transaction` each); on retry the bad line throws again → every later line never applies (poison line). Decimal quantity (1.5) accepted silently. Exp: per-line quarantine to ExceptionLog; safe lines continue (D3/D5). | Partial apply + permanent block on one bad line; validation inconsistent with the intake rails. | **FIXED (WP-A9, `9da68a0`)** on branch `fix/full-go-workstream-a`; pending deploy + D-15 |
+| **FG-C5** | Medium | J — point-in-time eligibility | Claim eligibility uses current member status, not as-of-service-date | `claim-intake.ts` gates on future-date + **current** `member.status`; never checks `enrollmentDate <= dateOfService`, and Member has no termination-effective/coverageEnd. Under-block: a pre-`enrollmentDate` service date isn't rejected (**171 prod claims** have `dateOfService < enrollmentDate`, unblocked — mostly seed, proves the gate is absent). Over-block: a TERMINATED status declines historical claims for dates when the member was active (J7). Exp: resolve coverage by signed effective-date policy as of the service date (J9). | Money-leak direction (pre-coverage claim payable) + wrong-decline direction; async status change retroactively flips a service-date-correct claim. | OPEN |
+| **FG-C6** | Medium | J — endorsement concurrency | Endorsement approval is not concurrency-safe (double-apply race) | `approveEndorsement` (endorsement.service.ts:98) is check-then-act on `status` with **no transaction/lock** (called from tRPC router + server action). Two concurrent approvals both pass the SUBMITTED guard → **double GL adjustment + two auto-invoices**; possible duplicate member (partly mitigated by `@@unique([tenantId,memberNumber])`, nondeterministic). Exp: atomic status transition (updateMany-guard/row lock) inside a transaction (J2). | Double billing / duplicate member on the maker-checker money path when two checkers act on the same endorsement. | OPEN |
+| **FG-C1** | Medium (latent High) | C — offline pack scope | Offline data pack roster is tenant-wide, not provider/client-scoped | `OfflinePackService.buildPayload` (offline-pack.service.ts:76) selects `where:{tenantId,status:ACTIVE}` then filters only by `PackageProviderEligibility`, which defaults to INCLUDE when empty. DB: that table is **empty (0 rows)** → all **2,997** active members land in **every** facility's pack (name + memberNumber + benefit balances), incl. all **2,750 NWSC** (isolated everywhere else). Exp: pack scoped to the provider's entitled members. | Breaks client/group isolation on the offline rail — worse than N3 (tenant-wide vs client-wide). **Currently gated** (pack access is OPS-only; no external pack-pull API), so no new *external* reach today; becomes a live High the moment offline is exposed to facility devices (its stated purpose). Fix: scope roster via `ProviderEntitlementService.entitledMemberWhere`. | **FIXED (WP-A8)** on branch `fix/full-go-workstream-a`; pending deploy + D-14 |
+| **BB2-DEF-01** (artifact) | — | B — input boundary | Negative-billed claim persists in prod | **1** claim with `billedAmount < 0` remains (CLM-2026-00302, −5,000, from the BB2 API probe). WP-A1 (branch `fix/full-go-workstream-a`, undeployed) prevents new ones; this row is a residual test artifact. | None (contract engine floors payable at 0). Clean up after WP-A1 deploys. | Known — fix pending deploy |
+
+## Systemic observation
+**Prod is a seeded demo/UAT environment, not a clean production load.** 2,999 members, 98 seed-paid
+claims with no vouchers/GL, and 8 future-dated service dates all indicate synthetic data inserted
+directly (bypassing intake/settlement pipelines). A true production cutover needs a clean data load and
+a conservation tie-out on real transactions — otherwise GL/reporting reconciliation will not hold and
+Family Q (end-of-day conservation) cannot pass on this dataset. This is a **launch condition**, not a
+code defect.
+
+## Family K persona sweep — no new defects (all PASS)
+HR / Broker / Fund / Member / Reports scope re-tested adversarially on the current prod build (provisioned
+logins) — every persona holds: group/scheme/book/self isolation, forbidden routes → branded denial or 404,
+no clinical/secret/health-vault leakage. Cross-broker foreign-group IDOR and health-vault cross-member
+access (both previously unprobed) are **cleared**. See `FULL_GO_RUN_LOG.md` §C1. No defect or observation
+raised from the persona sweep. The only open Family-K item is **N3** (above).
+
+## C3 HMS — observations (Low)
+- **OBS-D1:** HMS idempotency key `batchRef#lineHash` + the `caseServiceEntry.findFirst({hmsBatchRef})`
+  lookup are not provider-scoped → cross-facility collision if two facilities share a batchRef + identical
+  line (D2-06). Low (batchRefs are facility-prefixed by convention); scope the lookup by provider when fixing FG-C3.
+- **OBS-D2:** `/api/v1/hms-batch` resolves tenant via `prisma.tenant.findFirst()` (TODO G8) — same latent
+  multi-tenant bug as OBS-C3. Fix both before a second operator tenant.
+- **D6:** HMS poll transport is an honest stub ("connector not yet implemented — push API is live"); 0 HMS
+  configs on prod, so nothing falsely reports CONNECTED. `/settings/integrations` UI honesty not driven — small carry.
+- PASS by code: conservation (applied+dup+unmatched=total), idempotent replay, foreign-case/ambiguous-member
+  → unmatched exception, closed-case immutable (D1/D2-02..06).
+
+## C2 offline — observations (Low)
+- **OBS-C2:** `/offline-capture` is OPS-only, so the facility-workstation offline capture described in the
+  plan/code doesn't exist for `PROVIDER_USER` — external facilities can ingest via `/api/v1/sync` but can't
+  pull a pack. The facility-facing offline capability is effectively unbuilt (internal-ops tool only).
+- **OBS-C3:** `/api/v1/sync` resolves the tenant via `prisma.tenant.findFirst()` (TODO G8), not from the API
+  key — benign single-tenant, latent multi-tenant bug. Fix before a second operator tenant.
+- Exactly-once assimilation verified by code (opKey + clientUuid idempotency; WP-A2 unique index
+  DB-enforces it once deployed). A true offline→reconnect→duplicate-sync replay was not run (see run log).
+
+## Method note
+All findings this pass are from read-only DB queries + one admin UI session. No mutation, no PII dump
+(scope proven by counts). The persona-scope adversarial re-tests (HR/Fund/Reports/broker/member,
+health-vault) remain PENDING — see `FULL_GO_RUN_LOG.md` [K-remainder].
