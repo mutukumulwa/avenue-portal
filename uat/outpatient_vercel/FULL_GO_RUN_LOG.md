@@ -62,7 +62,15 @@
 > start-date mismatches** (all members non-terminal → all open). **Health re-verify:** `/login` 200 (serving),
 > `POST /api/v1/claims` no-key 401 (fail-closed on the new build). Concurrency guards (WP-B3) + hold-expiry
 > (WP-B1) are unit-verified (live sub-second race reproduction needs a harness); the FG-C5 coverage gate is
-> now live for the whole book (testable via `/claims/new`).
+> now live for the whole book.
+> **FG-C5 LIVE-VERIFIED via `/claims/new` 2026-07-15** (admin wizard, Timothy Mutebi NWSC-2026-02284,
+> cover-start 2026-07-01): service date **2026-06-15 → BLOCKED** ("outside coverage window", 0 claims created,
+> confirmed in the Vercel runtime log as `runClaimIntake`'s throw) and **2026-07-10 → ACCEPTED** (claim
+> **CLM-2026-00306** created, RECEIVED). Same member, both directions — the gate reads `MemberCoveragePeriod`
+> and discriminates by SERVICE date, not current status. **Also fixed + deployed `db60142`:** the admin claim
+> wizard now surfaces intake rejections as a friendly banner — Next masks THROWN server-action messages in
+> prod, so `submitClaimAction` RETURNS `{ok:false,error}` and `ClaimForm` renders it (was showing a generic
+> "Server Components render" error). (Left a test claim CLM-2026-00306 in the book from the accept-path check.)
 >
 > **SYS-1 audit sweep (WP-B3) — documented triage.** Swept every `findUnique → validate status →
 > update({where:{id}})` on a state machine. FIXED this fork: binding, amendment, `approveSettlementBatch`.
