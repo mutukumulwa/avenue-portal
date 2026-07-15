@@ -213,6 +213,20 @@ export class CaseService {
       .then((n) => `CLM-${new Date().getFullYear()}-${String(n + 1).padStart(5, "0")}`);
 
     const claim = await prisma.$transaction(async (tx) => {
+      // FG-C9: atomically claim the case as the FIRST write, so two concurrent
+      // closeAndFile calls can't both file a claim from it (Claim.caseId is
+      // non-unique — the "already filed" check above is not concurrency-safe).
+      // Only an OPEN/PENDING_CLOSURE case files, and only once: the loser matches
+      // 0 rows (row-locked behind the winner, re-evaluated as CLOSED_FILED) →
+      // throws → rolls back before a second claim is created. (One-case→one-claim, D5.)
+      const claimedCase = await tx.clinicalCase.updateMany({
+        where: { id: c.id, tenantId, status: { in: ["OPEN", "PENDING_CLOSURE"] } },
+        data: { status: "CLOSED_FILED", closedById, closedAt: new Date(), dischargeDate },
+      });
+      if (claimedCase.count !== 1) {
+        throw new Error("This case has just been filed by another user — refresh to see the claim.");
+      }
+
       const created = await tx.claim.create({
         data: {
           tenantId,
@@ -275,16 +289,8 @@ export class CaseService {
         data: { status: "UTILISED" },
       });
 
-      await tx.clinicalCase.update({
-        where: { id: c.id },
-        data: {
-          status: "CLOSED_FILED",
-          closedById,
-          closedAt: new Date(),
-          dischargeDate,
-        },
-      });
-
+      // Case status/closedBy/closedAt/dischargeDate were set by the atomic claim
+      // at the top of this transaction.
       return created;
     });
 

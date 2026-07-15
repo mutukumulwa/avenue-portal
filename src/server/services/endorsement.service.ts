@@ -113,8 +113,30 @@ export class EndorsementsService {
       );
     }
 
-    // Execute the changes
-    if (endorsement.type === "MEMBER_ADDITION") {
+    // FG-C6: atomically claim the endorsement BEFORE any side effect so two
+    // concurrent approvals can't both create the member / post the GL / raise the
+    // invoice. The loser matches 0 rows → throws. On a later failure we revert to
+    // SUBMITTED, preserving the retry-on-GL-failure invariant (a financial
+    // endorsement never stays applied without its GL entry).
+    const claimed = await prisma.endorsement.updateMany({
+      where: { id: endorsementId, tenantId, status: { in: ["SUBMITTED", "UNDER_REVIEW"] } },
+      data: {
+        status:     "APPLIED",
+        reviewedBy: approvedBy,
+        reviewedAt: new Date(),
+        appliedBy:  approvedBy,
+        appliedAt:  new Date(),
+      },
+    });
+    if (claimed.count !== 1) {
+      throw new Error(
+        "This endorsement was just actioned by another reviewer — refresh to see its current status.",
+      );
+    }
+
+    try {
+      // Execute the changes
+      if (endorsement.type === "MEMBER_ADDITION") {
       const details = endorsement.changeDetails as Record<string, string>;
 
       const group = await prisma.group.findUnique({ where: { id: endorsement.groupId }});
@@ -196,17 +218,20 @@ export class EndorsementsService {
         );
       }
     }
+    } catch (err) {
+      // FG-C6: a side effect failed after the atomic claim — revert to SUBMITTED
+      // so the endorsement stays pending and retryable (preserves the GL/invoice
+      // "never applied without its financial posting" invariant).
+      await prisma.endorsement
+        .updateMany({
+          where: { id: endorsementId },
+          data: { status: "SUBMITTED", appliedAt: null, appliedBy: null, reviewedAt: null, reviewedBy: null },
+        })
+        .catch(() => undefined);
+      throw err;
+    }
 
-    // Mark as approved and applied
-    return prisma.endorsement.update({
-      where: { id: endorsement.id },
-      data: {
-        status: "APPLIED",
-        reviewedBy: approvedBy,
-        reviewedAt: new Date(),
-        appliedBy: approvedBy,
-        appliedAt: new Date(),
-      },
-    });
+    // Status/reviewer/applied fields were set by the atomic claim above.
+    return prisma.endorsement.findUnique({ where: { id: endorsementId } });
   }
 }

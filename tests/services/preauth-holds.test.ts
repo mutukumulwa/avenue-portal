@@ -60,12 +60,26 @@ beforeEach(() => {
 });
 
 describe("approveByHuman — canonical PA approval (PR-011)", () => {
+  it("FG-C8: a concurrent decide loses the atomic gate — CONFLICT, no phantom hold", async () => {
+    // Another reviewer already decided the PA, so the status-guarded updateMany
+    // matches 0 rows for this approval (its pre-check saw the stale SUBMITTED PA).
+    db.preAuthorization.updateMany.mockResolvedValueOnce({ count: 0 });
+    await expect(
+      preauthAdjudicationService.approveByHuman("pa1", T, "u1", 85000, undefined, 30),
+    ).rejects.toThrow(/just decided by another reviewer/i);
+    // The hold is placed AFTER the atomic gate, so a lost race leaves no phantom hold.
+    expect(db.benefitHold.upsert).not.toHaveBeenCalled();
+  });
+
   it("approves with a hold: BenefitHold ACTIVE for the amount, expiry = validUntil, activeHoldAmount upserted", async () => {
     await preauthAdjudicationService.approveByHuman("pa1", T, "u1", 85000, undefined, 30);
 
-    // PA approved with a 30-day validity window
-    const paUpdate = db.preAuthorization.update.mock.calls[0][0].data;
+    // PA approved with a 30-day validity window (via the FG-C8 atomic status claim)
+    const paUpdate = db.preAuthorization.updateMany.mock.calls[0][0].data;
     expect(paUpdate.status).toBe("APPROVED");
+    expect(db.preAuthorization.updateMany.mock.calls[0][0].where).toMatchObject({
+      id: "pa1", status: { in: ["SUBMITTED", "UNDER_REVIEW"] },
+    });
     const days = Math.round((paUpdate.validUntil.getTime() - Date.now()) / 86400000);
     expect(days).toBeGreaterThanOrEqual(29);
     expect(days).toBeLessThanOrEqual(30);
@@ -89,7 +103,7 @@ describe("approveByHuman — canonical PA approval (PR-011)", () => {
   it("annotates the shortfall when approving above the available limit", async () => {
     db.benefitUsage.findUnique.mockResolvedValue({ id: "bu1", amountUsed: 480000, activeHoldAmount: 0 });
     await preauthAdjudicationService.approveByHuman("pa1", T, "u1", 85000);
-    const paUpdate = db.preAuthorization.update.mock.calls[0][0].data;
+    const paUpdate = db.preAuthorization.updateMany.mock.calls[0][0].data;
     expect(paUpdate.reviewNotes).toMatch(/shortfall/i);
   });
 

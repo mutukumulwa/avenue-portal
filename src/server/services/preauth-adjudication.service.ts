@@ -500,8 +500,12 @@ export const preauthAdjudicationService = {
     const gopCount = await prisma.preAuthorization.count({ where: { tenantId, gopNumber: { not: null } } });
     const gopNumber = `GOP-${new Date().getFullYear()}-${String(gopCount + 1).padStart(5, "0")}`;
 
-    await prisma.preAuthorization.update({
-      where: { id: preAuthId },
+    // FG-C8: the status transition is the ATOMIC decision gate. A concurrent
+    // decide (approve/decline in another session) matches 0 rows here → we throw
+    // BEFORE placing the benefit hold, so a lost race leaves no phantom hold and
+    // the PA carries exactly one terminal decision (G2).
+    const decided = await prisma.preAuthorization.updateMany({
+      where: { id: preAuthId, tenantId, status: { in: ["SUBMITTED", "UNDER_REVIEW"] } },
       data: {
         status:         "APPROVED",
         approvedAmount,
@@ -515,6 +519,12 @@ export const preauthAdjudicationService = {
         reviewNotes,
       } as never,
     });
+    if (decided.count !== 1) {
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: "This pre-authorization was just decided by another reviewer — refresh to see the current decision.",
+      });
+    }
 
     await preauthAdjudicationService.createBenefitHold(
       preAuthId, tenantId, pa.memberId,
@@ -549,8 +559,11 @@ export const preauthAdjudicationService = {
       });
     }
 
-    await prisma.preAuthorization.update({
-      where: { id: preAuthId },
+    // FG-C8: atomic decision gate (mirrors approveByHuman). A concurrent approve
+    // in another session matches 0 rows here → CONFLICT, so the PA has exactly
+    // one terminal decision and no phantom hold survives.
+    const decided = await prisma.preAuthorization.updateMany({
+      where: { id: preAuthId, tenantId, status: { in: ["SUBMITTED", "UNDER_REVIEW"] } },
       data: {
         status:           "DECLINED",
         declineReasonCode: reasonCode,
@@ -559,6 +572,12 @@ export const preauthAdjudicationService = {
         declinedBy:        reviewerId,
       },
     });
+    if (decided.count !== 1) {
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: "This pre-authorization was just decided by another reviewer — refresh to see the current decision.",
+      });
+    }
 
     await auditChainService.append({
       actorId:    reviewerId,

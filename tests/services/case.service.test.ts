@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const db = vi.hoisted(() => {
   const tx = {
     caseServiceEntry: { create: vi.fn(async (a: any) => ({ id: "e1", ...a.data })), update: vi.fn(async (a: any) => a.data), aggregate: vi.fn(async () => ({ _sum: { totalAmount: 30_000 } })) },
-    clinicalCase: { update: vi.fn(async (a: any) => a.data) },
+    clinicalCase: { update: vi.fn(async (a: any) => a.data), updateMany: vi.fn(async () => ({ count: 1 })) },
     claim: { create: vi.fn(async (a: any) => ({ id: "clm1", ...a.data })) },
     preAuthorization: { updateMany: vi.fn(async () => ({ count: 1 })) },
     letterOfUndertaking: { updateMany: vi.fn(async () => ({ count: 0 })) },
@@ -69,11 +69,22 @@ describe("CaseService.closeAndFile (WP-D2 — one case, one claim)", () => {
     );
   });
 
-  it("marks the case CLOSED_FILED", async () => {
+  it("marks the case CLOSED_FILED via the FG-C9 atomic status-guarded claim", async () => {
     await CaseService.closeAndFile("t1", "case1", "u1");
-    expect(db.tx.clinicalCase.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: "CLOSED_FILED" }) }),
+    expect(db.tx.clinicalCase.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: "case1", tenantId: "t1", status: { in: ["OPEN", "PENDING_CLOSURE"] } }),
+        data: expect.objectContaining({ status: "CLOSED_FILED" }),
+      }),
     );
+  });
+
+  it("FG-C9: a concurrent second file is atomically rejected — no second claim", async () => {
+    // The winner already flipped the case to CLOSED_FILED, so the atomic claim
+    // matches 0 rows for the loser (its pre-check saw the stale OPEN case).
+    db.tx.clinicalCase.updateMany.mockResolvedValueOnce({ count: 0 });
+    await expect(CaseService.closeAndFile("t1", "case1", "u1")).rejects.toThrow(/just been filed/i);
+    expect(db.tx.claim.create).not.toHaveBeenCalled();
   });
 
   it("enforces one claim per case", async () => {
