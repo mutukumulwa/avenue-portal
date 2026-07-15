@@ -90,6 +90,21 @@ export async function runClaimIntake(
     throw new Error(`Cannot submit claim: group "${member.group.name}" is ${member.group.status}.`);
   }
 
+  // ── Coverage-start gate (FG-C5, point-in-time eligibility) ────────────────
+  // A claim's service date must fall on or after the member's coverage start
+  // (`enrollmentDate`, which mirrors the endorsement effective date). A
+  // pre-enrollment service date was never covered, so it must not file — the
+  // current-status check alone let pre-coverage claims through. (The
+  // termination-side of point-in-time eligibility needs a coverage-end model
+  // and is a separate change.)
+  if (member.enrollmentDate && new Date(data.dateOfService) < member.enrollmentDate) {
+    throw new Error(
+      `Service date ${new Date(data.dateOfService).toLocaleDateString("en-UG")} is before ` +
+        `${member.firstName} ${member.lastName}'s coverage start ` +
+        `(${new Date(member.enrollmentDate).toLocaleDateString("en-UG")}) — the member was not covered on that date.`,
+    );
+  }
+
   // ── Provider gate (PR-006, server-enforced) ──────────────────────────────
   const gateProvider = await prisma.provider.findUnique({
     where: { id: data.providerId, tenantId },
