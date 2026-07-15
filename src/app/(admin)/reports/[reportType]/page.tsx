@@ -71,22 +71,28 @@ function reportGroupWhere(scope?: AnalyticsAccessScope) {
 
 // ── Data fetchers per report type ─────────────────────────────────────────────
 
-async function getClaimsData(tenantId: string) {
-  const rows = await prisma.claim.findMany({
-    where: { tenantId },
-    select: {
-      claimNumber: true, status: true, billedAmount: true, approvedAmount: true,
-      benefitCategory: true, createdAt: true,
-      member: { select: { firstName: true, lastName: true } },
-      provider: { select: { name: true } },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-  });
-  const total = rows.reduce((s, r) => s + Number(r.billedAmount), 0);
-  const approved = rows.reduce((s, r) => s + Number(r.approvedAmount ?? 0), 0);
+async function getClaimsData(tenantId: string): Promise<ReportResult> {
+  // Summary from tenant-wide aggregates (not the capped table sample); the table
+  // stays bounded and the CSV export is full.
+  const [agg, rows] = await Promise.all([
+    prisma.claim.aggregate({ where: { tenantId }, _count: { _all: true }, _sum: { billedAmount: true, approvedAmount: true } }),
+    prisma.claim.findMany({
+      where: { tenantId },
+      select: {
+        claimNumber: true, status: true, billedAmount: true, approvedAmount: true,
+        benefitCategory: true, createdAt: true,
+        member: { select: { firstName: true, lastName: true } },
+        provider: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    }),
+  ]);
+  const totalCount = agg._count._all;
+  const total = Number(agg._sum.billedAmount ?? 0);
+  const approved = Number(agg._sum.approvedAmount ?? 0);
   const kpis = [
-    { label: "Total Claims",        value: rows.length.toLocaleString() },
+    { label: "Total Claims",        value: totalCount.toLocaleString() },
     { label: "Total Billed (UGX)",  value: total.toLocaleString() },
     { label: "Total Approved (UGX)",value: approved.toLocaleString() },
     { label: "Loss Ratio",          value: total > 0 ? `${((approved / total) * 100).toFixed(1)}%` : "—" },
@@ -102,7 +108,7 @@ async function getClaimsData(tenantId: string) {
     r.status.replace(/_/g, " "),
     new Date(r.createdAt).toLocaleDateString("en-UG"),
   ]);
-  return { kpis, headers, data };
+  return { kpis, headers, data, totalCount };
 }
 
 async function getMembershipData(tenantId: string): Promise<ReportResult> {
@@ -145,25 +151,29 @@ async function getMembershipData(tenantId: string): Promise<ReportResult> {
   return { kpis, headers, data, totalCount: totalMembers };
 }
 
-async function getPreauthData(tenantId: string) {
-  const rows = await prisma.preAuthorization.findMany({
-    where: { tenantId },
-    select: {
-      preauthNumber: true, status: true, benefitCategory: true,
-      estimatedCost: true, approvedAmount: true, createdAt: true,
-      member: { select: { firstName: true, lastName: true } },
-      provider: { select: { name: true } },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-  });
-  const approved = rows.filter(r => r.status === "APPROVED").length;
-  const declined = rows.filter(r => r.status === "DECLINED").length;
+async function getPreauthData(tenantId: string): Promise<ReportResult> {
+  const [byStatus, rows] = await Promise.all([
+    prisma.preAuthorization.groupBy({ by: ["status"], where: { tenantId }, _count: { _all: true } }),
+    prisma.preAuthorization.findMany({
+      where: { tenantId },
+      select: {
+        preauthNumber: true, status: true, benefitCategory: true,
+        estimatedCost: true, approvedAmount: true, createdAt: true,
+        member: { select: { firstName: true, lastName: true } },
+        provider: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    }),
+  ]);
+  const totalCount = byStatus.reduce((s, g) => s + g._count._all, 0);
+  const approved = byStatus.find(g => g.status === "APPROVED")?._count._all ?? 0;
+  const declined = byStatus.find(g => g.status === "DECLINED")?._count._all ?? 0;
   const kpis = [
-    { label: "Total Pre-Auths", value: rows.length.toLocaleString() },
+    { label: "Total Pre-Auths", value: totalCount.toLocaleString() },
     { label: "Approved",        value: approved.toLocaleString() },
     { label: "Declined",        value: declined.toLocaleString() },
-    { label: "Approval Rate",   value: rows.length > 0 ? `${((approved / rows.length) * 100).toFixed(1)}%` : "—" },
+    { label: "Approval Rate",   value: totalCount > 0 ? `${((approved / totalCount) * 100).toFixed(1)}%` : "—" },
   ];
   const headers = ["PA No.", "Member", "Provider", "Category", "Estimated (UGX)", "Approved (UGX)", "Status", "Date"];
   const data = rows.map(r => [
@@ -176,25 +186,29 @@ async function getPreauthData(tenantId: string) {
     r.status,
     new Date(r.createdAt).toLocaleDateString("en-UG"),
   ]);
-  return { kpis, headers, data };
+  return { kpis, headers, data, totalCount };
 }
 
-async function getBillingData(tenantId: string) {
-  const rows = await prisma.invoice.findMany({
-    where: { tenantId },
-    select: {
-      invoiceNumber: true, period: true, memberCount: true,
-      totalAmount: true, paidAmount: true, balance: true,
-      status: true, dueDate: true,
-      group: { select: { name: true } },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-  });
-  const totalBilled    = rows.reduce((s, r) => s + Number(r.totalAmount), 0);
-  const totalCollected = rows.reduce((s, r) => s + Number(r.paidAmount), 0);
+async function getBillingData(tenantId: string): Promise<ReportResult> {
+  const [agg, rows] = await Promise.all([
+    prisma.invoice.aggregate({ where: { tenantId }, _count: { _all: true }, _sum: { totalAmount: true, paidAmount: true } }),
+    prisma.invoice.findMany({
+      where: { tenantId },
+      select: {
+        invoiceNumber: true, period: true, memberCount: true,
+        totalAmount: true, paidAmount: true, balance: true,
+        status: true, dueDate: true,
+        group: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    }),
+  ]);
+  const totalCount = agg._count._all;
+  const totalBilled    = Number(agg._sum.totalAmount ?? 0);
+  const totalCollected = Number(agg._sum.paidAmount ?? 0);
   const kpis = [
-    { label: "Total Invoices",      value: rows.length.toLocaleString() },
+    { label: "Total Invoices",      value: totalCount.toLocaleString() },
     { label: "Total Billed (UGX)",  value: totalBilled.toLocaleString() },
     { label: "Collected (UGX)",     value: totalCollected.toLocaleString() },
     { label: "Outstanding (UGX)",   value: (totalBilled - totalCollected).toLocaleString() },
@@ -210,24 +224,29 @@ async function getBillingData(tenantId: string) {
     Number(r.balance).toLocaleString(),
     r.status.replace(/_/g, " "),
   ]);
-  return { kpis, headers, data };
+  return { kpis, headers, data, totalCount };
 }
 
-async function getUtilizationData(tenantId: string) {
-  const rows = await prisma.benefitUsage.findMany({
-    where: { member: { tenantId } },
-    select: {
-      amountUsed: true, periodStart: true, periodEnd: true,
-      member: { select: { firstName: true, lastName: true, memberNumber: true, group: { select: { name: true } } } },
-      benefitConfig: { select: { category: true, annualSubLimit: true } },
-    },
-    orderBy: { amountUsed: "desc" },
-    take: 100,
-  });
-  const totalUsed  = rows.reduce((s, r) => s + Number(r.amountUsed), 0);
-  const totalLimit = rows.reduce((s, r) => s + Number(r.benefitConfig.annualSubLimit), 0);
+async function getUtilizationData(tenantId: string): Promise<ReportResult> {
+  const [agg, limitRows, rows] = await Promise.all([
+    prisma.benefitUsage.aggregate({ where: { member: { tenantId } }, _count: { _all: true }, _sum: { amountUsed: true } }),
+    prisma.benefitUsage.findMany({ where: { member: { tenantId } }, select: { benefitConfig: { select: { annualSubLimit: true } } } }),
+    prisma.benefitUsage.findMany({
+      where: { member: { tenantId } },
+      select: {
+        amountUsed: true, periodStart: true, periodEnd: true,
+        member: { select: { firstName: true, lastName: true, memberNumber: true, group: { select: { name: true } } } },
+        benefitConfig: { select: { category: true, annualSubLimit: true } },
+      },
+      orderBy: { amountUsed: "desc" },
+      take: 100,
+    }),
+  ]);
+  const totalCount = agg._count._all;
+  const totalUsed  = Number(agg._sum.amountUsed ?? 0);
+  const totalLimit = limitRows.reduce((s, r) => s + Number(r.benefitConfig.annualSubLimit), 0);
   const kpis = [
-    { label: "Records",          value: rows.length.toLocaleString() },
+    { label: "Records",          value: totalCount.toLocaleString() },
     { label: "Total Used (UGX)", value: totalUsed.toLocaleString() },
     { label: "Total Limit (UGX)",value: totalLimit.toLocaleString() },
     { label: "Utilization %",    value: totalLimit > 0 ? `${((totalUsed / totalLimit) * 100).toFixed(1)}%` : "—" },
@@ -248,26 +267,32 @@ async function getUtilizationData(tenantId: string) {
       period,
     ];
   });
-  return { kpis, headers, data };
+  return { kpis, headers, data, totalCount };
 }
 
-async function getEndorsementsData(tenantId: string) {
-  const rows = await prisma.endorsement.findMany({
-    where: { tenantId },
-    select: {
-      endorsementNumber: true, type: true, status: true,
-      effectiveDate: true, proratedAmount: true, createdAt: true,
-      group: { select: { name: true } },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-  });
-  const applied  = rows.filter(r => r.status === "APPLIED").length;
-  const totalAdj = rows.reduce((s, r) => s + Number(r.proratedAmount ?? 0), 0);
+async function getEndorsementsData(tenantId: string): Promise<ReportResult> {
+  const [byStatus, agg, rows] = await Promise.all([
+    prisma.endorsement.groupBy({ by: ["status"], where: { tenantId }, _count: { _all: true } }),
+    prisma.endorsement.aggregate({ where: { tenantId }, _sum: { proratedAmount: true } }),
+    prisma.endorsement.findMany({
+      where: { tenantId },
+      select: {
+        endorsementNumber: true, type: true, status: true,
+        effectiveDate: true, proratedAmount: true, createdAt: true,
+        group: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    }),
+  ]);
+  const totalCount = byStatus.reduce((s, g) => s + g._count._all, 0);
+  const applied  = byStatus.find(g => g.status === "APPLIED")?._count._all ?? 0;
+  const submittedReview = byStatus.filter(g => ["SUBMITTED", "UNDER_REVIEW"].includes(g.status)).reduce((s, g) => s + g._count._all, 0);
+  const totalAdj = Number(agg._sum.proratedAmount ?? 0);
   const kpis = [
-    { label: "Total Endorsements",   value: rows.length.toLocaleString() },
+    { label: "Total Endorsements",   value: totalCount.toLocaleString() },
     { label: "Applied",              value: applied.toLocaleString() },
-    { label: "Submitted / Review",   value: rows.filter(r => ["SUBMITTED", "UNDER_REVIEW"].includes(r.status)).length.toLocaleString() },
+    { label: "Submitted / Review",   value: submittedReview.toLocaleString() },
     { label: "Net Adjustment (UGX)", value: totalAdj.toLocaleString() },
   ];
   const headers = ["Endorsement No.", "Group", "Type", "Status", "Effective Date", "Adj. (UGX)", "Created"];
@@ -280,27 +305,31 @@ async function getEndorsementsData(tenantId: string) {
     r.proratedAmount ? Number(r.proratedAmount).toLocaleString() : "—",
     new Date(r.createdAt).toLocaleDateString("en-UG"),
   ]);
-  return { kpis, headers, data };
+  return { kpis, headers, data, totalCount };
 }
 
-async function getQuotationsData(tenantId: string) {
-  const rows = await prisma.quotation.findMany({
-    where: { tenantId },
-    select: {
-      quoteNumber: true, status: true, annualPremium: true,
-      memberCount: true, validUntil: true, createdAt: true,
-      group: { select: { name: true } },
-      prospectName: true,
-    },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-  });
-  const accepted     = rows.filter(r => r.status === "ACCEPTED").length;
-  const totalPremium = rows.filter(r => r.status === "ACCEPTED").reduce((s, r) => s + Number(r.annualPremium ?? 0), 0);
+async function getQuotationsData(tenantId: string): Promise<ReportResult> {
+  const [totalCount, accepted, acceptedAgg, rows] = await Promise.all([
+    prisma.quotation.count({ where: { tenantId } }),
+    prisma.quotation.count({ where: { tenantId, status: "ACCEPTED" } }),
+    prisma.quotation.aggregate({ where: { tenantId, status: "ACCEPTED" }, _sum: { annualPremium: true } }),
+    prisma.quotation.findMany({
+      where: { tenantId },
+      select: {
+        quoteNumber: true, status: true, annualPremium: true,
+        memberCount: true, validUntil: true, createdAt: true,
+        group: { select: { name: true } },
+        prospectName: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    }),
+  ]);
+  const totalPremium = Number(acceptedAgg._sum.annualPremium ?? 0);
   const kpis = [
-    { label: "Total Quotes",           value: rows.length.toLocaleString() },
+    { label: "Total Quotes",           value: totalCount.toLocaleString() },
     { label: "Accepted",               value: accepted.toLocaleString() },
-    { label: "Win Rate",               value: rows.length > 0 ? `${((accepted / rows.length) * 100).toFixed(1)}%` : "—" },
+    { label: "Win Rate",               value: totalCount > 0 ? `${((accepted / totalCount) * 100).toFixed(1)}%` : "—" },
     { label: "Accepted Premium (UGX)", value: totalPremium.toLocaleString() },
   ];
   const headers = ["Quote No.", "Group / Prospect", "Members", "Annual Premium (UGX)", "Status", "Valid Until", "Created"];
@@ -313,7 +342,7 @@ async function getQuotationsData(tenantId: string) {
     r.validUntil ? new Date(r.validUntil).toLocaleDateString("en-UG") : "—",
     new Date(r.createdAt).toLocaleDateString("en-UG"),
   ]);
-  return { kpis, headers, data };
+  return { kpis, headers, data, totalCount };
 }
 
 async function getChronicDiseaseData(tenantId: string) {
@@ -460,30 +489,35 @@ async function getProviderStatementsData(tenantId: string): Promise<ReportResult
   return { kpis, headers, data };
 }
 
-async function getMemberStatementsData(tenantId: string) {
-  const members = await prisma.member.findMany({
-    where: { tenantId, status: "ACTIVE" },
-    select: {
-      memberNumber: true, firstName: true, lastName: true,
-      group: { select: { name: true } },
-      package: { select: { name: true, annualLimit: true } },
-      claims: {
-        where: { status: { in: ["APPROVED", "PARTIALLY_APPROVED", "PAID"] } },
-        select: { billedAmount: true, approvedAmount: true, paidAmount: true },
+async function getMemberStatementsData(tenantId: string): Promise<ReportResult> {
+  const [totalCount, claimAgg, coAgg, members] = await Promise.all([
+    prisma.member.count({ where: { tenantId, status: "ACTIVE" } }),
+    prisma.claim.aggregate({ where: { tenantId, member: { status: "ACTIVE" }, status: { in: ["APPROVED", "PARTIALLY_APPROVED", "PAID"] } }, _sum: { billedAmount: true, approvedAmount: true } }),
+    prisma.coContributionTransaction.aggregate({ where: { member: { tenantId, status: "ACTIVE" } }, _sum: { amountCollected: true } }),
+    prisma.member.findMany({
+      where: { tenantId, status: "ACTIVE" },
+      select: {
+        memberNumber: true, firstName: true, lastName: true,
+        group: { select: { name: true } },
+        package: { select: { name: true, annualLimit: true } },
+        claims: {
+          where: { status: { in: ["APPROVED", "PARTIALLY_APPROVED", "PAID"] } },
+          select: { billedAmount: true, approvedAmount: true, paidAmount: true },
+        },
+        coContributionTransactions: {
+          select: { finalAmount: true, amountCollected: true, collectionStatus: true },
+        },
       },
-      coContributionTransactions: {
-        select: { finalAmount: true, amountCollected: true, collectionStatus: true },
-      },
-    },
-    orderBy: [{ group: { name: "asc" } }, { lastName: "asc" }],
-    take: 200,
-  });
+      orderBy: [{ group: { name: "asc" } }, { lastName: "asc" }],
+      take: 200,
+    }),
+  ]);
 
   const kpis = [
-    { label: "Members",              value: members.length.toLocaleString() },
-    { label: "Total Billed (UGX)",   value: members.reduce((s, m) => s + m.claims.reduce((c, cl) => c + Number(cl.billedAmount), 0), 0).toLocaleString() },
-    { label: "Total Approved (UGX)", value: members.reduce((s, m) => s + m.claims.reduce((c, cl) => c + Number(cl.approvedAmount), 0), 0).toLocaleString() },
-    { label: "Co-Contrib Collected", value: members.reduce((s, m) => s + m.coContributionTransactions.reduce((c, t) => c + Number(t.amountCollected ?? 0), 0), 0).toLocaleString() },
+    { label: "Members",              value: totalCount.toLocaleString() },
+    { label: "Total Billed (UGX)",   value: Number(claimAgg._sum.billedAmount ?? 0).toLocaleString() },
+    { label: "Total Approved (UGX)", value: Number(claimAgg._sum.approvedAmount ?? 0).toLocaleString() },
+    { label: "Co-Contrib Collected", value: Number(coAgg._sum.amountCollected ?? 0).toLocaleString() },
   ];
   const headers = ["Member No.", "Name", "Group", "Package", "Claims", "Total Billed (UGX)", "Approved (UGX)", "Co-Contrib Owed (UGX)", "Co-Contrib Paid (UGX)"];
   const data = members.map(m => {
@@ -503,7 +537,7 @@ async function getMemberStatementsData(tenantId: string) {
       coPaid.toLocaleString(),
     ];
   });
-  return { kpis, headers, data };
+  return { kpis, headers, data, totalCount };
 }
 
 async function getExceededLimitsData(tenantId: string) {
@@ -547,26 +581,31 @@ async function getExceededLimitsData(tenantId: string) {
   return { kpis, headers, data };
 }
 
-async function getAdmissionsData(tenantId: string) {
-  const rows = await prisma.claim.findMany({
-    where: { tenantId, serviceType: "INPATIENT" },
-    select: {
-      claimNumber: true, dateOfService: true, admissionDate: true,
-      dischargeDate: true, lengthOfStay: true, billedAmount: true,
-      approvedAmount: true, status: true, attendingDoctor: true,
-      member: { select: { memberNumber: true, firstName: true, lastName: true, group: { select: { name: true } } } },
-      provider: { select: { name: true } },
-    },
-    orderBy: { admissionDate: "desc" },
-    take: 200,
-  });
-  const totalBilled   = rows.reduce((s, r) => s + Number(r.billedAmount), 0);
-  const avgLOS        = rows.filter(r => r.lengthOfStay).reduce((s, r) => s + (r.lengthOfStay ?? 0), 0) / Math.max(1, rows.filter(r => r.lengthOfStay).length);
+async function getAdmissionsData(tenantId: string): Promise<ReportResult> {
+  const [agg, distinctProviders, rows] = await Promise.all([
+    prisma.claim.aggregate({ where: { tenantId, serviceType: "INPATIENT" }, _count: { _all: true }, _sum: { billedAmount: true }, _avg: { lengthOfStay: true } }),
+    prisma.claim.findMany({ where: { tenantId, serviceType: "INPATIENT" }, distinct: ["providerId"], select: { providerId: true } }),
+    prisma.claim.findMany({
+      where: { tenantId, serviceType: "INPATIENT" },
+      select: {
+        claimNumber: true, dateOfService: true, admissionDate: true,
+        dischargeDate: true, lengthOfStay: true, billedAmount: true,
+        approvedAmount: true, status: true, attendingDoctor: true,
+        member: { select: { memberNumber: true, firstName: true, lastName: true, group: { select: { name: true } } } },
+        provider: { select: { name: true } },
+      },
+      orderBy: { admissionDate: "desc" },
+      take: 200,
+    }),
+  ]);
+  const totalCount    = agg._count._all;
+  const totalBilled   = Number(agg._sum.billedAmount ?? 0);
+  const avgLOS        = Number(agg._avg.lengthOfStay ?? 0);
   const kpis = [
-    { label: "Total Admissions",    value: rows.length.toLocaleString() },
+    { label: "Total Admissions",    value: totalCount.toLocaleString() },
     { label: "Total Billed (UGX)",  value: totalBilled.toLocaleString() },
     { label: "Avg Length of Stay",  value: `${avgLOS.toFixed(1)} days` },
-    { label: "Unique Providers",    value: new Set(rows.map(r => r.provider.name)).size.toLocaleString() },
+    { label: "Unique Providers",    value: distinctProviders.length.toLocaleString() },
   ];
   const headers = ["Claim No.", "Member", "Group", "Provider", "Admission Date", "Discharge Date", "LOS (Days)", "Billed (UGX)", "Status"];
   const data = rows.map(r => [
@@ -580,31 +619,32 @@ async function getAdmissionsData(tenantId: string) {
     Number(r.billedAmount).toLocaleString(),
     r.status.replace(/_/g, " "),
   ]);
-  return { kpis, headers, data };
+  return { kpis, headers, data, totalCount };
 }
 
-async function getAdmissionVisitsData(tenantId: string) {
-  const rows = await prisma.claim.findMany({
-    where: { tenantId, serviceType: "OUTPATIENT" },
-    select: {
-      claimNumber: true, dateOfService: true, billedAmount: true, status: true,
-      benefitCategory: true,
-      member: { select: { memberNumber: true, firstName: true, lastName: true, group: { select: { name: true } } } },
-      provider: { select: { name: true } },
-    },
-    orderBy: { dateOfService: "desc" },
-    take: 300,
-  });
-  const totalBilled = rows.reduce((s, r) => s + Number(r.billedAmount), 0);
-  const byMember = new Map<string, number>();
-  rows.forEach(r => {
-    const key = r.member.memberNumber;
-    byMember.set(key, (byMember.get(key) ?? 0) + 1);
-  });
-  const avgVisits = byMember.size > 0 ? [...byMember.values()].reduce((s, v) => s + v, 0) / byMember.size : 0;
+async function getAdmissionVisitsData(tenantId: string): Promise<ReportResult> {
+  const [agg, distinctMembers, rows] = await Promise.all([
+    prisma.claim.aggregate({ where: { tenantId, serviceType: "OUTPATIENT" }, _count: { _all: true }, _sum: { billedAmount: true } }),
+    prisma.claim.findMany({ where: { tenantId, serviceType: "OUTPATIENT" }, distinct: ["memberId"], select: { memberId: true } }),
+    prisma.claim.findMany({
+      where: { tenantId, serviceType: "OUTPATIENT" },
+      select: {
+        claimNumber: true, dateOfService: true, billedAmount: true, status: true,
+        benefitCategory: true,
+        member: { select: { memberNumber: true, firstName: true, lastName: true, group: { select: { name: true } } } },
+        provider: { select: { name: true } },
+      },
+      orderBy: { dateOfService: "desc" },
+      take: 300,
+    }),
+  ]);
+  const totalCount  = agg._count._all;
+  const totalBilled = Number(agg._sum.billedAmount ?? 0);
+  const uniqueMembers = distinctMembers.length;
+  const avgVisits = uniqueMembers > 0 ? totalCount / uniqueMembers : 0;
   const kpis = [
-    { label: "Total OPD Visits",   value: rows.length.toLocaleString() },
-    { label: "Unique Members",     value: byMember.size.toLocaleString() },
+    { label: "Total OPD Visits",   value: totalCount.toLocaleString() },
+    { label: "Unique Members",     value: uniqueMembers.toLocaleString() },
     { label: "Avg Visits / Member",value: avgVisits.toFixed(1) },
     { label: "Total Billed (UGX)", value: totalBilled.toLocaleString() },
   ];
@@ -619,7 +659,7 @@ async function getAdmissionVisitsData(tenantId: string) {
     Number(r.billedAmount).toLocaleString(),
     r.status.replace(/_/g, " "),
   ]);
-  return { kpis, headers, data };
+  return { kpis, headers, data, totalCount };
 }
 
 // ── TRANCHE 2: Financial ──────────────────────────────────────────────────────
@@ -749,21 +789,26 @@ async function getAgeingAnalysisData(tenantId: string) {
   return { kpis, headers, data };
 }
 
-async function getCommissionStatementsData(tenantId: string) {
-  const rows = await prisma.commission.findMany({
-    where: { broker: { tenantId } },
-    select: {
-      period: true, commissionRate: true, commissionAmount: true,
-      paymentStatus: true, paidAt: true, createdAt: true,
-      broker: { select: { name: true } },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 200,
-  });
-  const totalEarned = rows.reduce((s, r) => s + Number(r.commissionAmount), 0);
-  const totalPaid   = rows.filter(r => r.paymentStatus === "PAID").reduce((s, r) => s + Number(r.commissionAmount), 0);
+async function getCommissionStatementsData(tenantId: string): Promise<ReportResult> {
+  const [agg, paidAgg, rows] = await Promise.all([
+    prisma.commission.aggregate({ where: { broker: { tenantId } }, _count: { _all: true }, _sum: { commissionAmount: true } }),
+    prisma.commission.aggregate({ where: { broker: { tenantId }, paymentStatus: "PAID" }, _sum: { commissionAmount: true } }),
+    prisma.commission.findMany({
+      where: { broker: { tenantId } },
+      select: {
+        period: true, commissionRate: true, commissionAmount: true,
+        paymentStatus: true, paidAt: true, createdAt: true,
+        broker: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+    }),
+  ]);
+  const totalCount  = agg._count._all;
+  const totalEarned = Number(agg._sum.commissionAmount ?? 0);
+  const totalPaid   = Number(paidAgg._sum.commissionAmount ?? 0);
   const kpis = [
-    { label: "Commission Records",   value: rows.length.toLocaleString() },
+    { label: "Commission Records",   value: totalCount.toLocaleString() },
     { label: "Total Earned (UGX)",   value: totalEarned.toLocaleString() },
     { label: "Total Paid (UGX)",     value: totalPaid.toLocaleString() },
     { label: "Outstanding (UGX)",    value: (totalEarned - totalPaid).toLocaleString() },
@@ -778,25 +823,29 @@ async function getCommissionStatementsData(tenantId: string) {
     new Date(r.createdAt).toLocaleDateString("en-UG"),
     r.paidAt ? new Date(r.paidAt).toLocaleDateString("en-UG") : "—",
   ]);
-  return { kpis, headers, data };
+  return { kpis, headers, data, totalCount };
 }
 
-async function getLeviesTaxesData(tenantId: string) {
-  const rows = await prisma.invoice.findMany({
-    where: { tenantId },
-    select: {
-      invoiceNumber: true, period: true, totalAmount: true,
-      stampDuty: true, trainingLevy: true, phcf: true, taxTotal: true,
-      createdAt: true,
-      group: { select: { name: true } },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 200,
-  });
-  const totalStamp    = rows.reduce((s, r) => s + Number(r.stampDuty), 0);
-  const totalLevy     = rows.reduce((s, r) => s + Number(r.trainingLevy), 0);
-  const totalPhcf     = rows.reduce((s, r) => s + Number(r.phcf), 0);
-  const totalTax      = rows.reduce((s, r) => s + Number(r.taxTotal), 0);
+async function getLeviesTaxesData(tenantId: string): Promise<ReportResult> {
+  const [agg, rows] = await Promise.all([
+    prisma.invoice.aggregate({ where: { tenantId }, _count: { _all: true }, _sum: { stampDuty: true, trainingLevy: true, phcf: true, taxTotal: true } }),
+    prisma.invoice.findMany({
+      where: { tenantId },
+      select: {
+        invoiceNumber: true, period: true, totalAmount: true,
+        stampDuty: true, trainingLevy: true, phcf: true, taxTotal: true,
+        createdAt: true,
+        group: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+    }),
+  ]);
+  const totalCount    = agg._count._all;
+  const totalStamp    = Number(agg._sum.stampDuty ?? 0);
+  const totalLevy     = Number(agg._sum.trainingLevy ?? 0);
+  const totalPhcf     = Number(agg._sum.phcf ?? 0);
+  const totalTax      = Number(agg._sum.taxTotal ?? 0);
   const kpis = [
     { label: "Stamp Duty (UGX)",      value: totalStamp.toLocaleString() },
     { label: "Training Levy (UGX)",   value: totalLevy.toLocaleString() },
@@ -814,7 +863,7 @@ async function getLeviesTaxesData(tenantId: string) {
     Number(r.phcf).toLocaleString(),
     Number(r.taxTotal).toLocaleString(),
   ]);
-  return { kpis, headers, data };
+  return { kpis, headers, data, totalCount };
 }
 
 async function getFundUtilisationData(tenantId: string) {
@@ -1303,21 +1352,22 @@ async function getDebtorsCreditorsData(tenantId: string): Promise<ReportResult> 
 
 // ── R-12: Fees Statement ──────────────────────────────────────────────────────
 async function getFeesStatementData(tenantId: string): Promise<ReportResult> {
-  // Card issuance fees — from MembershipCard records that have a replacementFeeInvoiceId
-  const cardFeeInvoices = await prisma.invoice.findMany({
-    where: { tenantId, notes: { contains: "Card" } },
-    select: { invoiceNumber: true, totalAmount: true, createdAt: true, group: { select: { name: true } } },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-  });
-
-  // Reinstatement fees — invoices with "Reinstate" in notes
-  const reinstateFeeInvoices = await prisma.invoice.findMany({
-    where: { tenantId, notes: { contains: "Reinstate" } },
-    select: { invoiceNumber: true, totalAmount: true, createdAt: true, group: { select: { name: true } } },
-    orderBy: { createdAt: "desc" },
-    take: 100,
-  });
+  const [cardAgg, reinstateAgg, cardFeeInvoices, reinstateFeeInvoices] = await Promise.all([
+    prisma.invoice.aggregate({ where: { tenantId, notes: { contains: "Card" } }, _count: { _all: true }, _sum: { totalAmount: true } }),
+    prisma.invoice.aggregate({ where: { tenantId, notes: { contains: "Reinstate" } }, _count: { _all: true }, _sum: { totalAmount: true } }),
+    prisma.invoice.findMany({
+      where: { tenantId, notes: { contains: "Card" } },
+      select: { invoiceNumber: true, totalAmount: true, createdAt: true, group: { select: { name: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    }),
+    prisma.invoice.findMany({
+      where: { tenantId, notes: { contains: "Reinstate" } },
+      select: { invoiceNumber: true, totalAmount: true, createdAt: true, group: { select: { name: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    }),
+  ]);
 
   const cardRows = cardFeeInvoices.map(i => [
     i.invoiceNumber, i.group.name, "Card Issuance",
@@ -1331,42 +1381,51 @@ async function getFeesStatementData(tenantId: string): Promise<ReportResult> {
   ]);
 
   const all = [...cardRows, ...reinstateRows];
-  const total = [...cardFeeInvoices, ...reinstateFeeInvoices].reduce((s, i) => s + Number(i.totalAmount), 0);
+  const cardTotal      = Number(cardAgg._sum.totalAmount ?? 0);
+  const reinstateTotal = Number(reinstateAgg._sum.totalAmount ?? 0);
+  const totalCount     = cardAgg._count._all + reinstateAgg._count._all;
 
   return {
     kpis: [
-      { label: "Card Fees",          value: `UGX ${cardFeeInvoices.reduce((s, i) => s + Number(i.totalAmount), 0).toLocaleString("en-UG")}` },
-      { label: "Reinstatement Fees", value: `UGX ${reinstateFeeInvoices.reduce((s, i) => s + Number(i.totalAmount), 0).toLocaleString("en-UG")}` },
-      { label: "Total Fees",         value: `UGX ${total.toLocaleString("en-UG")}` },
-      { label: "Records",            value: all.length.toString() },
+      { label: "Card Fees",          value: `UGX ${cardTotal.toLocaleString("en-UG")}` },
+      { label: "Reinstatement Fees", value: `UGX ${reinstateTotal.toLocaleString("en-UG")}` },
+      { label: "Total Fees",         value: `UGX ${(cardTotal + reinstateTotal).toLocaleString("en-UG")}` },
+      { label: "Records",            value: totalCount.toLocaleString("en-UG") },
     ],
     headers: ["Invoice No.", "Scheme", "Fee Type", "Amount (UGX)", "Date"],
     data: all,
+    totalCount,
   };
 }
 
 // ── R-15: Admin Fee Statement (self-funded) ───────────────────────────────────
 async function getAdminFeeData(tenantId: string): Promise<ReportResult> {
-  const feeTransactions = await prisma.fundTransaction.findMany({
-    where: { tenantId, type: "ADMIN_FEE" },
-    select: {
-      id: true, amount: true, postedAt: true, description: true,
-      selfFundedAccount: {
-        select: { group: { select: { name: true, adminFeeMethod: true, adminFeeRate: true } } },
+  const [agg, distinctAccounts, feeTransactions] = await Promise.all([
+    prisma.fundTransaction.aggregate({ where: { tenantId, type: "ADMIN_FEE" }, _count: { _all: true }, _sum: { amount: true } }),
+    prisma.fundTransaction.findMany({ where: { tenantId, type: "ADMIN_FEE" }, distinct: ["selfFundedAccountId"], select: { selfFundedAccountId: true } }),
+    prisma.fundTransaction.findMany({
+      where: { tenantId, type: "ADMIN_FEE" },
+      select: {
+        id: true, amount: true, postedAt: true, description: true,
+        selfFundedAccount: {
+          select: { group: { select: { name: true, adminFeeMethod: true, adminFeeRate: true } } },
+        },
       },
-    },
-    orderBy: { postedAt: "desc" },
-    take: 200,
-  });
+      orderBy: { postedAt: "desc" },
+      take: 200,
+    }),
+  ]);
 
-  const total = feeTransactions.reduce((s, t) => s + Number(t.amount), 0);
+  const totalCount = agg._count._all;
+  const total = Number(agg._sum.amount ?? 0);
+  const schemes = distinctAccounts.length;
 
   return {
     kpis: [
-      { label: "Admin Fee Transactions", value: feeTransactions.length.toString() },
+      { label: "Admin Fee Transactions", value: totalCount.toLocaleString() },
       { label: "Total Admin Fees (UGX)", value: `UGX ${total.toLocaleString("en-UG")}` },
-      { label: "Self-Funded Schemes",    value: new Set(feeTransactions.map(t => t.selfFundedAccount.group.name)).size.toString() },
-      { label: "Avg Fee (UGX)",          value: feeTransactions.length > 0 ? `UGX ${(total / feeTransactions.length).toLocaleString("en-UG")}` : "—" },
+      { label: "Self-Funded Schemes",    value: schemes.toString() },
+      { label: "Avg Fee (UGX)",          value: totalCount > 0 ? `UGX ${(total / totalCount).toLocaleString("en-UG")}` : "—" },
     ],
     headers: ["Scheme", "Calc Method", "Fee Rate", "Amount (UGX)", "Date", "Description"],
     data: feeTransactions.map(t => [
@@ -1377,6 +1436,7 @@ async function getAdminFeeData(tenantId: string): Promise<ReportResult> {
       new Date(t.postedAt).toLocaleDateString("en-UG"),
       t.description ?? "—",
     ]),
+    totalCount,
   };
 }
 
@@ -1451,14 +1511,15 @@ async function getOrganicGrowthData(tenantId: string): Promise<ReportResult> {
 
 // ── R-22: Service Cost Comparison ─────────────────────────────────────────────
 async function getComparisonServicesData(tenantId: string): Promise<ReportResult> {
-  // Group claim lines by CPT code to compare contracted vs billed vs approved
+  // Group claim lines by CPT code to compare contracted vs billed vs approved.
+  // Aggregate over all lines (the per-CPT comparison is only meaningful over the
+  // full set); the displayed table is bounded by the number of distinct CPTs.
   const lines = await prisma.claimLine.findMany({
     where: { claim: { tenantId } },
     select: {
       cptCode: true, description: true,
       billedAmount: true, approvedAmount: true, tariffRate: true,
     },
-    take: 2000,
   });
 
   const byCpt: Record<string, { desc: string; billed: number[]; approved: number[]; tariff: number[] }> = {};
@@ -1503,26 +1564,25 @@ async function getComparisonServicesData(tenantId: string): Promise<ReportResult
 
 // ── R-23: Quotation Funnel ────────────────────────────────────────────────────
 async function getQuotationFunnelData(tenantId: string): Promise<ReportResult> {
-  const quotations = await prisma.quotation.findMany({
-    where: { tenantId },
-    select: {
-      quoteNumber: true, status: true, clientType: true, memberCount: true,
-      finalPremium: true, createdAt: true, isRenewal: true,
-      broker: { select: { name: true } },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 200,
-  });
+  const [byStatusGroups, premiumAgg, quotations] = await Promise.all([
+    prisma.quotation.groupBy({ by: ["status"], where: { tenantId }, _count: { _all: true } }),
+    prisma.quotation.aggregate({ where: { tenantId }, _sum: { finalPremium: true } }),
+    prisma.quotation.findMany({
+      where: { tenantId },
+      select: {
+        quoteNumber: true, status: true, clientType: true, memberCount: true,
+        finalPremium: true, createdAt: true, isRenewal: true,
+        broker: { select: { name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 200,
+    }),
+  ]);
 
-  const byStatus: Record<string, number> = {};
-  for (const q of quotations) {
-    byStatus[q.status] = (byStatus[q.status] ?? 0) + 1;
-  }
-
-  const total      = quotations.length;
-  const accepted   = byStatus["ACCEPTED"] ?? 0;
+  const total      = byStatusGroups.reduce((s, g) => s + g._count._all, 0);
+  const accepted   = byStatusGroups.find(g => g.status === "ACCEPTED")?._count._all ?? 0;
   const convRate   = total > 0 ? ((accepted / total) * 100).toFixed(1) + "%" : "—";
-  const totalValue = quotations.filter(q => q.finalPremium).reduce((s, q) => s + Number(q.finalPremium), 0);
+  const totalValue = Number(premiumAgg._sum.finalPremium ?? 0);
 
   return {
     kpis: [
@@ -1542,6 +1602,7 @@ async function getQuotationFunnelData(tenantId: string): Promise<ReportResult> {
       q.broker?.name ?? "Direct",
       new Date(q.createdAt).toLocaleDateString("en-UG"),
     ]),
+    totalCount: total,
   };
 }
 
@@ -1558,49 +1619,48 @@ export default async function ReportDetailPage({
   const tenantId = session.user.tenantId;
   const title = REPORT_TITLES[reportType] ?? "Report";
 
-  let kpis: { label: string; value: string }[] = [];
-  let headers: string[] = [];
-  let data: Cell[][] = [];
-  let totalCount: number | undefined;
+  let result: ReportResult = { kpis: [], headers: [], data: [] };
 
-  if (reportType === "claims")                   ({ kpis, headers, data } = await getClaimsData(tenantId));
-  else if (reportType === "membership")          ({ kpis, headers, data, totalCount } = await getMembershipData(tenantId));
-  else if (reportType === "preauth")             ({ kpis, headers, data } = await getPreauthData(tenantId));
-  else if (reportType === "billing")             ({ kpis, headers, data } = await getBillingData(tenantId));
-  else if (reportType === "utilization")         ({ kpis, headers, data } = await getUtilizationData(tenantId));
-  else if (reportType === "endorsements")        ({ kpis, headers, data } = await getEndorsementsData(tenantId));
-  else if (reportType === "quotations")          ({ kpis, headers, data } = await getQuotationsData(tenantId));
-  else if (reportType === "chronic-disease")     ({ kpis, headers, data } = await getChronicDiseaseData(tenantId));
+  if (reportType === "claims")                   result = await getClaimsData(tenantId);
+  else if (reportType === "membership")          result = await getMembershipData(tenantId);
+  else if (reportType === "preauth")             result = await getPreauthData(tenantId);
+  else if (reportType === "billing")             result = await getBillingData(tenantId);
+  else if (reportType === "utilization")         result = await getUtilizationData(tenantId);
+  else if (reportType === "endorsements")        result = await getEndorsementsData(tenantId);
+  else if (reportType === "quotations")          result = await getQuotationsData(tenantId);
+  else if (reportType === "chronic-disease")     result = await getChronicDiseaseData(tenantId);
   // Tranche 1
-  else if (reportType === "outstanding-bills")   ({ kpis, headers, data } = await getOutstandingBillsData(tenantId));
-  else if (reportType === "provider-statements") ({ kpis, headers, data } = await getProviderStatementsData(tenantId));
-  else if (reportType === "member-statements")   ({ kpis, headers, data } = await getMemberStatementsData(tenantId));
-  else if (reportType === "exceeded-limits")     ({ kpis, headers, data } = await getExceededLimitsData(tenantId));
-  else if (reportType === "admissions")          ({ kpis, headers, data } = await getAdmissionsData(tenantId));
-  else if (reportType === "admission-visits")    ({ kpis, headers, data } = await getAdmissionVisitsData(tenantId));
+  else if (reportType === "outstanding-bills")   result = await getOutstandingBillsData(tenantId);
+  else if (reportType === "provider-statements") result = await getProviderStatementsData(tenantId);
+  else if (reportType === "member-statements")   result = await getMemberStatementsData(tenantId);
+  else if (reportType === "exceeded-limits")     result = await getExceededLimitsData(tenantId);
+  else if (reportType === "admissions")          result = await getAdmissionsData(tenantId);
+  else if (reportType === "admission-visits")    result = await getAdmissionVisitsData(tenantId);
   // Tranche 2
-  else if (reportType === "debtors-creditors")   ({ kpis, headers, data } = await getDebtorsCreditorsData(tenantId));
-  else if (reportType === "fees-statements")     ({ kpis, headers, data } = await getFeesStatementData(tenantId));
-  else if (reportType === "admin-fee")           ({ kpis, headers, data } = await getAdminFeeData(tenantId));
-  else if (reportType === "loss-ratio")          ({ kpis, headers, data } = await getLossRatioData(tenantId));
-  else if (reportType === "claims-experience")   ({ kpis, headers, data } = await getClaimsExperienceData(tenantId));
-  else if (reportType === "ageing-analysis")     ({ kpis, headers, data } = await getAgeingAnalysisData(tenantId));
-  else if (reportType === "commission-statements")({ kpis, headers, data } = await getCommissionStatementsData(tenantId));
-  else if (reportType === "levies-taxes")        ({ kpis, headers, data } = await getLeviesTaxesData(tenantId));
-  else if (reportType === "fund-utilisation")    ({ kpis, headers, data } = await getFundUtilisationData(tenantId));
+  else if (reportType === "debtors-creditors")   result = await getDebtorsCreditorsData(tenantId);
+  else if (reportType === "fees-statements")     result = await getFeesStatementData(tenantId);
+  else if (reportType === "admin-fee")           result = await getAdminFeeData(tenantId);
+  else if (reportType === "loss-ratio")          result = await getLossRatioData(tenantId);
+  else if (reportType === "claims-experience")   result = await getClaimsExperienceData(tenantId);
+  else if (reportType === "ageing-analysis")     result = await getAgeingAnalysisData(tenantId);
+  else if (reportType === "commission-statements")result = await getCommissionStatementsData(tenantId);
+  else if (reportType === "levies-taxes")        result = await getLeviesTaxesData(tenantId);
+  else if (reportType === "fund-utilisation")    result = await getFundUtilisationData(tenantId);
   // Tranche 3
-  else if (reportType === "organic-growth")      ({ kpis, headers, data } = await getOrganicGrowthData(tenantId));
-  else if (reportType === "comparison-services") ({ kpis, headers, data } = await getComparisonServicesData(tenantId));
-  else if (reportType === "quotation-funnel")    ({ kpis, headers, data } = await getQuotationFunnelData(tenantId));
-  else if (reportType === "exclusion-rejected")  ({ kpis, headers, data } = await getExclusionRejectedData(tenantId));
-  else if (reportType === "claims-per-operator") ({ kpis, headers, data } = await getClaimsPerOperatorData(tenantId));
-  else if (reportType === "user-rights-roles")   ({ kpis, headers, data } = await getUserRightsRolesData(tenantId));
+  else if (reportType === "organic-growth")      result = await getOrganicGrowthData(tenantId);
+  else if (reportType === "comparison-services") result = await getComparisonServicesData(tenantId);
+  else if (reportType === "quotation-funnel")    result = await getQuotationFunnelData(tenantId);
+  else if (reportType === "exclusion-rejected")  result = await getExclusionRejectedData(tenantId);
+  else if (reportType === "claims-per-operator") result = await getClaimsPerOperatorData(tenantId);
+  else if (reportType === "user-rights-roles")   result = await getUserRightsRolesData(tenantId);
   // Strategic analytics
-  else if (reportType === "analytics-portfolio-mlr")           ({ kpis, headers, data } = await getAnalyticsPortfolioMlrData(tenantId, analyticsScope));
-  else if (reportType === "analytics-scheme-profitability")    ({ kpis, headers, data } = await getAnalyticsSchemeProfitabilityData(tenantId, analyticsScope));
-  else if (reportType === "analytics-provider-performance")    ({ kpis, headers, data } = await getAnalyticsProviderPerformanceData(tenantId, analyticsScope));
-  else if (reportType === "analytics-renewal-recommendations") ({ kpis, headers, data } = await getAnalyticsRenewalRecommendationsData(tenantId, analyticsScope));
-  else if (reportType === "analytics-risk-distribution")       ({ kpis, headers, data } = await getAnalyticsRiskDistributionData(tenantId, analyticsScope));
+  else if (reportType === "analytics-portfolio-mlr")           result = await getAnalyticsPortfolioMlrData(tenantId, analyticsScope);
+  else if (reportType === "analytics-scheme-profitability")    result = await getAnalyticsSchemeProfitabilityData(tenantId, analyticsScope);
+  else if (reportType === "analytics-provider-performance")    result = await getAnalyticsProviderPerformanceData(tenantId, analyticsScope);
+  else if (reportType === "analytics-renewal-recommendations") result = await getAnalyticsRenewalRecommendationsData(tenantId, analyticsScope);
+  else if (reportType === "analytics-risk-distribution")       result = await getAnalyticsRiskDistributionData(tenantId, analyticsScope);
+
+  const { kpis, headers, data, totalCount } = result;
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
