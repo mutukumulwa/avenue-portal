@@ -12,6 +12,8 @@ const db = vi.hoisted(() => {
       findMany: vi.fn(async (): Promise<any[]> => []),
       create: vi.fn(async (a: any) => ({ id: "batchNew", ...a.data })),
       update: vi.fn(async (a: any) => ({ id: a.where.id, ...a.data })),
+      // FG-C7: atomic settlement claim — winner gets count 1.
+      updateMany: vi.fn(async () => ({ count: 1 })),
     },
     claim: {
       findMany: vi.fn(async (): Promise<any[]> => []),
@@ -92,10 +94,31 @@ describe("markSettlementBatchPaid (PR-018 D1)", () => {
     // member "plan paid" + statements reflect settled money).
     expect(db.$executeRaw).toHaveBeenCalledTimes(1);
 
-    // Batch settled.
-    expect(db.providerSettlementBatch.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: "SETTLED" }) }),
+    // FG-C7: batch settled via the ATOMIC status-guarded claim (only a
+    // CHECKER_APPROVED batch flips to SETTLED), not an unconditional update.
+    expect(db.providerSettlementBatch.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: "batch1", tenantId: T, status: "CHECKER_APPROVED" }),
+        data: expect.objectContaining({ status: "SETTLED" }),
+      }),
     );
+  });
+
+  it("FG-C7: a concurrent/retried Mark Paid is atomically rejected — no second voucher or JE", async () => {
+    // The winner already flipped the batch to SETTLED, so the atomic claim
+    // matches 0 rows for the loser (the outer status read still saw
+    // CHECKER_APPROVED — this is exactly the double-pay race window).
+    db.providerSettlementBatch.updateMany.mockResolvedValueOnce({ count: 0 });
+
+    await expect(
+      claimAdjudicationService.markSettlementBatchPaid("batch1", T, "finance2"),
+    ).rejects.toThrow(/no longer awaiting payment/i);
+
+    // The atomic claim is the FIRST write, so nothing financial was created:
+    // no second voucher, no second JE, no claim re-stamp.
+    expect(db.paymentVoucher.create).not.toHaveBeenCalled();
+    expect(db.journalEntry.create).not.toHaveBeenCalled();
+    expect(db.claim.updateMany).not.toHaveBeenCalled();
   });
 
   it("OBS-2 Ticket 6: a KES batch posts the BASE total to GL and stamps voucher base fields", async () => {

@@ -17,6 +17,8 @@ const db = vi.hoisted(() => {
     providerSettlementBatch: {
       findUnique: vi.fn(),
       update: vi.fn(async (a: any) => ({ id: a.where.id, ...a.data })),
+      // FG-C7: atomic settlement claim — winner gets count 1.
+      updateMany: vi.fn(async () => ({ count: 1 })),
     },
     claim: {
       findMany: vi.fn(async (): Promise<any[]> => []),
@@ -82,9 +84,12 @@ describe("markSettlementBatchPaid — set-based writes at scale", () => {
       // One voucher, one JE per batch.
       expect(db.paymentVoucher.create).toHaveBeenCalledTimes(1);
       expect(db.journalEntry.create).toHaveBeenCalledTimes(1);
-      // Batch flips to SETTLED.
-      expect(db.providerSettlementBatch.update).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ status: "SETTLED" }) }),
+      // Batch flips to SETTLED via the FG-C7 atomic status-guarded claim.
+      expect(db.providerSettlementBatch.updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ status: "CHECKER_APPROVED" }),
+          data: expect.objectContaining({ status: "SETTLED" }),
+        }),
       );
       // Sanity: the mocked path is trivially fast — the point is that write
       // COUNT does not scale with batch size (the real timeout cause).

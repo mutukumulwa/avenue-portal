@@ -615,6 +615,34 @@ export const claimAdjudicationService = {
     const { GLService } = await import("./gl.service");
 
     const updated = await prisma.$transaction(async (tx) => {
+      // FG-C7: the status transition is the ATOMIC settlement gate — the first
+      // write in the transaction. Only a CHECKER_APPROVED batch settles, and only
+      // ONCE: a concurrent or retried Mark Paid (I4 uncertain-retry / O2 two
+      // sessions) finds 0 matching rows here (row-locked behind the winner, then
+      // re-evaluated as SETTLED) → throws → the whole transaction rolls back
+      // before any voucher or GL entry is created. The outer status check above
+      // stays as a fast fail; this is the real guard. Prevents a double voucher +
+      // double bank-credit JE (provider paid twice) that the earlier
+      // check-then-act (status read outside the tx, unconditional batch update,
+      // no voucher/GL uniqueness) allowed.
+      const claimed = await tx.providerSettlementBatch.updateMany({
+        where: { id: batchId, tenantId, status: "CHECKER_APPROVED" },
+        data: {
+          status: "SETTLED",
+          settledAt: paidAt,
+          currency: batchCurrency,
+          baseCurrency: "UGX",
+          baseTotalAmount: baseTotal,
+        },
+      });
+      if (claimed.count !== 1) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message:
+            "This batch is no longer awaiting payment — it may have just been settled by another user. Refresh the batch before retrying.",
+        });
+      }
+
       const voucherCount = await tx.paymentVoucher.count({ where: { tenantId } });
       const voucherNumber = `PV-${paidAt.getFullYear()}-${String(voucherCount + 1).padStart(5, "0")}`;
 
@@ -658,16 +686,9 @@ export const claimAdjudicationService = {
       });
       await tx.$executeRaw`UPDATE "Claim" SET "paidAmount" = "approvedAmount" WHERE "settlementBatchId" = ${batchId}`;
 
-      return tx.providerSettlementBatch.update({
-        where: { id: batchId },
-        data: {
-          status: "SETTLED",
-          settledAt: paidAt,
-          currency: batchCurrency,
-          baseCurrency: "UGX",
-          baseTotalAmount: baseTotal,
-        },
-      });
+      // Status/settledAt/base totals were set by the atomic claim above; return
+      // the settled row.
+      return tx.providerSettlementBatch.findUnique({ where: { id: batchId } });
     }, { maxWait: 15000, timeout: 60000 });
 
     await auditChainService.append({

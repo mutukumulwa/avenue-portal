@@ -18,6 +18,7 @@ const db = vi.hoisted(() => {
       findMany: vi.fn(async (): Promise<any[]> => []),
       create: vi.fn(async (a: any) => ({ id: "batchNew", ...a.data })),
       update: vi.fn(async (a: any) => ({ id: a.where.id, ...a.data })),
+      updateMany: vi.fn(async () => ({ count: 1 })),
     },
     claim: {
       findMany: vi.fn(async (): Promise<any[]> => []),
