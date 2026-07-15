@@ -51,7 +51,7 @@ const REPORT_TITLES: Record<string, string> = {
 };
 
 type Cell = string | { text: string; href: string };
-type ReportResult = { kpis: { label: string; value: string }[]; headers: string[]; data: Cell[][] };
+type ReportResult = { kpis: { label: string; value: string }[]; headers: string[]; data: Cell[][]; totalCount?: number };
 
 function reportGroupIdWhere(scope?: AnalyticsAccessScope) {
   if (!scope) return {};
@@ -105,24 +105,31 @@ async function getClaimsData(tenantId: string) {
   return { kpis, headers, data };
 }
 
-async function getMembershipData(tenantId: string) {
-  const rows = await prisma.member.findMany({
-    where: { tenantId },
-    select: {
-      memberNumber: true, firstName: true, lastName: true, status: true,
-      relationship: true, gender: true, enrollmentDate: true,
-      group: { select: { name: true } },
-      package: { select: { name: true } },
-    },
-    orderBy: { enrollmentDate: "desc" },
-    take: 100,
-  });
-  const active = rows.filter(r => r.status === "ACTIVE").length;
+async function getMembershipData(tenantId: string): Promise<ReportResult> {
+  const MEMBERSHIP_DISPLAY_CAP = 100;
+  // CU-001: summary counts come from tenant-wide aggregates, not the capped
+  // table sample, so "Total Members / Active" reflect the whole roster. The
+  // table stays bounded for on-screen performance; the CSV export is full.
+  const [totalMembers, activeMembers, rows] = await Promise.all([
+    prisma.member.count({ where: { tenantId } }),
+    prisma.member.count({ where: { tenantId, status: "ACTIVE" } }),
+    prisma.member.findMany({
+      where: { tenantId },
+      select: {
+        memberNumber: true, firstName: true, lastName: true, status: true,
+        relationship: true, gender: true, enrollmentDate: true,
+        group: { select: { name: true } },
+        package: { select: { name: true } },
+      },
+      orderBy: { enrollmentDate: "desc" },
+      take: MEMBERSHIP_DISPLAY_CAP,
+    }),
+  ]);
   const kpis = [
-    { label: "Total Members",  value: rows.length.toLocaleString() },
-    { label: "Active",         value: active.toLocaleString() },
-    { label: "Inactive",       value: (rows.length - active).toLocaleString() },
-    { label: "% Active",       value: rows.length > 0 ? `${((active / rows.length) * 100).toFixed(1)}%` : "—" },
+    { label: "Total Members",  value: totalMembers.toLocaleString() },
+    { label: "Active",         value: activeMembers.toLocaleString() },
+    { label: "Inactive",       value: (totalMembers - activeMembers).toLocaleString() },
+    { label: "% Active",       value: totalMembers > 0 ? `${((activeMembers / totalMembers) * 100).toFixed(1)}%` : "—" },
   ];
   const headers = ["Member No.", "Name", "Group", "Package", "Relationship", "Gender", "Status", "Enrolled"];
   const data = rows.map(r => [
@@ -135,7 +142,7 @@ async function getMembershipData(tenantId: string) {
     r.status,
     new Date(r.enrollmentDate).toLocaleDateString("en-UG"),
   ]);
-  return { kpis, headers, data };
+  return { kpis, headers, data, totalCount: totalMembers };
 }
 
 async function getPreauthData(tenantId: string) {
@@ -1554,9 +1561,10 @@ export default async function ReportDetailPage({
   let kpis: { label: string; value: string }[] = [];
   let headers: string[] = [];
   let data: Cell[][] = [];
+  let totalCount: number | undefined;
 
   if (reportType === "claims")                   ({ kpis, headers, data } = await getClaimsData(tenantId));
-  else if (reportType === "membership")          ({ kpis, headers, data } = await getMembershipData(tenantId));
+  else if (reportType === "membership")          ({ kpis, headers, data, totalCount } = await getMembershipData(tenantId));
   else if (reportType === "preauth")             ({ kpis, headers, data } = await getPreauthData(tenantId));
   else if (reportType === "billing")             ({ kpis, headers, data } = await getBillingData(tenantId));
   else if (reportType === "utilization")         ({ kpis, headers, data } = await getUtilizationData(tenantId));
@@ -1605,7 +1613,7 @@ export default async function ReportDetailPage({
           <div>
             <h1 className="text-2xl font-bold text-brand-text-heading font-heading">{title}</h1>
             <p className="text-brand-text-body text-sm mt-0.5">
-              Medvex · {data.length} record{data.length !== 1 ? "s" : ""}
+              Medvex · {(totalCount ?? data.length).toLocaleString()} record{(totalCount ?? data.length) !== 1 ? "s" : ""}
             </p>
           </div>
         </div>
@@ -1644,8 +1652,13 @@ export default async function ReportDetailPage({
 
       {/* Data table */}
       <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-[#EEEEEE]">
+        <div className="px-6 py-4 border-b border-[#EEEEEE] flex items-center justify-between gap-3">
           <h2 className="font-bold text-brand-text-heading font-heading">Data</h2>
+          {typeof totalCount === "number" && totalCount > data.length && (
+            <span className="text-xs text-brand-text-muted">
+              Showing first {data.length.toLocaleString()} of {totalCount.toLocaleString()} — export for the full list
+            </span>
+          )}
         </div>
         {data.length > 0 ? (
           <div className="overflow-x-auto">
