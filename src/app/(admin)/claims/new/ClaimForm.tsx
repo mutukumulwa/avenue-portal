@@ -101,7 +101,7 @@ export function ClaimForm({
     setLoading(true);
     setError(null);
     try {
-      await submitClaimAction({
+      const result = await submitClaimAction({
         memberId,
         providerId,
         providerBranchId: providerBranchId || undefined,
@@ -122,6 +122,8 @@ export function ClaimForm({
           billedAmount: l.billedAmount,
         })),
       });
+      // A rejected intake returns a friendly message (a success redirects away).
+      if (result && !result.ok) setError(result.error);
     } catch (err) {
       setError((err as Error).message);
     } finally {

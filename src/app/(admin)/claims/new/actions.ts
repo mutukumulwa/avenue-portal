@@ -43,7 +43,15 @@ export async function submitClaimAction(data: {
 
   // Single shared intake path — same gates/fraud/auto-adjudication as the
   // provider facility portal and B2B channels (see claim-intake.ts).
-  await runClaimIntake(session.user.tenantId, session.user.id, data);
+  try {
+    await runClaimIntake(session.user.tenantId, session.user.id, data);
+  } catch (err) {
+    // Surface intake rejections (coverage window, provider/benefit gate, dup guard,
+    // …) as a friendly result the wizard renders. Next.js MASKS thrown server-action
+    // messages in production, so we RETURN the message instead of letting it throw.
+    if (err instanceof Error && err.message === "NEXT_REDIRECT") throw err;
+    return { ok: false as const, error: err instanceof Error ? err.message : "The claim could not be submitted." };
+  }
 
   redirect("/claims");
 }
