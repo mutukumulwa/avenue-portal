@@ -44,7 +44,7 @@
 > hold-expiry), WP-B2 (FG-C5 over-block / coverage-end model — product decision), WP-B3 (SYS-1 remnants
 > binding/amendment + audit sweep). Residual UAT: Family F check-in, worker-pause war-game, full Family R,
 > C9 scale. (Plan §8 has the fork backlog.)
-> **FORK B DONE (branch `fix/full-go-fork-b`, NOT deployed) 2026-07-15:** WP-B3 (`7444eb5`), WP-B1 (`636ab42`),
+> **FORK B DONE + DEPLOYED 2026-07-15:** WP-B3 (`7444eb5`), WP-B1 (`636ab42`),
 > WP-B2 (`810ca87`) — 706 vitest green, tsc clean, brand+currency guards pass. **WP-B3 FG-C11** = SYS-1 atomic
 > status-claim on binding (captureAcceptance SENT→ACCEPTED; createMemberships `groupId`-null double-bind claim +
 > orphan-group drop — the quotation enum has no post-ACCEPTED state), amendment (submit/approve/**apply**
@@ -55,10 +55,14 @@
 > (`MemberCoveragePeriod`); intake + B2B API resolve coverage as-of the SERVICE date (API cover-start parity gap
 > also closed); product decision = coverage-period table; backfill script; fail-open + `ignoreOpenPeriods`
 > safety; lifecycle terminations close periods, binding opens them.
-> **DEPLOY PENDING (needs human go):** `git push origin HEAD:main`; WP-B2 additionally needs the
-> `MemberCoveragePeriod` table (db push adds it — new table, no unique index → no `--accept-data-loss` issue) +
-> `npx tsx --env-file=.env scripts/backfill-coverage-periods.ts` run against the test-env Supabase before the
-> coverage gate goes live (fail-open means no breakage if left unbackfilled).
+> **DEPLOYED 2026-07-15 (human-authorised):** push `df5d7d1..fe0f7c1`→main; Vercel prod build
+> `dpl_HJp8QUfYn8wR6veH2KDsqz9oco9p` **READY** (~114s). `db push` created the `MemberCoveragePeriod` table
+> (new table, no unique index — clean). **WP-B2 backfill applied via Supabase MCP** on `otivyuroqraiijayvkze`
+> (idempotent `INSERT…SELECT`): **2,999 open periods for 2,999 members, 1:1, 0 dupes, 0 uncovered, 0
+> start-date mismatches** (all members non-terminal → all open). **Health re-verify:** `/login` 200 (serving),
+> `POST /api/v1/claims` no-key 401 (fail-closed on the new build). Concurrency guards (WP-B3) + hold-expiry
+> (WP-B1) are unit-verified (live sub-second race reproduction needs a harness); the FG-C5 coverage gate is
+> now live for the whole book (testable via `/claims/new`).
 >
 > **SYS-1 audit sweep (WP-B3) — documented triage.** Swept every `findUnique → validate status →
 > update({where:{id}})` on a state machine. FIXED this fork: binding, amendment, `approveSettlementBatch`.
