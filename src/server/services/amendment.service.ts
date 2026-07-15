@@ -240,10 +240,18 @@ export const amendmentService = {
     const rules = AMENDMENT_RULES[endorsement.type as EndorsementType];
     const newStatus = rules.selfApprove ? "SUBMITTED" : "SUBMITTED";
 
-    await prisma.endorsement.update({
-      where: { id: endorsementId },
+    // SYS-1: atomically claim the DRAFT→SUBMITTED transition; a concurrent submit
+    // matches 0 rows → CONFLICT (one submission per amendment).
+    const claimed = await prisma.endorsement.updateMany({
+      where: { id: endorsementId, tenantId, status: "DRAFT" },
       data: { status: newStatus, makerId },
     });
+    if (claimed.count !== 1) {
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: "This amendment was just actioned by another user — refresh to see its current status.",
+      });
+    }
 
     await auditChainService.append({
       actorId: makerId,
@@ -269,8 +277,11 @@ export const amendmentService = {
       throw new TRPCError({ code: "FORBIDDEN", message: "Maker and checker must be different users" });
     }
 
-    await prisma.endorsement.update({
-      where: { id: endorsementId },
+    // SYS-1: the status transition is the atomic decision gate — a concurrent
+    // approval matches 0 rows → CONFLICT, so the amendment carries exactly one
+    // approval (SoD is pre-checked above for a clearer message).
+    const claimed = await prisma.endorsement.updateMany({
+      where: { id: endorsementId, tenantId, status: { in: ["SUBMITTED", "UNDER_REVIEW"] } },
       data: {
         status: "APPROVED",
         approverId,
@@ -279,6 +290,12 @@ export const amendmentService = {
         reviewNotes: notes,
       },
     });
+    if (claimed.count !== 1) {
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: "This amendment was just actioned by another reviewer — refresh to see the current decision.",
+      });
+    }
 
     await auditChainService.append({
       actorId: approverId,
@@ -311,6 +328,23 @@ export const amendmentService = {
     const type = endorsement.type as EndorsementType;
     const details = endorsement.changeDetails as Record<string, unknown>;
 
+    // SYS-1: atomically claim APPROVED→APPLIED as the gate BEFORE any side effect
+    // (member mutation / pro-rata invoice / commission clawback), so two concurrent
+    // applies can't double-post. The loser matches 0 rows → CONFLICT. On a later
+    // failure we revert to APPROVED so the amendment stays pending and retryable.
+    const claimed = await prisma.endorsement.updateMany({
+      where: { id: endorsementId, tenantId, status: "APPROVED" },
+      data: { status: "APPLIED", appliedAt: new Date(), appliedBy: appliedById },
+    });
+    if (claimed.count !== 1) {
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: "This amendment was just actioned by another user — refresh to see its current status.",
+      });
+    }
+
+    let afterSnapshot: Record<string, unknown> | null = null;
+    try {
     // Apply the change based on type
     switch (type) {
       case "TIER_CHANGE":
@@ -381,7 +415,6 @@ export const amendmentService = {
     }
 
     // Capture after-snapshot
-    let afterSnapshot: Record<string, unknown> | null = null;
     if (endorsement.memberId) {
       const updatedMember = await prisma.member.findUnique({
         where: { id: endorsement.memberId },
@@ -402,15 +435,23 @@ export const amendmentService = {
       await amendmentService.processClawback(endorsement.groupId, endorsement.memberId, tenantId);
     }
 
+    // Status/appliedAt/appliedBy were set by the atomic claim above; persist the
+    // after-snapshot now that the change has been applied.
     await prisma.endorsement.update({
       where: { id: endorsementId },
-      data: {
-        status: "APPLIED",
-        appliedAt: new Date(),
-        appliedBy: appliedById,
-        afterSnapshot: afterSnapshot as never,
-      },
+      data: { afterSnapshot: afterSnapshot as never },
     });
+    } catch (err) {
+      // A side effect failed after the claim — revert to APPROVED so the amendment
+      // stays pending and retryable (never applied without its pro-rata/clawback).
+      await prisma.endorsement
+        .updateMany({
+          where: { id: endorsementId },
+          data: { status: "APPROVED", appliedAt: null, appliedBy: null },
+        })
+        .catch(() => undefined);
+      throw err;
+    }
 
     await auditChainService.append({
       actorId: appliedById,
@@ -496,10 +537,18 @@ export const amendmentService = {
     const endorsement = await prisma.endorsement.findUnique({ where: { id: endorsementId, tenantId } });
     if (!endorsement) throw new TRPCError({ code: "NOT_FOUND", message: "Endorsement not found" });
 
-    await prisma.endorsement.update({
-      where: { id: endorsementId },
+    // SYS-1: only a non-terminal amendment can be rejected, and only once — an
+    // atomic guard stops a reject from racing an apply/approve (or double-reject).
+    const claimed = await prisma.endorsement.updateMany({
+      where: { id: endorsementId, tenantId, status: { in: ["DRAFT", "SUBMITTED", "UNDER_REVIEW", "APPROVED"] } },
       data: { status: "REJECTED", reviewedBy: rejectedById, reviewedAt: new Date(), rejectionReason: reason },
     });
+    if (claimed.count !== 1) {
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: "This amendment can no longer be rejected — it was just actioned by another user.",
+      });
+    }
 
     await auditChainService.append({
       actorId: rejectedById,

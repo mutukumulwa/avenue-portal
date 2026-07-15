@@ -518,10 +518,22 @@ export const claimAdjudicationService = {
       throw new TRPCError({ code: "FORBIDDEN", message: "Maker and checker must be different users" });
     }
 
-    const updated = await prisma.providerSettlementBatch.update({
-      where: { id: batchId },
+    // SYS-1: atomically claim the MAKER_SUBMITTED→CHECKER_APPROVED transition, so
+    // two checkers can't both approve one batch — the maker-checker gate stays
+    // honest and exactly one checker of record is stamped. (The paid step,
+    // markSettlementBatchPaid, is already an atomic CHECKER_APPROVED→SETTLED
+    // claim — FG-C7 — so no money can double-post regardless.)
+    const claimedBatch = await prisma.providerSettlementBatch.updateMany({
+      where: { id: batchId, tenantId, status: "MAKER_SUBMITTED" },
       data:  { status: "CHECKER_APPROVED", checkerId },
     });
+    if (claimedBatch.count !== 1) {
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: "This settlement batch was just actioned by another checker — refresh to see its current status.",
+      });
+    }
+    const updated = await prisma.providerSettlementBatch.findUnique({ where: { id: batchId } });
 
     // PR-018: claims are NOT paid at checker approval — `markSettlementBatchPaid`
     // sets PAID/paidAt, creates the PaymentVoucher and posts the GL entry.

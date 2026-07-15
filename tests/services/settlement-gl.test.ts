@@ -218,8 +218,12 @@ describe("approveSettlementBatch — checker step (PR-018)", () => {
     });
     await claimAdjudicationService.approveSettlementBatch("batch1", T, "checker");
     expect(db.claim.update).not.toHaveBeenCalled();
-    expect(db.providerSettlementBatch.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ status: "CHECKER_APPROVED" }) }),
+    // SYS-1: the transition is now an atomic status-guarded claim, not a bare update.
+    expect(db.providerSettlementBatch.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: "batch1", tenantId: T, status: "MAKER_SUBMITTED" }),
+        data: expect.objectContaining({ status: "CHECKER_APPROVED", checkerId: "checker" }),
+      }),
     );
   });
 
@@ -231,5 +235,16 @@ describe("approveSettlementBatch — checker step (PR-018)", () => {
     await expect(
       claimAdjudicationService.approveSettlementBatch("batch1", T, "same"),
     ).rejects.toThrow(/different users/);
+  });
+
+  it("a concurrent second approval loses the atomic gate → CONFLICT (SYS-1)", async () => {
+    db.providerSettlementBatch.findUnique.mockResolvedValue({
+      id: "batch1", tenantId: T, providerId: "prov1", status: "MAKER_SUBMITTED",
+      totalAmount: 50000, makerId: "maker",
+    });
+    db.providerSettlementBatch.updateMany.mockResolvedValueOnce({ count: 0 }); // winner already approved
+    await expect(
+      claimAdjudicationService.approveSettlementBatch("batch1", T, "checker2"),
+    ).rejects.toThrow(/just actioned by another checker/i);
   });
 });

@@ -51,21 +51,32 @@ export const bindingService = {
     const coverStart = quotation.requestedCoverStart ?? new Date();
     const coolingOffEnds = new Date(coverStart.getTime() + coolingOffDays * 24 * 60 * 60 * 1000);
 
-    const acceptance = await prisma.quotationAcceptance.create({
-      data: {
-        tenantId,
-        quotationId,
-        method,
-        acceptedById,
-        acceptedAt: new Date(),
-        documentUrl,
-        coolingOffEnds,
-      },
-    });
-
-    await prisma.quotation.update({
-      where: { id: quotationId },
-      data: { status: "ACCEPTED" },
+    // SYS-1: atomically claim the SENT→ACCEPTED transition as the FIRST write, so
+    // two concurrent accepts can't both record an acceptance (QuotationAcceptance
+    // is unique per quotation) or double-fire the transition. The loser matches 0
+    // rows → CONFLICT, and its acceptance insert never runs (same transaction).
+    const acceptance = await prisma.$transaction(async (tx) => {
+      const claimed = await tx.quotation.updateMany({
+        where: { id: quotationId, tenantId, status: "SENT" },
+        data: { status: "ACCEPTED" },
+      });
+      if (claimed.count !== 1) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "This quotation was just actioned by another user — refresh to see its current status.",
+        });
+      }
+      return tx.quotationAcceptance.create({
+        data: {
+          tenantId,
+          quotationId,
+          method,
+          acceptedById,
+          acceptedAt: new Date(),
+          documentUrl,
+          coolingOffEnds,
+        },
+      });
     });
 
     await auditChainService.append({
@@ -167,7 +178,14 @@ export const bindingService = {
       });
     }
 
-    // ── Find or create the Group ──────────────────────────────
+    // ── Find or create the Group (atomic double-bind guard) ────
+    // Binding is one-shot per quotation. New business: create the group, then
+    // atomically claim the quotation's empty group slot (groupId null → this
+    // group). A concurrent bind that already linked a group loses the claim
+    // (count 0) → we drop the orphan group we just made and surface CONFLICT, so
+    // exactly ONE membership set is ever created. groupId is one-way (binding
+    // never nulls it), so it is a safe claim marker — there is no post-ACCEPTED
+    // quotation status to guard on.
     let groupId = quotation.groupId;
     if (!groupId) {
       // Create a Group from quotation details
@@ -197,12 +215,30 @@ export const bindingService = {
           notes: `Created from quotation ${quotation.quoteNumber}`,
         },
       });
-      groupId = group.id;
 
-      await prisma.quotation.update({
-        where: { id: quotationId },
-        data: { groupId },
+      const claimed = await prisma.quotation.updateMany({
+        where: { id: quotationId, tenantId, groupId: null },
+        data: { groupId: group.id },
       });
+      if (claimed.count !== 1) {
+        // Lost the race — another bind already linked a group. Drop our orphan.
+        await prisma.group.delete({ where: { id: group.id } }).catch(() => undefined);
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "Binding is already in progress for this quotation — refresh to see its memberships.",
+        });
+      }
+      groupId = group.id;
+    } else {
+      // Renewal / re-bind: the quotation already carries a group. Guard against a
+      // second membership set being created for the same quotation.
+      const existing = await prisma.member.count({ where: { quotationId, tenantId } });
+      if (existing > 0) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "Memberships have already been created for this quotation — refresh to see them.",
+        });
+      }
     }
 
     // ── Build a principalId map for dependants ────────────────
