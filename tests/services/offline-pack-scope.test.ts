@@ -63,6 +63,7 @@ const db = vi.hoisted(() => ({
   member: { findMany: vi.fn() },
   packageProviderEligibility: { findMany: vi.fn(async () => []) },
   benefitUsage: { findMany: vi.fn(async () => []) },
+  benefitHold: { findMany: vi.fn(async () => []) },
   providerTariff: { findMany: vi.fn(async () => []) },
 }));
 

@@ -23,6 +23,7 @@ import type { Prisma, BenefitCategory } from "@prisma/client";
 
 export interface ResolvedBenefitConfig {
   configId: string;
+  benefitCategory: string;
   annualSubLimit: number;
   periodStart: Date;
   periodEnd: Date;
@@ -64,10 +65,90 @@ export class BenefitUsageService {
     const { periodStart, periodEnd } = this.periodFor(member.enrollmentDate, now);
     return {
       configId: config.id,
+      benefitCategory: String(benefitCategory),
       annualSubLimit: Number(config.annualSubLimit),
       periodStart,
       periodEnd,
     };
+  }
+
+  /**
+   * FG-C10 core arithmetic: reconcile a *stored* activeHoldAmount against live
+   * hold expiry.
+   *
+   * The stored activeHoldAmount is only decremented when the worker releases an
+   * expired hold (`releaseExpiredHolds`). If the worker is down or lagging,
+   * expired holds keep inflating it → members are silently over-reserved and
+   * claims wrongly declined "insufficient balance". This recomputes `held` so
+   * expiry is reflected live — WITHOUT ever *under*-reserving (which would enable
+   * overspend): it can only free benefit that has already expired.
+   *
+   *   held = max(0, storedHeld − Σ expired-ACTIVE holds, Σ non-expired-ACTIVE holds)
+   *
+   * - Subtracting only provably-expired ACTIVE holds means a still-active hold is
+   *   never dropped; when nothing is expired `held === storedHeld` (available
+   *   unchanged — it never exceeds `limit − used − storedHeld`).
+   * - Flooring at the live sum of non-expired holds means a stored value that has
+   *   drifted *below* the real obligation can only be corrected upward, never
+   *   downward — the result is always ≥ the true active reservation.
+   */
+  static reconcileStored(storedHeld: number, sums?: { expired: number; active: number }): number {
+    return Math.max(0, storedHeld - (sums?.expired ?? 0), sums?.active ?? 0);
+  }
+
+  /** Stable key for the per-(member, category) live-hold sums map. */
+  static holdKey(memberId: string, benefitCategory: string): string {
+    return `${memberId}::${benefitCategory}`;
+  }
+
+  /**
+   * FG-C10: expired/active ACTIVE-hold sums for many members in ONE query,
+   * grouped by (memberId, benefitCategory) via `holdKey`. Bulk read paths (offline
+   * pack, sync re-validation, the PA balance surface) reconcile each stored held
+   * with `reconcileStored` instead of trusting the worker-maintained amount.
+   */
+  static async liveHoldSums(
+    tx: Prisma.TransactionClient,
+    memberIds: string[],
+    now: Date = new Date(),
+  ): Promise<Map<string, { expired: number; active: number }>> {
+    const map = new Map<string, { expired: number; active: number }>();
+    if (memberIds.length === 0) return map;
+    const holds = await tx.benefitHold.findMany({
+      where: { memberId: { in: memberIds }, status: "ACTIVE" },
+      select: { memberId: true, benefitCategory: true, heldAmount: true, expiresAt: true },
+    });
+    for (const h of holds) {
+      const key = this.holdKey(h.memberId, h.benefitCategory);
+      const cur = map.get(key) ?? { expired: 0, active: 0 };
+      const amount = Number(h.heldAmount);
+      if (h.expiresAt <= now) cur.expired += amount;
+      else cur.active += amount;
+      map.set(key, cur);
+    }
+    return map;
+  }
+
+  /** Single-key live reconciliation (sums across `categories` for one member). */
+  private static async reconcileHeld(
+    tx: Prisma.TransactionClient,
+    memberId: string,
+    categories: string[],
+    storedHeld: number,
+    now: Date = new Date(),
+  ): Promise<number> {
+    const holds = await tx.benefitHold.findMany({
+      where: { memberId, benefitCategory: { in: categories }, status: "ACTIVE" },
+      select: { heldAmount: true, expiresAt: true },
+    });
+    let expired = 0;
+    let active = 0;
+    for (const h of holds) {
+      const amount = Number(h.heldAmount);
+      if (h.expiresAt <= now) expired += amount;
+      else active += amount;
+    }
+    return this.reconcileStored(storedHeld, { expired, active });
   }
 
   /** Upsert the (member, config, period) row and apply the given deltas. */
@@ -191,7 +272,8 @@ export class BenefitUsageService {
       },
     });
     const used = Number(row?.amountUsed ?? 0);
-    const held = Number(row?.activeHoldAmount ?? 0);
+    // FG-C10: reconcile stored held against live hold expiry (never under-reserve).
+    const held = await this.reconcileHeld(tx, memberId, [cfg.benefitCategory], Number(row?.activeHoldAmount ?? 0));
     let remaining = Math.max(0, cfg.annualSubLimit - used - held);
 
     // Shared-limit groups: the joint pool may be tighter than the sub-limit.
@@ -205,10 +287,17 @@ export class BenefitUsageService {
       const groupRows = await tx.benefitUsage.findMany({
         where: { memberId, benefitConfigId: { in: configIds }, periodStart: cfg.periodStart },
       });
-      const groupUsed = groupRows.reduce(
-        (s, u) => s + Number(u.amountUsed) + Number(u.activeHoldAmount),
-        0,
-      );
+      // FG-C10: reconcile the pooled held against expiry too, keyed by the
+      // categories of the group's configs — a down worker would otherwise
+      // over-reserve the shared pool exactly as it over-reserves the sub-limit.
+      const groupConfigs = await tx.benefitConfig.findMany({
+        where: { id: { in: configIds } },
+        select: { category: true },
+      });
+      const groupCategories = groupConfigs.map((c) => String(c.category));
+      const groupStoredHeld = groupRows.reduce((s, u) => s + Number(u.activeHoldAmount), 0);
+      const groupHeld = await this.reconcileHeld(tx, memberId, groupCategories, groupStoredHeld);
+      const groupUsed = groupRows.reduce((s, u) => s + Number(u.amountUsed), 0) + groupHeld;
       remaining = Math.min(remaining, Math.max(0, Number(group.limitAmount) - groupUsed));
     }
     return remaining;
@@ -232,7 +321,8 @@ export class BenefitUsageService {
       },
     });
     const used = Number(row?.amountUsed ?? 0);
-    const held = Number(row?.activeHoldAmount ?? 0);
+    // FG-C10: reconcile stored held against live hold expiry (never under-reserve).
+    const held = await this.reconcileHeld(tx, memberId, [cfg.benefitCategory], Number(row?.activeHoldAmount ?? 0));
     return {
       configId: cfg.configId,
       limit: cfg.annualSubLimit,

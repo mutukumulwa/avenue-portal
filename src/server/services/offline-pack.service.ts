@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from "node:crypto";
+import { BenefitUsageService } from "./benefit-usage.service";
 
 // ─── FACILITY OFFLINE DATA PACK (WP-B3, TPA_FEEDBACK_WORKPLAN.md §B / D3) ────
 // The MINIMUM data a facility needs to run its day offline (TPA-confirmed):
@@ -117,14 +118,22 @@ export class OfflinePackService {
         benefitConfig: { select: { category: true, annualSubLimit: true } },
       },
     });
+    // FG-C10: reflect hold expiry live so a down worker doesn't ship a pack with
+    // over-reserved (understated) balances — the offline day would then wrongly
+    // deny members benefit that has actually expired and freed.
+    const holdSums = await BenefitUsageService.liveHoldSums(prisma, memberIds);
     const numberById = new Map(eligible.map((m) => [m.id, m.memberNumber]));
     const balances = usages.map((u) => {
       const limit = Number(u.benefitConfig.annualSubLimit);
+      const held = BenefitUsageService.reconcileStored(
+        Number(u.activeHoldAmount),
+        holdSums.get(BenefitUsageService.holdKey(u.memberId, String(u.benefitConfig.category))),
+      );
       return {
         memberNumber: numberById.get(u.memberId) ?? "",
         category: u.benefitConfig.category,
         limit,
-        remaining: Math.max(0, limit - Number(u.amountUsed) - Number(u.activeHoldAmount)),
+        remaining: Math.max(0, limit - Number(u.amountUsed) - held),
       };
     });
 

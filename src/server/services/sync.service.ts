@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { FraudService } from "./fraud.service";
 import { AutoAdjudicationService } from "./auto-adjudication.service";
 import { getSystemActorId } from "./system-actor.service";
+import { BenefitUsageService } from "./benefit-usage.service";
 
 /**
  * Store-and-forward sync rail (Medvex spec §4 / gap G4).
@@ -203,14 +204,19 @@ export class SyncService {
     // Only enforced when a balance is determinable (member has configured usage).
     const usages = await prisma.benefitUsage.findMany({
       where: { memberId: member.id },
-      select: { amountUsed: true, activeHoldAmount: true, benefitConfig: { select: { annualSubLimit: true } } },
+      select: { amountUsed: true, activeHoldAmount: true, benefitConfig: { select: { annualSubLimit: true, category: true } } },
     });
     if (usages.length > 0) {
-      const available = usages.reduce(
-        (sum, u) =>
-          sum + Math.max(0, Number(u.benefitConfig.annualSubLimit) - Number(u.amountUsed) - Number(u.activeHoldAmount)),
-        0,
-      );
+      // FG-C10: re-validate against live held (net of expired holds), so a down
+      // worker's stale over-reservation can't wrongly flag a fitting claim for review.
+      const holdSums = await BenefitUsageService.liveHoldSums(prisma, [member.id]);
+      const available = usages.reduce((sum, u) => {
+        const held = BenefitUsageService.reconcileStored(
+          Number(u.activeHoldAmount),
+          holdSums.get(BenefitUsageService.holdKey(member.id, String(u.benefitConfig.category))),
+        );
+        return sum + Math.max(0, Number(u.benefitConfig.annualSubLimit) - Number(u.amountUsed) - held);
+      }, 0);
       if (billed > available) {
         return {
           state: "CONFLICT",

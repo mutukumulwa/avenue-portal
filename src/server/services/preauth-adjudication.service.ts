@@ -699,16 +699,27 @@ export const preauthAdjudicationService = {
       include: { benefitConfig: { select: { annualSubLimit: true, category: true } } },
     });
 
+    // FG-C10: reconcile the displayed held against live hold expiry (same rule as
+    // availableLimit), so a down worker's stale reservation isn't shown as balance.
+    const reconciledHeld = usage
+      ? BenefitUsageService.reconcileStored(
+          Number(usage.activeHoldAmount),
+          (await BenefitUsageService.liveHoldSums(prisma, [pa.memberId])).get(
+            BenefitUsageService.holdKey(pa.memberId, String(usage.benefitConfig?.category ?? "")),
+          ),
+        )
+      : 0;
+
     return {
       ...pa,
       hold,
       benefitBalance: usage ? {
         limit:     Number(usage.benefitConfig?.annualSubLimit ?? 0),
         used:      Number(usage.amountUsed),
-        held:      Number(usage.activeHoldAmount),
+        held:      reconciledHeld,
         remaining: Number(usage.benefitConfig?.annualSubLimit ?? 0)
                    - Number(usage.amountUsed)
-                   - Number(usage.activeHoldAmount),
+                   - reconciledHeld,
         category:  usage.benefitConfig?.category,
       } : null,
     };

@@ -9,6 +9,7 @@ const db = vi.hoisted(() => ({
   member: { findFirst: vi.fn() },
   provider: { findFirst: vi.fn() },
   benefitUsage: { findMany: vi.fn(async (): Promise<any[]> => []) },
+  benefitHold: { findMany: vi.fn(async (): Promise<any[]> => []) },
   claim: { findFirst: vi.fn(async (): Promise<any> => null), count: vi.fn(async () => 0), create: vi.fn(async () => ({ id: "clm1" })) },
   // PR-036: CONFLICT ops land in the Exception Register; work-code path
   // resolves the provider from the issuing authorization.

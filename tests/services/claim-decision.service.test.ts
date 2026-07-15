@@ -24,7 +24,7 @@ const db = vi.hoisted(() => {
     benefitConfig: { findFirst: vi.fn() },
     benefitUsage: { findUnique: vi.fn(async () => null), findMany: vi.fn(async (): Promise<any[]> => []), create: vi.fn(async (a: any) => a.data), update: vi.fn(async (a: any) => a.data) },
     benefitConfigSharedLimit: { findMany: vi.fn(async (): Promise<any[]> => []) },
-    benefitHold: { findUnique: vi.fn(async () => null), update: vi.fn(async (a: any) => a.data), upsert: vi.fn(async () => ({})) },
+    benefitHold: { findUnique: vi.fn(async () => null), findMany: vi.fn(async (): Promise<any[]> => []), update: vi.fn(async (a: any) => a.data), upsert: vi.fn(async () => ({})) },
     preAuthorization: { updateMany: vi.fn(async () => ({ count: 1 })), update: vi.fn(async (a: any) => a.data) },
     approvalMatrix: { findMany: vi.fn(async (): Promise<any[]> => []) },
     approvalRequest: { findFirst: vi.fn(async () => null), create: vi.fn(async () => ({ id: "ar1" })), update: vi.fn(async (a: any) => a.data) },
