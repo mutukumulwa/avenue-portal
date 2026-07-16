@@ -20,7 +20,7 @@ const db = vi.hoisted(() => {
     },
     claimLine: { findMany: vi.fn(async (): Promise<any[]> => []), update: vi.fn(async () => ({})) },
     practitioner: { findFirst: vi.fn(async () => null) },
-    member: { findUnique: vi.fn() },
+    member: { findUnique: vi.fn(), findMany: vi.fn(async (): Promise<any[]> => []) },
     benefitConfig: { findFirst: vi.fn() },
     benefitUsage: { findUnique: vi.fn(async () => null), findMany: vi.fn(async (): Promise<any[]> => []), create: vi.fn(async (a: any) => a.data), update: vi.fn(async (a: any) => a.data) },
     benefitConfigSharedLimit: { findMany: vi.fn(async (): Promise<any[]> => []) },
@@ -703,5 +703,88 @@ describe("BD-07 — mixed coded + uncoded claim (money-control regression)", () 
 
     await expect(decideMixed({ approvedAmount: 83500 })).rejects.toThrow(/payable ceiling[\s\S]*3,500/);
     await expect(decideMixed({ approvedAmount: 3500 })).resolves.toBeTruthy();
+  });
+});
+
+// ─── P1.3 — benefit availability gate at the decision (IP-DEF-06) ────────────
+// The gate runs FIRST inside the decision transaction: an approval above the
+// member's available benefit is hard-blocked with the binding constraint and a
+// partial-to-availability suggestion (DEC-04), leaving NO side effects; holds
+// the claim converts are credited once (P1-B); FAMILY pools block dependants
+// beyond the family remainder (P1-C).
+describe("P1.3 — benefit availability gate (IP-DEF-06)", () => {
+  it("blocks approving a fully-exhausted member with BENEFIT_CATEGORY_EXHAUSTED and no side effects", async () => {
+    db.benefitUsage.findUnique.mockResolvedValue({ id: "bu1", amountUsed: 500000, activeHoldAmount: 0 });
+    await expect(decide({ approvedAmount: 85000 })).rejects.toThrow(/BENEFIT_CATEGORY_EXHAUSTED[\s\S]*Approve up to KES 0/);
+    expect(db.benefitUsage.create).not.toHaveBeenCalled();
+    expect(db.benefitUsage.update).not.toHaveBeenCalled();
+    expect(db.claim.update).not.toHaveBeenCalled();
+    expect(db.journalEntry.create).not.toHaveBeenCalled();
+  });
+
+  it("allows an explicit partial approval equal to the availability", async () => {
+    db.benefitUsage.findUnique.mockResolvedValue({ id: "bu1", amountUsed: 490000, activeHoldAmount: 0 });
+    await expect(decide({ action: "PARTIALLY_APPROVED", approvedAmount: 10000 })).resolves.toBeTruthy();
+    expect(db.benefitUsage.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ amountUsed: { increment: 10000 } }) }),
+    );
+  });
+
+  it("P1-B: a claim converting its own PA hold is NOT false-blocked by that reservation", async () => {
+    // 500k limit, 300k used, 200k held by THIS claim's PA. Without the credit
+    // the availability would be 0; crediting the converting hold makes it 200k.
+    const usageRow: any = { id: "bu1", amountUsed: 300000, activeHoldAmount: 200000 };
+    const holdRow: any = { preAuthId: "pa1", memberId: "m1", benefitCategory: "INPATIENT", heldAmount: 200000, status: "ACTIVE", expiresAt: new Date(Date.now() + 86400000) };
+    db.claim.findUnique.mockResolvedValue(baseClaim({
+      preauths: [{ id: "pa1", preauthNumber: "PA-2026-00001", approvedAmount: 200000, estimatedCost: 200000, utilisedAmount: 0, status: "ATTACHED" }],
+    }));
+    db.benefitUsage.findUnique.mockImplementation(async () => ({ ...usageRow }));
+    db.benefitUsage.update.mockImplementation(async (a: any) => {
+      if (a.data?.amountUsed?.increment) usageRow.amountUsed += a.data.amountUsed.increment;
+      if (a.data?.activeHoldAmount?.increment) usageRow.activeHoldAmount += a.data.activeHoldAmount.increment;
+      return { ...usageRow };
+    });
+    db.benefitHold.findUnique.mockImplementation(async () => ({ ...holdRow }));
+    db.benefitHold.update.mockImplementation(async (a: any) => {
+      Object.assign(holdRow, a.data);
+      return { ...holdRow };
+    });
+    db.benefitHold.findMany.mockImplementation(async (a: any) => {
+      if (a?.where?.preAuthId) return holdRow.status === "ACTIVE" ? [{ ...holdRow }] : [];
+      return holdRow.status === "ACTIVE" ? [{ ...holdRow }] : [];
+    });
+
+    await expect(decide({ approvedAmount: 150000 })).resolves.toBeTruthy();
+    // Hold partially consumed: 200k − 150k = 50k stays reserved; usage +150k.
+    expect(holdRow.heldAmount).toBe(50000);
+    expect(usageRow.amountUsed).toBe(450000);
+    expect(usageRow.activeHoldAmount).toBe(50000);
+  });
+
+  it("P1-C: a dependant beyond the FAMILY pool remainder is blocked with BENEFIT_FAMILY_LIMIT_EXHAUSTED", async () => {
+    // Reset implementations the P1-B test installed on shared mocks.
+    db.benefitHold.findMany.mockResolvedValue([]);
+    db.benefitUsage.update.mockImplementation(async (a: any) => a.data);
+    db.member.findUnique.mockResolvedValue({
+      id: "m1", relationship: "CHILD", principalId: "m0",
+      packageVersionId: "pv1", enrollmentDate: new Date("2026-01-15"),
+      package: { annualLimit: 0, perVisitLimit: null },
+    });
+    db.member.findMany.mockResolvedValue([{ id: "m0" }, { id: "m1" }, { id: "sib" }]);
+    db.benefitConfigSharedLimit.findMany.mockResolvedValue([
+      { sharedLimitGroup: { id: "slg1", name: "Family inpatient pool", limitAmount: 500000, appliesTo: "FAMILY", benefitConfigs: [{ benefitConfigId: "cfg-inpatient" }] } },
+    ]);
+    db.benefitUsage.findMany.mockImplementation(async (a: any) => {
+      const m = a?.where?.memberId;
+      if (m && typeof m === "object" && Array.isArray(m.in)) {
+        return [
+          { memberId: "m0", amountUsed: 200000, activeHoldAmount: 0, benefitConfig: { category: "INPATIENT" } },
+          { memberId: "sib", amountUsed: 250000, activeHoldAmount: 0, benefitConfig: { category: "INPATIENT" } },
+        ];
+      }
+      return [];
+    });
+    await expect(decide({ approvedAmount: 100000 })).rejects.toThrow(/BENEFIT_FAMILY_LIMIT_EXHAUSTED[\s\S]*Approve up to KES 50,000/);
+    expect(db.claim.update).not.toHaveBeenCalled();
   });
 });

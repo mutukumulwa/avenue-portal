@@ -12,6 +12,7 @@ import { getSystemActorId } from "./system-actor.service";
 import { MemberNotificationService } from "./member-notification.service";
 import { ClaimControlService } from "./claim-control.service";
 import { FxService, BASE_CURRENCY } from "./fx.service";
+import { inSerializableTx } from "@/lib/serializable-tx";
 
 /**
  * claim-decision.service.ts — the ONE canonical claim decision stack
@@ -226,7 +227,7 @@ export class ClaimDecisionService {
         id: true, claimNumber: true, status: true, currency: true,
         memberId: true, benefitCategory: true, serviceType: true,
         billedAmount: true, receivedAt: true, adjudicatorId: true,
-        attendingDoctor: true, isReimbursement: true,
+        attendingDoctor: true, isReimbursement: true, dateOfService: true,
         preauths: { select: { id: true, preauthNumber: true, approvedAmount: true, estimatedCost: true, utilisedAmount: true, status: true } },
         member: { select: { firstName: true, lastName: true, group: { select: { clientId: true, fundingMode: true, selfFundedAccount: { select: { id: true, balance: true } } } } } },
       },
@@ -516,7 +517,38 @@ export class ClaimDecisionService {
     const account = claim.member?.group?.selfFundedAccount ?? null;
     const isSelfFunded = claim.member?.group?.fundingMode === "SELF_FUNDED" && !!account;
 
-    const updated = await prisma.$transaction(async (tx) => {
+    const updated = await inSerializableTx(prisma, async (tx) => {
+      // P1.3 — THE benefit-availability gate: first thing inside the
+      // transaction, before ANY write (cost-share/GL/fund/usage). Availability
+      // is recomputed at the claim's service date under Serializable isolation
+      // (two approvals cannot spend the same remaining balance — the loser
+      // retries or surfaces BENEFIT_CONCURRENCY_RETRY). Holds this claim is
+      // about to convert are credited exactly once, so a PA-covered claim is
+      // never false-blocked by its own reservation. DEC-04: hard-block with an
+      // explicit partial-to-availability suggestion; never silently cap.
+      if (isApproval) {
+        const availability = await BenefitUsageService.computeAvailability(tx, {
+          memberId: claim.memberId,
+          benefitCategory: claim.benefitCategory,
+          requestedAmount: approvedAmount,
+          serviceDate: claim.dateOfService ?? undefined,
+          creditPreauthIds: claim.preauths
+            .filter((pa) => ["APPROVED", "ATTACHED"].includes(pa.status))
+            .map((pa) => pa.id),
+          tenantId,
+          actorId: decision.reviewerId,
+        });
+        if (availability && approvedAmount > availability.payableCeiling + EPSILON) {
+          const b = availability.binding!;
+          throw new Error(
+            `[${availability.reasonCode}] Benefit enforcement: the requested approval (${claim.currency} ${approvedAmount.toLocaleString()}) ` +
+              `exceeds the member's available benefit. Binding constraint: ${b.label} — limit ${b.limit.toLocaleString()}, ` +
+              `used ${b.used.toLocaleString()}, reserved ${b.held.toLocaleString()}, available ${Math.floor(b.available).toLocaleString()}. ` +
+              `Approve up to ${claim.currency} ${Math.floor(availability.payableCeiling).toLocaleString()} as an explicit partial approval, or decline the claim.`,
+          );
+        }
+      }
+
       // Cost-share split on the approved amount.
       const costShare = isApproval
         ? await CostShareResolver.applyForClaim(tx as never, claim.memberId, claim.benefitCategory, approvedAmount)
@@ -532,13 +564,11 @@ export class ClaimDecisionService {
         }
       }
 
-      // Benefit usage (PR-016): every approval consumes the net approved
-      // amount — PA-attached claims included (their holds are released below).
-      if (isApproval) {
-        await BenefitUsageService.recordUsage(tx, claim.memberId, claim.benefitCategory, approvedAmount);
-      }
-
       // PA holds + PA status (PR-011/016 #3-4; PR-022 partial utilisation).
+      // P1.3: holds convert BEFORE usage is recorded, so the guarded
+      // recordUsage backstop sees the reservation it is consuming as freed —
+      // hold-covered claims pass, and the availability a hold reserved cannot
+      // be double-counted against its own claim.
       // Each PA is consumed only up to the claim's approved amount:
       //  - fully consumed → hold CONVERTED, PA → UTILISED;
       //  - partially consumed → hold reduced (stays ACTIVE), PA back to
@@ -589,6 +619,16 @@ export class ClaimDecisionService {
         await tx.preAuthorization.updateMany({
           where: { claimId, status: { in: ["APPROVED", "ATTACHED"] } },
           data: { status: "APPROVED", claimId: null, attachedAt: null },
+        });
+      }
+
+      // Benefit usage (PR-016): every approval consumes the net approved
+      // amount. P1: recordUsage now REJECTS an over-limit write (fail-closed
+      // backstop behind the availability gate above) and books the usage into
+      // the service-date period.
+      if (isApproval) {
+        await BenefitUsageService.recordUsage(tx, claim.memberId, claim.benefitCategory, approvedAmount, {
+          serviceDate: claim.dateOfService ?? undefined,
         });
       }
 
@@ -669,7 +709,7 @@ export class ClaimDecisionService {
       }
 
       return row;
-    });
+    }, { label: `claim ${claim.claimNumber} decision` });
 
     // Zero the capitated lines + tag the pool on the decided claim.
     if (isApproval) {
@@ -746,7 +786,10 @@ export class ClaimDecisionService {
     const baseAmount = Number(claim.approvedBaseAmount) || amount;
     const rate = claim.fxRateToBase != null ? Number(claim.fxRateToBase) : 1;
 
-    const updated = await prisma.$transaction(async (tx) => {
+    // P1.4: the reversal runs under the same serializable-with-retry regime as
+    // the decision — usage decrement, GL reversal and fund refund land exactly
+    // once. Idempotency is the status gate above (a VOID claim cannot re-enter).
+    const updated = await inSerializableTx(prisma, async (tx) => {
       if (amount > 0) {
         await BenefitUsageService.reverseUsage(tx, claim.memberId, claim.benefitCategory, amount);
         const coTx = await tx.coContributionTransaction.findUnique({
@@ -799,7 +842,7 @@ export class ClaimDecisionService {
           },
         },
       });
-    });
+    }, { label: `claim ${claim.claimNumber} void` });
 
     await auditChainService.append({
       actorId: opts.actorId,

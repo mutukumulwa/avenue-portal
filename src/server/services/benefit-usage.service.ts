@@ -423,7 +423,7 @@ export class BenefitUsageService {
 
     const { periodStart, periodEnd } = this.periodFor(member.enrollmentDate, now);
     const category = String(opts.benefitCategory);
-    const familyRootId = member.relationship === "PRINCIPAL" ? member.id : member.principalId ?? member.id;
+    const familyRootId = member.relationship === "PRINCIPAL" ? opts.memberId : member.principalId ?? opts.memberId;
 
     // Credited holds (the ones this decision converts), keyed per member+category.
     const creditByKey = new Map<string, number>();
@@ -468,13 +468,13 @@ export class BenefitUsageService {
     }
 
     // CATEGORY — the member's own sublimit row.
-    const memberSums = await this.liveHoldSums(tx, [member.id], now);
+    const memberSums = await this.liveHoldSums(tx, [opts.memberId], now);
     const catRow = await tx.benefitUsage.findUnique({
-      where: { memberId_benefitConfigId_periodStart: { memberId: member.id, benefitConfigId: config.id, periodStart } },
+      where: { memberId_benefitConfigId_periodStart: { memberId: opts.memberId, benefitConfigId: config.id, periodStart } },
     });
     const catUsed = Number(catRow?.amountUsed ?? 0);
     const catHeld = heldAcross(
-      [{ memberId: member.id, activeHoldAmount: catRow?.activeHoldAmount ?? 0, category }],
+      [{ memberId: opts.memberId, activeHoldAmount: catRow?.activeHoldAmount ?? 0, category }],
       memberSums,
     );
     const catLimit = Number(config.annualSubLimit);
@@ -491,11 +491,11 @@ export class BenefitUsageService {
     const overallLimit = member.package?.annualLimit != null ? Number(member.package.annualLimit) : 0;
     if (overallLimit > 0) {
       const allRows = await tx.benefitUsage.findMany({
-        where: { memberId: member.id, periodStart: { lte: periodEnd }, periodEnd: { gte: periodStart } },
+        where: { memberId: opts.memberId, periodStart: { lte: periodEnd }, periodEnd: { gte: periodStart } },
         include: { benefitConfig: { select: { category: true } } },
       });
       const shaped = allRows.map((r) => ({
-        memberId: member.id,
+        memberId: opts.memberId,
         activeHoldAmount: r.activeHoldAmount,
         category: String((r as { benefitConfig?: { category?: unknown } }).benefitConfig?.category ?? ""),
       }));
@@ -529,10 +529,10 @@ export class BenefitUsageService {
               data: {
                 tenantId: opts.tenantId,
                 entityType: "MEMBER",
-                entityId: member.id,
-                entityRef: member.id,
+                entityId: opts.memberId,
+                entityRef: opts.memberId,
                 exceptionCode: "OTHER",
-                reason: `Family shared limit "${group.name}" cannot be computed: dependant ${member.id} has no linked principal (data quality). Decision blocked (DEC-06).`,
+                reason: `Family shared limit "${group.name}" cannot be computed: dependant ${opts.memberId} has no linked principal (data quality). Decision blocked (DEC-06).`,
                 raisedById: opts.actorId,
               },
             })
@@ -551,7 +551,7 @@ export class BenefitUsageService {
               select: { id: true },
             })
           ).map((m) => m.id))
-        : [member.id];
+        : [opts.memberId];
 
       const configIds = group.benefitConfigs.map((bc) => bc.benefitConfigId);
       const poolRows = await tx.benefitUsage.findMany({
@@ -589,7 +589,7 @@ export class BenefitUsageService {
     const payableCeiling = binding?.available ?? 0;
 
     return {
-      memberId: member.id,
+      memberId: opts.memberId,
       familyRootId,
       benefitConfigId: config.id,
       benefitCategory: category,
