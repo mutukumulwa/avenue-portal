@@ -1,0 +1,30 @@
+{
+  "generatedAt": "2026-07-05T12:55:17.982Z",
+  "totalRows": 2750,
+  "byProviderType": {
+    "HOSPITAL": 236,
+    "CLINIC": 1133,
+    "REHABILITATION": 95,
+    "PHARMACY": 628,
+    "LABORATORY": 363,
+    "OPTICAL": 145,
+    "DENTAL": 150
+  },
+  "byRegion": {
+    "Central": 912,
+    "Northern": 571,
+    "Eastern": 614,
+    "Western": 653
+  },
+  "byOwnership": {
+    "Government": 331,
+    "Private for profit": 2052,
+    "Private not for profit": 367
+  },
+  "bySourceClass": {
+    "report_seed": 77,
+    "synthetic_fixture": 2673
+  },
+  "activeContracts": 2750,
+  "insuranceAcceptingRows": 2750
+}
