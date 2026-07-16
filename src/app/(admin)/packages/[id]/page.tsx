@@ -20,6 +20,25 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
   ]);
   if (!pkg) notFound();
 
+  // Prisma Decimal fields don't survive the RSC boundary — hand the client
+  // manager plain numbers.
+  const ruleViews = coRules.map((r) => ({
+    id: r.id,
+    benefitCategory: r.benefitCategory,
+    networkTier: r.networkTier,
+    type: r.type,
+    fixedAmount: r.fixedAmount == null ? null : Number(r.fixedAmount),
+    percentage: r.percentage == null ? null : Number(r.percentage),
+    perVisitCap: r.perVisitCap == null ? null : Number(r.perVisitCap),
+    isActive: r.isActive,
+  }));
+  const annualCapView = annualCap
+    ? {
+        individualCap: Number(annualCap.individualCap),
+        familyCap: annualCap.familyCap == null ? null : Number(annualCap.familyCap),
+      }
+    : null;
+
   const currentBenefits = pkg.currentVersion?.benefits ?? [];
   const totalSubLimit = currentBenefits.reduce((s, b) => s + Number(b.annualSubLimit), 0);
 
@@ -148,8 +167,8 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
         <div className="p-5">
           <CoContributionRulesManager
             packageId={id}
-            rules={coRules}
-            annualCap={annualCap}
+            rules={ruleViews}
+            annualCap={annualCapView}
           />
         </div>
       </div>
