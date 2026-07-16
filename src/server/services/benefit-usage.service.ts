@@ -29,6 +29,52 @@ export interface ResolvedBenefitConfig {
   periodEnd: Date;
 }
 
+// ─── P1 (TPA_PRIORITY_SIX): one availability result ─────────────────────────
+// Decisions recorded in uat/priority-six/P1_BENEFIT_DECISIONS.md (DEC-02..06).
+
+export type BenefitConstraintKind =
+  | "PER_VISIT"
+  | "CATEGORY"
+  | "OVERALL"
+  | "SHARED_MEMBER"
+  | "SHARED_FAMILY";
+
+export interface BenefitConstraint {
+  kind: BenefitConstraintKind;
+  label: string;
+  limit: number;
+  used: number;
+  held: number;
+  available: number;
+}
+
+export interface BenefitAvailability {
+  memberId: string;
+  familyRootId: string;
+  benefitConfigId: string;
+  benefitCategory: string;
+  periodStart: Date;
+  periodEnd: Date;
+  requestedAmount: number;
+  /** Minimum available across every applicable constraint. */
+  payableCeiling: number;
+  constraints: BenefitConstraint[];
+  /** The constraint with the smallest available amount (ties: first). */
+  binding: BenefitConstraint | null;
+  /** Reason code for the binding constraint (P1.5), e.g. BENEFIT_CATEGORY_EXHAUSTED. */
+  reasonCode: string | null;
+}
+
+const EPSILON = 0.01;
+
+const KIND_REASON_CODE: Record<BenefitConstraintKind, string> = {
+  PER_VISIT: "BENEFIT_PER_VISIT_EXCEEDED",
+  CATEGORY: "BENEFIT_CATEGORY_EXHAUSTED",
+  OVERALL: "BENEFIT_OVERALL_EXHAUSTED",
+  SHARED_MEMBER: "BENEFIT_SHARED_LIMIT_EXHAUSTED",
+  SHARED_FAMILY: "BENEFIT_FAMILY_LIMIT_EXHAUSTED",
+};
+
 export class BenefitUsageService {
   /** Enrollment-anniversary benefit period containing `now`. */
   static periodFor(enrollmentDate: Date, now: Date = new Date()): { periodStart: Date; periodEnd: Date } {
@@ -195,22 +241,36 @@ export class BenefitUsageService {
    * Record consumed usage at claim decision (PR-016 D1): +amountUsed,
    * +claimCount. Returns the remaining limit after the write (shared-limit
    * groups included).
+   *
+   * P1 gap #2: the write is a GUARDED ledger entry — an amount above the
+   * remaining member-scope limit throws instead of incrementing-and-flooring.
+   * Callers (ClaimDecisionService.decide) run the full constraint gate first
+   * (family pools, overall cap, holds credited); this is the fail-closed
+   * backstop that keeps ANY future caller from over-consuming.
    */
   static async recordUsage(
     tx: Prisma.TransactionClient,
     memberId: string,
     benefitCategory: BenefitCategory | string,
     amount: number,
+    opts: { serviceDate?: Date } = {},
   ): Promise<{ configId: string; remaining: number }> {
-    const cfg = await this.resolveConfig(tx, memberId, benefitCategory);
+    const cfg = await this.resolveConfig(tx, memberId, benefitCategory, opts.serviceDate ?? new Date());
     if (!cfg) {
       throw new Error(
         `Benefit "${String(benefitCategory).replace(/_/g, " ")}" is not configured in the member's package — cannot record utilisation.`,
       );
     }
+    const remainingBefore = await this.remainingAfter(tx, memberId, cfg);
+    if (amount > remainingBefore + EPSILON) {
+      throw new Error(
+        `[BENEFIT_CATEGORY_EXHAUSTED] Recording ${amount.toLocaleString()} would exceed the member's remaining ` +
+          `${String(benefitCategory).replace(/_/g, " ")} benefit (${remainingBefore.toLocaleString()} left of ` +
+          `${cfg.annualSubLimit.toLocaleString()}). The decision must not consume more than is available.`,
+      );
+    }
     await this.applyDelta(tx, memberId, cfg, { amountUsed: amount, claimCount: 1 });
-    const remaining = await this.remainingAfter(tx, memberId, cfg);
-    return { configId: cfg.configId, remaining };
+    return { configId: cfg.configId, remaining: Math.max(0, remainingBefore - amount) };
   }
 
   /**
@@ -301,6 +361,246 @@ export class BenefitUsageService {
       remaining = Math.min(remaining, Math.max(0, Number(group.limitAmount) - groupUsed));
     }
     return remaining;
+  }
+
+  /**
+   * P1.1 — THE availability result. One computation, minimum across every
+   * applicable constraint, reason-ready detail per constraint:
+   *
+   *   PER_VISIT      BenefitConfig.perVisitLimit / Package.perVisitLimit
+   *   CATEGORY       annualSubLimit − used − held (holds expiry-reconciled)
+   *   OVERALL        Package.annualLimit across all categories (DEC-03, when > 0)
+   *   SHARED_MEMBER  SharedLimitGroup pool, treated member only
+   *   SHARED_FAMILY  SharedLimitGroup pool across principal + dependants (DEC-05)
+   *
+   * `creditPreauthIds` names the PAs whose ACTIVE holds THIS decision converts —
+   * their reservations are credited back once (P1.1 rule 5) so a hold-covered
+   * claim is never false-blocked by its own reservation.
+   *
+   * The period is anchored to the treated member's enrollment anniversary and
+   * resolved for the SERVICE DATE (P1.1 rule 1). Family aggregation matches
+   * rows overlapping that window (family members may have different
+   * anniversaries).
+   *
+   * DEC-06: a dependant with no resolvable principal fails CLOSED when a
+   * FAMILY pool applies — blocking error + ExceptionLog data-quality row.
+   *
+   * Returns null when the member's package has no config for the category —
+   * the benefit-in-package gate owns that message.
+   */
+  static async computeAvailability(
+    tx: Prisma.TransactionClient,
+    opts: {
+      memberId: string;
+      benefitCategory: BenefitCategory | string;
+      requestedAmount: number;
+      serviceDate?: Date;
+      creditPreauthIds?: string[];
+      /** For the DEC-06 ExceptionLog row; omitted → throw only. */
+      tenantId?: string;
+      actorId?: string;
+    },
+  ): Promise<BenefitAvailability | null> {
+    const now = opts.serviceDate ?? new Date();
+    const member = await tx.member.findUnique({
+      where: { id: opts.memberId },
+      select: {
+        id: true,
+        relationship: true,
+        principalId: true,
+        enrollmentDate: true,
+        packageVersionId: true,
+        package: { select: { annualLimit: true, perVisitLimit: true } },
+      },
+    });
+    if (!member?.packageVersionId) return null;
+
+    const config = await tx.benefitConfig.findFirst({
+      where: { packageVersionId: member.packageVersionId, category: opts.benefitCategory as BenefitCategory },
+      select: { id: true, annualSubLimit: true, perVisitLimit: true },
+    });
+    if (!config) return null;
+
+    const { periodStart, periodEnd } = this.periodFor(member.enrollmentDate, now);
+    const category = String(opts.benefitCategory);
+    const familyRootId = member.relationship === "PRINCIPAL" ? member.id : member.principalId ?? member.id;
+
+    // Credited holds (the ones this decision converts), keyed per member+category.
+    const creditByKey = new Map<string, number>();
+    if (opts.creditPreauthIds && opts.creditPreauthIds.length > 0) {
+      const credited = await tx.benefitHold.findMany({
+        where: { preAuthId: { in: opts.creditPreauthIds }, status: "ACTIVE" },
+        select: { memberId: true, benefitCategory: true, heldAmount: true },
+      });
+      for (const h of credited) {
+        const key = this.holdKey(h.memberId, h.benefitCategory);
+        creditByKey.set(key, (creditByKey.get(key) ?? 0) + Number(h.heldAmount));
+      }
+    }
+
+    /** Reconciled, credit-netted held across usage rows (local credit copy per constraint). */
+    const heldAcross = (
+      rows: Array<{ memberId: string; activeHoldAmount: unknown; category: string }>,
+      sums: Map<string, { expired: number; active: number }>,
+    ): number => {
+      const credits = new Map(creditByKey);
+      let total = 0;
+      for (const row of rows) {
+        const key = this.holdKey(row.memberId, row.category);
+        const reconciled = this.reconcileStored(Number(row.activeHoldAmount), sums.get(key));
+        const credit = Math.min(credits.get(key) ?? 0, reconciled);
+        credits.set(key, (credits.get(key) ?? 0) - credit);
+        total += reconciled - credit;
+      }
+      return total;
+    };
+
+    const constraints: BenefitConstraint[] = [];
+
+    // PER_VISIT — a per-claim cap, not a depleting pool.
+    const cfgPerVisit = config.perVisitLimit != null ? Number(config.perVisitLimit) : null;
+    if (cfgPerVisit != null && cfgPerVisit > 0) {
+      constraints.push({ kind: "PER_VISIT", label: `${category.replace(/_/g, " ")} per-visit limit`, limit: cfgPerVisit, used: 0, held: 0, available: cfgPerVisit });
+    }
+    const pkgPerVisit = member.package?.perVisitLimit != null ? Number(member.package.perVisitLimit) : null;
+    if (pkgPerVisit != null && pkgPerVisit > 0) {
+      constraints.push({ kind: "PER_VISIT", label: "Package per-visit limit", limit: pkgPerVisit, used: 0, held: 0, available: pkgPerVisit });
+    }
+
+    // CATEGORY — the member's own sublimit row.
+    const memberSums = await this.liveHoldSums(tx, [member.id], now);
+    const catRow = await tx.benefitUsage.findUnique({
+      where: { memberId_benefitConfigId_periodStart: { memberId: member.id, benefitConfigId: config.id, periodStart } },
+    });
+    const catUsed = Number(catRow?.amountUsed ?? 0);
+    const catHeld = heldAcross(
+      [{ memberId: member.id, activeHoldAmount: catRow?.activeHoldAmount ?? 0, category }],
+      memberSums,
+    );
+    const catLimit = Number(config.annualSubLimit);
+    constraints.push({
+      kind: "CATEGORY",
+      label: `${category.replace(/_/g, " ")} annual sublimit`,
+      limit: catLimit,
+      used: catUsed,
+      held: catHeld,
+      available: Math.max(0, catLimit - catUsed - catHeld),
+    });
+
+    // OVERALL — Package.annualLimit across all categories (DEC-03, when populated).
+    const overallLimit = member.package?.annualLimit != null ? Number(member.package.annualLimit) : 0;
+    if (overallLimit > 0) {
+      const allRows = await tx.benefitUsage.findMany({
+        where: { memberId: member.id, periodStart: { lte: periodEnd }, periodEnd: { gte: periodStart } },
+        include: { benefitConfig: { select: { category: true } } },
+      });
+      const shaped = allRows.map((r) => ({
+        memberId: member.id,
+        activeHoldAmount: r.activeHoldAmount,
+        category: String((r as { benefitConfig?: { category?: unknown } }).benefitConfig?.category ?? ""),
+      }));
+      const overallUsed = allRows.reduce((s, r) => s + Number(r.amountUsed), 0);
+      const overallHeld = heldAcross(shaped, memberSums);
+      constraints.push({
+        kind: "OVERALL",
+        label: "Package overall annual limit",
+        limit: overallLimit,
+        used: overallUsed,
+        held: overallHeld,
+        available: Math.max(0, overallLimit - overallUsed - overallHeld),
+      });
+    }
+
+    // SHARED pools — MEMBER-scoped or FAMILY-scoped (DEC-05/06).
+    const links = await tx.benefitConfigSharedLimit.findMany({
+      where: { benefitConfigId: config.id },
+      include: { sharedLimitGroup: { include: { benefitConfigs: true } } },
+    });
+    let familyIds: string[] | null = null;
+    for (const link of links) {
+      const group = link.sharedLimitGroup;
+      const isFamily = group.appliesTo === "FAMILY";
+
+      if (isFamily && member.relationship !== "PRINCIPAL" && !member.principalId) {
+        // DEC-06: fail closed + data-quality exception.
+        if (opts.tenantId && opts.actorId) {
+          await tx.exceptionLog
+            .create({
+              data: {
+                tenantId: opts.tenantId,
+                entityType: "MEMBER",
+                entityId: member.id,
+                entityRef: member.id,
+                exceptionCode: "OTHER",
+                reason: `Family shared limit "${group.name}" cannot be computed: dependant ${member.id} has no linked principal (data quality). Decision blocked (DEC-06).`,
+                raisedById: opts.actorId,
+              },
+            })
+            .catch(() => undefined);
+        }
+        throw new Error(
+          `Family shared limit "${group.name}" cannot be computed: this dependant has no linked principal member (data-quality issue). ` +
+            `Correct the member's principal linkage (Members → dependants) before deciding — the family pool cannot be safely calculated.`,
+        );
+      }
+
+      const scopeIds = isFamily
+        ? (familyIds ??= (
+            await tx.member.findMany({
+              where: { OR: [{ id: familyRootId }, { principalId: familyRootId }] },
+              select: { id: true },
+            })
+          ).map((m) => m.id))
+        : [member.id];
+
+      const configIds = group.benefitConfigs.map((bc) => bc.benefitConfigId);
+      const poolRows = await tx.benefitUsage.findMany({
+        where: {
+          memberId: scopeIds.length === 1 ? scopeIds[0] : { in: scopeIds },
+          benefitConfigId: { in: configIds },
+          periodStart: { lte: periodEnd },
+          periodEnd: { gte: periodStart },
+        },
+        include: { benefitConfig: { select: { category: true } } },
+      });
+      const sums = isFamily ? await this.liveHoldSums(tx, scopeIds, now) : memberSums;
+      const shaped = poolRows.map((r) => ({
+        memberId: (r as { memberId: string }).memberId,
+        activeHoldAmount: r.activeHoldAmount,
+        category: String((r as { benefitConfig?: { category?: unknown } }).benefitConfig?.category ?? ""),
+      }));
+      const poolUsed = poolRows.reduce((s, r) => s + Number(r.amountUsed), 0);
+      const poolHeld = heldAcross(shaped, sums);
+      const poolLimit = Number(group.limitAmount);
+      constraints.push({
+        kind: isFamily ? "SHARED_FAMILY" : "SHARED_MEMBER",
+        label: group.name,
+        limit: poolLimit,
+        used: poolUsed,
+        held: poolHeld,
+        available: Math.max(0, poolLimit - poolUsed - poolHeld),
+      });
+    }
+
+    const binding = constraints.reduce<BenefitConstraint | null>(
+      (min, c) => (min === null || c.available < min.available ? c : min),
+      null,
+    );
+    const payableCeiling = binding?.available ?? 0;
+
+    return {
+      memberId: member.id,
+      familyRootId,
+      benefitConfigId: config.id,
+      benefitCategory: category,
+      periodStart,
+      periodEnd,
+      requestedAmount: opts.requestedAmount,
+      payableCeiling,
+      constraints,
+      binding,
+      reasonCode: binding ? KIND_REASON_CODE[binding.kind] : null,
+    };
   }
 
   /** Available limit before any new commitment (PR-011 #4 read path). */
