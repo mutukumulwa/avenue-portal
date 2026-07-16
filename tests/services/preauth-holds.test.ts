@@ -100,11 +100,16 @@ describe("approveByHuman — canonical PA approval (PR-011)", () => {
     );
   });
 
-  it("annotates the shortfall when approving above the available limit", async () => {
+  it("P1.2 (DEC-04): hard-blocks an approval above availability with a partial-to-availability suggestion", async () => {
+    // 480k of 500k used → 20k available; an 85k approval is BLOCKED (the
+    // pre-P1 behaviour merely annotated the shortfall and approved anyway).
     db.benefitUsage.findUnique.mockResolvedValue({ id: "bu1", amountUsed: 480000, activeHoldAmount: 0 });
-    await preauthAdjudicationService.approveByHuman("pa1", T, "u1", 85000);
-    const paUpdate = db.preAuthorization.updateMany.mock.calls[0][0].data;
-    expect(paUpdate.reviewNotes).toMatch(/shortfall/i);
+    await expect(
+      preauthAdjudicationService.approveByHuman("pa1", T, "u1", 85000),
+    ).rejects.toThrow(/BENEFIT_CATEGORY_EXHAUSTED[\s\S]*Approve up to UGX 20,000/);
+    // Nothing was decided and no hold was placed — the gate precedes the flip.
+    expect(db.preAuthorization.updateMany).not.toHaveBeenCalled();
+    expect(db.benefitHold.upsert).not.toHaveBeenCalled();
   });
 
   it("rejects a decision on an already-APPROVED PA (idempotency / double-hold guard)", async () => {

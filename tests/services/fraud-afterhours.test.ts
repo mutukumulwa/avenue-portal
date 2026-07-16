@@ -7,7 +7,7 @@ const db = vi.hoisted(() => ({
     count: vi.fn(async () => 0),
   },
   providerTariff: { findFirst: vi.fn(async (): Promise<any> => null) },
-  claimFraudAlert: { createMany: vi.fn(async () => ({ count: 0 })) },
+  claimFraudAlert: { createMany: vi.fn(async (_a?: unknown) => ({ count: 0 })) },
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
 

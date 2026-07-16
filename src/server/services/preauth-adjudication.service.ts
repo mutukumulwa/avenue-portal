@@ -13,6 +13,7 @@ import { prisma } from "@/lib/prisma";
 import { TRPCError } from "@trpc/server";
 import { auditChainService } from "./audit-chain.service";
 import { BenefitUsageService } from "./benefit-usage.service";
+import { inSerializableTx } from "@/lib/serializable-tx";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
@@ -288,6 +289,7 @@ export const preauthAdjudicationService = {
     const pa     = await prisma.preAuthorization.findUnique({ where: { id: preAuthId } });
     if (!pa) throw new TRPCError({ code: "NOT_FOUND", message: "PA not found" });
 
+    let effective = result;
     if (result.decision === "AUTO_APPROVED") {
       const validUntil = new Date(Date.now() + PA_VALIDITY_DAYS * 24 * 60 * 60 * 1000);
       // Issue a Guarantee of Payment (G5.5): approvedAmount is already capped to
@@ -296,8 +298,41 @@ export const preauthAdjudicationService = {
       const gopCount = await prisma.preAuthorization.count({ where: { tenantId, gopNumber: { not: null } } });
       const gopNumber = `GOP-${new Date().getFullYear()}-${String(gopCount + 1).padStart(5, "0")}`;
 
-      await prisma.$transaction([
-        prisma.preAuthorization.update({
+      // P1.2: Gate 5 pre-screened availability OUTSIDE any transaction. The
+      // approval + hold now land in ONE serializable transaction that RE-CHECKS
+      // availability at commit; if the balance moved in between, the PA routes
+      // to human review instead of auto-approving (reject-or-route, never
+      // approve-then-hold).
+      let recheckFailure: string | null = null;
+      await inSerializableTx(prisma, async (tx) => {
+        const availability = await BenefitUsageService.computeAvailability(tx, {
+          memberId: pa.memberId,
+          benefitCategory: String(pa.benefitCategory),
+          requestedAmount: Number(pa.estimatedCost),
+          serviceDate: pa.expectedDateOfService ?? undefined,
+          creditPreauthIds: [preAuthId],
+          tenantId,
+          actorId,
+        });
+        if (availability && Number(pa.estimatedCost) > availability.payableCeiling + 0.01) {
+          const b = availability.binding!;
+          recheckFailure =
+            `[${availability.reasonCode}] Benefit availability moved before commit: ${b.label} has ` +
+            `UGX ${Math.floor(b.available).toLocaleString()} available vs estimated UGX ${Number(pa.estimatedCost).toLocaleString()}`;
+          const slaType = pa.isEmergency ? "EMERGENCY" : pa.serviceType === "INPATIENT" ? "INPATIENT_PREADMISSION" : "OUTPATIENT";
+          await tx.preAuthorization.update({
+            where: { id: preAuthId },
+            data: {
+              status:          "UNDER_REVIEW",
+              slaType,
+              slaDeadlineAt:   preauthAdjudicationService.getSlaDeadline(slaType, pa.isEmergency),
+              autoDecisionLog: [...result.gateLog, { gate: "BENEFIT_CAP_RECHECK", outcome: "ROUTE_TO_HUMAN", reason: recheckFailure }] as never,
+            },
+          });
+          return;
+        }
+
+        await tx.preAuthorization.update({
           where: { id: preAuthId },
           data: {
             status:         "APPROVED",
@@ -310,16 +345,31 @@ export const preauthAdjudicationService = {
             gopIssuedAt:    new Date(),
             autoDecisionLog: result.gateLog as never,
           },
-        }),
-      ]);
+        });
 
-      // Create benefit hold
-      await preauthAdjudicationService.createBenefitHold(
-        preAuthId, tenantId, pa.memberId,
-        String(pa.benefitCategory),
-        Number(pa.estimatedCost),
-        validUntil,
-      );
+        // The hold, in the SAME transaction (delta-safe on re-run).
+        const existing = await tx.benefitHold.findUnique({ where: { preAuthId } });
+        const previouslyHeld = existing && existing.status === "ACTIVE" ? Number(existing.heldAmount) : 0;
+        await tx.benefitHold.upsert({
+          where: { preAuthId },
+          update: { heldAmount: Number(pa.estimatedCost), expiresAt: validUntil, status: "ACTIVE", releasedAt: null },
+          create: { tenantId, memberId: pa.memberId, preAuthId, benefitCategory: String(pa.benefitCategory), heldAmount: Number(pa.estimatedCost), expiresAt: validUntil },
+        });
+        const delta = Number(pa.estimatedCost) - previouslyHeld;
+        if (delta > 0) {
+          await BenefitUsageService.placeHold(tx, pa.memberId, String(pa.benefitCategory), delta);
+        } else if (delta < 0) {
+          await BenefitUsageService.releaseHold(tx, pa.memberId, String(pa.benefitCategory), -delta);
+        }
+      }, { label: `PA ${pa.preauthNumber ?? preAuthId} auto-approval` });
+
+      if (recheckFailure) {
+        effective = {
+          decision: "ROUTE_TO_HUMAN",
+          reason: recheckFailure,
+          gateLog: [...result.gateLog, { gate: "BENEFIT_CAP_RECHECK", outcome: "ROUTE_TO_HUMAN", reason: recheckFailure }],
+        };
+      }
 
     } else if (result.decision === "AUTO_DECLINED") {
       await prisma.preAuthorization.update({
@@ -352,16 +402,16 @@ export const preauthAdjudicationService = {
 
     await auditChainService.append({
       actorId,
-      action:     `PREAUTH:${result.decision}`,
+      action:     `PREAUTH:${effective.decision}`,
       module:     "PREAUTH",
       entityType: "PreAuthorization",
       entityId:   preAuthId,
-      payload:    { decision: result.decision, gateLog: result.gateLog },
+      payload:    { decision: effective.decision, gateLog: effective.gateLog },
       tenantId,
-      description: `PA ${pa.preauthNumber} auto-decision: ${result.decision}`,
+      description: `PA ${pa.preauthNumber} auto-decision: ${effective.decision}`,
     });
 
-    return result;
+    return effective;
   },
 
   // ── 3. Benefit hold management ────────────────────────────────────────────
@@ -486,50 +536,78 @@ export const preauthAdjudicationService = {
       });
     }
 
-    // PR-011 #2 (human path): show the shortfall when the approval exceeds the
-    // member's available limit (limit − used − held).
-    const balance = await BenefitUsageService.availableLimit(prisma, pa.memberId, pa.benefitCategory);
-    let reviewNotes = notes;
-    if (balance && approvedAmount > balance.available) {
-      const short = `Limit shortfall: approved ${approvedAmount.toLocaleString()} vs available ${balance.available.toLocaleString()} (limit ${balance.limit.toLocaleString()} − used ${balance.used.toLocaleString()} − held ${balance.held.toLocaleString()}).`;
-      reviewNotes = reviewNotes ? `${reviewNotes} ${short}` : short;
-    }
-
     const validUntil = new Date(Date.now() + (validDays ?? PA_VALIDITY_DAYS) * 24 * 60 * 60 * 1000);
     // Issue the GOP on manual approval too (G5.5), within the guaranteed amount.
     const gopCount = await prisma.preAuthorization.count({ where: { tenantId, gopNumber: { not: null } } });
     const gopNumber = `GOP-${new Date().getFullYear()}-${String(gopCount + 1).padStart(5, "0")}`;
 
-    // FG-C8: the status transition is the ATOMIC decision gate. A concurrent
-    // decide (approve/decline in another session) matches 0 rows here → we throw
-    // BEFORE placing the benefit hold, so a lost race leaves no phantom hold and
-    // the PA carries exactly one terminal decision (G2).
-    const decided = await prisma.preAuthorization.updateMany({
-      where: { id: preAuthId, tenantId, status: { in: ["SUBMITTED", "UNDER_REVIEW"] } },
-      data: {
-        status:         "APPROVED",
-        approvedAmount,
-        approvedAt:     new Date(),
-        approvedBy:     reviewerId,
-        validFrom:      new Date(),
-        validUntil,
-        gopNumber,
-        gopIssuedAt:    new Date(),
-        benefitRemaining: balance ? Math.max(0, balance.available - approvedAmount) : null,
-        reviewNotes,
-      } as never,
-    });
-    if (decided.count !== 1) {
-      throw new TRPCError({
-        code: "CONFLICT",
-        message: "This pre-authorization was just decided by another reviewer — refresh to see the current decision.",
+    // P1.2 (DEC-04): the availability gate, the FG-C8 atomic status flip and the
+    // hold all land in ONE serializable transaction with bounded retry — the PA
+    // is never approved first with the hold to follow, and an over-limit
+    // approval is BLOCKED with an explicit partial-to-availability suggestion
+    // (the pre-P1 behaviour merely annotated the shortfall).
+    await inSerializableTx(prisma, async (tx) => {
+      const availability = await BenefitUsageService.computeAvailability(tx, {
+        memberId: pa.memberId,
+        benefitCategory: String(pa.benefitCategory),
+        requestedAmount: approvedAmount,
+        serviceDate: pa.expectedDateOfService ?? undefined,
+        creditPreauthIds: [preAuthId],
+        tenantId,
+        actorId: reviewerId,
       });
-    }
+      if (availability && approvedAmount > availability.payableCeiling + 0.01) {
+        const b = availability.binding!;
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            `[${availability.reasonCode}] Approving UGX ${approvedAmount.toLocaleString()} would exceed the member's available benefit: ` +
+            `${b.label} has UGX ${Math.floor(b.available).toLocaleString()} available (limit ${b.limit.toLocaleString()} − used ${b.used.toLocaleString()} − held ${b.held.toLocaleString()}). ` +
+            `Approve up to UGX ${Math.floor(availability.payableCeiling).toLocaleString()} as a partial authorization, or decline.`,
+        });
+      }
 
-    await preauthAdjudicationService.createBenefitHold(
-      preAuthId, tenantId, pa.memberId,
-      String(pa.benefitCategory), approvedAmount, validUntil,
-    );
+      // FG-C8: the status transition is the ATOMIC decision gate. A concurrent
+      // decide (approve/decline in another session) matches 0 rows here → we
+      // throw BEFORE placing the benefit hold, so a lost race leaves no phantom
+      // hold and the PA carries exactly one terminal decision (G2).
+      const decided = await tx.preAuthorization.updateMany({
+        where: { id: preAuthId, tenantId, status: { in: ["SUBMITTED", "UNDER_REVIEW"] } },
+        data: {
+          status:         "APPROVED",
+          approvedAmount,
+          approvedAt:     new Date(),
+          approvedBy:     reviewerId,
+          validFrom:      new Date(),
+          validUntil,
+          gopNumber,
+          gopIssuedAt:    new Date(),
+          benefitRemaining: availability ? Math.max(0, availability.payableCeiling - approvedAmount) : null,
+          reviewNotes: notes,
+        } as never,
+      });
+      if (decided.count !== 1) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "This pre-authorization was just decided by another reviewer — refresh to see the current decision.",
+        });
+      }
+
+      // The hold, in the SAME transaction (delta-safe on re-approval).
+      const existing = await tx.benefitHold.findUnique({ where: { preAuthId } });
+      const previouslyHeld = existing && existing.status === "ACTIVE" ? Number(existing.heldAmount) : 0;
+      await tx.benefitHold.upsert({
+        where: { preAuthId },
+        update: { heldAmount: approvedAmount, expiresAt: validUntil, status: "ACTIVE", releasedAt: null },
+        create: { tenantId, memberId: pa.memberId, preAuthId, benefitCategory: String(pa.benefitCategory), heldAmount: approvedAmount, expiresAt: validUntil },
+      });
+      const delta = approvedAmount - previouslyHeld;
+      if (delta > 0) {
+        await BenefitUsageService.placeHold(tx, pa.memberId, String(pa.benefitCategory), delta);
+      } else if (delta < 0) {
+        await BenefitUsageService.releaseHold(tx, pa.memberId, String(pa.benefitCategory), -delta);
+      }
+    }, { label: `PA ${pa.preauthNumber} approval` });
 
     await auditChainService.append({
       actorId:    reviewerId,
