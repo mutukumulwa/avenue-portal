@@ -43,6 +43,24 @@ async function main() {
   })
   console.log(`✅ Default client: ${defaultClient.name}`)
 
+  // ── One Client per employer (payer boundary) ──────────────────────────────
+  // Each employer scheme gets its OWN Client. Never pool distinct employers
+  // under a single client: client-level provider entitlement would then span
+  // every pooled employer, letting any entitled provider read every employer's
+  // members (the N3 cross-employer exposure). The Default Client above stays as
+  // the operator's own book — schemes are NOT hung off it.
+  const clientFor = async (name: string, type: 'INSURER' | 'EMPLOYER_SELF_FUNDED') => {
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
+    return prisma.client.upsert({
+      where:  { operatorTenantId_slug: { operatorTenantId: tenant.id, slug } },
+      update: {},
+      create: {
+        operatorTenantId: tenant.id, type, name, slug,
+        currency: 'UGX', status: 'ACTIVE',
+      },
+    })
+  }
+
   // ── Medvex HOUSE terminology dictionary (G2.4) ───────────────
   // Seeded as APPROVED so resolve()/useTerm() return Medvex vocabulary out of
   // the box. Canonical keys stay in code; clients can override per CLIENT scope.
@@ -281,8 +299,8 @@ async function main() {
   // ═══════════════════════════════════════════════════════════
   const providerDefs = [
     {
-      name: 'Medvex Hospital - Parklands', type: 'HOSPITAL' as const, tier: 'OWN' as const,
-      county: 'Nairobi', phone: '+254202345678', email: 'parklands@medvex.co.ug',
+      name: 'Medvex Hospital - Kololo', type: 'HOSPITAL' as const, tier: 'OWN' as const,
+      county: 'Kampala', phone: '+256202345678', email: 'kololo@medvex.co.ug',
       contactPerson: 'Dr. Kariuki Mbugua',
       contractStatus: 'ACTIVE', paymentTermDays: 14, creditLimit: 5000000,
       contractNotes: 'Flagship facility. All services covered. Priority settlement.',
@@ -306,8 +324,8 @@ async function main() {
       ],
     },
     {
-      name: 'Medvex Hospital - Thika', type: 'HOSPITAL' as const, tier: 'OWN' as const,
-      county: 'Kiambu', phone: '+254202456789', email: 'thika@medvex.co.ug',
+      name: 'Medvex Hospital - Entebbe', type: 'HOSPITAL' as const, tier: 'OWN' as const,
+      county: 'Wakiso', phone: '+256202456789', email: 'entebbe@medvex.co.ug',
       contactPerson: 'Dr. Jane Muthee',
       contractStatus: 'ACTIVE', paymentTermDays: 14, creditLimit: 2000000,
       contractNotes: 'Outpatient and maternity focus. Inpatient capacity up to 50 beds.',
@@ -324,8 +342,8 @@ async function main() {
       ],
     },
     {
-      name: 'Nairobi Hospital', type: 'HOSPITAL' as const, tier: 'PARTNER' as const,
-      county: 'Nairobi', phone: '+254202845000', email: 'medicalfinance@nairobihospital.org',
+      name: 'Kampala Hospital', type: 'HOSPITAL' as const, tier: 'PARTNER' as const,
+      county: 'Kampala', phone: '+256202845000', email: 'medicalfinance@kampalahospital.co.ug',
       contactPerson: 'Finance Manager',
       contractStatus: 'ACTIVE', paymentTermDays: 30, creditLimit: 3000000,
       contractNotes: 'Panel partner. Net 30 payment. Pre-auth required for all inpatient admissions.',
@@ -341,8 +359,8 @@ async function main() {
       ],
     },
     {
-      name: 'Aga Khan University Hospital', type: 'HOSPITAL' as const, tier: 'PARTNER' as const,
-      county: 'Nairobi', phone: '+254203662000', email: 'billing@aku.edu',
+      name: 'Nakasero Hospital', type: 'HOSPITAL' as const, tier: 'PARTNER' as const,
+      county: 'Kampala', phone: '+256203662000', email: 'billing@nakaserohospital.co.ug',
       contactPerson: 'Billing Supervisor',
       contractStatus: 'ACTIVE', paymentTermDays: 30, creditLimit: 4000000,
       contractNotes: 'Tertiary referral partner. Complex surgical and oncology cases.',
@@ -356,8 +374,8 @@ async function main() {
       diagTariffs: [],
     },
     {
-      name: 'Lancet Kenya Laboratories', type: 'LABORATORY' as const, tier: 'PANEL' as const,
-      county: 'Nairobi', phone: '+254722205050', email: 'corporate@lancet.co.ke',
+      name: 'Lancet Uganda Laboratories', type: 'LABORATORY' as const, tier: 'PANEL' as const,
+      county: 'Kampala', phone: '+256722205050', email: 'corporate@lancet.co.ug',
       contactPerson: 'Corporate Accounts',
       contractStatus: 'ACTIVE', paymentTermDays: 30, creditLimit: 500000,
       contractNotes: 'Preferred laboratory partner. 15% corporate discount applied.',
@@ -374,7 +392,7 @@ async function main() {
     },
     {
       name: 'City Eye Hospital', type: 'OPTICAL' as const, tier: 'PANEL' as const,
-      county: 'Nairobi', phone: '+254202230100', email: 'billing@cityeye.co.ke',
+      county: 'Kampala', phone: '+256202230100', email: 'billing@cityeye.co.ug',
       contactPerson: 'Admin Officer',
       contractStatus: 'ACTIVE', paymentTermDays: 30, creditLimit: 300000,
       contractNotes: 'Optical-only panel. Frames and lenses per agreed price list attached.',
@@ -420,9 +438,9 @@ async function main() {
   // 5. BROKERS
   // ═══════════════════════════════════════════════════════════
   const brokerDefs = [
-    { name: 'Kenyan Alliance Insurance Brokers', contact: 'John Mutua',     phone: '+254722111000', email: 'john@kaib.co.ke',   first: 15, renew: 10 },
-    { name: 'Minet Kenya',                       contact: 'Alice Njeri',    phone: '+254733222000', email: 'alice@minet.co.ke', first: 12, renew: 8  },
-    { name: 'AON Kenya',                         contact: 'Charles Otieno', phone: '+254711333000', email: 'charles@aon.co.ke', first: 18, renew: 12 },
+    { name: 'Pearl Alliance Insurance Brokers', contact: 'John Mugisha',     phone: '+256722111000', email: 'john@paib.co.ug',   first: 15, renew: 10 },
+    { name: 'Minet Uganda',                       contact: 'Alice Nakayiza',    phone: '+256733222000', email: 'alice@minet.co.ug', first: 12, renew: 8  },
+    { name: 'AON Uganda',                         contact: 'Charles Ochieng', phone: '+256711333000', email: 'charles@aon.co.ug', first: 18, renew: 12 },
   ]
   const brokers: string[] = []
   for (const b of brokerDefs) {
@@ -439,13 +457,13 @@ async function main() {
   }
   console.log(`✅ Brokers: ${brokers.length}`)
 
-  // Broker portal user — linked to KAIB (brokers[0])
-  const brokerUserExists = await prisma.user.findFirst({ where: { tenantId: tenant.id, email: 'broker@kaib.co.ke' } })
+  // Broker portal user — linked to PAIB (brokers[0])
+  const brokerUserExists = await prisma.user.findFirst({ where: { tenantId: tenant.id, email: 'broker@paib.co.ug' } })
   if (!brokerUserExists) {
     await prisma.user.create({
       data: {
         tenantId: tenant.id,
-        email: 'broker@kaib.co.ke',
+        email: 'broker@paib.co.ug',
         firstName: 'John',
         lastName: 'Mutua',
         role: 'BROKER_USER',
@@ -454,29 +472,30 @@ async function main() {
         brokerId: brokers[0],
       },
     })
-    console.log('✅ Broker portal user: broker@kaib.co.ke')
+    console.log('✅ Broker portal user: broker@paib.co.ug')
   }
 
   // ═══════════════════════════════════════════════════════════
-  // 6. GROUPS — Safaricom has 3 benefit tiers
+  // 6. GROUPS — Nile Telecom has 3 benefit tiers
   // ═══════════════════════════════════════════════════════════
   const [essentialPkg, premierPkg, executivePkg] = packages
 
-  // Safaricom — multi-tier group
-  const safaricomExisting = await prisma.group.findFirst({ where: { tenantId: tenant.id, name: 'Safaricom PLC' } })
-  const safaricom = safaricomExisting ?? await prisma.group.create({
+  // Nile Telecom — multi-tier group (its own client)
+  const nileTelecomClient = await clientFor('Nile Telecom Uganda', 'INSURER')
+  const nileTelecomExisting = await prisma.group.findFirst({ where: { tenantId: tenant.id, name: 'Nile Telecom Uganda' } })
+  const nileTelecom = nileTelecomExisting ?? await prisma.group.create({
     data: {
-      tenantId: tenant.id, clientId: defaultClient.id, name: 'Safaricom PLC', industry: 'Telecommunications',
+      tenantId: tenant.id, clientId: nileTelecomClient.id, name: 'Nile Telecom Uganda', industry: 'Telecommunications',
       registrationNumber: 'PVT-107227',
-      contactPersonName: 'Emily Wambui', contactPersonPhone: '+254700100100', contactPersonEmail: 'hr@safaricom.co.ke',
-      county: 'Nairobi', packageId: executivePkg.id, packageVersionId: executivePkg.versionId,
+      contactPersonName: 'Grace Nabweteme', contactPersonPhone: '+256700100100', contactPersonEmail: 'hr@niletelecom.co.ug',
+      county: 'Kampala', packageId: executivePkg.id, packageVersionId: executivePkg.versionId,
       brokerId: brokers[0],
       paymentFrequency: 'ANNUAL', contributionRate: executivePkg.contrib,
       effectiveDate: new Date('2024-01-01'), renewalDate: new Date('2025-01-01'), status: 'ACTIVE',
     },
   })
   await prisma.group.update({
-    where: { id: safaricom.id },
+    where: { id: nileTelecom.id },
     data: {
       contributionRate: 165000, // annual blended rate per covered life across Executive/Management/Staff tiers
       paymentFrequency: 'ANNUAL',
@@ -484,28 +503,28 @@ async function main() {
   })
 
   await prisma.user.upsert({
-    where: { tenantId_email: { tenantId, email: 'emily.wambui@safaricom.co.ke' } },
+    where: { tenantId_email: { tenantId, email: 'grace.nabweteme@niletelecom.co.ug' } },
     update: {
       passwordHash: pw,
       isActive: true,
       role: 'HR_MANAGER',
-      groupId: safaricom.id,
+      groupId: nileTelecom.id,
     },
     create: {
       tenantId,
-      email: 'emily.wambui@safaricom.co.ke',
+      email: 'grace.nabweteme@niletelecom.co.ug',
       firstName: 'Emily',
       lastName: 'Wambui',
       role: 'HR_MANAGER',
       passwordHash: pw,
       isActive: true,
-      groupId: safaricom.id,
+      groupId: nileTelecom.id,
     },
   })
-  console.log('✅ HR portal user: emily.wambui@safaricom.co.ke')
+  console.log('✅ HR portal user: grace.nabweteme@niletelecom.co.ug')
 
-  // Create benefit tiers for Safaricom
-  const tierExisting = await prisma.groupBenefitTier.findFirst({ where: { groupId: safaricom.id } })
+  // Create benefit tiers for Nile Telecom
+  const tierExisting = await prisma.groupBenefitTier.findFirst({ where: { groupId: nileTelecom.id } })
   let executiveTier: { id: string } | null = null
   let managementTier: { id: string } | null = null
   let staffTier: { id: string } | null = null
@@ -513,42 +532,43 @@ async function main() {
   if (!tierExisting) {
     executiveTier = await prisma.groupBenefitTier.create({
       data: {
-        groupId: safaricom.id, name: 'Executive', packageId: executivePkg.id,
+        groupId: nileTelecom.id, name: 'Executive', packageId: executivePkg.id,
         contributionRate: 480000, description: 'C-suite and Senior VP — high-limit inpatient, executive outpatient, mental health, and surgical cover',
         isDefault: false,
       },
     })
     managementTier = await prisma.groupBenefitTier.create({
       data: {
-        groupId: safaricom.id, name: 'Management', packageId: premierPkg.id,
+        groupId: nileTelecom.id, name: 'Management', packageId: premierPkg.id,
         contributionRate: 210000, description: 'Managers and team leads — comprehensive cover including chronic and mental health benefits',
         isDefault: true,
       },
     })
     staffTier = await prisma.groupBenefitTier.create({
       data: {
-        groupId: safaricom.id, name: 'Staff', packageId: essentialPkg.id,
+        groupId: nileTelecom.id, name: 'Staff', packageId: essentialPkg.id,
         contributionRate: 95000, description: 'All permanent staff — essential inpatient, outpatient, dental, and optical cover',
         isDefault: false,
       },
     })
-    console.log(`  ↳ Benefit tiers created for Safaricom PLC`)
+    console.log(`  ↳ Benefit tiers created for Nile Telecom Uganda`)
   } else {
-    const tiers = await prisma.groupBenefitTier.findMany({ where: { groupId: safaricom.id }, orderBy: { createdAt: 'asc' } })
+    const tiers = await prisma.groupBenefitTier.findMany({ where: { groupId: nileTelecom.id }, orderBy: { createdAt: 'asc' } })
     executiveTier  = tiers[0] ?? null
     managementTier = tiers[1] ?? null
     staffTier      = tiers[2] ?? null
   }
-  await prisma.groupBenefitTier.updateMany({ where: { groupId: safaricom.id, name: 'Executive' }, data: { packageId: executivePkg.id, contributionRate: 480000 } })
-  await prisma.groupBenefitTier.updateMany({ where: { groupId: safaricom.id, name: 'Management' }, data: { packageId: premierPkg.id, contributionRate: 210000 } })
-  await prisma.groupBenefitTier.updateMany({ where: { groupId: safaricom.id, name: 'Staff' }, data: { packageId: essentialPkg.id, contributionRate: 95000 } })
+  await prisma.groupBenefitTier.updateMany({ where: { groupId: nileTelecom.id, name: 'Executive' }, data: { packageId: executivePkg.id, contributionRate: 480000 } })
+  await prisma.groupBenefitTier.updateMany({ where: { groupId: nileTelecom.id, name: 'Management' }, data: { packageId: premierPkg.id, contributionRate: 210000 } })
+  await prisma.groupBenefitTier.updateMany({ where: { groupId: nileTelecom.id, name: 'Staff' }, data: { packageId: essentialPkg.id, contributionRate: 95000 } })
 
-  // Other groups — flat package
+  // Other groups — flat package. `payer` types each employer's OWN client: the
+  // two that become self-funded schemes below (§16d) are EMPLOYER_SELF_FUNDED.
   const otherGroupDefs = [
-    { name: 'KCB Group',              industry: 'Banking & Finance',      contact: 'Moses Kiptoo',  phone: '+254700200200', email: 'hr@kcb.co.ke',     pkgIdx: 1, county: 'Nairobi',  brokerIdx: 1,    contributionRate: 225000 },
-    { name: 'East African Breweries', industry: 'Manufacturing',           contact: 'Anne Chebet',   phone: '+254700300300', email: 'hr@eabl.co.ke',    pkgIdx: 1, county: 'Nairobi',  brokerIdx: null, contributionRate: 255000 },
-    { name: 'Bamburi Cement',         industry: 'Construction',            contact: 'Samuel Njoroge',phone: '+254700400400', email: 'hr@bamburi.co.ke', pkgIdx: 0, county: 'Mombasa',  brokerIdx: 2,    contributionRate: 135000 },
-    { name: 'Twiga Foods',            industry: 'Agriculture & Logistics', contact: 'Lucy Akinyi',   phone: '+254700500500', email: 'hr@twiga.com',     pkgIdx: 0, county: 'Nairobi',  brokerIdx: null, contributionRate: 115000 },
+    { name: 'Pearl Bank Uganda',  industry: 'Banking & Finance',       contact: 'Moses Okiror',  phone: '+256700200200', email: 'hr@pearlbank.co.ug',     pkgIdx: 1, county: 'Kampala', brokerIdx: 1,    contributionRate: 225000, payer: 'INSURER' as const },
+    { name: 'Victoria Breweries', industry: 'Manufacturing',           contact: 'Anne Namuli',   phone: '+256700300300', email: 'hr@victoriabrew.co.ug',  pkgIdx: 1, county: 'Kampala', brokerIdx: null, contributionRate: 255000, payer: 'EMPLOYER_SELF_FUNDED' as const },
+    { name: 'Rwenzori Cement',    industry: 'Construction',            contact: 'Samuel Wasswa', phone: '+256700400400', email: 'hr@rwenzoricement.co.ug',pkgIdx: 0, county: 'Jinja',   brokerIdx: 2,    contributionRate: 135000, payer: 'EMPLOYER_SELF_FUNDED' as const },
+    { name: 'Kyoga Foods',        industry: 'Agriculture & Logistics', contact: 'Lucy Nabirye',  phone: '+256700500500', email: 'hr@kyogafoods.co.ug',    pkgIdx: 0, county: 'Kampala', brokerIdx: null, contributionRate: 115000, payer: 'INSURER' as const },
   ]
   const otherGroups: string[] = []
   for (const g of otherGroupDefs) {
@@ -567,9 +587,10 @@ async function main() {
       otherGroups.push(existing.id);
       continue
     }
+    const gClient = await clientFor(g.name, g.payer)
     const grp = await prisma.group.create({
       data: {
-        tenantId: tenant.id, clientId: defaultClient.id, name: g.name, industry: g.industry,
+        tenantId: tenant.id, clientId: gClient.id, name: g.name, industry: g.industry,
         registrationNumber: `PVT-${Math.floor(100000+Math.random()*900000)}`,
         contactPersonName: g.contact, contactPersonPhone: g.phone, contactPersonEmail: g.email,
         county: g.county, packageId: pkg.id, packageVersionId: pkg.versionId,
@@ -580,11 +601,11 @@ async function main() {
     })
     otherGroups.push(grp.id)
   }
-  const [kcbId, eablId, bamburiId, twigaId] = otherGroups
-  console.log(`✅ Groups: 5 (Safaricom with 3 benefit tiers, 4 flat-package groups)`)
+  const [pearlBankId, vblId, rwenzoriId, kyogaId] = otherGroups
+  console.log(`✅ Groups: 5 (Nile Telecom with 3 benefit tiers, 4 flat-package groups)`)
 
   // ═══════════════════════════════════════════════════════════
-  // 7. MEMBERS — Safaricom members spread across tiers
+  // 7. MEMBERS — Nile Telecom members spread across tiers
   // ═══════════════════════════════════════════════════════════
   const existingMembers = await prisma.member.findMany({ where: { tenantId }, select: { id: true } })
   let members: { id: string; groupId: string }[] = []
@@ -593,149 +614,149 @@ async function main() {
     let num = 1
     const mk = (data: object) => prisma.member.create({ data: data as never, select: { id: true, groupId: true } })
 
-    // Safaricom — Executive tier (Executive package)
+    // Nile Telecom — Executive tier (Executive package)
     const saf_ceo = await mk({
-      tenantId, groupId: safaricom.id, benefitTierId: executiveTier?.id,
-      memberNumber: `AVH-2024-${String(num++).padStart(5,'0')}`,
-      firstName: 'Wanjiru', lastName: 'Kamau', gender: 'FEMALE', dateOfBirth: new Date('1975-03-15'),
+      tenantId, groupId: nileTelecom.id, benefitTierId: executiveTier?.id,
+      memberNumber: `MVX-2024-${String(num++).padStart(5,'0')}`,
+      firstName: 'Nakato', lastName: 'Kamau', gender: 'FEMALE', dateOfBirth: new Date('1975-03-15'),
       relationship: 'PRINCIPAL', packageId: executivePkg.id, packageVersionId: executivePkg.versionId,
       enrollmentDate: new Date('2024-01-15'), activationDate: new Date('2024-02-01'), status: 'ACTIVE',
     })
     const saf_ceo_spouse = await mk({
-      tenantId, groupId: safaricom.id, benefitTierId: executiveTier?.id,
-      memberNumber: `AVH-2024-${String(num++).padStart(5,'0')}`,
+      tenantId, groupId: nileTelecom.id, benefitTierId: executiveTier?.id,
+      memberNumber: `MVX-2024-${String(num++).padStart(5,'0')}`,
       firstName: 'Kenneth', lastName: 'Kamau', gender: 'MALE', dateOfBirth: new Date('1973-07-20'),
       relationship: 'SPOUSE', principalId: saf_ceo.id, packageId: executivePkg.id, packageVersionId: executivePkg.versionId,
       enrollmentDate: new Date('2024-01-15'), activationDate: new Date('2024-02-01'), status: 'ACTIVE',
     })
     await mk({
-      tenantId, groupId: safaricom.id, benefitTierId: executiveTier?.id,
-      memberNumber: `AVH-2024-${String(num++).padStart(5,'0')}`,
+      tenantId, groupId: nileTelecom.id, benefitTierId: executiveTier?.id,
+      memberNumber: `MVX-2024-${String(num++).padStart(5,'0')}`,
       firstName: 'Brian', lastName: 'Karanja', gender: 'MALE', dateOfBirth: new Date('1978-01-05'),
       relationship: 'PRINCIPAL', packageId: executivePkg.id, packageVersionId: executivePkg.versionId,
       enrollmentDate: new Date('2024-01-15'), activationDate: new Date('2024-02-01'), status: 'ACTIVE',
     })
     void saf_ceo_spouse
 
-    // Safaricom — Management tier (Premier package)
+    // Nile Telecom — Management tier (Premier package)
     const saf_mgr1 = await mk({
-      tenantId, groupId: safaricom.id, benefitTierId: managementTier?.id,
-      memberNumber: `AVH-2024-${String(num++).padStart(5,'0')}`,
+      tenantId, groupId: nileTelecom.id, benefitTierId: managementTier?.id,
+      memberNumber: `MVX-2024-${String(num++).padStart(5,'0')}`,
       firstName: 'Kevin', lastName: 'Odera', gender: 'MALE', dateOfBirth: new Date('1985-07-22'),
       relationship: 'PRINCIPAL', packageId: premierPkg.id, packageVersionId: premierPkg.versionId,
       enrollmentDate: new Date('2024-01-15'), activationDate: new Date('2024-02-01'), status: 'ACTIVE',
     })
     await mk({
-      tenantId, groupId: safaricom.id, benefitTierId: managementTier?.id,
-      memberNumber: `AVH-2024-${String(num++).padStart(5,'0')}`,
+      tenantId, groupId: nileTelecom.id, benefitTierId: managementTier?.id,
+      memberNumber: `MVX-2024-${String(num++).padStart(5,'0')}`,
       firstName: 'Mercy', lastName: 'Odera', gender: 'FEMALE', dateOfBirth: new Date('1987-11-10'),
       relationship: 'SPOUSE', principalId: saf_mgr1.id, packageId: premierPkg.id, packageVersionId: premierPkg.versionId,
       enrollmentDate: new Date('2024-01-15'), activationDate: new Date('2024-02-01'), status: 'ACTIVE',
     })
     await mk({
-      tenantId, groupId: safaricom.id, benefitTierId: managementTier?.id,
-      memberNumber: `AVH-2024-${String(num++).padStart(5,'0')}`,
+      tenantId, groupId: nileTelecom.id, benefitTierId: managementTier?.id,
+      memberNumber: `MVX-2024-${String(num++).padStart(5,'0')}`,
       firstName: 'Diana', lastName: 'Njoroge', gender: 'FEMALE', dateOfBirth: new Date('1988-06-18'),
       relationship: 'PRINCIPAL', packageId: premierPkg.id, packageVersionId: premierPkg.versionId,
       enrollmentDate: new Date('2024-01-15'), activationDate: new Date('2024-02-01'), status: 'ACTIVE',
     })
 
-    // Safaricom — Staff tier (Essential package)
+    // Nile Telecom — Staff tier (Essential package)
     await mk({
-      tenantId, groupId: safaricom.id, benefitTierId: staffTier?.id,
-      memberNumber: `AVH-2024-${String(num++).padStart(5,'0')}`,
+      tenantId, groupId: nileTelecom.id, benefitTierId: staffTier?.id,
+      memberNumber: `MVX-2024-${String(num++).padStart(5,'0')}`,
       firstName: 'Felix', lastName: 'Wekesa', gender: 'MALE', dateOfBirth: new Date('1995-11-03'),
       relationship: 'PRINCIPAL', packageId: essentialPkg.id, packageVersionId: essentialPkg.versionId,
       enrollmentDate: new Date('2024-01-15'), activationDate: new Date('2024-02-01'), status: 'ACTIVE',
     })
     await mk({
-      tenantId, groupId: safaricom.id, benefitTierId: staffTier?.id,
-      memberNumber: `AVH-2024-${String(num++).padStart(5,'0')}`,
+      tenantId, groupId: nileTelecom.id, benefitTierId: staffTier?.id,
+      memberNumber: `MVX-2024-${String(num++).padStart(5,'0')}`,
       firstName: 'Sharon', lastName: 'Auma', gender: 'FEMALE', dateOfBirth: new Date('1998-04-12'),
       relationship: 'PRINCIPAL', packageId: essentialPkg.id, packageVersionId: essentialPkg.versionId,
       enrollmentDate: new Date('2024-01-15'), activationDate: new Date('2024-02-01'), status: 'ACTIVE',
     })
 
-    // KCB — Premier, flat
+    // Pearl Bank — Premier, flat
     const kcb_p1 = await mk({
-      tenantId, groupId: kcbId,
-      memberNumber: `AVH-2024-${String(num++).padStart(5,'0')}`,
+      tenantId, groupId: pearlBankId,
+      memberNumber: `MVX-2024-${String(num++).padStart(5,'0')}`,
       firstName: 'Joseph', lastName: 'Mwangi', gender: 'MALE', dateOfBirth: new Date('1980-12-20'),
       relationship: 'PRINCIPAL', packageId: premierPkg.id, packageVersionId: premierPkg.versionId,
       enrollmentDate: new Date('2024-01-15'), activationDate: new Date('2024-02-01'), status: 'ACTIVE',
     })
     await mk({
-      tenantId, groupId: kcbId,
-      memberNumber: `AVH-2024-${String(num++).padStart(5,'0')}`,
+      tenantId, groupId: pearlBankId,
+      memberNumber: `MVX-2024-${String(num++).padStart(5,'0')}`,
       firstName: 'Agnes', lastName: 'Mwangi', gender: 'FEMALE', dateOfBirth: new Date('1983-04-14'),
       relationship: 'SPOUSE', principalId: kcb_p1.id, packageId: premierPkg.id, packageVersionId: premierPkg.versionId,
       enrollmentDate: new Date('2024-01-15'), activationDate: new Date('2024-02-01'), status: 'ACTIVE',
     })
     await mk({
-      tenantId, groupId: kcbId,
-      memberNumber: `AVH-2024-${String(num++).padStart(5,'0')}`,
+      tenantId, groupId: pearlBankId,
+      memberNumber: `MVX-2024-${String(num++).padStart(5,'0')}`,
       firstName: 'Cynthia', lastName: 'Adhiambo', gender: 'FEMALE', dateOfBirth: new Date('1995-08-30'),
       relationship: 'PRINCIPAL', packageId: premierPkg.id, packageVersionId: premierPkg.versionId,
       enrollmentDate: new Date('2024-01-15'), activationDate: new Date('2024-02-01'), status: 'ACTIVE',
     })
     await mk({
-      tenantId, groupId: kcbId,
-      memberNumber: `AVH-2024-${String(num++).padStart(5,'0')}`,
+      tenantId, groupId: pearlBankId,
+      memberNumber: `MVX-2024-${String(num++).padStart(5,'0')}`,
       firstName: 'Patrick', lastName: 'Kibet', gender: 'MALE', dateOfBirth: new Date('1978-02-17'),
       relationship: 'PRINCIPAL', packageId: premierPkg.id, packageVersionId: premierPkg.versionId,
       enrollmentDate: new Date('2024-01-15'), activationDate: new Date('2024-02-01'), status: 'SUSPENDED',
     })
 
-    // EABL — Premier
+    // VBL — Premier
     await mk({
-      tenantId, groupId: eablId,
-      memberNumber: `AVH-2024-${String(num++).padStart(5,'0')}`,
+      tenantId, groupId: vblId,
+      memberNumber: `MVX-2024-${String(num++).padStart(5,'0')}`,
       firstName: 'George', lastName: 'Onyango', gender: 'MALE', dateOfBirth: new Date('1987-05-12'),
       relationship: 'PRINCIPAL', packageId: premierPkg.id, packageVersionId: premierPkg.versionId,
       enrollmentDate: new Date('2024-01-15'), activationDate: new Date('2024-02-01'), status: 'ACTIVE',
     })
     await mk({
-      tenantId, groupId: eablId,
-      memberNumber: `AVH-2024-${String(num++).padStart(5,'0')}`,
+      tenantId, groupId: vblId,
+      memberNumber: `MVX-2024-${String(num++).padStart(5,'0')}`,
       firstName: 'Esther', lastName: 'Wairimu', gender: 'FEMALE', dateOfBirth: new Date('1991-07-16'),
       relationship: 'PRINCIPAL', packageId: premierPkg.id, packageVersionId: premierPkg.versionId,
       enrollmentDate: new Date('2024-01-15'), activationDate: new Date('2024-02-01'), status: 'ACTIVE',
     })
 
-    // Bamburi — Essential
+    // Rwenzori — Essential
     await mk({
-      tenantId, groupId: bamburiId,
-      memberNumber: `AVH-2024-${String(num++).padStart(5,'0')}`,
+      tenantId, groupId: rwenzoriId,
+      memberNumber: `MVX-2024-${String(num++).padStart(5,'0')}`,
       firstName: 'Hassan', lastName: 'Mohamed', gender: 'MALE', dateOfBirth: new Date('1982-06-08'),
       relationship: 'PRINCIPAL', packageId: essentialPkg.id, packageVersionId: essentialPkg.versionId,
       enrollmentDate: new Date('2024-01-15'), activationDate: new Date('2024-02-01'), status: 'ACTIVE',
     })
     await mk({
-      tenantId, groupId: bamburiId,
-      memberNumber: `AVH-2024-${String(num++).padStart(5,'0')}`,
+      tenantId, groupId: rwenzoriId,
+      memberNumber: `MVX-2024-${String(num++).padStart(5,'0')}`,
       firstName: 'Elizabeth', lastName: 'Nduta', gender: 'FEMALE', dateOfBirth: new Date('1996-12-05'),
       relationship: 'PRINCIPAL', packageId: essentialPkg.id, packageVersionId: essentialPkg.versionId,
       enrollmentDate: new Date('2024-01-15'), activationDate: new Date('2024-02-01'), status: 'ACTIVE',
     })
 
-    // Twiga — Essential
+    // Kyoga — Essential
     await mk({
-      tenantId, groupId: twigaId,
-      memberNumber: `AVH-2024-${String(num++).padStart(5,'0')}`,
+      tenantId, groupId: kyogaId,
+      memberNumber: `MVX-2024-${String(num++).padStart(5,'0')}`,
       firstName: 'Daniel', lastName: 'Njuguna', gender: 'MALE', dateOfBirth: new Date('1994-10-11'),
       relationship: 'PRINCIPAL', packageId: essentialPkg.id, packageVersionId: essentialPkg.versionId,
       enrollmentDate: new Date('2024-01-15'), activationDate: new Date('2024-02-01'), status: 'ACTIVE',
     })
     await mk({
-      tenantId, groupId: twigaId,
-      memberNumber: `AVH-2024-${String(num++).padStart(5,'0')}`,
+      tenantId, groupId: kyogaId,
+      memberNumber: `MVX-2024-${String(num++).padStart(5,'0')}`,
       firstName: 'Winnie', lastName: 'Cherop', gender: 'FEMALE', dateOfBirth: new Date('1992-02-14'),
       relationship: 'PRINCIPAL', packageId: essentialPkg.id, packageVersionId: essentialPkg.versionId,
       enrollmentDate: new Date('2024-01-15'), status: 'PENDING_ACTIVATION',
     })
 
     members = await prisma.member.findMany({ where: { tenantId }, select: { id: true, groupId: true } })
-    console.log(`✅ Members: ${members.length} (Safaricom split across 3 tiers)`)
+    console.log(`✅ Members: ${members.length} (Nile Telecom split across 3 tiers)`)
   } else {
     members = await prisma.member.findMany({ where: { tenantId }, select: { id: true, groupId: true } })
     console.log(`✅ Members: ${members.length} (already seeded)`)
@@ -754,15 +775,15 @@ async function main() {
       'Adhiambo', 'Omondi', 'Wairimu', 'Karanja', 'Cherono', 'Mboya', 'Nyambura', 'Kiplagat', 'Mwaura', 'Were',
     ]
     const groupTargets = [
-      { groupId: safaricom.id, code: 'SAF', target: 78, packageId: essentialPkg.id, packageVersionId: essentialPkg.versionId, tiers: [
+      { groupId: nileTelecom.id, code: 'NTU', target: 78, packageId: essentialPkg.id, packageVersionId: essentialPkg.versionId, tiers: [
         { tierId: executiveTier?.id ?? null, packageId: executivePkg.id, versionId: executivePkg.versionId, weight: 1 },
         { tierId: managementTier?.id ?? null, packageId: premierPkg.id, versionId: premierPkg.versionId, weight: 2 },
         { tierId: staffTier?.id ?? null, packageId: essentialPkg.id, versionId: essentialPkg.versionId, weight: 5 },
       ] },
-      { groupId: kcbId, code: 'KCB', target: 52, packageId: premierPkg.id, packageVersionId: premierPkg.versionId },
-      { groupId: eablId, code: 'EABL', target: 46, packageId: premierPkg.id, packageVersionId: premierPkg.versionId },
-      { groupId: bamburiId, code: 'BAM', target: 38, packageId: essentialPkg.id, packageVersionId: essentialPkg.versionId },
-      { groupId: twigaId, code: 'TWI', target: 32, packageId: essentialPkg.id, packageVersionId: essentialPkg.versionId },
+      { groupId: pearlBankId, code: 'PBU', target: 52, packageId: premierPkg.id, packageVersionId: premierPkg.versionId },
+      { groupId: vblId, code: 'VBL', target: 46, packageId: premierPkg.id, packageVersionId: premierPkg.versionId },
+      { groupId: rwenzoriId, code: 'RWZ', target: 38, packageId: essentialPkg.id, packageVersionId: essentialPkg.versionId },
+      { groupId: kyogaId, code: 'KYG', target: 32, packageId: essentialPkg.id, packageVersionId: essentialPkg.versionId },
     ]
 
     const pick = <T,>(items: T[], index: number) => items[index % items.length]
@@ -829,7 +850,7 @@ async function main() {
         const principalEnrollment = enrollmentDate(family)
         const principalId = await createIfMissing({
           groupId: target.groupId,
-          memberNumber: `AVH-DEMO-${target.code}-${String(family).padStart(4, '0')}-P`,
+          memberNumber: `MVX-DEMO-${target.code}-${String(family).padStart(4, '0')}-P`,
           firstName: pick(firstNames, family),
           lastName,
           gender: principalGender,
@@ -844,10 +865,10 @@ async function main() {
         addedLives += 1
         if (current >= target.target) break
 
-        if (family % 2 !== 0 || target.code === 'SAF' || target.code === 'KCB') {
+        if (family % 2 !== 0 || target.code === 'NTU' || target.code === 'PBU') {
           await createIfMissing({
             groupId: target.groupId,
-            memberNumber: `AVH-DEMO-${target.code}-${String(family).padStart(4, '0')}-S`,
+            memberNumber: `MVX-DEMO-${target.code}-${String(family).padStart(4, '0')}-S`,
             firstName: pick(firstNames, family + 7),
             lastName,
             gender: spouseGender,
@@ -867,7 +888,7 @@ async function main() {
         if (family % 3 !== 0) {
           await createIfMissing({
             groupId: target.groupId,
-            memberNumber: `AVH-DEMO-${target.code}-${String(family).padStart(4, '0')}-C1`,
+            memberNumber: `MVX-DEMO-${target.code}-${String(family).padStart(4, '0')}-C1`,
             firstName: pick(firstNames, family + 13),
             lastName,
             gender: family % 2 === 0 ? 'MALE' : 'FEMALE',
@@ -887,7 +908,7 @@ async function main() {
         if (family % 5 === 0) {
           await createIfMissing({
             groupId: target.groupId,
-            memberNumber: `AVH-DEMO-${target.code}-${String(family).padStart(4, '0')}-C2`,
+            memberNumber: `MVX-DEMO-${target.code}-${String(family).padStart(4, '0')}-C2`,
             firstName: pick(firstNames, family + 19),
             lastName,
             gender: family % 2 === 0 ? 'FEMALE' : 'MALE',
@@ -1248,7 +1269,7 @@ async function main() {
       tenantId, entityType: 'CLAIM', entityId: clm3.id, entityRef: 'CLM-2024-00003', claimId: clm3.id,
       exceptionCode: 'MANUAL_OVERRIDE',
       reason: 'Provider billed above agreed tariff for specialist consultation. Approved at contracted rate.',
-      notes: 'Nairobi Hospital charged KES 5,500 vs contracted KES 4,500. Rate dispute resolved. Pharmacy also reduced to formulary rate.',
+      notes: 'Kampala Hospital charged UGX 5,500 vs contracted UGX 4,500. Rate dispute resolved. Pharmacy also reduced to formulary rate.',
       raisedById: users['CLAIMS_OFFICER'],
       status: 'APPROVED',
       resolvedById: users['SUPER_ADMIN'],
@@ -1379,18 +1400,18 @@ async function main() {
   // 11. ENDORSEMENTS (4 types including TIER_CHANGE)
   // ═══════════════════════════════════════════════════════════
   if (await prisma.endorsement.count({ where: { tenantId } }) === 0) {
-    const safaricomMember = await prisma.member.findFirst({ where: { groupId: safaricom.id, status: 'ACTIVE' } })
+    const nileTelecomMember = await prisma.member.findFirst({ where: { groupId: nileTelecom.id, status: 'ACTIVE' } })
     await prisma.endorsement.createMany({ data: [
       {
-        tenantId, endorsementNumber: 'END-2024-00001', groupId: safaricom.id,
+        tenantId, endorsementNumber: 'END-2024-00001', groupId: nileTelecom.id,
         type: 'MEMBER_ADDITION', status: 'APPLIED', effectiveDate: new Date('2024-03-01'),
         changeDetails: { firstName: 'Aisha', lastName: 'Mwangi', dob: '1999-04-20', gender: 'FEMALE', relationship: 'CHILD', tierId: staffTier?.id },
         proratedAmount: 1875, previousPremium: 0, newPremium: 1875, premiumDelta: 1875,
         appliedAt: new Date('2024-03-01'), appliedBy: users['UNDERWRITER'],
       },
       {
-        tenantId, endorsementNumber: 'END-2024-00002', groupId: safaricom.id,
-        memberId: safaricomMember?.id,
+        tenantId, endorsementNumber: 'END-2024-00002', groupId: nileTelecom.id,
+        memberId: nileTelecomMember?.id,
         type: 'TIER_CHANGE', status: 'APPROVED', effectiveDate: new Date('2024-04-01'),
         changeDetails: { fromTier: 'Staff', toTier: 'Management', reason: 'Promotion to team lead' },
         proratedAmount: 33750, previousPremium: 30000, newPremium: 75000, premiumDelta: 45000,
@@ -1418,13 +1439,13 @@ async function main() {
   // ═══════════════════════════════════════════════════════════
   if (await prisma.invoice.count({ where: { tenantId } }) === 0) {
     const inv1 = await prisma.invoice.create({ data: {
-      tenantId, invoiceNumber: 'INV-2024-00001', groupId: safaricom.id,
+      tenantId, invoiceNumber: 'INV-2024-00001', groupId: nileTelecom.id,
       period: '2024-01', memberCount: 9, ratePerMember: 85000,
       totalAmount: 765000, paidAmount: 765000, balance: 0,
       dueDate: new Date('2024-01-31'), status: 'PAID', sentAt: new Date('2024-01-05'),
     }})
     await prisma.payment.create({ data: {
-      groupId: safaricom.id, invoiceId: inv1.id,
+      groupId: nileTelecom.id, invoiceId: inv1.id,
       amount: 765000, paymentDate: new Date('2024-01-20'),
       paymentMethod: 'BANK_TRANSFER', referenceNumber: 'TRF-20240120-001',
     }})
@@ -1471,7 +1492,7 @@ async function main() {
     await prisma.quotation.createMany({ data: [
       {
         tenantId, quoteNumber: 'QUO-2024-00001', createdBy: users['UNDERWRITER'],
-        prospectName: 'Standard Chartered Bank Kenya', prospectEmail: 'hr@stanbic.co.ke',
+        prospectName: 'Stanbic Bank Uganda', prospectEmail: 'hr@stanbic.co.ug',
         prospectIndustry: 'Banking & Finance', memberCount: 320, dependentCount: 180,
         packageId: packages[2].id, ratePerMember: 142000,
         loadings: { claimsHistory: 10, industry: 5 },
@@ -1483,7 +1504,7 @@ async function main() {
       {
         tenantId, quoteNumber: 'QUO-2024-00002', createdBy: users['UNDERWRITER'],
         brokerId: brokers[1],
-        prospectName: 'Kenya Power & Lighting Co.', prospectEmail: 'hr@kplc.co.ke',
+        prospectName: 'Umeme Ltd', prospectEmail: 'hr@umeme.co.ug',
         prospectIndustry: 'Energy & Utilities', memberCount: 850, dependentCount: 620,
         packageId: packages[1].id, ratePerMember: 72000,
         loadings: { claimsHistory: 15, industry: 0 },
@@ -1494,7 +1515,7 @@ async function main() {
       },
       {
         tenantId, quoteNumber: 'QUO-2024-00003', createdBy: users['UNDERWRITER'],
-        prospectName: 'Sendy Logistics Ltd', prospectEmail: 'ops@sendy.co.ke',
+        prospectName: 'Sendy Logistics Ltd', prospectEmail: 'ops@sendy.co.ug',
         prospectIndustry: 'Technology & Logistics', memberCount: 45, dependentCount: 30,
         packageId: packages[0].id, ratePerMember: 31500,
         loadings: { claimsHistory: 5 },
@@ -1508,10 +1529,10 @@ async function main() {
   }
 
   // ═══════════════════════════════════════════════════════════
-  // 14a. HISTORICAL MONTHLY INVOICES — Safaricom (repricing workbench)
+  // 14a. HISTORICAL MONTHLY INVOICES — Nile Telecom (repricing workbench)
   // ═══════════════════════════════════════════════════════════
   {
-    const existing = await prisma.invoice.count({ where: { tenantId, groupId: safaricom.id } })
+    const existing = await prisma.invoice.count({ where: { tenantId, groupId: nileTelecom.id } })
     if (existing < 6) {
       const months = [
         '2024-02','2024-03','2024-04','2024-05','2024-06',
@@ -1525,13 +1546,13 @@ async function main() {
         await prisma.invoice.create({ data: {
           tenantId,
           invoiceNumber: `INV-SAF-${period.replace('-','')}`,
-          groupId: safaricom.id,
+          groupId: nileTelecom.id,
           period, memberCount: 9, ratePerMember: 85000,
           totalAmount: 765000, paidAmount: 765000, balance: 0,
           dueDate, sentAt, status: 'PAID',
         }})
       }
-      console.log(`✅ Safaricom monthly invoices: 14 months added (repricing workbench)`)
+      console.log(`✅ Nile Telecom monthly invoices: 14 months added (repricing workbench)`)
     }
   }
 
@@ -1597,10 +1618,10 @@ async function main() {
       const periodStart = new Date('2024-01-01')
       const periodEnd   = new Date('2024-12-31')
 
-      // member[0] — Executive package member; member[6] (KCB) — Premier package member
+      // member[0] — Executive package member; member[6] (Pearl Bank) — Premier package member
       // Use members from activeMembers that match essential/premier packages
-      const essMembers = activeMembers.filter(m => m.groupId === bamburiId || m.groupId === twigaId)
-      const premMembers = activeMembers.filter(m => m.groupId === kcbId || m.groupId === eablId)
+      const essMembers = activeMembers.filter(m => m.groupId === rwenzoriId || m.groupId === kyogaId)
+      const premMembers = activeMembers.filter(m => m.groupId === pearlBankId || m.groupId === vblId)
 
       if (essVersion && essMembers[0]) {
         const benInpatient  = essVersion.benefits.find(b => b.category === 'INPATIENT')
@@ -1650,7 +1671,7 @@ async function main() {
             rule: 'Amount Threshold Exceeded',
             score: 44,
             severity: 'LOW',
-            notes: 'Single outpatient claim of KES 78,500 — 3× the 90th-percentile outpatient benchmark.',
+            notes: 'Single outpatient claim of UGX 78,500 — 3× the 90th-percentile outpatient benchmark.',
             resolved: true,
             resolvedBy: users['SUPER_ADMIN'],
             resolvedAt: new Date('2024-08-10'),
@@ -1678,7 +1699,7 @@ async function main() {
         },
         {
           tenantId,
-          subject: 'Aga Khan Hospital refused to accept Medvex card',
+          subject: 'Nakasero Hospital refused to accept Medvex card',
           type: 'FACILITY',
           description: 'Member presented at AKUH on 12 June 2024 for specialist visit. Front desk refused direct billing and demanded payment upfront. Member had to pay out of pocket and seek reimbursement.',
           status: 'OPEN',
@@ -1696,7 +1717,7 @@ async function main() {
           tenantId,
           subject: 'SMS notifications not being received',
           type: 'SERVICE',
-          description: 'Multiple members from KCB Group report not receiving claim status SMS notifications. Issue started after the October 2024 system migration.',
+          description: 'Multiple members from Pearl Bank Uganda report not receiving claim status SMS notifications. Issue started after the October 2024 system migration.',
           status: 'DISMISSED',
           resolution: 'Investigated — members had opted out of SMS via the app. No system fault found.',
           resolvedAt: new Date('2024-11-03'),
@@ -1758,7 +1779,7 @@ async function main() {
     if (docCount === 0) {
       const seedClaim   = await prisma.claim.findFirst({ where: { tenantId }, select: { id: true } })
       const seedPreauth = await prisma.preAuthorization.findFirst({ where: { tenantId }, select: { id: true } })
-      const seedGroup   = safaricom
+      const seedGroup   = nileTelecom
       const uploader    = users['CLAIMS_OFFICER']
       await prisma.document.createMany({ data: [
         {
@@ -1780,8 +1801,8 @@ async function main() {
           preauthId: seedPreauth?.id,
         },
         {
-          fileName: 'Safaricom_Group_Contract_2024.pdf', mimeType: 'application/pdf', fileSize: 512000,
-          fileUrl: '/seed-docs/Safaricom_Group_Contract_2024.pdf',
+          fileName: 'Nile Telecom_Group_Contract_2024.pdf', mimeType: 'application/pdf', fileSize: 512000,
+          fileUrl: '/seed-docs/Nile Telecom_Group_Contract_2024.pdf',
           category: 'AGREEMENT', uploadedBy: users['UNDERWRITER'],
           groupId: seedGroup.id,
         },
@@ -1800,8 +1821,8 @@ async function main() {
       const m1 = activeMembers[1]
       await prisma.activityLog.createMany({ data: [
         { entityType:'MEMBER', entityId:m0.id, memberId:m0.id, action:'MEMBER_ACTIVATED', description:'Member activated after premium confirmed.', userId: users['CUSTOMER_SERVICE'] },
-        { entityType:'MEMBER', entityId:m0.id, memberId:m0.id, action:'CLAIM_SUBMITTED',  description:'Claim CLM-2024-00001 submitted by member at Medvex Hospital Parklands.', userId: users['CLAIMS_OFFICER'] },
-        { entityType:'MEMBER', entityId:m0.id, memberId:m0.id, action:'CLAIM_APPROVED',   description:'Claim CLM-2024-00001 approved — KES 5,700 authorised.', userId: users['CLAIMS_OFFICER'] },
+        { entityType:'MEMBER', entityId:m0.id, memberId:m0.id, action:'CLAIM_SUBMITTED',  description:'Claim CLM-2024-00001 submitted by member at Medvex Hospital Kololo.', userId: users['CLAIMS_OFFICER'] },
+        { entityType:'MEMBER', entityId:m0.id, memberId:m0.id, action:'CLAIM_APPROVED',   description:'Claim CLM-2024-00001 approved — UGX 5,700 authorised.', userId: users['CLAIMS_OFFICER'] },
         { entityType:'MEMBER', entityId:m1.id, memberId:m1.id, action:'MEMBER_ACTIVATED', description:'Member activated after group enrollment confirmation.', userId: users['CUSTOMER_SERVICE'] },
         { entityType:'MEMBER', entityId:m1.id, memberId:m1.id, action:'PREAUTH_REQUESTED',description:'Pre-authorisation PA-2024-00002 submitted for cardiac inpatient admission.', userId: users['CLAIMS_OFFICER'] },
         { entityType:'MEMBER', entityId:m1.id, memberId:m1.id, action:'STATUS_CHANGED',   description:'Member status changed from PENDING_ACTIVATION to ACTIVE.', userId: users['SUPER_ADMIN'] },
@@ -1818,8 +1839,8 @@ async function main() {
   {
     const exists = await prisma.claim.findFirst({ where: { tenantId, claimNumber: 'CLM-FRAUD-001' } })
     if (!exists && activeMembers.length >= 2) {
-      const parklands = providers[0] // Medvex Hospital - Parklands (has CPT 99213 @ 2,500)
-      const nairobi   = providers[2] // Nairobi Hospital            (has CPT 99213 @ 3,000)
+      const parklands = providers[0] // Medvex Hospital - Kololo (has CPT 99213 @ 2,500)
+      const nairobi   = providers[2] // Kampala Hospital            (has CPT 99213 @ 3,000)
 
       // Need a guaranteed MALE member for the gender-mismatch scenario
       const maleMember  = activeMembers.find(m => m.gender === 'MALE') ?? activeMembers[0]
@@ -1840,7 +1861,7 @@ async function main() {
         status: 'UNDER_REVIEW',
         claimLines: { create: [
           { lineNumber: 1, serviceCategory: 'CONSULTATION', description: 'Admission consultation', quantity: 1, unitCost: 3500,  billedAmount: 3500,  approvedAmount: 0 },
-          { lineNumber: 2, serviceCategory: 'PROCEDURE',    description: 'Inpatient ward — 4 days @ KES 8,500/day', quantity: 4, unitCost: 8500, billedAmount: 34000, approvedAmount: 0 },
+          { lineNumber: 2, serviceCategory: 'PROCEDURE',    description: 'Inpatient ward — 4 days @ UGX 8,500/day', quantity: 4, unitCost: 8500, billedAmount: 34000, approvedAmount: 0 },
           { lineNumber: 3, serviceCategory: 'PHARMACY',     description: 'IV antibiotics course', quantity: 1, unitCost: 11000, billedAmount: 11000, approvedAmount: 0 },
         ]},
       }})
@@ -1876,8 +1897,8 @@ async function main() {
       }})
 
       // ── RULE-BILL-003: Billed amount exceeds contracted tariff >15% (HIGH)
-      // CPT 99213 agreed rate at Parklands = KES 2,500 — billed at KES 4,200 (+68%)
-      // CPT 87207 (malaria RDT) agreed rate at Parklands = KES 800 — billed at KES 1,400 (+75%)
+      // CPT 99213 agreed rate at Kololo = UGX 2,500 — billed at UGX 4,200 (+68%)
+      // CPT 87207 (malaria RDT) agreed rate at Kololo = UGX 800 — billed at UGX 1,400 (+75%)
       const f3 = await prisma.claim.create({ data: {
         tenantId, claimNumber: 'CLM-FRAUD-003',
         memberId: anyMember.id, providerId: parklands,
@@ -1897,11 +1918,11 @@ async function main() {
         tenantId, claimId: f3.id,
         rule: 'Billed Amount Exceeds Contracted Tariff',
         score: 75, severity: 'HIGH',
-        notes: 'Line 1 (CPT 99213): billed KES 4,200 vs agreed KES 2,500 — 68% over tariff. Line 3 (CPT 87207): billed KES 1,400 vs agreed KES 800 — 75% over tariff. Provider is operating significantly outside contracted rates.',
+        notes: 'Line 1 (CPT 99213): billed UGX 4,200 vs agreed UGX 2,500 — 68% over tariff. Line 3 (CPT 87207): billed UGX 1,400 vs agreed UGX 800 — 75% over tariff. Provider is operating significantly outside contracted rates.',
       }})
 
       // ── RULE-BILL-004: Round-number clustering (MEDIUM) ──────────────────
-      // All 4 lines are exact KES 1,000 multiples — unusual for real clinical bills
+      // All 4 lines are exact UGX 1,000 multiples — unusual for real clinical bills
       const f4 = await prisma.claim.create({ data: {
         tenantId, claimNumber: 'CLM-FRAUD-004',
         memberId: maleMember.id, providerId: nairobi,
@@ -1922,7 +1943,7 @@ async function main() {
         tenantId, claimId: f4.id,
         rule: 'Round-Number Billing Pattern',
         score: 55, severity: 'MEDIUM',
-        notes: '4 of 4 claim lines billed at exact KES 1,000 multiples (KES 5,000 / 8,000 / 7,000 / 8,000). Real clinical bills — especially pharmacy and lab — typically include odd amounts. Possible use of estimated rather than actual charges.',
+        notes: '4 of 4 claim lines billed at exact UGX 1,000 multiples (UGX 5,000 / 8,000 / 7,000 / 8,000). Real clinical bills — especially pharmacy and lab — typically include odd amounts. Possible use of estimated rather than actual charges.',
       }})
 
       // ── RULE-TEMP-004: Duplicate claim (HIGH on the later submission) ─────
@@ -1949,7 +1970,7 @@ async function main() {
         dateOfService: dupDate, // identical date
         diagnoses:  [{ icdCode: 'I10', description: 'Essential hypertension', isPrimary: true }],
         procedures: [],
-        billedAmount: 7700, approvedAmount: 0, // KES 200 difference — within 5% duplicate tolerance
+        billedAmount: 7700, approvedAmount: 0, // UGX 200 difference — within 5% duplicate tolerance
         status: 'UNDER_REVIEW',
         claimLines: { create: [
           { lineNumber: 1, serviceCategory: 'CONSULTATION', description: 'Specialist cardiology consultation', quantity: 1, unitCost: 4700, billedAmount: 4700, approvedAmount: 0 },
@@ -1961,7 +1982,7 @@ async function main() {
         tenantId, claimId: f5b.id,
         rule: 'Probable Duplicate Claim',
         score: 90, severity: 'HIGH',
-        notes: `Near-identical to CLM-FRAUD-005 (same member, same provider, same service date 2025-01-22). Billed amounts differ by only KES 200 (2.6%) — within the 5% duplicate tolerance. CLM-FRAUD-005 was already approved and paid. One claim should be voided.`,
+        notes: `Near-identical to CLM-FRAUD-005 (same member, same provider, same service date 2025-01-22). Billed amounts differ by only UGX 200 (2.6%) — within the 5% duplicate tolerance. CLM-FRAUD-005 was already approved and paid. One claim should be voided.`,
       }})
 
       // ── RULE-FIN-004: Split billing (MEDIUM on the second claim) ─────────
@@ -2000,7 +2021,7 @@ async function main() {
         tenantId, claimId: f6b.id,
         rule: 'Probable Split Billing',
         score: 72, severity: 'MEDIUM',
-        notes: `2 outpatient claims from the same member at Nairobi Hospital on 2025-02-14 (CLM-FRAUD-007 KES 12,000 + CLM-FRAUD-008 KES 9,500 = KES 21,500 combined). Services appear related — submitting as two claims may be deliberate to stay below single-visit review thresholds.`,
+        notes: `2 outpatient claims from the same member at Kampala Hospital on 2025-02-14 (CLM-FRAUD-007 UGX 12,000 + CLM-FRAUD-008 UGX 9,500 = UGX 21,500 combined). Services appear related — submitting as two claims may be deliberate to stay below single-visit review thresholds.`,
       }})
 
       console.log('✅ Fraud demonstrations: 8 claims covering 6 new detection rules (TEMP-001, CLIN-001, BILL-003, BILL-004, TEMP-004, FIN-004)')
@@ -2012,15 +2033,15 @@ async function main() {
   // ═══════════════════════════════════════════════════════════
   //
   // Demonstrates the full rules hierarchy:
-  //   Essential  — outpatient 10% (all tiers) + Dental KES 500 fixed (Tier 2/3)
-  //                + annual individual cap KES 8,000 / family KES 20,000
+  //   Essential  — outpatient 10% (all tiers) + Dental UGX 500 fixed (Tier 2/3)
+  //                + annual individual cap UGX 8,000 / family UGX 20,000
   //   Premier    — outpatient 5% Tier 2/3, free at own (NONE Tier 1)
-  //                + Dental KES 1,000 fixed Tier 3
-  //                + annual individual cap KES 15,000
+  //                + Dental UGX 1,000 fixed Tier 3
+  //                + annual individual cap UGX 15,000
   //   Executive  — no co-contribution on any tier (NONE global)
   //
   // After rules, creates sample CoContributionTransactions on existing claims
-  // to show each collection status: PENDING, COLLECTED (M-Pesa), WAIVED.
+  // to show each collection status: PENDING, COLLECTED (MTN MoMo), WAIVED.
   {
     const existingRule = await prisma.coContributionRule.findFirst({
       where: { tenantId, packageId: packages[0]!.id },
@@ -2040,7 +2061,7 @@ async function main() {
           perVisitCap: null, effectiveFrom: new Date('2024-01-01'),
         }})
       }
-      // Essential: Dental — fixed KES 500 on partner/panel tiers, free at own
+      // Essential: Dental — fixed UGX 500 on partner/panel tiers, free at own
       await prisma.coContributionRule.create({ data: {
         tenantId, packageId: essentialPkg.id,
         benefitCategory: 'DENTAL', networkTier: 'TIER_1',
@@ -2084,7 +2105,7 @@ async function main() {
         type: 'PERCENTAGE', percentage: 10, perVisitCap: 3000,
         effectiveFrom: new Date('2024-01-01'),
       }})
-      // Premier: Dental — fixed KES 1,000 for Tier 3 only
+      // Premier: Dental — fixed UGX 1,000 for Tier 3 only
       await prisma.coContributionRule.create({ data: {
         tenantId, packageId: premierPkg.id,
         benefitCategory: 'DENTAL', networkTier: 'TIER_3',
@@ -2111,7 +2132,7 @@ async function main() {
       console.log('✅ Co-contribution rules: Essential (10% OPD + Dental tiers) + Premier (tiered OPD) + Executive (none)')
 
       // ── Sample transactions on existing claims ────────────────────────────
-      // CLM-001: PENDING (member owes KES 800 on a KES 8,000 outpatient visit)
+      // CLM-001: PENDING (member owes UGX 800 on a UGX 8,000 outpatient visit)
       const clm1 = await prisma.claim.findFirst({ where: { tenantId, claimNumber: 'CLM-001' } })
       if (clm1) {
         const existing = await prisma.coContributionTransaction.findUnique({ where: { claimId: clm1.id } })
@@ -2136,7 +2157,7 @@ async function main() {
         }
       }
 
-      // CLM-002: COLLECTED via M-Pesa (KES 400 collected)
+      // CLM-002: COLLECTED via MTN MoMo (UGX 400 collected)
       const clm2 = await prisma.claim.findFirst({ where: { tenantId, claimNumber: 'CLM-002' } })
       if (clm2) {
         const existing = await prisma.coContributionTransaction.findUnique({ where: { claimId: clm2.id } })
@@ -2187,7 +2208,7 @@ async function main() {
         }
       }
 
-      console.log('✅ Co-contribution transactions: CLM-001 (PENDING KES 800), CLM-002 (COLLECTED M-Pesa), CLM-003 (WAIVED — hardship)')
+      console.log('✅ Co-contribution transactions: CLM-001 (PENDING UGX 800), CLM-002 (COLLECTED MTN MoMo), CLM-003 (WAIVED — hardship)')
     } else {
       console.log('✅ Co-contribution rules: already seeded')
     }
@@ -2213,22 +2234,22 @@ async function main() {
           create: { tenantId, ...tax },
         })
       }
-      console.log('✅ Tax rates: Stamp Duty (KES 40), Training Levy (0.2%), PHCF (0.25%)')
+      console.log('✅ Tax rates: Stamp Duty (UGX 40), Training Levy (0.2%), PHCF (0.25%)')
 
       // ── 16b. Approval matrix ──────────────────────────────────────────────
-      // Rule 1: Inpatient claims > KES 200k require UNDERWRITER
+      // Rule 1: Inpatient claims > UGX 200k require UNDERWRITER
       await prisma.approvalMatrix.create({ data: {
         tenantId, serviceType: 'INPATIENT', claimValueMin: 200000, claimValueMax: null,
         benefitCategory: null, requiredRole: 'UNDERWRITER', requiresDual: true,
         effectiveFrom: new Date('2024-01-01'),
       }})
-      // Rule 2: Surgical > KES 150k require MEDICAL_OFFICER
+      // Rule 2: Surgical > UGX 150k require MEDICAL_OFFICER
       await prisma.approvalMatrix.create({ data: {
         tenantId, serviceType: null, claimValueMin: 150000, claimValueMax: 199999,
         benefitCategory: 'SURGICAL', requiredRole: 'MEDICAL_OFFICER', requiresDual: false,
         effectiveFrom: new Date('2024-01-01'),
       }})
-      // Rule 3: All claims > KES 50k require CLAIMS_OFFICER or above
+      // Rule 3: All claims > UGX 50k require CLAIMS_OFFICER or above
       await prisma.approvalMatrix.create({ data: {
         tenantId, serviceType: null, claimValueMin: 50000, claimValueMax: 149999,
         benefitCategory: null, requiredRole: 'CLAIMS_OFFICER', requiresDual: false,
@@ -2237,13 +2258,14 @@ async function main() {
       console.log('✅ Approval matrix: 3 rules (inpatient >200k dual-approval, surgical >150k, general >50k)')
 
       // ── 16c. Individual client ─────────────────────────────────────────────
-      // Patricia Wanjiru — self-pay individual enrolled on Executive package
+      // Patricia Nakato — self-pay individual enrolled on Executive package
       const indivExists = await prisma.group.findFirst({ where: { tenantId, clientType: 'INDIVIDUAL' } })
       if (!indivExists) {
+        const indivClient = await clientFor('Patricia Nakato', 'INSURER')
         const indivGroup = await prisma.group.create({ data: {
-          tenantId, clientId: defaultClient.id, name: 'Patricia Wanjiru', clientType: 'INDIVIDUAL',
+          tenantId, clientId: indivClient.id, name: 'Patricia Nakato', clientType: 'INDIVIDUAL',
           fundingMode: 'INSURED', registrationNumber: 'IND-00001',
-          contactPersonName: 'Patricia Wanjiru', contactPersonPhone: '+254711000001', contactPersonEmail: 'patricia@email.com',
+          contactPersonName: 'Patricia Nakato', contactPersonPhone: '+256711000001', contactPersonEmail: 'patricia@email.com',
           packageId: executivePkg.id, packageVersionId: executivePkg.versionId,
           contributionRate: executivePkg.contrib,
           effectiveDate: new Date('2024-03-01'), renewalDate: new Date('2025-03-01'), status: 'ACTIVE',
@@ -2251,19 +2273,19 @@ async function main() {
         const memberCount = await prisma.member.count({ where: { tenantId } })
         await prisma.member.create({ data: {
           tenantId, groupId: indivGroup.id, packageId: executivePkg.id, packageVersionId: executivePkg.versionId,
-          memberNumber: `AVH-2024-${String(memberCount + 1).padStart(5,'0')}`,
-          firstName: 'Patricia', lastName: 'Wanjiru', gender: 'FEMALE',
+          memberNumber: `MVX-2024-${String(memberCount + 1).padStart(5,'0')}`,
+          firstName: 'Patricia', lastName: 'Nakato', gender: 'FEMALE',
           dateOfBirth: new Date('1982-09-21'), relationship: 'PRINCIPAL',
           enrollmentDate: new Date('2024-03-01'), activationDate: new Date('2024-03-01'), status: 'ACTIVE',
-          idNumber: '28459671', phone: '+254711000001', email: 'patricia@email.com',
+          idNumber: '28459671', phone: '+256711000001', email: 'patricia@email.com',
           smartCardNumber: 'AV-IND-00001',
         }})
-        console.log('✅ Individual client: Patricia Wanjiru (clientType=INDIVIDUAL, Executive package)')
+        console.log('✅ Individual client: Patricia Nakato (clientType=INDIVIDUAL, Executive package)')
       }
 
       // ── 16d. Self-funded schemes ──────────────────────────────────────────
-      // Scheme 1: East African Breweries — healthy fund, multi-category claims
-      const eabl = await prisma.group.findFirst({ where: { tenantId, name: 'East African Breweries' } })
+      // Scheme 1: Victoria Breweries — healthy fund, multi-category claims
+      const eabl = await prisma.group.findFirst({ where: { tenantId, name: 'Victoria Breweries' } })
       if (eabl) {
         const fundAdminUser = await prisma.user.findFirst({ where: { tenantId, email: 'fund@medvex.co.ug' } })
         await prisma.group.update({ where: { id: eabl.id }, data: {
@@ -2271,7 +2293,7 @@ async function main() {
           fundAdministrators: fundAdminUser ? { connect: { id: fundAdminUser.id } } : undefined,
         }})
 
-        // Get EABL members to attach claims to
+        // Get VBL members to attach claims to
         const eablMembers = await prisma.member.findMany({
           where: { tenantId, groupId: eabl.id, status: 'ACTIVE' },
           select: { id: true, firstName: true, lastName: true },
@@ -2279,12 +2301,12 @@ async function main() {
         const eablMember1 = eablMembers[0]
         const eablMember2 = eablMembers[1] ?? eablMembers[0]
 
-        // Create real EABL claims so the dashboard has fund deductions with claimIds
-        const eablClaims: { id: string; approvedAmount: unknown; benefitCategory: string; dateOfService: Date }[] = []
+        // Create real VBL claims so the dashboard has fund deductions with claimIds
+        const vblClaims: { id: string; approvedAmount: unknown; benefitCategory: string; dateOfService: Date }[] = []
         if (eablMember1) {
           // Inpatient — large claim to show in large-claims table
           const clm1 = await prisma.claim.upsert({
-            where: { tenantId_claimNumber: { tenantId, claimNumber: 'CLM-EABL-FUND-001' } },
+            where: { tenantId_claimNumber: { tenantId, claimNumber: 'CLM-VBL-FUND-001' } },
             update: {
               memberId: eablMember1.id, providerId: providers[2],
               serviceType: 'INPATIENT', benefitCategory: 'INPATIENT',
@@ -2296,7 +2318,7 @@ async function main() {
               procedures: [],
             },
             create: {
-            tenantId, claimNumber: 'CLM-EABL-FUND-001',
+            tenantId, claimNumber: 'CLM-VBL-FUND-001',
             memberId: eablMember1.id, providerId: providers[2],
             serviceType: 'INPATIENT', benefitCategory: 'INPATIENT',
             dateOfService: new Date('2025-02-10'),
@@ -2306,11 +2328,11 @@ async function main() {
             diagnoses: [{ icdCode: 'J18.9', description: 'Pneumonia', isPrimary: true }],
             procedures: [],
           }})
-          eablClaims.push(clm1)
+          vblClaims.push(clm1)
 
           // Outpatient — medium claim
           const clm2 = await prisma.claim.upsert({
-            where: { tenantId_claimNumber: { tenantId, claimNumber: 'CLM-EABL-FUND-002' } },
+            where: { tenantId_claimNumber: { tenantId, claimNumber: 'CLM-VBL-FUND-002' } },
             update: {
               memberId: eablMember1.id, providerId: providers[0],
               serviceType: 'OUTPATIENT', benefitCategory: 'OUTPATIENT',
@@ -2321,7 +2343,7 @@ async function main() {
               procedures: [],
             },
             create: {
-            tenantId, claimNumber: 'CLM-EABL-FUND-002',
+            tenantId, claimNumber: 'CLM-VBL-FUND-002',
             memberId: eablMember1.id, providerId: providers[0],
             serviceType: 'OUTPATIENT', benefitCategory: 'OUTPATIENT',
             dateOfService: new Date('2025-03-05'),
@@ -2335,12 +2357,12 @@ async function main() {
               { lineNumber: 3, serviceCategory: 'PHARMACY',     description: 'Metformin + supplements', cptCode: null,    quantity: 1, unitCost: 12000, billedAmount: 12000, approvedAmount: 10500 },
             ]},
           }})
-          eablClaims.push(clm2)
+          vblClaims.push(clm2)
         }
         if (eablMember2 && eablMember2.id !== eablMember1?.id) {
           // Surgical — large, triggers large-claims table
           const clm3 = await prisma.claim.upsert({
-            where: { tenantId_claimNumber: { tenantId, claimNumber: 'CLM-EABL-FUND-003' } },
+            where: { tenantId_claimNumber: { tenantId, claimNumber: 'CLM-VBL-FUND-003' } },
             update: {
               memberId: eablMember2.id, providerId: providers[2],
               serviceType: 'INPATIENT', benefitCategory: 'SURGICAL',
@@ -2352,7 +2374,7 @@ async function main() {
               procedures: [{ cptCode: '44950', description: 'Appendectomy', quantity: 1, unitCost: 110000 }],
             },
             create: {
-            tenantId, claimNumber: 'CLM-EABL-FUND-003',
+            tenantId, claimNumber: 'CLM-VBL-FUND-003',
             memberId: eablMember2.id, providerId: providers[2],
             serviceType: 'INPATIENT', benefitCategory: 'SURGICAL',
             dateOfService: new Date('2025-01-20'),
@@ -2362,11 +2384,11 @@ async function main() {
             diagnoses: [{ icdCode: 'K35.9', description: 'Acute appendicitis', isPrimary: true }],
             procedures: [{ cptCode: '44950', description: 'Appendectomy', quantity: 1, unitCost: 110000 }],
           }})
-          eablClaims.push(clm3)
+          vblClaims.push(clm3)
 
           // Dental
           const clm4 = await prisma.claim.upsert({
-            where: { tenantId_claimNumber: { tenantId, claimNumber: 'CLM-EABL-FUND-004' } },
+            where: { tenantId_claimNumber: { tenantId, claimNumber: 'CLM-VBL-FUND-004' } },
             update: {
               memberId: eablMember2.id, providerId: providers[0],
               serviceType: 'OUTPATIENT', benefitCategory: 'DENTAL',
@@ -2377,7 +2399,7 @@ async function main() {
               procedures: [],
             },
             create: {
-            tenantId, claimNumber: 'CLM-EABL-FUND-004',
+            tenantId, claimNumber: 'CLM-VBL-FUND-004',
             memberId: eablMember2.id, providerId: providers[0],
             serviceType: 'OUTPATIENT', benefitCategory: 'DENTAL',
             dateOfService: new Date('2025-03-18'),
@@ -2386,14 +2408,14 @@ async function main() {
             diagnoses: [{ icdCode: 'K02.9', description: 'Dental caries', isPrimary: true }],
             procedures: [],
           }})
-          eablClaims.push(clm4)
+          vblClaims.push(clm4)
         }
 
         // Build fund account: corporate-sized opening deposit and running balance from real claim amounts
         const eablOpeningDeposit = 32_000_000
         const eablAdminFee = 450_000
         let runningBalance = eablOpeningDeposit
-        const claimTotal = eablClaims.reduce((s, c) => s + Number(c.approvedAmount), 0)
+        const claimTotal = vblClaims.reduce((s, c) => s + Number(c.approvedAmount), 0)
         runningBalance -= claimTotal
         runningBalance -= eablAdminFee
 
@@ -2431,19 +2453,19 @@ async function main() {
         await prisma.fundTransaction.create({ data: {
           tenantId, selfFundedAccountId: sfAccount.id,
           type: 'DEPOSIT', amount: eablOpeningDeposit, balanceAfter: ledgerBalance,
-          description: 'Opening fund deposit — 2025 policy year', referenceNumber: 'EFT-EABL-2025-001',
+          description: 'Opening fund deposit — 2025 policy year', referenceNumber: 'EFT-VBL-2025-001',
           postedAt: new Date('2025-01-02'),
         }})
 
         // Individual claim deductions (with real claimIds — powers the category breakdown)
-        for (const clm of eablClaims) {
+        for (const clm of vblClaims) {
           const c = clm as unknown as { id: string; approvedAmount: number; benefitCategory: string; dateOfService: Date }
           ledgerBalance -= c.approvedAmount
           claimDeductions.push({
             amount: c.approvedAmount,
             balance: ledgerBalance,
             claimId: c.id,
-            description: `Claim deduction — ${c.benefitCategory.replace(/_/g,' ')} — KES ${c.approvedAmount.toLocaleString()}`,
+            description: `Claim deduction — ${c.benefitCategory.replace(/_/g,' ')} — UGX ${c.approvedAmount.toLocaleString()}`,
             postedAt: new Date(c.dateOfService.getTime() + 2 * 24 * 60 * 60 * 1000), // 2 days after service
           })
         }
@@ -2460,15 +2482,15 @@ async function main() {
         await prisma.fundTransaction.create({ data: {
           tenantId, selfFundedAccountId: sfAccount.id,
           type: 'ADMIN_FEE', amount: eablAdminFee, balanceAfter: ledgerBalance,
-          description: 'Admin fee Q1 2025 — corporate self-funded administration retainer', referenceNumber: 'ADM-EABL-2025-Q1',
+          description: 'Admin fee Q1 2025 — corporate self-funded administration retainer', referenceNumber: 'ADM-VBL-2025-Q1',
           postedAt: new Date('2025-04-01'),
         }})
 
-        console.log(`✅ Self-funded scheme 1: East African Breweries — KES ${runningBalance.toLocaleString()} balance, ${eablClaims.length} claims wired to fund`)
+        console.log(`✅ Self-funded scheme 1: Victoria Breweries — UGX ${runningBalance.toLocaleString()} balance, ${vblClaims.length} claims wired to fund`)
       }
 
-      // Scheme 2: Bamburi Cement — LOW balance, triggers alert demonstration
-      const bamburi = await prisma.group.findFirst({ where: { tenantId, name: 'Bamburi Cement' } })
+      // Scheme 2: Rwenzori Cement — LOW balance, triggers alert demonstration
+      const bamburi = await prisma.group.findFirst({ where: { tenantId, name: 'Rwenzori Cement' } })
       if (bamburi) {
         const fundAdminUser = await prisma.user.findFirst({ where: { tenantId, email: 'fund@medvex.co.ug' } })
         await prisma.group.update({ where: { id: bamburi.id }, data: {
@@ -2512,7 +2534,7 @@ async function main() {
         ]) {
           await prisma.fundTransaction.create({ data: { tenantId, selfFundedAccountId: sfAccount2.id, ...txn } })
         }
-        console.log(`✅ Self-funded scheme 2: Bamburi Cement — KES 3.8M balance (BELOW minimum KES 5M → low-balance demo)`)
+        console.log(`✅ Self-funded scheme 2: Rwenzori Cement — UGX 3.8M balance (BELOW minimum UGX 5M → low-balance demo)`)
       }
 
       // ── 16e. Invoices with Kenyan taxes ────────────────────────────────────
@@ -2527,7 +2549,7 @@ async function main() {
           stampDuty: sdAmount, trainingLevy: tlAmount, phcf: pcAmount,
           taxTotal: sdAmount + tlAmount + pcAmount,
         }})
-        console.log(`✅ Invoice taxes: ${firstInvoice.invoiceNumber} — SD KES ${sdAmount}, TL KES ${tlAmount}, PHCF KES ${pcAmount}`)
+        console.log(`✅ Invoice taxes: ${firstInvoice.invoiceNumber} — SD UGX ${sdAmount}, TL UGX ${tlAmount}, PHCF UGX ${pcAmount}`)
       }
 
       // ── 16f. Claims in INCURRED and CAPTURED states ────────────────────────
@@ -2562,7 +2584,7 @@ async function main() {
             { lineNumber: 3, serviceCategory: 'PHARMACY',     description: 'Antibiotics', cptCode: null,            quantity: 1, unitCost: 4000,  billedAmount: 4000  },
           ]},
         }})
-        console.log('✅ New claim states: 1× INCURRED (Nairobi Hospital, pneumonia) + 1× CAPTURED (dental, ready for adjudication)')
+        console.log('✅ New claim states: 1× INCURRED (Kampala Hospital, pneumonia) + 1× CAPTURED (dental, ready for adjudication)')
       }
 
       // ── 16g. Reimbursement claim ───────────────────────────────────────────
@@ -2575,7 +2597,7 @@ async function main() {
           dateOfService: new Date('2025-03-20'),
           billedAmount: 13500, status: 'RECEIVED',
           isReimbursement: true, invoiceNumber: 'EYE-INV-2025-0178',
-          reimbursementMpesaPhone: '+254722555888',
+          reimbursementMpesaPhone: '+256722555888',
           attendingDoctor: 'Dr. Amina Hassan',
           diagnoses: [{ icdCode: 'Z01.0', description: 'Eye examination', isPrimary: true }],
           procedures: [],
@@ -2585,7 +2607,7 @@ async function main() {
             { lineNumber: 3, serviceCategory: 'OTHER',        description: 'Spectacle Lenses',    cptCode: '92340', quantity: 1, unitCost: 6000, billedAmount: 6000 },
           ]},
         }})
-        console.log('✅ Reimbursement claim: CLM-RMB-* — optical, member paid provider (M-Pesa +254722555888)')
+        console.log('✅ Reimbursement claim: CLM-RMB-* — optical, member paid provider (MTN MoMo +256722555888)')
       }
 
       // ── 16h. Pre-auth with escalation threshold ───────────────────────────
@@ -2609,9 +2631,9 @@ async function main() {
       }
 
       // ── 16i. SCHEME_TRANSFER endorsement ─────────────────────────────────
-      // Move a KCB member to EABL (career move scenario)
-      const kcbGroup  = await prisma.group.findFirst({ where: { tenantId, name: 'KCB Group' } })
-      const eablGroup = await prisma.group.findFirst({ where: { tenantId, name: 'East African Breweries' } })
+      // Move a Pearl Bank member to VBL (career move scenario)
+      const kcbGroup  = await prisma.group.findFirst({ where: { tenantId, name: 'Pearl Bank Uganda' } })
+      const eablGroup = await prisma.group.findFirst({ where: { tenantId, name: 'Victoria Breweries' } })
       if (kcbGroup && eablGroup) {
         const kcbMember = await prisma.member.findFirst({
           where: { tenantId, groupId: kcbGroup.id, status: 'ACTIVE', relationship: 'PRINCIPAL' },
@@ -2623,33 +2645,33 @@ async function main() {
             groupId: kcbGroup.id, toGroupId: eablGroup.id, memberId: kcbMember.id,
             type: 'SCHEME_TRANSFER', status: 'APPROVED',
             effectiveDate: new Date('2025-04-01'),
-            changeDetails: { reason: 'Career change — member joined East African Breweries on 1 April 2025', fromGroupId: kcbGroup.id, toGroupId: eablGroup.id },
+            changeDetails: { reason: 'Career change — member joined Victoria Breweries on 1 April 2025', fromGroupId: kcbGroup.id, toGroupId: eablGroup.id },
             reviewedBy: users['SUPER_ADMIN'], reviewedAt: new Date('2025-03-28'),
           }})
-          console.log(`✅ Scheme transfer endorsement: ${kcbMember.firstName} ${kcbMember.lastName} — KCB → EABL`)
+          console.log(`✅ Scheme transfer endorsement: ${kcbMember.firstName} ${kcbMember.lastName} — Pearl Bank → VBL`)
         }
       }
 
       // ── 16j. TIER_CHANGE endorsement ─────────────────────────────────────
-      // Promote a Safaricom Staff member to Management tier
+      // Promote a Nile Telecom Staff member to Management tier
       const staffMember = await prisma.member.findFirst({
-        where: { tenantId, groupId: safaricom.id, relationship: 'PRINCIPAL', status: 'ACTIVE',
+        where: { tenantId, groupId: nileTelecom.id, relationship: 'PRINCIPAL', status: 'ACTIVE',
                  benefitTier: { name: 'Staff' } },
       })
       const mgmtTier = await prisma.groupBenefitTier.findFirst({
-        where: { groupId: safaricom.id, name: 'Management' },
+        where: { groupId: nileTelecom.id, name: 'Management' },
       })
       if (staffMember && mgmtTier) {
         const endCount2 = await prisma.endorsement.count({ where: { tenantId } })
         await prisma.endorsement.create({ data: {
           tenantId, endorsementNumber: `END-TIER-${String(endCount2 + 1).padStart(5,'0')}`,
-          groupId: safaricom.id, memberId: staffMember.id, toBenefitTierId: mgmtTier.id,
+          groupId: nileTelecom.id, memberId: staffMember.id, toBenefitTierId: mgmtTier.id,
           type: 'TIER_CHANGE', status: 'APPROVED',
           effectiveDate: new Date('2025-03-01'),
           changeDetails: { reason: 'Promotion to Team Lead — eligible for Management tier', fromTierId: staffMember.benefitTierId, toBenefitTierId: mgmtTier.id },
           reviewedBy: users['UNDERWRITER'], reviewedAt: new Date('2025-02-28'),
         }})
-        console.log(`✅ Tier change endorsement: ${staffMember.firstName} ${staffMember.lastName} — Staff → Management (Safaricom)`)
+        console.log(`✅ Tier change endorsement: ${staffMember.firstName} ${staffMember.lastName} — Staff → Management (Nile Telecom)`)
       }
 
       // ── 16k. Smart-card replacement ───────────────────────────────────────
@@ -2671,11 +2693,11 @@ async function main() {
         await prisma.activityLog.create({ data: {
           entityType: 'MEMBER', entityId: cardMember.id, memberId: cardMember.id,
           action: 'CARD_REPLACEMENT_REQUESTED',
-          description: `Card replacement requested. Reason: Lost card. Fee invoice ${replInvoice.invoiceNumber} raised (KES 500).`,
+          description: `Card replacement requested. Reason: Lost card. Fee invoice ${replInvoice.invoiceNumber} raised (UGX 500).`,
           userId: users['SUPER_ADMIN'],
           metadata: { reason: 'Lost card', invoiceId: replInvoice.id, fee: 500 },
         }})
-        console.log(`✅ Smart-card replacement: ${cardMember.firstName} ${cardMember.lastName} — INV-CARD raised, KES 500 fee`)
+        console.log(`✅ Smart-card replacement: ${cardMember.firstName} ${cardMember.lastName} — INV-CARD raised, UGX 500 fee`)
       }
 
       // ── 16l. BenefitUsage for exceeded-limits report ──────────────────────
@@ -2743,23 +2765,23 @@ async function main() {
 
       // ── 16m-2. Broker Command Center demo data ───────────────────────────
       const brokerCommandCenterExists = await prisma.brokerCommissionSchedule.findFirst({
-        where: { broker: { tenantId }, scheduleName: 'KAIB Corporate Standard 2026' },
+        where: { broker: { tenantId }, scheduleName: 'PAIB Corporate Standard 2026' },
       })
       if (!brokerCommandCenterExists) {
         const [kaib, minet] = await Promise.all([
-          prisma.broker.findFirst({ where: { tenantId, name: 'Kenyan Alliance Insurance Brokers' } }),
-          prisma.broker.findFirst({ where: { tenantId, name: 'Minet Kenya' } }),
+          prisma.broker.findFirst({ where: { tenantId, name: 'Pearl Alliance Insurance Brokers' } }),
+          prisma.broker.findFirst({ where: { tenantId, name: 'Minet Uganda' } }),
         ])
-        const safaricomGroup = await prisma.group.findFirst({ where: { tenantId, name: 'Safaricom PLC' } })
+        const nileTelecomGroup = await prisma.group.findFirst({ where: { tenantId, name: 'Nile Telecom Uganda' } })
         const adminUserId = users['SUPER_ADMIN']
 
-        if (kaib && safaricomGroup && adminUserId) {
+        if (kaib && nileTelecomGroup && adminUserId) {
           await prisma.broker.update({
             where: { id: kaib.id },
             data: {
-              brokerCode: kaib.brokerCode ?? 'BRK-KAIB',
-              legalName: 'Kenyan Alliance Insurance Brokers Limited',
-              tradingName: 'KAIB',
+              brokerCode: kaib.brokerCode ?? 'BRK-PAIB',
+              legalName: 'Pearl Alliance Insurance Brokers Limited',
+              tradingName: 'PAIB',
               brokerType: 'MASTER_BROKER',
               intermediaryCategory: 'REGULATED_BROKER',
               requiresIraRegistration: true,
@@ -2769,8 +2791,8 @@ async function main() {
               iraExpiryDate: new Date('2026-12-31'),
               kraPin: 'P051234567A',
               vatRegistered: true,
-              vatNumber: 'VAT-KAIB-001',
-              bankAccountReference: 'KCB-010012345678',
+              vatNumber: 'VAT-PAIB-001',
+              bankAccountReference: 'Pearl Bank-010012345678',
               mpesaPaybillNumber: '522522',
               approvedById: adminUserId,
               approvedAt: new Date('2024-01-05'),
@@ -2782,7 +2804,7 @@ async function main() {
               where: { id: minet.id },
               data: {
                 brokerCode: minet.brokerCode ?? 'BRK-MINET',
-                legalName: 'Minet Kenya Insurance Brokers Limited',
+                legalName: 'Minet Uganda Insurance Brokers Limited',
                 brokerType: 'SUB_AGENT',
                 intermediaryCategory: 'REGULATED_BROKER',
                 requiresIraRegistration: true,
@@ -2810,7 +2832,7 @@ async function main() {
               referralFeeAmount: 15000,
               sourceDescription: 'Independent non-IRA introducer that brings employer leads and is paid by approved referral fee.',
               contactPerson: 'Nia Kamau',
-              phone: '+254722901100',
+              phone: '+256722901100',
               email: 'nia.introducer@example.com',
               kraPin: 'A012345678N',
               bankAccountReference: 'EQUITY-010099887766',
@@ -2834,7 +2856,7 @@ async function main() {
               commissionBasis: 'ATTRIBUTION_ONLY',
               sourceDescription: 'Internal sales attribution source. No external commission or referral payout is generated.',
               contactPerson: 'Corporate Sales Lead',
-              phone: '+254700300300',
+              phone: '+256700300300',
               email: 'corporate.sales@medvex.co.ug',
               effectiveFrom: new Date('2024-01-01'),
               approvedById: adminUserId,
@@ -2849,7 +2871,7 @@ async function main() {
                 brokerId: kaib.id,
                 documentType: 'IRA_LICENSE',
                 fileUri: '/seed-docs/brokers/kaib-ira-license-2026.pdf',
-                fileName: 'KAIB IRA License 2026.pdf',
+                fileName: 'PAIB IRA License 2026.pdf',
                 uploadedById: adminUserId,
                 verifiedAt: new Date('2024-01-05'),
                 verifiedById: adminUserId,
@@ -2860,7 +2882,7 @@ async function main() {
                 brokerId: kaib.id,
                 documentType: 'KRA_PIN_CERTIFICATE',
                 fileUri: '/seed-docs/brokers/kaib-kra-pin.pdf',
-                fileName: 'KAIB KRA PIN Certificate.pdf',
+                fileName: 'PAIB KRA PIN Certificate.pdf',
                 uploadedById: adminUserId,
                 verifiedAt: new Date('2024-01-05'),
                 verifiedById: adminUserId,
@@ -2870,7 +2892,7 @@ async function main() {
                 brokerId: kaib.id,
                 documentType: 'BANK_CONFIRMATION',
                 fileUri: '/seed-docs/brokers/kaib-bank-confirmation.pdf',
-                fileName: 'KAIB Bank Confirmation.pdf',
+                fileName: 'PAIB Bank Confirmation.pdf',
                 uploadedById: adminUserId,
                 status: 'PENDING_REVIEW',
                 notes: 'Seeded pending review to demonstrate KYC workflow.',
@@ -2913,22 +2935,22 @@ async function main() {
             data: {
               brokerId: kaib.id,
               producerName: 'Grace Wanjiku',
-              producerCode: 'PROD-KAIB-001',
+              producerCode: 'PROD-PAIB-001',
               iraIndividualNumber: 'IRA-AGT-77881',
-              email: 'grace.wanjiku@kaib.co.ke',
-              phone: '+254722555001',
+              email: 'grace.wanjiku@paib.co.ug',
+              phone: '+256722555001',
               effectiveFrom: new Date('2024-01-01'),
               status: 'ACTIVE',
-              groups: { connect: [{ id: safaricomGroup.id }] },
+              groups: { connect: [{ id: nileTelecomGroup.id }] },
             },
           })
 
           const schedule = await prisma.brokerCommissionSchedule.create({
             data: {
               brokerId: kaib.id,
-              scheduleName: 'KAIB Corporate Standard 2026',
+              scheduleName: 'PAIB Corporate Standard 2026',
               scheduleType: 'TIERED_VOLUME',
-              groupId: safaricomGroup.id,
+              groupId: nileTelecomGroup.id,
               clientType: 'CORPORATE',
               newBusinessRate: 0.12,
               renewalRate: 0.08,
@@ -2951,7 +2973,7 @@ async function main() {
           })
 
           const ledgerRows = [
-            { receipt: 'SEED-RCPT-2024-001', start: new Date('2024-01-01'), end: new Date('2024-01-31'), gross: 18000, wht: 1800, vat: 2880, levy: 36, net: 19044, state: 'PAID', paidAt: new Date('2024-02-10'), ref: 'PAY-KAIB-001' },
+            { receipt: 'SEED-RCPT-2024-001', start: new Date('2024-01-01'), end: new Date('2024-01-31'), gross: 18000, wht: 1800, vat: 2880, levy: 36, net: 19044, state: 'PAID', paidAt: new Date('2024-02-10'), ref: 'PAY-PAIB-001' },
             { receipt: 'SEED-RCPT-2024-002', start: new Date('2024-02-01'), end: new Date('2024-02-29'), gross: 18000, wht: 1800, vat: 2880, levy: 36, net: 19044, state: 'PAYABLE', paidAt: null, ref: null },
             { receipt: 'SEED-RCPT-2024-003', start: new Date('2024-03-01'), end: new Date('2024-03-31'), gross: 0, wht: 0, vat: 0, levy: 0, net: 0, state: 'PENDING_RECONCILIATION', paidAt: null, ref: null },
           ] as const
@@ -2961,7 +2983,7 @@ async function main() {
               data: {
                 brokerId: kaib.id,
                 scheduleId: row.state === 'PENDING_RECONCILIATION' ? null : schedule.id,
-                groupId: safaricomGroup.id,
+                groupId: nileTelecomGroup.id,
                 contributionReceiptId: row.receipt,
                 state: row.state,
                 grossCommission: row.gross,
@@ -2985,7 +3007,7 @@ async function main() {
           if (paidEntry) {
             const batch = await prisma.commissionPayoutBatch.create({
               data: {
-                batchReference: 'CPB-SEED-KAIB-001',
+                batchReference: 'CPB-SEED-PAIB-001',
                 batchDate: new Date('2024-02-10'),
                 totalGross: 18000,
                 totalWHT: 1800,
@@ -3060,7 +3082,7 @@ async function main() {
           waiverApprovedBy: status === 'WAIVED' ? 'Dr. Sarah Achieng (Medical Officer)' : null,
         }})
       }
-      console.log('✅ Co-contribution transactions fixed: CLM-2024-00001 (PENDING), CLM-2024-00002 (COLLECTED M-Pesa), CLM-2024-00003 (WAIVED)')
+      console.log('✅ Co-contribution transactions fixed: CLM-2024-00001 (PENDING), CLM-2024-00002 (COLLECTED MTN MoMo), CLM-2024-00003 (WAIVED)')
 
       console.log('\n✅ Phase A–D demonstrations complete.')
     } else {
@@ -3073,11 +3095,11 @@ async function main() {
   // ═══════════════════════════════════════════════════════════
   const notifTemplates = [
     { name: 'Welcome Email',          type: 'WELCOME',              channel: 'EMAIL', subject: 'Welcome to Medvex',         bodyTemplate: 'Dear {{firstName}}, welcome to Medvex. Your member number is {{memberNumber}}.' },
-    { name: 'Claim Approved',         type: 'CLAIM_APPROVED',       channel: 'EMAIL', subject: 'Claim Approved — {{claimNumber}}',     bodyTemplate: 'Your claim {{claimNumber}} for KES {{approvedAmount}} has been approved.' },
+    { name: 'Claim Approved',         type: 'CLAIM_APPROVED',       channel: 'EMAIL', subject: 'Claim Approved — {{claimNumber}}',     bodyTemplate: 'Your claim {{claimNumber}} for UGX {{approvedAmount}} has been approved.' },
     { name: 'Claim Declined',         type: 'CLAIM_DECLINED',       channel: 'EMAIL', subject: 'Claim Declined — {{claimNumber}}',     bodyTemplate: 'Your claim {{claimNumber}} has been declined. Reason: {{declineReason}}.' },
     { name: 'Renewal Reminder 30',    type: 'RENEWAL_REMINDER_30',  channel: 'EMAIL', subject: 'Policy Renewal in 30 days',            bodyTemplate: 'Your policy renews on {{renewalDate}}. Please ensure premiums are up to date.' },
-    { name: 'Payment Overdue',        type: 'PAYMENT_OVERDUE',      channel: 'SMS',   subject: null,                                   bodyTemplate: 'Medvex: Invoice {{invoiceNumber}} of KES {{balance}} is overdue. Pay now to avoid suspension.' },
-    { name: 'Pre-Auth Approved SMS',  type: 'PREAUTH_STATUS',       channel: 'SMS',   subject: null,                                   bodyTemplate: 'Pre-auth {{preauthNumber}} approved for KES {{approvedAmount}}. Valid until {{validUntil}}.' },
+    { name: 'Payment Overdue',        type: 'PAYMENT_OVERDUE',      channel: 'SMS',   subject: null,                                   bodyTemplate: 'Medvex: Invoice {{invoiceNumber}} of UGX {{balance}} is overdue. Pay now to avoid suspension.' },
+    { name: 'Pre-Auth Approved SMS',  type: 'PREAUTH_STATUS',       channel: 'SMS',   subject: null,                                   bodyTemplate: 'Pre-auth {{preauthNumber}} approved for UGX {{approvedAmount}}. Valid until {{validUntil}}.' },
     { name: 'Suspension Notice',      type: 'SUSPENSION_NOTICE',    channel: 'EMAIL', subject: 'Cover Suspended — Action Required',    bodyTemplate: 'Dear {{firstName}}, your cover has been suspended due to outstanding premium. Contact us immediately.' },
   ]
   for (const t of notifTemplates) {
@@ -3159,7 +3181,7 @@ async function main() {
     const demoGroups = await prisma.group.findMany({
       where: {
         tenantId,
-        name: { in: ['Safaricom PLC', 'KCB Group', 'East African Breweries', 'Bamburi Cement', 'Twiga Foods'] },
+        name: { in: ['Nile Telecom Uganda', 'Pearl Bank Uganda', 'Victoria Breweries', 'Rwenzori Cement', 'Kyoga Foods'] },
       },
       include: {
         members: { where: { status: 'ACTIVE' }, select: { id: true, packageId: true, packageVersionId: true, benefitTierId: true } },
@@ -3176,40 +3198,40 @@ async function main() {
       providerPattern: number[]
       diseasePattern: { icd: string; label: string; benefitCategory: 'OUTPATIENT' | 'INPATIENT' | 'CHRONIC_DISEASE' | 'SURGICAL' | 'MATERNITY' | 'DENTAL' | 'OPTICAL'; serviceType: 'OUTPATIENT' | 'INPATIENT' | 'DAY_CASE' }[]
     }> = {
-      'Safaricom PLC': {
-        code: 'SAF', renewalOffset: 22, mlr: 0.58, status: 'healthy', providerPattern: [0, 1, 4],
+      'Nile Telecom Uganda': {
+        code: 'NTU', renewalOffset: 22, mlr: 0.58, status: 'healthy', providerPattern: [0, 1, 4],
         diseasePattern: [
           { icd: 'B54', label: 'Malaria, unspecified', benefitCategory: 'OUTPATIENT', serviceType: 'OUTPATIENT' },
           { icd: 'J06.9', label: 'Acute upper respiratory infection', benefitCategory: 'OUTPATIENT', serviceType: 'OUTPATIENT' },
           { icd: 'E11.9', label: 'Type 2 diabetes mellitus', benefitCategory: 'CHRONIC_DISEASE', serviceType: 'OUTPATIENT' },
         ],
       },
-      'KCB Group': {
-        code: 'KCB', renewalOffset: 37, mlr: 0.78, status: 'watch', providerPattern: [0, 2, 4],
+      'Pearl Bank Uganda': {
+        code: 'PBU', renewalOffset: 37, mlr: 0.78, status: 'watch', providerPattern: [0, 2, 4],
         diseasePattern: [
           { icd: 'I10', label: 'Essential hypertension', benefitCategory: 'CHRONIC_DISEASE', serviceType: 'OUTPATIENT' },
           { icd: 'E11.9', label: 'Type 2 diabetes mellitus', benefitCategory: 'CHRONIC_DISEASE', serviceType: 'OUTPATIENT' },
           { icd: 'J18.9', label: 'Pneumonia, unspecified organism', benefitCategory: 'INPATIENT', serviceType: 'INPATIENT' },
         ],
       },
-      'East African Breweries': {
-        code: 'EABL', renewalOffset: 61, mlr: 0.94, status: 'critical', providerPattern: [2, 3, 0],
+      'Victoria Breweries': {
+        code: 'VBL', renewalOffset: 61, mlr: 0.94, status: 'critical', providerPattern: [2, 3, 0],
         diseasePattern: [
           { icd: 'J18.9', label: 'Pneumonia, unspecified organism', benefitCategory: 'INPATIENT', serviceType: 'INPATIENT' },
           { icd: 'K35.9', label: 'Acute appendicitis', benefitCategory: 'SURGICAL', serviceType: 'INPATIENT' },
           { icd: 'E11.9', label: 'Type 2 diabetes mellitus', benefitCategory: 'CHRONIC_DISEASE', serviceType: 'OUTPATIENT' },
         ],
       },
-      'Bamburi Cement': {
-        code: 'BAM', renewalOffset: 83, mlr: 1.08, status: 'critical', providerPattern: [3, 2, 5],
+      'Rwenzori Cement': {
+        code: 'RWZ', renewalOffset: 83, mlr: 1.08, status: 'critical', providerPattern: [3, 2, 5],
         diseasePattern: [
           { icd: 'K35.9', label: 'Acute appendicitis', benefitCategory: 'SURGICAL', serviceType: 'INPATIENT' },
           { icd: 'S09.9', label: 'Head injury', benefitCategory: 'INPATIENT', serviceType: 'INPATIENT' },
           { icd: 'M54.5', label: 'Low back pain', benefitCategory: 'OUTPATIENT', serviceType: 'OUTPATIENT' },
         ],
       },
-      'Twiga Foods': {
-        code: 'TWI', renewalOffset: 112, mlr: 0.69, status: 'watch', providerPattern: [1, 0, 4],
+      'Kyoga Foods': {
+        code: 'KYG', renewalOffset: 112, mlr: 0.69, status: 'watch', providerPattern: [1, 0, 4],
         diseasePattern: [
           { icd: 'A09', label: 'Gastroenteritis and diarrhoeal disease', benefitCategory: 'OUTPATIENT', serviceType: 'OUTPATIENT' },
           { icd: 'N39.0', label: 'Urinary tract infection', benefitCategory: 'OUTPATIENT', serviceType: 'OUTPATIENT' },
@@ -3401,20 +3423,20 @@ async function main() {
       where: { tenantId, context: { path: ['source'], equals: 'analytics-demo' } },
     })
     const alertGroups = await prisma.group.findMany({
-      where: { tenantId, name: { in: ['East African Breweries', 'Bamburi Cement', 'KCB Group', 'Safaricom PLC'] } },
+      where: { tenantId, name: { in: ['Victoria Breweries', 'Rwenzori Cement', 'Pearl Bank Uganda', 'Nile Telecom Uganda'] } },
       select: { id: true, name: true, brokerId: true },
     })
     const groupByName = new Map(alertGroups.map(g => [g.name, g]))
-    const providerForAlert = await prisma.provider.findFirst({ where: { tenantId, name: 'Aga Khan University Hospital' }, select: { id: true } })
+    const providerForAlert = await prisma.provider.findFirst({ where: { tenantId, name: 'Nakasero Hospital' }, select: { id: true } })
     await prisma.analyticsAlert.createMany({ data: [
       {
         tenantId,
-        groupId: groupByName.get('Bamburi Cement')?.id,
-        intermediaryId: groupByName.get('Bamburi Cement')?.brokerId,
+        groupId: groupByName.get('Rwenzori Cement')?.id,
+        intermediaryId: groupByName.get('Rwenzori Cement')?.brokerId,
         type: 'MLR_DRIFT',
         severity: 'CRITICAL',
         status: 'OPEN',
-        title: 'Bamburi Cement MLR above pricing target',
+        title: 'Rwenzori Cement MLR above pricing target',
         message: 'Trailing claims have exceeded contributions, driven by surgical and injury episodes.',
         metricKey: 'trailing12Mlr',
         metricValue: 1.08,
@@ -3427,7 +3449,7 @@ async function main() {
         type: 'PROVIDER_ANOMALY',
         severity: 'WARNING',
         status: 'OPEN',
-        title: 'Aga Khan adjusted cost above peer benchmark',
+        title: 'Nakasero adjusted cost above peer benchmark',
         message: 'Case-mix-adjusted inpatient cost is materially above Medvex-owned facilities.',
         metricKey: 'adjustedCostIndex',
         metricValue: 1.34,
@@ -3436,11 +3458,11 @@ async function main() {
       },
       {
         tenantId,
-        groupId: groupByName.get('East African Breweries')?.id,
+        groupId: groupByName.get('Victoria Breweries')?.id,
         type: 'RENEWAL_RISK',
         severity: 'CRITICAL',
         status: 'ACKNOWLEDGED',
-        title: 'EABL renewal requires contribution action',
+        title: 'VBL renewal requires contribution action',
         message: 'Renewal analysis recommends an increase because trailing MLR is above target.',
         metricKey: 'recommendedAdjustmentPct',
         metricValue: 0.18,
@@ -3449,11 +3471,11 @@ async function main() {
       },
       {
         tenantId,
-        groupId: groupByName.get('KCB Group')?.id,
+        groupId: groupByName.get('Pearl Bank Uganda')?.id,
         type: 'UTILIZATION_SPIKE',
         severity: 'WARNING',
         status: 'OPEN',
-        title: 'KCB chronic disease utilization rising',
+        title: 'Pearl Bank chronic disease utilization rising',
         message: 'Diabetes and hypertension claims are trending upward across the last two quarters.',
         metricKey: 'chronicClaimShare',
         metricValue: 0.42,
@@ -3462,11 +3484,11 @@ async function main() {
       },
       {
         tenantId,
-        groupId: groupByName.get('Safaricom PLC')?.id,
+        groupId: groupByName.get('Nile Telecom Uganda')?.id,
         type: 'CONTRIBUTION_SHORTFALL',
         severity: 'INFO',
         status: 'RESOLVED',
-        title: 'Safaricom contribution collection restored',
+        title: 'Nile Telecom contribution collection restored',
         message: 'Premium collection is current after a temporary delay in the last cycle.',
         metricKey: 'collectionRate',
         metricValue: 1,
@@ -3522,11 +3544,11 @@ async function main() {
       take: 60,
     })
 
-    const demoPhones = ['+254711000101', '+254711000102', '+254711000103', '+254711000104', '+254711000105']
+    const demoPhones = ['+256711000101', '+256711000102', '+256711000103', '+256711000104', '+256711000105']
     for (let i = 0; i < Math.min(50, demoMembers.length); i++) {
       await prisma.member.update({
         where: { id: demoMembers[i].id },
-        data: { phone: `+2547111${String(i + 1).padStart(5, '0')}` },
+        data: { phone: `+2567111${String(i + 1).padStart(5, '0')}` },
       })
     }
 
@@ -3808,8 +3830,8 @@ async function main() {
       claimNumber?: string
       preauthNumber?: string
     }> = [
-      { fileName: 'Medvex_Member_Benefit_Guide_2025.pdf', category: 'BENEFIT_GUIDE', groupId: safaricom.id, url: '/seed-docs/Medvex_Member_Benefit_Guide_2025.pdf' },
-      { fileName: 'Safaricom_Benefit_Schedule_2025.pdf', category: 'BENEFIT_SCHEDULE', groupId: safaricom.id, url: '/seed-docs/Safaricom_Benefit_Schedule_2025.pdf' },
+      { fileName: 'Medvex_Member_Benefit_Guide_2025.pdf', category: 'BENEFIT_GUIDE', groupId: nileTelecom.id, url: '/seed-docs/Medvex_Member_Benefit_Guide_2025.pdf' },
+      { fileName: 'Nile Telecom_Benefit_Schedule_2025.pdf', category: 'BENEFIT_SCHEDULE', groupId: nileTelecom.id, url: '/seed-docs/Nile Telecom_Benefit_Schedule_2025.pdf' },
       { fileName: 'PA-MEXP-001_Approval_Letter.pdf', category: 'PREAUTH_APPROVAL', preauthNumber: 'PA-MEXP-001', url: '/seed-docs/PA-MEXP-001_Approval_Letter.pdf' },
       { fileName: 'CLM-MEXP-001_Claim_Support.pdf', category: 'CLAIM_SUPPORT', claimNumber: 'CLM-MEXP-001', url: '/seed-docs/CLM-MEXP-001_Claim_Support.pdf' },
     ]
@@ -3835,7 +3857,7 @@ async function main() {
       { member: demoMembers[0], type: 'BENEFIT_ALERT' as const, title: 'You are on track', body: 'Your outpatient benefit usage is comfortably within the expected range.', href: '/member/benefits', priority: 'LOW' as const },
       { member: demoMembers[1], type: 'BENEFIT_ALERT' as const, title: 'Outpatient benefit near cap', body: 'You have used more than 90% of one benefit category this year.', href: '/member/benefits', priority: 'HIGH' as const },
       { member: demoMembers[2], type: 'CLAIM_STATUS' as const, title: 'Care event recorded', body: 'A recent outpatient visit has been added to your care history.', href: '/member/utilization', priority: 'NORMAL' as const },
-      { member: demoMembers[3], type: 'PAYMENT_STATUS' as const, title: 'M-Pesa payment confirmed', body: 'Your wallet payment has been confirmed and matched to your member share.', href: '/member/wallet', priority: 'HIGH' as const },
+      { member: demoMembers[3], type: 'PAYMENT_STATUS' as const, title: 'MTN MoMo payment confirmed', body: 'Your wallet payment has been confirmed and matched to your member share.', href: '/member/wallet', priority: 'HIGH' as const },
       { member: demoMembers[4], type: 'PREAUTH_STATUS' as const, title: 'Pre-authorization approved', body: 'Your consultation pre-authorization was approved instantly.', href: '/member/preauth', priority: 'HIGH' as const },
       { member: demoMembers[0], type: 'RENEWAL_REMINDER' as const, title: 'Scheme renewal coming up', body: 'Your employer scheme renewal date is approaching.', href: '/member/dashboard', priority: 'NORMAL' as const },
       { member: demoMembers[0], type: 'DOCUMENT_AVAILABLE' as const, title: 'Benefit guide available', body: 'Your 2025 member benefit guide is available in Documents.', href: '/member/documents', priority: 'NORMAL' as const },
@@ -3857,8 +3879,8 @@ async function main() {
     }
 
     const healthFileSeeds = [
-      { member: demoMembers[0], title: 'March full blood count', category: 'LAB_RESULT' as const, fileName: 'Wanjiru_Kamau_FBC_Mar_2026.pdf', fileUrl: '/seed-docs/Wanjiru_Kamau_FBC_Mar_2026.pdf', capturedAt: new Date('2026-03-18'), notes: 'Uploaded before annual wellness review.' },
-      { member: demoMembers[0], title: 'Hypertension prescription refill', category: 'PRESCRIPTION' as const, fileName: 'Wanjiru_Kamau_Prescription_Apr_2026.jpg', fileUrl: '/seed-docs/Wanjiru_Kamau_Prescription_Apr_2026.jpg', capturedAt: new Date('2026-04-12'), notes: 'Current medication list for next consultation.' },
+      { member: demoMembers[0], title: 'March full blood count', category: 'LAB_RESULT' as const, fileName: 'Nakato_Kamau_FBC_Mar_2026.pdf', fileUrl: '/seed-docs/Nakato_Kamau_FBC_Mar_2026.pdf', capturedAt: new Date('2026-03-18'), notes: 'Uploaded before annual wellness review.' },
+      { member: demoMembers[0], title: 'Hypertension prescription refill', category: 'PRESCRIPTION' as const, fileName: 'Nakato_Kamau_Prescription_Apr_2026.jpg', fileUrl: '/seed-docs/Nakato_Kamau_Prescription_Apr_2026.jpg', capturedAt: new Date('2026-04-12'), notes: 'Current medication list for next consultation.' },
       { member: demoMembers[1], title: 'Chest X-ray report', category: 'RADIOLOGY' as const, fileName: 'Member_Radiology_Report_2026.pdf', fileUrl: '/seed-docs/Member_Radiology_Report_2026.pdf', capturedAt: new Date('2026-02-22'), notes: 'Follow-up imaging after respiratory symptoms.' },
       { member: demoMembers[4], title: 'Consultation referral note', category: 'REFERRAL' as const, fileName: 'PA_MEXP_Referral_Note.pdf', fileUrl: '/seed-docs/PA_MEXP_Referral_Note.pdf', capturedAt: new Date('2026-04-02'), notes: 'Shared with the pre-authorization reviewer for context.' },
     ]
@@ -3972,8 +3994,8 @@ async function main() {
   console.log(`  Login: admin@medvex.co.ug / ${SEED_PASSWORD}`)
   console.log('')
   console.log('  Core:')
-  console.log('  • Safaricom — 3 benefit tiers (Executive/Management/Staff) with different packages')
-  console.log('  • 5 corporate groups + 1 individual client (Patricia Wanjiru)')
+  console.log('  • Nile Telecom — 3 benefit tiers (Executive/Management/Staff) with different packages')
+  console.log('  • 5 corporate groups + 1 individual client (Patricia Nakato)')
   console.log('  • 6 providers with CPT tariffs + ICD-10 diagnosis tariffs')
   console.log('  • 6+ claims with structured service lines grouped by category')
   console.log('  • 2 exception logs (1 approved, 1 pending review)')
@@ -3981,27 +4003,27 @@ async function main() {
   console.log('  • Pre-authorizations, endorsements, quotations in various states')
   console.log('')
   console.log('  Phase A — Schema hardening:')
-  console.log('  • Tax rates: Stamp Duty KES 40, Training Levy 0.2%, PHCF 0.25%')
+  console.log('  • Tax rates: Stamp Duty UGX 40, Training Levy 0.2%, PHCF 0.25%')
   console.log('  • Approval matrix: 3 rules (inpatient >200k dual-approval, surgical >150k, general >50k)')
-  console.log('  • INCURRED claim: Nairobi Hospital pneumonia, invoice NH-INV-2025-0341')
+  console.log('  • INCURRED claim: Kampala Hospital pneumonia, invoice NH-INV-2025-0341')
   console.log('  • CAPTURED claim: Dental, all lines entered, forwarded for adjudication')
   console.log('')
   console.log('  Phase B — Claims integrity:')
-  console.log('  • Reimbursement claim: optical, member paid provider (M-Pesa reimbursement)')
+  console.log('  • Reimbursement claim: optical, member paid provider (MTN MoMo reimbursement)')
   console.log('  • Pre-auth with escalation: appendectomy, 4h SLA → Medical Officer')
   console.log('  • Adjudication logs: 8 records across 3 operators (claims-per-operator report)')
   console.log('')
   console.log('  Phase C — Membership completeness:')
-  console.log('  • Individual client: Patricia Wanjiru (clientType=INDIVIDUAL, Executive)')
-  console.log('  • Self-funded scheme 1: EABL — KES 32M deposit, real claim deductions by claimId, admin fee')
-  console.log('  • Self-funded scheme 2: Bamburi Cement — KES 3.8M balance below KES 5M minimum (low-balance demo)')
+  console.log('  • Individual client: Patricia Nakato (clientType=INDIVIDUAL, Executive)')
+  console.log('  • Self-funded scheme 1: VBL — UGX 32M deposit, real claim deductions by claimId, admin fee')
+  console.log('  • Self-funded scheme 2: Rwenzori Cement — UGX 3.8M balance below UGX 5M minimum (low-balance demo)')
   console.log('  • Fund admin: fund@medvex.co.ug — linked to all self-funded schemes (seed password)')
   console.log('  • Member: member@medvex.co.ug — linked to an active member (seed password)')
   console.log('  • Member demo logins: member.demo.low@medvex.co.ug, member.demo.nearcap@medvex.co.ug, member.demo.family@medvex.co.ug, member.demo.wallet@medvex.co.ug, member.demo.preauth@medvex.co.ug (seed password)')
   console.log('  • Admin sidebar: Self-Funded Schemes link under Finance → /fund/dashboard')
-  console.log('  • Scheme transfer endorsement: KCB member → EABL (career change)')
-  console.log('  • Tier change endorsement: Safaricom Staff → Management (promotion)')
-  console.log('  • Smart-card replacement: lost card, fee invoice raised (KES 500)')
+  console.log('  • Scheme transfer endorsement: Pearl Bank member → VBL (career change)')
+  console.log('  • Tier change endorsement: Nile Telecom Staff → Management (promotion)')
+  console.log('  • Smart-card replacement: lost card, fee invoice raised (UGX 500)')
   console.log('')
   console.log('  Phase D — Reports (all populated with real data):')
   console.log('  • Fraud: 8 demonstration claims (TEMP-001, CLIN-001, BILL-003, BILL-004, TEMP-004, FIN-004)')
