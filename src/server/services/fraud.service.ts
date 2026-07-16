@@ -126,10 +126,16 @@ export class FraudService {
     }
 
     // ── RULE-TEMP-003: After-Hours Outpatient Anomaly ─────────────────────────
+    // CU-OBS-8: dateOfService is date-only (midnight UTC) for wizard/API intakes,
+    // so the +3h shift read as "03:00 EAT" and flagged legitimately daytime-entered
+    // claims. A midnight-UTC sentinel carries no time-of-day signal — the rule may
+    // only fire when the timestamp has a real clock time.
     if (claim.serviceType === "OUTPATIENT" && claim.dateOfService) {
-      const eat = new Date(claim.dateOfService.getTime() + 3 * 60 * 60 * 1000);
+      const dos = claim.dateOfService;
+      const hasClockTime = dos.getUTCHours() !== 0 || dos.getUTCMinutes() !== 0 || dos.getUTCSeconds() !== 0;
+      const eat = new Date(dos.getTime() + 3 * 60 * 60 * 1000);
       const hour = eat.getUTCHours();
-      if (hour >= CONFIG.afterHoursStart && hour < CONFIG.afterHoursEnd) {
+      if (hasClockTime && hour >= CONFIG.afterHoursStart && hour < CONFIG.afterHoursEnd) {
         newAlerts.push({
           tenantId,
           claimId,

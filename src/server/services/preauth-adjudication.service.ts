@@ -689,12 +689,17 @@ export const preauthAdjudicationService = {
 
     if (!pa) return null;
 
-    // Compute current benefit balance for the member
+    // Compute current benefit balance for the member.
+    // OBS-IP-1: scope to the PA's OWN benefit category — unscoped, this picked
+    // whichever usage row existed, so the panel's limit basis flipped (e.g.
+    // outpatient 5M pre-approval → inpatient 25M once the hold created a new
+    // row). One category, one stable basis.
     const usage = await prisma.benefitUsage.findFirst({
       where: {
         memberId:    pa.memberId,
         periodStart: { lte: new Date() },
         periodEnd:   { gte: new Date() },
+        benefitConfig: { category: pa.benefitCategory },
       },
       include: { benefitConfig: { select: { annualSubLimit: true, category: true } } },
     });

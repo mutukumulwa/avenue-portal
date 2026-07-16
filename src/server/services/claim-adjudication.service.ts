@@ -566,7 +566,13 @@ export const claimAdjudicationService = {
       throw new TRPCError({ code: "NOT_FOUND", message: "Settlement batch not found" });
     }
     if (batch.status !== "CHECKER_APPROVED") {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "Batch is not approved yet" });
+      // CU-OBS-3: name the batch's real state — a stale retry on an already-settled
+      // batch previously read "not approved yet", which looks like a workflow bug.
+      const message =
+        batch.status === "SETTLED"
+          ? "This batch is already settled — the payment was recorded exactly once and cannot be repeated."
+          : `Batch cannot be paid from status ${batch.status.replace(/_/g, " ")} — it must be checker-approved first.`;
+      throw new TRPCError({ code: "BAD_REQUEST", message });
     }
 
     const claims = await prisma.claim.findMany({

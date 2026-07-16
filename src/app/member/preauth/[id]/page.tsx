@@ -131,6 +131,19 @@ export default async function MemberPreAuthDetailPage({
 
         <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm">
           <h2 className="font-heading text-lg font-bold text-brand-text-heading">Request notes</h2>
+          {/* CU-OBS-14: the member's typed reason is stored as the primary
+              diagnosis description — show it, or the request looks empty. */}
+          {(() => {
+            const primary = Array.isArray(detail.diagnoses)
+              ? (detail.diagnoses[0] as { description?: string } | undefined)?.description
+              : undefined;
+            return primary ? (
+              <div className="mt-3">
+                <p className="text-[13px] text-brand-text-muted">Reason for care</p>
+                <p className="text-sm font-semibold text-brand-text-heading">{primary}</p>
+              </div>
+            ) : null;
+          })()}
           <p className="mt-3 text-sm text-brand-text-muted">{detail.clinicalNotes || "No additional notes were provided."}</p>
           {detail.claim && (
             <Link href={`/member/utilization/${detail.claim.id}`} className="mt-4 inline-flex text-sm font-semibold text-brand-indigo hover:underline">

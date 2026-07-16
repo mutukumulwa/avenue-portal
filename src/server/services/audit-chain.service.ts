@@ -6,6 +6,22 @@ import { prisma } from "@/lib/prisma";
 // Each entry stores a SHA-256 hash of its payload and the hash of the
 // preceding entry, creating a tamper-evident chain.
 
+/**
+ * CU-OBS-11: best-effort actor IP for chain entries. Dynamic import + catch so
+ * the worker (no Next request scope) records entries without an IP instead of
+ * crashing; in request contexts (server actions, route handlers) the IP lands
+ * on the chain row itself, so callers need no duplicate plain-audit write.
+ */
+async function requestIp(): Promise<string | undefined> {
+  try {
+    const { headers } = await import("next/headers");
+    const hdrs = await headers();
+    return hdrs.get("x-forwarded-for")?.split(",")[0].trim() ?? hdrs.get("x-real-ip") ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export const auditChainService = {
   /**
    * Appends a new entry to the audit chain.
@@ -64,7 +80,7 @@ export const auditChainService = {
         entityId,
         payloadHash,
         previousHash,
-        ipAddress,
+        ipAddress: ipAddress ?? (await requestIp()),
         // Cast required: Prisma's InputJsonValue is stricter than Record<string, unknown>
         metadata: payload as never,
       },

@@ -176,6 +176,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   pages: {
     signIn: "/login",
+    // CU-OBS-4: branded confirmation page instead of the framework default.
+    signOut: "/signout",
   }
 });
 

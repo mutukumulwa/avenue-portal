@@ -679,6 +679,17 @@ export default async function ClaimDetailPage({
               <summary className="cursor-pointer text-xs font-bold text-brand-indigo">
                 Need to pay above the contract ceiling? Raise a PAY ABOVE CONTRACT RATE override
               </summary>
+              {/* CU-OBS-12: with every line unpriced the ceiling is 0 — say plainly
+                  what the override does (and what it can't fix) instead of a silent no-op. */}
+              {ceiling.hasUnpricedLines && ceiling.ceiling === 0 && (
+                <p className="mt-2 text-xs font-semibold text-[#856404]">
+                  Every line on this claim is unpriced, so the payable ceiling is 0. An approved override
+                  authorizes paying the requested amount above that 0 ceiling — it does not price the lines.
+                  The preferred path is to correct the coding so the tariff binds, then adjudicate normally.
+                  After a senior approver actions the override on the Overrides console, return here and
+                  submit the decision.
+                </p>
+              )}
               <form action={requestPriceOverrideAction} className="mt-3 space-y-2">
                 <input type="hidden" name="claimId" value={claim.id} />
                 <div className="grid grid-cols-2 gap-3">

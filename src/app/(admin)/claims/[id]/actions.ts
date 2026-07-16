@@ -53,7 +53,11 @@ export async function adjudicateClaimAction(formData: FormData) {
       ? ((formData.get("overCoverNote") as string)?.trim() || "confirmed by adjudicator")
       : null;
 
-    const claim = await ClaimDecisionService.decide(tenantId, claimId, {
+    // CU-OBS-11: no writeAudit here — ClaimDecisionService.decide appends the
+    // hash-chained audit row for the decision (now module "CLAIMS", with the
+    // actor IP captured in request contexts). A second plain row double-logged
+    // every decision with an inconsistent module label.
+    await ClaimDecisionService.decide(tenantId, claimId, {
       action,
       approvedAmount,
       declineReasonCode: (formData.get("declineReasonCode") as string) || undefined,
@@ -62,14 +66,6 @@ export async function adjudicateClaimAction(formData: FormData) {
       reviewerId: session.user.id,
       reviewerRole: session.user.role,
       overCoverConfirmation: overCover,
-    });
-
-    await writeAudit({
-      userId: session.user.id,
-      action: `CLAIM_${action}`,
-      module: "CLAIMS",
-      description: `Claim ${claim.claimNumber} ${action.toLowerCase().replace(/_/g, " ")} — ${claim.currency} ${approvedAmount.toLocaleString()}`,
-      metadata: { claimId, action, approvedAmount },
     });
   } catch (err) {
     errorMsg = safeActionError(err, "claim-decision");

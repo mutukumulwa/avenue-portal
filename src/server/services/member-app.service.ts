@@ -71,6 +71,7 @@ function buildBenefitStates(member: {
     periodStart: Date;
     periodEnd: Date;
     amountUsed: unknown;
+    activeHoldAmount: unknown;
     claimCount: number;
     lastUpdated: Date;
   }>;
@@ -88,8 +89,12 @@ function buildBenefitStates(member: {
     const usage = usageMap.get(benefit.id);
     const limit = toMoney(benefit.annualSubLimit);
     const used = toMoney(usage?.amountUsed);
-    const remaining = Math.max(0, limit - used);
-    const usedPct = limit > 0 ? Math.min(1, used / limit) : 0;
+    // CU-OBS-14: an approved PA reserves benefit server-side (BenefitHold) — the
+    // member-visible balance must subtract those active holds, or the member
+    // sees more "available" than is truly uncommitted.
+    const held = toMoney(usage?.activeHoldAmount);
+    const remaining = Math.max(0, limit - used - held);
+    const usedPct = limit > 0 ? Math.min(1, (used + held) / limit) : 0;
 
     return {
       id: benefit.id,
@@ -97,6 +102,7 @@ function buildBenefitStates(member: {
       name: benefit.customCategoryName ?? benefit.category.replace(/_/g, " "),
       limit,
       used,
+      held,
       remaining,
       usedPct,
       perVisitLimit: benefit.perVisitLimit ? toMoney(benefit.perVisitLimit) : null,
@@ -113,10 +119,12 @@ function buildBenefitStates(member: {
   const categoryLimitTotal = benefitStates.reduce((sum, benefit) => sum + benefit.limit, 0);
   const annualCoverLimit = toMoney(member.package.annualLimit) || categoryLimitTotal;
   const categoryUsedTotal = benefitStates.reduce((sum, benefit) => sum + benefit.used, 0);
+  const categoryHeldTotal = benefitStates.reduce((sum, benefit) => sum + benefit.held, 0);
   const totalLimit = annualCoverLimit;
   const totalUsed = Math.min(categoryUsedTotal, totalLimit);
-  const totalRemaining = Math.max(0, totalLimit - totalUsed);
-  const overallUsedPct = totalLimit > 0 ? Math.min(1, totalUsed / totalLimit) : 0;
+  const totalHeld = Math.min(categoryHeldTotal, Math.max(0, totalLimit - totalUsed));
+  const totalRemaining = Math.max(0, totalLimit - totalUsed - totalHeld);
+  const overallUsedPct = totalLimit > 0 ? Math.min(1, (totalUsed + totalHeld) / totalLimit) : 0;
   const pressureBenefits = [...benefitStates].sort((a, b) => b.usedPct - a.usedPct).slice(0, 3);
 
   return {
@@ -126,6 +134,7 @@ function buildBenefitStates(member: {
     summary: {
       totalLimit,
       totalUsed,
+      totalHeld,
       totalRemaining,
       categoryLimitTotal,
       overallUsedPct,
@@ -483,6 +492,7 @@ export class MemberAppService {
           ...benefit,
           masked,
           used: masked ? null : benefit.used,
+          held: masked ? null : benefit.held,
           remaining: masked ? null : benefit.remaining,
           usedPct: masked ? null : benefit.usedPct,
           claimCount: masked ? null : benefit.claimCount,

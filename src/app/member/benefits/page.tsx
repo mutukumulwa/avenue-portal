@@ -61,6 +61,11 @@ export default async function MemberBenefitsPage() {
               <p className="mt-1 text-sm text-brand-text-muted">
                 Used {formatMoney(state.summary.totalUsed)} of {formatMoney(state.summary.totalLimit)} annual cover
               </p>
+              {state.summary.totalHeld > 0 && (
+                <p className="mt-1 text-sm font-semibold text-[#856404]">
+                  {formatMoney(state.summary.totalHeld)} reserved by approved pre-authorizations
+                </p>
+              )}
             </div>
             <Shield className="h-8 w-8 text-brand-indigo" />
           </div>
@@ -123,6 +128,11 @@ export default async function MemberBenefitsPage() {
               </div>
 
               <div className="mt-4 flex flex-wrap gap-2 text-[13px] text-brand-text-muted">
+                {benefit.held > 0 && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[#FFF8E1] px-2 py-1 text-[#856404]">
+                    <Shield className="h-3.5 w-3.5" /> {formatMoney(benefit.held)} reserved (pre-auth)
+                  </span>
+                )}
                 {benefit.perVisitLimit !== null && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-[#F8F9FA] px-2 py-1">
                     <Activity className="h-3.5 w-3.5" /> {formatMoney(benefit.perVisitLimit)} per visit

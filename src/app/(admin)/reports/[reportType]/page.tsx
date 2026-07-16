@@ -3,6 +3,7 @@ import { getAnalyticsAccessScope, type AnalyticsAccessScope } from "@/lib/analyt
 import { prisma } from "@/lib/prisma";
 import { getExclusionRejectionRows } from "@/server/services/report-exclusions";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import { ArrowLeft, Download } from "lucide-react";
 import { ExportPDFButton } from "@/components/pdf/ExportPDFButton";
 
@@ -1617,7 +1618,9 @@ export default async function ReportDetailPage({
   const analyticsScope = await getAnalyticsAccessScope(session);
   const { reportType } = await params;
   const tenantId = session.user.tenantId;
-  const title = REPORT_TITLES[reportType] ?? "Report";
+  // CU-OBS-7: an unknown slug is a 404, not an empty "0 records" report shell.
+  if (!(reportType in REPORT_TITLES)) notFound();
+  const title = REPORT_TITLES[reportType];
 
   let result: ReportResult = { kpis: [], headers: [], data: [] };
 

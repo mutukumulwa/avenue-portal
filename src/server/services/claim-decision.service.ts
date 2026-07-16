@@ -680,7 +680,7 @@ export class ClaimDecisionService {
     await auditChainService.append({
       actorId: decision.reviewerId,
       action: `CLAIM:${decision.action}`,
-      module: "CLAIM",
+      module: "CLAIMS",
       entityType: "Claim",
       entityId: claimId,
       payload: { approvedAmount, action: decision.action, currency: claim.currency },
@@ -804,7 +804,7 @@ export class ClaimDecisionService {
     await auditChainService.append({
       actorId: opts.actorId,
       action: "CLAIM:VOID",
-      module: "CLAIM",
+      module: "CLAIMS",
       entityType: "Claim",
       entityId: claimId,
       payload: { amount, reason: opts.reason },

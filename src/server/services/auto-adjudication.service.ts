@@ -300,7 +300,7 @@ export class AutoAdjudicationService {
       await auditChainService.append({
         actorId,
         action: "CLAIM:AUTO_APPROVED",
-        module: "CLAIM",
+        module: "CLAIMS",
         entityType: "Claim",
         entityId: claimId,
         payload: { approvedAmount, policyId: result.policyId, excludedLines: exclusions.excludedCount },

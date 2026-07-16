@@ -161,7 +161,18 @@ describe("markSettlementBatchPaid (PR-018 D1)", () => {
     });
     await expect(
       claimAdjudicationService.markSettlementBatchPaid("batch1", T, "finance1"),
-    ).rejects.toThrow(/not approved/);
+    ).rejects.toThrow(/checker-approved first/);
+  });
+
+  // CU-OBS-3: a stale retry on an already-settled batch names the real state
+  // (the old generic "not approved yet" read as a workflow bug to operators).
+  it("an already-SETTLED batch refuses Mark Paid with an already-settled message", async () => {
+    db.providerSettlementBatch.findUnique.mockResolvedValue({
+      id: "batch1", tenantId: T, providerId: "prov1", status: "SETTLED", totalAmount: 50000,
+    });
+    await expect(
+      claimAdjudicationService.markSettlementBatchPaid("batch1", T, "finance1"),
+    ).rejects.toThrow(/already settled/);
   });
 });
 

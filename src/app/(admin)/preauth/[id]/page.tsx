@@ -326,7 +326,9 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
           {benefitBalance && (
             <div className="grid grid-cols-4 gap-3 text-sm">
               {[
-                { label: "Annual Limit",   value: `UGX ${Number(benefitBalance.limit).toLocaleString("en-UG")}`,     color: "text-brand-text-heading" },
+                // OBS-IP-1: name the limit's basis — this is the PA category's
+                // annual sub-limit, not the package's overall annual cover.
+                { label: `Annual Limit — ${String(benefitBalance.category ?? "").replace(/_/g, " ") || "category"}`, value: `UGX ${Number(benefitBalance.limit).toLocaleString("en-UG")}`, color: "text-brand-text-heading" },
                 { label: "Consumed",       value: `UGX ${Number(benefitBalance.used).toLocaleString("en-UG")}`,      color: "text-[#DC3545]" },
                 { label: "Active Holds",   value: `UGX ${Number(benefitBalance.held).toLocaleString("en-UG")}`,      color: "text-[#856404]" },
                 { label: "Available",      value: `UGX ${Number(benefitBalance.remaining).toLocaleString("en-UG")}`, color: "text-[#28A745] font-bold" },

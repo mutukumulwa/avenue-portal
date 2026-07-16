@@ -338,7 +338,9 @@ export function ClaimForm({
       <div className="flex items-center justify-between">
         <button
           type="button"
-          onClick={() => setStep(s => Math.max(0, s - 1))}
+          // CU-OBS-2: a rejection banner belongs to the submit attempt — clear it
+          // once the user navigates to amend the claim.
+          onClick={() => { setError(null); setStep(s => Math.max(0, s - 1)); }}
           disabled={step === 0}
           className="flex items-center gap-2 px-5 py-2 rounded-full border border-[#EEEEEE] text-brand-text-body hover:border-brand-indigo hover:text-brand-indigo transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
         >
@@ -355,7 +357,7 @@ export function ClaimForm({
         {step < STEPS.length - 1 ? (
           <button
             type="button"
-            onClick={() => setStep(s => s + 1)}
+            onClick={() => { setError(null); setStep(s => s + 1); }}
             disabled={!canNext[step]}
             className="flex items-center gap-2 px-6 py-2 rounded-full bg-brand-indigo text-white font-semibold hover:bg-brand-secondary transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
           >
