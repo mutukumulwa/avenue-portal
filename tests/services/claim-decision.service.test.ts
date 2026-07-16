@@ -722,6 +722,17 @@ describe("P1.3 — benefit availability gate (IP-DEF-06)", () => {
     expect(db.journalEntry.create).not.toHaveBeenCalled();
   });
 
+  it("a SELF_FUNDED claim blocked by the gate leaves NO fund or GL side effects", async () => {
+    db.claim.findUnique.mockResolvedValue(baseClaim({
+      member: { group: { clientId: "c1", fundingMode: "SELF_FUNDED", selfFundedAccount: { id: "sfa1", balance: 10_000_000 } } },
+    }));
+    db.benefitUsage.findUnique.mockResolvedValue({ id: "bu1", amountUsed: 500000, activeHoldAmount: 0 });
+    await expect(decide({ approvedAmount: 85000 })).rejects.toThrow(/BENEFIT_CATEGORY_EXHAUSTED/);
+    expect(db.selfFundedAccount.update).not.toHaveBeenCalled();
+    expect(db.fundTransaction.create).not.toHaveBeenCalled();
+    expect(db.journalEntry.create).not.toHaveBeenCalled();
+  });
+
   it("allows an explicit partial approval equal to the availability", async () => {
     db.benefitUsage.findUnique.mockResolvedValue({ id: "bu1", amountUsed: 490000, activeHoldAmount: 0 });
     await expect(decide({ action: "PARTIALLY_APPROVED", approvedAmount: 10000 })).resolves.toBeTruthy();

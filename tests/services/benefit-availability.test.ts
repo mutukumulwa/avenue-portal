@@ -219,6 +219,20 @@ describe("P1.1 computeAvailability — one result, minimum across constraints", 
     expect(db.exceptionLog.create).toHaveBeenCalled();
   });
 
+  it("an ACTIVE hold from an UNRELATED PA blocks capacity (no credit without attachment)", async () => {
+    // 500k limit, 0 used, 200k held by someone else's PA → only 300k available.
+    db.benefitUsage.findUnique.mockResolvedValue({ amountUsed: 0, activeHoldAmount: 200_000 });
+    db.benefitHold.findMany.mockResolvedValue([
+      { memberId: "m1", benefitCategory: "OUTPATIENT", heldAmount: 200_000, expiresAt: new Date(Date.now() + 86_400_000) },
+    ]);
+    const a = await BenefitUsageService.computeAvailability(db, {
+      memberId: "m1", benefitCategory: "OUTPATIENT", requestedAmount: 400_000,
+    });
+    expect(a!.payableCeiling).toBe(300_000);
+    const cat = a!.constraints.find((c) => c.kind === "CATEGORY")!;
+    expect(cat.held).toBe(200_000);
+  });
+
   it("resolves the benefit period from the SERVICE DATE, not now (P1.1 rule 1)", async () => {
     const a = await BenefitUsageService.computeAvailability(db, {
       memberId: "m1", benefitCategory: "OUTPATIENT", requestedAmount: 1,

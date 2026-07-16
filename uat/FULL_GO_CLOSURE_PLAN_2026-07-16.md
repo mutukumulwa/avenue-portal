@@ -54,6 +54,12 @@ services only; `npm run typecheck` + `npx vitest run` + brand/currency guards gr
 one commit per WP; additive-only schema via `prisma db push` until DEC-20 lands).
 
 ### WP-1 — Benefit-limit availability gate (fixes IP-DEF-06 Critical; the anchor)
+> **✅ EXECUTED 2026-07-16** — P1.0–P1.6 complete (commits `c01a1f4`, `65a7452`, `07ca32d`, `4fbb973`,
+> `99603d4` + P1.6). Concurrency proven 3/3 on a real Postgres (one balance, two approvals, exactly one
+> commits). Result notes + two carried findings (missing appeal resolution; pre-existing co-contribution
+> Decimal RSC crash): `uat/priority-six/P1_IMPLEMENTATION_LOG.md`. Remaining for the P1 DoD: the live
+> inpatient re-run (V2/V3).
+
 Execute `TPA_PRIORITY_SIX_EXECUTION_PLAN.md` **P1.0–P1.6 as written** (it is implementation-ready):
 one availability result from `BenefitUsageService`; atomic hold placement; atomic claim consumption
 (reject `BENEFIT_LIMIT_EXCEEDED`, never floor-at-zero); FAMILY shared-limit pools in `remainingAfter`;

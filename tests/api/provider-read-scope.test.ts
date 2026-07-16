@@ -104,6 +104,7 @@ const db = vi.hoisted(() => ({
   },
   packageVersion: { findFirst: vi.fn(async () => ({ benefits: [] })) },
   benefitUsage: { findMany: vi.fn(async () => []) },
+  benefitHold: { findMany: vi.fn(async () => []) },
 }));
 
 const cred = vi.hoisted(() => ({ current: null as ApiCredential | null }));

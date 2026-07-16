@@ -56,4 +56,96 @@ Files expected to change: src/lib/serializable-tx.ts (new), benefit-usage.servic
 
 ## Result notes (§3.7) — appended per package
 
-_(pending)_
+### P1.0 + P1.1 — 2026-07-16
+```text
+Result: IMPLEMENTED (commit c01a1f4)
+Files changed: src/server/services/benefit-usage.service.ts; uat/priority-six/P1_BENEFIT_DECISIONS.md
+Tests added/changed: tests/services/benefit-availability.test.ts (11, written FAILING first per P1.0)
+Commands run: npx vitest run (721/721), npm run typecheck
+Observed result: computeAvailability returns one result (PER_VISIT/CATEGORY/OVERALL/SHARED_MEMBER/
+  SHARED_FAMILY, credit-once for converting holds, service-date periods, DEC-06 fail-closed +
+  ExceptionLog); recordUsage rejects over-limit writes.
+Remaining conditions: none for the package.
+```
+
+### P1.2 — 2026-07-16
+```text
+Result: IMPLEMENTED (commit 65a7452)
+Files changed: src/lib/serializable-tx.ts (new); src/server/services/preauth-adjudication.service.ts
+Tests added/changed: tests/services/preauth-holds.test.ts (over-limit approval now expects HARD BLOCK
+  with partial suggestion — the pre-P1 annotate-and-approve assertion replaced)
+Commands run: npx vitest run (721/721), npm run typecheck
+Observed result: approveByHuman and executeAutoDecision run availability-gate → status flip → hold in
+  ONE Serializable tx with bounded retry; auto path routes to human when availability moved at commit.
+Remaining conditions: GOP numbering still count-based (pre-existing, out of P1 scope).
+```
+
+### P1.3 — 2026-07-16
+```text
+Result: IMPLEMENTED (commit 07ca32d)
+Files changed: src/server/services/claim-decision.service.ts
+Tests added/changed: tests/services/claim-decision.service.test.ts (+5: exhausted block w/ zero side
+  effects incl. self-funded fund/GL, partial-equal-to-availability, P1-B hold credit end-to-end,
+  P1-C family block)
+Commands run: npx vitest run (725/725), npm run typecheck
+Observed result: gate first-in-tx before any write; holds convert before guarded recordUsage;
+  decide + voidClaim Serializable with retry; IP-DEF-06 root closed in code.
+Remaining conditions: live re-run of the inpatient scenario (V2/V3) for the DoD.
+```
+
+### P1.4 — 2026-07-16
+```text
+Result: IMPLEMENTED + VERIFIED-EXISTING (commit 4fbb973)
+Files changed: scripts/benefit-integrity-report.ts (new, report-only + --apply for HOLD_DRIFT only);
+  scripts/data-integrity-check.ts (permanent invariants: negative balances, category/overall/shared
+  over-limit)
+Observed result: voidClaim verified — reverseUsage exactly once behind the status guard (idempotent);
+  FINDING: appeal RESOLUTION does not exist anywhere in the codebase (initiateAppeal flips status to
+  APPEALED and nothing can decide it — decide() excludes APPEALED). No reversal risk (no writer), but
+  the appeal workflow is a dead end → carry as a defect-register item for the verdict (Medium,
+  workflow completeness).
+Remaining conditions: appeal-resolution flow is a separate work package (not P1).
+```
+
+### P1.5 — 2026-07-16
+```text
+Result: IMPLEMENTED (commit 99603d4)
+Files changed: claims/[id]/page.tsx (constraint panel); preauth-adjudication getEnrichedDetail +
+  preauth/[id]/page.tsx ("All applicable limits"); api/v1/benefits (holds-net remaining +
+  amountReserved); sync.service.ts (category-scoped, gap #6); reason-codes.service.ts (+6 BENEFIT_*
+  codes, provisioning-seeded — prod gets them via the H7 Re-provision)
+Observed result: offline packs VERIFIED-EXISTING (already FG-C10 hold-reconciled). Member view was
+  hold-corrected in WP-6. Live render verified on a seeded throwaway DB: claim CLM-FRAUD-008 shows
+  "Benefit availability — approvable up to UGX 500,000 · binding: OUTPATIENT annual sublimit" +
+  "Package overall annual limit UGX 4,839,000 available (limit 5,000,000 · used 161,000)" — the
+  OVERALL (DEC-03) constraint computed from real cross-category usage.
+Remaining conditions: none for the package.
+```
+
+### P1.6 — 2026-07-16
+```text
+Result: IMPLEMENTED
+Files changed: tests/integration/benefit-race.integration.test.ts (new, opt-in);
+  tests/services/benefit-availability.test.ts (+unrelated-PA-hold blocks capacity);
+  tests/services/claim-decision.service.test.ts (+self-funded no-side-effects);
+  tests/services/sync.service.test.ts + tests/api/provider-read-scope.test.ts (harnesses updated for
+  the new call paths); benefit-usage.service.ts applyDelta hardened (P2002 create-race → update)
+Commands run: full suite (727 passed, 1 opt-in skipped), tsc, brand+currency guards. Integration race
+  executed 3/3 PASSING against a real local Postgres (createdb p1_race → prisma db push → seed →
+  P1_TEST_DB=… vitest): two simultaneous 80,000 approvals against a 100,000 balance → exactly one
+  committed; loser rejected [BENEFIT_CATEGORY_EXHAUSTED] with post-winner numbers; ledger showed
+  exactly one consumption; losing claim untouched at UNDER_REVIEW.
+Observed result: P1.6 matrix covered — no-row, exact-limit, one-above, per-visit, overall,
+  MEMBER/FAMILY pools, unrelated-hold blocks, attached-hold credited, partial PA consumption,
+  CONCURRENT double-spend (real DB), void-once, new-period (structural via unique period key),
+  offline category, self-funded no-side-effects.
+Remaining conditions (P1 definition of done): IP-DEF-06 independent live re-run (V2/V3 campaigns) —
+  everything code-side is in place.
+```
+
+### Findings carried to the verdict register
+1. **Appeal resolution missing** (Medium, workflow): APPEALED is terminal in practice.
+2. **Co-contribution Decimal RSC crash** (Medium, pre-existing, NOT P1): claims/[id] passes a raw
+   CoContributionTransaction (Prisma Decimals) to the client CoContributionCollectionForm → RSC
+   serialization error; page content fails to hydrate for claims WITH a co-contribution row
+   (observed live on seeded CLM-2024-00002). Spawned as a separate task chip.

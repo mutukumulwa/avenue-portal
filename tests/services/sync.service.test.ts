@@ -6,9 +6,11 @@ const db = vi.hoisted(() => ({
     create: vi.fn(async (a: any) => ({ id: "op_" + a.data.opKey })),
     update: vi.fn(async () => ({ tenantId: "t1", opKey: "k1", entityType: "Claim" })),
   },
-  member: { findFirst: vi.fn() },
+  member: { findFirst: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(async (): Promise<any[]> => []) },
   provider: { findFirst: vi.fn() },
-  benefitUsage: { findMany: vi.fn(async (): Promise<any[]> => []) },
+  benefitConfig: { findFirst: vi.fn(async (): Promise<any> => null) },
+  benefitUsage: { findMany: vi.fn(async (): Promise<any[]> => []), findUnique: vi.fn(async (): Promise<any> => null) },
+  benefitConfigSharedLimit: { findMany: vi.fn(async (): Promise<any[]> => []) },
   benefitHold: { findMany: vi.fn(async (): Promise<any[]> => []) },
   claim: { findFirst: vi.fn(async (): Promise<any> => null), count: vi.fn(async () => 0), create: vi.fn(async () => ({ id: "clm1" })) },
   // PR-036: CONFLICT ops land in the Exception Register; work-code path
@@ -94,25 +96,27 @@ describe("SyncService — store-and-forward (G4)", () => {
       db.provider.findFirst.mockResolvedValue(okProvider);
       db.claim.findFirst.mockResolvedValue(null);
       db.benefitUsage.findMany.mockResolvedValue([]);
+      // P1.5 (gap #6): sync now resolves the SUBMITTED category through
+      // BenefitUsageService.computeAvailability — the member+config mocks feed it.
+      db.member.findUnique.mockResolvedValue({ packageVersionId: "pv1", enrollmentDate: new Date("2026-01-15") });
+      db.benefitConfig.findFirst.mockResolvedValue({ id: "cfg-out", annualSubLimit: 1_000_000 });
+      db.benefitUsage.findUnique.mockResolvedValue(null);
     });
 
     it("CONFLICTs when the benefit balance is insufficient at sync time", async () => {
       db.syncOperation.findUnique.mockResolvedValue(claimOp(fullPayload({ lineItems: [{ description: "X", quantity: 1, unitCost: 200000 }] })));
-      // available = 100000 - 20000 - 0 = 80000 < 200000
-      db.benefitUsage.findMany.mockResolvedValue([
-        { amountUsed: 20000, activeHoldAmount: 0, benefitConfig: { annualSubLimit: 100000 } },
-      ]);
+      // OUTPATIENT availability = 100000 − 20000 − 0 = 80000 < 200000 billed
+      db.benefitConfig.findFirst.mockResolvedValue({ id: "cfg-out", annualSubLimit: 100000 });
+      db.benefitUsage.findUnique.mockResolvedValue({ amountUsed: 20000, activeHoldAmount: 0 });
       const res = await SyncService.reconcile("c1");
       expect(res.state).toBe("CONFLICT");
-      expect(res.reason).toMatch(/insufficient benefit balance/i);
+      expect(res.reason).toMatch(/BENEFIT_CATEGORY_EXHAUSTED[\s\S]*Insufficient benefit at sync time/i);
       expect(db.claim.create).not.toHaveBeenCalled();
     });
 
     it("SYNCs when the benefit balance covers the claim", async () => {
       db.syncOperation.findUnique.mockResolvedValue(claimOp(fullPayload()));
-      db.benefitUsage.findMany.mockResolvedValue([
-        { amountUsed: 0, activeHoldAmount: 0, benefitConfig: { annualSubLimit: 1_000_000 } },
-      ]);
+      db.benefitUsage.findUnique.mockResolvedValue({ amountUsed: 0, activeHoldAmount: 0 });
       expect((await SyncService.reconcile("c1")).state).toBe("SYNCED");
     });
 

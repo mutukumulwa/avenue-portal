@@ -1,4 +1,5 @@
-import type { Prisma, BenefitCategory } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import type { BenefitCategory } from "@prisma/client";
 
 /**
  * benefit-usage.service.ts — single home for benefit-limit arithmetic
@@ -224,17 +225,42 @@ export class BenefitUsageService {
         },
       });
     }
-    return tx.benefitUsage.create({
-      data: {
-        memberId,
-        benefitConfigId: cfg.configId,
-        periodStart: cfg.periodStart,
-        periodEnd: cfg.periodEnd,
-        amountUsed: Math.max(0, delta.amountUsed ?? 0),
-        activeHoldAmount: Math.max(0, delta.activeHoldAmount ?? 0),
-        claimCount: Math.max(0, delta.claimCount ?? 0),
-      },
-    });
+    try {
+      return await tx.benefitUsage.create({
+        data: {
+          memberId,
+          benefitConfigId: cfg.configId,
+          periodStart: cfg.periodStart,
+          periodEnd: cfg.periodEnd,
+          amountUsed: Math.max(0, delta.amountUsed ?? 0),
+          activeHoldAmount: Math.max(0, delta.activeHoldAmount ?? 0),
+          claimCount: Math.max(0, delta.claimCount ?? 0),
+        },
+      });
+    } catch (err) {
+      // P1: two serializable transactions can race the FIRST-EVER row for this
+      // (member, config, period) key — the loser lands here with a unique
+      // violation instead of a serialization failure. Apply the delta to the
+      // row the winner created; anything else rethrows.
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+        return tx.benefitUsage.update({
+          where: {
+            memberId_benefitConfigId_periodStart: {
+              memberId,
+              benefitConfigId: cfg.configId,
+              periodStart: cfg.periodStart,
+            },
+          },
+          data: {
+            ...(delta.amountUsed ? { amountUsed: { increment: delta.amountUsed } } : {}),
+            ...(delta.activeHoldAmount ? { activeHoldAmount: { increment: delta.activeHoldAmount } } : {}),
+            ...(delta.claimCount ? { claimCount: { increment: delta.claimCount } } : {}),
+            lastUpdated: new Date(),
+          },
+        });
+      }
+      throw err;
+    }
   }
 
   /**
