@@ -61,6 +61,8 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
   const autoLog       = enriched?.autoDecisionLog as Array<{ gate: string; outcome: string; reason?: string }> | null;
   const hold          = enriched?.hold;
   const benefitBalance = enriched?.benefitBalance;
+  const availability = enriched?.availability;
+  const availabilityError = enriched?.availabilityError;
   const slaDeadline   = enriched?.slaDeadlineAt;
   const slaBreached   = enriched?.slaBreachedAt;
   const parentPreAuth = enriched?.parentPreAuthId
@@ -336,6 +338,32 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
                 <div key={label}>
                   <p className="text-xs text-brand-text-muted">{label}</p>
                   <p className={`font-semibold mt-0.5 ${color}`}>{value}</p>
+                </div>
+              ))}
+            </div>
+          )}
+          {/* P1.5: every applicable limit separately when more than the category
+              sublimit binds (overall cover, shared pools, per-visit). */}
+          {availabilityError && (
+            <p className="text-xs font-semibold text-[#DC3545]">{availabilityError}</p>
+          )}
+          {availability && availability.constraints.length > 1 && (
+            <div className="border-t border-[#EEEEEE] pt-3 space-y-1">
+              <p className="text-xs font-bold text-brand-text-heading">
+                All applicable limits — authorizable up to UGX {Math.floor(availability.payableCeiling).toLocaleString("en-UG")}
+                {availability.binding ? ` · binding: ${availability.binding.label}` : ""}
+              </p>
+              {availability.constraints.map((c, i) => (
+                <div
+                  key={i}
+                  className={`flex items-center justify-between gap-3 text-xs ${availability.binding === c ? "font-semibold text-[#856404]" : "text-brand-text-muted"}`}
+                >
+                  <span>{c.label}</span>
+                  <span className="text-right">
+                    {c.kind === "PER_VISIT"
+                      ? `UGX ${c.limit.toLocaleString("en-UG")} per visit`
+                      : `UGX ${Math.floor(c.available).toLocaleString("en-UG")} available (limit ${c.limit.toLocaleString("en-UG")} · used ${c.used.toLocaleString("en-UG")} · reserved ${c.held.toLocaleString("en-UG")})`}
+                  </span>
                 </div>
               ))}
             </div>

@@ -793,9 +793,29 @@ export const preauthAdjudicationService = {
         )
       : 0;
 
+    // P1.5: the full constraint set (category / overall / shared pools) for the
+    // approval form — the same result the approval gate enforces, crediting this
+    // PA's own hold. Read-surface: a DEC-06 data-quality throw renders as a
+    // message, not a crash (the approval path still blocks).
+    let availability: Awaited<ReturnType<typeof BenefitUsageService.computeAvailability>> | null = null;
+    let availabilityError: string | null = null;
+    try {
+      availability = await BenefitUsageService.computeAvailability(prisma, {
+        memberId: pa.memberId,
+        benefitCategory: String(pa.benefitCategory),
+        requestedAmount: Number(pa.estimatedCost ?? 0),
+        serviceDate: pa.expectedDateOfService ?? undefined,
+        creditPreauthIds: [pa.id],
+      });
+    } catch (e) {
+      availabilityError = e instanceof Error ? e.message : "Benefit availability could not be computed.";
+    }
+
     return {
       ...pa,
       hold,
+      availability,
+      availabilityError,
       benefitBalance: usage ? {
         limit:     Number(usage.benefitConfig?.annualSubLimit ?? 0),
         used:      Number(usage.amountUsed),

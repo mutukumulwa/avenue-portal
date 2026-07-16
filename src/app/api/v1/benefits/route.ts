@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withApiKey, getApiCredential, operatorTenantWhere } from "@/lib/apiAuth";
 import { ProviderEntitlementService } from "@/server/services/provider-entitlement.service";
+import { BenefitUsageService } from "@/server/services/benefit-usage.service";
 
 /**
  * GET /api/v1/benefits?memberNumber=AV-2025-00001
@@ -83,24 +84,32 @@ async function getBenefits(req: Request) {
         periodStart: { lte: now },
         periodEnd:   { gte: now },
       },
-      select: { benefitConfigId: true, amountUsed: true },
+      select: { benefitConfigId: true, amountUsed: true, activeHoldAmount: true },
     });
 
-    const usageMap = new Map<string, number>(
-      usages.map((u) => [u.benefitConfigId, Number(u.amountUsed)])
-    );
+    const usageMap = new Map(usages.map((u) => [u.benefitConfigId, u]));
+    // P1.5: a facility must see what is truly uncommitted — approved-PA holds
+    // reduce the remaining balance (expiry-reconciled, FG-C10) and are surfaced
+    // separately as amountReserved.
+    const holdSums = await BenefitUsageService.liveHoldSums(prisma, [member.id]);
 
     const benefitConfigs = packageVersion?.benefits ?? [];
     const benefits = benefitConfigs.map((bc) => {
       const limit       = Number(bc.annualSubLimit);
       const visitLimit  = bc.perVisitLimit ? Number(bc.perVisitLimit) : null;
-      const used        = usageMap.get(bc.id) ?? 0;
-      const remaining   = Math.max(0, limit - used);
+      const row         = usageMap.get(bc.id);
+      const used        = Number(row?.amountUsed ?? 0);
+      const reserved    = BenefitUsageService.reconcileStored(
+        Number(row?.activeHoldAmount ?? 0),
+        holdSums.get(BenefitUsageService.holdKey(member.id, String(bc.category))),
+      );
+      const remaining   = Math.max(0, limit - used - reserved);
       return {
         category:        bc.category,
         annualLimit:     limit,
         perVisitLimit:   visitLimit,
         amountUsed:      used,
+        amountReserved:  reserved,
         amountRemaining: remaining,
         utilizationPct:  limit > 0 ? Math.round((used / limit) * 100) : 0,
         copayPercent:    Number(bc.copayPercentage),

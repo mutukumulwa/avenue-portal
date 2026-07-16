@@ -2,6 +2,7 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { notFound } from "next/navigation";
 import { ClaimsService } from "@/server/services/claims.service";
 import { ClaimDecisionService } from "@/server/services/claim-decision.service";
+import { BenefitUsageService } from "@/server/services/benefit-usage.service";
 import { TenantSettingsService } from "@/server/services/tenant-settings.service";
 import { prisma } from "@/lib/prisma";
 import { adjudicateClaimAction, resolveExceptionAction, requestPriceOverrideAction, voidClaimAction } from "./actions";
@@ -95,6 +96,27 @@ export default async function ClaimDetailPage({
         ClaimDecisionService.hasApprovedPriceOverride(tenantId, id),
       ])
     : [null, null, false];
+
+  // P1.5: show the adjudicator every benefit constraint BEFORE submission —
+  // never one misleading "remaining" number when category, overall and shared
+  // pools differ. Same computation the decision gate enforces (holds this
+  // claim would convert are credited). Read-surface: a DEC-06 data-quality
+  // block renders as its message instead of a panel.
+  let availability = null as Awaited<ReturnType<typeof BenefitUsageService.computeAvailability>> | null;
+  let availabilityError: string | null = null;
+  if (canAdjudicate) {
+    try {
+      availability = await BenefitUsageService.computeAvailability(prisma, {
+        memberId: claim.memberId,
+        benefitCategory: claim.benefitCategory,
+        requestedAmount: Number(claim.billedAmount),
+        serviceDate: claim.dateOfService ?? undefined,
+        creditPreauthIds: claim.preauths?.filter((p) => ["APPROVED", "ATTACHED"].includes(p.status)).map((p) => p.id) ?? [],
+      });
+    } catch (e) {
+      availabilityError = e instanceof Error ? e.message : "Benefit availability could not be computed.";
+    }
+  }
 
   // OBS-7 fraud gate preview: when the tenant requires fraud clearance, surface
   // the unresolved alerts at/above threshold that will block an approval, so the
@@ -590,6 +612,39 @@ export default async function ClaimDetailPage({
           ) : (
             <div className="mb-4 rounded-lg bg-[#FFF8E1] border border-[#FFC107]/40 px-4 py-2.5 text-xs font-semibold text-[#856404]">
               No contract ceiling — reviewer judgement applies to the approved amount.
+            </div>
+          )}
+
+          {/* P1.5: benefit availability — every binding constraint separately,
+              never one misleading "remaining" number. Same result the decision
+              gate enforces. */}
+          {availabilityError && (
+            <div className="mb-4 rounded-lg border border-brand-error/40 bg-brand-error/10 px-4 py-3 text-sm text-brand-error">
+              <p className="font-bold">Benefit availability blocked (data quality)</p>
+              <p className="mt-1 text-brand-error/90">{availabilityError}</p>
+            </div>
+          )}
+          {availability && (
+            <div className="mb-4 rounded-lg bg-[#F8F9FA] border border-[#EEEEEE] px-4 py-3">
+              <p className="text-xs font-bold text-brand-text-heading">
+                Benefit availability — approvable up to {claim.currency} {Math.floor(availability.payableCeiling).toLocaleString("en-UG")}
+                {availability.binding ? ` · binding: ${availability.binding.label}` : ""}
+              </p>
+              <div className="mt-2 space-y-1">
+                {availability.constraints.map((c, i) => (
+                  <div
+                    key={i}
+                    className={`flex items-center justify-between gap-3 text-xs ${availability.binding === c ? "font-semibold text-[#856404]" : "text-brand-text-muted"}`}
+                  >
+                    <span>{c.label}</span>
+                    <span className="text-right">
+                      {c.kind === "PER_VISIT"
+                        ? `${claim.currency} ${c.limit.toLocaleString("en-UG")} per visit`
+                        : `${claim.currency} ${Math.floor(c.available).toLocaleString("en-UG")} available (limit ${c.limit.toLocaleString("en-UG")} · used ${c.used.toLocaleString("en-UG")} · reserved ${c.held.toLocaleString("en-UG")})`}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

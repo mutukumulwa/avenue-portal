@@ -199,30 +199,27 @@ export class SyncService {
     const billed = lineItems.reduce((s, l) => s + l.quantity * l.unitCost, 0);
 
     // Benefit-balance re-validation (spec §4): the provisional decision was made
-    // against a cached balance. Re-check against live usage net of soft holds;
-    // if the claim can no longer fit, flag for review — never a silent overpay.
-    // Only enforced when a balance is determinable (member has configured usage).
-    const usages = await prisma.benefitUsage.findMany({
-      where: { memberId: member.id },
-      select: { amountUsed: true, activeHoldAmount: true, benefitConfig: { select: { annualSubLimit: true, category: true } } },
+    // against a cached balance. P1.5 (gap #6): the check resolves the SUBMITTED
+    // claim's category through BenefitUsageService instead of summing
+    // availability across every category (which let an outpatient claim "fit"
+    // inside dental+optical+inpatient headroom). The offline rail files
+    // OUTPATIENT claims; full constraint enforcement (pools/overall) re-runs at
+    // adjudication via the P1.3 gate. FG-C10 hold-expiry reconciliation and the
+    // converting-hold credit are inside computeAvailability.
+    const availability = await BenefitUsageService.computeAvailability(prisma, {
+      memberId: member.id,
+      benefitCategory: "OUTPATIENT",
+      requestedAmount: billed,
+      serviceDate: payload.dateOfService ? new Date(payload.dateOfService as string) : undefined,
     });
-    if (usages.length > 0) {
-      // FG-C10: re-validate against live held (net of expired holds), so a down
-      // worker's stale over-reservation can't wrongly flag a fitting claim for review.
-      const holdSums = await BenefitUsageService.liveHoldSums(prisma, [member.id]);
-      const available = usages.reduce((sum, u) => {
-        const held = BenefitUsageService.reconcileStored(
-          Number(u.activeHoldAmount),
-          holdSums.get(BenefitUsageService.holdKey(member.id, String(u.benefitConfig.category))),
-        );
-        return sum + Math.max(0, Number(u.benefitConfig.annualSubLimit) - Number(u.amountUsed) - held);
-      }, 0);
-      if (billed > available) {
-        return {
-          state: "CONFLICT",
-          reason: `Insufficient benefit balance at sync time (needs ${billed}, available ${available})`,
-        };
-      }
+    if (availability && billed > availability.payableCeiling + 0.01) {
+      const b = availability.binding!;
+      return {
+        state: "CONFLICT",
+        reason:
+          `[${availability.reasonCode}] Insufficient benefit at sync time: ${b.label} has ` +
+          `${Math.floor(b.available)} available vs billed ${billed}`,
+      };
     }
     const count = await prisma.claim.count({ where: { tenantId } });
     const claimNumber = `CLM-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
