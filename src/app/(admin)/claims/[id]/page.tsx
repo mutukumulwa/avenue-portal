@@ -52,6 +52,19 @@ export default async function ClaimDetailPage({
   const tariffVariances = contractRates.lines;
   const governingContract = contractRates.contract;
 
+  // Prisma Decimal fields don't survive the RSC boundary (the flight stream
+  // aborts and the page never hydrates) — hand the client form plain numbers.
+  const coContribView = coContribTx
+    ? {
+        id: coContribTx.id,
+        finalAmount: Number(coContribTx.finalAmount),
+        planShare: Number(coContribTx.planShare),
+        amountCollected: Number(coContribTx.amountCollected),
+        capsApplied: coContribTx.capsApplied,
+        collectionStatus: coContribTx.collectionStatus,
+      }
+    : null;
+
   // Build a lookup map: lineId → variance data
   const tariffMap = new Map(tariffVariances.map(v => [v.lineId, v]));
   const overbilledLines = tariffVariances.filter(v => v.variance !== null && v.variance > 0);
@@ -513,12 +526,12 @@ export default async function ClaimDetailPage({
       />
 
       {/* Co-contribution */}
-      {coContribTx && (
+      {coContribView && (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm">
           <h3 className="text-sm font-bold text-brand-text-heading uppercase tracking-wide mb-1 flex items-center gap-2">
             <Percent size={15} className="text-brand-indigo" /> Member Co-Contribution
           </h3>
-          <CoContributionCollectionForm transaction={coContribTx} />
+          <CoContributionCollectionForm transaction={coContribView} />
         </div>
       )}
 

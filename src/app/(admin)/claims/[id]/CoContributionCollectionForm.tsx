@@ -2,10 +2,20 @@
 
 import { useState, useTransition } from "react";
 import { collectCoContributionAction, waiveCoContributionAction } from "./actions";
-import type { CoContributionTransaction } from "@prisma/client";
+
+// Plain serialized view of CoContributionTransaction — Prisma Decimal
+// instances can't cross the RSC boundary, so the page maps them to numbers.
+export interface CoContributionTransactionView {
+  id: string;
+  finalAmount: number;
+  planShare: number;
+  amountCollected: number;
+  capsApplied: string[];
+  collectionStatus: string;
+}
 
 interface Props {
-  transaction: CoContributionTransaction;
+  transaction: CoContributionTransactionView;
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -23,7 +33,7 @@ export function CoContributionCollectionForm({ transaction }: Props) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const finalAmount = Number(transaction.finalAmount);
+  const finalAmount = transaction.finalAmount;
   const isDone = ["COLLECTED", "WAIVED", "WRITTEN_OFF"].includes(transaction.collectionStatus);
 
   function handleCollect(e: React.FormEvent<HTMLFormElement>) {
@@ -61,20 +71,20 @@ export function CoContributionCollectionForm({ transaction }: Props) {
           <div className="flex gap-6">
             <span className="text-brand-text-muted">Plan share</span>
             <span className="font-bold text-[#28A745] font-mono">
-              UGX {Number(transaction.planShare).toLocaleString("en-UG")}
+              UGX {transaction.planShare.toLocaleString("en-UG")}
             </span>
           </div>
-          {Number(transaction.amountCollected ?? 0) > 0 && (
+          {transaction.amountCollected > 0 && (
             <div className="flex gap-6">
               <span className="text-brand-text-muted">Collected</span>
               <span className="font-bold text-[#17A2B8] font-mono">
-                UGX {Number(transaction.amountCollected).toLocaleString("en-UG")}
+                UGX {transaction.amountCollected.toLocaleString("en-UG")}
               </span>
             </div>
           )}
-          {transaction.capsApplied && (transaction.capsApplied as string[]).length > 0 && (
+          {transaction.capsApplied.length > 0 && (
             <p className="text-xs text-brand-text-muted">
-              Caps applied: {(transaction.capsApplied as string[]).join(", ")}
+              Caps applied: {transaction.capsApplied.join(", ")}
             </p>
           )}
         </div>

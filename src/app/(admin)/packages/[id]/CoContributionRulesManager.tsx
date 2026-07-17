@@ -2,7 +2,6 @@
 
 import { useState, useTransition } from "react";
 import { Plus, Trash2, ToggleLeft, ToggleRight, ChevronDown, ChevronUp } from "lucide-react";
-import type { CoContributionRule, AnnualCoContributionCap } from "@prisma/client";
 import {
   createCoContributionRuleAction,
   toggleCoContributionRuleAction,
@@ -20,10 +19,28 @@ const NETWORK_TIERS = ["TIER_1", "TIER_2", "TIER_3"];
 const TIER_LABELS: Record<string, string> = { TIER_1: "Tier 1 (Own)", TIER_2: "Tier 2 (Partner)", TIER_3: "Tier 3 (Panel)" };
 const TYPE_LABELS: Record<string, string> = { FIXED_AMOUNT: "Fixed Amount", PERCENTAGE: "Percentage", HYBRID: "Hybrid", NONE: "None (plan covers all)" };
 
+// Plain serialized views — Prisma Decimal instances can't cross the RSC
+// boundary, so the page maps money fields to numbers before passing them.
+export interface CoContributionRuleView {
+  id: string;
+  benefitCategory: string | null;
+  networkTier: string;
+  type: string;
+  fixedAmount: number | null;
+  percentage: number | null;
+  perVisitCap: number | null;
+  isActive: boolean;
+}
+
+export interface AnnualCapView {
+  individualCap: number;
+  familyCap: number | null;
+}
+
 interface Props {
   packageId: string;
-  rules: CoContributionRule[];
-  annualCap: AnnualCoContributionCap | null;
+  rules: CoContributionRuleView[];
+  annualCap: AnnualCapView | null;
 }
 
 export function CoContributionRulesManager({ packageId, rules, annualCap }: Props) {
@@ -79,8 +96,8 @@ export function CoContributionRulesManager({ packageId, rules, annualCap }: Prop
         <div className="text-sm">
           {annualCap ? (
             <span className="text-brand-text-body">
-              Annual caps — Individual: <span className="font-bold text-brand-text-heading">UGX {Number(annualCap.individualCap).toLocaleString()}</span>
-              {annualCap.familyCap && <> · Family: <span className="font-bold text-brand-text-heading">UGX {Number(annualCap.familyCap).toLocaleString()}</span></>}
+              Annual caps — Individual: <span className="font-bold text-brand-text-heading">UGX {annualCap.individualCap.toLocaleString()}</span>
+              {annualCap.familyCap != null && <> · Family: <span className="font-bold text-brand-text-heading">UGX {annualCap.familyCap.toLocaleString()}</span></>}
             </span>
           ) : (
             <span className="text-brand-text-muted italic text-sm">No annual cap configured</span>
@@ -101,13 +118,13 @@ export function CoContributionRulesManager({ packageId, rules, annualCap }: Prop
           <div className="space-y-1">
             <label className="text-xs font-semibold text-brand-text-muted uppercase">Individual Annual Cap (UGX)</label>
             <input name="individualCap" type="number" step="0.01" min="1" required
-              defaultValue={annualCap ? Number(annualCap.individualCap) : ""}
+              defaultValue={annualCap ? annualCap.individualCap : ""}
               className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo" />
           </div>
           <div className="space-y-1">
             <label className="text-xs font-semibold text-brand-text-muted uppercase">Family Annual Cap (UGX) — optional</label>
             <input name="familyCap" type="number" step="0.01" min="1"
-              defaultValue={annualCap?.familyCap ? Number(annualCap.familyCap) : ""}
+              defaultValue={annualCap?.familyCap ?? ""}
               className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo" />
           </div>
           <div className="flex items-end gap-2">
@@ -148,13 +165,13 @@ export function CoContributionRulesManager({ packageId, rules, annualCap }: Prop
                 <td className="px-4 py-3 text-brand-text-body">{TIER_LABELS[r.networkTier] ?? r.networkTier}</td>
                 <td className="px-4 py-3 text-brand-text-body">{TYPE_LABELS[r.type] ?? r.type}</td>
                 <td className="px-4 py-3 font-mono text-brand-text-heading">
-                  {r.type === "FIXED_AMOUNT" && `UGX ${Number(r.fixedAmount ?? 0).toLocaleString()}`}
-                  {r.type === "PERCENTAGE"   && `${Number(r.percentage ?? 0)}%`}
-                  {r.type === "HYBRID"       && `${Number(r.percentage ?? 0)}% / UGX ${Number(r.fixedAmount ?? 0).toLocaleString()} floor`}
+                  {r.type === "FIXED_AMOUNT" && `UGX ${(r.fixedAmount ?? 0).toLocaleString()}`}
+                  {r.type === "PERCENTAGE"   && `${r.percentage ?? 0}%`}
+                  {r.type === "HYBRID"       && `${r.percentage ?? 0}% / UGX ${(r.fixedAmount ?? 0).toLocaleString()} floor`}
                   {r.type === "NONE"         && "—"}
                 </td>
                 <td className="px-4 py-3 font-mono text-brand-text-body">
-                  {r.perVisitCap ? `UGX ${Number(r.perVisitCap).toLocaleString()}` : "—"}
+                  {r.perVisitCap != null ? `UGX ${r.perVisitCap.toLocaleString()}` : "—"}
                 </td>
                 <td className="px-4 py-3">
                   <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${r.isActive ? "bg-[#28A745]/10 text-[#28A745]" : "bg-[#6C757D]/10 text-[#6C757D]"}`}>
