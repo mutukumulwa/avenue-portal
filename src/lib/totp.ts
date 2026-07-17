@@ -100,7 +100,27 @@ export const TOTP_ENFORCED_ROLES: ReadonlySet<string> = new Set([
   "UNDERWRITER",
 ]);
 
-/** True when the role demands TOTP and the user hasn't enrolled yet. */
+/** True when the role demands TOTP and the user hasn't enrolled yet (pure rule). */
 export function totpEnrolmentRequired(role: string | null | undefined, totpEnabled: boolean): boolean {
   return !!role && TOTP_ENFORCED_ROLES.has(role) && !totpEnabled;
+}
+
+/**
+ * Deployment gate for the WP-8 rule (Arthur, 2026-07-17): during the test
+ * phase shared UAT personas hold privileged roles and testers cannot enrol
+ * authenticators, so enforcement is OFF unless the environment says otherwise.
+ * Go-live checklist (H8): set REQUIRE_PRIVILEGED_2FA=true in Vercel — nothing
+ * else changes; the grace/confinement flow activates for the DEC-09 roles.
+ */
+export function totpEnforcementActive(env: Record<string, string | undefined> = process.env): boolean {
+  return ["true", "1", "on"].includes((env.REQUIRE_PRIVILEGED_2FA ?? "").toLowerCase());
+}
+
+/** The rule × the deployment gate — what login/requireRole actually consult. */
+export function totpEnrolmentRequiredNow(
+  role: string | null | undefined,
+  totpEnabled: boolean,
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  return totpEnforcementActive(env) && totpEnrolmentRequired(role, totpEnabled);
 }

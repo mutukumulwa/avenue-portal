@@ -1,6 +1,6 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
-import { TOTP_ENFORCED_ROLES } from "@/lib/totp";
+import { TOTP_ENFORCED_ROLES, totpEnforcementActive } from "@/lib/totp";
 import { SecurityManager } from "./SecurityManager";
 import { ShieldAlert, ShieldCheck } from "lucide-react";
 
@@ -12,7 +12,7 @@ export default async function SecurityPage() {
     where: { id: session.user.id },
     select: { totpEnabled: true },
   });
-  const mandatory = TOTP_ENFORCED_ROLES.has(session.user.role ?? "");
+  const mandatory = totpEnforcementActive() && TOTP_ENFORCED_ROLES.has(session.user.role ?? "");
   const mustEnroll = mandatory && !(user?.totpEnabled ?? false);
 
   return (

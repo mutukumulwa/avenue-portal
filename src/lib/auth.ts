@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { cache } from "react";
 import { measureAsync } from "@/lib/perf";
-import { verifyTotp, totpEnrolmentRequired } from "@/lib/totp";
+import { verifyTotp, totpEnrolmentRequiredNow } from "@/lib/totp";
 
 /** Loads all active permission codes for a user from UserRoleAssignment. */
 async function loadUserPermissions(userId: string, tenantId: string): Promise<string[]> {
@@ -140,7 +140,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             // WP-8 (DEC-09): privileged roles must enrol an authenticator —
             // login is allowed (grace) but requireRole confines the session to
             // Settings → Security until enrolment completes.
-            mustEnrollTotp: totpEnrolmentRequired(user.role, user.totpEnabled),
+            mustEnrollTotp: totpEnrolmentRequiredNow(user.role, user.totpEnabled),
           };
         });
       }
@@ -171,7 +171,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         // WP-8: recompute the enrolment flag from the same lookup so enabling
         // TOTP unlocks the session within the cache TTL (~15s), no re-login.
         if (state !== null) {
-          token.mustEnrollTotp = totpEnrolmentRequired(token.role as string | undefined, state.totpEnabled);
+          token.mustEnrollTotp = totpEnrolmentRequiredNow(token.role as string | undefined, state.totpEnabled);
         }
       }
       return token;

@@ -137,6 +137,12 @@ admin-triggered `refreshFoundation` mutation for analytics only.
 > exemptions on the enrolment surface only), flag self-heals ~15s after enrolment via the R25
 > session lookup, disable server-refused for enforced roles. +8 tests. NOTE for H3/DEC-10: every
 > newly created privileged user will be forced through enrolment at first login.
+>
+> **AMENDED 2026-07-17 (Arthur): enforcement env-gated for the test phase.** Shared UAT personas
+> hold privileged roles and testers can't enrol authenticators, so the gate is OFF unless
+> `REQUIRE_PRIVILEGED_2FA=true`. **Added to the H8 go-live env checklist: set it in Vercel at
+> cutover** (alongside PLATFORM_TENANT_SLUG etc.). The mechanism itself is built, tested, and
+> verified — flipping the flag is the entire activation.
 Tenant policy: TOTP mandatory for selected roles at login (recommend SUPER_ADMIN, FINANCE_OFFICER,
 UNDERWRITER minimum). Enrolment grace flow for existing users.
 

@@ -49,7 +49,7 @@ describe("TOTP (RFC 6238, R81)", () => {
 });
 
 // ─── WP-8 (CU-OBS-15 / DEC-09) — compulsory-2FA rule ─────────────────────────
-import { totpEnrolmentRequired, TOTP_ENFORCED_ROLES } from "@/lib/totp";
+import { totpEnrolmentRequired, totpEnrolmentRequiredNow, totpEnforcementActive, TOTP_ENFORCED_ROLES } from "@/lib/totp";
 
 describe("totpEnrolmentRequired (WP-8, DEC-09)", () => {
   it("covers exactly the money-moving roles", () => {
@@ -71,5 +71,23 @@ describe("totpEnrolmentRequired (WP-8, DEC-09)", () => {
     expect(totpEnrolmentRequired("MEMBER_USER", false)).toBe(false);
     expect(totpEnrolmentRequired(undefined, false)).toBe(false);
     expect(totpEnrolmentRequired(null, false)).toBe(false);
+  });
+});
+
+describe("totpEnforcementActive / totpEnrolmentRequiredNow (test-phase hold-off, 2026-07-17)", () => {
+  it("enforcement is OFF by default (shared UAT personas must not be confined)", () => {
+    expect(totpEnforcementActive({})).toBe(false);
+    expect(totpEnforcementActive({ REQUIRE_PRIVILEGED_2FA: "" })).toBe(false);
+    expect(totpEnforcementActive({ REQUIRE_PRIVILEGED_2FA: "false" })).toBe(false);
+    expect(totpEnrolmentRequiredNow("SUPER_ADMIN", false, {})).toBe(false);
+  });
+
+  it("flips ON with REQUIRE_PRIVILEGED_2FA at go-live (H8 checklist)", () => {
+    for (const v of ["true", "1", "on", "TRUE"]) {
+      expect(totpEnforcementActive({ REQUIRE_PRIVILEGED_2FA: v })).toBe(true);
+    }
+    expect(totpEnrolmentRequiredNow("SUPER_ADMIN", false, { REQUIRE_PRIVILEGED_2FA: "true" })).toBe(true);
+    expect(totpEnrolmentRequiredNow("SUPER_ADMIN", true, { REQUIRE_PRIVILEGED_2FA: "true" })).toBe(false);
+    expect(totpEnrolmentRequiredNow("CLAIMS_OFFICER", false, { REQUIRE_PRIVILEGED_2FA: "true" })).toBe(false);
   });
 });
