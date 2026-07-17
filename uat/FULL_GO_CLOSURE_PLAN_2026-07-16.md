@@ -120,6 +120,11 @@ approval path (today it deadlocks silently). Ops pair: H4 provisions a real seco
 | new | **`/api/health`** endpoint (DB ping + default-client presence + version) — none exists today; needed for uptime monitoring |
 
 ### WP-7 — Background-job layer in production (blocked on DEC-08)
+> **✅ CODE + PACK DONE 2026-07-17** (`ff72ee1`): Dockerfile.worker + Railway/Fly configs +
+> `.env.worker.example` + `docs/WORKER_DEPLOYMENT.md`; WorkerHeartbeat row surfaced as
+> `workerFresh` on `/api/health` (dormancy now monitorable). LOCAL PROOF: clean boot, 0 schedule
+> failures, heartbeats, analytics job populates facts (CU-OBS-6 locally). **Remaining = Arthur's
+> ~15-min provisioning step (Upstash + Railway/Fly per the runbook) → `workerFresh:true` on prod.**
 Recommended: a small always-on worker (Railway/Fly/Render) running `npm run worker` against Supabase +
 Upstash Redis, with `validateWorkerConfig` env set; alternative: convert scheduling to Vercel crons
 hitting job routes. Acceptance: analytics facts populate (closes CU-OBS-6), membership-activation and
@@ -127,6 +132,11 @@ lapse jobs observably run, fund-balance alert fires on a test threshold. Stopgap
 admin-triggered `refreshFoundation` mutation for analytics only.
 
 ### WP-8 — 2FA enforcement for privileged staff (CU-OBS-15, blocked on DEC-09)
+> **✅ DONE 2026-07-17** (`33c9255`): TOTP compulsory for SUPER_ADMIN / FINANCE_OFFICER /
+> UNDERWRITER — grace login confined to Settings → Security until enrolment (deadlock-proof
+> exemptions on the enrolment surface only), flag self-heals ~15s after enrolment via the R25
+> session lookup, disable server-refused for enforced roles. +8 tests. NOTE for H3/DEC-10: every
+> newly created privileged user will be forced through enrolment at first login.
 Tenant policy: TOTP mandatory for selected roles at login (recommend SUPER_ADMIN, FINANCE_OFFICER,
 UNDERWRITER minimum). Enrolment grace flow for existing users.
 
