@@ -39,7 +39,10 @@ function isNextControlFlow(err: unknown): boolean {
   return typeof message === "string" && (message.startsWith("NEXT_REDIRECT") || message === "NEXT_NOT_FOUND");
 }
 
-function looksLowLevel(err: Error): boolean {
+/** True when an error is infrastructure-level (Prisma/SQL/connection) — its
+ *  message must never reach a browser or API client. Exported for API routes
+ *  that map errors to status codes (validation → 400, low-level → 500). */
+export function looksLowLevel(err: Error): boolean {
   const name = err.name || err.constructor?.name || "";
   if (name.startsWith("Prisma")) return true;
   return /prisma[.$]|Invalid `|Transaction API|PrismaClient|ECONNREFUSED|ETIMEDOUT|getaddrinfo|ENOTFOUND|does not exist on the current database|column .* does not exist|relation .* does not exist|deadlock|connection pool|interactive transaction/i.test(

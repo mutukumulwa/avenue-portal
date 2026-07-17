@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withApiKey, getApiCredential } from "@/lib/apiAuth";
+import { looksLowLevel } from "@/lib/safe-action-error";
 import { HmsBatchService } from "@/server/services/hms-batch.service";
 
 /**
@@ -32,10 +33,14 @@ async function postHmsBatch(req: Request) {
     const report = await HmsBatchService.apply(tenantId, body, providerFromKey ?? undefined);
     return NextResponse.json({ success: true, ...report });
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "HMS batch ingest failed" },
-      { status: 400 },
-    );
+    // IP-DEF-05 hardening: validation errors (missing facilityCode/batchRef,
+    // malformed entries) → 400 with the field message; infrastructure errors
+    // → 500 with a generic body (never leak Prisma/SQL internals on the API).
+    if (err instanceof Error && !looksLowLevel(err)) {
+      return NextResponse.json({ error: err.message }, { status: 400 });
+    }
+    console.error("[hms-batch] ingest failed", err);
+    return NextResponse.json({ error: "HMS batch ingest failed — contact the operator." }, { status: 500 });
   }
 }
 

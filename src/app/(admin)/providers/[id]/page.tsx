@@ -202,6 +202,20 @@ export default async function ProviderDetailPage({
               <span className="font-semibold text-brand-text-heading">{f.value}</span>
             </div>
           ))}
+          {/* IP-GAP-HMS: make the batch identity discoverable — the 2026-07-07
+              inpatient UAT could only guess it from the exact facility name. */}
+          <div className="mt-2 rounded-lg bg-[#F8F9FA] px-3 py-2 text-xs text-brand-text-muted">
+            <span className="font-bold text-brand-text-heading">HMS batch identity:</span>{" "}
+            batches submitted with this facility&apos;s own API key need no <code className="font-mono">facilityCode</code>;
+            operator-channel batches must quote one of: the Facility ID{" "}
+            <code className="font-mono">{provider.id}</code>, the exact name{" "}
+            <span className="font-semibold">&quot;{provider.name}&quot;</span>
+            {provider.smartProviderId ? (
+              <> or the SMART Provider ID <code className="font-mono">{provider.smartProviderId}</code></>
+            ) : (
+              <> (no SMART Provider ID is set for this facility)</>
+            )}.
+          </div>
         </div>
 
         {/* KPI cards */}
