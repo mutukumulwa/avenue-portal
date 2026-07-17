@@ -97,6 +97,35 @@ export class CaseService {
     });
   }
 
+  /**
+   * IP-DEF-04: accommodation ("bed-day") charges — ward/ICU/HDU bed days.
+   * Matches "ICU bed", "General ward bed day", "Accommodation", "HDU day fee";
+   * does NOT match "bedside X-ray" (word boundary) or "ward round" (ward only
+   * counts next to bed/day/fee/charge).
+   */
+  static readonly BED_DAY_PATTERN = /\bbed\b|\baccommodation\b|\b(icu|hdu|ward)\s+(bed|day|fee|charge)s?\b/i;
+
+  /**
+   * IP-DEF-04: days on which MORE THAN ONE non-voided bed-day entry bills.
+   * Same-date ward + ICU both pricing payable is either a transfer day
+   * (legitimate — a reviewer confirms it) or double-billing. Pure function so
+   * the rule is unit-testable.
+   */
+  static detectBedDayOverlaps(
+    entries: Array<{ entryDate: Date; description: string; serviceCode?: string | null; voided?: boolean }>,
+  ): Array<{ day: string; items: string[] }> {
+    const byDay = new Map<string, string[]>();
+    for (const e of entries) {
+      if (e.voided) continue;
+      if (!CaseService.BED_DAY_PATTERN.test(`${e.serviceCode ?? ""} ${e.description}`)) continue;
+      const day = e.entryDate.toISOString().slice(0, 10);
+      byDay.set(day, [...(byDay.get(day) ?? []), e.description]);
+    }
+    return [...byDay.entries()]
+      .filter(([, items]) => items.length > 1)
+      .map(([day, items]) => ({ day, items }));
+  }
+
   static async addServiceEntry(input: {
     tenantId: string;
     caseId: string;
@@ -110,10 +139,32 @@ export class CaseService {
     enteredById?: string;
     hmsBatchRef?: string | null;
   }) {
-    await CaseService.getOpenCase(input.tenantId, input.caseId);
+    const openCase = await CaseService.getOpenCase(input.tenantId, input.caseId);
     const quantity = input.quantity ?? 1;
     if (quantity < 1) throw new Error("Quantity must be at least 1");
     if (input.unitAmount < 0) throw new Error("Unit amount cannot be negative");
+
+    // IP-DEF-02: a service entry must fall inside the admission episode and can
+    // never be in the future — a post-discharge or future-dated entry accrues
+    // billable money for care that has not (or cannot have) happened. Compared
+    // at DAY granularity (entry dates are date-only).
+    const day = (d: Date) => Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+    const entryDay = day(input.entryDate);
+    if (entryDay > day(new Date())) {
+      throw new Error("Service entry date cannot be in the future.");
+    }
+    if (openCase.admissionDate && entryDay < day(openCase.admissionDate)) {
+      throw new Error(
+        `Service entry date (${input.entryDate.toISOString().slice(0, 10)}) is before the admission date ` +
+          `(${openCase.admissionDate.toISOString().slice(0, 10)}) — entries must fall inside the admission episode.`,
+      );
+    }
+    if (openCase.dischargeDate && entryDay > day(openCase.dischargeDate)) {
+      throw new Error(
+        `Service entry date (${input.entryDate.toISOString().slice(0, 10)}) is after the discharge date ` +
+          `(${openCase.dischargeDate.toISOString().slice(0, 10)}) — post-discharge services need a new episode, not a back-dated entry.`,
+      );
+    }
 
     return prisma.$transaction(async (tx) => {
       const entry = await tx.caseServiceEntry.create({
@@ -132,6 +183,34 @@ export class CaseService {
         },
       });
       await CaseService.recomputeAccrued(tx, input.caseId);
+
+      // IP-DEF-04: the moment a SECOND same-day bed-day entry lands, record it
+      // on the case timeline so the ward clerk sees the overlap immediately.
+      // The enforcement (fraud-gate hold on the filed claim) happens at
+      // closeAndFile — this is the early warning.
+      if (CaseService.BED_DAY_PATTERN.test(`${input.serviceCode ?? ""} ${input.description}`)) {
+        const sameDay = await tx.caseServiceEntry.findMany({
+          where: { caseId: input.caseId, voided: false, entryDate: input.entryDate, id: { not: entry.id } },
+          select: { description: true, serviceCode: true },
+        });
+        const overlapping = sameDay.filter((e) =>
+          CaseService.BED_DAY_PATTERN.test(`${e.serviceCode ?? ""} ${e.description}`),
+        );
+        if (overlapping.length > 0) {
+          await tx.activityLog.create({
+            data: {
+              entityType: "CASE",
+              entityId: input.caseId,
+              action: "BED_DAY_OVERLAP",
+              description:
+                `Multiple bed-day charges on ${input.entryDate.toISOString().slice(0, 10)}: ` +
+                `"${input.description}" overlaps ${overlapping.map((e) => `"${e.description}"`).join(", ")}. ` +
+                `The filed claim will require fraud clearance (transfer day vs double-billing).`,
+              userId: input.enteredById ?? null,
+            },
+          });
+        }
+      }
       return entry;
     });
   }
@@ -275,6 +354,28 @@ export class CaseService {
           },
         },
       });
+
+      // IP-DEF-04: same-date multiple bed-day charges (e.g. ward + ICU on one
+      // day) hard-flag the filed claim. With the fraud gate enforced, the claim
+      // cannot be approved until OPS/fraud/medical clears the alert — a genuine
+      // transfer day is cleared with a note; double-billing is declined. This
+      // is the "hard-flag with an authorised override path" shape.
+      const bedDayOverlaps = CaseService.detectBedDayOverlaps(c.serviceEntries);
+      if (bedDayOverlaps.length > 0) {
+        await tx.claimFraudAlert.create({
+          data: {
+            tenantId,
+            claimId: created.id,
+            rule: "Overlapping Bed-Day Charges",
+            score: 80,
+            severity: "HIGH",
+            notes: bedDayOverlaps
+              .map((o) => `${o.day}: ${o.items.join(" + ")}`)
+              .join("; ")
+              .slice(0, 900),
+          },
+        });
+      }
 
       // Case PAs re-point at the filed claim (WP-C2 attach semantics).
       if (c.preauths.length > 0) {

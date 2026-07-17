@@ -2,11 +2,13 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const db = vi.hoisted(() => {
   const tx = {
-    caseServiceEntry: { create: vi.fn(async (a: any) => ({ id: "e1", ...a.data })), update: vi.fn(async (a: any) => a.data), aggregate: vi.fn(async () => ({ _sum: { totalAmount: 30_000 } })) },
+    caseServiceEntry: { create: vi.fn(async (a: any) => ({ id: "e1", ...a.data })), update: vi.fn(async (a: any) => a.data), aggregate: vi.fn(async () => ({ _sum: { totalAmount: 30_000 } })), findMany: vi.fn(async (): Promise<any[]> => []) },
     clinicalCase: { update: vi.fn(async (a: any) => a.data), updateMany: vi.fn(async () => ({ count: 1 })) },
     claim: { create: vi.fn(async (a: any) => ({ id: "clm1", ...a.data })) },
     preAuthorization: { updateMany: vi.fn(async () => ({ count: 1 })) },
     letterOfUndertaking: { updateMany: vi.fn(async () => ({ count: 0 })) },
+    claimFraudAlert: { create: vi.fn(async () => ({})) },
+    activityLog: { create: vi.fn(async () => ({})) },
   };
   return {
     tx,
@@ -153,5 +155,104 @@ describe("CaseService.attachPreauth", () => {
       memberId: "m1", providerId: "p1", status: "APPROVED", claimId: "other", caseId: null,
     });
     await expect(CaseService.attachPreauth("t1", "case1", "pa9")).rejects.toThrow(/already attached/);
+  });
+});
+
+// ─── WP-2 IP-DEF-02 — entry dates inside the admission episode ───────────────
+describe("IP-DEF-02 — service entry dates are bounded by the episode", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    db.clinicalCase.findUnique.mockResolvedValue(openCaseRow());
+  });
+
+  const entry = (entryDate: Date) =>
+    CaseService.addServiceEntry({
+      tenantId: "t1", caseId: "case1", entryDate,
+      category: "PROCEDURE", description: "Dressing change", unitAmount: 5_000,
+    });
+
+  it("rejects a FUTURE service entry (was accepted and accrued billable money)", async () => {
+    await expect(entry(new Date(Date.now() + 3 * 86_400_000))).rejects.toThrow(/future/i);
+    expect(db.tx.caseServiceEntry.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects an entry BEFORE the admission date", async () => {
+    await expect(entry(new Date("2026-06-10"))).rejects.toThrow(/before the admission date/i);
+    expect(db.tx.caseServiceEntry.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects an entry AFTER the discharge date", async () => {
+    db.clinicalCase.findUnique.mockResolvedValue(openCaseRow({ dischargeDate: new Date("2026-06-25") }));
+    await expect(entry(new Date("2026-06-28"))).rejects.toThrow(/after the discharge date/i);
+    expect(db.tx.caseServiceEntry.create).not.toHaveBeenCalled();
+  });
+
+  it("accepts an entry ON the admission day", async () => {
+    await entry(new Date("2026-06-20"));
+    expect(db.tx.caseServiceEntry.create).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ─── WP-3 IP-DEF-04 — same-date bed-day overlap ──────────────────────────────
+describe("IP-DEF-04 — overlapping bed-day charges", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    db.clinicalCase.findUnique.mockResolvedValue(openCaseRow());
+  });
+
+  it("detectBedDayOverlaps: ward + ICU beds on one day flag; bedside X-ray and ward rounds do not", () => {
+    const overlaps = CaseService.detectBedDayOverlaps([
+      { entryDate: new Date("2026-06-21"), description: "General ward bed day", serviceCode: "BED-WARD" },
+      { entryDate: new Date("2026-06-21"), description: "ICU bed day", serviceCode: "BED-ICU" },
+      { entryDate: new Date("2026-06-21"), description: "Bedside X-ray" },
+      { entryDate: new Date("2026-06-21"), description: "Doctor's ward round" },
+      { entryDate: new Date("2026-06-22"), description: "General ward bed day" },
+      { entryDate: new Date("2026-06-23"), description: "ICU bed day", voided: true },
+      { entryDate: new Date("2026-06-23"), description: "General ward bed day" },
+    ]);
+    expect(overlaps).toHaveLength(1);
+    expect(overlaps[0].day).toBe("2026-06-21");
+    expect(overlaps[0].items).toEqual(["General ward bed day", "ICU bed day"]);
+  });
+
+  it("closeAndFile hard-flags the filed claim with a HIGH fraud alert when bed-days overlap", async () => {
+    db.clinicalCase.findUnique.mockResolvedValue(openCaseRow({
+      serviceEntries: [
+        { entryDate: new Date("2026-06-21"), category: "OTHER", serviceCode: "BED-WARD", description: "General ward bed day", quantity: 1, unitAmount: 200_000, totalAmount: 200_000 },
+        { entryDate: new Date("2026-06-21"), category: "OTHER", serviceCode: "BED-ICU", description: "ICU bed day", quantity: 1, unitAmount: 650_000, totalAmount: 650_000 },
+      ],
+    }));
+    await CaseService.closeAndFile("t1", "case1", "u1");
+    expect(db.tx.claimFraudAlert.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          claimId: "clm1",
+          rule: "Overlapping Bed-Day Charges",
+          severity: "HIGH",
+          notes: expect.stringContaining("2026-06-21"),
+        }),
+      }),
+    );
+  });
+
+  it("closeAndFile does NOT flag distinct-day bed charges", async () => {
+    await CaseService.closeAndFile("t1", "case1", "u1");
+    expect(db.tx.claimFraudAlert.create).not.toHaveBeenCalled();
+  });
+
+  it("addServiceEntry records a timeline warning the moment a second same-day bed-day lands", async () => {
+    db.tx.caseServiceEntry.findMany.mockResolvedValue([
+      { description: "General ward bed day", serviceCode: "BED-WARD" },
+    ]);
+    await CaseService.addServiceEntry({
+      tenantId: "t1", caseId: "case1", entryDate: new Date("2026-06-21"),
+      category: "OTHER", serviceCode: "BED-ICU", description: "ICU bed day", unitAmount: 650_000,
+      enteredById: "u1",
+    });
+    expect(db.tx.activityLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ action: "BED_DAY_OVERLAP", entityId: "case1" }),
+      }),
+    );
   });
 });
