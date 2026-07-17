@@ -68,6 +68,11 @@ A–D as automated tests + live V3 below. **Blocked on DEC-02..06** (safe defaul
 the plan §"P1 decisions"; confirming defaults unblocks same-day).
 
 ### WP-2 — Inpatient High fixes
+> **✅ DONE 2026-07-17** (`4f727d7`, `4fc74ec`): IP-DEF-01 root = phantom `reviewNotes` column behind an
+> `as never` cast → additive column + cast removed + `safeActionError` on the action (no more schema
+> dump); IP-DEF-02 = entry dates bounded to [admission, discharge] and never future. Both REAL-DB-proven
+> on a throwaway pg + UI-verified. IP-DEF-03 = VERIFIED-BY-SUBSEQUENT-RUNS (every live settlement since
+> BD-03's fix; explicit re-check stays on V2).
 - **IP-DEF-01:** PA-approval reviewer notes crash + raw Prisma error/schema leak to browser. Fix the
   write; add a global "no raw DB errors to client" guard on that route family.
 - **IP-DEF-02:** future-dated / post-discharge `CaseServiceEntry` accepted and accrues billable. Reject
@@ -77,6 +82,11 @@ the plan §"P1 decisions"; confirming defaults unblocks same-day).
   it reproduces.
 
 ### WP-3 — Inpatient Mediums
+> **✅ DONE 2026-07-17** (`4fc74ec`, `b3ac3af`): IP-DEF-04 = same-date bed-day overlap → case-timeline
+> warning at entry + HIGH "Overlapping Bed-Day Charges" fraud alert on the filed claim (gate blocks until
+> OPS/fraud/medical clears — the authorised-override shape). IP-DEF-05 crash = VERIFIED-EXISTING (FG-C3/C4
+> envelope validation); route hardened (validation→400, infra→500 generic). IP-GAP-HMS = provider page now
+> spells out the accepted batch identity. REAL-DB-proven + UI-verified.
 - **IP-DEF-04:** same-date ward + ICU bed-day both price payable — add an overlap guard (flag or block
   per DEC-01 scope decision; recommend hard-flag to adjudicator, PAY override to allow).
 - **IP-DEF-05 + IP-GAP-HMS:** HMS batch missing `facilityCode` crashes unhandled → return 400 with
