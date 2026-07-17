@@ -71,6 +71,13 @@ describe("approveByHuman — canonical PA approval (PR-011)", () => {
     expect(db.benefitHold.upsert).not.toHaveBeenCalled();
   });
 
+  it("IP-DEF-01: the reviewer's approval note persists to the real reviewNotes column", async () => {
+    await preauthAdjudicationService.approveByHuman("pa1", T, "u1", 85000, "Clinically indicated — repeat scan", 30);
+    const paUpdate = db.preAuthorization.updateMany.mock.calls[0][0].data;
+    expect(paUpdate.reviewNotes).toBe("Clinically indicated — repeat scan");
+    expect(paUpdate.status).toBe("APPROVED");
+  });
+
   it("approves with a hold: BenefitHold ACTIVE for the amount, expiry = validUntil, activeHoldAmount upserted", async () => {
     await preauthAdjudicationService.approveByHuman("pa1", T, "u1", 85000, undefined, 30);
 

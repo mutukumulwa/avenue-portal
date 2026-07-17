@@ -268,6 +268,16 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
         />
       )}
 
+      {/* IP-DEF-01: the reviewer's approval note is persisted and visible. */}
+      {pa.reviewNotes && ["APPROVED", "ATTACHED", "UTILISED"].includes(pa.status) && (
+        <div className="bg-[#28A745]/5 border border-[#28A745]/20 rounded-lg p-5">
+          <h3 className="flex items-center gap-2 text-sm font-bold text-[#1F7A34] uppercase tracking-wide">
+            <CheckCircle2 size={16} /> Reviewer notes
+          </h3>
+          <p className="text-sm text-brand-text-body mt-1">{pa.reviewNotes}</p>
+        </div>
+      )}
+
       {/* Declined info */}
       {pa.status === "DECLINED" && (
         <div className="bg-[#DC3545]/5 border border-[#DC3545]/20 rounded-lg p-5">

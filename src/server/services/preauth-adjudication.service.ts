@@ -583,8 +583,11 @@ export const preauthAdjudicationService = {
           gopNumber,
           gopIssuedAt:    new Date(),
           benefitRemaining: availability ? Math.max(0, availability.payableCeiling - approvedAmount) : null,
-          reviewNotes: notes,
-        } as never,
+          // IP-DEF-01: reviewNotes is now a real column — the `as never` cast
+          // that hid the phantom field (and crashed every notes-carrying
+          // approval with a raw Prisma error) is gone for good.
+          reviewNotes: notes ?? null,
+        },
       });
       if (decided.count !== 1) {
         throw new TRPCError({

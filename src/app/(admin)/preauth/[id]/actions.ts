@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { ClaimsService } from "@/server/services/claims.service";
 import { preauthAdjudicationService } from "@/server/services/preauth-adjudication.service";
 import { writeAudit } from "@/lib/audit";
+import { safeActionError } from "@/lib/safe-action-error";
 
 /**
  * W1.1: the single pre-auth decision entry point. Delegates to the canonical
@@ -42,7 +43,10 @@ export async function adjudicatePreAuthAction(
       );
     }
   } catch (err) {
-    return { error: (err as Error).message };
+    // IP-DEF-01 (leak half): never surface a raw Prisma/DB error — the pre-fix
+    // path returned err.message verbatim, dumping the full model schema to the
+    // browser when a write failed validation.
+    return { error: safeActionError(err, "preauth-decision") };
   }
 
   await writeAudit({

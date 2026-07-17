@@ -2558,6 +2558,10 @@ model PreAuthorization {
   // the window. gopNumber references the GOP for the provider.
   gopNumber      String? // e.g. GOP-2026-00001
   gopIssuedAt    DateTime?
+  // IP-DEF-01: the reviewer's optional note on APPROVAL. The pre-fix code wrote
+  // this field behind an `as never` cast while the column did not exist — any
+  // approval with notes crashed with a raw Prisma validation error.
+  reviewNotes    String?
 
   // Decline details
   declineReasonCode String?
