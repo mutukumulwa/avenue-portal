@@ -86,3 +86,21 @@ export function otpauthUri(secret: string, account: string, issuer = "Medvex"): 
   const params = new URLSearchParams({ secret, issuer, digits: "6", period: "30" });
   return `otpauth://totp/${label}?${params.toString()}`;
 }
+
+/**
+ * WP-8 (CU-OBS-15 / DEC-09, accepted 2026-07-16): roles for which two-factor
+ * is COMPULSORY — the money-moving and cover-granting staff. A privileged user
+ * without an enrolled authenticator may still sign in (enrolment grace) but is
+ * confined to Settings → Security until TOTP is enabled; verification itself
+ * is already mandatory once enabled (R81).
+ */
+export const TOTP_ENFORCED_ROLES: ReadonlySet<string> = new Set([
+  "SUPER_ADMIN",
+  "FINANCE_OFFICER",
+  "UNDERWRITER",
+]);
+
+/** True when the role demands TOTP and the user hasn't enrolled yet. */
+export function totpEnrolmentRequired(role: string | null | undefined, totpEnabled: boolean): boolean {
+  return !!role && TOTP_ENFORCED_ROLES.has(role) && !totpEnabled;
+}

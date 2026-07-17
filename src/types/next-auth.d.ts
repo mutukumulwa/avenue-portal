@@ -11,6 +11,8 @@ declare module "next-auth" {
       memberId?: string;
       providerId?: string;
       permissions?: string[];
+      /** WP-8 (DEC-09): privileged role signed in without an enrolled authenticator. */
+      mustEnrollTotp?: boolean;
     } & DefaultSession["user"];
   }
 
@@ -24,6 +26,8 @@ declare module "next-auth" {
     providerId?: string;
     permissions?: string[];
     sessionVersion?: number;
+    /** WP-8 (DEC-09): privileged role signed in without an enrolled authenticator. */
+    mustEnrollTotp?: boolean;
   }
 }
 
@@ -38,5 +42,7 @@ declare module "next-auth/jwt" {
     providerId?: string;
     permissions?: string[];
     sessionVersion?: number;
+    /** WP-8 (DEC-09): privileged role signed in without an enrolled authenticator. */
+    mustEnrollTotp?: boolean;
   }
 }

@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { cache } from "react";
 import { measureAsync } from "@/lib/perf";
-import { verifyTotp } from "@/lib/totp";
+import { verifyTotp, totpEnrolmentRequired } from "@/lib/totp";
 
 /** Loads all active permission codes for a user from UserRoleAssignment. */
 async function loadUserPermissions(userId: string, tenantId: string): Promise<string[]> {
@@ -28,19 +28,25 @@ async function loadUserPermissions(userId: string, tenantId: string): Promise<st
  * Current sessionVersion for a user, cached briefly to bound the per-request DB
  * cost of single-session enforcement (R25). Returns null on error (fail-open).
  */
-const sessionVersionCache = new Map<string, { version: number; at: number }>();
+const sessionStateCache = new Map<string, { version: number; totpEnabled: boolean; at: number }>();
 const SESSION_VERSION_TTL_MS = 15_000;
-async function currentSessionVersion(userId: string): Promise<number | null> {
-  const hit = sessionVersionCache.get(userId);
-  if (hit && Date.now() - hit.at < SESSION_VERSION_TTL_MS) return hit.version;
+async function currentSessionState(
+  userId: string,
+): Promise<{ version: number; totpEnabled: boolean } | null> {
+  const hit = sessionStateCache.get(userId);
+  if (hit && Date.now() - hit.at < SESSION_VERSION_TTL_MS) return hit;
   try {
     const row = await prisma.user.findUnique({
       where: { id: userId },
-      select: { sessionVersion: true },
+      // WP-8: totpEnabled rides the same single-session query (R25) so the
+      // enrolment flag self-heals within the cache TTL — no re-login needed
+      // after the user enables their authenticator.
+      select: { sessionVersion: true, totpEnabled: true },
     });
     if (!row) return null;
-    sessionVersionCache.set(userId, { version: row.sessionVersion, at: Date.now() });
-    return row.sessionVersion;
+    const state = { version: row.sessionVersion, totpEnabled: row.totpEnabled, at: Date.now() };
+    sessionStateCache.set(userId, state);
+    return state;
   } catch {
     return null; // fail-open: never lock users out on a transient DB error
   }
@@ -131,6 +137,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             providerId: user.providerId ?? undefined,
             permissions,
             sessionVersion: bumped.sessionVersion,
+            // WP-8 (DEC-09): privileged roles must enrol an authenticator —
+            // login is allowed (grace) but requireRole confines the session to
+            // Settings → Security until enrolment completes.
+            mustEnrollTotp: totpEnrolmentRequired(user.role, user.totpEnabled),
           };
         });
       }
@@ -148,14 +158,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.providerId = user.providerId;
         token.permissions = user.permissions;
         token.sessionVersion = user.sessionVersion;
+        token.mustEnrollTotp = user.mustEnrollTotp;
         return token;
       }
       // Subsequent requests: invalidate if a newer login has superseded this
       // session (single-session, R25). Fail-open when the version is unknown.
       if (token.id && typeof token.sessionVersion === "number") {
-        const current = await currentSessionVersion(token.id as string);
-        if (current !== null && current > (token.sessionVersion as number)) {
+        const state = await currentSessionState(token.id as string);
+        if (state !== null && state.version > (token.sessionVersion as number)) {
           return null; // stale session → sign out
+        }
+        // WP-8: recompute the enrolment flag from the same lookup so enabling
+        // TOTP unlocks the session within the cache TTL (~15s), no re-login.
+        if (state !== null) {
+          token.mustEnrollTotp = totpEnrolmentRequired(token.role as string | undefined, state.totpEnabled);
         }
       }
       return token;
@@ -170,6 +186,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.memberId = token.memberId as string | undefined;
         session.user.providerId = token.providerId as string | undefined;
         session.user.permissions = token.permissions as string[] | undefined;
+        session.user.mustEnrollTotp = token.mustEnrollTotp as boolean | undefined;
       }
       return session;
     }

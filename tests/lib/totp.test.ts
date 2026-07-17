@@ -47,3 +47,29 @@ describe("TOTP (RFC 6238, R81)", () => {
     expect(generateTotp(secret, 59_000)).toBe("287082".padStart(6, "0").slice(-6));
   });
 });
+
+// ─── WP-8 (CU-OBS-15 / DEC-09) — compulsory-2FA rule ─────────────────────────
+import { totpEnrolmentRequired, TOTP_ENFORCED_ROLES } from "@/lib/totp";
+
+describe("totpEnrolmentRequired (WP-8, DEC-09)", () => {
+  it("covers exactly the money-moving roles", () => {
+    expect([...TOTP_ENFORCED_ROLES].sort()).toEqual(["FINANCE_OFFICER", "SUPER_ADMIN", "UNDERWRITER"]);
+  });
+
+  it("requires enrolment for an enforced role without TOTP", () => {
+    expect(totpEnrolmentRequired("SUPER_ADMIN", false)).toBe(true);
+    expect(totpEnrolmentRequired("FINANCE_OFFICER", false)).toBe(true);
+    expect(totpEnrolmentRequired("UNDERWRITER", false)).toBe(true);
+  });
+
+  it("is satisfied once TOTP is enabled", () => {
+    expect(totpEnrolmentRequired("SUPER_ADMIN", true)).toBe(false);
+  });
+
+  it("does not constrain non-privileged roles or missing roles", () => {
+    expect(totpEnrolmentRequired("CLAIMS_OFFICER", false)).toBe(false);
+    expect(totpEnrolmentRequired("MEMBER_USER", false)).toBe(false);
+    expect(totpEnrolmentRequired(undefined, false)).toBe(false);
+    expect(totpEnrolmentRequired(null, false)).toBe(false);
+  });
+});

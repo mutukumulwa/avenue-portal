@@ -4,7 +4,7 @@ import { useActionState, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { startTotpEnrolmentAction, confirmTotpAction, disableTotpAction } from "./actions";
 
-export function SecurityManager({ enabled }: { enabled: boolean }) {
+export function SecurityManager({ enabled, mandatory = false }: { enabled: boolean; mandatory?: boolean }) {
   const router = useRouter();
   const [enrol, setEnrol] = useState<{ secret: string; uri: string } | null>(null);
   const [pending, start] = useTransition();
@@ -29,13 +29,21 @@ export function SecurityManager({ enabled }: { enabled: boolean }) {
         <p className="mt-1 text-sm text-brand-text-muted">
           You&apos;ll be asked for a 6-digit code from your authenticator at sign-in.
         </p>
-        <button
-          onClick={disable}
-          disabled={pending}
-          className="mt-4 rounded-full border border-brand-border px-4 py-2 text-sm font-semibold text-brand-error hover:bg-brand-bg-alt disabled:opacity-50"
-        >
-          {pending ? "Disabling…" : "Disable 2FA"}
-        </button>
+        {mandatory ? (
+          // WP-8 (DEC-09): compulsory for this role — the server refuses the
+          // disable action too; the UI simply doesn't offer it.
+          <p className="mt-4 text-xs font-semibold text-brand-text-muted">
+            Two-step sign-in is required for your role and cannot be disabled.
+          </p>
+        ) : (
+          <button
+            onClick={disable}
+            disabled={pending}
+            className="mt-4 rounded-full border border-brand-border px-4 py-2 text-sm font-semibold text-brand-error hover:bg-brand-bg-alt disabled:opacity-50"
+          >
+            {pending ? "Disabling…" : "Disable 2FA"}
+          </button>
+        )}
       </div>
     );
   }

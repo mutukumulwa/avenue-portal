@@ -4,14 +4,14 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { writeAudit } from "@/lib/audit";
-import { generateSecret, otpauthUri, verifyTotp } from "@/lib/totp";
+import { generateSecret, otpauthUri, verifyTotp, TOTP_ENFORCED_ROLES } from "@/lib/totp";
 
 /**
  * Begin 2FA enrolment (R81): generate + store a secret (not yet enabled) and
  * return the otpauth URI + base32 secret for the authenticator app.
  */
 export async function startTotpEnrolmentAction(): Promise<{ secret: string; uri: string; error?: string }> {
-  const session = await requireRole(ROLES.ANY_STAFF);
+  const session = await requireRole(ROLES.ANY_STAFF, { allow2faEnrolment: true });
   const secret = generateSecret();
   await prisma.user.update({
     where: { id: session.user.id },
@@ -28,7 +28,7 @@ export async function confirmTotpAction(
   _prev: { enabled?: boolean; error?: string } | null,
   formData: FormData,
 ): Promise<{ enabled?: boolean; error?: string }> {
-  const session = await requireRole(ROLES.ANY_STAFF);
+  const session = await requireRole(ROLES.ANY_STAFF, { allow2faEnrolment: true });
   const code = ((formData.get("code") as string) || "").trim();
 
   const user = await prisma.user.findUnique({
@@ -51,7 +51,12 @@ export async function confirmTotpAction(
 
 /** Disable 2FA and clear the secret. */
 export async function disableTotpAction(): Promise<{ disabled: boolean }> {
-  const session = await requireRole(ROLES.ANY_STAFF);
+  const session = await requireRole(ROLES.ANY_STAFF, { allow2faEnrolment: true });
+  // WP-8 (DEC-09): two-factor is COMPULSORY for money-moving roles — the
+  // server refuses to disable it regardless of what the UI offers.
+  if (TOTP_ENFORCED_ROLES.has(session.user.role ?? "")) {
+    return { disabled: false };
+  }
   await prisma.user.update({
     where: { id: session.user.id },
     data: { totpSecret: null, totpEnabled: false },
