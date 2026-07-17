@@ -4532,6 +4532,19 @@ model Correspondence {
   sentAt   DateTime @default(now())
 }
 
+// WP-7 (FULL GO closure): the background worker's liveness, readable by the
+// web app — the Redis heartbeat key is invisible to Vercel, so the worker
+// also upserts one row per host here every 60s. /api/health reports the
+// freshest row (workerFresh = seen within 5 minutes).
+model WorkerHeartbeat {
+  id         String   @id @default(cuid())
+  host       String   @unique
+  startedAt  DateTime
+  lastSeenAt DateTime
+
+  @@index([lastSeenAt])
+}
+
 model ActivityLog {
   id          String   @id @default(cuid())
   entityType  String // GROUP, MEMBER, CLAIM, PREAUTH, ENDORSEMENT

@@ -1,0 +1,20 @@
+# WP-7 — Fly.io deployment for the background worker (alternative to Railway).
+#   fly launch --no-deploy --copy-config --name medvex-worker
+#   fly secrets set DATABASE_URL=... DIRECT_URL=... REDIS_URL=...
+#   fly deploy
+app = "medvex-worker"
+primary_region = "jnb" # Johannesburg — closest Fly region to Kampala/eu-central DB
+
+[build]
+  dockerfile = "Dockerfile.worker"
+
+# No [[services]] section on purpose: the worker exposes no ports. Liveness is
+# the WorkerHeartbeat row surfaced at https://avenue-portal.vercel.app/api/health
+# (workerFresh) plus `fly logs`.
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+
+[restart]
+  policy = "always"

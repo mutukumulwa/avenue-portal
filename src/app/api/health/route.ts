@@ -16,14 +16,20 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     await prisma.$queryRaw`SELECT 1`;
-    const defaultClient = await prisma.client.findFirst({
-      where: { slug: "default" },
-      select: { id: true },
-    });
+    const [defaultClient, workerBeat] = await Promise.all([
+      prisma.client.findFirst({ where: { slug: "default" }, select: { id: true } }),
+      // WP-7: the background worker upserts a heartbeat row every 60s.
+      // workerFresh=false (or lastSeenAt=null) means the async job layer —
+      // escalations, membership activation, lapse detection, fund alerts,
+      // analytics — is NOT running.
+      prisma.workerHeartbeat.findFirst({ orderBy: { lastSeenAt: "desc" }, select: { lastSeenAt: true, host: true } }),
+    ]);
     return NextResponse.json({
       ok: true,
       db: "up",
       defaultClientPresent: defaultClient !== null,
+      workerLastSeenAt: workerBeat?.lastSeenAt?.toISOString() ?? null,
+      workerFresh: workerBeat != null && Date.now() - workerBeat.lastSeenAt.getTime() < 5 * 60_000,
       version: process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? "dev",
       time: new Date().toISOString(),
     });

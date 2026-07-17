@@ -2,7 +2,9 @@
 // `npm run worker` works from a clean shell. First import so every module that
 // reads process.env at init time sees the loaded values.
 import "dotenv/config";
+import os from "node:os";
 import { validateWorkerConfig } from "./worker-config";
+import { prisma } from "../../lib/prisma";
 import { Worker, Job } from "bullmq";
 import { getConnection, scheduleEscalationJob, scheduleDailyJobs, scheduleCommissionReconciliationJob, scheduleAnalyticsRefreshJob, scheduleIntakeJobs, scheduleQuotationExpiryJob, scheduleMembershipActivationJob, scheduleLapseDetectionJob, scheduleReportGenerationJob, scheduleAdminFeeAccrualJob, scheduleFraudScanJob } from "../../lib/queue";
 import { NotificationService } from "../services/notification.service";
@@ -41,14 +43,33 @@ const connection = getConnection();
 // PR-002 #3: heartbeat — a log line + Redis key (worker:heartbeat, TTL 180s)
 // every 60s so operations can detect a dead worker (alerting: absence of the
 // key or a stale timestamp; see docs/INSTALL.md).
+// WP-7: the Redis key is invisible to the Vercel web app, so the same beat
+// also upserts a WorkerHeartbeat row — /api/health reports it (workerFresh),
+// which is what turns "the job layer is dormant" from a UAT discovery into a
+// monitorable signal.
 const HEARTBEAT_KEY = "worker:heartbeat";
-setInterval(() => {
-  const ts = new Date().toISOString();
-  connection
-    .set(HEARTBEAT_KEY, ts, "EX", 180)
-    .then(() => console.log(`[Worker] heartbeat ${ts}`))
-    .catch((err: Error) => console.error("[Worker] heartbeat write failed:", err.message));
-}, 60_000).unref();
+const WORKER_STARTED_AT = new Date();
+const WORKER_HOST = `${os.hostname()}#${process.pid}`;
+async function beat() {
+  const ts = new Date();
+  try {
+    await connection.set(HEARTBEAT_KEY, ts.toISOString(), "EX", 180);
+  } catch (err) {
+    console.error("[Worker] heartbeat redis write failed:", (err as Error).message);
+  }
+  try {
+    await prisma.workerHeartbeat.upsert({
+      where: { host: WORKER_HOST },
+      update: { lastSeenAt: ts },
+      create: { host: WORKER_HOST, startedAt: WORKER_STARTED_AT, lastSeenAt: ts },
+    });
+    console.log(`[Worker] heartbeat ${ts.toISOString()}`);
+  } catch (err) {
+    console.error("[Worker] heartbeat db write failed:", (err as Error).message);
+  }
+}
+void beat();
+setInterval(() => void beat(), 60_000).unref();
 
 // Register recurring scheduled jobs (idempotent — BullMQ deduplicates by jobId)
 scheduleEscalationJob().catch(err => console.error("[Worker] Failed to schedule escalation job:", err));

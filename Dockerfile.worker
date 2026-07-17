@@ -1,0 +1,30 @@
+# WP-7 (FULL GO closure / DEC-08): the background-job worker as its own
+# always-on container — Railway / Fly / Render / any Docker host.
+#
+#   docker build -f Dockerfile.worker -t medvex-worker .
+#   docker run --env-file .env.worker medvex-worker
+#
+# The worker refuses to start without real DATABASE_URL + REDIS_URL
+# (validateWorkerConfig, PR-002): the CHANGE_ME build dummies below exist only
+# so `prisma generate` can run at image-build time — if they leak to runtime
+# because the platform env is missing, the worker exits non-zero immediately.
+FROM node:22-alpine
+
+WORKDIR /app
+
+# Prisma engines want these on alpine.
+RUN apk add --no-cache openssl libc6-compat
+
+COPY package.json package-lock.json ./
+COPY prisma ./prisma
+COPY prisma.config.ts tsconfig.json ./
+# tsx and prisma live in devDependencies — install everything.
+RUN npm ci --no-audit --no-fund
+
+ENV DATABASE_URL="postgresql://CHANGE_ME:CHANGE_ME@localhost:5432/CHANGE_ME" \
+    DIRECT_URL="postgresql://CHANGE_ME:CHANGE_ME@localhost:5432/CHANGE_ME"
+RUN npx prisma generate
+
+COPY src ./src
+
+CMD ["npx", "tsx", "src/server/jobs/worker.ts"]
