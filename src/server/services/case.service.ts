@@ -220,6 +220,19 @@ export class CaseService {
     const entry = await prisma.caseServiceEntry.findUnique({ where: { id: entryId } });
     if (!entry || entry.caseId !== caseId) throw new Error("Service entry not found on this case");
     if (entry.voided) return entry;
+    // IPL-001 (CASE-12): a line already frozen into an interim/final slice is an
+    // immutable financial fact — it cannot be voided. A late correction must go
+    // through an adjustment on that claim, never by mutating a billed slice.
+    if (entry.billedInClaimId) {
+      const slice = await prisma.claim.findUnique({
+        where: { id: entry.billedInClaimId },
+        select: { claimNumber: true },
+      });
+      throw new Error(
+        `This service line is already billed on slice ${slice?.claimNumber ?? entry.billedInClaimId} and cannot be voided — ` +
+          `raise an adjustment on that claim instead.`,
+      );
+    }
 
     return prisma.$transaction(async (tx) => {
       const voided = await tx.caseServiceEntry.update({
@@ -263,10 +276,186 @@ export class CaseService {
     return prisma.letterOfUndertaking.update({ where: { id: louId }, data: { caseId } });
   }
 
+  /** Inclusive end-of-day (UTC) for a cut-off calendar day — TIME-05 determinism:
+   * an entry dated on the cut-off day is IN the slice; the next day is OUT,
+   * regardless of the time component the caller passed. */
+  private static cutoffDayEnd(d: Date): Date {
+    return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23, 59, 59, 999));
+  }
+
   /**
-   * Close the case and file exactly ONE claim from the accrued services
-   * (decision D5). Case pre-auths re-point at the filed claim (WP-C2 attach
-   * semantics); LOUs become UTILISED; the case becomes immutable.
+   * IPL-001 — cut an interim bill slice from an OPEN admission (plan §11, SET-01).
+   * Freezes the non-voided, not-yet-billed service entries dated on/before the
+   * Friday cut-off into exactly ONE claim (status RECEIVED), keeps the case OPEN
+   * so care keeps accruing, and stamps the frozen entries with the slice's claim
+   * id so they can never be voided or re-billed on a later slice (identity-based
+   * double-billing guard, SET-02). The slice then flows through the ordinary
+   * adjudication → settlement pipeline unchanged; benefit `used` is recognised
+   * when the slice is DECIDED (§11.6), cash settles later.
+   */
+  static async cutInterimSlice(input: {
+    tenantId: string;
+    caseId: string;
+    cutoffDate: Date;
+    invoiceNumber?: string | null;
+    cutById: string;
+  }) {
+    const c = await prisma.clinicalCase.findUnique({
+      where: { id: input.caseId, tenantId: input.tenantId },
+      include: {
+        claims: { select: { caseSliceSeq: true } },
+        preauths: { select: { id: true, status: true } },
+      },
+    });
+    if (!c) throw new Error("Case not found");
+    if (c.status === "CLOSED_FILED") throw new Error("Case is already closed and filed — no further interim slices.");
+    if (c.status === "CANCELLED") throw new Error("Case is cancelled — no interim slices.");
+
+    const cutoffEnd = CaseService.cutoffDayEnd(input.cutoffDate);
+    // Guard the obvious footgun: a cut-off before the admission bills nothing.
+    if (c.admissionDate && cutoffEnd < c.admissionDate) {
+      throw new Error("Cut-off date is before the admission date — nothing to bill.");
+    }
+
+    // Slice = non-voided, still-unbilled entries dated on/before the cut-off day.
+    const eligible = await prisma.caseServiceEntry.findMany({
+      where: { caseId: c.id, voided: false, billedInClaimId: null, entryDate: { lte: cutoffEnd } },
+      orderBy: { entryDate: "asc" },
+    });
+    if (eligible.length === 0) {
+      throw new Error(
+        `No unbilled services on or before ${input.cutoffDate.toISOString().slice(0, 10)} to bill on a new slice. ` +
+          `Every prior line is already on a slice, or nothing new has accrued.`,
+      );
+    }
+
+    const seq = Math.max(0, ...c.claims.map((cl) => cl.caseSliceSeq ?? 0)) + 1;
+    const sliceTotal = eligible.reduce((s, e) => s + Number(e.totalAmount), 0);
+    const serviceFrom = eligible[0].entryDate;
+    const serviceTo = eligible[eligible.length - 1].entryDate;
+    const claimNumber = await prisma.claim
+      .count({ where: { tenantId: input.tenantId } })
+      .then((n) => `CLM-${new Date().getFullYear()}-${String(n + 1).padStart(5, "0")}`);
+    const invoiceNumber = input.invoiceNumber?.trim() || `${c.caseNumber}-S${seq}`;
+    const entryIds = eligible.map((e) => e.id);
+
+    return prisma.$transaction(async (tx) => {
+      const claim = await tx.claim.create({
+        data: {
+          tenantId: input.tenantId,
+          claimNumber,
+          invoiceNumber,
+          memberId: c.memberId,
+          providerId: c.providerId,
+          providerBranchId: c.providerBranchId,
+          caseId: c.id,
+          currency: c.currency,
+          isInterimBill: true,
+          caseSliceSeq: seq,
+          sliceCutoffAt: cutoffEnd,
+          sliceServiceFrom: serviceFrom,
+          sliceServiceTo: serviceTo,
+          serviceType: CASE_TYPE_TO_SERVICE_TYPE[c.caseType],
+          dateOfService: serviceFrom,
+          admissionDate: c.admissionDate,
+          // Interim: the stay is ongoing — no discharge, no LOS yet.
+          attendingDoctor: c.attendingDoctor,
+          diagnoses: (c.primaryDiagnoses ?? []) as Prisma.InputJsonValue,
+          procedures: eligible.map((e) => ({
+            description: e.description,
+            code: e.serviceCode,
+            qty: e.quantity,
+            unitCost: Number(e.unitAmount),
+            total: Number(e.totalAmount),
+          })) as Prisma.InputJsonValue,
+          billedAmount: sliceTotal,
+          benefitCategory: c.benefitCategory,
+          status: "RECEIVED",
+          claimLines: {
+            create: eligible.map((e, i) => ({
+              lineNumber: i + 1,
+              serviceCategory: e.category,
+              description: e.description,
+              cptCode: e.serviceCode,
+              quantity: e.quantity,
+              unitCost: e.unitAmount,
+              billedAmount: e.totalAmount,
+            })),
+          },
+          adjudicationLogs: {
+            create: {
+              userId: input.cutById,
+              action: "RECEIVED",
+              toStatus: "RECEIVED",
+              notes:
+                `Interim slice ${seq} from case ${c.caseNumber} — cut-off ` +
+                `${input.cutoffDate.toISOString().slice(0, 10)}, ${eligible.length} service line(s). Case remains open.`,
+            },
+          },
+        },
+      });
+
+      // Atomic freeze: stamp exactly the eligible entries that are STILL unbilled.
+      // A concurrent cut that grabbed any of them leaves count < expected → we
+      // roll back so the loser never bills a line twice (SET-06 shape at case level).
+      const frozen = await tx.caseServiceEntry.updateMany({
+        where: { id: { in: entryIds }, billedInClaimId: null },
+        data: { billedInClaimId: claim.id },
+      });
+      if (frozen.count !== entryIds.length) {
+        throw new Error("Some of these services were just billed on another slice — refresh the case and try again.");
+      }
+
+      // §11.3 PA/LOU linkage: attach the case's currently-available approved PAs
+      // to the slice so the availability gate credits their hold at decision and
+      // consumes only what this slice needs. Partially-consumed PAs detach back
+      // to the case (existing decide logic), keeping residual guarantee usable
+      // for the next slice (§11.5). Fully-consumed PAs become UTILISED.
+      if (c.preauths.some((pa) => pa.status === "APPROVED")) {
+        await tx.preAuthorization.updateMany({
+          where: { caseId: c.id, status: "APPROVED", claimId: null },
+          data: { claimId: claim.id, attachedAt: new Date(), status: "ATTACHED" },
+        });
+      }
+
+      // Same-day multiple bed-day charges hard-flag the slice for fraud clearance
+      // before it can be approved/settled (IP-DEF-04, same rule as closeAndFile).
+      const bedDayOverlaps = CaseService.detectBedDayOverlaps(eligible);
+      if (bedDayOverlaps.length > 0) {
+        await tx.claimFraudAlert.create({
+          data: {
+            tenantId: input.tenantId,
+            claimId: claim.id,
+            rule: "Overlapping Bed-Day Charges",
+            score: 80,
+            severity: "HIGH",
+            notes: bedDayOverlaps.map((o) => `${o.day}: ${o.items.join(" + ")}`).join("; ").slice(0, 900),
+          },
+        });
+      }
+
+      await tx.activityLog.create({
+        data: {
+          entityType: "CASE",
+          entityId: c.id,
+          action: "INTERIM_SLICE_CUT",
+          description:
+            `Interim slice ${seq} (${claim.claimNumber}, invoice ${invoiceNumber}) cut from case ${c.caseNumber}: ` +
+            `${eligible.length} line(s), ${c.currency} ${sliceTotal.toLocaleString()} billed. Case remains open.`,
+          userId: input.cutById,
+        },
+      });
+
+      return claim;
+    });
+  }
+
+  /**
+   * Close the case and file the FINAL claim from the residual (not-yet-sliced)
+   * services. Interim slices already cut stay untouched; their entries are never
+   * re-billed (SET-03). If every entry was already billed on a slice, the case
+   * closes with no empty final claim — the slices ARE the claims. Case pre-auths
+   * re-point at the final claim (WP-C2); LOUs become UTILISED; case is immutable.
    */
   static async closeAndFile(tenantId: string, caseId: string, closedById: string) {
     const c = await prisma.clinicalCase.findUnique({
@@ -274,30 +463,66 @@ export class CaseService {
       include: {
         serviceEntries: { where: { voided: false }, orderBy: { entryDate: "asc" } },
         preauths: { select: { id: true } },
-        claims: { select: { id: true } },
+        claims: { select: { caseSliceSeq: true } },
       },
     });
     if (!c) throw new Error("Case not found");
     if (c.status === "CLOSED_FILED") throw new Error("Case is already closed and filed");
     if (c.status === "CANCELLED") throw new Error("Case is cancelled");
-    // One case → one claim (service-layer rule, D5).
-    if (c.claims.length > 0) throw new Error("Case already has a filed claim");
     if (c.serviceEntries.length === 0) {
       throw new Error("Cannot file an empty case — add service entries or cancel it");
     }
 
+    // IPL-001: the final claim bills only the RESIDUAL — non-voided entries not
+    // already frozen into an interim slice. Sliced entries are never re-billed
+    // (SET-03). If everything was already sliced, the case closes with no empty
+    // final claim (the slices ARE the claims).
+    const residual = c.serviceEntries.filter((e) => !e.billedInClaimId);
+    const residualTotal = residual.reduce((s, e) => s + Number(e.totalAmount), 0);
     const dischargeDate = c.dischargeDate ?? new Date();
+    const nextSeq = Math.max(0, ...c.claims.map((cl) => cl.caseSliceSeq ?? 0)) + 1;
+
+    // ── All-sliced path: no residual → close with no final claim ──────────────
+    if (residual.length === 0) {
+      await prisma.$transaction(async (tx) => {
+        // CASE-13: same atomic OPEN/PENDING_CLOSURE → CLOSED_FILED guard.
+        const claimedCase = await tx.clinicalCase.updateMany({
+          where: { id: c.id, tenantId, status: { in: ["OPEN", "PENDING_CLOSURE"] } },
+          data: { status: "CLOSED_FILED", closedById, closedAt: new Date(), dischargeDate },
+        });
+        if (claimedCase.count !== 1) {
+          throw new Error("This case has just been filed by another user — refresh to see the claim.");
+        }
+        await tx.letterOfUndertaking.updateMany({
+          where: { caseId: c.id, status: "ISSUED" },
+          data: { status: "UTILISED" },
+        });
+        await tx.activityLog.create({
+          data: {
+            entityType: "CASE",
+            entityId: c.id,
+            action: "CASE_CLOSED_ALL_SLICED",
+            description:
+              `Case ${c.caseNumber} closed with no final claim — all services were already billed on ` +
+              `${c.claims.length} interim slice(s). Nothing to re-bill (SET-03).`,
+            userId: closedById,
+          },
+        });
+      });
+      return null;
+    }
+
     const claimNumber = await prisma.claim
       .count({ where: { tenantId } })
       .then((n) => `CLM-${new Date().getFullYear()}-${String(n + 1).padStart(5, "0")}`);
+    const residualIds = residual.map((e) => e.id);
 
     const claim = await prisma.$transaction(async (tx) => {
-      // FG-C9: atomically claim the case as the FIRST write, so two concurrent
-      // closeAndFile calls can't both file a claim from it (Claim.caseId is
-      // non-unique — the "already filed" check above is not concurrency-safe).
-      // Only an OPEN/PENDING_CLOSURE case files, and only once: the loser matches
-      // 0 rows (row-locked behind the winner, re-evaluated as CLOSED_FILED) →
-      // throws → rolls back before a second claim is created. (One-case→one-claim, D5.)
+      // CASE-13 / FG-C9: atomically claim the case as the FIRST write, so two
+      // concurrent closeAndFile calls can't both file a final claim from it. Only
+      // an OPEN/PENDING_CLOSURE case files, and only once: the loser matches 0
+      // rows (row-locked behind the winner, re-evaluated as CLOSED_FILED) →
+      // throws → rolls back before a second final claim is created.
       const claimedCase = await tx.clinicalCase.updateMany({
         where: { id: c.id, tenantId, status: { in: ["OPEN", "PENDING_CLOSURE"] } },
         data: { status: "CLOSED_FILED", closedById, closedAt: new Date(), dischargeDate },
@@ -314,8 +539,15 @@ export class CaseService {
           providerId: c.providerId,
           providerBranchId: c.providerBranchId,
           caseId: c.id,
+          currency: c.currency,
+          // Final claim of a sliced case: ordered after the interim slices, but
+          // not itself an interim bill.
+          caseSliceSeq: nextSeq,
+          isInterimBill: false,
+          sliceServiceFrom: residual[0].entryDate,
+          sliceServiceTo: residual[residual.length - 1].entryDate,
           serviceType: CASE_TYPE_TO_SERVICE_TYPE[c.caseType],
-          dateOfService: c.admissionDate ?? c.serviceEntries[0].entryDate,
+          dateOfService: c.admissionDate ?? residual[0].entryDate,
           admissionDate: c.admissionDate,
           dischargeDate,
           lengthOfStay: c.admissionDate
@@ -323,18 +555,18 @@ export class CaseService {
             : null,
           attendingDoctor: c.attendingDoctor,
           diagnoses: (c.primaryDiagnoses ?? []) as Prisma.InputJsonValue,
-          procedures: c.serviceEntries.map((e) => ({
+          procedures: residual.map((e) => ({
             description: e.description,
             code: e.serviceCode,
             qty: e.quantity,
             unitCost: Number(e.unitAmount),
             total: Number(e.totalAmount),
           })) as Prisma.InputJsonValue,
-          billedAmount: c.accruedAmount,
+          billedAmount: residualTotal,
           benefitCategory: c.benefitCategory,
           status: "RECEIVED",
           claimLines: {
-            create: c.serviceEntries.map((e, i) => ({
+            create: residual.map((e, i) => ({
               lineNumber: i + 1,
               serviceCategory: e.category,
               description: e.description,
@@ -349,18 +581,25 @@ export class CaseService {
               userId: closedById,
               action: "RECEIVED",
               toStatus: "RECEIVED",
-              notes: `Filed from case ${c.caseNumber} (${c.serviceEntries.length} service entries).`,
+              notes:
+                `Final claim from case ${c.caseNumber} (${residual.length} residual service line(s)` +
+                `${c.claims.length > 0 ? `, after ${c.claims.length} interim slice(s)` : ""}).`,
             },
           },
         },
       });
 
-      // IP-DEF-04: same-date multiple bed-day charges (e.g. ward + ICU on one
-      // day) hard-flag the filed claim. With the fraud gate enforced, the claim
-      // cannot be approved until OPS/fraud/medical clears the alert — a genuine
-      // transfer day is cleared with a note; double-billing is declined. This
-      // is the "hard-flag with an authorised override path" shape.
-      const bedDayOverlaps = CaseService.detectBedDayOverlaps(c.serviceEntries);
+      // Freeze the residual entries onto the final claim too, so every non-voided
+      // entry ends the case with exactly one billing owner (reconciliation stays
+      // exhaustive; a late void can no longer silently drop a billed line).
+      await tx.caseServiceEntry.updateMany({
+        where: { id: { in: residualIds }, billedInClaimId: null },
+        data: { billedInClaimId: created.id },
+      });
+
+      // IP-DEF-04: same-date multiple bed-day charges on the residual hard-flag
+      // the final claim for fraud clearance (same rule as an interim slice).
+      const bedDayOverlaps = CaseService.detectBedDayOverlaps(residual);
       if (bedDayOverlaps.length > 0) {
         await tx.claimFraudAlert.create({
           data: {
@@ -377,14 +616,13 @@ export class CaseService {
         });
       }
 
-      // Case PAs re-point at the filed claim (WP-C2 attach semantics).
-      if (c.preauths.length > 0) {
-        await tx.preAuthorization.updateMany({
-          where: { caseId: c.id },
-          data: { claimId: created.id, attachedAt: new Date(), status: "ATTACHED" },
-        });
-      }
-      // LOUs on the case are consumed by the filing.
+      // Residual case PAs (still APPROVED and unattached — a prior slice may have
+      // UTILISED or partly consumed others) re-point at the final claim.
+      await tx.preAuthorization.updateMany({
+        where: { caseId: c.id, status: "APPROVED", claimId: null },
+        data: { claimId: created.id, attachedAt: new Date(), status: "ATTACHED" },
+      });
+      // LOUs on the case are consumed by the final filing.
       await tx.letterOfUndertaking.updateMany({
         where: { caseId: c.id, status: "ISSUED" },
         data: { status: "UTILISED" },
@@ -449,10 +687,95 @@ export class CaseService {
           select: { id: true, preauthNumber: true, status: true, approvedAmount: true, validUntil: true },
         },
         lous: { select: { id: true, louNumber: true, status: true, amountCeiling: true, validUntil: true } },
-        claims: { select: { id: true, claimNumber: true, status: true } },
+        claims: {
+          select: { id: true, claimNumber: true, status: true, caseSliceSeq: true, isInterimBill: true },
+          orderBy: { caseSliceSeq: "asc" },
+        },
         openedBy: { select: { firstName: true, lastName: true } },
       },
     });
+  }
+
+  /**
+   * IPL-001 — per-case seven-ledger reconciliation (plan §3/§11.9, probe #11).
+   * Derives billed / approved / paid / outstanding to-date and the residual
+   * guarantee from the case's claims (interim slices + final), so an open long
+   * stay can be reconciled every Friday without a single generic "balance".
+   * Read-only; the money facts live on the claims and settlement batches.
+   */
+  static async getCaseReconciliation(tenantId: string, caseId: string) {
+    const c = await prisma.clinicalCase.findUnique({
+      where: { id: caseId, tenantId },
+      select: { currency: true },
+    });
+    if (!c) throw new Error("Case not found");
+
+    const [claims, entries] = await Promise.all([
+      prisma.claim.findMany({
+        where: { caseId, tenantId },
+        select: {
+          id: true, claimNumber: true, invoiceNumber: true, caseSliceSeq: true,
+          isInterimBill: true, sliceCutoffAt: true, sliceServiceFrom: true, sliceServiceTo: true,
+          billedAmount: true, approvedAmount: true, memberLiability: true, status: true, decidedAt: true,
+          settlementBatch: { select: { status: true, settledAt: true } },
+        },
+        orderBy: [{ caseSliceSeq: "asc" }, { createdAt: "asc" }],
+      }),
+      prisma.caseServiceEntry.findMany({
+        where: { caseId, voided: false },
+        select: { totalAmount: true, billedInClaimId: true },
+      }),
+    ]);
+
+    const claimIds = claims.map((cl) => cl.id);
+    // PAs securing this episode — attached to the case OR to any of its claims.
+    const pas = await prisma.preAuthorization.findMany({
+      where: { tenantId, OR: [{ caseId }, { claimId: { in: claimIds } }] },
+      select: { approvedAmount: true, estimatedCost: true, utilisedAmount: true, status: true },
+    });
+
+    const isSettled = (s?: { status: string } | null) => s?.status === "SETTLED";
+    const num = (d: unknown) => Number(d ?? 0);
+
+    const billedToDate = entries.reduce((s, e) => s + num(e.totalAmount), 0); // B
+    const billedOnSlices = entries.filter((e) => e.billedInClaimId).reduce((s, e) => s + num(e.totalAmount), 0);
+    const unbilledResidual = billedToDate - billedOnSlices;
+    const approvedToDate = claims.reduce((s, cl) => s + num(cl.approvedAmount), 0); // U / provider payable pre-settlement
+    const paidToDate = claims.filter((cl) => isSettled(cl.settlementBatch)).reduce((s, cl) => s + num(cl.approvedAmount), 0); // S
+    const outstanding = approvedToDate - paidToDate; // P not yet settled
+    const memberShare = claims.reduce((s, cl) => s + num(cl.memberLiability), 0);
+    // Residual guarantee: episode PA/GOP approved not yet utilised (H).
+    const remainingGuarantee = pas
+      .filter((pa) => ["APPROVED", "ATTACHED"].includes(pa.status))
+      .reduce((s, pa) => s + Math.max(0, num(pa.approvedAmount ?? pa.estimatedCost) - num(pa.utilisedAmount)), 0);
+
+    return {
+      currency: c.currency,
+      billedToDate,
+      billedOnSlices,
+      unbilledResidual,
+      approvedToDate,
+      paidToDate,
+      outstanding,
+      memberShare,
+      remainingGuarantee,
+      sliceCount: claims.filter((cl) => cl.isInterimBill).length,
+      slices: claims.map((cl) => ({
+        id: cl.id,
+        claimNumber: cl.claimNumber,
+        invoiceNumber: cl.invoiceNumber,
+        seq: cl.caseSliceSeq,
+        isInterimBill: cl.isInterimBill,
+        cutoffAt: cl.sliceCutoffAt,
+        serviceFrom: cl.sliceServiceFrom,
+        serviceTo: cl.sliceServiceTo,
+        billed: num(cl.billedAmount),
+        approved: num(cl.approvedAmount),
+        status: cl.status,
+        settlementStatus: cl.settlementBatch?.status ?? null,
+        decidedAt: cl.decidedAt,
+      })),
+    };
   }
 }
 

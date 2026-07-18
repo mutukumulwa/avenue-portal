@@ -3,11 +3,11 @@ import { prisma } from "@/lib/prisma";
 import { CaseService } from "@/server/services/case.service";
 import {
   addServiceEntryAction, voidServiceEntryAction, attachCasePreauthAction,
-  issueCaseLouAction, closeAndFileAction, cancelCaseAction,
+  issueCaseLouAction, closeAndFileAction, cancelCaseAction, cutInterimSliceAction,
 } from "./actions";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, BriefcaseMedical, Clock, FileCheck2, Ban, Stethoscope, FileSignature, AlertTriangle } from "lucide-react";
+import { ArrowLeft, BriefcaseMedical, Clock, FileCheck2, Ban, Stethoscope, FileSignature, AlertTriangle, Scissors, Layers, CheckCircle2 } from "lucide-react";
 
 const STATUS_BADGE: Record<string, string> = {
   OPEN: "bg-[#17A2B8]/10 text-[#17A2B8]",
@@ -23,15 +23,18 @@ export default async function CaseDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; closed?: string }>;
 }) {
   const session = await requireRole(ROLES.OPS);
   const { id } = await params;
-  const { error } = await searchParams;
+  const { error, closed } = await searchParams;
   const tenantId = session.user.tenantId;
 
   const c = await CaseService.getCaseDetail(tenantId, id);
   if (!c) notFound();
+
+  // IPL-001 per-case seven-ledger reconciliation (interim slices + final).
+  const recon = await CaseService.getCaseReconciliation(tenantId, id);
 
   const editable = c.status === "OPEN" || c.status === "PENDING_CLOSURE";
   const los = c.admissionDate
@@ -64,6 +67,14 @@ export default async function CaseDetailPage({
         <div className="bg-[#DC3545]/10 border border-[#DC3545]/30 rounded-lg p-3 flex items-start gap-2">
           <AlertTriangle size={15} className="text-[#DC3545] mt-0.5 shrink-0" />
           <p className="text-sm text-[#842029]">{error}</p>
+        </div>
+      )}
+      {closed && (
+        <div className="bg-[#28A745]/10 border border-[#28A745]/30 rounded-lg p-3 flex items-start gap-2">
+          <CheckCircle2 size={15} className="text-[#28A745] mt-0.5 shrink-0" />
+          <p className="text-sm text-[#155724]">
+            Case closed. All services were already billed on interim slices — no final claim was needed.
+          </p>
         </div>
       )}
 
@@ -99,17 +110,102 @@ export default async function CaseDetailPage({
         </div>
       </div>
 
-      {/* Filed claim link */}
-      {c.claims.length > 0 && (
-        <div className="rounded-lg border border-[#28A745]/30 bg-[#28A745]/5 p-4 text-sm">
-          Filed as{" "}
-          {c.claims.map((cl) => (
-            <Link key={cl.id} href={`/claims/${cl.id}`} className="font-semibold text-brand-indigo hover:underline">
-              {cl.claimNumber} ({cl.status.replace(/_/g, " ")})
-            </Link>
+      {/* IPL-001 — Interim settlement & seven-ledger reconciliation */}
+      <section className="rounded-lg border border-brand-border bg-white p-5 shadow-sm">
+        <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-brand-text-muted">
+          <Layers size={14} /> Interim settlement &amp; reconciliation
+        </h2>
+
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+          {([
+            ["Billed to date", recon.billedToDate],
+            ["Billed on slices", recon.billedOnSlices],
+            ["Unbilled residual", recon.unbilledResidual],
+            ["Approved to date", recon.approvedToDate],
+            ["Paid to date", recon.paidToDate],
+            ["Outstanding", recon.outstanding],
+          ] as const).map(([lbl, val]) => (
+            <div key={lbl} className="rounded-lg border border-[#EEEEEE] bg-[#F8F9FA] p-3">
+              <p className="text-[10px] font-bold uppercase text-brand-text-muted">{lbl}</p>
+              <p className="mt-0.5 text-sm font-bold text-brand-text-heading">
+                {recon.currency} {val.toLocaleString()}
+              </p>
+            </div>
           ))}
         </div>
-      )}
+        <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-xs text-brand-text-muted">
+          <span>Remaining guarantee (PA/GOP): <b className="text-brand-text-heading">{recon.currency} {recon.remainingGuarantee.toLocaleString()}</b></span>
+          <span>Member share: <b className="text-brand-text-heading">{recon.currency} {recon.memberShare.toLocaleString()}</b></span>
+        </div>
+
+        {recon.slices.length > 0 ? (
+          <div className="mt-4 overflow-x-auto rounded-lg border border-[#EEEEEE]">
+            <table className="w-full border-collapse text-left text-sm">
+              <thead>
+                <tr className="bg-[#E6E7E8] text-xs font-semibold uppercase text-[#6C757D]">
+                  <th className="px-3 py-2">#</th>
+                  <th className="px-3 py-2">Claim</th>
+                  <th className="px-3 py-2">Invoice</th>
+                  <th className="px-3 py-2">Type</th>
+                  <th className="px-3 py-2">Service dates</th>
+                  <th className="px-3 py-2 text-right">Billed</th>
+                  <th className="px-3 py-2 text-right">Approved</th>
+                  <th className="px-3 py-2">Status</th>
+                  <th className="px-3 py-2">Settlement</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#EEEEEE]">
+                {recon.slices.map((s) => (
+                  <tr key={s.id} className="hover:bg-[#F8F9FA]">
+                    <td className="px-3 py-2">{s.seq ?? "—"}</td>
+                    <td className="px-3 py-2">
+                      <Link href={`/claims/${s.id}`} className="font-mono font-semibold text-brand-indigo hover:underline">{s.claimNumber}</Link>
+                    </td>
+                    <td className="px-3 py-2 font-mono text-xs">{s.invoiceNumber ?? "—"}</td>
+                    <td className="px-3 py-2 text-xs">
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${s.isInterimBill ? "bg-[#6F42C1]/10 text-[#6F42C1]" : "bg-[#28A745]/10 text-[#28A745]"}`}>
+                        {s.isInterimBill ? "Interim" : "Final"}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-xs">
+                      {s.serviceFrom ? s.serviceFrom.toISOString().slice(0, 10) : "—"}
+                      {s.serviceTo && s.serviceTo.getTime() !== s.serviceFrom?.getTime() ? ` → ${s.serviceTo.toISOString().slice(0, 10)}` : ""}
+                    </td>
+                    <td className="px-3 py-2 text-right">{s.billed.toLocaleString()}</td>
+                    <td className="px-3 py-2 text-right font-semibold">{s.approved.toLocaleString()}</td>
+                    <td className="px-3 py-2 text-xs">{s.status.replace(/_/g, " ")}</td>
+                    <td className="px-3 py-2 text-xs">{s.settlementStatus ? s.settlementStatus.replace(/_/g, " ") : "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-brand-text-muted">No bill slices cut yet — the whole episode will file as one claim at closure.</p>
+        )}
+
+        {editable && (
+          <form action={cutInterimSliceAction} className="mt-4 flex flex-wrap items-end gap-3 border-t border-[#EEEEEE] pt-4">
+            <input type="hidden" name="caseId" value={c.id} />
+            <label className={label}>Friday cut-off date
+              <input name="cutoffDate" type="date" defaultValue={new Date().toISOString().slice(0, 10)} className={input} />
+            </label>
+            <label className={`${label} grow`}>Provider invoice ref (optional)
+              <input name="invoiceNumber" placeholder={`${c.caseNumber}-S${recon.sliceCount + 1}`} className={input} />
+            </label>
+            <button
+              type="submit"
+              disabled={recon.unbilledResidual <= 0}
+              title={recon.unbilledResidual <= 0 ? "Nothing new to bill since the last slice" : undefined}
+              className="inline-flex items-center gap-2 rounded-full bg-[#6F42C1] px-5 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed">
+              <Scissors size={14} /> Cut interim bill slice
+            </button>
+            <p className="w-full text-xs text-brand-text-muted">
+              Freezes {recon.currency} {recon.unbilledResidual.toLocaleString()} of unbilled services dated on/before the cut-off into an immutable, adjudicable slice. The case stays open and keeps accruing.
+            </p>
+          </form>
+        )}
+      </section>
 
       {/* Service entries */}
       <section className="rounded-lg border border-brand-border bg-white p-5 shadow-sm">
@@ -141,13 +237,17 @@ export default async function CaseDetailPage({
                   <td className="px-3 py-2 text-right font-semibold">{Number(e.totalAmount).toLocaleString()}</td>
                   <td className="px-3 py-2 text-xs">{e.source}</td>
                   <td className="px-3 py-2">
-                    {editable && !e.voided && (
+                    {e.billedInClaimId ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-[#6F42C1]/10 px-2 py-0.5 text-[10px] font-bold uppercase text-[#6F42C1]" title="Frozen onto a bill slice — immutable, cannot be voided">
+                        <Layers size={10} /> Billed
+                      </span>
+                    ) : editable && !e.voided ? (
                       <form action={voidServiceEntryAction}>
                         <input type="hidden" name="caseId" value={c.id} />
                         <input type="hidden" name="entryId" value={e.id} />
                         <button type="submit" className="text-xs font-semibold text-[#DC3545] hover:underline">Void</button>
                       </form>
-                    )}
+                    ) : null}
                   </td>
                 </tr>
               ))}
@@ -243,12 +343,18 @@ export default async function CaseDetailPage({
         <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border-2 border-brand-indigo/20 bg-brand-indigo/5 p-5">
           <div>
             <h3 className="flex items-center gap-2 font-heading text-lg font-bold text-brand-text-heading">
-              <FileCheck2 size={18} className="text-brand-indigo" /> Close &amp; file claim
+              <FileCheck2 size={18} className="text-brand-indigo" /> {recon.unbilledResidual > 0 ? "Close & file final claim" : "Close case"}
             </h3>
             <p className="mt-1 text-sm text-brand-text-body">
-              Files ONE claim: {c.serviceEntries.filter((e) => !e.voided).length} service line(s),
-              billed {c.currency} {Number(c.accruedAmount).toLocaleString()},
-              {" "}{c.preauths.length} PA(s) re-attached to the claim. The case becomes read-only.
+              {recon.unbilledResidual > 0 ? (
+                <>
+                  Files the FINAL claim for the residual: {c.serviceEntries.filter((e) => !e.voided && !e.billedInClaimId).length} unbilled
+                  service line(s), billed {recon.currency} {recon.unbilledResidual.toLocaleString()}
+                  {recon.sliceCount > 0 ? ` (${recon.sliceCount} interim slice(s) already cut are not re-billed)` : ""}. The case becomes read-only.
+                </>
+              ) : (
+                <>All {recon.sliceCount} interim slice(s) already cover every service — closing files no new claim and makes the case read-only.</>
+              )}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -266,7 +372,7 @@ export default async function CaseDetailPage({
                 disabled={c.serviceEntries.filter((e) => !e.voided).length === 0}
                 title={c.serviceEntries.filter((e) => !e.voided).length === 0 ? "Add at least one service entry (or cancel the case)" : undefined}
                 className="inline-flex items-center gap-2 rounded-full bg-brand-indigo px-6 py-2.5 font-semibold text-white shadow-sm hover:bg-brand-secondary disabled:opacity-50 disabled:cursor-not-allowed">
-                <FileCheck2 size={16} /> Close &amp; file claim
+                <FileCheck2 size={16} /> {recon.unbilledResidual > 0 ? "Close & file final claim" : "Close case"}
               </button>
             </form>
           </div>

@@ -68,6 +68,37 @@ export async function issueCaseLouAction(formData: FormData) {
   revalidatePath(`/cases/${caseId}`);
 }
 
+export async function cutInterimSliceAction(formData: FormData) {
+  const session = await requireRole(ROLES.OPS);
+  const caseId = formData.get("caseId") as string;
+
+  // IPL-001: cut a Friday interim bill slice from an OPEN case. Guard violations
+  // (nothing new to bill, cut-off before admission) surface as a banner, never a
+  // server exception (same PR-032 shape as close & file).
+  let slice;
+  try {
+    slice = await CaseService.cutInterimSlice({
+      tenantId: session.user.tenantId,
+      caseId,
+      cutoffDate: new Date((formData.get("cutoffDate") as string) || Date.now()),
+      invoiceNumber: (formData.get("invoiceNumber") as string) || null,
+      cutById: session.user.id,
+    });
+  } catch (err) {
+    if (err instanceof Error && err.message === "NEXT_REDIRECT") throw err;
+    const msg = err instanceof Error ? err.message : "Cut interim slice failed";
+    redirect(`/cases/${caseId}?error=${encodeURIComponent(msg)}`);
+  }
+  await writeAudit({
+    userId: session.user.id,
+    action: "CASE_INTERIM_SLICE_CUT",
+    module: "CASES",
+    description: `Case ${caseId.slice(0, 8)} — interim slice ${slice.claimNumber} cut (invoice ${slice.invoiceNumber})`,
+    metadata: { caseId, claimId: slice.id, sliceSeq: slice.caseSliceSeq },
+  });
+  redirect(`/claims/${slice.id}`);
+}
+
 export async function closeAndFileAction(formData: FormData) {
   const session = await requireRole(ROLES.OPS);
   const caseId = formData.get("caseId") as string;
@@ -86,10 +117,14 @@ export async function closeAndFileAction(formData: FormData) {
     userId: session.user.id,
     action: "CASE_FILED",
     module: "CASES",
-    description: `Case ${caseId.slice(0, 8)} closed — filed as claim ${claim.claimNumber}`,
-    metadata: { caseId, claimId: claim.id },
+    // IPL-001: closeAndFile returns null when every service was already billed on
+    // interim slices — the case closes with no final claim (the slices ARE the claims).
+    description: claim
+      ? `Case ${caseId.slice(0, 8)} closed — filed as claim ${claim.claimNumber}`
+      : `Case ${caseId.slice(0, 8)} closed — all services already billed on interim slices; no final claim`,
+    metadata: { caseId, claimId: claim?.id ?? null },
   });
-  redirect(`/claims/${claim.id}`);
+  redirect(claim ? `/claims/${claim.id}` : `/cases/${caseId}?closed=1`);
 }
 
 export async function cancelCaseAction(formData: FormData) {

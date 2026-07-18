@@ -2223,6 +2223,17 @@ model Claim {
   // case at closure. Non-unique by design — one-case-many-claims stays open.
   caseId           String?
   case             ClinicalCase?     @relation(fields: [caseId], references: [id])
+  // ── IPL-001 interim/periodic inpatient settlement ────────────────────────
+  // A case now files MANY claims: interim "slices" cut at each Friday cut-off
+  // while the admission stays open, then one final claim for the residual at
+  // closure. These fields describe a case-derived claim; they are null for
+  // ordinary (non-case) claims.
+  caseSliceSeq     Int? // 1,2,3… assigned in cut order within the case (final claim = last seq)
+  isInterimBill    Boolean            @default(false) // true = slice cut on an OPEN case; false = final/ordinary
+  sliceCutoffAt    DateTime? // frozen cut-off instant for an interim slice
+  sliceServiceFrom DateTime? // earliest entry date in the slice
+  sliceServiceTo   DateTime? // latest entry date in the slice
+  sliceEntries     CaseServiceEntry[] @relation("SliceEntries") // entries frozen into this claim
   source           ClaimSource       @default(MANUAL)
   serviceType      ServiceType
   dateOfService    DateTime
@@ -2692,10 +2703,18 @@ model CaseServiceEntry {
   hmsBatchRef String?
   voided      Boolean           @default(false) // never delete — void instead
   voidReason  String?
+  // IPL-001 interim settlement: when set, this entry is frozen into an interim
+  // (or final) claim slice and is immutable — it can never be voided or
+  // re-billed on a later slice. `null` = still unbilled, eligible for the next
+  // Friday cut-off. This is the identity-based double-billing guard (plan SET-02:
+  // "prior lines excluded by identity, not description guess").
+  billedInClaimId String?
+  billedInClaim   Claim?            @relation("SliceEntries", fields: [billedInClaimId], references: [id])
   createdAt   DateTime          @default(now())
 
   @@index([caseId, entryDate])
   @@index([hmsBatchRef])
+  @@index([billedInClaimId])
 }
 
 // Letter of Undertaking (WP-D1, decision D6): a payer undertaking issued to a
