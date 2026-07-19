@@ -15,10 +15,22 @@ OBS-COPY-01/OBS-A11Y-01/OBS-UI-02 (`c1fc571`), WP-B hermetic test (`9733aa1`), S
 passes at e314de8). SCN-OBS-01 confirmed in code → decision memo `notes/SCN-OBS-01_DECISION.md` (⭐ Option B)
 **awaiting sponsor sign-off**. New Low observations logged: OBS-PA-LINK-01/EXP-01/VOID-01.
 
-**Still required for a clean unconditional GO (NOT done this pass):** the §25 prior-defect gate
-(IP-DEF-01..05 + OBS-IP-* live retests) and the §9.4 breadth (privacy/RBAC, reporting/GL reconciliation,
-maker/checker SoD via distinct personas, family-pool concurrency, full day-by-day narratives), then
-merge→main + prod deploy (Arthur's go). The original run-02 verdict below stands as the baseline.
+**§25 prior-defect gate — COMPLETE (2026-07-19, all PASS/FIXED-VERIFIED):** IP-DEF-01 (PA approve w/ notes,
+no crash, note persists, GOP issued), IP-DEF-02 (future/pre-admit/post-discharge all blocked, accrued 0),
+IP-DEF-03 (2nd decide blocked — apply exactly once), IP-DEF-04 (bed-day HIGH alert + timeline warning;
+fraud-gate-enabled decide HARD-BLOCKS, tenant setting restored), IP-DEF-05 (malformed/unknown-facility HMS
+errors friendly, valid rows conserved, unmatched→Exception Register), OBS-IP-GL (trial balance balanced),
+OBS-IP-TARIFF (V1/V2 resolve, Sep-1 step-up, source/version, UGX). IP-DEF-06 + IPL-001 already
+FIXED-VERIFIED (run 02). **This clears the §29.12 automatic-NO-GO exposure** (no un-retested prior
+Critical/High inpatient finding). Evidence: `evidence/IP-DEF-01-05_gate_proof.txt`,
+`PRIOR_DEFECT_RETEST_MATRIX.csv`. **Deployed to prod** (`ef912cf`, Vercel READY, /api/health green).
+
+**Still required for a clean unconditional GO (NOT done):** the §9.4 breadth — privacy/RBAC (§23),
+reporting + GL/trial-balance tie-out to reports/exports (§24), maker/checker SoD via distinct finance
+personas (SET-09), family-pool concurrency (LIM-01/03), and the full day-by-day scenario narratives
+(§12–17). Remaining OBS-IP observations (OBS-IP-1 benefit-panel basis, OBS-IP-CUR full screen-walk,
+OBS-IP-PA-HOLD final-close residual, OBS-IP-CONTRACT-CONFIG) are UI-render / prior-run-covered. The
+original run-02 verdict below stands as the baseline.
 
 ---
 

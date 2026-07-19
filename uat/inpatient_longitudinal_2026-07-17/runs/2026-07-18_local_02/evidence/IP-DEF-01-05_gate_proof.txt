@@ -1,0 +1,33 @@
+=== §25 PRIOR-DEFECT GATE (2026-07-19, fix branch) ===
+§25 PRIOR-DEFECT GATE — controlled clock 2026-08-01T06:00:00.000Z
+
+ctx: member=MVX-2024-00001 provider=Kampala Hospital
+
+✅ IP-DEF-01 — approve-with-notes: status=APPROVED, reviewNotes persisted=true, GOP=GOP-2026-00001 (no raw-schema crash)
+✅ IP-DEF-02 — future:blocked(ok), pre-admission:blocked(ok), post-discharge:blocked(ok); accrued=0 (expect 0)
+✅ IP-DEF-03 — 1st decide APPROVED 40000; 2nd decide BLOCKED (idempotent) — Claim cannot be adjudicated in its current status (APPROVED).
+✅ IP-DEF-04 — timeline BED_DAY_OVERLAP=1, slice fraud alert=HIGH, approval not-blocked
+✅ IP-DEF-05 — validate: badVersion=ok, missingFacility=ok | unknownFacility=ok | validPlusUnmatched: applied=1 unmatched=1 (validOnCase=1, unmatched->exceptionLog=1)
+✅ OBS-IP-GL — trial balance over 54 lines: Σdebit=150,178,205 Σcredit=150,178,205 → BALANCED
+
+═══ SUMMARY: 6/6 PASS ═══
+  PASS  IP-DEF-01
+  PASS  IP-DEF-02
+  PASS  IP-DEF-03
+  PASS  IP-DEF-04
+  PASS  IP-DEF-05
+  PASS  OBS-IP-GL
+
+=== IP-DEF-04 fraud-gate BLOCK (enable/prove/restore) ===
+fraud gate ENABLED (was requireClearance=false)
+slice alert=HIGH resolved=false; approval → BLOCKED by fraud gate; slice status=RECEIVED
+
+✅ IP-DEF-04 BLOCK CONFIRMED — bed-day overlap hard-blocks approval until cleared
+fraud gate RESTORED → requireClearance=false, threshold=MEDIUM
+
+=== OBS-IP-TARIFF (V1/V2) ===
+PRECHECK 2026-07-13 (V1): {"matched":true,"message":"Matched","contract":{"id":"cmrqnndf40000myftmsc5rlbk","contractNumber":"PC-UAT-IP-2026","title":"UAT Inpatient Master Rate Schedule 2026 (local test)","versionId":"cmrqnndf80001myftyf3lkg4c","status":"ACTIVE"}}
+PRECHECK 2026-09-15 (V2): {"matched":true,"message":"Matched","contract":{"id":"cmrqnndf40000myftmsc5rlbk","contractNumber":"PC-UAT-IP-2026","title":"UAT Inpatient Master Rate Schedule 2026 (local test)","versionId":"cmrqnndf80001myftyf3lkg4c","status":"ACTIVE"}}
+TARIFF WARD-GEN @ 2026-07-13: 250000 UGX
+TARIFF ICU-DAY @ 2026-07-13: 1200000 UGX
+TARIFF ICU-DAY @ 2026-09-15: 1300000 UGX

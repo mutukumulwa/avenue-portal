@@ -130,13 +130,27 @@ Plan `../../REMEDIATION_EXECUTION_PLAN_2026-07-19.md` executed on branch **`fix/
 - **Registers updated:** GAP_REGISTER (statuses + 4 new rows), PRIOR_DEFECT_RETEST_MATRIX (IPL-PA-01 row),
   VERDICT_ONEPAGE (remediation addendum).
 
+### §25 PRIOR-DEFECT GATE — COMPLETE (2026-07-19, 6/6 + block confirmed)
+`scripts/uat-prior-defect-gate.ts` + `scripts/uat-def04-gateblock.ts` on the VM →
+`evidence/IP-DEF-01-05_gate_proof.txt`, matrix rows in `outputs/PRIOR_DEFECT_RETEST_MATRIX.csv`:
+- IP-DEF-01 PA-approve-with-notes (no crash, note persists, GOP) · IP-DEF-02 future/pre-admit/post-discharge
+  all blocked, accrued 0 · IP-DEF-03 2nd decide blocked (apply-once) · IP-DEF-04 bed-day HIGH alert + timeline
+  warning, and fraud-gate-ENABLED decide HARD-BLOCKS (enable→prove→restore) · IP-DEF-05 malformed/unknown-
+  facility friendly errors + valid rows conserved + unmatched→Exception Register · OBS-IP-GL trial balance
+  balanced · OBS-IP-TARIFF V1/V2 resolve, Sep-1 step-up, source/version, UGX.
+- With IP-DEF-06 + IPL-001 (run 02) this **clears the §29.12 automatic-NO-GO** (no un-retested prior
+  Critical/High inpatient finding).
+
 ### STILL TO DO for a clean unconditional GO (NOT done)
-1. **§25 prior-defect gate — IP-DEF-01..05 + OBS-IP-* live retests** on the VM (fix branch). Specs in the
-   plan §9.2 table. Fixtures partly depleted from prior sessions — some need a re-seed or a fresh member.
-2. **§9.4 breadth:** privacy/RBAC (§23), reporting + GL/trial-balance reconciliation (§24), maker/checker
-   SoD via distinct finance personas (SET-09), family-pool concurrency (LIM-01/03), full day-by-day
-   scenario narratives (§12–17).
-3. **Merge `fix/inpatient-slice-case-pa` → main + prod deploy** (Arthur's go), then re-verify /api/health.
+1. **§9.4 breadth:** privacy/RBAC (§23), reporting + GL/trial-balance tie-out to reports/exports (§24),
+   maker/checker SoD via distinct finance personas (SET-09), family-pool concurrency (LIM-01/03), full
+   day-by-day scenario narratives (§12–17). Remaining OBS-IP-* (OBS-IP-1, OBS-IP-CUR full walk,
+   OBS-IP-PA-HOLD, OBS-IP-CONTRACT-CONFIG) are UI-render / prior-run-covered.
+2. Fixtures partly depleted from prior sessions — breadth probes needing exact-limit binding may want a
+   re-seed or a fresh member.
+
+**DONE:** merge `fix/inpatient-slice-case-pa` → main (`ef912cf`) + prod deploy (Vercel READY, /api/health
+green) + §25 gate. VM live on the fix branch @ clock 2026-08-01.
 
 VM live on branch `fix/inpatient-slice-case-pa` @ clock 2026-08-01. To get more commits onto it:
 `git bundle create <f> <base>..fix/inpatient-slice-case-pa` → `limactl copy` → `git fetch <f> br:br` →
