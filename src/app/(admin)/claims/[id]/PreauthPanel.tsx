@@ -25,6 +25,8 @@ export async function PreauthPanel({
     memberId: string;
     providerId: string;
     status: string;
+    /** IPL-PA-01: set when this claim is a case interim slice / final bill. */
+    caseId?: string | null;
     preauths: {
       id: string;
       preauthNumber: string;
@@ -32,6 +34,8 @@ export async function PreauthPanel({
       approvedAmount: unknown;
       estimatedCost: unknown;
       validUntil: Date | null;
+      /** null for a case-attached PA (read through from the episode). */
+      claimId?: string | null;
     }[];
   };
 }) {
@@ -45,6 +49,9 @@ export async function PreauthPanel({
           providerId: claim.providerId,
           status: "APPROVED",
           claimId: null,
+          // IPL-PA-01 (A4): hide PAs that secure an open case — they belong to
+          // the episode and are read through to its slices, not attachable here.
+          caseId: null,
           OR: [{ validUntil: null }, { validUntil: { gte: new Date() } }],
         },
         select: { id: true, preauthNumber: true, approvedAmount: true, benefitCategory: true },
@@ -63,7 +70,9 @@ export async function PreauthPanel({
 
       {claim.preauths.length === 0 ? (
         <p className="mt-3 text-sm text-brand-text-muted">
-          No pre-auth attached. PA-required services on this claim will route to review until one is attached.
+          {claim.caseId
+            ? "This claim's case has no PA/GOP. Attach one on the case page — it is then read through to every slice and the final bill."
+            : "No pre-auth attached. PA-required services on this claim will route to review until one is attached."}
         </p>
       ) : (
         <ul className="mt-3 divide-y divide-[#EEEEEE]">
@@ -76,6 +85,11 @@ export async function PreauthPanel({
                 <span className={`ml-2 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${PA_BADGE[pa.status] ?? "bg-[#6C757D]/10 text-[#6C757D]"}`}>
                   {pa.status.replace(/_/g, " ")}
                 </span>
+                {claim.caseId && pa.claimId !== claim.id && (
+                  <span className="ml-2 rounded-full bg-brand-indigo/10 px-2 py-0.5 text-[10px] font-bold uppercase text-brand-indigo">
+                    via case
+                  </span>
+                )}
                 {pa.validUntil && (
                   <span className="ml-2 text-xs text-brand-text-muted">
                     valid until {new Date(pa.validUntil).toLocaleDateString()}
@@ -86,7 +100,7 @@ export async function PreauthPanel({
                 <span className="font-semibold text-brand-text-heading">
                   {Number(pa.approvedAmount ?? pa.estimatedCost ?? 0).toLocaleString()} cover
                 </span>
-                {editable && pa.status !== "UTILISED" && (
+                {editable && pa.status !== "UTILISED" && pa.claimId === claim.id && (
                   <form action={detachPreauthAction}>
                     <input type="hidden" name="claimId" value={claim.id} />
                     <input type="hidden" name="preauthId" value={pa.id} />

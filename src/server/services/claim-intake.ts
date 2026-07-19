@@ -166,6 +166,9 @@ export async function runClaimIntake(
         benefitCategory: data.benefitCategory,
         status: "APPROVED",
         claimId: null,
+        // IPL-PA-01 (A4): don't auto-grab a PA that secures an open case — it
+        // is read through to that case's interim slices / final bill.
+        caseId: null,
         validUntil: { gte: new Date() },
       },
       select: { id: true, preauthNumber: true },

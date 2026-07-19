@@ -8,6 +8,8 @@ const db = vi.hoisted(() => ({
   },
   providerTariff: { findFirst: vi.fn(async (): Promise<any> => null) },
   claimFraudAlert: { createMany: vi.fn(async (_a?: unknown) => ({ count: 0 })) },
+  // IPL-PA-01 (A5): RULE-GATE-001 now counts securing PAs case-inclusively.
+  preAuthorization: { count: vi.fn(async () => 1) },
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
 

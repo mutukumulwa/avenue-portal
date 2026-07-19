@@ -1,11 +1,13 @@
 import { prisma } from "@/lib/prisma";
 import type { BenefitCategory, CaseType, ClaimLineCategory, Prisma, ServiceType } from "@prisma/client";
+import { FraudService } from "./fraud.service";
 
 // ─── CASE MANAGEMENT (WP-D2, TPA_FEEDBACK_WORKPLAN.md §D) ────────────────────
 // A clinical episode container. Services, pre-auths, and letters of
-// undertaking accrue against an OPEN case (e.g. an inpatient stay); closure
-// assembles them into exactly ONE claim (the one-claim-per-case rule lives
-// here — the schema deliberately allows many for the future).
+// undertaking accrue against an OPEN case (e.g. an inpatient stay). IPL-001:
+// an open case can be billed in periodic interim SLICES (each a Claim from a
+// subset of entries) while it stays open, and the final bill files the
+// residual at closure — one case → many claims (the schema allows it).
 
 const CASE_TYPE_TO_SERVICE_TYPE: Record<CaseType, ServiceType> = {
   INPATIENT_ADMISSION: "INPATIENT",
@@ -300,11 +302,28 @@ export class CaseService {
     invoiceNumber?: string | null;
     cutById: string;
   }) {
+    const claim = await CaseService.cutInterimSliceTx(input);
+    // IPL-PA-01 (A5): screen the slice through the fraud rules (case-aware) for
+    // parity with the wizard/B2B/offline rails. Post-commit + never-throw, so
+    // screening can never fail the cut; the bed-day HIGH alert already gates
+    // slices inline.
+    await FraudService.evaluateClaim(claim.id, input.tenantId).catch(() => undefined);
+    return claim;
+  }
+
+  private static async cutInterimSliceTx(input: {
+    tenantId: string;
+    caseId: string;
+    cutoffDate: Date;
+    invoiceNumber?: string | null;
+    cutById: string;
+  }) {
     const c = await prisma.clinicalCase.findUnique({
       where: { id: input.caseId, tenantId: input.tenantId },
       include: {
         claims: { select: { caseSliceSeq: true } },
-        preauths: { select: { id: true, status: true } },
+        // Case PAs are read through at slice decision (IPL-PA-01), not
+        // re-pointed here, so cutInterimSlice no longer needs to load them.
       },
     });
     if (!c) throw new Error("Case not found");
@@ -406,17 +425,14 @@ export class CaseService {
         throw new Error("Some of these services were just billed on another slice — refresh the case and try again.");
       }
 
-      // §11.3 PA/LOU linkage: attach the case's currently-available approved PAs
-      // to the slice so the availability gate credits their hold at decision and
-      // consumes only what this slice needs. Partially-consumed PAs detach back
-      // to the case (existing decide logic), keeping residual guarantee usable
-      // for the next slice (§11.5). Fully-consumed PAs become UTILISED.
-      if (c.preauths.some((pa) => pa.status === "APPROVED")) {
-        await tx.preAuthorization.updateMany({
-          where: { caseId: c.id, status: "APPROVED", claimId: null },
-          data: { claimId: claim.id, attachedAt: new Date(), status: "ATTACHED" },
-        });
-      }
+      // §11.3/IPL-PA-01: case PAs are NOT re-pointed onto interim slices. They
+      // stay attached to the case for the whole admission; the decision path
+      // reads them through ClaimsService.effectivePreauthWhere (the union of
+      // claim- and case-attached PAs), so a PA approved AFTER this cut — or one
+      // still securing an undecided earlier slice — is honoured by every slice.
+      // Re-pointing at cut time made PA linkage an instant-of-cut snapshot and
+      // was the IPL-PA-01 defect. Only closeAndFile re-points residual PAs onto
+      // the FINAL claim (for audit continuity, existing behaviour).
 
       // Same-day multiple bed-day charges hard-flag the slice for fraud clearance
       // before it can be approved/settled (IP-DEF-04, same rule as closeAndFile).
@@ -633,11 +649,27 @@ export class CaseService {
       return created;
     });
 
+    // IPL-PA-01 (A5): screen the final claim (case-aware fraud rules), parity
+    // with the other intake rails. Post-commit + never-throw.
+    await FraudService.evaluateClaim(claim.id, tenantId).catch(() => undefined);
     return claim;
   }
 
   static async cancelCase(tenantId: string, caseId: string, closedById: string, reason: string) {
     const c = await CaseService.getOpenCase(tenantId, caseId);
+    // IPL-PA-01 (A8): a case with already-cut interim slices cannot be
+    // cancelled — those slice Claims are live/adjudicable, and clearing the
+    // case's PAs would strand the guarantee behind them. Decline or void the
+    // slices first, then cancel.
+    const liveClaims = await prisma.claim.count({
+      where: { caseId: c.id, status: { notIn: ["DECLINED", "VOID"] } },
+    });
+    if (liveClaims > 0) {
+      throw new Error(
+        `Case has ${liveClaims} billed slice(s)/claim(s) — decline or void them first, then cancel. ` +
+          `A cancelled episode cannot leave live billable claims behind.`,
+      );
+    }
     // Release attached PAs back to the pool.
     await prisma.preAuthorization.updateMany({
       where: { caseId: c.id },

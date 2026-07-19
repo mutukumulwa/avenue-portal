@@ -52,6 +52,17 @@ export default async function ClaimDetailPage({
   const tariffVariances = contractRates.lines;
   const governingContract = contractRates.contract;
 
+  // IPL-PA-01: a case-linked claim (interim slice / final bill) is secured by
+  // PAs attached to its CASE — read them through here so the panel, the
+  // availability credit and the cover cap all see the episode's guarantee, not
+  // just the slice's own (empty) FK list.
+  const effectivePreauths = claim.caseId
+    ? await prisma.preAuthorization.findMany({
+        where: { tenantId, OR: [{ claimId: claim.id }, { caseId: claim.caseId }] },
+        orderBy: { approvedAt: "asc" },
+      })
+    : claim.preauths;
+
   // Prisma Decimal fields don't survive the RSC boundary (the flight stream
   // aborts and the page never hydrates) — hand the client form plain numbers.
   const coContribView = coContribTx
@@ -124,7 +135,7 @@ export default async function ClaimDetailPage({
         benefitCategory: claim.benefitCategory,
         requestedAmount: Number(claim.billedAmount),
         serviceDate: claim.dateOfService ?? undefined,
-        creditPreauthIds: claim.preauths?.filter((p) => ["APPROVED", "ATTACHED"].includes(p.status)).map((p) => p.id) ?? [],
+        creditPreauthIds: effectivePreauths?.filter((p) => ["APPROVED", "ATTACHED"].includes(p.status)).map((p) => p.id) ?? [],
       });
     } catch (e) {
       availabilityError = e instanceof Error ? e.message : "Benefit availability could not be computed.";
@@ -240,6 +251,22 @@ export default async function ClaimDetailPage({
         </div>
       </div>
 
+      {/* IPL-PA-01: episode linkage — a slice / final bill names its case. */}
+      {claim.caseId && claim.case && (
+        <Link
+          href={`/cases/${claim.caseId}`}
+          className="flex items-center gap-2 rounded-lg border border-brand-indigo/20 bg-brand-indigo/5 px-4 py-2.5 text-sm text-brand-text-body hover:bg-brand-indigo/10"
+        >
+          <Info size={15} className="text-brand-indigo shrink-0" />
+          <span>
+            {claim.isInterimBill
+              ? `Interim slice ${claim.caseSliceSeq ?? ""} of case ${claim.case.caseNumber}`
+              : `Final bill of case ${claim.case.caseNumber}`}{" "}
+            — its pre-authorisations are read through from the case.
+          </span>
+        </Link>
+      )}
+
       {/* Attached pre-authorizations (WP-C3) */}
       <PreauthPanel
         claim={{
@@ -248,7 +275,8 @@ export default async function ClaimDetailPage({
           memberId: claim.memberId,
           providerId: claim.providerId,
           status: claim.status,
-          preauths: claim.preauths,
+          caseId: claim.caseId,
+          preauths: effectivePreauths,
         }}
       />
 

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
   claim: { findUnique: vi.fn() },
-  preAuthorization: { findUnique: vi.fn(), update: vi.fn(async (a: any) => a.data) },
+  preAuthorization: { findUnique: vi.fn(), findMany: vi.fn(async (): Promise<any[]> => []), update: vi.fn(async (a: any) => a.data) },
 }));
 
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
@@ -101,21 +101,30 @@ describe("ClaimsService.detachPreauth", () => {
 });
 
 describe("ClaimsService.getPreauthCoverage (WP-C2 cap check)", () => {
-  it("flags overage when billed exceeds attached PA cover", async () => {
-    db.claim.findUnique.mockResolvedValue({
-      billedAmount: 500_000,
-      preauths: [
-        { id: "pa1", preauthNumber: "PA-1", approvedAmount: 200_000, estimatedCost: 250_000 },
-        { id: "pa2", preauthNumber: "PA-2", approvedAmount: null, estimatedCost: 100_000 },
-      ],
-    });
+  it("flags overage when billed exceeds attached PA cover (net of utilisation)", async () => {
+    db.claim.findUnique.mockResolvedValue({ billedAmount: 500_000, caseId: null });
+    db.preAuthorization.findMany.mockResolvedValue([
+      { id: "pa1", preauthNumber: "PA-1", approvedAmount: 200_000, estimatedCost: 250_000, utilisedAmount: 0 },
+      { id: "pa2", preauthNumber: "PA-2", approvedAmount: null, estimatedCost: 100_000, utilisedAmount: 0 },
+    ]);
     const c = await ClaimsService.getPreauthCoverage("t1", "clm1");
     expect(c.approvedCover).toBe(300_000);
     expect(c.exceedsCover).toBe(true);
   });
 
+  it("nets utilisation out of the cover (multi-slice episode)", async () => {
+    db.claim.findUnique.mockResolvedValue({ billedAmount: 500_000, caseId: "case1" });
+    db.preAuthorization.findMany.mockResolvedValue([
+      { id: "pa1", preauthNumber: "PA-1", approvedAmount: 200_000, estimatedCost: 250_000, utilisedAmount: 150_000 },
+    ]);
+    const c = await ClaimsService.getPreauthCoverage("t1", "clm1");
+    expect(c.approvedCover).toBe(50_000); // 200k − 150k already consumed by earlier slices
+    expect(c.exceedsCover).toBe(true);
+  });
+
   it("does not flag claims with no attached PAs", async () => {
-    db.claim.findUnique.mockResolvedValue({ billedAmount: 500_000, preauths: [] });
+    db.claim.findUnique.mockResolvedValue({ billedAmount: 500_000, caseId: null });
+    db.preAuthorization.findMany.mockResolvedValue([]);
     const c = await ClaimsService.getPreauthCoverage("t1", "clm1");
     expect(c.exceedsCover).toBe(false);
   });

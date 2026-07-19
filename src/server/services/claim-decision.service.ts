@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/prisma";
-import type { Prisma } from "@prisma/client";
 import { ApprovalMatrixService } from "./approval-matrix.service";
 import { ApprovalRequestService } from "./approval-request.service";
 import { BenefitUsageService } from "./benefit-usage.service";
@@ -228,11 +227,28 @@ export class ClaimDecisionService {
         memberId: true, benefitCategory: true, serviceType: true,
         billedAmount: true, receivedAt: true, adjudicatorId: true,
         attendingDoctor: true, isReimbursement: true, dateOfService: true,
-        preauths: { select: { id: true, preauthNumber: true, approvedAmount: true, estimatedCost: true, utilisedAmount: true, status: true } },
+        caseId: true,
         member: { select: { firstName: true, lastName: true, group: { select: { clientId: true, fundingMode: true, selfFundedAccount: { select: { id: true, balance: true } } } } } },
       },
     });
     if (!claim) throw new Error("Claim not found");
+
+    // IPL-PA-01: the PAs securing this claim. For a case-linked claim (interim
+    // slice or final bill) they live on the CASE and are only FK-re-pointed at
+    // final close, so we read the UNION of claim- and case-attached PAs. A slice
+    // PA approved/attached after the cut — or still securing an undecided
+    // earlier slice — is thereby honoured (fixes the instant-of-cut snapshot
+    // that blocked PA-required lines from interim settlement). These drive the
+    // pre-tx gates; the money writes re-read inside the serializable tx (below).
+    const paSelect = {
+      id: true, preauthNumber: true, approvedAmount: true,
+      estimatedCost: true, utilisedAmount: true, status: true,
+    } as const;
+    const effectivePreauths = await prisma.preAuthorization.findMany({
+      where: { tenantId, ...ClaimsService.effectivePreauthWhere(claim) },
+      select: paSelect,
+      orderBy: [{ approvedAt: "asc" }, { createdAt: "asc" }], // oldest cover first — deterministic consumption
+    });
 
     // 1 ── status transition guard (also the idempotency guard, PR-016 #5)
     if (!["RECEIVED", "CAPTURED", "UNDER_REVIEW"].includes(claim.status)) {
@@ -406,10 +422,20 @@ export class ClaimDecisionService {
       const rates = allRates.filter((r) => !capitatedLineIds.has(r.lineId));
       if (rates.length > 0) {
         const paLines = rates.filter((r) => r.requiresPreauth);
-        if (paLines.length > 0 && claim.preauths.length === 0) {
+        // IPL-PA-01: the gate answers "was this episode authorised?" — UTILISED
+        // PAs count (a long stay whose GOP was consumed by earlier slices must
+        // still be able to file its final PA-required line; the money is bound
+        // by the cover cap + availability gate, not this gate). Reads the
+        // effective (case-inclusive) list, so a case PA satisfies a slice's
+        // PA-required line.
+        const securingPAs = effectivePreauths.filter((p) =>
+          ["APPROVED", "ATTACHED", "UTILISED"].includes(p.status),
+        );
+        if (paLines.length > 0 && securingPAs.length === 0) {
           const codes = paLines.map((r) => r.cptCode ?? "uncoded").join(", ");
           throw new Error(
-            `Contract ${contract?.contractNumber ?? ""} requires pre-authorization for: ${codes}. Link an approved PA to this claim or decline the line(s).`,
+            `Contract ${contract?.contractNumber ?? ""} requires pre-authorization for: ${codes}. ` +
+              `Link an approved PA to this claim${claim.caseId ? " (or attach one to its case)" : ""} or decline the line(s).`,
           );
         }
         const qtyLines = rates.filter((r) => r.quantityExceeded);
@@ -459,8 +485,8 @@ export class ClaimDecisionService {
     // PR-022: the enforceable cover is the REMAINING cover (approved −
     // already-utilised), so multi-claim episodes are capped correctly.
     let notes = decision.notes || undefined;
-    if (isApproval && claim.preauths.length > 0) {
-      const cover = claim.preauths.reduce(
+    if (isApproval && effectivePreauths.length > 0) {
+      const cover = effectivePreauths.reduce(
         (sum, pa) =>
           sum + Math.max(0, Number(pa.approvedAmount ?? pa.estimatedCost ?? 0) - Number(pa.utilisedAmount ?? 0)),
         0,
@@ -518,6 +544,17 @@ export class ClaimDecisionService {
     const isSelfFunded = claim.member?.group?.fundingMode === "SELF_FUNDED" && !!account;
 
     const updated = await inSerializableTx(prisma, async (tx) => {
+      // IPL-PA-01: re-read the effective PAs INSIDE the serializable tx. The
+      // outer snapshot is stale across retries, and under case read-through two
+      // slices of one case can be decided concurrently — the money writes
+      // (hold credit + utilisation) must bind to a fresh in-tx view or the
+      // second decide double-counts the same case PA's remaining cover.
+      const txPreauths = await tx.preAuthorization.findMany({
+        where: { tenantId, ...ClaimsService.effectivePreauthWhere(claim) },
+        select: paSelect,
+        orderBy: [{ approvedAt: "asc" }, { createdAt: "asc" }],
+      });
+
       // P1.3 — THE benefit-availability gate: first thing inside the
       // transaction, before ANY write (cost-share/GL/fund/usage). Availability
       // is recomputed at the claim's service date under Serializable isolation
@@ -532,7 +569,7 @@ export class ClaimDecisionService {
           benefitCategory: claim.benefitCategory,
           requestedAmount: approvedAmount,
           serviceDate: claim.dateOfService ?? undefined,
-          creditPreauthIds: claim.preauths
+          creditPreauthIds: txPreauths
             .filter((pa) => ["APPROVED", "ATTACHED"].includes(pa.status))
             .map((pa) => pa.id),
           tenantId,
@@ -577,7 +614,7 @@ export class ClaimDecisionService {
       //    reservation and can attach the PA to the next claim.
       if (isApproval) {
         let toConsume = approvedAmount;
-        for (const pa of claim.preauths) {
+        for (const pa of txPreauths) {
           if (!["APPROVED", "ATTACHED"].includes(pa.status)) continue;
           const paCover = Number(pa.approvedAmount ?? pa.estimatedCost ?? 0);
           const remainingCover = Math.max(0, paCover - Number(pa.utilisedAmount ?? 0));
@@ -609,13 +646,21 @@ export class ClaimDecisionService {
           await tx.preAuthorization.update({
             where: { id: pa.id },
             data: fullyConsumed
-              ? { status: "UTILISED", utilisedAmount: newUtilised }
+              // IPL-PA-01: stamp WHICH claim finished the PA (audit: the case
+              // recon + preauth pages then show the consuming slice). `caseId`
+              // is intentionally left untouched so read-through history holds.
+              ? { status: "UTILISED", utilisedAmount: newUtilised, claimId, attachedAt: new Date() }
+              // Partial: PA back to APPROVED, detached from any claim FK, so the
+              // rest of the episode still has its reservation. `caseId` stays.
               : { status: "APPROVED", utilisedAmount: newUtilised, claimId: null, attachedAt: null },
           });
         }
-      } else if (claim.preauths.length > 0) {
+      } else if (txPreauths.length > 0) {
         // DECLINED: hold stays ACTIVE — detach + back to APPROVED for
-        // resubmission (PR-016 D4).
+        // resubmission (PR-016 D4). Only PAs FK-attached to THIS claim are
+        // reset (the where clause filters on claimId); case-attached PAs
+        // (claimId null) are left untouched, so declining a slice never
+        // disturbs the episode's guarantee.
         await tx.preAuthorization.updateMany({
           where: { claimId, status: { in: ["APPROVED", "ATTACHED"] } },
           data: { status: "APPROVED", claimId: null, attachedAt: null },

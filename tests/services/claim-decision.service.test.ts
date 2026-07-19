@@ -25,7 +25,7 @@ const db = vi.hoisted(() => {
     benefitUsage: { findUnique: vi.fn(async () => null), findMany: vi.fn(async (): Promise<any[]> => []), create: vi.fn(async (a: any) => a.data), update: vi.fn(async (a: any) => a.data) },
     benefitConfigSharedLimit: { findMany: vi.fn(async (): Promise<any[]> => []) },
     benefitHold: { findUnique: vi.fn(async () => null), findMany: vi.fn(async (): Promise<any[]> => []), update: vi.fn(async (a: any) => a.data), upsert: vi.fn(async () => ({})) },
-    preAuthorization: { updateMany: vi.fn(async () => ({ count: 1 })), update: vi.fn(async (a: any) => a.data) },
+    preAuthorization: { findMany: vi.fn(async (): Promise<any[]> => []), count: vi.fn(async () => 0), updateMany: vi.fn(async () => ({ count: 1 })), update: vi.fn(async (a: any) => a.data) },
     approvalMatrix: { findMany: vi.fn(async (): Promise<any[]> => []) },
     approvalRequest: { findFirst: vi.fn(async () => null), create: vi.fn(async () => ({ id: "ar1" })), update: vi.fn(async (a: any) => a.data) },
     // OBS-7 fraud gate: default tenant config leaves the gate OFF, and no
@@ -56,6 +56,11 @@ vi.mock("@/server/services/contract-engine/engine", () => ({ ContractEngine: eng
 
 const claimsSvc = vi.hoisted(() => ({
   resolveClaimContractRates: vi.fn(async (): Promise<any> => ({ contract: null, lines: [] })),
+  // IPL-PA-01: faithful copy of the real resolver (union of claim- and
+  // case-attached PAs). The findMany it feeds is mocked, so only its shape
+  // matters, but we mirror the branch so a caseId scenario is exercised.
+  effectivePreauthWhere: (claim: any) =>
+    claim.caseId ? { OR: [{ claimId: claim.id }, { caseId: claim.caseId }] } : { claimId: claim.id },
 }));
 vi.mock("@/server/services/claims.service", () => ({ ClaimsService: claimsSvc }));
 
@@ -114,6 +119,16 @@ beforeEach(() => {
     code: a.where.tenantId_code.code,
   }));
   db.claim.findUnique.mockResolvedValue(baseClaim());
+  // IPL-PA-01: decide() reads securing PAs via preAuthorization.findMany (case
+  // read-through), not the claim's own FK list. Route the mock to the current
+  // claim's `preauths` so PA scenarios (set via baseClaim({ preauths: [...] }))
+  // keep exercising the credit + utilisation loop. Reads the recorded findUnique
+  // result at call-time, so per-test overrides propagate without extra calls.
+  db.preAuthorization.findMany.mockImplementation(async () => {
+    const results = db.claim.findUnique.mock.results;
+    const claim = await Promise.resolve(results[results.length - 1]?.value);
+    return (claim?.preauths ?? []) as any[];
+  });
   db.benefitUsage.findUnique.mockResolvedValue(null);
   db.benefitUsage.findMany.mockResolvedValue([]);
   db.benefitConfigSharedLimit.findMany.mockResolvedValue([]);
@@ -797,5 +812,99 @@ describe("P1.3 — benefit availability gate (IP-DEF-06)", () => {
     });
     await expect(decide({ approvedAmount: 100000 })).rejects.toThrow(/BENEFIT_FAMILY_LIMIT_EXHAUSTED[\s\S]*Approve up to KES 50,000/);
     expect(db.claim.update).not.toHaveBeenCalled();
+  });
+});
+
+// ─── IPL-PA-01 — interim slices honour the case's PAs ────────────────────────
+describe("IPL-PA-01 — a case slice reads its PAs through the case", () => {
+  // A PA-required contract line (the CT-HEAD shape from the Boda repro). No
+  // enforceable-price surprise: allowedUnit is high so the ceiling never binds
+  // the small approval, isolating the PA gate.
+  const paRequiredLine = () =>
+    claimsSvc.resolveClaimContractRates.mockResolvedValue({
+      contract: { contractNumber: "PC-UAT-IP-2026" },
+      lines: [
+        {
+          lineId: "l1", cptCode: "CT-HEAD", description: "CT Head",
+          requiresPreauth: true, quantityExceeded: false,
+          allowedUnit: 1_000_000, quantity: 1, maxQuantityPerVisit: null, agreedRate: null,
+        },
+      ],
+    });
+
+  it("a slice with a case PA and a PA-required line ADJUDICATES (was the IPL-PA-01 block)", async () => {
+    memberWithConfig();
+    paRequiredLine();
+    // The PA is attached to the CASE (claimId null), approved after / independent
+    // of the cut — the exact state the old FK-snapshot code could not see.
+    db.claim.findUnique.mockResolvedValue(
+      baseClaim({
+        caseId: "case1",
+        preauths: [{ id: "capa", preauthNumber: "PA-CASE-1", approvedAmount: 2_000_000, estimatedCost: 2_000_000, utilisedAmount: 0, status: "APPROVED", claimId: null }],
+      }),
+    );
+
+    await decide({ approvedAmount: 3600 });
+
+    expect(db.claim.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: "APPROVED", approvedAmount: 3600 }) }),
+    );
+    // The case PA was consumed (partial) and stayed APPROVED with caseId intact
+    // (the update data never clears caseId).
+    const paUpdate = db.preAuthorization.update.mock.calls.find((c: any[]) => c[0]?.where?.id === "capa");
+    expect(paUpdate).toBeTruthy();
+    expect(paUpdate![0].data).toEqual(expect.objectContaining({ status: "APPROVED", utilisedAmount: 3600, claimId: null }));
+    expect(paUpdate![0].data).not.toHaveProperty("caseId");
+  });
+
+  it("a slice with a PA-required line and NO PA anywhere still THROWS (gate regression) and points at the case", async () => {
+    memberWithConfig();
+    paRequiredLine();
+    db.claim.findUnique.mockResolvedValue(baseClaim({ caseId: "case1", preauths: [] }));
+
+    await expect(decide({ approvedAmount: 3600 })).rejects.toThrow(
+      /requires pre-authorization[\s\S]*attach one to its case/,
+    );
+    expect(db.claim.update).not.toHaveBeenCalled();
+  });
+
+  it("a UTILISED case PA satisfies the required-line gate (F6 final bill) but the cover cap needs explicit confirmation", async () => {
+    memberWithConfig();
+    paRequiredLine();
+    // Earlier slices fully consumed the GOP → PA is UTILISED, 0 remaining cover.
+    db.claim.findUnique.mockResolvedValue(
+      baseClaim({
+        caseId: "case1",
+        preauths: [{ id: "capa", preauthNumber: "PA-CASE-1", approvedAmount: 2_000_000, estimatedCost: 2_000_000, utilisedAmount: 2_000_000, status: "UTILISED", claimId: "slice-earlier" }],
+      }),
+    );
+
+    // Gate passes (UTILISED counts), but 3,600 > 0 remaining cover → cover cap.
+    await expect(decide({ approvedAmount: 3600 })).rejects.toThrow(/PA cover check/);
+    // With the explicit over-cover confirmation it proceeds.
+    await decide({ approvedAmount: 3600, overCoverConfirmation: "final residual line after GOP exhausted" });
+    expect(db.claim.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: "APPROVED" }) }),
+    );
+  });
+
+  it("DECLINING a slice never consumes or detaches the case's PAs", async () => {
+    memberWithConfig();
+    paRequiredLine();
+    db.claim.findUnique.mockResolvedValue(
+      baseClaim({
+        caseId: "case1",
+        preauths: [{ id: "capa", preauthNumber: "PA-CASE-1", approvedAmount: 2_000_000, estimatedCost: 2_000_000, utilisedAmount: 0, status: "APPROVED", claimId: null }],
+      }),
+    );
+
+    await decide({ action: "DECLINED", approvedAmount: 0, declineReasonCode: "NOT_COVERED" });
+    // No per-PA utilisation write (that only happens on approval).
+    expect(db.preAuthorization.update).not.toHaveBeenCalled();
+    // The detach updateMany is scoped to claimId, so a case PA (claimId null)
+    // is untouched — the guarantee survives for the next slice.
+    expect(db.preAuthorization.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({ where: expect.objectContaining({ claimId: "clm1" }) }),
+    );
   });
 });

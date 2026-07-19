@@ -172,6 +172,8 @@ export class ClaimsService {
         },
         provider: true,
         preauths: true,
+        // IPL-PA-01: episode linkage so a slice / final bill shows its case.
+        case: { select: { id: true, caseNumber: true } },
         claimLines: { orderBy: { lineNumber: "asc" } },
         adjudicationLogs: { orderBy: { createdAt: "desc" } },
         exceptionLogs: {
@@ -259,13 +261,19 @@ export class ClaimsService {
       const PREAUTH_REQUIRED = ["INPATIENT", "SURGICAL", "MATERNITY"] as const;
       const needsPreauth = (PREAUTH_REQUIRED as readonly string[]).includes(data.benefitCategory);
       if (needsPreauth && !data.preauthId) {
-        // Check if there's an approved pre-auth for this member + benefit that hasn't been converted yet
+        // Check if there's an approved pre-auth for this member + benefit that hasn't been converted yet.
+        // IPL-PA-01 (A4): exclude PAs that secure an open case — those are read
+        // through to the case's interim slices / final bill and must not be
+        // auto-hijacked onto a stray direct claim. (OBS-PA-LINK-01: this query
+        // still filters neither providerId nor tenantId — logged as a Low
+        // observation for a follow-up, not fixed here to keep the diff scoped.)
         const linkedPreauth = await prisma.preAuthorization.findFirst({
           where: {
             memberId: data.memberId,
             benefitCategory: data.benefitCategory,
             status: "APPROVED",
             claimId: null,
+            caseId: null,
           },
         });
         if (!linkedPreauth) {
@@ -423,6 +431,25 @@ export class ClaimsService {
   // ─── PRE-AUTH ATTACHMENT (WP-C2, TPA_FEEDBACK_WORKPLAN.md §C) ────────────
 
   /**
+   * IPL-PA-01: the PAs securing a claim. For a case-linked claim (interim slice
+   * or final bill) the episode's PAs live on the CASE (`caseId`) for the whole
+   * admission and are only FK-re-pointed at final close — so the decision path
+   * must read the UNION of claim-attached and case-attached PAs. A PA approved
+   * or attached after a slice was cut, or still securing an undecided earlier
+   * slice, is thereby seen by every slice (fixes the instant-of-cut snapshot).
+   * Non-case claims keep the FK-only behaviour. A single findMany with this
+   * where cannot return a row twice (each PA matches at most one arm per row).
+   */
+  static effectivePreauthWhere(claim: {
+    id: string;
+    caseId?: string | null;
+  }): Prisma.PreAuthorizationWhereInput {
+    return claim.caseId
+      ? { OR: [{ claimId: claim.id }, { caseId: claim.caseId }] }
+      : { claimId: claim.id };
+  }
+
+  /**
    * Attach an approved pre-authorization to a claim. The claim keeps its BAU
    * lines; the PA covers the PA-required services within it. Validates member,
    * provider, PA status, validity window, and single-attachment.
@@ -437,7 +464,7 @@ export class ClaimsService {
         where: { id: preauthId, tenantId },
         select: {
           id: true, memberId: true, providerId: true, status: true,
-          claimId: true, validUntil: true, preauthNumber: true,
+          claimId: true, caseId: true, validUntil: true, preauthNumber: true,
         },
       }),
     ]);
@@ -449,6 +476,16 @@ export class ClaimsService {
     if (pa.claimId === claimId) return pa; // already attached here — idempotent
     if (pa.claimId) {
       throw new Error(`Pre-auth ${pa.preauthNumber} is already attached to another claim`);
+    }
+    // IPL-PA-01 (A4): a PA securing an open case is read through to that case's
+    // interim slices and final bill automatically — hijacking it onto an
+    // unrelated claim would strand the episode's guarantee. Detach it from the
+    // case first if it genuinely must move.
+    if (pa.caseId) {
+      throw new Error(
+        `Pre-auth ${pa.preauthNumber} secures an open case — its interim slices and final bill read it ` +
+          `automatically. Detach it from the case first if you really need to attach it here.`,
+      );
     }
     if (pa.status !== "APPROVED") {
       throw new Error(`Only APPROVED pre-auths can be attached (current: ${pa.status})`);
@@ -493,20 +530,30 @@ export class ClaimsService {
   static async getPreauthCoverage(tenantId: string, claimId: string) {
     const claim = await prisma.claim.findUnique({
       where: { id: claimId, tenantId },
-      select: {
-        billedAmount: true,
-        preauths: { select: { id: true, preauthNumber: true, approvedAmount: true, estimatedCost: true } },
-      },
+      select: { billedAmount: true, caseId: true },
     });
     if (!claim) throw new Error("Claim not found");
-    const cover = claim.preauths.reduce(
-      (sum, pa) => sum + Number(pa.approvedAmount ?? pa.estimatedCost ?? 0), 0,
+    // IPL-PA-01 (A6.3): read the effective PAs (own + case-attached) and net
+    // utilisation — the gross sum overstates cover for multi-slice episodes.
+    // Mirrors the decide()-side PR-022 remaining-cover formula.
+    const preauths = await prisma.preAuthorization.findMany({
+      where: {
+        tenantId,
+        ...ClaimsService.effectivePreauthWhere({ id: claimId, caseId: claim.caseId }),
+        status: { in: ["APPROVED", "ATTACHED", "UTILISED"] },
+      },
+      select: { id: true, preauthNumber: true, approvedAmount: true, estimatedCost: true, utilisedAmount: true },
+    });
+    const cover = preauths.reduce(
+      (sum, pa) =>
+        sum + Math.max(0, Number(pa.approvedAmount ?? pa.estimatedCost ?? 0) - Number(pa.utilisedAmount ?? 0)),
+      0,
     );
     return {
-      attachedCount: claim.preauths.length,
+      attachedCount: preauths.length,
       approvedCover: cover,
       billedAmount: Number(claim.billedAmount),
-      exceedsCover: claim.preauths.length > 0 && Number(claim.billedAmount) > cover,
+      exceedsCover: preauths.length > 0 && Number(claim.billedAmount) > cover,
     };
   }
 

@@ -28,6 +28,11 @@ const db = vi.hoisted(() => {
 
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
 
+// IPL-PA-01 (A5): case-born claims are screened post-commit. Mock it so the
+// unit tests can assert the call without running the real fraud rules.
+const fraud = vi.hoisted(() => ({ evaluateClaim: vi.fn(async () => undefined) }));
+vi.mock("@/server/services/fraud.service", () => ({ FraudService: fraud }));
+
 import { CaseService } from "@/server/services/case.service";
 
 const openCaseRow = (over: any = {}) => ({
@@ -380,15 +385,18 @@ describe("CaseService.cutInterimSlice (SET-01 — immutable slice on an open cas
     await expect(cut()).rejects.toThrow(/just billed on another slice/i);
   });
 
-  it("attaches the case's available approved PAs to the slice so the hold is credited at decision", async () => {
+  it("does NOT re-point the case's PAs onto the slice — they are read through at decision (IPL-PA-01)", async () => {
     db.clinicalCase.findUnique.mockResolvedValue(sliceCaseRow({ preauths: [{ id: "pa1", status: "APPROVED" }] }));
     await cut();
-    expect(db.tx.preAuthorization.updateMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: { caseId: "case1", status: "APPROVED", claimId: null },
-        data: expect.objectContaining({ claimId: "clm1", status: "ATTACHED" }),
-      }),
-    );
+    // The instant-of-cut FK re-point is gone; the decision path resolves case
+    // PAs via ClaimsService.effectivePreauthWhere, so a PA approved after the
+    // cut (or securing an undecided sibling slice) is still honoured.
+    expect(db.tx.preAuthorization.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("screens the slice through the fraud rules after commit (A5 parity)", async () => {
+    const slice = await cut();
+    expect(fraud.evaluateClaim).toHaveBeenCalledWith(slice!.id, "t1");
   });
 
   it("hard-flags the slice with a HIGH fraud alert on same-day bed-day overlap", async () => {
@@ -475,5 +483,35 @@ describe("CaseService.getCaseReconciliation — per-case seven-ledger view", () 
     expect(r.remainingGuarantee).toBe(250_000);  // 1,000k PA − 750k utilised
     expect(r.sliceCount).toBe(2);
     expect(r.slices).toHaveLength(2);
+  });
+});
+
+describe("CaseService.cancelCase (IPL-PA-01 — guard live slices)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    db.clinicalCase.findUnique.mockResolvedValue(openCaseRow());
+  });
+
+  it("refuses to cancel a case that has live (non-declined/void) slices", async () => {
+    db.claim.count.mockResolvedValue(2);
+    await expect(CaseService.cancelCase("t1", "case1", "u1", "duplicate")).rejects.toThrow(
+      /decline or void them first/i,
+    );
+    // No destructive writes when blocked — the guarantee and case are untouched.
+    expect(db.clinicalCase.update).not.toHaveBeenCalled();
+    expect(db.preAuthorization.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("cancels a case with no live claims, releasing its attached PAs", async () => {
+    db.claim.count.mockResolvedValue(0);
+    const res = await CaseService.cancelCase("t1", "case1", "u1", "entered in error");
+    expect(db.preAuthorization.updateMany).toHaveBeenCalledWith({
+      where: { caseId: "case1" },
+      data: { caseId: null },
+    });
+    expect(db.clinicalCase.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: "CANCELLED" }) }),
+    );
+    expect(res.status).toBe("CANCELLED");
   });
 });

@@ -76,7 +76,6 @@ export class FraudService {
       where: { id: claimId },
       include: {
         claimLines: true,
-        preauths: { select: { id: true } },
         member: {
           include: {
             claims: {
@@ -87,7 +86,7 @@ export class FraudService {
                   ),
                 },
               },
-              select: { id: true },
+              select: { id: true, caseId: true },
             },
           },
         },
@@ -99,8 +98,21 @@ export class FraudService {
     const newAlerts: AlertPayload[] = [];
 
     // ── RULE-GATE-001: Unlinked High-Value Claim ──────────────────────────────
+    // IPL-PA-01: count the PAs that SECURE this claim, case-inclusive — an
+    // interim slice / final bill is authorised by a PA attached to its CASE, not
+    // to the slice's own FK (which is empty for a case-born claim). Mirrors
+    // ClaimsService.effectivePreauthWhere (inlined to avoid a circular import).
+    const securingPaCount = await prisma.preAuthorization.count({
+      where: {
+        tenantId,
+        status: { in: ["APPROVED", "ATTACHED", "UTILISED"] },
+        ...(claim.caseId
+          ? { OR: [{ claimId: claim.id }, { caseId: claim.caseId }] }
+          : { claimId: claim.id }),
+      },
+    });
     if (
-      claim.preauths.length === 0 &&
+      securingPaCount === 0 &&
       Number(claim.billedAmount) > CONFIG.highValueNoPreAuthThreshold
     ) {
       newAlerts.push({
@@ -114,14 +126,20 @@ export class FraudService {
     }
 
     // ── RULE-VEL-001: Visit Velocity ─────────────────────────────────────────
-    if (claim.member.claims.length > CONFIG.velocityClaimCount) {
+    // IPL-PA-01: a weekly-sliced admission emits several claims that share one
+    // case — those siblings are one episode, not suspicious velocity, so they
+    // are excluded from the count.
+    const velocityClaims = claim.member.claims.filter(
+      (c) => !claim.caseId || c.caseId !== claim.caseId,
+    );
+    if (velocityClaims.length > CONFIG.velocityClaimCount) {
       newAlerts.push({
         tenantId,
         claimId,
         rule: "Suspicious Visit Velocity",
         score: 70,
         severity: "MEDIUM",
-        notes: `Member has ${claim.member.claims.length} claims in the last ${CONFIG.velocityWindowDays} days (threshold: ${CONFIG.velocityClaimCount}).`,
+        notes: `Member has ${velocityClaims.length} claims in the last ${CONFIG.velocityWindowDays} days (threshold: ${CONFIG.velocityClaimCount}).`,
       });
     }
 
