@@ -49,7 +49,8 @@ const NAV_GROUPS: NavGroup[] = [
     label: "Clinical",
     items: [
       // Case management sub-menu (WP-D3): claims are worked clinically — an
-      // open case accrues services/PAs/LOUs and files as a single claim.
+      // open case accrues services/PAs/LOUs and can bill in interim slices
+      // while open, with the final bill at closure (IPL-001).
       {
         label: "Case Management", href: "/cases", icon: Receipt, roles: OPS,
         children: [

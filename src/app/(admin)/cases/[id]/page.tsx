@@ -181,7 +181,7 @@ export default async function CaseDetailPage({
             </table>
           </div>
         ) : (
-          <p className="mt-3 text-sm text-brand-text-muted">No bill slices cut yet — the whole episode will file as one claim at closure.</p>
+          <p className="mt-3 text-sm text-brand-text-muted">No interim bill slices cut yet — cut a slice below to bill periodically while the case stays open, or the whole episode files as one claim at closure.</p>
         )}
 
         {editable && (
@@ -195,6 +195,7 @@ export default async function CaseDetailPage({
             </label>
             <button
               type="submit"
+              aria-label="Cut interim bill slice"
               disabled={recon.unbilledResidual <= 0}
               title={recon.unbilledResidual <= 0 ? "Nothing new to bill since the last slice" : undefined}
               className="inline-flex items-center gap-2 rounded-full bg-[#6F42C1] px-5 py-2 text-xs font-semibold text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed">
@@ -268,9 +269,12 @@ export default async function CaseDetailPage({
             <label className={`${label} col-span-2`}>Description *<input name="description" required placeholder="Ward fees — day 3" className={input} /></label>
             <label className={label}>Code<input name="serviceCode" placeholder="SER001" className={input} /></label>
             <label className={label}>Qty<input name="quantity" type="number" min="1" defaultValue={1} className={input} /></label>
-            <div className="flex items-end gap-2">
+            <div className="flex flex-wrap items-end gap-2">
               <label className={`${label} grow`}>Unit amount *<input name="unitAmount" type="number" min="0" required className={input} /></label>
-              <button type="submit" className="rounded-full bg-brand-indigo px-4 py-2 text-xs font-semibold text-white hover:bg-brand-secondary">Add</button>
+              {/* OBS-A11Y-01/OBS-UI-02: shrink-0 + flex-wrap keep the submit
+                  present in the a11y tree at narrow (1280px) viewports instead
+                  of clipping out of the grid cell. Explicit aria-label too. */}
+              <button type="submit" aria-label="Add service entry" className="shrink-0 rounded-full bg-brand-indigo px-4 py-2 text-xs font-semibold text-white hover:bg-brand-secondary">Add</button>
             </div>
           </form>
         )}
@@ -302,7 +306,7 @@ export default async function CaseDetailPage({
                   ))}
                 </select>
               </label>
-              <button type="submit" className="rounded-full bg-brand-indigo px-4 py-2 text-xs font-semibold text-white hover:bg-brand-secondary">Attach</button>
+              <button type="submit" aria-label="Attach pre-authorization to case" className="shrink-0 rounded-full bg-brand-indigo px-4 py-2 text-xs font-semibold text-white hover:bg-brand-secondary">Attach</button>
             </form>
           )}
         </section>
@@ -332,7 +336,7 @@ export default async function CaseDetailPage({
               <label className={label}>Valid (days)
                 <input name="validityDays" type="number" min="1" defaultValue={30} className={`${input} w-20`} />
               </label>
-              <button type="submit" className="rounded-full bg-brand-indigo px-4 py-2 text-xs font-semibold text-white hover:bg-brand-secondary">Issue</button>
+              <button type="submit" aria-label="Issue letter of undertaking" className="shrink-0 rounded-full bg-brand-indigo px-4 py-2 text-xs font-semibold text-white hover:bg-brand-secondary">Issue</button>
             </form>
           )}
         </section>

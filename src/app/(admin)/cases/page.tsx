@@ -43,7 +43,7 @@ export default async function OpenCasesPage({
           <div>
             <h1 className="text-2xl font-heading font-bold text-brand-text-heading">Open Cases</h1>
             <p className="text-sm text-brand-text-muted">
-              Clinical episodes accruing services, pre-auths and LOUs — each files as a single claim at closure.
+              Clinical episodes accruing services, pre-auths and LOUs — bill in interim slices while open; the final bill files at closure.
               {" "}{cases.length} open.
             </p>
           </div>
