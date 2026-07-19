@@ -26,7 +26,7 @@ const paymentTermTypeEnum = z.enum(["CALENDAR", "BUSINESS"]);
 const submissionBasisEnum = z.enum(["SERVICE_DATE", "DISCHARGE_DATE", "INVOICE_DATE", "MONTHLY_BATCH"]);
 const balanceBillingEnum = z.enum(["PROHIBITED", "ALLOWED_NONCOVERED_WITH_CONSENT", "ALLOWED"]);
 const taxInclusivityEnum = z.enum(["INCLUSIVE", "EXCLUSIVE", "UNKNOWN"]);
-const reconciliationEnum = z.enum(["NONE", "MONTHLY", "QUARTERLY", "BIANNUAL"]);
+const reconciliationEnum = z.enum(["NONE", "WEEKLY", "MONTHLY", "QUARTERLY", "BIANNUAL"]);
 const unlistedRuleEnum = z.enum(["PAY_AS_BILLED", "DISCOUNT_OFF_BILLED", "REFER_FOR_REVIEW", "REJECT"]);
 
 export const contractsRouter = createTRPCRouter({

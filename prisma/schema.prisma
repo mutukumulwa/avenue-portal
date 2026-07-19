@@ -3238,6 +3238,7 @@ enum BalanceBillingPolicy {
 // Reconciliation settlement cadence (spec §5.1 — Old Mutual quarterly, Jubilee monthly).
 enum ReconciliationCadence {
   NONE
+  WEEKLY
   MONTHLY
   QUARTERLY
   BIANNUAL

@@ -157,6 +157,7 @@ export default async function NewContractPage({
               <label className={label}>Reconciliation cadence</label>
               <select name="reconciliationCadence" defaultValue="NONE" className={field}>
                 <option value="NONE">None</option>
+                <option value="WEEKLY">Weekly</option>
                 <option value="MONTHLY">Monthly</option>
                 <option value="QUARTERLY">Quarterly</option>
                 <option value="BIANNUAL">Biannual</option>
