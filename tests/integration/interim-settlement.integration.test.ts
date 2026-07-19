@@ -32,12 +32,14 @@ describe.skipIf(!URL_SET)("IPL-001 integration — interim inpatient settlement 
   let Decisions: (typeof import("@/server/services/claim-decision.service"))["ClaimDecisionService"];
   let adjudication: (typeof import("@/server/services/claim-adjudication.service"))["claimAdjudicationService"];
   let BenefitUsageService: (typeof import("@/server/services/benefit-usage.service"))["BenefitUsageService"];
+  let preauthAdj: (typeof import("@/server/services/preauth-adjudication.service"))["preauthAdjudicationService"];
 
   let tenantId: string;
   let memberId: string;
   let providerId: string;
   let reviewerId: string;
   let caseId: string;
+  let configId: string;
   const createdClaimIds: string[] = [];
   const ENTRY = 8_000; // small, so any real INPATIENT limit comfortably covers 5 of them
 
@@ -57,15 +59,20 @@ describe.skipIf(!URL_SET)("IPL-001 integration — interim inpatient settlement 
   const w2a = d(12), w2b = d(10), cut2 = d(9);
   const resid = d(6);
 
+  // IPL-RV-01 fix: SUM usage across ALL periods for the member+config. The old
+  // `findFirst orderBy periodStart desc` read a single period row, so when a
+  // decision booked into a period different from the latest existing row the
+  // before/after reads hit DIFFERENT rows — the reported "anomalous −834k on a
+  // no-op approval". A sum over every period is immune to which period a write
+  // lands in, so the delta is exactly what the decision booked.
   const usedInpatient = async () => {
     const cfg = await BenefitUsageService.resolveConfig(prisma, memberId, "INPATIENT");
     if (!cfg) return 0;
-    const row = await prisma.benefitUsage.findFirst({
+    const agg = await prisma.benefitUsage.aggregate({
       where: { memberId, benefitConfigId: cfg.configId },
-      orderBy: { periodStart: "desc" },
-      select: { amountUsed: true },
+      _sum: { amountUsed: true },
     });
-    return Number(row?.amountUsed ?? 0);
+    return Number(agg._sum.amountUsed ?? 0);
   };
 
   beforeAll(async () => {
@@ -74,6 +81,7 @@ describe.skipIf(!URL_SET)("IPL-001 integration — interim inpatient settlement 
     Decisions = (await import("@/server/services/claim-decision.service")).ClaimDecisionService;
     adjudication = (await import("@/server/services/claim-adjudication.service")).claimAdjudicationService;
     BenefitUsageService = (await import("@/server/services/benefit-usage.service")).BenefitUsageService;
+    preauthAdj = (await import("@/server/services/preauth-adjudication.service")).preauthAdjudicationService;
 
     // A member with an INPATIENT benefit config and plenty of headroom.
     const member = await prisma.member.findFirst({
@@ -88,23 +96,40 @@ describe.skipIf(!URL_SET)("IPL-001 integration — interim inpatient settlement 
     memberId = member.id;
     tenantId = member.tenantId;
 
-    // A provider with a live contract that has NO existing settlement batch and
-    // NO other approved-unsettled claims, so our batch contains only our slices.
+    // IPL-RV-01 hermeticity: capture the INPATIENT config and ZERO this member's
+    // INPATIENT usage across all periods, so the suite runs on a clean ledger
+    // regardless of what the seed pre-loaded (the old suite depended on ambient
+    // usage/contract state and produced non-deterministic deltas). The opt-in
+    // guard guarantees this is a throwaway DB.
+    const cfg = await BenefitUsageService.resolveConfig(prisma, memberId, "INPATIENT");
+    if (!cfg) throw new Error("Member has no INPATIENT benefit config — cannot run.");
+    configId = cfg.configId;
+    await prisma.benefitUsage.deleteMany({ where: { memberId, benefitConfigId: configId } });
+
+    // Prefer a provider with NO active ProviderContract, so the slice adjudicates
+    // on the deterministic "no ceiling — reviewer judgement" path (assessCeiling
+    // → null), AND with NO existing settlement batch / approved-unsettled claim,
+    // so §11.7-8's batch contains only our slices.
     const providers = await prisma.provider.findMany({
       where: { tenantId, contractStatus: { notIn: ["EXPIRED", "SUSPENDED"] } },
       select: { id: true },
     });
+    let fallback: string | undefined;
     for (const p of providers) {
-      const [batches, pending] = await Promise.all([
+      const [batches, pending, contracts] = await Promise.all([
         prisma.providerSettlementBatch.count({ where: { tenantId, providerId: p.id } }),
         prisma.claim.count({
           where: { tenantId, providerId: p.id, status: { in: ["APPROVED", "PARTIALLY_APPROVED"] }, settlementBatchId: null },
         }),
+        prisma.providerContract.count({ where: { providerId: p.id } }).catch(() => 0),
       ]);
-      if (batches === 0 && pending === 0) { providerId = p.id; break; }
+      if (batches === 0 && pending === 0) {
+        fallback ??= p.id;
+        if (contracts === 0) { providerId = p.id; break; } // ideal: no contract
+      }
     }
-    if (!providerId) providerId = providers[0]?.id;
-    if (!providerId) throw new Error("No contracted provider available — cannot run.");
+    if (!providerId) providerId = fallback ?? providers[0]?.id;
+    if (!providerId) throw new Error("No usable provider available — cannot run.");
 
     const reviewer = await prisma.user.findFirst({ where: { tenantId }, select: { id: true } });
     reviewerId = reviewer!.id;
@@ -169,6 +194,10 @@ describe.skipIf(!URL_SET)("IPL-001 integration — interim inpatient settlement 
   it("§11.6: adjudicating the slice raises benefit `used` by the approved amount (once)", async () => {
     const before = await usedInpatient();
     const slice1 = await prisma.claim.findFirst({ where: { caseId, caseSliceSeq: 1 }, select: { id: true, billedAmount: true } });
+    // Precondition (guards against seed drift): with a no-contract provider the
+    // slice adjudicates on the deterministic reviewer-judgement path — no ceiling.
+    const ceil = await Decisions.assessCeiling(tenantId, slice1!.id);
+    expect(ceil.ceiling).toBeNull();
     await approve(slice1!.id, Number(slice1!.billedAmount));
     const after = await usedInpatient();
     expect(after - before).toBeCloseTo(2 * ENTRY, 2);
@@ -260,5 +289,70 @@ describe.skipIf(!URL_SET)("IPL-001 integration — interim inpatient settlement 
     // Settlement did NOT consume benefit a second time (§11.6 / §21 timing rule).
     const usedAfterSettle = await usedInpatient();
     expect(usedAfterSettle).toBeCloseTo(usedBeforeSettle, 2);
+  });
+
+  // ── IPL-PA-01: a slice honours a PA attached to its CASE (read-through) ──────
+  it("IPL-PA-01: a slice consumes a case PA's hold via read-through (partial → PA stays APPROVED, caseId intact)", async () => {
+    const now = new Date();
+    const admit = new Date(now); admit.setUTCHours(0, 0, 0, 0); admit.setUTCDate(admit.getUTCDate() - 3);
+    const svc = new Date(admit); svc.setUTCDate(svc.getUTCDate() + 1);
+
+    // A fresh case for the same member/provider.
+    const c = await CaseService.openCase({
+      tenantId, memberId, providerId, caseType: "INPATIENT_ADMISSION",
+      benefitCategory: "INPATIENT", admissionDate: admit, openedById: reviewerId,
+    });
+    const paCaseId = c.id;
+    await CaseService.addServiceEntry({
+      tenantId, caseId: paCaseId, entryDate: svc, category: "OTHER",
+      serviceCode: null, description: "PA-covered ward day", quantity: 1, unitAmount: ENTRY, enteredById: reviewerId,
+    });
+
+    // An APPROVED PA on the CASE (not the slice), with an ACTIVE hold — the exact
+    // shape the old FK-snapshot code could not credit to a slice.
+    const PA_COVER = 50_000;
+    const pa = await prisma.preAuthorization.create({
+      data: {
+        tenantId, preauthNumber: `PA-IPL-${Date.now()}`, memberId, providerId,
+        submittedBy: "ADMIN", status: "APPROVED", benefitCategory: "INPATIENT",
+        serviceType: "INPATIENT", diagnoses: [], procedures: [],
+        estimatedCost: PA_COVER, approvedAmount: PA_COVER, utilisedAmount: 0,
+        validFrom: admit, validUntil: new Date(now.getTime() + 30 * 86_400_000),
+      },
+      select: { id: true },
+    });
+    await preauthAdj.createBenefitHold(pa.id, tenantId, memberId, "INPATIENT", PA_COVER, new Date(now.getTime() + 30 * 86_400_000));
+    await CaseService.attachPreauth(tenantId, paCaseId, pa.id); // sets caseId, keeps claimId null
+
+    // Cut a slice — the fix means it does NOT re-point the PA.
+    const slice = await CaseService.cutInterimSlice({ tenantId, caseId: paCaseId, cutoffDate: svc, cutById: reviewerId });
+    createdClaimIds.push(slice.id);
+    const afterCut = await prisma.preAuthorization.findUnique({ where: { id: pa.id }, select: { claimId: true, caseId: true } });
+    expect(afterCut?.claimId).toBeNull();          // NOT re-pointed onto the slice
+    expect(afterCut?.caseId).toBe(paCaseId);        // still secures the case
+
+    // Decide the slice — read-through must find the case PA, credit its hold and
+    // consume it partially.
+    await approve(slice.id, ENTRY);
+
+    const afterDecide = await prisma.preAuthorization.findUnique({
+      where: { id: pa.id }, select: { status: true, utilisedAmount: true, claimId: true, caseId: true },
+    });
+    expect(afterDecide?.status).toBe("APPROVED");                 // partial → back to APPROVED
+    expect(Number(afterDecide?.utilisedAmount)).toBeCloseTo(ENTRY, 2);
+    expect(afterDecide?.claimId).toBeNull();                       // detached from the slice FK
+    expect(afterDecide?.caseId).toBe(paCaseId);                    // episode linkage preserved
+
+    const hold = await prisma.benefitHold.findUnique({ where: { preAuthId: pa.id }, select: { status: true, heldAmount: true } });
+    // Hold reduced by the consumed amount, still ACTIVE (residual guarantee).
+    expect(hold?.status).toBe("ACTIVE");
+    expect(Number(hold?.heldAmount)).toBeCloseTo(PA_COVER - ENTRY, 2);
+
+    const decided = await prisma.claim.findUnique({ where: { id: slice.id }, select: { status: true } });
+    expect(decided?.status).toBe("APPROVED");
+
+    // teardown of this leg's case
+    await prisma.caseServiceEntry.deleteMany({ where: { caseId: paCaseId } }).catch(() => {});
+    await prisma.benefitHold.deleteMany({ where: { preAuthId: pa.id } }).catch(() => {});
   });
 });
