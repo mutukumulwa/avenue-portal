@@ -1,0 +1,11 @@
+FIXTURES tenant=cmrqmgje provider=Kampala Hospital member=MVX-2024-00001
+CASE CASE-2026-00011 opened (INPATIENT, admit 2026-08-01)
+SLICE CASE-2026-00011-S1 cut: billed=1,450,000, PAs re-pointed onto slice=0 (expect 0); engine ceiling=1,450,000 → approve 1,450,000
+PHASE A (no PA): decide → ✅ BLOCKED — Contract PC-UAT-IP-2026 requires pre-authorization for: MRI-BRAIN. Link an approved PA to this claim (or attach one to i
+         slice status after block = RECEIVED (expect RECEIVED — no side effects)
+PA PA-ACCEPT-1785571251223 approved (cover 1,600,000) + hold placed, attached to CASE (caseId set=true, claimId=null)
+PHASE B (case PA): decide → ✅ APPROVED approved=1,450,000
+         PA after: status=APPROVED utilised=1,450,000 claimId=null caseId-intact=true
+         hold after: status=ACTIVE held=150,000 (expect ACTIVE, 150,000)
+
+✅✅ IPL-PA-01 ACCEPTANCE PASS — case CASE-2026-00011, slice CASE-2026-00011-S1
