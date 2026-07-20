@@ -213,17 +213,14 @@ async function postClaim(req: Request) {
       }
     }
 
-    // Generate claim number
-    const count = await prisma.claim.count({ where: { tenantId: member.tenantId } });
-    const claimNumber = `CLM-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
-
     // PR-017 D2: stamp the claim currency at intake.
     const { ClaimsService } = await import("@/server/services/claims.service");
     const currency = await ClaimsService.resolveClaimCurrency(member.tenantId, provider.id, member.id);
 
+    // Everything except claimNumber — the number is assigned inside the
+    // reservation loop below so a concurrency collision can be retried cleanly.
     const claimData = {
       tenantId:      member.tenantId,
-      claimNumber,
       currency,
       externalRef:   idemKey,
       memberId:      member.id,
@@ -255,32 +252,70 @@ async function postClaim(req: Request) {
       },
     };
 
-    let claim;
-    try {
-      claim = await prisma.claim.create({ data: claimData });
-    } catch (e) {
-      // BB2-DEF-03: a concurrent retry raced past the pre-check and hit the
-      // unique index — resolve it as an idempotent replay, not an error.
-      if (idemKey && e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-        const existing = await prisma.claim.findFirst({
-          where: { tenantId: member.tenantId, providerId: provider.id, externalRef: idemKey },
-          select: { claimNumber: true, status: true, billedAmount: true },
-        });
-        if (existing) {
-          return NextResponse.json(
-            {
-              success:     true,
-              duplicate:   true,
-              claimNumber: existing.claimNumber,
-              status:      existing.status,
-              billedAmount: Number(existing.billedAmount),
-              message:     "Duplicate submission — original claim returned (idempotent replay).",
-            },
-            { status: 200 }
-          );
+    // TPA-DEF-01: the claim number was derived from a running `count()+1`, which
+    // races under concurrent submission — two requests read the same count,
+    // generate the same CLM-YYYY-NNNNN, and one hits the (tenantId, claimNumber)
+    // unique index (P2002 → previously a raw 500 that dropped the claim).
+    // Assign the number inside a bounded reservation loop: on a claimNumber
+    // collision, advance to the next candidate and retry; an externalRef
+    // collision is the idempotent-replay case (a concurrent request with the
+    // same key won) and returns the original claim. Bounded, so extreme
+    // per-tenant contention degrades to a retry-able 503, never a 500.
+    // (For very high sustained concurrency a dedicated atomic counter row updated
+    // with `UPDATE … RETURNING` would remove the retry entirely; this is the
+    // minimal, schema-free fix.)
+    const year = new Date().getFullYear();
+    const baseCount = await prisma.claim.count({ where: { tenantId: member.tenantId } });
+    const MAX_CLAIM_NUMBER_ATTEMPTS = 50;
+    let claim: Awaited<ReturnType<typeof prisma.claim.create>> | undefined;
+    for (let attempt = 0; attempt < MAX_CLAIM_NUMBER_ATTEMPTS; attempt++) {
+      const claimNumber = `CLM-${year}-${String(baseCount + 1 + attempt).padStart(5, "0")}`;
+      try {
+        claim = await prisma.claim.create({ data: { ...claimData, claimNumber } });
+        break;
+      } catch (e) {
+        const code = e instanceof Prisma.PrismaClientKnownRequestError
+          ? e.code
+          : (e as { code?: string })?.code;
+        if (code === "P2002") {
+          // BB2-DEF-03: idempotent replay — a concurrent request with the same
+          // externalRef won the (tenantId, providerId, externalRef) index. Detect
+          // it by finding the committed claim rather than by parsing
+          // e.meta.target — its shape is connector-specific (Postgres returns the
+          // constraint NAME string, not the field-name array), so a field-list
+          // check silently misses.
+          if (idemKey) {
+            const existing = await prisma.claim.findFirst({
+              where: { tenantId: member.tenantId, providerId: provider.id, externalRef: idemKey },
+              select: { claimNumber: true, status: true, billedAmount: true },
+            });
+            if (existing) {
+              return NextResponse.json(
+                {
+                  success:     true,
+                  duplicate:   true,
+                  claimNumber: existing.claimNumber,
+                  status:      existing.status,
+                  billedAmount: Number(existing.billedAmount),
+                  message:     "Duplicate submission — original claim returned (idempotent replay).",
+                },
+                { status: 200 }
+              );
+            }
+          }
+          // TPA-DEF-01: otherwise this is a claimNumber collision under
+          // concurrency (the only other unique index reachable here — invoiceNumber
+          // is unset) → advance to the next candidate number and retry.
+          continue;
         }
+        throw e;
       }
-      throw e;
+    }
+    if (!claim) {
+      return NextResponse.json(
+        { error: "Could not assign a unique claim number under load — please retry." },
+        { status: 503 }
+      );
     }
 
     // Stamp attachment state on the connected PA (WP-C2).
