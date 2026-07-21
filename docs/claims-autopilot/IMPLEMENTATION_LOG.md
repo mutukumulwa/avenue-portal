@@ -81,3 +81,27 @@ staged.
 - **Security/privacy review:** neutral IDs, no names/DOB/documents; attachment refs are synthetic hashes.
 - **Next eligible task:** F0.4 — Characterize current automation and failure behavior.
 - **Blocker/options, if blocked:** n/a.
+
+---
+
+## F0.4 — Characterize current automation and failure behavior
+
+- **Status:** COMPLETE
+- **Commit/branch:** `feat/claims-autopilot` (F0.4 commit)
+- **Files changed:** `tests/services/auto-adjudication-characterization.test.ts` (new).
+- **Decisions enforced:** none yet — this package *documents* the D1/D11 violations before F4 removes them. Read: `auto-adjudication.service.ts`, `settings/auto-adjudication/page.tsx` + `actions.ts`, existing `auto-adjudication.service.test.ts` (claim-decision.service read via its `decide`/`assessCeiling` interface; deep read deferred to F4.5 as the package directs).
+- **Acceptance scenarios covered:** anchors CA-032 (no-policy must route — currently violated), CA-050 (partial-write rollback — currently violated), CA-045 (reimbursement manual — currently holds), CA-036 (unpriced routes — currently holds).
+- **Observable behavior before:** the unsafe/partial behaviors were undocumented; a refactor could silently change them with no before/after anchor.
+- **Observable behavior after:** 8 characterization tests pin current behavior, split into two blocks:
+  - **UNSAFE (flip in F4.1/F4.5):** #1 no-policy ⇒ AUTO_APPROVE (policyId null); #2 no-ceiling fallback approves a 5,000,000 priced claim; #3 line stamping runs *before* `decide` (`invocationCallOrder` proof); #4 a mid-loop failure leaves line `l1` stamped APPROVED while the claim routes PIPELINE_ERROR (partial state, no rollback); #5 pipeline error writes only the claim flag, no durable run/stage.
+  - **SAFE (preserve):** #6 reimbursement always routes; #7 engine-pended ⇒ `PRICING_COMPLETE` route, no-price ⇒ `NO_ENFORCEABLE_PRICE` route.
+- **Forbidden effects explicitly checked:** every UNSAFE test carries a `[UNSAFE:Dx]` marker and an inline "F4.x must flip this" note so it cannot be mistaken for desired behavior and will be removed at remediation (F0.4 instruction). No production code touched.
+- **Tests run and exact results:**
+  - `npx vitest run tests/services/auto-adjudication-characterization.test.ts tests/services/auto-adjudication.service.test.ts` → **23 passed** (8 new + 15 existing).
+  - `npm run typecheck` → PASS.
+- **Database/audit/reconciliation evidence:** n/a (mock harness mirroring the existing unit test).
+- **Creator allowlist change:** none.
+- **Known gaps or skips:** the F4.1 UI copy target is pinned — `settings/auto-adjudication/page.tsx:110` currently reads "No policies — the conservative built-in default applies (auto-approve clean claims, no ceiling)"; F4.1 changes it to "No approved live policy — claims route to review." `DEFAULT` object at `auto-adjudication.service.ts:42` is the D1-violating fallback F4.1 removes.
+- **Security/privacy review:** no secrets/PII; tests use neutral mock ids.
+- **Next eligible task:** F1.1 — Add the versioned Zod claim envelope (M1). **M0 complete.**
+- **Blocker/options, if blocked:** n/a.
