@@ -127,3 +127,25 @@ staged.
 - **Security/privacy review:** anti-HTML text guard blocks tag-starts + `javascript:`; `.strict()` blocks privilege injection; no PII in schema or tests (neutral ids).
 - **Next eligible task:** F1.2 — Canonical normalization for dates, text, codes, quantities and money.
 - **Blocker/options, if blocked:** n/a.
+
+---
+
+## F1.2 — Canonical normalization for dates, text, codes, quantities and money
+
+- **Status:** COMPLETE
+- **Commit/branch:** `feat/claims-autopilot` (F1.2 commit)
+- **Files changed:** `src/server/services/claim-intake/normalize.ts` (new), `tests/services/claim-intake-normalize.test.ts` (new).
+- **Decisions enforced:** hard prohibition "no float money" — all money via `Decimal`; §7.4 recompute totals (don't trust supplied billed); §7.5 code normalization without inventing codes; §8.2 canonical ordering by source line ref.
+- **Acceptance scenarios covered:** underpins the cross-rail equivalence matrix CA-070..079 (same normalized business payload ⇒ same canonical object).
+- **Observable behavior before:** each rail parsed money/dates/codes differently (float vs Decimal, varied whitespace, mixed case) — no shared canonical form.
+- **Observable behavior after:** `normalizeSubmission(ClaimSubmissionV1)` → one `NormalizedSubmission`: Decimal money (billed/total recomputed + 2dp HALF_UP round, unit cost as no-trailing-zero canonical string), calendar-date vs instant date semantics, uppercased codes, collapsed text, source-ref line ordering with stable `lineNumber`, sorted PA refs, optional-absent→null.
+- **Forbidden effects explicitly checked:** no float arithmetic (Decimal only, proven via large-integer test with no overflow); `canonicalDecimal` throws on NaN/Infinity/exponent (defence in depth); no code invented (undefined→null); no DB/clock.
+- **Tests run and exact results:**
+  - `npx vitest run tests/services/claim-intake-normalize.test.ts` → **11 passed**, including the Done-when: four rail representations (API numbers, UI strings+whitespace, CSV lowercase+reversed order, offline numbers) normalize to one identical object.
+  - `npm run typecheck` → PASS.
+- **Database/audit/reconciliation evidence:** n/a (pure function). Every golden fixture normalizes with total == Σ line billed.
+- **Creator allowlist change:** none.
+- **Known gaps or skips:** currency-aware money scale fixed at 2dp (`MONEY_SCALE`); true per-currency minor-unit scaling refined in context where the currency table is available. idempotencyKey/timestamps are normalized but treated as transport fields (excluded from the hash in F1.3).
+- **Security/privacy review:** no PII beyond neutral ids; no logging.
+- **Next eligible task:** F1.3 — Request hash and separated duplicate fingerprints.
+- **Blocker/options, if blocked:** n/a.
