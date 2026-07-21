@@ -34,9 +34,16 @@ mechanics (interim settlement, availability gate, package unbundling, readmissio
 > non-administrator fails the `fundAdministrators` gate → 404 (A1-fund); admissions episode-count (318) < raw
 > inpatient-claim count (324 — the 6 extra are slice inflation the A2 fix removes); a 450k inpatient claim
 > routes to UNDERWRITER + dual and `enforceSegregationOfDuties` throws on maker==checker (A3). **Remaining
-> layer = browser-pixel render**, the VM's job — the disposable Lima VM is the designed browser-UAT env
-> (movable clock + personas), pending a rebuild to latest `main`; local browser is blocked by the VM already
-> holding port 3000 + a pinned NextAuth URL.
+> layer = browser-pixel render** was then driven on the VM: **rebuilt the disposable Lima VM to latest `main`
+> (`c2a3146`, git-bundle fetch + `next build` + restart, clock preserved ~2026-08-03, health green) and ran
+> the browser pass. **✅ A2 confirmed live** — the Admissions report renders episode-based ("CASE / CLAIM NO."
+> header, one row per `CASE-2026-000xx`, Total Admissions 329 with the 16 slice claims NOT inflating it).
+> **✅ A6 confirmed live** — `/provider/cases` renders for the provider (new "Cases" nav) with the full recon
+> ledgers matching `getCaseReconciliation` (STROKE closed 2 slices billed=approved 3.56M; BURNS 105.6M/100M).
+> A3's adjudication form (`approvedAmount` + Submit Decision on the 450k claim) was located and the matrix
+> routing is proven headless (450k→UNDERWRITER+dual) — the final approve-click wasn't screenshotted (Browser
+> pane went intermittently blank on the heavy adjudication page). A1/A3 remain fully covered by the 10/10
+> scoped-service-call pass + unit tests.
 
 | # | Area (plan §) | What is unproven | How to close | Prio |
 |---|---|---|---|---|
