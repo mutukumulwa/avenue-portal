@@ -908,3 +908,98 @@ describe("IPL-PA-01 — a case slice reads its PAs through the case", () => {
     );
   });
 });
+
+describe("OBS-PA-EXP-01 — PA validity is checked at decision time", () => {
+  // Same PA-required line shape as the IPL-PA-01 suite (allowedUnit high so the
+  // ceiling never binds the small approval — isolates the PA validity gate).
+  const paRequiredLine = () =>
+    claimsSvc.resolveClaimContractRates.mockResolvedValue({
+      contract: { contractNumber: "PC-UAT-IP-2026" },
+      lines: [
+        {
+          lineId: "l1", cptCode: "CT-HEAD", description: "CT Head",
+          requiresPreauth: true, quantityExceeded: false,
+          allowedUnit: 1_000_000, quantity: 1, maxQuantityPerVisit: null, agreedRate: null,
+        },
+      ],
+    });
+  // Far past / far future so the check is robust to real wall-clock (`decide()`
+  // reads `new Date()`, not the test's NOW).
+  const EXPIRED = new Date("2020-01-01T00:00:00Z");
+  const FUTURE = new Date("2099-12-31T00:00:00Z");
+
+  it("BLOCKS when the only securing PA has lapsed (validUntil in the past)", async () => {
+    memberWithConfig();
+    paRequiredLine();
+    db.claim.findUnique.mockResolvedValue(
+      baseClaim({
+        caseId: "case1",
+        preauths: [{ id: "capa", preauthNumber: "PA-CASE-1", approvedAmount: 2_000_000, estimatedCost: 2_000_000, utilisedAmount: 0, status: "APPROVED", claimId: null, validUntil: EXPIRED }],
+      }),
+    );
+    await expect(decide({ approvedAmount: 3600 })).rejects.toThrow(/has expired[\s\S]*Renew or extend/);
+    expect(db.claim.update).not.toHaveBeenCalled();
+  });
+
+  it("ADJUDICATES when the securing PA is still within validity (no false block)", async () => {
+    memberWithConfig();
+    paRequiredLine();
+    db.claim.findUnique.mockResolvedValue(
+      baseClaim({
+        caseId: "case1",
+        preauths: [{ id: "capa", preauthNumber: "PA-CASE-1", approvedAmount: 2_000_000, estimatedCost: 2_000_000, utilisedAmount: 0, status: "APPROVED", claimId: null, validUntil: FUTURE }],
+      }),
+    );
+    await decide({ approvedAmount: 3600 });
+    expect(db.claim.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: "APPROVED", approvedAmount: 3600 }) }),
+    );
+  });
+
+  it("does NOT block a UTILISED-but-expired PA (F6 final bill — the episode was authorised)", async () => {
+    memberWithConfig();
+    paRequiredLine();
+    db.claim.findUnique.mockResolvedValue(
+      baseClaim({
+        caseId: "case1",
+        preauths: [{ id: "capa", preauthNumber: "PA-CASE-1", approvedAmount: 2_000_000, estimatedCost: 2_000_000, utilisedAmount: 2_000_000, status: "UTILISED", claimId: "slice-earlier", validUntil: EXPIRED }],
+      }),
+    );
+    // Gate passes (UTILISED satisfies it despite expiry); the cover cap — NOT an
+    // "expired" throw — is what stops the 0-remaining over-cover approval.
+    await expect(decide({ approvedAmount: 3600 })).rejects.toThrow(/PA cover check/);
+  });
+
+  it("does NOT block when at least one securing PA is still valid (mixed expired + live)", async () => {
+    memberWithConfig();
+    paRequiredLine();
+    db.claim.findUnique.mockResolvedValue(
+      baseClaim({
+        caseId: "case1",
+        preauths: [
+          { id: "old", preauthNumber: "PA-OLD", approvedAmount: 1_000_000, estimatedCost: 1_000_000, utilisedAmount: 0, status: "APPROVED", claimId: null, validUntil: EXPIRED },
+          { id: "new", preauthNumber: "PA-NEW", approvedAmount: 2_000_000, estimatedCost: 2_000_000, utilisedAmount: 0, status: "APPROVED", claimId: null, validUntil: FUTURE },
+        ],
+      }),
+    );
+    await decide({ approvedAmount: 3600 });
+    expect(db.claim.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: "APPROVED" }) }),
+    );
+  });
+
+  it("never blocks a PA with no validUntil set (open-ended guarantee — regression guard)", async () => {
+    memberWithConfig();
+    paRequiredLine();
+    db.claim.findUnique.mockResolvedValue(
+      baseClaim({
+        caseId: "case1",
+        preauths: [{ id: "capa", preauthNumber: "PA-CASE-1", approvedAmount: 2_000_000, estimatedCost: 2_000_000, utilisedAmount: 0, status: "APPROVED", claimId: null }],
+      }),
+    );
+    await decide({ approvedAmount: 3600 });
+    expect(db.claim.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ status: "APPROVED" }) }),
+    );
+  });
+});

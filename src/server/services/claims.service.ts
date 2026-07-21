@@ -264,12 +264,16 @@ export class ClaimsService {
         // Check if there's an approved pre-auth for this member + benefit that hasn't been converted yet.
         // IPL-PA-01 (A4): exclude PAs that secure an open case — those are read
         // through to the case's interim slices / final bill and must not be
-        // auto-hijacked onto a stray direct claim. (OBS-PA-LINK-01: this query
-        // still filters neither providerId nor tenantId — logged as a Low
-        // observation for a follow-up, not fixed here to keep the diff scoped.)
+        // auto-hijacked onto a stray direct claim.
+        // OBS-PA-LINK-01 (fixed): scope by tenantId + providerId so an approved PA
+        // raised for facility X can never auto-link to a direct claim at facility Y
+        // (a GOP guarantees a specific facility). Mirrors the already-scoped intake
+        // path (claim-intake.ts). Prevents cross-facility guarantee hijack.
         const linkedPreauth = await prisma.preAuthorization.findFirst({
           where: {
+            tenantId,
             memberId: data.memberId,
+            providerId: data.providerId,
             benefitCategory: data.benefitCategory,
             status: "APPROVED",
             claimId: null,

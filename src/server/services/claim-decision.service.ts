@@ -243,6 +243,7 @@ export class ClaimDecisionService {
     const paSelect = {
       id: true, preauthNumber: true, approvedAmount: true,
       estimatedCost: true, utilisedAmount: true, status: true,
+      validUntil: true, // OBS-PA-EXP-01: needed for the decision-time validity check
     } as const;
     const effectivePreauths = await prisma.preAuthorization.findMany({
       where: { tenantId, ...ClaimsService.effectivePreauthWhere(claim) },
@@ -431,12 +432,34 @@ export class ClaimDecisionService {
         const securingPAs = effectivePreauths.filter((p) =>
           ["APPROVED", "ATTACHED", "UTILISED"].includes(p.status),
         );
-        if (paLines.length > 0 && securingPAs.length === 0) {
+        if (paLines.length > 0) {
           const codes = paLines.map((r) => r.cptCode ?? "uncoded").join(", ");
-          throw new Error(
-            `Contract ${contract?.contractNumber ?? ""} requires pre-authorization for: ${codes}. ` +
-              `Link an approved PA to this claim${claim.caseId ? " (or attach one to its case)" : ""} or decline the line(s).`,
+          if (securingPAs.length === 0) {
+            throw new Error(
+              `Contract ${contract?.contractNumber ?? ""} requires pre-authorization for: ${codes}. ` +
+                `Link an approved PA to this claim${claim.caseId ? " (or attach one to its case)" : ""} or decline the line(s).`,
+            );
+          }
+          // OBS-PA-EXP-01: a PA past its validUntil no longer guarantees new spend.
+          // A UTILISED PA always satisfies the gate (the episode WAS authorised —
+          // the F6 long-stay final-bill case), and a null validUntil never expires.
+          // Only block when EVERY securing PA is a non-UTILISED, explicitly-expired
+          // one — otherwise the operator would silently approve against a lapsed
+          // guarantee with no signal.
+          const now = new Date();
+          const stillValid = securingPAs.some(
+            (p) => p.status === "UTILISED" || p.validUntil == null || p.validUntil >= now,
           );
+          if (!stillValid) {
+            const expired = securingPAs
+              .filter((p) => p.validUntil != null)
+              .map((p) => `${p.preauthNumber} (expired ${p.validUntil!.toISOString().slice(0, 10)})`)
+              .join(", ");
+            throw new Error(
+              `Pre-authorization ${expired} has expired — its guarantee no longer covers: ${codes}. ` +
+                `Renew or extend the PA's validity${claim.caseId ? " and attach it to the case" : ""}, or decline the line(s).`,
+            );
+          }
         }
         const qtyLines = rates.filter((r) => r.quantityExceeded);
         if (qtyLines.length > 0) {

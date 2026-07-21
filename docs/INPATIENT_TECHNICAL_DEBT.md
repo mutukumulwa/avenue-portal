@@ -42,13 +42,15 @@ Concrete code items, each with a location and a suggested fix. None are shipping
 (the availability gate + cover cap + read-through keep money safe); they are hardening / correctness
 follow-ups. IDs match the gap register where present.
 
-### B1 — OBS-PA-LINK-01: `createClaim` PA auto-link is under-scoped · **P2**
+### B1 — OBS-PA-LINK-01: `createClaim` PA auto-link is under-scoped · ✅ **FIXED 2026-07-21**
 `ClaimsService.createClaim` ([src/server/services/claims.service.ts](../src/server/services/claims.service.ts))
-auto-links an approved PA by `memberId + benefitCategory + status + claimId:null` (and now `caseId:null`
-after the fix), but filters **neither `providerId` nor `tenantId`**. In a single tenant with the member +
-benefit + unattached constraints this is heavily narrowed, but a member with an approved PA at facility X
-could have it auto-linked to a direct claim at facility Y. **Fix:** add `providerId: data.providerId` and
-`tenantId` to the `findFirst` where. Low risk, small change; not done in the fix to keep the diff scoped.
+auto-linked an approved PA by `memberId + benefitCategory + status + claimId:null` (+ `caseId:null`), but
+filtered **neither `providerId` nor `tenantId`** — so a member with an approved PA at facility X could have
+it auto-linked to a direct claim at facility Y (cross-facility guarantee hijack). **Fixed:** the `findFirst`
+where now includes `tenantId` + `providerId: data.providerId`, mirroring the already-scoped intake path
+(`claim-intake.ts:161-171`). A GOP guarantees a specific facility, so this is the correct narrowing. No
+host unit test covers `createClaim`'s auto-link directly (integration-only); the change is a query narrowing
+proven by the existing intake-path parity + the interim-settlement integration suite (same-provider PA).
 
 ### B2 — OBS-PA-VOID-01: voiding a claim does not refund PA cover · **DECISION / P3**
 `ClaimDecisionService.voidClaim` reverses benefit `used` + GL + fund, but does **not** restore the consumed
@@ -57,12 +59,19 @@ pre-existing, unchanged by the fix. **Decision needed:** should a void refund PA
 guarantee) or is the PA considered spent? If refund is intended, mirror the utilisation decrement in
 `voidClaim`. Low frequency (void-before-settle only).
 
-### B3 — OBS-PA-EXP-01: PA validity is not re-checked at decision time · **P3**
-`decide()` does not check `PreAuthorization.validUntil` when it consumes a PA. An expired-mid-admission PA's
-hold is released by the expiry sweep (`releaseExpiredHolds`) and availability then binds raw benefit — a
-**fail-safe** direction, not a money hole — but the operator gets no explicit "PA expired" signal at
-decision. **Fix (optional):** a validity check at `decide()` that warns/blocks with a clear message; belongs
-with the §26.8 PA-enforcement probe.
+### B3 — OBS-PA-EXP-01: PA validity is not re-checked at decision time · ✅ **FIXED 2026-07-21 (gate-level)**
+`decide()` did not check `PreAuthorization.validUntil` when it consumed a PA, so an expired-but-not-yet-swept
+PA silently satisfied the PA-required gate with no operator signal. **Fixed:** the PA-required gate in
+`ClaimDecisionService.decide` ([claim-decision.service.ts](../src/server/services/claim-decision.service.ts))
+now blocks with a clear *"Pre-authorization … has expired — renew or extend … or decline the line(s)"*
+message **only** when every securing PA is a non-`UTILISED`, explicitly-expired one. Precisely scoped so it
+never false-blocks: a `null` `validUntil` never expires (open-ended guarantee), and a `UTILISED` PA always
+satisfies the gate (the F6 long-stay final-bill case — the episode *was* authorised). 5 targeted unit tests
+in `tests/services/claim-decision.service.test.ts` (block / allow-when-valid / F6-UTILISED / mixed-expired+live
+/ null-validUntil regression). **Residual (intentional, out of scope):** the *money* path (availability
+credit + cover cap) still consumes an expired-but-unswept PA's remaining cover — that is the fail-safe
+direction the expiry sweep (`releaseExpiredHolds`) already handles, and changing it would touch the
+just-verified availability spine. This WP closes the operator-signal gap the observation was raised for.
 
 ### B4 — Count-based document numbering collides on non-contiguous DBs · **P2 (partially addressed)**
 `caseNumber` / `claimNumber` / slice `invoiceNumber` are generated as `PREFIX-YEAR-{count+1}`
