@@ -34,3 +34,27 @@ staged.
 - **Security/privacy review:** baseline doc contains no credentials, keys, or patient data — verified by inspection.
 - **Next eligible task:** F0.2 — Build the production claim-creator inventory.
 - **Blocker/options, if blocked:** n/a.
+
+---
+
+## F0.2 — Build the production claim-creator inventory
+
+- **Status:** COMPLETE
+- **Commit/branch:** `feat/claims-autopilot` (F0.2 commit)
+- **Files changed:** `docs/claims-autopilot/CLAIM_CREATOR_INVENTORY.md` (new), `tests/services/claim-creator-consolidation.test.ts` (new).
+- **Decisions enforced:** groundwork for the hard prohibition "no second public claim-intake entry point" and D-consolidation; no behavior change.
+- **Acceptance scenarios covered:** none directly; underpins CA-073 and the F5 cross-rail matrix by pinning the creator set.
+- **Observable behavior before:** no inventory; a new direct `Claim.create` could land unnoticed.
+- **Observable behavior after:** all 9 production creators documented with per-rail auth/source/idempotency/fraud/automation/audit/txn detail; a guard test fails CI if a new un-allowlisted `Claim.create` appears or an allowlisted file stops creating claims.
+- **Forbidden effects explicitly checked:** guard scans `src/**` only (seed/test creators excluded by design); no runtime code changed; meta-test confirmed the guard *fails* on a planted probe creator and passes once removed (probe file deleted, no residue).
+- **Tests run and exact results:**
+  - `npx vitest run tests/services/claim-creator-consolidation.test.ts` → **3 passed**.
+  - Scanner dump → exactly 9 create sites across 8 files, matching the allowlist 1:1.
+  - Meta-test → guard FAILS with actionable message on a planted creator; PASSES 3/3 after removal.
+  - `npm run typecheck` → PASS.
+- **Database/audit/reconciliation evidence:** n/a (static source scan).
+- **Creator allowlist change:** established the initial allowlist of 8 files (claim-intake, claims.service, api/v1/claims, api/claims/import, admin claims/new actions, reimbursement.service, sync.service, case.service). Shrinks per F5 migration; canonical `claim-intake/persist.ts` joins at F3.3 and is the last entry after F5.10.
+- **Known gaps or skips:** none. `createClaimWithPreauth` and the `@deprecated convertPreauthToClaim` are wrappers over `createClaim` (no independent create site) — recorded in the inventory, not the allowlist.
+- **Security/privacy review:** inventory records auth scope per rail; no secrets/PII; documents the fraud/automation coverage gaps (#2 tRPC, #4 CSV, #6 reimbursement service run neither) that M5 closes.
+- **Next eligible task:** F0.3 — Create golden claim scenarios.
+- **Blocker/options, if blocked:** n/a.
