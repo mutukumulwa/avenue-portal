@@ -19,20 +19,21 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
   claim: { findUnique: vi.fn(), update: vi.fn(async () => ({})) },
-  claimLine: { findMany: vi.fn(async (): Promise<any[]> => []), update: vi.fn(async () => ({})) },
+  claimLine: { findMany: vi.fn(async (): Promise<unknown[]> => []), update: vi.fn(async () => ({})) },
   adjudicationLog: { create: vi.fn(async () => ({})) },
-  autoAdjudicationPolicy: { findMany: vi.fn(async (): Promise<any[]> => []) },
+  autoAdjudicationPolicy: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
   claimFraudAlert: { count: vi.fn(async () => 0) },
 }));
 const gate = vi.hoisted(() => ({ runHardGateValidation: vi.fn(async () => ({ passed: true, errors: [] as string[] })) }));
 const exclusions = vi.hoisted(() => ({
   applyToClaim: vi.fn(async () => ({ excludedCount: 0, excludedAmount: 0, payableAmount: 50000 })),
 }));
+type CeilingAssessment = { ceiling: number | null; deterministic: boolean; source: string | null; enginePayable: number | null; contractNumber: string | null };
 const decisionSvc = vi.hoisted(() => ({
   decide: vi.fn(async () => ({})),
-  assessCeiling: vi.fn(async () => ({ ceiling: 1_000_000, deterministic: true, source: "Provider tariff schedule", enginePayable: null, contractNumber: null })),
+  assessCeiling: vi.fn(async (): Promise<CeilingAssessment> => ({ ceiling: 1_000_000, deterministic: true, source: "Provider tariff schedule", enginePayable: null, contractNumber: null })),
 }));
-const engineMock = vi.hoisted(() => ({ evaluateClaimById: vi.fn(async (): Promise<any> => null) }));
+const engineMock = vi.hoisted(() => ({ evaluateClaimById: vi.fn(async (): Promise<unknown> => null) }));
 const audit = vi.hoisted(() => ({ append: vi.fn(async () => ({})) }));
 const contractPersist = vi.hoisted(() => ({ evaluateAndPersist: vi.fn(async () => ({})) }));
 const fx = vi.hoisted(() => ({ normalise: vi.fn(async (_t: string, a: number) => ({ baseAmount: a, identity: false })) }));
@@ -48,12 +49,12 @@ vi.mock("@/server/services/fx.service", () => ({ FxService: fx }));
 
 import { AutoAdjudicationService } from "@/server/services/auto-adjudication.service";
 
-const claim = (over: any = {}) => ({
+const claim = (over: Record<string, unknown> = {}) => ({
   providerId: "p1", memberId: "m1", dateOfService: new Date("2026-06-01"),
   benefitCategory: "OUTPATIENT", invoiceNumber: "INV-1", billedAmount: 50000, currency: "UGX",
   member: { group: { clientId: "c1" } }, ...over,
 });
-const intakeClaim = (over: any = {}) => ({
+const intakeClaim = (over: Record<string, unknown> = {}) => ({
   ...claim(), isReimbursement: false, claimNumber: "CLM-2026-00001", status: "RECEIVED",
   claimLines: [{ id: "l1" }], ...over,
 });
@@ -156,7 +157,7 @@ describe("F0.4 SAFE current behavior — MUST be preserved through the refactor"
 
   it("[PRESERVE] no deterministic price at all ROUTEs (NO_ENFORCEABLE_PRICE)", async () => {
     engineMock.evaluateClaimById.mockResolvedValue(null);
-    decisionSvc.assessCeiling.mockResolvedValue({ ceiling: null, deterministic: false, source: null, enginePayable: null, contractNumber: null } as any);
+    decisionSvc.assessCeiling.mockResolvedValue({ ceiling: null, deterministic: false, source: null, enginePayable: null, contractNumber: null });
     const r = await AutoAdjudicationService.processIntake("t1", "clm1", "u1");
     expect(r.decision).toBe("ROUTE");
     expect(r.failingGate).toBe("NO_ENFORCEABLE_PRICE");

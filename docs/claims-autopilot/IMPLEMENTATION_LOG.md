@@ -171,3 +171,27 @@ staged.
 - **Security/privacy review:** SHA-256 only; no reversible identifiers stored; descriptor (raw ids) is ephemeral query input, never a persisted fingerprint.
 - **Next eligible task:** F1.4 — Structured intake errors and response mapping.
 - **Blocker/options, if blocked:** n/a.
+
+---
+
+## F1.4 — Structured intake errors and response mapping
+
+- **Status:** COMPLETE
+- **Commit/branch:** `feat/claims-autopilot` (F1.4 commit)
+- **Files changed:** `src/server/services/claim-intake/errors.ts` (new), `tests/services/claim-intake-errors.test.ts` (new), `tests/services/auto-adjudication-characterization.test.ts` (lint cleanup — removed `any` from the F0.4 test).
+- **Decisions enforced:** §7.3/§11.5 (never leak raw Zod/Prisma/SQL/stack); D6 (structural rejection vs business route separation reflected in error kinds vs non-error outcome codes). No business rules in the mapper.
+- **Acceptance scenarios covered:** CA-003/CA-005 (safe field issues), CA-022 (409 conflict body), CA-086/CA-087/CA-090 (non-enumerating, redacted errors), and the F1.4 "stable 401/403/409/422/503 mapping".
+- **Observable behavior before:** each rail hand-rolled error responses; some surfaced raw thrown messages (Next masks server-action throws, so the admin wizard already RETURNs strings, but there was no shared safe mapper).
+- **Observable behavior after:** `IntakeError` (kinds VALIDATION/AUTHENTICATION/AUTHORIZATION/IDEMPOTENCY_CONFLICT/RETRYABLE/INTERNAL → 422/401/403/409/503/500), `zodToIntakeIssues` (safe `IntakeIssue[]`), `IntakeError.from(unknown)` (wraps any thrown value as generic 500, original captured only in `logContext`), `toHttpResponse`/`toActionResult` transport mappers, and stable `INTAKE_CODES` including non-error outcome codes (ACCEPTED/REPLAYED/ROUTED) for the F3.4 result type.
+- **Forbidden effects explicitly checked:** serialized bodies asserted free of `ZodError`/`PrismaClient`/`SELECT…FROM`/stack-frame/`node_modules` markers; a Prisma-like error's `constraint`/`claimNumber`/message text never reaches the body but IS in `logContext`; authorization message never enumerates the attempted id; action results strip `ECONNREFUSED`/port.
+- **Tests run and exact results:**
+  - `npx vitest run tests/services/claim-intake-errors.test.ts` → **13 passed**.
+  - `npx vitest run tests/services/auto-adjudication-characterization.test.ts` → **8 passed** (post lint cleanup).
+  - **M1 boundary full gate:** `npm run typecheck` PASS; `npx vitest run` → **1013 passed / 9 skipped**; `npm run brand:guard` PASS; `npm run currency:guard` PASS.
+  - **Lint:** my new files are eslint-clean. Full `npm run lint` has one PRE-EXISTING `no-explicit-any` error in `tests/services/claim-intake-enrollment-gate.test.ts:12` (not part of this epic; left untouched to preserve unrelated code). Full-lint was therefore already non-clean at baseline (F0.1 did not capture lint).
+- **Database/audit/reconciliation evidence:** n/a (pure mapper).
+- **Creator allowlist change:** none.
+- **Known gaps or skips:** replay/route are success OUTCOMES (codes exported here) rendered by the F3.4 submit result, not thrown errors — intentionally out of `IntakeError`.
+- **Security/privacy review:** the core privacy guarantee of the epic's transport layer; verified by anti-leakage assertions.
+- **Next eligible task:** F2.1 — Add intake receipt schema (M2). **M1 complete.**
+- **Blocker/options, if blocked:** n/a.
