@@ -58,3 +58,26 @@ staged.
 - **Security/privacy review:** inventory records auth scope per rail; no secrets/PII; documents the fraud/automation coverage gaps (#2 tRPC, #4 CSV, #6 reimbursement service run neither) that M5 closes.
 - **Next eligible task:** F0.3 — Create golden claim scenarios.
 - **Blocker/options, if blocked:** n/a.
+
+---
+
+## F0.3 — Create golden claim scenarios
+
+- **Status:** COMPLETE
+- **Commit/branch:** `feat/claims-autopilot` (F0.3 commit)
+- **Files changed:** `tests/fixtures/claims-autopilot.ts` (new), `tests/fixtures/claims-autopilot.fixtures.test.ts` (new), `docs/claims-autopilot/GOLDEN_SCENARIOS.md` (new).
+- **Decisions enforced:** D2 (three policy modes reflected in every oracle), D4 (partial opt-in — scenario 2 is contract adjustment not partial), D5 (uncoded line routes whole claim), D6 (business failures ACCEPT+ROUTE not throw), D7 (strong-link vs fuzzy-suspect separation), D13 (reimbursement always manual), D14 (inpatient shadow-only).
+- **Acceptance scenarios covered:** fixtures back CA-001, 010–012, 020–022, 024, 026–027, 030–031, 036–040, 042–046, 070–072, 076, 078–079 (recorded per-fixture in `acceptanceScenarioIds`).
+- **Observable behavior before:** no shared fixture set; each test would invent its own inputs and disagree on expected disposition.
+- **Observable behavior after:** 19 named `GoldenScenario` fixtures (18 required + FX split) with a full oracle (structural disposition, route code, queue, per-mode outcome, decimal-string line totals, money-may-move, duplicate kind, CA refs); a registry and `goldenByName` index; a 115-assertion self-consistency guard.
+- **Forbidden effects explicitly checked:** no floats (all money is decimal strings validated `^\d+(\.\d{1,2})?$`); no PHI (neutral synthetic IDs only); routed claims never move money (asserted); money-may-move implies AUTO_APPROVE + null route (asserted); no DB access in fixtures.
+- **Tests run and exact results:**
+  - `npx vitest run tests/fixtures/claims-autopilot.fixtures.test.ts` → **115 passed**.
+  - `npm run typecheck` → PASS.
+  - Full suite → see F0.4 boundary run (recorded there / this commit).
+- **Database/audit/reconciliation evidence:** n/a (unit fixtures). `expectedTotalPayable` deliberately `null` for auto-approve cases — resolved in DB builders later.
+- **Creator allowlist change:** none.
+- **Known gaps or skips:** DB-specific builders (seeded IDs + concrete payable/shortfall) deferred to when F5 integration tests need them (F0.3 step 1). FX scenario split into with/without ⇒ 19 fixtures.
+- **Security/privacy review:** neutral IDs, no names/DOB/documents; attachment refs are synthetic hashes.
+- **Next eligible task:** F0.4 — Characterize current automation and failure behavior.
+- **Blocker/options, if blocked:** n/a.
