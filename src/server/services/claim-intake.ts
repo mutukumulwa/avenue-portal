@@ -7,6 +7,7 @@ import { ProvidersService } from "@/server/services/providers.service";
 import { MemberNotificationService } from "@/server/services/member-notification.service";
 import { coverageService, isCoverageEnded } from "@/server/services/coverage.service";
 import { assertServiceDateNotFuture } from "@/lib/service-date";
+import { createWithDocumentNumber } from "@/lib/document-number";
 import type { ServiceType, BenefitCategory, ClaimLineCategory } from "@prisma/client";
 
 export interface IntakeLineItem {
@@ -183,45 +184,58 @@ export async function runClaimIntake(
 
   const billedAmount = data.lineItems.reduce((s, l) => s + l.billedAmount, 0);
 
-  const count = await prisma.claim.count({ where: { tenantId } });
-  const claimNumber = `CLM-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
-
   // PR-017 D2: stamp the claim currency at intake.
   const currency = await ClaimsService.resolveClaimCurrency(tenantId, data.providerId, data.memberId);
 
-  const claim = await prisma.claim.create({
-    data: {
-      tenantId,
-      claimNumber,
-      currency,
-      memberId: data.memberId,
-      providerId: data.providerId,
-      providerBranchId: data.providerBranchId || null,
-      preauths: approvedPA ? { connect: [{ id: approvedPA.id }] } : undefined,
-      serviceType: data.serviceType,
-      benefitCategory: data.benefitCategory,
-      dateOfService: new Date(data.dateOfService),
-      admissionDate: data.admissionDate ? new Date(data.admissionDate) : null,
-      dischargeDate: data.dischargeDate ? new Date(data.dischargeDate) : null,
-      attendingDoctor: data.attendingDoctor || null,
-      diagnoses: data.diagnoses as never,
-      procedures: data.lineItems as never,
-      billedAmount,
-      status: "RECEIVED",
-      claimLines: {
-        create: data.lineItems.map((l, i) => ({
-          lineNumber: i + 1,
-          serviceCategory: l.serviceCategory,
-          description: l.description,
-          cptCode: l.cptCode || null,
-          icdCode: l.icdCode || null,
-          quantity: l.quantity,
-          unitCost: l.unitCost,
-          billedAmount: l.billedAmount,
-        })),
-      },
-    },
-  });
+  // B4: collision-safe claim number (max+1 seed + reservation-retry). This path
+  // has no externalRef idempotency index, so a P2002 here is unambiguously a
+  // claimNumber collision — safe to advance to the next candidate.
+  const claim = await createWithDocumentNumber(
+    "CLM",
+    (yp) =>
+      prisma.claim
+        .findFirst({
+          where: { tenantId, claimNumber: { startsWith: yp } },
+          orderBy: { claimNumber: "desc" },
+          select: { claimNumber: true },
+        })
+        .then((r) => r?.claimNumber ?? null),
+    (claimNumber) =>
+      prisma.claim.create({
+        data: {
+          tenantId,
+          claimNumber,
+          currency,
+          memberId: data.memberId,
+          providerId: data.providerId,
+          providerBranchId: data.providerBranchId || null,
+          preauths: approvedPA ? { connect: [{ id: approvedPA.id }] } : undefined,
+          serviceType: data.serviceType,
+          benefitCategory: data.benefitCategory,
+          dateOfService: new Date(data.dateOfService),
+          admissionDate: data.admissionDate ? new Date(data.admissionDate) : null,
+          dischargeDate: data.dischargeDate ? new Date(data.dischargeDate) : null,
+          attendingDoctor: data.attendingDoctor || null,
+          diagnoses: data.diagnoses as never,
+          procedures: data.lineItems as never,
+          billedAmount,
+          status: "RECEIVED",
+          claimLines: {
+            create: data.lineItems.map((l, i) => ({
+              lineNumber: i + 1,
+              serviceCategory: l.serviceCategory,
+              description: l.description,
+              cptCode: l.cptCode || null,
+              icdCode: l.icdCode || null,
+              quantity: l.quantity,
+              unitCost: l.unitCost,
+              billedAmount: l.billedAmount,
+            })),
+          },
+        },
+      }),
+  );
+  const claimNumber = claim.claimNumber;
 
   if (approvedPA) {
     await prisma.preAuthorization.update({

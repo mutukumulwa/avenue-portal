@@ -3,6 +3,7 @@ import type { ClaimStatus, PreauthStatus, BenefitCategory, ServiceType, Prisma }
 import { FraudService } from "./fraud.service";
 import { ProviderContractsService, type ResolvedClaimRates } from "./provider-contracts.service";
 import { assertServiceDateNotFuture } from "@/lib/service-date";
+import { createWithDocumentNumber } from "@/lib/document-number";
 import { BenefitUsageService } from "./benefit-usage.service";
 
 export class ClaimsService {
@@ -344,9 +345,6 @@ export class ClaimsService {
       }
     }
 
-    const count = await prisma.claim.count({ where: { tenantId } });
-    const claimNumber = `CLM-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
-
     // Calculate length of stay for inpatient
     let lengthOfStay: number | undefined;
     if (data.admissionDate && data.dischargeDate) {
@@ -361,41 +359,54 @@ export class ClaimsService {
     // ceilings) FX-normalise from this value.
     const currency = await ClaimsService.resolveClaimCurrency(tenantId, data.providerId, data.memberId);
 
-    const created = await prisma.claim.create({
-      data: {
-        tenantId,
-        claimNumber,
-        currency,
-        memberId: data.memberId,
-        providerId: data.providerId,
-        // Attach the linked/auto-linked PA (WP-C1). Previously data.preauthId
-        // was resolved but never persisted — the link silently went nowhere.
-        preauths: data.preauthId ? { connect: [{ id: data.preauthId }] } : undefined,
-        serviceType: data.serviceType,
-        dateOfService: data.dateOfService,
-        admissionDate: data.admissionDate,
-        dischargeDate: data.dischargeDate,
-        lengthOfStay,
-        attendingDoctor: data.attendingDoctor,
-        diagnoses: data.diagnoses as Prisma.InputJsonValue,
-        procedures: data.procedures as Prisma.InputJsonValue,
-        billedAmount: data.billedAmount,
-        benefitCategory: data.benefitCategory,
-        status: "RECEIVED",
-        adjudicationLogs: {
-          create: {
-            userId: "SYSTEM",
-            action: "RECEIVED",
-            toStatus: "RECEIVED",
-            notes: "Claim submitted for review.",
+    // B4: collision-safe claim number (max+1 seed + reservation-retry).
+    const created = await createWithDocumentNumber(
+      "CLM",
+      (yp) =>
+        prisma.claim
+          .findFirst({
+            where: { tenantId, claimNumber: { startsWith: yp } },
+            orderBy: { claimNumber: "desc" },
+            select: { claimNumber: true },
+          })
+          .then((r) => r?.claimNumber ?? null),
+      (claimNumber) =>
+        prisma.claim.create({
+          data: {
+            tenantId,
+            claimNumber,
+            currency,
+            memberId: data.memberId,
+            providerId: data.providerId,
+            // Attach the linked/auto-linked PA (WP-C1). Previously data.preauthId
+            // was resolved but never persisted — the link silently went nowhere.
+            preauths: data.preauthId ? { connect: [{ id: data.preauthId }] } : undefined,
+            serviceType: data.serviceType,
+            dateOfService: data.dateOfService,
+            admissionDate: data.admissionDate,
+            dischargeDate: data.dischargeDate,
+            lengthOfStay,
+            attendingDoctor: data.attendingDoctor,
+            diagnoses: data.diagnoses as Prisma.InputJsonValue,
+            procedures: data.procedures as Prisma.InputJsonValue,
+            billedAmount: data.billedAmount,
+            benefitCategory: data.benefitCategory,
+            status: "RECEIVED",
+            adjudicationLogs: {
+              create: {
+                userId: "SYSTEM",
+                action: "RECEIVED",
+                toStatus: "RECEIVED",
+                notes: "Claim submitted for review.",
+              },
+            },
           },
-        },
-      },
-      include: {
-        member: { select: { firstName: true, lastName: true, memberNumber: true } },
-        provider: { select: { name: true } },
-      },
-    });
+          include: {
+            member: { select: { firstName: true, lastName: true, memberNumber: true } },
+            provider: { select: { name: true } },
+          },
+        }),
+    );
 
     // Stamp attachment state on any PA connected at create (WP-C2).
     if (data.preauthId) {
@@ -667,30 +678,40 @@ export class ClaimsService {
       );
     }
 
-    const count = await prisma.preAuthorization.count({ where: { tenantId } });
-    const preauthNumber = `PA-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
-
-    const preauth = await prisma.preAuthorization.create({
-      data: {
-        tenantId,
-        preauthNumber,
-        memberId: data.memberId,
-        providerId: data.providerId,
-        serviceType: data.serviceType,
-        expectedDateOfService: data.expectedDateOfService,
-        diagnoses: data.diagnoses as Prisma.InputJsonValue,
-        procedures: data.procedures as Prisma.InputJsonValue,
-        estimatedCost: data.estimatedCost,
-        clinicalNotes: data.clinicalNotes,
-        benefitCategory: data.benefitCategory,
-        submittedBy: data.submittedBy,
-        status: "SUBMITTED",
-      },
-      include: {
-        member: { select: { firstName: true, lastName: true, memberNumber: true } },
-        provider: { select: { name: true } },
-      },
-    });
+    // B4: collision-safe pre-auth number (max+1 seed + reservation-retry).
+    const preauth = await createWithDocumentNumber(
+      "PA",
+      (yp) =>
+        prisma.preAuthorization
+          .findFirst({
+            where: { tenantId, preauthNumber: { startsWith: yp } },
+            orderBy: { preauthNumber: "desc" },
+            select: { preauthNumber: true },
+          })
+          .then((r) => r?.preauthNumber ?? null),
+      (preauthNumber) =>
+        prisma.preAuthorization.create({
+          data: {
+            tenantId,
+            preauthNumber,
+            memberId: data.memberId,
+            providerId: data.providerId,
+            serviceType: data.serviceType,
+            expectedDateOfService: data.expectedDateOfService,
+            diagnoses: data.diagnoses as Prisma.InputJsonValue,
+            procedures: data.procedures as Prisma.InputJsonValue,
+            estimatedCost: data.estimatedCost,
+            clinicalNotes: data.clinicalNotes,
+            benefitCategory: data.benefitCategory,
+            submittedBy: data.submittedBy,
+            status: "SUBMITTED",
+          },
+          include: {
+            member: { select: { firstName: true, lastName: true, memberNumber: true } },
+            provider: { select: { name: true } },
+          },
+        }),
+    );
 
     return { preauth, warnings: fraudWarnings };
   }

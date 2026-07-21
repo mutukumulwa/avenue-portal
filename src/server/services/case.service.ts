@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { createWithDocumentNumber, peekNextDocumentNumber } from "@/lib/document-number";
 import type { BenefitCategory, CaseType, ClaimLineCategory, Prisma, ServiceType } from "@prisma/client";
 import { FraudService } from "./fraud.service";
 
@@ -49,33 +50,43 @@ export class CaseService {
       throw new Error(`Facility contract is ${provider.contractStatus}`);
     }
 
-    const count = await prisma.clinicalCase.count({ where: { tenantId: input.tenantId } });
-    const caseNumber = `CASE-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
-
     // PR-031: stamp the case with the SCHEME currency at open (same D2 rule
     // the claim intake uses) — a KES scheme's episode must never display UGX.
     const { ClaimsService } = await import("./claims.service");
     const currency = await ClaimsService.resolveClaimCurrency(input.tenantId, input.providerId, input.memberId);
 
-    return prisma.clinicalCase.create({
-      data: {
-        tenantId: input.tenantId,
-        caseNumber,
-        currency,
-        memberId: input.memberId,
-        providerId: input.providerId,
-        providerBranchId: input.providerBranchId ?? null,
-        caseType: input.caseType,
-        benefitCategory: input.benefitCategory,
-        admissionDate: input.admissionDate ?? null,
-        expectedDischargeDate: input.expectedDischargeDate ?? null,
-        primaryDiagnoses: (input.primaryDiagnoses ?? []) as Prisma.InputJsonValue,
-        attendingDoctor: input.attendingDoctor ?? null,
-        estimatedCost: input.estimatedCost ?? null,
-        openedById: input.openedById,
-      },
-      include: { member: { select: { firstName: true, lastName: true, memberNumber: true } } },
-    });
+    // B4: collision-safe case number (max+1 seed + reservation-retry).
+    return createWithDocumentNumber(
+      "CASE",
+      (yp) =>
+        prisma.clinicalCase
+          .findFirst({
+            where: { tenantId: input.tenantId, caseNumber: { startsWith: yp } },
+            orderBy: { caseNumber: "desc" },
+            select: { caseNumber: true },
+          })
+          .then((r) => r?.caseNumber ?? null),
+      (caseNumber) =>
+        prisma.clinicalCase.create({
+          data: {
+            tenantId: input.tenantId,
+            caseNumber,
+            currency,
+            memberId: input.memberId,
+            providerId: input.providerId,
+            providerBranchId: input.providerBranchId ?? null,
+            caseType: input.caseType,
+            benefitCategory: input.benefitCategory,
+            admissionDate: input.admissionDate ?? null,
+            expectedDischargeDate: input.expectedDischargeDate ?? null,
+            primaryDiagnoses: (input.primaryDiagnoses ?? []) as Prisma.InputJsonValue,
+            attendingDoctor: input.attendingDoctor ?? null,
+            estimatedCost: input.estimatedCost ?? null,
+            openedById: input.openedById,
+          },
+          include: { member: { select: { firstName: true, lastName: true, memberNumber: true } } },
+        }),
+    );
   }
 
   private static async getOpenCase(tenantId: string, caseId: string) {
@@ -352,9 +363,20 @@ export class CaseService {
     const sliceTotal = eligible.reduce((s, e) => s + Number(e.totalAmount), 0);
     const serviceFrom = eligible[0].entryDate;
     const serviceTo = eligible[eligible.length - 1].entryDate;
-    const claimNumber = await prisma.claim
-      .count({ where: { tenantId: input.tenantId } })
-      .then((n) => `CLM-${new Date().getFullYear()}-${String(n + 1).padStart(5, "0")}`);
+    // B4: seed the slice claim number from max+1 (not count()+1) so it can't
+    // collide with a live row after a purge. Created inside the tx below (a P2002
+    // would abort it), so this is seed-only — acceptable on this low-concurrency,
+    // operator-driven cut path; the standalone claim/case/PA/LOU paths get the
+    // full reservation-retry via createWithDocumentNumber.
+    const claimNumber = await peekNextDocumentNumber("CLM", (yp) =>
+      prisma.claim
+        .findFirst({
+          where: { tenantId: input.tenantId, claimNumber: { startsWith: yp } },
+          orderBy: { claimNumber: "desc" },
+          select: { claimNumber: true },
+        })
+        .then((r) => r?.claimNumber ?? null),
+    );
     const invoiceNumber = input.invoiceNumber?.trim() || `${c.caseNumber}-S${seq}`;
     const entryIds = eligible.map((e) => e.id);
 
@@ -528,9 +550,17 @@ export class CaseService {
       return null;
     }
 
-    const claimNumber = await prisma.claim
-      .count({ where: { tenantId } })
-      .then((n) => `CLM-${new Date().getFullYear()}-${String(n + 1).padStart(5, "0")}`);
+    // B4: seed the final claim number from max+1 (not count()+1) — created inside
+    // the tx below, so seed-only (see cutInterimSlice). Low-concurrency close path.
+    const claimNumber = await peekNextDocumentNumber("CLM", (yp) =>
+      prisma.claim
+        .findFirst({
+          where: { tenantId, claimNumber: { startsWith: yp } },
+          orderBy: { claimNumber: "desc" },
+          select: { claimNumber: true },
+        })
+        .then((r) => r?.claimNumber ?? null),
+    );
     const residualIds = residual.map((e) => e.id);
 
     const claim = await prisma.$transaction(async (tx) => {
@@ -832,28 +862,39 @@ export class LouService {
     });
     if (!member) throw new Error("Member not found");
 
-    const count = await prisma.letterOfUndertaking.count({ where: { tenantId: input.tenantId } });
-    const louNumber = `LOU-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
     const now = new Date();
 
-    return prisma.letterOfUndertaking.create({
-      data: {
-        tenantId: input.tenantId,
-        louNumber,
-        memberId: input.memberId,
-        providerId: input.providerId,
-        caseId: input.caseId ?? null,
-        amountCeiling: input.amountCeiling,
-        currency: input.currency ?? "UGX",
-        status: "ISSUED",
-        issuedById: input.issuedById,
-        issuedAt: now,
-        validFrom: now,
-        validUntil: new Date(now.getTime() + (input.validityDays ?? 30) * 86_400_000),
-        notes: input.notes ?? null,
-      },
-      include: { member: { select: { firstName: true, lastName: true } }, provider: { select: { name: true } } },
-    });
+    // B4: collision-safe LOU number (max+1 seed + reservation-retry).
+    return createWithDocumentNumber(
+      "LOU",
+      (yp) =>
+        prisma.letterOfUndertaking
+          .findFirst({
+            where: { tenantId: input.tenantId, louNumber: { startsWith: yp } },
+            orderBy: { louNumber: "desc" },
+            select: { louNumber: true },
+          })
+          .then((r) => r?.louNumber ?? null),
+      (louNumber) =>
+        prisma.letterOfUndertaking.create({
+          data: {
+            tenantId: input.tenantId,
+            louNumber,
+            memberId: input.memberId,
+            providerId: input.providerId,
+            caseId: input.caseId ?? null,
+            amountCeiling: input.amountCeiling,
+            currency: input.currency ?? "UGX",
+            status: "ISSUED",
+            issuedById: input.issuedById,
+            issuedAt: now,
+            validFrom: now,
+            validUntil: new Date(now.getTime() + (input.validityDays ?? 30) * 86_400_000),
+            notes: input.notes ?? null,
+          },
+          include: { member: { select: { firstName: true, lastName: true } }, provider: { select: { name: true } } },
+        }),
+    );
   }
 
   static async cancel(tenantId: string, louId: string) {
