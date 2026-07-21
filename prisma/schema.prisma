@@ -117,6 +117,7 @@ model Tenant {
   wellnessPrograms               WellnessProgram[]
   wellnessEnrollments            WellnessEnrollment[]
   wellnessActivities             WellnessActivity[]
+  intakeReceipts                 ClaimIntakeReceipt[]
 }
 
 // ── Multi-client TPA tenancy (Medvex spec §2.1 / gap G2.1) ──────────────
@@ -2348,6 +2349,7 @@ model Claim {
   coContributionTransaction CoContributionTransaction?
   fundTransactions          FundTransaction[]
   reimbursementRequest      ReimbursementRequest?
+  intakeReceipts            ClaimIntakeReceipt[]
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
 
@@ -6363,4 +6365,71 @@ model WellnessActivity {
 
   @@index([enrollmentId])
   @@index([tenantId, memberId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CLAIMS AUTOPILOT — canonical intake receipt (F2.1, plan §9.1–§9.2)
+// Durable, payload-safe idempotency receipt: one row per intake attempt under a
+// (tenant, scopeKey, channel, idempotencyKey) uniqueness boundary. Stores hashes
+// and safe outcomes only — never raw payloads/credentials/clinical text (D16).
+// ═══════════════════════════════════════════════════════════════════════════
+
+enum ClaimIntakeChannel {
+  ADMIN_PORTAL
+  PROVIDER_PORTAL
+  API_V1
+  TRPC
+  CSV_IMPORT
+  OFFLINE_SYNC
+  REIMBURSEMENT
+  PREAUTH_CONVERSION
+  CASE_INTERIM
+  CASE_FINAL
+  SMART
+  SLADE360
+}
+
+enum ClaimIntakeReceiptState {
+  PROCESSING
+  SUCCEEDED
+  REJECTED
+  FAILED
+}
+
+model ClaimIntakeReceipt {
+  id                            String                  @id @default(cuid())
+  tenantId                      String
+  tenant                        Tenant                  @relation(fields: [tenantId], references: [id])
+  // Server-derived idempotency scope (user:<id> / provider:<id> / device:<p>:<d>
+  // / case:<id> / preauth:<id> / reimbursement:<m> / integration:<key>).
+  scopeKey                      String
+  channel                       ClaimIntakeChannel
+  idempotencyKey                String
+  schemaVersion                 String
+  // SHA-256 of canonical claim-affecting content (prefixed req:v1:).
+  requestHash                   String
+  // Authoritative identity hash (strong:v1:) — null when no authoritative id.
+  strongEventFingerprint        String?
+  // Non-unique content signature (suspect:v1:) — candidate detection only.
+  suspectedDuplicateFingerprint String
+  // At most one claim per receipt; a claim may have many receipts (cross-rail link).
+  claimId                       String?
+  claim                         Claim?                  @relation(fields: [claimId], references: [id])
+  state                         ClaimIntakeReceiptState @default(PROCESSING)
+  outcomeCode                   String? // stable INTAKE_CODES / route code
+  safeMessage                   String? // caller-safe message; never raw internals
+  httpStatus                    Int?
+  correlationId                 String
+  // Set when this receipt replayed/linked to an earlier receipt (plain ref, no FK
+  // self-relation to keep queries simple).
+  replayedFromReceiptId         String?
+  createdAt                     DateTime                @default(now())
+  completedAt                   DateTime?
+  updatedAt                     DateTime                @updatedAt
+
+  @@unique([tenantId, scopeKey, channel, idempotencyKey])
+  @@index([tenantId, strongEventFingerprint])
+  @@index([tenantId, suspectedDuplicateFingerprint])
+  @@index([tenantId, state, createdAt])
+  @@index([claimId])
 }

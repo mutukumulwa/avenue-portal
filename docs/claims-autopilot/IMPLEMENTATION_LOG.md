@@ -195,3 +195,26 @@ staged.
 - **Security/privacy review:** the core privacy guarantee of the epic's transport layer; verified by anti-leakage assertions.
 - **Next eligible task:** F2.1 — Add intake receipt schema (M2). **M1 complete.**
 - **Blocker/options, if blocked:** n/a.
+
+---
+
+## F2.1 — Add intake receipt schema
+
+- **Status:** COMPLETE (schema + client + tests; live `db push` deferred — no DB in env)
+- **Commit/branch:** `feat/claims-autopilot` (F2.1 commit)
+- **Files changed:** `prisma/schema.prisma` (additive: 2 enums + `ClaimIntakeReceipt` model + Tenant/Claim back-relations), `tests/services/claim-intake-receipt-schema.test.ts` (new), `docs/claims-autopilot/DEPLOYMENT.md` (new).
+- **Decisions enforced:** D16 (receipt stores hashes + safe outcomes only, never raw payloads); §9.8 (additive only, no rename/removal, `db push`).
+- **Acceptance scenarios covered:** foundation for CA-020..029 (idempotency/duplicate) — the durable `(tenantId, scopeKey, channel, idempotencyKey)` uniqueness boundary now exists in the model.
+- **Observable behavior before:** no durable receipt; idempotency was rail-specific (`externalRef` unique on Claim only).
+- **Observable behavior after:** `ClaimIntakeReceipt` model with the compound unique + 4 indexes; `ClaimIntakeChannel`/`ClaimIntakeReceiptState` enums; Prisma client regenerated. No runtime behavior change (model unwired until F3.x).
+- **Forbidden effects explicitly checked:** additive only (existing Claim/Tenant columns untouched — only new relation fields added); `prisma validate` OK; no `prisma migrate/reset` run; the `db push`-managed rule honored.
+- **Tests run and exact results:**
+  - `npx prisma validate` → valid; `npx prisma generate` → client generated (v7.7.0).
+  - `npx vitest run tests/services/claim-intake-receipt-schema.test.ts` → **5 passed** (enum values, field set via dmmf, compound-unique + create-input compile-time proofs).
+  - `npm run typecheck` → PASS.
+- **Database/audit/reconciliation evidence:** offline only. Live `db push` + row-level concurrency proof is F2.2/F8.1 territory (needs a disposable DB with `DATABASE_URL`).
+- **Creator allowlist change:** none.
+- **Known gaps or skips:** `npm run db:push` NOT run — no `DATABASE_URL` configured; documented in `DEPLOYMENT.md`. `replayedFromReceiptId` is a plain nullable ref (no self-relation FK) to keep queries simple.
+- **Security/privacy review:** model carries only hashes/safe messages/outcome codes; no PHI columns.
+- **Next eligible task:** F2.2 — Implement receipt reservation and replay semantics.
+- **Blocker/options, if blocked:** n/a.
