@@ -149,3 +149,25 @@ staged.
 - **Security/privacy review:** no PII beyond neutral ids; no logging.
 - **Next eligible task:** F1.3 — Request hash and separated duplicate fingerprints.
 - **Blocker/options, if blocked:** n/a.
+
+---
+
+## F1.3 — Request hash and separated duplicate fingerprints
+
+- **Status:** COMPLETE
+- **Commit/branch:** `feat/claims-autopilot` (F1.3 commit)
+- **Files changed:** `src/server/services/claim-intake/fingerprint.ts` (new), `tests/services/claim-intake-fingerprint.test.ts` (new).
+- **Decisions enforced:** D7 (transport replay vs authoritative event-link vs content-similarity are three separate things); §8.2/§8.3/§8.4; "no readable PII in fingerprint columns" (all SHA-256 hex).
+- **Acceptance scenarios covered:** CA-020/024 (replay via request hash), CA-022 (changed-payload conflict via request hash), CA-026 (strong cross-rail link), CA-027 (fuzzy candidate never linked).
+- **Observable behavior before:** rails relied on ad-hoc `externalRef`/invoice checks; no separation of identity vs similarity, no request-content hash.
+- **Observable behavior after:** three versioned hashes — `computeRequestHash` (`req:v1:` over content minus transport fields), `computeStrongEventFingerprint` (`strong:v1:` by authoritative precedence invoice→external→case→preauth, else `null`), `computeSuspectedDuplicateFingerprint` (`suspect:v1:`, order-independent content signature, always non-null) plus `buildSuspectedDuplicateDescriptor` for windowed candidate search.
+- **Forbidden effects explicitly checked:** strong fp is `null` without authoritative identity (never fabricated); suspect fp can never take the strong-link branch (separate functions, separate prefixes); no PII leaks (asserted fp values contain no "SECRET"/"member" substrings, only `kind:v1:<64hex>`); request hash excludes idempotencyKey/timestamps; tenant-scoped (same invoice, different tenant ⇒ different strong fp).
+- **Tests run and exact results:**
+  - `npx vitest run tests/services/claim-intake-fingerprint.test.ts` → **13 passed** (request-hash key-independence + content-sensitivity; strong precedence/null/change/tenant-scope; suspect equality for identical content + order-independence + fuzzy-visit-is-candidate-not-event; PII-safety).
+  - `npm run typecheck` → PASS.
+- **Database/audit/reconciliation evidence:** n/a (pure crypto). Uniqueness/link semantics land at the DB boundary in F2.1/F3.3.
+- **Creator allowlist change:** none.
+- **Known gaps or skips:** `entrySetHash`, `integrationKeyId`, `preauthConversionMarker`, `providerOwnsInvoiceNamespace` are caller-supplied (assembled from context in F3.x). Version bump procedure documented in `FINGERPRINT_VERSIONS`.
+- **Security/privacy review:** SHA-256 only; no reversible identifiers stored; descriptor (raw ids) is ephemeral query input, never a persisted fingerprint.
+- **Next eligible task:** F1.4 — Structured intake errors and response mapping.
+- **Blocker/options, if blocked:** n/a.
