@@ -8,6 +8,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import { peekNextDocumentNumber } from "@/lib/document-number";
 import { TRPCError } from "@trpc/server";
 import { EndorsementType, ProRataType } from "@prisma/client";
 import { auditChainService } from "./audit-chain.service";
@@ -71,8 +72,11 @@ export const amendmentService = {
       // We just flag it; the override is validated before apply (see applyAmendment)
     }
 
-    const count = await prisma.endorsement.count({ where: { tenantId } });
-    const endorsementNumber = `END-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
+    const endorsementNumber = await peekNextDocumentNumber("END", (yp) =>
+      prisma.endorsement
+        .findFirst({ where: { tenantId, endorsementNumber: { startsWith: yp } }, orderBy: { endorsementNumber: "desc" }, select: { endorsementNumber: true } })
+        .then((r) => r?.endorsementNumber ?? null),
+    );
 
     // Capture before-snapshot of the affected member if applicable
     let beforeSnapshot: Record<string, unknown> | null = null;
@@ -476,8 +480,11 @@ export const amendmentService = {
     const amount = Number(endorsement.proRataCalculation.adjustmentAmount);
     if (amount === 0) return;
 
-    const invCount = await prisma.invoice.count({ where: { tenantId } });
-    const invoiceNumber = `INV-ADJ-${new Date().getFullYear()}-${String(invCount + 1).padStart(5, "0")}`;
+    const invoiceNumber = await peekNextDocumentNumber("INV-ADJ", (yp) =>
+      prisma.invoice
+        .findFirst({ where: { tenantId, invoiceNumber: { startsWith: yp } }, orderBy: { invoiceNumber: "desc" }, select: { invoiceNumber: true } })
+        .then((r) => r?.invoiceNumber ?? null),
+    );
     const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
     await prisma.invoice.create({

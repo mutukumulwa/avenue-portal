@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { prisma } from "@/lib/prisma";
+import { peekNextDocumentNumber } from "@/lib/document-number";
 import { quotationBuilderService } from "@/server/services/quotation-builder.service";
 import { rbacService } from "@/server/services/rbac.service";
 
@@ -52,8 +53,11 @@ export const quotationsRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const count = await prisma.quotation.count({ where: { tenantId: ctx.tenantId } });
-      const quoteNumber = `QUO-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
+      const quoteNumber = await peekNextDocumentNumber("QUO", (yp) =>
+        prisma.quotation
+          .findFirst({ where: { tenantId: ctx.tenantId, quoteNumber: { startsWith: yp } }, orderBy: { quoteNumber: "desc" }, select: { quoteNumber: true } })
+          .then((r) => r?.quoteNumber ?? null),
+      );
 
       return prisma.quotation.create({
         data: {

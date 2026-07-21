@@ -36,7 +36,7 @@ const db = vi.hoisted(() => {
     overrideRecord: { findFirst: vi.fn(async () => null) },
     coContributionTransaction: { findUnique: vi.fn(async () => null) },
     chartOfAccount: { findUnique: vi.fn(async (a: any) => ({ id: `acc-${a.where.tenantId_code.code}`, code: a.where.tenantId_code.code })) },
-    journalEntry: { count: vi.fn(async () => 0), create: vi.fn(async (a: any) => ({ id: "je1", ...a.data })) },
+    journalEntry: { count: vi.fn(async () => 0), findFirst: vi.fn(async () => null), create: vi.fn(async (a: any) => ({ id: "je1", ...a.data })) },
     selfFundedAccount: { update: vi.fn(async () => ({})) },
     fundTransaction: { create: vi.fn(async () => ({})) },
     exceptionLog: { create: vi.fn(async () => ({})) },

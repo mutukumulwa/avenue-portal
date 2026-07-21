@@ -86,14 +86,20 @@ seed-only `peekNextDocumentNumber` (max+1, no retry — a P2002 aborts a tx, and
 operator paths). 9 unit tests in `tests/lib/document-number.test.ts`; host suite 789 green, tsc + guards
 clean. The B2B claims route keeps its own externalRef-aware loop (`07e97b3`, unchanged).
 
-**Systemic residual → new item B4-WIDE (P2, follow-up):** the **same `count()+1` pattern lives at ~14 more
-sites outside the inpatient line** — `intake.service.ts` (quote), `billing.service.ts`/`reinstatement.service.ts`
-(invoice), `amendment.service.ts`/`endorsement.service.ts` (endorsement + invoice), `binding.service.ts`
-`nextMemberNumber`/`nextInvoiceNumber` (and a second `nextMemberNumber` in `member-numbering.service.ts`),
-several `app/(admin)/**/actions.ts` (quote/endorsement/invoice/group-ref), and two higher-risk **API routes**:
-`app/api/v1/preauth/route.ts` (preauthNumber) and `app/api/claims/import/route.ts` (bulk claimNumber — can
-collide within one import batch). All have the identical post-purge + concurrency exposure. **Fix:** sweep
-them onto `createWithDocumentNumber` / `peekNextDocumentNumber` (helper already exists — mechanical).
+**B4-WIDE — ✅ SWEPT 2026-07-21.** An exhaustive grep showed the `count()+1` pattern was far more pervasive
+than the ~14 first estimated: **~36 document-number sites across ~28 files** all shared it. All are now on
+the shared allocator: `intake`/`broker`/`admin` quotes (QUO), `amendment`/`endorsement`/`members` endorsements
+(END), `billing`/`reinstatement`/`amendment`/`endorsement`/`fund`/`members-card` invoices (INV/INV-REINSTATE/
+INV-ADJ/INV-ADMIN/INV-CARD), `binding`+`member-numbering` member numbers, `claims/new`/`sync`/`reimbursement`
+claims (CLM/CLM-REIMB), `gl.service` journal entries (JE), `claim-adjudication` payment vouchers (PV),
+`preauth-adjudication` GOP + PA-AMD, `cross-border` CBC/CBI, and the higher-risk API routes `api/v1/preauth`
+(full reservation-retry) + `api/claims/import` (seed-only, sequential loop). Two format-deviant sites
+(`provider-contracts` `PC-` pad-3, `brokers` `BRK-` no-year) got an inline max+1. Sub-prefixes on a shared
+field (e.g. `INV-` vs `INV-REINSTATE-`) stay correctly separated because year-scoped `startsWith` (`INV-2026-`)
+doesn't match `INV-REINSTATE-2026-`. **Left intentionally:** two cosmetic `GRP-` labels (a fallback group
+`name` in `binding`, a `notes` string in `quotations/[id]`) — not persisted in a unique field, so no
+collision — and the `api/v1/claims` route's own externalRef-aware loop. 9 helper unit tests + 8 test-harness
+mock updates (`findFirst` added where services now read max); host suite **789 green**, tsc + guards clean.
 
 ### B5 — Fraud screening on case-born claims: monitor the new rules · **P3 (watch)**
 The fix wired `FraudService.evaluateClaim` onto `cutInterimSlice` + `closeAndFile` (post-commit) and made

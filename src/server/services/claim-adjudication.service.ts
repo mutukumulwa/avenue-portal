@@ -12,6 +12,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import { peekNextDocumentNumber } from "@/lib/document-number";
 import { TRPCError } from "@trpc/server";
 import { ClaimLineDecision, SettlementStatus } from "@prisma/client";
 import { auditChainService } from "./audit-chain.service";
@@ -661,8 +662,11 @@ export const claimAdjudicationService = {
         });
       }
 
-      const voucherCount = await tx.paymentVoucher.count({ where: { tenantId } });
-      const voucherNumber = `PV-${paidAt.getFullYear()}-${String(voucherCount + 1).padStart(5, "0")}`;
+      const voucherNumber = await peekNextDocumentNumber("PV", (yp) =>
+        tx.paymentVoucher
+          .findFirst({ where: { tenantId, voucherNumber: { startsWith: yp } }, orderBy: { voucherNumber: "desc" }, select: { voucherNumber: true } })
+          .then((r) => r?.voucherNumber ?? null),
+      );
 
       const je = await GLService.postSettlementBatchPaid(tenantId, {
         sourceId: batchId,

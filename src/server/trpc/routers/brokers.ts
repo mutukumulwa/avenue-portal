@@ -107,12 +107,21 @@ export const brokersRouter = createTRPCRouter({
     }))
     .mutation(async ({ ctx, input }) => {
       requireStaff(ctx.session.user.role);
-      const count = await prisma.broker.count({ where: { tenantId: ctx.tenantId } });
+      // B4-WIDE: seed from max+1 (not count()+1) so a purge/gap can't collide.
+      // Inline (not the shared helper) because BRK codes carry no year segment.
+      const latestBroker = await prisma.broker.findFirst({
+        where: { tenantId: ctx.tenantId, brokerCode: { startsWith: "BRK-" } },
+        orderBy: { brokerCode: "desc" },
+        select: { brokerCode: true },
+      });
+      const parsedBrk = latestBroker?.brokerCode
+        ? Number.parseInt(latestBroker.brokerCode.slice(latestBroker.brokerCode.lastIndexOf("-") + 1), 10)
+        : 0;
       return prisma.broker.create({
         data: {
           ...input,
           tenantId: ctx.tenantId,
-          brokerCode: `BRK-${String(count + 1).padStart(5, "0")}`,
+          brokerCode: `BRK-${String((Number.isFinite(parsedBrk) ? parsedBrk : 0) + 1).padStart(5, "0")}`,
           legalName: input.legalName ?? input.name,
         },
       });

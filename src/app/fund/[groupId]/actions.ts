@@ -2,6 +2,7 @@
 
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
+import { peekNextDocumentNumber } from "@/lib/document-number";
 import { revalidatePath } from "next/cache";
 import type { BenefitCategory } from "@prisma/client";
 
@@ -125,8 +126,11 @@ export async function generateAdminFeeInvoiceAction(formData: FormData): Promise
   if (feeAmount <= 0) return { error: "Calculated admin fee is zero — check configuration." };
 
   const tenantId = session.user.tenantId;
-  const count    = await prisma.invoice.count({ where: { tenantId } });
-  const invoiceNumber = `INV-ADMIN-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
+  const invoiceNumber = await peekNextDocumentNumber("INV-ADMIN", (yp) =>
+    prisma.invoice
+      .findFirst({ where: { tenantId, invoiceNumber: { startsWith: yp } }, orderBy: { invoiceNumber: "desc" }, select: { invoiceNumber: true } })
+      .then((r) => r?.invoiceNumber ?? null),
+  );
 
   const invoice = await prisma.$transaction(async (tx) => {
     const inv = await tx.invoice.create({

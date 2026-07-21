@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { peekNextDocumentNumber } from "@/lib/document-number";
 import type { GLSourceType, Prisma } from "@prisma/client";
 
 // Postings may run inside the caller's transaction (PR-018 #1: GL rows commit
@@ -50,8 +51,11 @@ async function getAccount(tenantId: string, code: string, db: Db = prisma) {
 }
 
 async function nextEntryNumber(tenantId: string, db: Db = prisma) {
-  const count = await db.journalEntry.count({ where: { tenantId } });
-  return `JE-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
+  return peekNextDocumentNumber("JE", (yp) =>
+    db.journalEntry
+      .findFirst({ where: { tenantId, entryNumber: { startsWith: yp } }, orderBy: { entryNumber: "desc" }, select: { entryNumber: true } })
+      .then((r) => r?.entryNumber ?? null),
+  );
 }
 
 interface LineSpec { accountCode: string; description?: string; debit?: number; credit?: number }

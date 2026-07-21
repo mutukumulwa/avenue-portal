@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { peekNextDocumentNumber } from "@/lib/document-number";
 import { TRPCError } from "@trpc/server";
 import { AcceptanceMethod, FundingMode, MemberRelationship } from "@prisma/client";
 import { auditChainService } from "./audit-chain.service";
@@ -17,16 +18,21 @@ function leftPad(n: number, width: number) {
 }
 
 async function nextMemberNumber(tenantId: string, clientId?: string | null): Promise<string> {
-  const year = new Date().getFullYear();
   const prefix = await resolveMemberPrefix(tenantId, clientId);
-  const count = await prisma.member.count({ where: { tenantId } });
-  return `${prefix}-${year}-${leftPad(count + 1, 5)}`;
+  // B4-WIDE: seed from max+1 (not count()+1) so a purge/gap can't collide.
+  return peekNextDocumentNumber(prefix, (yp) =>
+    prisma.member
+      .findFirst({ where: { tenantId, memberNumber: { startsWith: yp } }, orderBy: { memberNumber: "desc" }, select: { memberNumber: true } })
+      .then((r) => r?.memberNumber ?? null),
+  );
 }
 
 async function nextInvoiceNumber(tenantId: string): Promise<string> {
-  const year = new Date().getFullYear();
-  const count = await prisma.invoice.count({ where: { tenantId } });
-  return `INV-${year}-${leftPad(count + 1, 5)}`;
+  return peekNextDocumentNumber("INV", (yp) =>
+    prisma.invoice
+      .findFirst({ where: { tenantId, invoiceNumber: { startsWith: yp } }, orderBy: { invoiceNumber: "desc" }, select: { invoiceNumber: true } })
+      .then((r) => r?.invoiceNumber ?? null),
+  );
 }
 
 // ─── BINDING SERVICE ──────────────────────────────────────────────────────────

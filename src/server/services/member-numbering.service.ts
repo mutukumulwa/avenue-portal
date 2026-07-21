@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { peekNextDocumentNumber } from "@/lib/document-number";
 
 /**
  * Client-configurable member/policy numbering (gap G9.6). Replaces the legacy
@@ -30,8 +31,10 @@ export async function nextMemberNumber(
   const prefix = await resolveMemberPrefix(tenantId, clientId);
   // Sequence is per-prefix so each client/payer gets its own clean series
   // (e.g. NWSC-2026-00001), independent of other clients' member counts.
-  const count = await prisma.member.count({
-    where: { tenantId, memberNumber: { startsWith: `${prefix}-` } },
-  });
-  return `${prefix}-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
+  // B4-WIDE: seed from max+1 (not count()+1) so a purge/gap can't collide.
+  return peekNextDocumentNumber(prefix, (yp) =>
+    prisma.member
+      .findFirst({ where: { tenantId, memberNumber: { startsWith: yp } }, orderBy: { memberNumber: "desc" }, select: { memberNumber: true } })
+      .then((r) => r?.memberNumber ?? null),
+  );
 }

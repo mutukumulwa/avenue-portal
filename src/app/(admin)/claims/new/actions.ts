@@ -3,6 +3,7 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { peekNextDocumentNumber } from "@/lib/document-number";
 import { writeAudit } from "@/lib/audit";
 import { FraudService } from "@/server/services/fraud.service";
 import { AutoAdjudicationService } from "@/server/services/auto-adjudication.service";
@@ -95,8 +96,11 @@ export async function submitReimbursementClaimAction(data: {
   }
 
   const billedAmount = data.lineItems.reduce((s, l) => s + l.billedAmount, 0);
-  const count = await prisma.claim.count({ where: { tenantId } });
-  const claimNumber = `CLM-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
+  const claimNumber = await peekNextDocumentNumber("CLM", (yp) =>
+    prisma.claim
+      .findFirst({ where: { tenantId, claimNumber: { startsWith: yp } }, orderBy: { claimNumber: "desc" }, select: { claimNumber: true } })
+      .then((r) => r?.claimNumber ?? null),
+  );
 
   const claim = await prisma.claim.create({
     data: {

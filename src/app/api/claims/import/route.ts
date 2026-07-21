@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { peekNextDocumentNumber } from "@/lib/document-number";
 import { claimAdjudicationService } from "@/server/services/claim-adjudication.service";
 import { ClaimLineCategory } from "@prisma/client";
 
@@ -218,8 +219,11 @@ export async function POST(request: Request) {
     }
 
     try {
-      const count = await prisma.claim.count({ where: { tenantId } });
-      const claimNumber = `CLM-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
+      const claimNumber = await peekNextDocumentNumber("CLM", (yp) =>
+        prisma.claim
+          .findFirst({ where: { tenantId, claimNumber: { startsWith: yp } }, orderBy: { claimNumber: "desc" }, select: { claimNumber: true } })
+          .then((r) => r?.claimNumber ?? null),
+      );
       const lineDescription = cptCode ? `CPT ${cptCode}` : diagnosisCode ? `Diagnosis ${diagnosisCode}` : "Imported service line";
 
       const claim = await prisma.claim.create({

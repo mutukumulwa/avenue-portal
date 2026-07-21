@@ -35,7 +35,7 @@ beforeEach(() => vi.clearAllMocks());
 describe("CrossBorderService.openCase (G5.15)", () => {
   it("opens a SOURCING case with a sequential CBC number when the member belongs to the client", async () => {
     db.member.findFirst.mockResolvedValue({ id: "m1", group: { clientId: "c1" } });
-    db.crossBorderCase.count.mockResolvedValue(4);
+    db.crossBorderCase.findFirst.mockResolvedValue({ caseNumber: `CBC-${new Date().getFullYear()}-00004` }); // latest → next is 00005
     const c = await CrossBorderService.openCase("t1", { clientId: "c1", memberId: "m1", diagnosis: "Oncology" });
     expect(db.crossBorderCase.create).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -117,9 +117,12 @@ describe("CrossBorderService.issueGop (GOP within limits)", () => {
 
 describe("CrossBorderService.consolidateInvoice", () => {
   it("sums INVOICE lines into a single UGX total + reference", async () => {
-    db.crossBorderCase.findFirst.mockResolvedValue({ id: "case1", status: "IN_TREATMENT", invoiceReference: null });
+    db.crossBorderCase.findFirst.mockImplementation(async (args: any) =>
+      args?.where?.invoiceReference?.startsWith
+        ? { invoiceReference: `CBI-${new Date().getFullYear()}-00002` } // latest → next is 00003
+        : { id: "case1", status: "IN_TREATMENT", invoiceReference: null },
+    );
     db.crossBorderLineItem.findMany.mockResolvedValue([{ amountUgx: 380000 }, { amountUgx: 190000 }]);
-    db.crossBorderCase.count.mockResolvedValue(2); // → CBI ...00003
     const updated = await CrossBorderService.consolidateInvoice("t1", "case1");
     expect(updated).toEqual(
       expect.objectContaining({

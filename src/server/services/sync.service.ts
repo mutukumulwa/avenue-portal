@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { peekNextDocumentNumber } from "@/lib/document-number";
 import { FraudService } from "./fraud.service";
 import { AutoAdjudicationService } from "./auto-adjudication.service";
 import { getSystemActorId } from "./system-actor.service";
@@ -221,8 +222,11 @@ export class SyncService {
           `${Math.floor(b.available)} available vs billed ${billed}`,
       };
     }
-    const count = await prisma.claim.count({ where: { tenantId } });
-    const claimNumber = `CLM-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
+    const claimNumber = await peekNextDocumentNumber("CLM", (yp) =>
+      prisma.claim
+        .findFirst({ where: { tenantId, claimNumber: { startsWith: yp } }, orderBy: { claimNumber: "desc" }, select: { claimNumber: true } })
+        .then((r) => r?.claimNumber ?? null),
+    );
 
     const created = await prisma.claim.create({
       data: {

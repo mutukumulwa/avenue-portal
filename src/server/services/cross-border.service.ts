@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { peekNextDocumentNumber } from "@/lib/document-number";
 import { FxService, BASE_CURRENCY } from "./fx.service";
 import { AdminFeeService } from "./admin-fee.service";
 import type { CrossBorderCaseStatus } from "@prisma/client";
@@ -98,11 +99,11 @@ export class CrossBorderService {
 
   // ── Coordination cases ────────────────────────────────────────────────
   private static async nextCaseNumber(tenantId: string): Promise<string> {
-    const year = new Date().getFullYear();
-    const count = await prisma.crossBorderCase.count({
-      where: { tenantId, caseNumber: { startsWith: `CBC-${year}-` } },
-    });
-    return `CBC-${year}-${String(count + 1).padStart(5, "0")}`;
+    return peekNextDocumentNumber("CBC", (yp) =>
+      prisma.crossBorderCase
+        .findFirst({ where: { tenantId, caseNumber: { startsWith: yp } }, orderBy: { caseNumber: "desc" }, select: { caseNumber: true } })
+        .then((r) => r?.caseNumber ?? null),
+    );
   }
 
   static async openCase(
@@ -241,11 +242,11 @@ export class CrossBorderService {
   }
 
   private static async nextInvoiceReference(tenantId: string): Promise<string> {
-    const year = new Date().getFullYear();
-    const count = await prisma.crossBorderCase.count({
-      where: { tenantId, invoiceReference: { startsWith: `CBI-${year}-` } },
-    });
-    return `CBI-${year}-${String(count + 1).padStart(5, "0")}`;
+    return peekNextDocumentNumber("CBI", (yp) =>
+      prisma.crossBorderCase
+        .findFirst({ where: { tenantId, invoiceReference: { startsWith: yp } }, orderBy: { invoiceReference: "desc" }, select: { invoiceReference: true } })
+        .then((r) => r?.invoiceReference ?? null),
+    );
   }
 
   /**

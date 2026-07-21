@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { peekNextDocumentNumber } from "@/lib/document-number";
 import type { AdminFeeMethod } from "@prisma/client";
 
 /**
@@ -154,8 +155,11 @@ export class AdminFeeService {
 
     const total = round2(entries.reduce((s, e) => s + Number(e.amount), 0));
     const currency = entries[0].currency;
-    const issued = await prisma.adminFeeLedgerEntry.count({ where: { tenantId, invoiceId: { not: null } } });
-    const reference = `AFI-${new Date().getFullYear()}-${String(issued + 1).padStart(5, "0")}`;
+    const reference = await peekNextDocumentNumber("AFI", (yp) =>
+      prisma.adminFeeLedgerEntry
+        .findFirst({ where: { tenantId, invoiceId: { startsWith: yp } }, orderBy: { invoiceId: "desc" }, select: { invoiceId: true } })
+        .then((r) => r?.invoiceId ?? null),
+    );
 
     await prisma.adminFeeLedgerEntry.updateMany({
       where: { id: { in: entries.map((e) => e.id) } },

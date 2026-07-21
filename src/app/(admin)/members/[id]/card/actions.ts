@@ -2,6 +2,7 @@
 
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
+import { peekNextDocumentNumber } from "@/lib/document-number";
 import { writeAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
 
@@ -78,8 +79,11 @@ export async function requestCardReplacementAction(
   if (!member) return { error: "Member not found." };
 
   // Build a card-replacement invoice (separate from premium invoices)
-  const count = await prisma.invoice.count({ where: { tenantId } });
-  const invoiceNumber = `INV-CARD-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
+  const invoiceNumber = await peekNextDocumentNumber("INV-CARD", (yp) =>
+    prisma.invoice
+      .findFirst({ where: { tenantId, invoiceNumber: { startsWith: yp } }, orderBy: { invoiceNumber: "desc" }, select: { invoiceNumber: true } })
+      .then((r) => r?.invoiceNumber ?? null),
+  );
   const dueDate = new Date();
   dueDate.setDate(dueDate.getDate() + 7);
 

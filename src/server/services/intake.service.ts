@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { peekNextDocumentNumber } from "@/lib/document-number";
 import { TRPCError } from "@trpc/server";
 import { FundingMode, ClientType, Gender, LifeRole, UWDecisionType } from "@prisma/client";
 import ExcelJS from "exceljs";
@@ -60,8 +61,11 @@ export const intakeService = {
     prospectEmail?: string;
     prospectIndustry?: string;
   }) {
-    const count = await prisma.quotation.count({ where: { tenantId } });
-    const quoteNumber = `QUO-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
+    const quoteNumber = await peekNextDocumentNumber("QUO", (yp) =>
+      prisma.quotation
+        .findFirst({ where: { tenantId, quoteNumber: { startsWith: yp } }, orderBy: { quoteNumber: "desc" }, select: { quoteNumber: true } })
+        .then((r) => r?.quoteNumber ?? null),
+    );
 
     const quotation = await prisma.quotation.create({
       data: {

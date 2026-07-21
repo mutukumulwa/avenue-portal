@@ -33,8 +33,17 @@ export async function enrollIndividualClientAction(formData: FormData) {
   renewalDate.setFullYear(renewalDate.getFullYear() + 1);
 
   // Individual clients get a synthetic "group" record named after the person
-  const groupCount = await prisma.group.count({ where: { tenantId } });
-  const groupRef = `IND-${String(groupCount + 1).padStart(5, "0")}`;
+  // B4-WIDE: seed the synthetic individual-group ref from max+1 (not count()+1)
+  // so a purge/gap can't reuse a live ref. groupRef is IND-NNNNN (no year segment).
+  const latestIndividual = await prisma.group.findFirst({
+    where: { tenantId, clientType: "INDIVIDUAL", registrationNumber: { startsWith: "IND-" } },
+    orderBy: { registrationNumber: "desc" },
+    select: { registrationNumber: true },
+  });
+  const parsedGroupSeq = latestIndividual?.registrationNumber
+    ? Number.parseInt(latestIndividual.registrationNumber.slice(latestIndividual.registrationNumber.lastIndexOf("-") + 1), 10)
+    : 0;
+  const groupRef = `IND-${String((Number.isFinite(parsedGroupSeq) ? parsedGroupSeq : 0) + 1).padStart(5, "0")}`;
 
   const group = await prisma.group.create({
     data: {

@@ -3,6 +3,7 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { peekNextDocumentNumber } from "@/lib/document-number";
 
 export async function submitEndorsementAction(formData: FormData) {
   const session = await requireRole(ROLES.OPS);
@@ -102,8 +103,11 @@ export async function submitEndorsementAction(formData: FormData) {
     }
   }
 
-  const count = await prisma.endorsement.count({ where: { tenantId } });
-  const endorsementNumber = `END-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
+  const endorsementNumber = await peekNextDocumentNumber("END", (yp) =>
+    prisma.endorsement
+      .findFirst({ where: { tenantId, endorsementNumber: { startsWith: yp } }, orderBy: { endorsementNumber: "desc" }, select: { endorsementNumber: true } })
+      .then((r) => r?.endorsementNumber ?? null),
+  );
 
   await prisma.endorsement.create({
     data: {

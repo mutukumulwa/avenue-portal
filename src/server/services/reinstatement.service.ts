@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { peekNextDocumentNumber } from "@/lib/document-number";
 
 export class ReinstatementService {
   static async requestReinstatement(tenantId: string, memberId: string) {
@@ -82,8 +83,11 @@ export class ReinstatementService {
       });
 
       // 3. Generate catch-up invoice
-      const invoiceCount = await tx.invoice.count({ where: { tenantId } });
-      const invoiceNumber = `INV-REINSTATE-${now.getFullYear()}-${String(invoiceCount + 1).padStart(5, "0")}`;
+      const invoiceNumber = await peekNextDocumentNumber("INV-REINSTATE", (yp) =>
+        tx.invoice
+          .findFirst({ where: { tenantId, invoiceNumber: { startsWith: yp } }, orderBy: { invoiceNumber: "desc" }, select: { invoiceNumber: true } })
+          .then((r) => r?.invoiceNumber ?? null),
+      );
       const dueDate = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // due in 7 days
       const amount = Number(req.catchUpAmount);
 

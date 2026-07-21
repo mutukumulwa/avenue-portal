@@ -10,6 +10,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import { peekNextDocumentNumber } from "@/lib/document-number";
 import { TRPCError } from "@trpc/server";
 import { ProofType, ReimbursementPaymentMethod } from "@prisma/client";
 import { auditChainService } from "./audit-chain.service";
@@ -90,8 +91,11 @@ export const reimbursementService = {
     }
 
     // Generate claim number
-    const claimCount = await prisma.claim.count({ where: { tenantId } });
-    const claimNumber = `CLM-REIMB-${new Date().getFullYear()}-${String(claimCount + 1).padStart(5, "0")}`;
+    const claimNumber = await peekNextDocumentNumber("CLM-REIMB", (yp) =>
+      prisma.claim
+        .findFirst({ where: { tenantId, claimNumber: { startsWith: yp } }, orderBy: { claimNumber: "desc" }, select: { claimNumber: true } })
+        .then((r) => r?.claimNumber ?? null),
+    );
 
     const claim = await prisma.$transaction(async (tx) => {
       const newClaim = await tx.claim.create({

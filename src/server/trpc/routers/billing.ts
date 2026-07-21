@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { prisma } from "@/lib/prisma";
+import { peekNextDocumentNumber } from "@/lib/document-number";
 
 export const billingRouter = createTRPCRouter({
   // ─── INVOICES ────────────────────────────────────────────
@@ -45,8 +46,11 @@ export const billingRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const count = await prisma.invoice.count({ where: { tenantId: ctx.tenantId } });
-      const invoiceNumber = `INV-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
+      const invoiceNumber = await peekNextDocumentNumber("INV", (yp) =>
+        prisma.invoice
+          .findFirst({ where: { tenantId: ctx.tenantId, invoiceNumber: { startsWith: yp } }, orderBy: { invoiceNumber: "desc" }, select: { invoiceNumber: true } })
+          .then((r) => r?.invoiceNumber ?? null),
+      );
       const totalAmount = input.memberCount * input.ratePerMember;
 
       return prisma.invoice.create({

@@ -8,6 +8,7 @@ const db = vi.hoisted(() => {
   const state: any = {
     preAuthorization: {
       findUnique: vi.fn(),
+      findFirst: vi.fn(async () => null),
       update: vi.fn(async (a: any) => ({ id: a.where.id, ...a.data })),
       updateMany: vi.fn(async () => ({ count: 1 })),
       count: vi.fn(async () => 4),

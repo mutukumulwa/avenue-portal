@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { createWithDocumentNumber } from "@/lib/document-number";
 import { withApiKey, getApiCredential, operatorTenantWhere } from "@/lib/apiAuth";
 import { ProviderEntitlementService } from "@/server/services/provider-entitlement.service";
 
@@ -59,25 +60,31 @@ async function postPreAuth(req: Request) {
       return NextResponse.json({ error: "Member is not active" }, { status: 403 });
     }
 
-    // Auto-generate Preauth Number
-    const count = await prisma.preAuthorization.count({ where: { tenantId: member.tenantId } });
-    const preauthNumber = `PA-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
-
-    const pa = await prisma.preAuthorization.create({
-      data: {
-        tenantId: member.tenantId,
-        preauthNumber,
-        memberId: member.id,
-        providerId: provider.id,
-        submittedBy: "PROVIDER",
-        benefitCategory,
-        diagnoses,
-        procedures: [],
-        estimatedCost: estimatedCost,
-        status: "SUBMITTED" as const,
-        clinicalNotes: notes ?? null,
-      }
-    });
+    // Auto-generate Preauth Number — B4-WIDE: collision-safe (max+1 seed +
+    // reservation-retry). preauthNumber is the only unique index on this create.
+    const pa = await createWithDocumentNumber(
+      "PA",
+      (yp) =>
+        prisma.preAuthorization
+          .findFirst({ where: { tenantId: member.tenantId, preauthNumber: { startsWith: yp } }, orderBy: { preauthNumber: "desc" }, select: { preauthNumber: true } })
+          .then((r) => r?.preauthNumber ?? null),
+      (preauthNumber) =>
+        prisma.preAuthorization.create({
+          data: {
+            tenantId: member.tenantId,
+            preauthNumber,
+            memberId: member.id,
+            providerId: provider.id,
+            submittedBy: "PROVIDER",
+            benefitCategory,
+            diagnoses,
+            procedures: [],
+            estimatedCost: estimatedCost,
+            status: "SUBMITTED" as const,
+            clinicalNotes: notes ?? null,
+          },
+        }),
+    );
 
     return NextResponse.json({
         success: true,

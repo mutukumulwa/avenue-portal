@@ -3,6 +3,7 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { peekNextDocumentNumber } from "@/lib/document-number";
 
 export async function generateQuotationAction(data: {
   prospectName: string;
@@ -22,8 +23,11 @@ export async function generateQuotationAction(data: {
 
   const tenantId = session.user.tenantId;
 
-  const count = await prisma.quotation.count({ where: { tenantId } });
-  const quoteNumber = `QUO-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
+  const quoteNumber = await peekNextDocumentNumber("QUO", (yp) =>
+    prisma.quotation
+      .findFirst({ where: { tenantId, quoteNumber: { startsWith: yp } }, orderBy: { quoteNumber: "desc" }, select: { quoteNumber: true } })
+      .then((r) => r?.quoteNumber ?? null),
+  );
 
   const validUntil = new Date();
   validUntil.setDate(validUntil.getDate() + 30); // 30-day validity

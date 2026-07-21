@@ -2,6 +2,7 @@
 
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { peekNextDocumentNumber } from "@/lib/document-number";
 import { redirect } from "next/navigation";
 
 export async function createBrokerQuotationAction(formData: FormData) {
@@ -23,8 +24,11 @@ export async function createBrokerQuotationAction(formData: FormData) {
   const validUntil = new Date();
   validUntil.setDate(validUntil.getDate() + 30);
 
-  const count = await prisma.quotation.count({ where: { tenantId: session.user.tenantId } });
-  const quoteNumber = `QUO-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
+  const quoteNumber = await peekNextDocumentNumber("QUO", (yp) =>
+    prisma.quotation
+      .findFirst({ where: { tenantId: session.user.tenantId, quoteNumber: { startsWith: yp } }, orderBy: { quoteNumber: "desc" }, select: { quoteNumber: true } })
+      .then((r) => r?.quoteNumber ?? null),
+  );
 
   await prisma.quotation.create({
     data: {

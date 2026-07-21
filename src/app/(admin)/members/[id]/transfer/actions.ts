@@ -2,6 +2,7 @@
 
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
+import { peekNextDocumentNumber } from "@/lib/document-number";
 import { revalidatePath } from "next/cache";
 import { writeAudit } from "@/lib/audit";
 
@@ -26,8 +27,11 @@ export async function schemeTransferAction(
   if (member.groupId === toGroupId) return { error: "Member is already in this group." };
 
   // Build endorsement number
-  const count = await prisma.endorsement.count({ where: { tenantId } });
-  const endorsementNumber = `END-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
+  const endorsementNumber = await peekNextDocumentNumber("END", (yp) =>
+    prisma.endorsement
+      .findFirst({ where: { tenantId, endorsementNumber: { startsWith: yp } }, orderBy: { endorsementNumber: "desc" }, select: { endorsementNumber: true } })
+      .then((r) => r?.endorsementNumber ?? null),
+  );
 
   await prisma.$transaction(async (tx) => {
     // Create SCHEME_TRANSFER endorsement
@@ -93,8 +97,11 @@ export async function tierChangeAction(
   if (tier.groupId !== member.groupId) return { error: "Tier does not belong to the member's group." };
   if (member.benefitTierId === toBenefitTierId) return { error: "Member is already in this tier." };
 
-  const count = await prisma.endorsement.count({ where: { tenantId } });
-  const endorsementNumber = `END-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
+  const endorsementNumber = await peekNextDocumentNumber("END", (yp) =>
+    prisma.endorsement
+      .findFirst({ where: { tenantId, endorsementNumber: { startsWith: yp } }, orderBy: { endorsementNumber: "desc" }, select: { endorsementNumber: true } })
+      .then((r) => r?.endorsementNumber ?? null),
+  );
 
   await prisma.$transaction(async (tx) => {
     await tx.endorsement.create({

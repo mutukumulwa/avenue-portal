@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { peekNextDocumentNumber } from "@/lib/document-number";
 
 export class BillingService {
   /**
@@ -25,8 +26,11 @@ export class BillingService {
       const dueDate = new Date();
       dueDate.setDate(dueDate.getDate() + 30);
 
-      const count = await prisma.invoice.count({ where: { tenantId } });
-      const invoiceNumber = `INV-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
+      const invoiceNumber = await peekNextDocumentNumber("INV", (yp) =>
+        prisma.invoice
+          .findFirst({ where: { tenantId, invoiceNumber: { startsWith: yp } }, orderBy: { invoiceNumber: "desc" }, select: { invoiceNumber: true } })
+          .then((r) => r?.invoiceNumber ?? null),
+      );
 
       const invoice = await prisma.invoice.create({
         data: {

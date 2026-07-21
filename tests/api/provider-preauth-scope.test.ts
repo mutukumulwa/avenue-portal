@@ -61,7 +61,7 @@ const db = vi.hoisted(() => ({
   member: { findFirst: vi.fn() },
   provider: { findFirst: vi.fn() },
   contractApplicability: { findMany: vi.fn() },
-  preAuthorization: { count: vi.fn(async () => 0), create: vi.fn(async ({ data }: any) => ({ ...data })) },
+  preAuthorization: { count: vi.fn(async () => 0), findFirst: vi.fn(async () => null), create: vi.fn(async ({ data }: any) => ({ ...data })) },
 }));
 
 const cred = vi.hoisted(() => ({ current: null as ApiCredential | null }));

@@ -267,11 +267,18 @@ export class ProviderContractsService {
 
   /** PC-2026-007 style numbers, per tenant per year. */
   static async nextContractNumber(tenantId: string): Promise<string> {
+    // B4-WIDE: seed from max+1 (not count()+1) so a purge/gap can't collide.
+    // Inline (not the shared helper) because PC numbers pad to 3, not 5.
     const year = new Date().getFullYear();
-    const count = await prisma.providerContract.count({
+    const latest = await prisma.providerContract.findFirst({
       where: { tenantId, contractNumber: { startsWith: `PC-${year}-` } },
+      orderBy: { contractNumber: "desc" },
+      select: { contractNumber: true },
     });
-    return `PC-${year}-${String(count + 1).padStart(3, "0")}`;
+    const parsed = latest?.contractNumber
+      ? Number.parseInt(latest.contractNumber.slice(latest.contractNumber.lastIndexOf("-") + 1), 10)
+      : 0;
+    return `PC-${year}-${String((Number.isFinite(parsed) ? parsed : 0) + 1).padStart(3, "0")}`;
   }
 
   /**

@@ -10,6 +10,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import { peekNextDocumentNumber } from "@/lib/document-number";
 import { TRPCError } from "@trpc/server";
 import { auditChainService } from "./audit-chain.service";
 import { BenefitUsageService } from "./benefit-usage.service";
@@ -295,8 +296,11 @@ export const preauthAdjudicationService = {
       // Issue a Guarantee of Payment (G5.5): approvedAmount is already capped to
       // the member's available benefit limit by the gates, so the GOP is
       // guaranteed within financial limits.
-      const gopCount = await prisma.preAuthorization.count({ where: { tenantId, gopNumber: { not: null } } });
-      const gopNumber = `GOP-${new Date().getFullYear()}-${String(gopCount + 1).padStart(5, "0")}`;
+      const gopNumber = await peekNextDocumentNumber("GOP", (yp) =>
+        prisma.preAuthorization
+          .findFirst({ where: { tenantId, gopNumber: { startsWith: yp } }, orderBy: { gopNumber: "desc" }, select: { gopNumber: true } })
+          .then((r) => r?.gopNumber ?? null),
+      );
 
       // P1.2: Gate 5 pre-screened availability OUTSIDE any transaction. The
       // approval + hold now land in ONE serializable transaction that RE-CHECKS
@@ -538,8 +542,11 @@ export const preauthAdjudicationService = {
 
     const validUntil = new Date(Date.now() + (validDays ?? PA_VALIDITY_DAYS) * 24 * 60 * 60 * 1000);
     // Issue the GOP on manual approval too (G5.5), within the guaranteed amount.
-    const gopCount = await prisma.preAuthorization.count({ where: { tenantId, gopNumber: { not: null } } });
-    const gopNumber = `GOP-${new Date().getFullYear()}-${String(gopCount + 1).padStart(5, "0")}`;
+    const gopNumber = await peekNextDocumentNumber("GOP", (yp) =>
+      prisma.preAuthorization
+        .findFirst({ where: { tenantId, gopNumber: { startsWith: yp } }, orderBy: { gopNumber: "desc" }, select: { gopNumber: true } })
+        .then((r) => r?.gopNumber ?? null),
+    );
 
     // P1.2 (DEC-04): the availability gate, the FG-C8 atomic status flip and the
     // hold all land in ONE serializable transaction with bounded retry — the PA
@@ -692,8 +699,11 @@ export const preauthAdjudicationService = {
       throw new TRPCError({ code: "BAD_REQUEST", message: "Can only amend an APPROVED pre-authorization" });
     }
 
-    const count = await prisma.preAuthorization.count({ where: { tenantId } });
-    const preauthNumber = `PA-AMD-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
+    const preauthNumber = await peekNextDocumentNumber("PA-AMD", (yp) =>
+      prisma.preAuthorization
+        .findFirst({ where: { tenantId, preauthNumber: { startsWith: yp } }, orderBy: { preauthNumber: "desc" }, select: { preauthNumber: true } })
+        .then((r) => r?.preauthNumber ?? null),
+    );
 
     const amendment = await prisma.preAuthorization.create({
       data: {

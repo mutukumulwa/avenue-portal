@@ -22,6 +22,7 @@ const db = vi.hoisted(() => {
     },
     member: {
       count: vi.fn(async () => 0),
+      findFirst: vi.fn(async () => null),
       create: vi.fn(async (a: any) => ({ id: "m1", ...a.data })),
     },
     membershipExclusion: { create: vi.fn(async () => ({})) },

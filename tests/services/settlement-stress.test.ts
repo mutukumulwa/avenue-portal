@@ -27,12 +27,13 @@ const db = vi.hoisted(() => {
     },
     paymentVoucher: {
       count: vi.fn(async () => 0),
+      findFirst: vi.fn(async () => null),
       create: vi.fn(async (a: any) => ({ id: "pv1", ...a.data })),
     },
     chartOfAccount: {
       findUnique: vi.fn(async (a: any) => ({ id: `acc-${a.where.tenantId_code.code}`, code: a.where.tenantId_code.code })),
     },
-    journalEntry: { count: vi.fn(async () => 0), create: vi.fn(async (a: any) => ({ id: "je1", ...a.data })) },
+    journalEntry: { count: vi.fn(async () => 0), findFirst: vi.fn(async () => null), create: vi.fn(async (a: any) => ({ id: "je1", ...a.data })) },
     auditLog: { findFirst: vi.fn(async () => null), create: vi.fn(async () => ({})) },
     // OBS-H1: markSettlementBatchPaid now reads the fraud-gate setting (config
     // null → gate off, behaviour unchanged) and checks for unresolved alerts.
