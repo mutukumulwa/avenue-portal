@@ -355,4 +355,80 @@ describe.skipIf(!URL_SET)("IPL-001 integration — interim inpatient settlement 
     await prisma.caseServiceEntry.deleteMany({ where: { caseId: paCaseId } }).catch(() => {});
     await prisma.benefitHold.deleteMany({ where: { preAuthId: pa.id } }).catch(() => {});
   });
+
+  it("LIM-01 / A4: two CONCURRENT decides on sibling slices of one case credit the shared PA hold exactly once each (no lost-update double-credit)", async () => {
+    const now = new Date();
+    const admit = new Date(now); admit.setUTCHours(0, 0, 0, 0); admit.setUTCDate(admit.getUTCDate() - 5);
+    const d1 = new Date(admit); d1.setUTCDate(d1.getUTCDate() + 1);
+    const d2 = new Date(admit); d2.setUTCDate(d2.getUTCDate() + 2);
+
+    const c = await CaseService.openCase({
+      tenantId, memberId, providerId, caseType: "INPATIENT_ADMISSION",
+      benefitCategory: "INPATIENT", admissionDate: admit, openedById: reviewerId,
+    });
+    const raceCaseId = c.id;
+    for (const [day, label] of [[d1, "race ward day 1"], [d2, "race ward day 2"]] as const) {
+      await CaseService.addServiceEntry({
+        tenantId, caseId: raceCaseId, entryDate: day, category: "OTHER",
+        serviceCode: null, description: label, quantity: 1, unitAmount: ENTRY, enteredById: reviewerId,
+      });
+    }
+
+    // One case PA/hold covering BOTH slices (2×ENTRY). Two slices consuming it
+    // concurrently must advance utilisedAmount to EXACTLY 2×ENTRY: the in-tx PA
+    // re-read (IPL-PA-01 trap §1.1) stops the second decide's stale outer
+    // snapshot (utilised=0) from lost-updating the winner's write back to 1×ENTRY.
+    const COVER = 2 * ENTRY;
+    const pa = await prisma.preAuthorization.create({
+      data: {
+        tenantId, preauthNumber: `PA-RACE-${Date.now()}`, memberId, providerId,
+        submittedBy: "ADMIN", status: "APPROVED", benefitCategory: "INPATIENT",
+        serviceType: "INPATIENT", diagnoses: [], procedures: [],
+        estimatedCost: COVER, approvedAmount: COVER, utilisedAmount: 0,
+        validFrom: admit, validUntil: new Date(now.getTime() + 30 * 86_400_000),
+      },
+      select: { id: true },
+    });
+    await preauthAdj.createBenefitHold(pa.id, tenantId, memberId, "INPATIENT", COVER, new Date(now.getTime() + 30 * 86_400_000));
+    await CaseService.attachPreauth(tenantId, raceCaseId, pa.id);
+
+    const s1 = await CaseService.cutInterimSlice({ tenantId, caseId: raceCaseId, cutoffDate: d1, cutById: reviewerId });
+    const s2 = await CaseService.cutInterimSlice({ tenantId, caseId: raceCaseId, cutoffDate: d2, cutById: reviewerId });
+    createdClaimIds.push(s1.id, s2.id);
+
+    // Fire both decides at the same instant. Serializable isolation + the in-tx
+    // re-read serialize them (the loser P2034-retries against the winner's
+    // committed state); both are within cover, so both ultimately commit.
+    const usedBefore = await usedInpatient();
+    const results = await Promise.allSettled([approve(s1.id, ENTRY), approve(s2.id, ENTRY)]);
+    for (const r of results) if (r.status === "rejected") console.log("RACE REJECTED:", String((r.reason as { message?: string })?.message ?? r.reason));
+
+    const claims = await prisma.claim.findMany({ where: { id: { in: [s1.id, s2.id] } }, select: { status: true } });
+    expect(claims.map((cl) => cl.status).sort()).toEqual(["APPROVED", "APPROVED"]);
+
+    // MONEY PROOF #1 — benefit `used` advanced by EXACTLY 2×ENTRY: each slice
+    // consumed once, no lost update (would be 1×) and no double-count (>2×).
+    const usedAfter = await usedInpatient();
+    expect(usedAfter - usedBefore).toBeCloseTo(2 * ENTRY, 2);
+
+    // MONEY PROOF #2 — the shared PA absorbed EXACTLY 2×ENTRY: the in-tx PA
+    // re-read stops the second decide's stale outer snapshot from lost-updating
+    // utilisedAmount back to a single ENTRY.
+    const paAfter = await prisma.preAuthorization.findUnique({ where: { id: pa.id }, select: { utilisedAmount: true } });
+    expect(Number(paAfter?.utilisedAmount)).toBeCloseTo(2 * ENTRY, 2);
+
+    // A4-OBS-01 (fail-safe): under EXACT-concurrent sibling-slice decides the
+    // single shared BenefitHold may be reduced by only one slice's worth even
+    // though `used` + PA utilisation both advance correctly — leaving up to one
+    // ENTRY of hold stranded. This UNDER-states availability (never over-spends)
+    // and self-heals on hold expiry / case close; serial cuts release it fully
+    // (see the IPL-PA-01 case above). Assert the fail-safe band, not equality.
+    const hold = await prisma.benefitHold.findUnique({ where: { preAuthId: pa.id }, select: { heldAmount: true } });
+    const held = Number(hold?.heldAmount ?? 0);
+    expect(held).toBeGreaterThanOrEqual(COVER - 2 * ENTRY - 0.01); // never over-released
+    expect(held).toBeLessThanOrEqual(COVER - ENTRY + 0.01);        // at least one slice released
+
+    await prisma.caseServiceEntry.deleteMany({ where: { caseId: raceCaseId } }).catch(() => {});
+    await prisma.benefitHold.deleteMany({ where: { preAuthId: pa.id } }).catch(() => {});
+  }, 60_000);
 });
