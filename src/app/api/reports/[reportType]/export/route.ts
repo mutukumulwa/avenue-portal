@@ -343,19 +343,43 @@ async function fetchReportData(
     }
 
     case "admissions": {
-      const rows = await prisma.claim.findMany({
-        where: { tenantId, serviceType: "INPATIENT" },
-        select: { claimNumber: true, admissionDate: true, dischargeDate: true, lengthOfStay: true,
-          billedAmount: true, status: true, provider: { select: { name: true } },
-          member: { select: { memberNumber: true, firstName: true, lastName: true, group: { select: { name: true } } } } },
-        orderBy: { admissionDate: "desc" },
-      });
+      // A2-DEF-01: one admission = one episode. Interim slices + the final bill
+      // are many INPATIENT claims per admission (and a fully-sliced case files no
+      // final), so source from ClinicalCase (billed = case accrued) + direct
+      // inpatient claims that never opened a case (caseId: null).
+      const losOf = (adm: Date | null, dis: Date | null, stored?: number | null): number | null => {
+        if (stored != null) return stored;
+        if (!adm) return null;
+        return Math.max(1, Math.ceil(((dis ? new Date(dis).getTime() : Date.now()) - new Date(adm).getTime()) / 86_400_000));
+      };
+      const [caseRows, directRows] = await Promise.all([
+        prisma.clinicalCase.findMany({
+          where: { tenantId },
+          select: { caseNumber: true, admissionDate: true, dischargeDate: true, accruedAmount: true, status: true,
+            provider: { select: { name: true } },
+            member: { select: { memberNumber: true, firstName: true, lastName: true, group: { select: { name: true } } } } },
+          orderBy: { admissionDate: "desc" },
+        }),
+        prisma.claim.findMany({
+          where: { tenantId, serviceType: "INPATIENT", caseId: null },
+          select: { claimNumber: true, admissionDate: true, dischargeDate: true, lengthOfStay: true, billedAmount: true, status: true,
+            provider: { select: { name: true } },
+            member: { select: { memberNumber: true, firstName: true, lastName: true, group: { select: { name: true } } } } },
+          orderBy: { admissionDate: "desc" },
+        }),
+      ]);
+      const rows = [
+        ...caseRows.map((c) => ({ ref: c.caseNumber, adm: c.admissionDate, dis: c.dischargeDate, los: losOf(c.admissionDate, c.dischargeDate),
+          billed: Number(c.accruedAmount), status: c.status, member: `${c.member.firstName} ${c.member.lastName} (${c.member.memberNumber})`, group: c.member.group.name, provider: c.provider.name })),
+        ...directRows.map((r) => ({ ref: r.claimNumber, adm: r.admissionDate, dis: r.dischargeDate, los: losOf(r.admissionDate, r.dischargeDate, r.lengthOfStay),
+          billed: Number(r.billedAmount), status: r.status, member: `${r.member.firstName} ${r.member.lastName} (${r.member.memberNumber})`, group: r.member.group.name, provider: r.provider.name })),
+      ].sort((a, b) => (b.adm ? new Date(b.adm).getTime() : 0) - (a.adm ? new Date(a.adm).getTime() : 0));
       return {
-        headers: ["Claim No.", "Member", "Group", "Provider", "Admission Date", "Discharge Date", "LOS", "Billed (UGX)", "Status"],
-        rows: rows.map(r => [r.claimNumber, `${r.member.firstName} ${r.member.lastName} (${r.member.memberNumber})`, r.member.group.name,
-          r.provider.name, r.admissionDate ? new Date(r.admissionDate).toISOString().split("T")[0] : "",
-          r.dischargeDate ? new Date(r.dischargeDate).toISOString().split("T")[0] : "",
-          r.lengthOfStay?.toString() ?? "", Number(r.billedAmount).toString(), r.status]),
+        headers: ["Case / Claim No.", "Member", "Group", "Provider", "Admission Date", "Discharge Date", "LOS", "Billed (UGX)", "Status"],
+        rows: rows.map((r) => [r.ref, r.member, r.group, r.provider,
+          r.adm ? new Date(r.adm).toISOString().split("T")[0] : "",
+          r.dis ? new Date(r.dis).toISOString().split("T")[0] : "",
+          r.los?.toString() ?? "", r.billed.toString(), r.status]),
       };
     }
 

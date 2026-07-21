@@ -8,7 +8,7 @@ const db = vi.hoisted(() => ({
     update: vi.fn(async (a: any) => ({ id: a.where.id, ...a.data })),
   },
   crossBorderCase: {
-    findFirst: vi.fn(async (): Promise<any> => null),
+    findFirst: vi.fn(async (_args?: any): Promise<any> => null),
     findMany: vi.fn(async (): Promise<any[]> => []),
     create: vi.fn(async (a: any) => ({ id: "case1", ...a.data })),
     update: vi.fn(async (a: any) => ({ id: a.where.id, ...a.data })),

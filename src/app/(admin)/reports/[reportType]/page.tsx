@@ -583,15 +583,32 @@ async function getExceededLimitsData(tenantId: string) {
 }
 
 async function getAdmissionsData(tenantId: string): Promise<ReportResult> {
-  const [agg, distinctProviders, rows] = await Promise.all([
-    prisma.claim.aggregate({ where: { tenantId, serviceType: "INPATIENT" }, _count: { _all: true }, _sum: { billedAmount: true }, _avg: { lengthOfStay: true } }),
-    prisma.claim.findMany({ where: { tenantId, serviceType: "INPATIENT" }, distinct: ["providerId"], select: { providerId: true } }),
-    prisma.claim.findMany({
-      where: { tenantId, serviceType: "INPATIENT" },
+  // A2-DEF-01: an admission is a clinical EPISODE, not a claim. Since interim
+  // settlement (IPL-001) one admission files many claims (N interim slices + a
+  // final), so counting INPATIENT claims over-counted admissions and listed each
+  // slice as a duplicate row — and a fully-sliced case files no final claim at
+  // all. Source admissions from ClinicalCase (billed = the case's accrued total)
+  // plus direct inpatient claims that never opened a case (caseId: null). Counts
+  // + billed are full-tenant via aggregates; the list shows the 200 most recent.
+  const [caseAgg, directAgg, caseProviders, directProviders, caseRows, directRows] = await Promise.all([
+    prisma.clinicalCase.aggregate({ where: { tenantId }, _count: { _all: true }, _sum: { accruedAmount: true } }),
+    prisma.claim.aggregate({ where: { tenantId, serviceType: "INPATIENT", caseId: null }, _count: { _all: true }, _sum: { billedAmount: true } }),
+    prisma.clinicalCase.findMany({ where: { tenantId }, distinct: ["providerId"], select: { providerId: true } }),
+    prisma.claim.findMany({ where: { tenantId, serviceType: "INPATIENT", caseId: null }, distinct: ["providerId"], select: { providerId: true } }),
+    prisma.clinicalCase.findMany({
+      where: { tenantId },
       select: {
-        claimNumber: true, dateOfService: true, admissionDate: true,
-        dischargeDate: true, lengthOfStay: true, billedAmount: true,
-        approvedAmount: true, status: true, attendingDoctor: true,
+        caseNumber: true, admissionDate: true, dischargeDate: true, accruedAmount: true, status: true,
+        member: { select: { memberNumber: true, firstName: true, lastName: true, group: { select: { name: true } } } },
+        provider: { select: { name: true } },
+      },
+      orderBy: { admissionDate: "desc" },
+      take: 200,
+    }),
+    prisma.claim.findMany({
+      where: { tenantId, serviceType: "INPATIENT", caseId: null },
+      select: {
+        claimNumber: true, admissionDate: true, dischargeDate: true, lengthOfStay: true, billedAmount: true, status: true,
         member: { select: { memberNumber: true, firstName: true, lastName: true, group: { select: { name: true } } } },
         provider: { select: { name: true } },
       },
@@ -599,25 +616,46 @@ async function getAdmissionsData(tenantId: string): Promise<ReportResult> {
       take: 200,
     }),
   ]);
-  const totalCount    = agg._count._all;
-  const totalBilled   = Number(agg._sum.billedAmount ?? 0);
-  const avgLOS        = Number(agg._avg.lengthOfStay ?? 0);
+
+  const totalCount     = caseAgg._count._all + directAgg._count._all;
+  const totalBilled    = Number(caseAgg._sum.accruedAmount ?? 0) + Number(directAgg._sum.billedAmount ?? 0);
+  const uniqueProviders = new Set([...caseProviders, ...directProviders].map((p) => p.providerId)).size;
+  const losOf = (adm: Date | null, dis: Date | null, stored?: number | null): number | null => {
+    if (stored != null) return stored;
+    if (!adm) return null;
+    return Math.max(1, Math.ceil(((dis ? new Date(dis).getTime() : Date.now()) - new Date(adm).getTime()) / 86_400_000));
+  };
+  const merged = [
+    ...caseRows.map((c) => ({
+      ref: c.caseNumber, adm: c.admissionDate, dis: c.dischargeDate, los: losOf(c.admissionDate, c.dischargeDate),
+      billed: Number(c.accruedAmount), status: c.status,
+      who: `${c.member.firstName} ${c.member.lastName} (${c.member.memberNumber})`, group: c.member.group.name, provider: c.provider.name,
+    })),
+    ...directRows.map((r) => ({
+      ref: r.claimNumber, adm: r.admissionDate, dis: r.dischargeDate, los: losOf(r.admissionDate, r.dischargeDate, r.lengthOfStay),
+      billed: Number(r.billedAmount), status: r.status,
+      who: `${r.member.firstName} ${r.member.lastName} (${r.member.memberNumber})`, group: r.member.group.name, provider: r.provider.name,
+    })),
+  ].sort((a, b) => (b.adm ? new Date(b.adm).getTime() : 0) - (a.adm ? new Date(a.adm).getTime() : 0)).slice(0, 200);
+  const losVals = merged.map((r) => r.los).filter((n): n is number => n != null);
+  const avgLOS = losVals.length ? losVals.reduce((s, n) => s + n, 0) / losVals.length : 0;
+
   const kpis = [
     { label: "Total Admissions",    value: totalCount.toLocaleString() },
     { label: "Total Billed (UGX)",  value: totalBilled.toLocaleString() },
     { label: "Avg Length of Stay",  value: `${avgLOS.toFixed(1)} days` },
-    { label: "Unique Providers",    value: distinctProviders.length.toLocaleString() },
+    { label: "Unique Providers",    value: uniqueProviders.toLocaleString() },
   ];
-  const headers = ["Claim No.", "Member", "Group", "Provider", "Admission Date", "Discharge Date", "LOS (Days)", "Billed (UGX)", "Status"];
-  const data = rows.map(r => [
-    r.claimNumber,
-    `${r.member.firstName} ${r.member.lastName} (${r.member.memberNumber})`,
-    r.member.group.name,
-    r.provider.name,
-    r.admissionDate ? new Date(r.admissionDate).toLocaleDateString("en-UG") : "—",
-    r.dischargeDate ? new Date(r.dischargeDate).toLocaleDateString("en-UG") : "—",
-    r.lengthOfStay?.toString() ?? "—",
-    Number(r.billedAmount).toLocaleString(),
+  const headers = ["Case / Claim No.", "Member", "Group", "Provider", "Admission Date", "Discharge Date", "LOS (Days)", "Billed (UGX)", "Status"];
+  const data = merged.map((r) => [
+    r.ref,
+    r.who,
+    r.group,
+    r.provider,
+    r.adm ? new Date(r.adm).toLocaleDateString("en-UG") : "—",
+    r.dis ? new Date(r.dis).toLocaleDateString("en-UG") : "—",
+    r.los?.toString() ?? "—",
+    r.billed.toLocaleString(),
     r.status.replace(/_/g, " "),
   ]);
   return { kpis, headers, data, totalCount };

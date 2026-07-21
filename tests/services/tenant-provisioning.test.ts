@@ -19,6 +19,7 @@ import { TenantProvisioningService } from "@/server/services/tenant-provisioning
 import { ReasonCodeService } from "@/server/services/reason-codes.service";
 import { OverrideControlService } from "@/server/services/override-control.service";
 import { ServiceCategoryService } from "@/server/services/service-category.service";
+import { ApprovalMatrixService } from "@/server/services/approval-matrix.service";
 import { GLService } from "@/server/services/gl.service";
 
 describe("TenantProvisioningService.provisionTenant", () => {
@@ -32,6 +33,7 @@ describe("TenantProvisioningService.provisionTenant", () => {
     vi.spyOn(ReasonCodeService, "seedForTenant").mockResolvedValue(12);
     vi.spyOn(OverrideControlService, "seedForTenant").mockResolvedValue(5);
     vi.spyOn(ServiceCategoryService, "seedForTenant").mockResolvedValue(47);
+    vi.spyOn(ApprovalMatrixService, "seedForTenant").mockResolvedValue(3);
   });
   afterEach(() => vi.restoreAllMocks());
 
@@ -57,6 +59,7 @@ describe("TenantProvisioningService.provisionTenant", () => {
       reasonCodes: 12,
       overrideControls: 5,
       serviceCategories: 47,
+      approvalMatrixRules: 3,
       glAccounts: 24,
       roles: 17,
       defaultClient: true,

@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { ReasonCodeService } from "./reason-codes.service";
 import { OverrideControlService } from "./override-control.service";
 import { ServiceCategoryService } from "./service-category.service";
+import { ApprovalMatrixService } from "./approval-matrix.service";
 import { GLService, STANDARD_ACCOUNTS } from "./gl.service";
 import { seedRbac } from "../../../prisma/seeds/rbac";
 
@@ -82,11 +83,15 @@ export class TenantProvisioningService {
     const reasonCodes = await ReasonCodeService.seedForTenant(tenantId);
     const overrideControls = await OverrideControlService.seedForTenant(tenantId);
     const serviceCategories = await ServiceCategoryService.seedForTenant(tenantId);
+    // 5. Approval matrix (A3-OBS-01) — without a default, resolve() returns null
+    //    and claim approval fail-opens to a single reviewer for any amount.
+    const approvalMatrixRules = await ApprovalMatrixService.seedForTenant(tenantId);
 
     return {
       reasonCodes,
       overrideControls,
       serviceCategories,
+      approvalMatrixRules,
       glAccounts: STANDARD_ACCOUNTS.length, // seedChartOfAccounts returns void
       roles,
       defaultClient: !existingDefaultClient, // true = created by THIS run

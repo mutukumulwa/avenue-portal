@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { TRPCError } from "@trpc/server";
 
 const db = vi.hoisted(() => ({
-  approvalMatrix: { findMany: vi.fn() },
+  approvalMatrix: { findMany: vi.fn(), count: vi.fn(), createMany: vi.fn(async (_a: any) => ({ count: 3 })) },
   fxRate: { findFirst: vi.fn() },
 }));
 
@@ -160,6 +160,28 @@ describe("ApprovalMatrixService — engine (G3.1)", () => {
       });
       expect(r?.baseAmount).toBe(86_000 * 25);
       expect(r?.matrix.id).toBe("band");
+    });
+  });
+
+  describe("seedForTenant (A3-OBS-01 — default matrix on provisioning)", () => {
+    it("seeds the 3 default CLAIM_PAYMENT rules when none exist", async () => {
+      db.approvalMatrix.count.mockResolvedValue(0);
+      const n = await ApprovalMatrixService.seedForTenant(T);
+      expect(n).toBe(3);
+      expect(db.approvalMatrix.createMany).toHaveBeenCalledOnce();
+      const seeded = (db.approvalMatrix.createMany.mock.calls[0][0] as { data: any[] }).data;
+      expect(seeded).toHaveLength(3);
+      // The inpatient >200k dual-approval rule is present (the register's A3 control).
+      expect(seeded).toContainEqual(
+        expect.objectContaining({ serviceType: "INPATIENT", claimValueMin: 200000, requiredRole: "UNDERWRITER", requiresDual: true }),
+      );
+    });
+
+    it("is idempotent — leaves an already-configured matrix untouched", async () => {
+      db.approvalMatrix.count.mockResolvedValue(3);
+      const n = await ApprovalMatrixService.seedForTenant(T);
+      expect(n).toBe(0);
+      expect(db.approvalMatrix.createMany).not.toHaveBeenCalled();
     });
   });
 });

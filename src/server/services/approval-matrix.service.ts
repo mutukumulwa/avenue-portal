@@ -83,6 +83,33 @@ export class ApprovalMatrixService {
     }
   }
 
+  /**
+   * A3-OBS-01: seed a sensible default CLAIM_PAYMENT approval matrix so a newly
+   * provisioned tenant launches with the dual-approval / SoD control ACTIVE. An
+   * unconfigured matrix fail-opens — `resolve()` returns null and `decide()`
+   * then approves on a single reviewer for ANY amount. Idempotent: if the tenant
+   * already has any CLAIM_PAYMENT rule (admin-configured, or a re-provision) it
+   * leaves them untouched. Mirrors the three rules the initial seed installs.
+   */
+  static async seedForTenant(tenantId: string): Promise<number> {
+    const existing = await prisma.approvalMatrix.count({
+      where: { tenantId, actionType: "CLAIM_PAYMENT" },
+    });
+    if (existing > 0) return 0;
+    const effectiveFrom = new Date("2024-01-01");
+    await prisma.approvalMatrix.createMany({
+      data: [
+        // Inpatient claims > UGX 200k require UNDERWRITER + dual (maker ≠ checker).
+        { tenantId, actionType: "CLAIM_PAYMENT", serviceType: "INPATIENT", claimValueMin: 200000, claimValueMax: null, benefitCategory: null, requiredRole: "UNDERWRITER", requiresDual: true, effectiveFrom },
+        // Surgical UGX 150k–199,999 require MEDICAL_OFFICER.
+        { tenantId, actionType: "CLAIM_PAYMENT", serviceType: null, claimValueMin: 150000, claimValueMax: 199999, benefitCategory: "SURGICAL", requiredRole: "MEDICAL_OFFICER", requiresDual: false, effectiveFrom },
+        // All claims UGX 50k–149,999 require CLAIMS_OFFICER or above.
+        { tenantId, actionType: "CLAIM_PAYMENT", serviceType: null, claimValueMin: 50000, claimValueMax: 149999, benefitCategory: null, requiredRole: "CLAIMS_OFFICER", requiresDual: false, effectiveFrom },
+      ],
+    });
+    return 3;
+  }
+
   /** Sequential steps for a rule — explicit ApprovalSteps, else a synthetic
    *  single step (or two when requiresDual) from the legacy requiredRole. */
   static expandSteps(matrix: ApprovalMatrix & { steps: ApprovalStep[] }): ResolvedStep[] {
