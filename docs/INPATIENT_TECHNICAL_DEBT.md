@@ -25,6 +25,19 @@ uat-inpatient`, controlled clock 2026-08-01). Re-seed a couple of member fixture
 mechanics (interim settlement, availability gate, package unbundling, readmission, prior-defect gate) are
 **not** re-listed here — see the run-02 verdict + the 2026-07-19 prior-defect gate evidence.
 
+> **⚡ 2026-07-21 LIVE CONFIRMATION (scoped service calls, real DB) — 10/10 PASS.** A1/A2/A3/A6 were
+> confirmed at runtime against a fresh throwaway on the LATEST schema (fresh `createdb` + `prisma db push` +
+> seed), exercising **the actual scoped code paths each persona's page/action invokes** — the register's
+> accepted "through the UI **or scoped service calls**" method: provider sees only its own facility's cases
+> and a foreign-case deep-link returns empty, with recon parity to `getCaseReconciliation` (A6/A1-provider);
+> a member passing a foreign `memberId` gets no leak and a foreign-claim deep-link → null (A1-member); a
+> non-administrator fails the `fundAdministrators` gate → 404 (A1-fund); admissions episode-count (318) < raw
+> inpatient-claim count (324 — the 6 extra are slice inflation the A2 fix removes); a 450k inpatient claim
+> routes to UNDERWRITER + dual and `enforceSegregationOfDuties` throws on maker==checker (A3). **Remaining
+> layer = browser-pixel render**, the VM's job — the disposable Lima VM is the designed browser-UAT env
+> (movable clock + personas), pending a rebuild to latest `main`; local browser is blocked by the VM already
+> holding port 3000 + a pinned NextAuth URL.
+
 | # | Area (plan §) | What is unproven | How to close | Prio |
 |---|---|---|---|---|
 | A1 | **Privacy / RBAC (§23)** — ✅ **CODE-VERIFIED PASS 2026-07-21** (live persona pass = documented fast-follow) | Per-actor list + deep-link scope for provider / member / HR / fund / reports users against inpatient cases, slices, PAs, GL. No foreign-scope or excessive-clinical-data access. | **Audited all actor surfaces — no foreign-scope read found; defence-in-depth throughout.** `requireRole` gates role only; every read is bound by *session-derived* scope (never user input). Member: `resolveMemberContext(userId)`→`allowedMemberIds` (self+deps), user-supplied `memberId` validated against allowed (foreign → falls back, never leaks; `member-app.service.ts:565`), deep-link claim scoped `{id,tenantId,memberId∈allowed}`→null on foreign id, sensitive-category masking, health-vault/documents user-id-derived. Provider: settlements `{tenantId,providerId}`; B2B eligibility `entitledMemberWhere(providerId)` (E2E-D02 fix); `/api/v1/claims` POST-only (no read-GET). HR: `{groupId}` from session. Fund export `[groupId]`: tenant+role+**explicit `fundAdministrators` membership check**→404 foreign group. OPS cases: role+tenant-scoped; internal case-service reads validate-after-read (`entry.caseId`/`lou.tenantId` throw). No provider/member-facing raw `ClinicalCase` surface exists. **Residual:** live persona pass on the VM (assert 403/empty at runtime) confirms the query-layer enforcement — fast-follow, not a blocker. | **P1→done (code)** |
