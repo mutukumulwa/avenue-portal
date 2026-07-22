@@ -87,6 +87,6 @@ export const preauthRouter = createTRPCRouter({
   convertToClaim: protectedProcedure
     .input(z.object({ preauthId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      return ClaimsService.convertPreAuthToClaim(ctx.tenantId, input.preauthId);
+      return ClaimsService.createClaimWithPreauth(ctx.tenantId, input.preauthId);
     }),
 });

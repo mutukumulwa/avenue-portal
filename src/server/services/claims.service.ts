@@ -740,52 +740,104 @@ export class ClaimsService {
   // always place/release the hold) and `executeAutoDecision`.
 
   /**
-   * Create an ordinary claim shell with this pre-auth ATTACHED (WP-C2/D4).
-   * Replaces the legacy 1:1 "conversion": the claim starts from the PA's
-   * clinical picture but remains a normal claim that can accrue BAU lines and
-   * further PAs. The PA becomes ATTACHED, not CONVERTED_TO_CLAIM.
+   * Create an ordinary claim shell with this pre-auth ATTACHED (WP-C2/D4),
+   * through the CANONICAL intake (F5.7): channel PREAUTH_CONVERSION, source
+   * PREAUTH, durable key `<preauthId>:claim-create:v1` — a repeated action (or
+   * a concurrent one) returns the existing claim instead of erroring or
+   * duplicating; the PA is connected + marked ATTACHED atomically with the
+   * claim via `origin.preauthId`. The PA's benefit HOLD is untouched here —
+   * it is consumed only at decision time (unchanged semantics).
    */
   static async createClaimWithPreauth(tenantId: string, preauthId: string) {
     const preauth = await prisma.preAuthorization.findUnique({
       where: { id: preauthId, tenantId },
     });
-
     if (!preauth) throw new Error("Pre-authorization not found");
+
+    const claimInclude = {
+      member: { select: { firstName: true, lastName: true, memberNumber: true } },
+      provider: { select: { name: true } },
+    } as const;
+
+    // Repeated action ⇒ the existing claim (also covers legacy-attached PAs).
+    if (preauth.claimId) {
+      const existing = await prisma.claim.findUnique({ where: { id: preauth.claimId }, include: claimInclude });
+      if (existing) return existing;
+    }
     if (preauth.status !== "APPROVED") {
       throw new Error("Only approved pre-authorizations can start a claim");
     }
-    if (preauth.claimId) {
-      throw new Error("Pre-authorization is already attached to a claim");
+    const amount = Number(preauth.approvedAmount ?? preauth.estimatedCost);
+    if (!(amount > 0)) {
+      throw new Error("The pre-authorization has no positive approved/estimated amount to bill against.");
     }
 
     // A PA's expected DOS is prospective; the claim starts when service actually
     // happens — never in the future (PR-013).
     const now = new Date();
     const expected = preauth.expectedDateOfService;
-    const claim = await this.createClaim(tenantId, {
-      memberId: preauth.memberId,
-      providerId: preauth.providerId,
-      serviceType: preauth.serviceType,
-      dateOfService: expected && expected < now ? expected : now,
-      diagnoses: preauth.diagnoses as Record<string, unknown>[],
-      procedures: preauth.procedures as Record<string, unknown>[],
-      billedAmount: Number(preauth.approvedAmount ?? preauth.estimatedCost),
-      benefitCategory: preauth.benefitCategory,
-      source: "PREAUTH",
-      preauthId: preauth.id,
-    });
+    const dos = expected && expected < now ? expected : now;
 
-    // createClaim connected the PA; stamp attachment state explicitly.
-    await prisma.preAuthorization.update({
-      where: { id: preauthId },
-      data: { claimId: claim.id, attachedAt: new Date(), status: "ATTACHED" },
-    });
+    const dxRaw = ((preauth.diagnoses as Array<{ icdCode?: string; code?: string; description?: string; isPrimary?: boolean }>) ?? [])
+      .filter((d) => (d.icdCode ?? d.code ?? "").trim().length > 0);
+    const flagged = dxRaw.findIndex((d) => d.isPrimary);
+    const primaryIdx = flagged === -1 ? 0 : flagged;
+    const firstProc = ((preauth.procedures as Array<{ cptCode?: string; description?: string }>) ?? [])[0];
 
-    return claim;
-  }
+    const { ClaimIntakeService } = await import("./claim-intake/intake.service");
+    const { getSystemActorId } = await import("./system-actor.service");
+    const systemActorId = await getSystemActorId(tenantId);
 
-  /** @deprecated WP-C2 — use createClaimWithPreauth; kept for API compatibility. */
-  static async convertPreAuthToClaim(tenantId: string, preauthId: string) {
-    return this.createClaimWithPreauth(tenantId, preauthId);
+    const result = await ClaimIntakeService.submit(
+      { kind: "preauthConversion", tenantId, preauthId, providerId: preauth.providerId, systemActorId },
+      {
+        schemaVersion: "1" as const,
+        idempotencyKey: `${preauthId}:claim-create:v1`,
+        member: { memberId: preauth.memberId },
+        provider: { providerId: preauth.providerId },
+        encounter: {
+          serviceType: preauth.serviceType,
+          benefitCategory: preauth.benefitCategory,
+          serviceFrom: dos.toISOString().slice(0, 10),
+        },
+        diagnoses: dxRaw.map((d, i) => ({
+          code: (d.icdCode ?? d.code)!,
+          ...(d.description?.trim() ? { description: d.description.trim() } : {}),
+          isPrimary: i === primaryIdx,
+        })),
+        // The PA's clinical itemization stays on the PA row; the claim starts as
+        // one aggregate pre-authorised line at the approved amount (the legacy
+        // shell had NO lines at all — this is strictly more adjudicable).
+        lines: [
+          {
+            serviceCategory: "OTHER" as const,
+            ...(firstProc?.cptCode?.trim() ? { cptCode: firstProc.cptCode.trim() } : {}),
+            description: `Pre-authorised treatment (PA ${preauth.preauthNumber})`,
+            quantity: 1,
+            unitCost: amount,
+            billedAmount: amount,
+          },
+        ],
+        preauthRefs: [preauth.preauthNumber],
+      },
+      { origin: { preauthId } },
+    );
+
+    if (result.outcome === "ACCEPTED" && result.claimId) {
+      const { processAcceptedRunInline } = await import("./claim-intake");
+      await processAcceptedRunInline(result.claimId);
+    }
+
+    // A concurrent conversion can replay the receipt mid-persist (claim not yet
+    // linked). The rival commits within its transaction — poll briefly for the
+    // authoritative link instead of failing the losing caller.
+    let claimId = result.claimId;
+    for (let i = 0; !claimId && i < 10; i += 1) {
+      await new Promise((r) => setTimeout(r, 150));
+      claimId = (await ClaimIntakeService.getReceipt(tenantId, result.receiptId))?.claimId ?? null;
+    }
+    if (!claimId) throw new Error("The conversion is still being processed — retry in a moment.");
+
+    return prisma.claim.findUniqueOrThrow({ where: { id: claimId }, include: claimInclude });
   }
 }

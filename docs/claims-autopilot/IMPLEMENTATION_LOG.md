@@ -776,3 +776,20 @@ F4.5, F7.4).
 - **Known gaps or skips:** `CLM-REIMB` number prefix retired (canonical CLM series; `isReimbursement` is the discriminator — existing CLM-REIMB numbers unaffected); the request row is written post-acceptance (best-effort — a failure leaves the claim safely in proof review, logged).
 - **Security/privacy review:** destination/proof data on the request row as before; member NOT_FOUND stays structural; the out-of-network relaxation applies ONLY to the reimbursement channel (every other rail still requires an operational provider).
 - **Next eligible task:** F5.7 — pre-auth-originated claim adapter.
+
+---
+
+## F5.7 — Pre-auth-originated claim adapter
+
+- **Status:** COMPLETE (real-DB)
+- **Commit/branch:** `feat/claims-autopilot` (F5.7 commit)
+- **Files changed:** `src/server/services/claims.service.ts` (`createClaimWithPreauth` rewritten as a canonical adapter; the `@deprecated convertPreAuthToClaim` alias REMOVED — no legacy converter), `src/server/trpc/routers/preauth.ts` (caller repointed), `tests/integration/claim-intake-preauth.integration.test.ts` (new).
+- **Decisions enforced:** §8.5 key `<preauthId>:claim-create:v1`; §8.3.4 strong PA-conversion fingerprint via `origin.preauthId` (one claim per PA event); D12 (member/provider/benefit/currency all from the PA row through the canonical context — `preauthConversion` caller); PA connect + `ATTACHED` stamped ATOMICALLY inside the canonical persist (legacy did it in a separate write after create); the benefit HOLD is untouched at conversion — consumed only at decision (unchanged semantics, now proven).
+- **Observable behavior before:** conversion called the legacy `createClaim` (no receipt/idempotency; a repeat threw "already attached"; a concurrent double-click could double-create; the claim shell had ZERO claim lines; PA stamping non-atomic).
+- **Observable behavior after:** repeated OR concurrent conversion returns the SAME claim (pa.claimId short-circuit + canonical replay + a brief authoritative-receipt poll for the mid-persist race); the claim carries ONE aggregate pre-authorised line at the approved amount (adjudicable; the PA row keeps its own clinical itemization); receipt channel PREAUTH_CONVERSION / scope `preauth:<id>` / source PREAUTH; processed in-request.
+- **Forbidden effects explicitly checked (real DB):** hold stays ACTIVE at 8000 after conversion; repeat + concurrent ⇒ exactly ONE claim; SUBMITTED PA ⇒ safe error, zero claims; suspended-facility PA ⇒ safe scope error, zero claims.
+- **Tests run and exact results:** integration → **5 passed**; full unit → **1151 passed / 99 skipped**; all integration together → **90 passed / 9 skipped**; typecheck + eslint clean.
+- **Creator allowlist change:** none this package — `claims.service.ts` stays allowlisted for the now-orphaned `createClaim` body itself, deleted in F5.10.
+- **Known gaps or skips:** `ClaimsService.createClaim` now has ZERO callers (tRPC create removed in F5.3; conversion canonical here) — F5.10 deletes it and closes the allowlist.
+- **Security/privacy review:** conversion identity fully server-derived from the PA row; tenant-scoped fetch; safe non-enumerating failures.
+- **Next eligible task:** F5.8/F5.9 — inpatient interim + final canonical persistence.
