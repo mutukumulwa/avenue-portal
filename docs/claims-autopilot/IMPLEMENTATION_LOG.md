@@ -218,3 +218,39 @@ staged.
 - **Security/privacy review:** model carries only hashes/safe messages/outcome codes; no PHI columns.
 - **Next eligible task:** F2.2 — Implement receipt reservation and replay semantics.
 - **Blocker/options, if blocked:** n/a.
+
+---
+
+## Environment — disposable Postgres provisioned (per user decision 2026-07-22)
+
+Stood up a throwaway Postgres 16.14 in the session scratchpad (no Docker; `initdb`
++ `pg_ctl` on port 55432, short socket dir `/tmp/ap_uat_sock` to dodge the 103-byte
+socket-path limit). DB `autopilot_uat`, schema pushed (`prisma db push` → 181
+tables incl. `ClaimIntakeReceipt` with all indexes). Connection env at
+`<scratchpad>/db.env`; recipe + teardown in `docs/claims-autopilot/VERIFICATION.md`.
+Integration suites gate on `AUTOPILOT_TEST_DB === DATABASE_URL` so they can only
+ever touch this throwaway. This unblocks the mandated real-DB proofs (F2.2, F3.5/6,
+F4.5, F7.4).
+
+---
+
+## F2.2 — Implement receipt reservation and replay semantics
+
+- **Status:** COMPLETE (incl. real-DB concurrency proof)
+- **Commit/branch:** `feat/claims-autopilot` (F2.2 commit)
+- **Files changed:** `src/server/services/claim-intake/receipt.ts` (new), `tests/services/claim-intake-receipt.test.ts` (new, mocked), `tests/integration/claim-intake-receipt.integration.test.ts` (new, real DB), `docs/claims-autopilot/VERIFICATION.md` (new).
+- **Decisions enforced:** §8.6 replay/conflict semantics; §11.4 exact-once (one receipt per scoped key); D16 (no payload in receipt).
+- **Acceptance scenarios covered:** CA-020/CA-021 (same key sequential/concurrent ⇒ one receipt), CA-022 (different hash ⇒ conflict, original unchanged), CA-024 (lost response retry returns durable state).
+- **Observable behavior before:** no durable reservation; concurrent same-key submissions on most rails could create duplicate claims.
+- **Observable behavior after:** `reserveReceipt(db, input)` → RESERVED | REPLAY | CONFLICT via the DB unique constraint; `markReceipt{Succeeded,Rejected,Failed}` transition ONLY from PROCESSING (`updateMany where state=PROCESSING`, returns whether this call won); `assertValidScopeKey`, `findReceiptByKey`. Takes an explicit client/tx (composes in the F3.3 intake transaction; constructs no client on import).
+- **Forbidden effects explicitly checked:** CONFLICT never mutates the original (asserted `updateMany` not called; real-DB row hash unchanged); a late terminal transition returns false and does not overwrite success (real-DB SUCCEEDED survives a later markFailed); non-P2002 errors rethrown unchanged.
+- **Tests run and exact results:**
+  - `npx vitest run tests/services/claim-intake-receipt.test.ts` → **20 passed** (mocked).
+  - **Real DB** (`source db.env`): `npx vitest run tests/integration/claim-intake-receipt.integration.test.ts` → **3 passed** — 20 concurrent same key+hash ⇒ exactly 1 RESERVED + 19 REPLAY + 1 DB row; 10 concurrent same key/diff hash ⇒ 1 RESERVED + 9 CONFLICT + 1 DB row (winner hash intact, all conflicts reference it); one-way terminal.
+  - `npm run typecheck` → PASS.
+- **Database/audit/reconciliation evidence:** real Postgres 16.14; the compound unique `(tenantId, scopeKey, channel, idempotencyKey)` enforces exactly-once under 20-way concurrency.
+- **Creator allowlist change:** none (no Claim.create here — receipts only).
+- **Known gaps or skips:** notification/audit exact-once and claim linkage happen in F3.3/F3.7 (receipt.claimId populated there).
+- **Security/privacy review:** scope-key format validated; receipt stores hashes/outcome only.
+- **Next eligible task:** F2.3 — Add processing run and stage schema.
+- **Blocker/options, if blocked:** n/a.
