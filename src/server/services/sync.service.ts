@@ -1,9 +1,9 @@
 import { prisma } from "@/lib/prisma";
-import { peekNextDocumentNumber } from "@/lib/document-number";
-import { FraudService } from "./fraud.service";
-import { AutoAdjudicationService } from "./auto-adjudication.service";
 import { getSystemActorId } from "./system-actor.service";
 import { BenefitUsageService } from "./benefit-usage.service";
+import { ClaimIntakeService } from "./claim-intake/intake.service";
+import { IntakeError } from "./claim-intake/errors";
+import { processAcceptedRunInline } from "./claim-intake";
 
 /**
  * Store-and-forward sync rail (Medvex spec §4 / gap G4).
@@ -115,15 +115,20 @@ export class SyncService {
 
     // Dispatch authoritative re-validation by entity type. Each returns a
     // terminal state; a CONFLICT is never silently dropped — it surfaces for
-    // review. (Phase-1: Claim re-validation live; other entities pass-through.)
-    let outcome: { state: "SYNCED" | "CONFLICT"; reason?: string };
+    // review. A RETRY outcome (transient canonical failure BEFORE acceptance)
+    // leaves the op PENDING so the next reconcile pass retries it (F5.5).
+    let outcome: { state: "SYNCED" | "CONFLICT" | "RETRY"; reason?: string };
     switch (op.entityType) {
       case "Claim":
-        outcome = await this.reconcileClaim(op.tenantId, op.payload as Record<string, unknown>, op.clientUuid, op.offlineAuthId);
+        outcome = await this.reconcileClaim(
+          { id: op.id, tenantId: op.tenantId, clientUuid: op.clientUuid, opKey: op.opKey, deviceId: op.deviceId, offlineAuthId: op.offlineAuthId },
+          op.payload as Record<string, unknown>,
+        );
         break;
       default:
         outcome = { state: "SYNCED" };
     }
+    if (outcome.state === "RETRY") return { state: "PENDING", reason: outcome.reason };
     return this.finalise(operationId, outcome.state, outcome.reason);
   }
 
@@ -138,11 +143,10 @@ export class SyncService {
    * so a re-run does not create a duplicate.
    */
   private static async reconcileClaim(
-    tenantId: string,
+    op: { id: string; tenantId: string; clientUuid: string; opKey: string; deviceId: string | null; offlineAuthId: string | null },
     payload: Record<string, unknown>,
-    clientUuid: string,
-    offlineAuthId?: string | null,
-  ): Promise<{ state: "SYNCED" | "CONFLICT"; reason?: string }> {
+  ): Promise<{ state: "SYNCED" | "CONFLICT" | "RETRY"; reason?: string }> {
+    const { tenantId, clientUuid } = op;
     const memberNumber = payload.memberNumber as string | undefined;
     const providerCode = payload.providerCode as string | undefined;
     const serviceType = payload.serviceType as string | undefined;
@@ -151,30 +155,20 @@ export class SyncService {
     if (!serviceType) return { state: "CONFLICT", reason: "Missing serviceType" };
     if (lineItems.length === 0) return { state: "CONFLICT", reason: "No line items" };
 
-    const member = await prisma.member.findFirst({
-      where: { tenantId, memberNumber },
-      select: { id: true, status: true, group: { select: { status: true } } },
-    });
-    if (!member) return { state: "CONFLICT", reason: "Member not found at sync time" };
-    if (member.status !== "ACTIVE") return { state: "CONFLICT", reason: `Membership ${member.status} at sync time` };
-    if (["SUSPENDED", "LAPSED", "TERMINATED"].includes(member.group.status)) {
-      return { state: "CONFLICT", reason: `Scheme ${member.group.status} at sync time` };
-    }
-
     // PR-036: the work code IS the provider identity — the pack was issued to
     // one facility, so the op resolves to that provider authoritatively. The
     // free-text provider code is only a fallback for API-path ops without a
     // work code (matched by Slade360 id, then case-insensitive name).
-    let provider: { id: string; contractStatus: string } | null = null;
-    if (offlineAuthId) {
+    let providerId: string | null = null;
+    if (op.offlineAuthId) {
       const auth = await prisma.offlineWorkAuthorization.findUnique({
-        where: { id: offlineAuthId },
-        select: { provider: { select: { id: true, contractStatus: true } } },
+        where: { id: op.offlineAuthId },
+        select: { provider: { select: { id: true } } },
       });
-      provider = auth?.provider ?? null;
+      providerId = auth?.provider?.id ?? null;
     }
-    if (!provider && providerCode) {
-      provider = await prisma.provider.findFirst({
+    if (!providerId && providerCode) {
+      const byCode = await prisma.provider.findFirst({
         where: {
           tenantId,
           OR: [
@@ -182,92 +176,105 @@ export class SyncService {
             { name: { equals: providerCode, mode: "insensitive" } },
           ],
         },
-        select: { id: true, contractStatus: true },
+        select: { id: true },
       });
+      providerId = byCode?.id ?? null;
     }
-    if (!provider) return { state: "CONFLICT", reason: "Provider not resolvable at sync time (no work-code facility, no Slade360/name match)" };
-    if (["EXPIRED", "SUSPENDED"].includes(provider.contractStatus)) {
-      return { state: "CONFLICT", reason: `Provider contract ${provider.contractStatus}` };
-    }
+    if (!providerId) return { state: "CONFLICT", reason: "Provider not resolvable at sync time (no work-code facility, no Slade360/name match)" };
 
-    // Idempotency: if a claim already exists for this offline op, do not recreate.
+    // Idempotency across the migration boundary: a claim already created for
+    // this offline op (legacy externalRef path OR canonical) links + syncs.
     const existing = await prisma.claim.findFirst({
       where: { tenantId, externalRef: clientUuid },
       select: { id: true },
     });
-    if (existing) return { state: "SYNCED" };
+    if (existing) {
+      await prisma.syncOperation.update({ where: { id: op.id }, data: { resultClaimId: existing.id } }).catch(() => undefined);
+      return { state: "SYNCED" };
+    }
 
     const billed = lineItems.reduce((s, l) => s + l.quantity * l.unitCost, 0);
 
-    // Benefit-balance re-validation (spec §4): the provisional decision was made
-    // against a cached balance. P1.5 (gap #6): the check resolves the SUBMITTED
-    // claim's category through BenefitUsageService instead of summing
-    // availability across every category (which let an outpatient claim "fit"
-    // inside dental+optical+inpatient headroom). The offline rail files
-    // OUTPATIENT claims; full constraint enforcement (pools/overall) re-runs at
-    // adjudication via the P1.3 gate. FG-C10 hold-expiry reconciliation and the
-    // converting-hold credit are inside computeAvailability.
-    const availability = await BenefitUsageService.computeAvailability(prisma, {
-      memberId: member.id,
-      benefitCategory: "OUTPATIENT",
-      requestedAmount: billed,
-      serviceDate: payload.dateOfService ? new Date(payload.dateOfService as string) : undefined,
-    });
-    if (availability && billed > availability.payableCeiling + 0.01) {
-      const b = availability.binding!;
-      return {
-        state: "CONFLICT",
-        reason:
-          `[${availability.reasonCode}] Insufficient benefit at sync time: ${b.label} has ` +
-          `${Math.floor(b.available)} available vs billed ${billed}`,
-      };
-    }
-    const claimNumber = await peekNextDocumentNumber("CLM", (yp) =>
-      prisma.claim
-        .findFirst({ where: { tenantId, claimNumber: { startsWith: yp } }, orderBy: { claimNumber: "desc" }, select: { claimNumber: true } })
-        .then((r) => r?.claimNumber ?? null),
-    );
-
-    const created = await prisma.claim.create({
-      data: {
-        tenantId,
-        claimNumber,
-        externalRef: clientUuid,
+    // Offline-reservation re-validation (spec §4 / F5.5): the provisional
+    // offline promise was made against a cached balance; if the LIVE canonical
+    // benefit service can no longer honour it, that is a reconciliation
+    // CONFLICT for review (the pack over-committed) — distinct from ordinary
+    // business gates, which now become routed claims (D6) below.
+    const member = await prisma.member.findFirst({ where: { tenantId, memberNumber }, select: { id: true } });
+    if (member) {
+      const availability = await BenefitUsageService.computeAvailability(prisma, {
         memberId: member.id,
-        providerId: provider.id,
-        source: "OFFLINE_SYNC",
-        serviceType: serviceType as never,
-        dateOfService: payload.dateOfService ? new Date(payload.dateOfService as string) : new Date(),
-        diagnoses: (payload.diagnoses as string[]) ?? [],
-        procedures: [],
-        billedAmount: billed,
-        approvedAmount: 0,
-        copayAmount: 0,
-        status: "RECEIVED",
         benefitCategory: "OUTPATIENT",
-        claimLines: {
-          create: lineItems.map((l, i) => ({
-            lineNumber: i + 1,
-            description: l.description,
-            quantity: l.quantity,
-            unitCost: l.unitCost,
-            billedAmount: l.quantity * l.unitCost,
-            approvedAmount: 0,
-            serviceCategory: (l.serviceCategory as never) ?? ("OTHER" as never),
-            cptCode: l.cptCode ?? null,
-          })),
-        },
+        requestedAmount: billed,
+        serviceDate: payload.dateOfService ? new Date(payload.dateOfService as string) : undefined,
+      });
+      if (availability && billed > availability.payableCeiling + 0.01) {
+        const b = availability.binding!;
+        return {
+          state: "CONFLICT",
+          reason:
+            `[${availability.reasonCode}] Insufficient benefit at sync time: ${b.label} has ` +
+            `${Math.floor(b.available)} available vs billed ${billed}`,
+        };
+      }
+    }
+
+    // Canonical intake (F5.5): opKey is the durable idempotency key; the
+    // clientUuid rides as the external ref for cross-boundary continuity.
+    // Member/eligibility problems are ACCEPTED-AND-ROUTED claims (D6) — the
+    // business exception stays visible on the claim, never a lost op. Only
+    // structural/scope failures (member not in the pack's entitlement, bad
+    // codes/amounts) resolve to CONFLICT for review.
+    const diagnoses = ((payload.diagnoses as string[]) ?? [])
+      .filter((d) => typeof d === "string" && d.trim().length > 0)
+      .map((code, i) => ({ code: code.trim(), isPrimary: i === 0 }));
+    const submission = {
+      schemaVersion: "1" as const,
+      idempotencyKey: op.opKey,
+      externalClaimRef: clientUuid,
+      member: { memberNumber },
+      provider: { providerId },
+      encounter: {
+        serviceType: serviceType as never,
+        benefitCategory: "OUTPATIENT" as const,
+        serviceFrom: payload.dateOfService
+          ? new Date(payload.dateOfService as string).toISOString().slice(0, 10)
+          : new Date().toISOString().slice(0, 10),
       },
-    });
+      diagnoses,
+      lines: lineItems.map((l) => ({
+        serviceCategory: (l.serviceCategory ?? "OTHER") as never,
+        ...(l.cptCode ? { cptCode: l.cptCode } : {}),
+        description: l.description,
+        quantity: l.quantity,
+        unitCost: l.unitCost,
+        billedAmount: Math.round(l.quantity * l.unitCost * 100) / 100,
+      })),
+    };
 
-    // Intake pipeline (G3.7/G9.5): fraud signals, drug exclusions, then
-    // auto-adjudication under the system actor. processIntake never throws —
-    // any pipeline failure routes the claim to manual review.
-    const systemActorId = await getSystemActorId(tenantId);
-    await FraudService.evaluateClaim(created.id, tenantId).catch(() => undefined);
-    await AutoAdjudicationService.processIntake(tenantId, created.id, systemActorId);
-
-    return { state: "SYNCED" };
+    try {
+      const result = await ClaimIntakeService.submit(
+        { kind: "offlineDevice", tenantId, providerId, deviceId: op.deviceId ?? "unknown" },
+        submission,
+      );
+      // Link the op to its receipt + result claim BEFORE marking SYNCED, so a
+      // crash between the two never yields a SYNCED-but-unlinked op.
+      await prisma.syncOperation.update({
+        where: { id: op.id },
+        data: { receiptId: result.receiptId, resultClaimId: result.claimId },
+      });
+      if (result.outcome === "ACCEPTED" && result.claimId) {
+        await processAcceptedRunInline(result.claimId);
+      }
+      return { state: "SYNCED" };
+    } catch (err) {
+      const e = IntakeError.from(err);
+      // Transient failure BEFORE acceptance: keep the op PENDING — the next
+      // reconcile pass retries with the same opKey (never double-applies).
+      if (e.kind === "RETRYABLE") return { state: "RETRY", reason: e.message };
+      const detail = e.issues?.length ? e.issues.map((i) => i.message).join("; ") : e.message;
+      return { state: "CONFLICT", reason: detail };
+    }
   }
 
   private static async finalise(

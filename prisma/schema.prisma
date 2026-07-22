@@ -1770,6 +1770,11 @@ model SyncOperation {
   offlineAuthId String?
   offlineAuth   OfflineWorkAuthorization? @relation(fields: [offlineAuthId], references: [id])
 
+  // F5.5: canonical-intake linkage — the receipt this op's submission reserved
+  // and the claim it resolved to. Plain refs (no FK) so sync rows stay light.
+  receiptId     String?
+  resultClaimId String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -1777,6 +1782,7 @@ model SyncOperation {
   @@index([tenantId, state])
   @@index([tenantId, entityType])
   @@index([offlineAuthId])
+  @@index([resultClaimId])
 }
 
 model OfflineReservation {

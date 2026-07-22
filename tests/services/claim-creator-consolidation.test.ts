@@ -39,8 +39,8 @@ const ALLOWLIST: Record<string, string> = {
     "Admin reimbursement action pre-migration (F5.6).",
   "src/server/services/reimbursement.service.ts":
     "Reimbursement service rail pre-migration (F5.6).",
-  "src/server/services/sync.service.ts":
-    "Offline sync rail pre-migration (F5.5).",
+  // F5.5 DONE: the offline sync rail submits through ClaimIntakeService — no
+  // direct Claim.create, removed from the allowlist.
   "src/server/services/case.service.ts":
     "Inpatient interim + final; becomes DERIVED_TRANSACTIONAL calling the canonical persist owner (F5.8/F5.9).",
   "src/server/services/claim-intake/persist.ts":

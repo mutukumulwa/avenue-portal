@@ -214,3 +214,12 @@ contract tightens per §8.5/§8.6 — notify any HMS integrator before deploy:
   since E2E-D04. Issue keys only for facilities with an active contract scope.
 - New: **GET `/api/v1/claims/receipts/{receiptId}`** — authoritative receipt
   state for timeout recovery, facility-scoped.
+
+---
+
+## F5.5 — SyncOperation linkage columns (additive)
+
+**Adds** `SyncOperation.receiptId` + `SyncOperation.resultClaimId` (nullable
+plain refs, no FK) and `@@index([resultClaimId])`. `db push` — no data-loss
+warning, existing rows untouched. Rollback: drop the two columns + index;
+nothing references them outside the sync service.

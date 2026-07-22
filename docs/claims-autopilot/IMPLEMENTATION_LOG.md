@@ -742,3 +742,20 @@ F4.5, F7.4).
 - **Known gaps or skips:** import stays single-request (preview is a dry-run of the same request rather than a stored two-phase batch); benefitCategory fixed to OUTPATIENT as before (column addition is a template change for later).
 - **Security/privacy review:** role gate unchanged; HTML output escaped; canonical non-enumerating errors per row; bounded rows/bytes.
 - **Next eligible task:** F5.5 — offline sync adapter.
+
+---
+
+## F5.5 — Offline sync adapter and result linkage
+
+- **Status:** COMPLETE (real-DB)
+- **Commit/branch:** `feat/claims-autopilot` (F5.5 commit)
+- **Files changed:** `src/server/services/sync.service.ts` (`reconcileClaim` rewritten as a canonical adapter; RETRY sentinel keeps transient failures PENDING), `prisma/schema.prisma` (`SyncOperation.receiptId`/`resultClaimId` + index — additive, pushed), `tests/services/sync.service.test.ts` (claim section rewritten to the new contract), `tests/integration/claim-intake-sync.integration.test.ts` (new), allowlist shrink.
+- **Decisions enforced:** §8.5 (`SyncOperation.opKey` IS the canonical idempotency key; clientUuid rides as externalClaimRef for cross-boundary continuity); D6 (member-status/scheme problems are no longer CONFLICTs — the claim is accepted and ROUTED, the business exception visible on the claim, never a lost op); D8/D9 (op links receipt+claim BEFORE the SYNCED finalise; accepted claims processed in-request; RETRYABLE canonical failures leave the op PENDING for the next pass — never double-applied, never falsely SYNCED); PR-036 preserved (work-code provider authority; CONFLICT ⇒ exception register).
+- **Observable behavior before:** reconcile created the claim directly (`peekNextDocumentNumber` + `claim.create`), CONFLICTed on member/scheme status, ran fraud+processIntake post-create, and recorded NO linkage from op to claim/receipt.
+- **Observable behavior after:** clean captures submit through `ClaimIntakeService` as `offlineDevice` (channel OFFLINE_SYNC, scope `device:<provider>:<device>`, source OFFLINE_SYNC), the op stores `receiptId`+`resultClaimId`, and SYNCED is only ever set AFTER canonical acceptance + linkage; the offline-reservation overcommit check (canonical `BenefitUsageService`) stays a CONFLICT (the pack's provisional promise can no longer be honoured) — distinct from business gates, which route.
+- **Forbidden effects explicitly checked (real DB):** retry ingest dedups the opKey and reconcile is an idempotency drop (1 claim); a NEW op for an already-created claim (same clientUuid, e.g. device reinstall) LINKS — zero duplicates across the migration boundary; overcommit ⇒ CONFLICT + exception-register row + zero claims; an un-entitled facility's op ⇒ non-enumerating CONFLICT + zero claims (entitlement seeded for facility A via real ProviderContract/ContractApplicability; facility B un-entitled).
+- **Tests run and exact results:** integration → **5 passed**; sync unit suite → **17 passed** (incl. new D6/RETRY/linkage contracts); full unit → **1151 passed / 90 skipped**; all integration together → **81 passed / 9 skipped**; typecheck PASS; consolidation guard passes with sync.service removed. (12 pre-existing `no-explicit-any` lint hits in the sync unit test predate this change — count unchanged.)
+- **Creator allowlist change:** **`src/server/services/sync.service.ts` REMOVED** (creator #7 migrated). 4/9 converged.
+- **Known gaps or skips:** changed-payload-same-key is structurally unreachable through SyncOperation (opKey dedup at ingest) — the conflict contract is proven at the receipt layer (F2.2/F5.2); worker-down recovery is the F3.6-proven sweep (not re-simulated here); RETRY path unit-proven.
+- **Security/privacy review:** offline devices remain entitlement-scoped (pack parity); tenant derived from the op row; non-enumerating scope errors; conflicts always land in the exception register.
+- **Next eligible task:** F5.6 — reimbursement adapters.
