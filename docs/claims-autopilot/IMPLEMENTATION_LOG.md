@@ -595,3 +595,26 @@ F4.5, F7.4).
 - **Security/privacy review:** plan stores safe totals + catalog wording; the safe projection avoids PHI duplication (line codes/ids only).
 - **Next eligible task:** F4.5 — Execute automatic line and claim decision atomically (the money-spine [L]).
 - **Blocker/options, if blocked:** n/a.
+
+---
+
+## F4.5 — Execute automatic line and claim decision atomically
+
+- **Status:** COMPLETE — **STOP CONDITION MET (real-DB transaction/concurrency proof passes)**
+- **Commit/branch:** `feat/claims-autopilot` (F4.5 commit)
+- **Files changed:** `src/server/services/claim-decision.service.ts` (`StalePlanError`, `lineDecisions`/`expectedRevision` on the input, in-tx stale/fraud gates + atomic line stamping, `executeAutoPlan`), `src/server/services/auto-adjudication.service.ts` (removed the pre-decision line loop — F4.5f), `src/server/services/claim-autopilot/processor.ts` (new — the real evaluate→plan→execute processor), `src/server/jobs/worker.ts` (register the real processor), `tests/services/auto-adjudication-characterization.test.ts` (D11 remediated — unsafe tests removed), `tests/integration/claim-autopilot-execute.integration.test.ts` (new), `docs/claims-autopilot/VERIFICATION.md`.
+- **Decisions enforced:** **D10** (one money decision stack — auto executes through the same `decide`), **D11** (line stamping + decision + benefit/PA/GL/fund commit atomically), D17 (stale plan cannot commit), CA-044 (commit-time fraud gate).
+- **Acceptance scenarios covered:** CA-050 (rollback), CA-051 (two concurrent ⇒ one), CA-052 (stale revision), CA-054 (benefit re-check at commit), CA-044 (fraud before commit), CA-058 (benefit consumed once), CA-061 (idempotent post-commit recovery).
+- **Observable behavior before:** `processIntake` stamped per-line `adjudicationDecision`/`approvedAmount` OUTSIDE the decision tx (the D11 violation characterized in F0.4 #3/#4) — a mid-loop failure left partial line state.
+- **Observable behavior after:** `ClaimDecisionService.decide` stamps line decisions INSIDE its existing `inSerializableTx` and re-checks revision/status + open fraud at commit; `executeAutoPlan(tenantId, claimId, plan, systemActorId)` maps an APPROVE/PARTIAL plan into that atomic transaction and returns `{ executed | stale }`; `processIntake` passes `lineDecisions` instead of the removed loop; the F3.6 processor is replaced by the real `evaluate→plan→execute` path (worker-registered), with idempotent post-commit reconciliation.
+- **Forbidden effects explicitly checked (real DB):** money-tx failure ⇒ claim stays RECEIVED, line `adjudicationDecision` null (NO partial write); stale revision ⇒ no writes; open fraud alert ⇒ blocked, no writes; two concurrent executes ⇒ exactly one, benefit consumed once (300 not 600); executed claim: line stamped APPROVED, benefit decreased by exactly the approved amount.
+- **Tests run and exact results:**
+  - **Real DB (STOP CONDITION):** `npx vitest run tests/integration/claim-autopilot-execute.integration.test.ts` → **5 passed** (atomic execute + benefit-once; rollback; stale; fraud-at-commit; concurrent→one).
+  - `npx vitest run tests/services/auto-adjudication.service.test.ts tests/services/auto-adjudication-characterization.test.ts` → **29 passed** (D11 remediation asserted: processIntake passes lineDecisions, no direct line writes).
+  - Full suite `npx vitest run` → **1152 passed / 60 skipped**; no regression from the money-spine change. `npm run typecheck` PASS; eslint clean.
+- **Database/audit/reconciliation evidence:** real Postgres; benefit conservation proven (consumed exactly once under concurrency); GL/fund effects run inside the same atomic `decide` tx (existing, unchanged) so approval either fully posts or rolls back.
+- **Creator allowlist change:** none.
+- **Known gaps or skips:** the SHADOW branch of the processor returns SHADOW_COMPLETE without storing the proposal projection yet — F4.6 adds the shadow store; the circuit-breaker commit gate is F4.7. The canonical processor is worker-registered but the live rails still create legacy claims (not canonical runs) until F5.1.
+- **Security/privacy review:** all money flows through the single audited `decide` transaction; the auto path uses `systemDecision` + the F4.1 policy gates as its authorization; commit-time fraud re-check closes the eval→commit window.
+- **Next eligible task:** F4.6 — Implement shadow mode.
+- **Blocker/options, if blocked:** n/a.

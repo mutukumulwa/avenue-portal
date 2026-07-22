@@ -12,6 +12,16 @@ import { MemberNotificationService } from "./member-notification.service";
 import { ClaimControlService } from "./claim-control.service";
 import { FxService, BASE_CURRENCY } from "./fx.service";
 import { inSerializableTx } from "@/lib/serializable-tx";
+import type { AutoDecisionPlan } from "./claim-autopilot/plan";
+
+/** Thrown when an automatic plan is stale at commit (revision changed, claim
+ *  already decided, or a fraud signal appeared) — no money writes occur. */
+export class StalePlanError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StalePlanError";
+  }
+}
 
 /**
  * claim-decision.service.ts — the ONE canonical claim decision stack
@@ -62,6 +72,17 @@ export interface ClaimDecisionInput {
    * authorisation) — every other control still runs.
    */
   matrixSatisfied?: boolean;
+  /**
+   * F4.5 (D11): per-line decisions stamped ATOMICALLY inside the decision
+   * transaction (replaces the removed pre-decision line-update loop).
+   */
+  lineDecisions?: Array<{ lineId: string; decision: "APPROVED" | "APPROVED_WITH_ADJUSTMENT" | "DECLINED"; approvedAmount: number }>;
+  /**
+   * F4.5 (D17): the claim revision the plan was evaluated against. A mismatch —
+   * or an already-decided claim — at commit aborts with `StalePlanError` and no
+   * writes. Used by automatic execution; omit for human decisions.
+   */
+  expectedRevision?: number;
 }
 
 export interface CeilingAssessment {
@@ -578,6 +599,23 @@ export class ClaimDecisionService {
         orderBy: [{ approvedAt: "asc" }, { createdAt: "asc" }],
       });
 
+      // F4.5 commit-time gates (D17/CA-052/CA-044). Re-read the claim's revision +
+      // status INSIDE the serializable tx — a stale plan (revision changed, or the
+      // claim already decided by a concurrent decision) aborts with NO money
+      // writes. And a fraud signal raised between evaluation and commit blocks an
+      // automatic decision. Human decisions (no expectedRevision) keep the
+      // existing pre-tx guards.
+      if (decision.expectedRevision != null) {
+        const fresh = await tx.claim.findUnique({ where: { id: claimId }, select: { claimRevision: true, status: true } });
+        if (!fresh) throw new StalePlanError("claim vanished before commit");
+        if (fresh.claimRevision !== decision.expectedRevision) throw new StalePlanError(`stale plan: claim revision ${fresh.claimRevision} != plan ${decision.expectedRevision}`);
+        if (!["RECEIVED", "CAPTURED", "UNDER_REVIEW"].includes(fresh.status)) throw new StalePlanError(`claim already ${fresh.status} at commit`);
+      }
+      if (isApproval && decision.systemDecision) {
+        const openFraud = await tx.claimFraudAlert.count({ where: { claimId, resolved: false } });
+        if (openFraud > 0) throw new StalePlanError(`fraud alert raised before commit (${openFraud} open)`);
+      }
+
       // P1.3 — THE benefit-availability gate: first thing inside the
       // transaction, before ANY write (cost-share/GL/fund/usage). Availability
       // is recomputed at the claim's service date under Serializable isolation
@@ -615,6 +653,15 @@ export class ClaimDecisionService {
         : null;
       const copay = costShare ? approvedAmount * (costShare.copayPercentage / 100) : 0;
       const memberLiability = copay + (costShare?.memberPays ?? 0);
+
+      // F4.5 (D11): stamp per-line decision + approved amount ATOMICALLY inside
+      // the tx — replaces the caller's pre-decision loop, so line results, the
+      // claim decision and all money effects commit together or not at all.
+      if (decision.lineDecisions) {
+        for (const ld of decision.lineDecisions) {
+          await tx.claimLine.update({ where: { id: ld.lineId }, data: { adjudicationDecision: ld.decision, approvedAmount: ld.approvedAmount } });
+        }
+      }
 
       // Tariff stamping (audit trail) — contract-aware resolution.
       const resolved = await ClaimsService.resolveClaimContractRates(tenantId, claimId);
@@ -819,6 +866,45 @@ export class ClaimDecisionService {
     }
 
     return updated;
+  }
+
+  /**
+   * F4.5 (D10/D11): execute an APPROVE/PARTIAL AutoDecisionPlan atomically through
+   * the SAME decision transaction as a human decision — no parallel money stack.
+   * Line decisions, the claim decision and all benefit/PA/GL/fund effects commit
+   * together; the plan's revision is re-checked at commit (stale ⇒ no writes).
+   * A ROUTE/shadow plan is not executed here.
+   */
+  static async executeAutoPlan(
+    tenantId: string,
+    claimId: string,
+    plan: AutoDecisionPlan,
+    systemActorId: string,
+  ): Promise<{ executed: boolean; stale?: boolean; reason?: string }> {
+    if (plan.disposition !== "APPROVE" && plan.disposition !== "PARTIAL") {
+      return { executed: false, reason: `plan disposition ${plan.disposition} is not executable` };
+    }
+    const action = plan.disposition === "PARTIAL" ? ("PARTIALLY_APPROVED" as const) : ("APPROVED" as const);
+    const lineDecisions = plan.lines.map((l) => ({
+      lineId: l.claimLineId,
+      decision: (l.decision === "APPROVED_WITH_ADJUSTMENT" ? "APPROVED_WITH_ADJUSTMENT" : l.decision === "DECLINED" ? "DECLINED" : "APPROVED") as "APPROVED" | "APPROVED_WITH_ADJUSTMENT" | "DECLINED",
+      approvedAmount: Number(l.payableAmount),
+    }));
+    try {
+      await this.decide(tenantId, claimId, {
+        action,
+        approvedAmount: Number(plan.totalPayable),
+        reviewerId: systemActorId,
+        systemDecision: true,
+        notes: `Auto-adjudicated (policy ${plan.policyId ?? "n/a"}, ${plan.mode})`,
+        lineDecisions,
+        expectedRevision: plan.claimRevision,
+      });
+      return { executed: true };
+    } catch (err) {
+      if (err instanceof StalePlanError) return { executed: false, stale: true, reason: err.message };
+      throw err;
+    }
   }
 
   /**

@@ -72,6 +72,10 @@ in the session scratchpad and is deleted on teardown.
 | F3.5 | `claim-intake-processing.integration.test.ts` | **PASS** — two-worker race ⇒ one claim; stale-lease reclaim; non-owner cannot complete; retry reuses run (attempt++); reprocess next-sequence + supersession; concurrent reprocess ⇒ one non-terminal run; terminal immutable; stage upsert. |
 | F3.6 | `claim-autopilot-recovery.integration.test.ts` | **PASS** — processClaimRun route+mirror; error ⇒ retry below cap, FAILED (visible) at cap; recovery sweep processes un-enqueued runs; sweep reclaims a crashed worker's stale-leased run. |
 | F3.6 | `claim-autopilot-queue.integration.test.ts` (Redis) | **PASS** — enqueue dedup by run id (one job); run-job handler claims+processes. Throwaway Redis on `:56379` (`redis-server --port 56379 --save "" --appendonly no`; gate `AUTOPILOT_TEST_REDIS===REDIS_URL`). |
+| F4.2 | `claim-autopilot-evaluate.integration.test.ts` | **PASS** — OFF routes without evaluating; stop-at-first-route + SKIPPED; read-only (claim/line unchanged). |
+| F4.3 | `claim-autopilot-fidelity.integration.test.ts` | **PASS** — mixed coded/uncoded → CODING; missing doc → DOCUMENTS + supply clears; fuzzy 2nd visit → DUPLICATE + candidate ref + cleared passes. |
+| F4.4 | `claim-autopilot-plan.integration.test.ts` | **PASS** — routed plan (catalog reasons, 0 payable, conserves); any plan conserves + JSON-serializes. |
+| **F4.5g** | `claim-autopilot-execute.integration.test.ts` | **PASS (STOP CONDITION MET)** — atomic execute (claim APPROVED, line stamped, benefit consumed once); full rollback (money-tx failure ⇒ no partial line/claim/money); stale plan ⇒ no writes; fraud-at-commit ⇒ blocked; two concurrent ⇒ exactly one, benefit consumed once (not 2×). |
 
 **⚠️ Timezone finding (F3.5):** the DB session TZ is EAT (UTC+3). Prisma stores
 `DateTime` as UTC in a `timestamp` (no-tz) column, so raw-SQL lease/retry

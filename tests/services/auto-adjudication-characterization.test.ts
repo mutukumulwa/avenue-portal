@@ -71,30 +71,23 @@ beforeEach(() => {
   decisionSvc.assessCeiling.mockResolvedValue({ ceiling: 1_000_000, deterministic: true, source: "Provider tariff schedule", enginePayable: null, contractNumber: null });
 });
 
-describe("UNSAFE current behavior — MUST be flipped in F4.5 (do not preserve)", () => {
-  // #3 — D11 VIOLATION: per-line stamping happens BEFORE ClaimDecisionService.decide.
-  it("[UNSAFE:D11] line updates run BEFORE the decision (non-atomic ordering)", async () => {
+describe("Legacy processIntake — D11 REMEDIATED (F4.5); remaining gap closes at F5.1", () => {
+  // D11 IS FIXED: processIntake no longer stamps lines before deciding — it passes
+  // lineDecisions to ClaimDecisionService.decide, which stamps them INSIDE its
+  // serializable transaction (proven atomically in the F4.5 real-DB suite). The
+  // former "[UNSAFE:D11]" characterization tests were removed at remediation.
+  it("[REMEDIATED:D11] AUTO_APPROVE passes lineDecisions to decide (no pre-decision line loop)", async () => {
     const r = await AutoAdjudicationService.processIntake("t1", "clm1", "u1");
     expect(r.executed).toBe(true);
-    const firstLineUpdate = db.claimLine.update.mock.invocationCallOrder[0];
-    const firstDecide = decisionSvc.decide.mock.invocationCallOrder[0];
-    expect(firstLineUpdate).toBeDefined();
-    expect(firstDecide).toBeDefined();
-    expect(firstLineUpdate).toBeLessThan(firstDecide); // ← F4.5 folds both into one transaction
+    // processIntake no longer writes claim lines directly — decide owns line stamping.
+    expect(db.claimLine.update).not.toHaveBeenCalled();
+    expect(decisionSvc.decide).toHaveBeenCalledWith("t1", "clm1", expect.objectContaining({
+      action: "APPROVED",
+      lineDecisions: expect.arrayContaining([expect.objectContaining({ lineId: "l1", decision: "APPROVED" })]),
+    }));
   });
 
-  // #4 — D11 VIOLATION: a failure mid-loop leaves a partially-stamped line, no rollback.
-  it("[UNSAFE:D11] a failure after the first line update leaves partial line state", async () => {
-    db.claimLine.findMany.mockResolvedValue([{ id: "l1", billedAmount: 25000 }, { id: "l2", billedAmount: 25000 }]);
-    db.claimLine.update.mockResolvedValueOnce({}).mockRejectedValueOnce(new Error("db write failed on l2"));
-    const r = await AutoAdjudicationService.processIntake("t1", "clm1", "u1");
-    expect(db.claimLine.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: "l1" }, data: expect.objectContaining({ adjudicationDecision: "APPROVED" }) }));
-    expect(decisionSvc.decide).not.toHaveBeenCalled();
-    expect(r.decision).toBe("ROUTE");
-    expect(r.failingGate).toBe("PIPELINE_ERROR"); // ← F4.5: no partial write can survive
-  });
-
-  // #5 — no durable run/stage: a pipeline error records only a claim flag.
+  // #5 — no durable run/stage: a pipeline error records only a claim flag (legacy path).
   it("[GAP] a pipeline error writes only the claim route flag, with no durable run/stage", async () => {
     exclusions.applyToClaim.mockRejectedValue(new Error("boom"));
     const r = await AutoAdjudicationService.processIntake("t1", "clm1", "u1");

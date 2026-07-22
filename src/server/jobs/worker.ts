@@ -27,6 +27,7 @@ import { runContractLifecycleJob } from "./contract-lifecycle.job";
 import { runOfflinePackJob } from "./offline-pack.job";
 import { runClaimAutopilotRunJob, runClaimAutopilotRecoveryJob } from "./claim-autopilot.job";
 import { scheduleClaimAutopilotRecovery } from "../../lib/queue";
+import { registerClaimAutopilotProcessor } from "../services/claim-autopilot/processor";
 
 // PR-002 #2: fail fast on missing/placeholder config — never fall back to
 // defaults (the OS-username DB fallback caused June's silent failure storm).
@@ -86,6 +87,7 @@ scheduleReportGenerationJob().catch(err => console.error("[Worker] Failed to sch
 scheduleAdminFeeAccrualJob().catch(err => console.error("[Worker] Failed to schedule admin-fee accrual job:", err));
 scheduleFraudScanJob().catch(err => console.error("[Worker] Failed to schedule fraud-scan job:", err));
 scheduleClaimAutopilotRecovery().catch(err => console.error("[Worker] Failed to schedule claim-autopilot recovery:", err));
+registerClaimAutopilotProcessor(); // real evaluate→plan→execute processor (replaces the fail-closed default)
 
 /**
  * NOTIFICATIONS WORKER

@@ -271,13 +271,6 @@ export class AutoAdjudicationService {
         where: { claimId, adjudicationDecision: null },
         select: { id: true, billedAmount: true },
       });
-      for (const line of undecided) {
-        const payable = result.linePayables?.get(line.id);
-        await prisma.claimLine.update({
-          where: { id: line.id },
-          data: { adjudicationDecision: "APPROVED", approvedAmount: payable ?? line.billedAmount },
-        });
-      }
 
       // PR-021: the executed amount is the contract-constrained approveAmount;
       // excluded-drug adjustments can only reduce it further.
@@ -291,6 +284,15 @@ export class AutoAdjudicationService {
           ? ("PARTIALLY_APPROVED" as const)
           : ("APPROVED" as const);
 
+      // F4.5 (D11): the per-line decisions are stamped INSIDE the decision
+      // transaction — no pre-decision loop — so line results and the claim
+      // decision commit atomically or not at all.
+      const lineDecisions = undecided.map((line) => ({
+        lineId: line.id,
+        decision: "APPROVED" as const,
+        approvedAmount: result.linePayables?.get(line.id) ?? Number(line.billedAmount),
+      }));
+
       // W1.1: auto-approval executes through the canonical decision stack so
       // usage/holds/GL side-effects are identical to a human decision.
       // systemDecision skips the matrix role-gate — the policy gates above are
@@ -301,6 +303,7 @@ export class AutoAdjudicationService {
         approvedAmount,
         reviewerId: actorId,
         systemDecision: true,
+        lineDecisions,
         notes: `Auto-adjudicated (policy ${result.policyId ?? "built-in default"})${
           exclusions.excludedCount > 0 ? ` — ${exclusions.excludedCount} excluded-drug line(s) declined` : ""
         }`,
