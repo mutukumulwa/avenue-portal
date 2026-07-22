@@ -323,3 +323,26 @@ F4.5, F7.4).
 - **Security/privacy review:** activation is a money-control governed by maker-checker; audit events for policy change land in F3.7/F4.7 (AUTO_ADJ_POLICY:* chain events).
 - **Next eligible task:** F2.6 — Add schema deployment, backfill and integrity scripts.
 - **Blocker/options, if blocked:** n/a.
+
+---
+
+## F2.6 — Add schema deployment, backfill and integrity scripts
+
+- **Status:** COMPLETE (incl. real-DB script smoke)
+- **Commit/branch:** `feat/claims-autopilot` (F2.6 commit)
+- **Files changed:** `scripts/backfill-claim-intake-provenance.ts` (new), `scripts/data-integrity-check.ts` (+`checkClaimsAutopilotInvariants`), `tests/services/backfill-claim-intake-provenance.test.ts` (new), `docs/claims-autopilot/DEPLOYMENT.md` (F2.6 section).
+- **Decisions enforced:** §9.8 (additive deploy; never synthesize transport keys); §14.1 (safe rollback preserves accepted data); D1 (post-deploy verify no LIVE).
+- **Acceptance scenarios covered:** CA-110 (rerunnable/idempotent backfill; no policy activated; stable integrity).
+- **Observable behavior before:** no way to verify the additive schema deployed safely or that no policy is live post-deploy.
+- **Observable behavior after:** `runBackfill` (report-only default, `--apply` idempotent, computes non-unique `suspectedDuplicateFingerprint` from claim content — never invents keys), `verifyPoliciesNonLive` (fail-closed gate), `rollbackDisableLive` (non-OFF → OFF/DEACTIVATED, never deletes receipts/runs), `claimSuspectFingerprint`; integrity script now also asserts receipt→claim linkage, strong-fp uniqueness, terminal-run completion.
+- **Forbidden effects explicitly checked:** report-only writes nothing (asserted `update` uncalled); apply idempotent (0 missing ⇒ 0 updates); rollback never deletes receipts/runs (only policy updateMany); no transport-key/receipt fabrication; `--verify-non-live` exits non-zero on any LIVE.
+- **Tests run and exact results:**
+  - `npx vitest run tests/services/backfill-claim-intake-provenance.test.ts` → **9 passed**.
+  - **Real DB:** `npx tsx scripts/data-integrity-check.ts` → "✓ … claims autopilot"; `npx tsx scripts/backfill-claim-intake-provenance.ts --verify-non-live` → report + "✓ Report-only", exit 0.
+  - **M2 boundary full gate:** `npm run typecheck` PASS; `npx vitest run` → **1083 passed / 16 skipped** (16 = 9 original + 7 autopilot integration, correctly gated); `brand:guard` + `currency:guard` PASS; eslint new files clean.
+- **Database/audit/reconciliation evidence:** scripts execute against real Postgres; integrity invariants hold on the (near-empty) `autopilot_uat`.
+- **Creator allowlist change:** none.
+- **Known gaps or skips:** legacy `legacy:<claimId>` receipts intentionally NOT created (product-owner-gated, §9.8); full §11.7 reconciliation report is F7.2. **M2 COMPLETE.**
+- **Security/privacy review:** scripts use safe identifiers; backfill computes only non-unique content hashes; no PHI printed.
+- **Next eligible task:** F3.1 — Implement derived intake context (M3).
+- **Blocker/options, if blocked:** n/a.

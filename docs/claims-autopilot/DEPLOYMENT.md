@@ -101,3 +101,33 @@ Dropping the new columns/enums is safe; nothing executes on `mode` yet.
 **Backfill (F2.6):** the `classifyHistoricalPolicyMode` helper maps legacy rows to
 OFF (or SHADOW only if the operator opts in); the F2.6 script applies it. Never
 infers LIVE.
+
+---
+
+## F2.6 — Deployment sequence, backfill & integrity
+
+**Additive-schema deploy sequence (M2 whole):**
+1. `npm run db:push -- --accept-data-loss` (the only lossy-looking change is the
+   safe all-NULL `Claim` strong-fp unique — see F2.3). Applies all of F2.1–F2.5.
+2. `npm run db:generate`.
+3. Report-only backfill + post-deploy safety gate:
+   `npx tsx scripts/backfill-claim-intake-provenance.ts --verify-non-live`
+   — exits non-zero if ANY policy resolves LIVE (must be zero right after deploy).
+4. Optional provenance backfill (idempotent, non-destructive):
+   `npx tsx scripts/backfill-claim-intake-provenance.ts --apply`
+   — computes the non-unique `suspectedDuplicateFingerprint` for existing claims
+   so retroactive duplicate detection works. Never invents idempotency keys or
+   receipts (§9.8).
+5. `npx tsx scripts/data-integrity-check.ts` — now also asserts the Claims
+   Autopilot invariants (SUCCEEDED receipt ⇒ linked claim; strong-fp uniqueness;
+   terminal run ⇒ completed). Wire into the existing integrity cron.
+
+**Rollback (safe, non-destructive):**
+`npx tsx scripts/backfill-claim-intake-provenance.ts --rollback` sets every
+non-OFF policy to `OFF` + `DEACTIVATED`. Receipts and processing runs are **never
+deleted** — accepted claim data is preserved (§14.1 rollback rule). Combined with
+the circuit breaker (F4.7), this stops all live automation immediately.
+
+**Verified on `autopilot_uat`:** integrity script → "✓ … claims autopilot";
+backfill report → 0 claims/policies, `policiesResolvingLive: []`, `--verify-non-live`
+exits 0.

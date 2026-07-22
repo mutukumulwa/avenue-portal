@@ -172,15 +172,45 @@ async function checkBenefitLimitInvariants(): Promise<string[]> {
   return problems;
 }
 
+// Claims Autopilot invariants (F2.6 starter set; the full §11.7 reconciliation
+// report is F7.2). Cheap, read-only assertions safe to run on every schedule.
+async function checkClaimsAutopilotInvariants(): Promise<string[]> {
+  const problems: string[] = [];
+
+  // Accepted receipt ⇒ exactly one linked claim: a SUCCEEDED receipt with no
+  // claimId is an impossible state.
+  const orphanReceipts = await prisma.claimIntakeReceipt.count({ where: { state: "SUCCEEDED", claimId: null } });
+  if (orphanReceipts > 0) problems.push(`AUTOPILOT_RECEIPT: ${orphanReceipts} SUCCEEDED receipt(s) with no linked claim`);
+
+  // A non-null strong event fingerprint is unique per tenant (DB-enforced; this
+  // catches any data that slipped in before the constraint).
+  const dupStrong = await prisma.$queryRaw<Array<{ c: bigint }>>`
+    SELECT COUNT(*)::bigint AS c FROM (
+      SELECT 1 FROM "Claim" WHERE "strongEventFingerprint" IS NOT NULL
+      GROUP BY "tenantId", "strongEventFingerprint" HAVING COUNT(*) > 1
+    ) d`;
+  const dupCount = Number(dupStrong[0]?.c ?? 0);
+  if (dupCount > 0) problems.push(`AUTOPILOT_STRONG_FP: ${dupCount} strong fingerprint(s) shared by more than one claim`);
+
+  // A terminal processing run must have completed.
+  const badRuns = await prisma.claimProcessingRun.count({
+    where: { state: { in: ["ROUTED", "SHADOW_COMPLETE", "AUTO_DECIDED", "FAILED"] }, completedAt: null },
+  });
+  if (badRuns > 0) problems.push(`AUTOPILOT_RUN: ${badRuns} terminal run(s) missing completedAt`);
+
+  return problems;
+}
+
 async function main() {
-  const [holds, recon, limits] = await Promise.all([
+  const [holds, recon, limits, autopilot] = await Promise.all([
     checkHoldInvariant(),
     checkSettlementReconciliation(),
     checkBenefitLimitInvariants(),
+    checkClaimsAutopilotInvariants(),
   ]);
-  const problems = [...holds, ...recon, ...limits];
+  const problems = [...holds, ...recon, ...limits, ...autopilot];
   if (problems.length === 0) {
-    console.log("✓ Data-integrity invariants hold (holds ledger, settlement reconciliation, benefit limits).");
+    console.log("✓ Data-integrity invariants hold (holds ledger, settlement reconciliation, benefit limits, claims autopilot).");
     return;
   }
   console.error(`✗ ${problems.length} invariant violation(s):`);
