@@ -24,10 +24,13 @@ export type StageOutcome =
 const PASS: StageOutcome = { disposition: "PASS" };
 const routeOut = (code: RouteCode, reason: string, result?: Record<string, unknown>): StageOutcome => ({ disposition: "ROUTE", code, reason, result });
 
-interface LinePlan {
+export interface LinePlan {
   claimLineId: string;
   payableAmount: string;
   billedAmount: string;
+  decision: "APPROVED" | "APPROVED_WITH_ADJUSTMENT" | "DECLINED" | "PENDED";
+  contractId?: string | null;
+  contractVersionId?: string | null;
 }
 
 export interface EvalContext {
@@ -148,14 +151,28 @@ async function stageContract(ctx: EvalContext): Promise<StageOutcome> {
     if (engine.claimDecision === "UNDER_REVIEW") return routeOut(ROUTE_CODES.PRICING_INCOMPLETE, `engine pended: ${engine.reasonCode ?? "line pended"}`);
     if (engine.claimDecision === "DECLINED") return routeOut(ROUTE_CODES.EXCLUSION_CONFIRMATION, `engine declines: ${engine.reasonCode ?? "excluded"}`);
     ctx.approveAmount = new Decimal(engine.totals.payable).toDecimalPlaces(2).toFixed();
+    const billedByLine = new Map(ctx.claim.claimLines.map((l) => [l.id, new Decimal(String(l.billedAmount)).toDecimalPlaces(2).toFixed()]));
     ctx.lines = engine.lines
       .filter((l) => !l.lineId.startsWith("case-rate") && !l.lineId.startsWith("package-") && !l.lineId.startsWith("proc-"))
-      .map((l) => ({ claimLineId: l.lineId, payableAmount: new Decimal(l.payableAmount).toDecimalPlaces(2).toFixed(), billedAmount: "0" }));
+      .map((l) => ({
+        claimLineId: l.lineId,
+        payableAmount: new Decimal(l.payableAmount).toDecimalPlaces(2).toFixed(),
+        billedAmount: billedByLine.get(l.lineId) ?? new Decimal(l.payableAmount).toDecimalPlaces(2).toFixed(),
+        decision: (l.decision as LinePlan["decision"]) ?? "APPROVED",
+      }));
   } else {
     const { ClaimDecisionService } = await import("@/server/services/claim-decision.service");
     const assessment = await ClaimDecisionService.assessCeiling(ctx.tenantId, ctx.claimId);
     if (!assessment.deterministic || assessment.ceiling == null) return routeOut(ROUTE_CODES.NO_CONTRACT, "no deterministic contract/tariff price");
-    ctx.approveAmount = new Decimal(Math.min(Number(ctx.claim.billedAmount), assessment.ceiling)).toDecimalPlaces(2).toFixed();
+    // FFS ceiling: distribute the capped payable across lines pro-rata to billed.
+    const totalBilled = new Decimal(String(ctx.claim.billedAmount));
+    const capped = Decimal.min(totalBilled, assessment.ceiling);
+    ctx.approveAmount = capped.toDecimalPlaces(2).toFixed();
+    ctx.lines = ctx.claim.claimLines.map((l) => {
+      const billed = new Decimal(String(l.billedAmount));
+      const payable = totalBilled.gt(0) ? capped.times(billed).div(totalBilled).toDecimalPlaces(2) : new Decimal(0);
+      return { claimLineId: l.id, payableAmount: payable.toFixed(), billedAmount: billed.toDecimalPlaces(2).toFixed(), decision: payable.equals(billed) ? "APPROVED" : "APPROVED_WITH_ADJUSTMENT" as const };
+    });
   }
   if (!(Number(ctx.approveAmount) > 0)) return routeOut(ROUTE_CODES.PRICING_INCOMPLETE, "contract prices this claim at zero");
   return { disposition: "PASS", result: { approveAmount: ctx.approveAmount } };

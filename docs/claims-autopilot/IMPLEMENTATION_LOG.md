@@ -572,3 +572,26 @@ F4.5, F7.4).
 - **Security/privacy review:** candidate refs are claim numbers; no PHI; no SSRF (no external fetch).
 - **Next eligible task:** F4.4 — Build complete serializable `AutoDecisionPlan`.
 - **Blocker/options, if blocked:** n/a.
+
+---
+
+## F4.4 — Build complete serializable `AutoDecisionPlan`
+
+- **Status:** COMPLETE (unit + real-DB)
+- **Commit/branch:** `feat/claims-autopilot` (F4.4 commit)
+- **Files changed:** `src/server/services/claim-autopilot/plan.ts` (new), `src/server/services/claim-autopilot/evaluate.ts` (per-line billed+decision+FFS pro-rata), `tests/services/claim-autopilot-plan.test.ts` (new), `tests/integration/claim-autopilot-plan.integration.test.ts` (new).
+- **Decisions enforced:** §10.1 plan contract; §11.7 money conservation; no-float money; audience-safe route reasons (§10.3).
+- **Acceptance scenarios covered:** CA-030/CA-037 (approve/adjustment plan), CA-036 (routed plan), CA-121 (plain-language reasons/remedy).
+- **Observable behavior before:** evaluation produced a disposition but no immutable, serializable, money-conserving plan.
+- **Observable behavior after:** `buildAutoDecisionPlan(db, tenantId, claimId, runId?)` assembles the §10.1 `AutoDecisionPlan` from the staged evaluation — disposition (ROUTE/APPROVE/PARTIAL/WOULD_APPROVE/WOULD_PARTIAL), per-line money (billed/contracted/payable/shortfall/disallowed/member/payer/writeoff), catalog reasons (internal/provider/member/remedy), and snapshots (claim updatedAt, contract versions, eligibility as-of); `validatePlanConservation` asserts the money invariants.
+- **Forbidden effects explicitly checked:** money is decimal strings (`^\d+\.\d{2}$`, JSON round-trip proven); per-line `billed = payer + member + writeoff + disallowed` for decided plans; `totalBilled = Σ billed`, `totalPayable = Σ payer`; a ROUTE plan pays 0; every pended/adjusted/declined line carries a reason (validator flags violations).
+- **Tests run and exact results:**
+  - `npx vitest run tests/services/claim-autopilot-plan.test.ts` → **6 passed** (conservation: clean/adjustment/broken/total-mismatch/routed; serialization).
+  - **Real DB:** `npx vitest run tests/integration/claim-autopilot-plan.integration.test.ts` → **2 passed** (routed plan: ROUTE + catalog reasons + 0 payable + conserves; any plan conserves + serializes).
+  - `npm run typecheck` → PASS; eslint clean.
+- **Database/audit/reconciliation evidence:** real Postgres; plan built from a persisted claim.
+- **Creator allowlist change:** none.
+- **Known gaps or skips:** member cost-share (copay/deductible) is set to 0 in the plan and applied by `ClaimDecisionService` at execution (F4.5) — the plan carries the CONTRACT-priced split; COST_SHARE stage deepening is optional. `policyVersion` null until the policy console (F6.5) stamps versions.
+- **Security/privacy review:** plan stores safe totals + catalog wording; the safe projection avoids PHI duplication (line codes/ids only).
+- **Next eligible task:** F4.5 — Execute automatic line and claim decision atomically (the money-spine [L]).
+- **Blocker/options, if blocked:** n/a.
