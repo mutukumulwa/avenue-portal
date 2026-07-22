@@ -5,6 +5,7 @@ import { ClaimDecisionService } from "./claim-decision.service";
 import { auditChainService } from "./audit-chain.service";
 import { ContractEngine } from "./contract-engine/engine";
 import { ContractEngineIntegration } from "./contract-engine/persist";
+import { effectivePolicyMode, type PolicyLike } from "./claim-autopilot/policy";
 
 // Digital-contract engine gates (spec §8.3): a claim the engine cannot fully
 // price/match ROUTES with a named contract gate, and auto-approval executes at
@@ -36,10 +37,6 @@ export interface AutoAdjResult {
   /** Per-line engine payables for line stamping (real ClaimLine ids only). */
   linePayables?: Map<string, number>;
 }
-
-// Fallback when no policy is configured: conservative — auto-approve clean
-// claims with no fraud flag and no ceiling.
-const DEFAULT = { enabled: true, maxAutoApproveAmount: null as number | null, requireCleanFraud: true };
 
 export class AutoAdjudicationService {
   /** Resolve the governing policy: client-specific active wins, else operator default. */
@@ -80,12 +77,24 @@ export class AutoAdjudicationService {
 
     const clientId = claim.member?.group?.clientId ?? null;
     const policyRow = await this.resolvePolicy(tenantId, clientId);
-    const policy = policyRow ?? DEFAULT;
-    const policyId = policyRow?.id ?? null;
 
-    if (!policy.enabled) {
-      return { decision: "ROUTE", failingGate: "AUTO_ADJ_DISABLED", reason: "Auto-adjudication is disabled for this client", policyId };
+    // ── D1: no implicit live automation ───────────────────────────────────────
+    // A claim may auto-decide ONLY under an approved LIVE policy that resolves for
+    // its client. No policy (or an OFF/SHADOW/unapproved one) is NEVER permission
+    // to move money — the claim routes to a human. The old built-in fallback
+    // (enabled:true, no ceiling) is removed; there is no production bypass.
+    if (!policyRow || effectivePolicyMode(policyRow as unknown as PolicyLike) !== "LIVE") {
+      return {
+        decision: "ROUTE",
+        failingGate: policyRow ? "AUTO_POLICY_OFF" : "AUTO_POLICY_NOT_LIVE",
+        reason: policyRow
+          ? "Automation is not LIVE for this client — claim routes to review"
+          : "No approved LIVE policy — claim routes to review",
+        policyId: policyRow?.id ?? null,
+      };
     }
+    const policy = policyRow;
+    const policyId = policy.id;
 
     // Deterministic hard gates (dup invoice, double-capture, temporal, cover).
     // The claim under evaluation is excluded so it never flags itself (PR-012).

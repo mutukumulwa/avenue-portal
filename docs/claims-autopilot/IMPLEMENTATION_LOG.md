@@ -505,3 +505,26 @@ F4.5, F7.4).
 - **Security/privacy review:** audit/notification carry only safe refs (runId/claimId/routeCode); member notification uses the audience-safe reason text; timeline selects no PHI. **M3 COMPLETE.**
 - **Next eligible task:** F4.1 — Remove implicit no-policy auto-approval (M4) — the D1 safety fix.
 - **Blocker/options, if blocked:** n/a.
+
+---
+
+## F4.1 — Remove implicit no-policy auto-approval (D1 safety fix)
+
+- **Status:** COMPLETE — **first package to change live production behavior**
+- **Commit/branch:** `feat/claims-autopilot` (F4.1 commit)
+- **Files changed:** `src/server/services/auto-adjudication.service.ts` (removed `DEFAULT` fallback; require approved LIVE via `effectivePolicyMode`), `src/app/(admin)/settings/auto-adjudication/page.tsx` (copy), `tests/services/auto-adjudication.service.test.ts` (rewritten to the LIVE-policy model + D1 matrix), `tests/services/auto-adjudication-characterization.test.ts` (D1 unsafe tests removed — remediated; D11 pinned for F4.5).
+- **Decisions enforced:** **D1** (no implicit live automation — no policy is never permission to move money); D2 (only mode=LIVE executes).
+- **Acceptance scenarios covered:** CA-032 (no/OFF/draft/pending/rejected/shadow ⇒ route regardless of value — proven for all cases).
+- **Observable behavior before:** with no configured policy, `AutoAdjudicationService` auto-approved clean claims at any value (the `DEFAULT = { enabled:true, maxAutoApproveAmount:null }` fallback — the D1 violation characterized in F0.4 #1/#2).
+- **Observable behavior after:** a claim auto-decides ONLY under a policy whose `effectivePolicyMode` is LIVE (approved + finite positive ceiling + all required gates + explicit inclusions). No policy ⇒ `AUTO_POLICY_NOT_LIVE`; an OFF/SHADOW/draft/pending/rejected/unapproved-LIVE policy ⇒ `AUTO_POLICY_OFF`. No production bypass.
+- **⚠️ Live impact:** the existing rails (runClaimIntake→processIntake, sync, /api/v1/claims) call this service. Since all production policies are backfilled OFF/DRAFT (F2.4), **auto-approval now stops platform-wide until a governed LIVE policy is created + approved** (F2.5) — exactly the plan's fail-closed "deploy OFF" posture (§14.1). Clean claims route to manual meanwhile.
+- **Forbidden effects explicitly checked:** no env bypass added (F4.1 "Do not"); the full D1 matrix routes (no policy, OFF, DRAFT, PENDING_APPROVAL, REJECTED, approved SHADOW, LIVE-without-ceiling, LIVE-with-a-gate-off, LIVE-without-inclusions — all ROUTE); only a fully-valid approved LIVE policy AUTO_APPROVEs.
+- **Tests run and exact results:**
+  - `npx vitest run tests/services/auto-adjudication.service.test.ts tests/services/auto-adjudication-characterization.test.ts` → **30 passed**.
+  - Full suite `npx vitest run` → **1147 passed / 47 skipped**; no other suite depended on the old fallback. `npm run typecheck` PASS; eslint clean.
+- **Database/audit/reconciliation evidence:** logic-level (mocked). The route reason flows through `processIntake`'s existing ROUTE handling (adjudicationLog "ROUTED — AUTO_POLICY_NOT_LIVE"); full audit/metric for the code is F4.2/F4.7.
+- **Creator allowlist change:** none.
+- **Known gaps or skips:** SHADOW proposals are just routed here (no proposal stored) — F4.6 adds shadow recording; the settings copy change is a static admin-page string (not browser-verified — trivial, no logic).
+- **Security/privacy review:** the core D1 money-safety control; fail-closed.
+- **Next eligible task:** F4.2 — Decompose automation evaluation into named read-only stages.
+- **Blocker/options, if blocked:** n/a.

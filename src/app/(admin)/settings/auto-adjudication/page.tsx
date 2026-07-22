@@ -107,7 +107,7 @@ export default async function AutoAdjudicationPage({
           </thead>
           <tbody className="divide-y divide-brand-border">
             {policies.length === 0 ? (
-              <tr><td colSpan={7} className="px-4 py-6 text-center text-brand-text-muted">No policies — the conservative built-in default applies (auto-approve clean claims, no ceiling).</td></tr>
+              <tr><td colSpan={7} className="px-4 py-6 text-center text-brand-text-muted">No approved live policy — claims route to review. Automation moves money only under an approved LIVE policy.</td></tr>
             ) : policies.map((p) => (
               <tr key={p.id} className={p.isActive ? "" : "opacity-60"}>
                 <td className="px-4 py-2.5 font-medium text-brand-text-heading">{p.client?.name ?? "Operator default"}</td>
