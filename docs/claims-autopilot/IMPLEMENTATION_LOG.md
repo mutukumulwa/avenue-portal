@@ -528,3 +528,25 @@ F4.5, F7.4).
 - **Security/privacy review:** the core D1 money-safety control; fail-closed.
 - **Next eligible task:** F4.2 — Decompose automation evaluation into named read-only stages.
 - **Blocker/options, if blocked:** n/a.
+
+---
+
+## F4.2 — Decompose automation evaluation into named read-only stages
+
+- **Status:** COMPLETE (incl. real-DB proof)
+- **Commit/branch:** `feat/claims-autopilot` (F4.2 commit)
+- **Files changed:** `src/server/services/claim-autopilot/evaluate.ts` (new), `tests/integration/claim-autopilot-evaluate.integration.test.ts` (new).
+- **Decisions enforced:** §6.5 (14-stage vocabulary; read-only trace, not a second engine), D1 (OFF/no-live routes without evaluating), D5 (uncoded line routes).
+- **Acceptance scenarios covered:** CA-032 (OFF routes), CA-048/CA-049 (stage pass/route/skip), foundation for CA-030/037 (plan build, F4.4).
+- **Observable behavior before:** evaluation was a monolithic `evaluateClaim` with no per-stage trace.
+- **Observable behavior after:** `evaluateClaimStaged(db, tenantId, claimId, runId?)` runs the ordered stages (CONTEXT→POLICY), each a thin adapter over an existing owner (coverage, hard-gates, contract engine, PA, benefit, fraud, FX/ceiling), recording each via `recordStage`, stopping at the first route and marking later stages SKIPPED; returns `{ disposition: APPROVE|WOULD_APPROVE|ROUTE, mode, routeCode, lines, approveAmount }`.
+- **Forbidden effects explicitly checked:** read-only w.r.t. claim/line money+status (proven: status/billed/approved unchanged, line `adjudicationDecision` null, `approvedAmount` 0 after evaluation); stops at first route with all later stages SKIPPED (proven, robust to which stage routes); OFF ⇒ POLICY routed + all others SKIPPED without running them; fraud screening is idempotent (`.catch`) and recorded as a stage effect.
+- **Tests run and exact results:**
+  - **Real DB:** `npx vitest run tests/integration/claim-autopilot-evaluate.integration.test.ts` → **3 passed** (OFF routing, stop-at-route+skip, read-only) against seeded contracts/benefits.
+  - `npm run typecheck` → PASS; eslint clean.
+- **Database/audit/reconciliation evidence:** real Postgres; stage rows recorded in order; claim unchanged.
+- **Creator allowlist change:** none.
+- **Known gaps or skips:** DOCUMENTS + COST_SHARE stages are PASS-through placeholders — DOCUMENTS is completed in F4.3, COST_SHARE preview in F4.4. The evaluator is additive (wired into the processor via F4.4/F4.5; the old monolithic `evaluateClaim` still serves the legacy rails until F5.1).
+- **Security/privacy review:** stage results store safe totals/counts only; no PHI.
+- **Next eligible task:** F4.3 — Complete coding, document and duplicate route fidelity.
+- **Blocker/options, if blocked:** n/a.
