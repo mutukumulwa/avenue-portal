@@ -81,3 +81,23 @@ count(*)>1` returns no rows (it will — the column is unpopulated pre-backfill)
 
 **Rollback:** unwired until F3.x. Drop the two new models + Claim columns/indexes
 if strictly required; the legacy `autoAdj*` columns remain the compatibility path.
+
+---
+
+## F2.4 — Governed policy modes + fail-safe defaults
+
+**Adds:**
+- enums `AutoAdjudicationMode` (OFF, SHADOW, LIVE) and `AutoAdjudicationPolicyStatus` (DRAFT, PENDING_APPROVAL, APPROVED, REJECTED, SUPERSEDED, DEACTIVATED).
+- `AutoAdjudicationPolicy` columns: `name`, `version @default(1)`, `mode @default(OFF)`, `status @default(DRAFT)`, `allowAutoPartial @default(false)`, `allowedSources/allowedServiceTypes/allowedBenefitCategories/allowedProviderTiers @default([])`, `maxClaimAgeDays`, `requireAllLinesPriced/requireDocumentsComplete/requireEligibilityClear @default(true)`, `createdById`, `approvalRequestId`, `approvedById`, `approvedAt`, `deactivatedById`, `deactivationReason`. (Existing `enabled`, `maxAutoApproveAmount`, `requireCleanFraud`, `requirePreauthWhenNeeded` retained.)
+
+**Fail-safe on deploy:** the `mode @default(OFF)` + `status @default(DRAFT)` column
+defaults backfill **every existing policy row to OFF/DRAFT** — no pre-existing
+policy is implicitly LIVE (D1). No unique constraint is added, so `db push`
+produces **no** data-loss warning. Verified on `autopilot_uat`.
+
+**Rollback:** unwired (resolution still reads the legacy `enabled` path until F4.1).
+Dropping the new columns/enums is safe; nothing executes on `mode` yet.
+
+**Backfill (F2.6):** the `classifyHistoricalPolicyMode` helper maps legacy rows to
+OFF (or SHADOW only if the operator opts in); the F2.6 script applies it. Never
+infers LIVE.

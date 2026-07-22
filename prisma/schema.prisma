@@ -1702,6 +1702,30 @@ model AutoAdjudicationPolicy {
   requireCleanFraud        Boolean  @default(true) // no open fraud flag to auto-approve
   requirePreauthWhenNeeded Boolean  @default(true)
 
+  // ── Claims Autopilot governed policy (F2.4, §9.6) ─────────────────────────
+  // mode defaults OFF and status DRAFT so NO existing/new row is implicitly LIVE
+  // (D1/D2). LIVE requires an APPROVED status + finite positive ceiling + the
+  // required gates on + explicit inclusions (validated in claim-autopilot/policy.ts).
+  name                     String?
+  version                  Int                          @default(1)
+  mode                     AutoAdjudicationMode         @default(OFF)
+  status                   AutoAdjudicationPolicyStatus @default(DRAFT)
+  allowAutoPartial         Boolean                      @default(false) // D4 opt-in
+  allowedSources           ClaimSource[]                @default([])
+  allowedServiceTypes      ServiceType[]                @default([])
+  allowedBenefitCategories BenefitCategory[]            @default([])
+  allowedProviderTiers     String[]                     @default([])
+  maxClaimAgeDays          Int?
+  requireAllLinesPriced    Boolean                      @default(true)
+  requireDocumentsComplete Boolean                      @default(true)
+  requireEligibilityClear  Boolean                      @default(true)
+  createdById              String?
+  approvalRequestId        String?
+  approvedById             String?
+  approvedAt               DateTime?
+  deactivatedById          String?
+  deactivationReason       String?
+
   effectiveFrom DateTime  @default(now())
   effectiveTo   DateTime?
   isActive      Boolean   @default(true)
@@ -6558,4 +6582,25 @@ model ClaimProcessingStage {
   updatedAt    DateTime                  @updatedAt
 
   @@unique([runId, stage])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CLAIMS AUTOPILOT — governed automation policy mode/status (F2.4, §9.1/§9.6)
+// Every scope starts OFF (D1/D2). LIVE requires an APPROVED policy version and a
+// finite positive ceiling; activation is maker-checker governed (D15, F2.5).
+// ═══════════════════════════════════════════════════════════════════════════
+
+enum AutoAdjudicationMode {
+  OFF
+  SHADOW
+  LIVE
+}
+
+enum AutoAdjudicationPolicyStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  SUPERSEDED
+  DEACTIVATED
 }

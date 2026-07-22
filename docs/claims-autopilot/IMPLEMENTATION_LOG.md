@@ -277,3 +277,26 @@ F4.5, F7.4).
 - **Security/privacy review:** run/stage store safe messages/reason codes/JSON refs only.
 - **Next eligible task:** F2.4 — Add policy modes and fail-safe schema defaults.
 - **Blocker/options, if blocked:** n/a.
+
+---
+
+## F2.4 — Add policy modes and fail-safe schema defaults
+
+- **Status:** COMPLETE
+- **Commit/branch:** `feat/claims-autopilot` (F2.4 commit)
+- **Files changed:** `prisma/schema.prisma` (2 enums + governed fields on `AutoAdjudicationPolicy`), `src/server/services/claim-autopilot/policy.ts` (new), `tests/services/claim-autopilot-policy.test.ts` (new), `docs/claims-autopilot/DEPLOYMENT.md` (F2.4 section).
+- **Decisions enforced:** D1 (no implicit live), D2 (OFF/SHADOW/LIVE), D4 (`allowAutoPartial` default false), D15 (governed activation via approval fields).
+- **Acceptance scenarios covered:** CA-032 (no/OFF/draft/pending/rejected ⇒ route — `effectivePolicyMode` returns OFF for all), CA-081/CA-082 (approved finite scope required for LIVE).
+- **Observable behavior before:** the only policy control was `enabled` + `maxAutoApproveAmount` (null = no ceiling) — the D1-violating shape.
+- **Observable behavior after:** `AutoAdjudicationPolicy` has `mode @default(OFF)`, `status @default(DRAFT)`, explicit inclusion arrays, per-gate requirements, and approval/version/deactivation fields. `policy.ts` provides `validateLivePolicy` (APPROVED + finite positive ceiling + all required gates on + explicit inclusions), `effectivePolicyMode` (**fail-closed** — an invalid "LIVE" row ⇒ OFF), `canExecuteLive`, and `classifyHistoricalPolicyMode` (never LIVE).
+- **Forbidden effects explicitly checked:** column defaults make every existing row OFF/DRAFT (no implicit LIVE); `effectivePolicyMode` proven to return OFF for a malformed LIVE row; `classifyHistoricalPolicyMode` never returns LIVE; existing legacy columns retained.
+- **Tests run and exact results:**
+  - `npx prisma validate/generate/db push --accept-data-loss` → in sync (no data-loss warning; all additive nullable/defaulted).
+  - `npx vitest run tests/services/claim-autopilot-policy.test.ts` → **18 passed**.
+  - `npm run typecheck` → PASS; eslint on new files → clean.
+- **Database/audit/reconciliation evidence:** applied to `autopilot_uat`; new policy columns present.
+- **Creator allowlist change:** none.
+- **Known gaps or skips:** actual policy RESOLUTION still runs the legacy path in `AutoAdjudicationService` until F4.1 removes the D1 fallback and switches to `effectivePolicyMode`. Backfill script is F2.6.
+- **Security/privacy review:** policy is a money-control; the fail-closed resolver is the core D1 safety at the data layer.
+- **Next eligible task:** F2.5 — Add policy approval action and application contract.
+- **Blocker/options, if blocked:** n/a.
