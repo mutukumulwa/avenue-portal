@@ -707,3 +707,21 @@ F4.5, F7.4).
 - **Security/privacy review:** tenant/provider/member never trusted from the body; member errors non-enumerating (404→403 existence-leak closed); entitlement scoping enforced for facility keys (consistent with the E2E-D02/D04 read-endpoint remediation — a key without ContractApplicability cannot file, which is a misconfigured key, not a regression: sibling eligibility/benefits endpoints already fail the same way); receipt lookups facility-scoped; no raw internals in any response (IntakeError mapping).
 - **Next eligible task:** F5.3 — tRPC claim mutation adapter/deprecation.
 - **Blocker/options, if blocked:** n/a.
+
+---
+
+## F5.3 — tRPC claim mutation removal + read scoping
+
+- **Status:** COMPLETE
+- **Commit/branch:** `feat/claims-autopilot` (F5.3 commit)
+- **Files changed:** `src/server/trpc/routers/claims.ts` (create mutation REMOVED; list/getById client-confined), `src/server/trpc/trpc.ts` (`createCallerFactory` export), `tests/services/trpc-claims-router.test.ts` (new).
+- **Decisions enforced:** the plan's F5.3 step 3 (unused ⇒ deprecate/REMOVE, never retain a convenience creator); D10 (adjudicate stays on `ClaimDecisionService.decide`); G2.1 client confinement on reads.
+- **Acceptance scenarios covered:** explicit-removal guard; no `ClaimsService.createClaim` reachable from tRPC; confined list passes clientId; confined getById NOT_FOUND out of scope; adjudicate canonical.
+- **Observable behavior before:** `claims.create` (protectedProcedure) called `ClaimsService.createClaim` with NO fraud, NO auto-adjudication, NO idempotency, caller-supplied source — reachable by any authenticated session via raw POST /api/trpc even though NO tRPC client exists anywhere in the app (verified: the only import of the router tree is the HTTP mount). `list`/`getById` ignored the session's client confinement (`ctx.clientId` derived but unused).
+- **Observable behavior after:** the mutation is gone (router exposes exactly list/getById/adjudicate); a client-confined session's list is scoped to its client and an out-of-scope getById is a non-enumerating NOT_FOUND.
+- **Forbidden effects explicitly checked:** router source contains no `createClaim(` and no `create:` procedure (source-scan guard will catch a reintroduction); out-of-scope getById never reaches the service.
+- **Tests run and exact results:** `trpc-claims-router.test.ts` → **7 passed** (removal guard ×2, scoping ×4, canonical adjudicate). Full suite → **1152 passed / 81 skipped**. typecheck PASS; eslint clean.
+- **Creator allowlist change:** none yet — `claims.service.ts` stays allowlisted until F5.7 removes the PA-conversion path (`createClaim` now has exactly one remaining caller: `createClaimWithPreauth`).
+- **Known gaps or skips:** n/a.
+- **Security/privacy review:** removes an unaudited authenticated write path; adds client confinement to two read procedures.
+- **Next eligible task:** F5.4 — CSV import row receipts and canonical commit.

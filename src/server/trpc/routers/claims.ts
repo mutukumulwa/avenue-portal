@@ -1,56 +1,41 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { ClaimsService } from "@/server/services/claims.service";
+import { TRPCError } from "@trpc/server";
+import { prisma } from "@/lib/prisma";
 
+/**
+ * Claims router (F5.3).
+ *
+ * The legacy `create` mutation is REMOVED — it had no callers (no tRPC client
+ * is mounted anywhere in the app; the only import of this router is the HTTP
+ * handler), ran no fraud/eligibility/idempotency, and was the last path into
+ * `ClaimsService.createClaim` besides the PA conversion (F5.7). Claim intake
+ * happens ONLY through the canonical `ClaimIntakeService` rails. Adjudication
+ * stays on the one canonical decision stack (D10).
+ *
+ * `list`/`getById` enforce client confinement (G2.1): a client-confined session
+ * sees only its own client's claims.
+ */
 export const claimsRouter = createTRPCRouter({
   list: protectedProcedure
     .query(async ({ ctx }) => {
-      return ClaimsService.getClaims(ctx.tenantId);
+      return ClaimsService.getClaims(ctx.tenantId, undefined, ctx.clientId ?? null);
     }),
 
   getById: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
+      // Client confinement: a confined user may only open a claim whose member
+      // belongs to their client — anything else is NOT_FOUND (non-enumerating).
+      if (ctx.clientId) {
+        const inScope = await prisma.claim.findFirst({
+          where: { id: input.id, tenantId: ctx.tenantId, member: { group: { clientId: ctx.clientId } } },
+          select: { id: true },
+        });
+        if (!inScope) throw new TRPCError({ code: "NOT_FOUND" });
+      }
       return ClaimsService.getClaimById(ctx.tenantId, input.id);
-    }),
-
-  create: protectedProcedure
-    .input(
-      z.object({
-        memberId: z.string(),
-        providerId: z.string(),
-        serviceType: z.enum(["OUTPATIENT", "INPATIENT", "DAY_CASE", "EMERGENCY"]),
-        dateOfService: z.string(),
-        admissionDate: z.string().optional(),
-        dischargeDate: z.string().optional(),
-        attendingDoctor: z.string().optional(),
-        diagnoses: z.array(z.object({
-          icdCode: z.string().optional(),
-          description: z.string(),
-          isPrimary: z.boolean().optional(),
-        })),
-        procedures: z.array(z.object({
-          cptCode: z.string().optional(),
-          description: z.string(),
-          quantity: z.number().optional(),
-          unitCost: z.number(),
-          total: z.number(),
-        })),
-        billedAmount: z.number(),
-        benefitCategory: z.enum([
-          "INPATIENT", "OUTPATIENT", "MATERNITY", "DENTAL", "OPTICAL",
-          "MENTAL_HEALTH", "CHRONIC_DISEASE", "SURGICAL", "AMBULANCE_EMERGENCY",
-          "LAST_EXPENSE", "WELLNESS_PREVENTIVE", "REHABILITATION", "CUSTOM",
-        ]),
-      })
-    )
-    .mutation(async ({ ctx, input }) => {
-      return ClaimsService.createClaim(ctx.tenantId, {
-        ...input,
-        dateOfService: new Date(input.dateOfService),
-        admissionDate: input.admissionDate ? new Date(input.admissionDate) : undefined,
-        dischargeDate: input.dischargeDate ? new Date(input.dischargeDate) : undefined,
-      });
     }),
 
   adjudicate: protectedProcedure

@@ -19,6 +19,8 @@ const t = initTRPC.context<Context>().create({
 
 export const createTRPCRouter = t.router;
 export const publicProcedure = t.procedure;
+/** Server-side caller factory (tests + server-to-server invocation). */
+export const createCallerFactory = t.createCallerFactory;
 
 const enforceUserIsAuthed = t.middleware(({ ctx, next }) => {
   if (!ctx.session?.user) {
