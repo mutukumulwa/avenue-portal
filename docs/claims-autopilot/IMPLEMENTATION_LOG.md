@@ -368,3 +368,25 @@ F4.5, F7.4).
 - **Security/privacy review:** THE intake security boundary; all scope is server-derived; errors never enumerate member/provider existence.
 - **Next eligible task:** F3.2 — Separate structural acceptance from business routing.
 - **Blocker/options, if blocked:** n/a.
+
+---
+
+## F3.2 — Separate structural acceptance from business routing
+
+- **Status:** COMPLETE
+- **Commit/branch:** `feat/claims-autopilot` (F3.2 commit)
+- **Files changed:** `src/server/services/claim-intake/reason-catalog.ts` (new), `tests/services/claim-intake-reason-catalog.test.ts` (new).
+- **Decisions enforced:** D6 (business failures accept+route, not throw — structural/security stays pre-claim reject via `IntakeError`); §11.5 (audience-safe wording, no fraud leakage).
+- **Acceptance scenarios covered:** underpins CA-012/CA-036/CA-038..043/CA-121/CA-128 (route codes, remedies, member-safe text).
+- **Observable behavior before:** rails threw on business gate failures (coverage/benefit/PA), losing the claim; no shared route-code→queue→wording registry.
+- **Observable behavior after:** `reason-catalog.ts` maps all 23 §10.3 route codes to their §10.4 queue plus internal/provider/member wording, remedy, resubmission/override flags; `getReason`/`queueFor`/`reasonForAudience` helpers; `StageDisposition` (PASS | ROUTE(code)) is the stage-ready finding vocabulary (defined, wired into the runner in F4.2 — kept unused by rails now per F3.2 step 5).
+- **Forbidden effects explicitly checked:** no provider/member text contains "fraud"/"investigat"/"alert" (asserted for all 23 codes); fraud named only in `internal`; INPATIENT_SHADOW_ONLY + PIPELINE_RETRY have no human queue; `overrideAllowed=false ⇒ overrideType=NONE`.
+- **Tests run and exact results:**
+  - `npx vitest run tests/services/claim-intake-reason-catalog.test.ts` → **24 passed**, including golden-oracle consistency (every fixture route code → the fixture's expected queue).
+  - `npm run typecheck` → PASS; eslint clean.
+- **Database/audit/reconciliation evidence:** n/a (pure catalog). Single source of truth; the golden fixtures' queue expectations are validated against it.
+- **Creator allowlist change:** none.
+- **Known gaps or skips:** the classifier/stage-finding is defined but intentionally not wired into any rail until the processing runner exists (F4.2). Added `MANUAL_ADJUDICATION` queue for clean-but-not-auto-eligible routes (AUTO_POLICY_*/ABOVE_AUTO_CEILING) — a documented extension of the §10.4 suggested set.
+- **Security/privacy review:** the audience-safe wording contract is the privacy core of routed-claim messaging.
+- **Next eligible task:** F3.3 — Implement transaction-aware canonical persistence.
+- **Blocker/options, if blocked:** n/a.
