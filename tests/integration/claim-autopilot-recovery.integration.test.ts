@@ -18,6 +18,7 @@ describe.skipIf(!URL_SET)("F3.6 integration — processing + recovery", () => {
   let prisma: typeof import("@/lib/prisma").prisma;
   let tenantId: string;
   const claimPool: string[] = [];
+  const mintedClaimIds: string[] = [];
   const usedClaimIds: string[] = [];
   const receiptIds: string[] = [];
   let seq = 0;
@@ -25,18 +26,24 @@ describe.skipIf(!URL_SET)("F3.6 integration — processing + recovery", () => {
   beforeAll(async () => {
     prisma = (await import("@/lib/prisma")).prisma;
     tenantId = (await prisma.tenant.findFirstOrThrow()).id;
-    // Disjoint claim window (by claimNumber) so parallel integration files never
-    // share seeded claims. Pool ONLY untouched claims — canonical intake (F5.1+)
-    // creates claims that already carry a sequence-1 run, and VOIDed test
-    // leftovers must never re-enter a fixture pool.
-    claimPool.push(
-      ...(
-        await prisma.claim.findMany({
-          where: { tenantId, processingRuns: { none: {} }, status: { not: "VOID" } },
-          orderBy: { claimNumber: "asc" }, select: { id: true }, skip: 40, take: 25,
-        })
-      ).map((c) => c.id),
-    );
+    // Hermetic pool (F5.8 hardening): borrow NOTHING from the seed — earlier
+    // suites' append-only audit + accumulating VOIDs kept shrinking any seeded
+    // window run-over-run until it ran dry. Mint this suite's own bare claims.
+    const member = await prisma.member.findFirstOrThrow({ where: { tenantId, status: "ACTIVE" }, select: { id: true } });
+    const provider = await prisma.provider.findFirstOrThrow({ where: { tenantId, contractStatus: "ACTIVE" }, select: { id: true } });
+    const run = Date.now().toString(36);
+    for (let i = 0; i < 25; i += 1) {
+      const created = await prisma.claim.create({
+        data: {
+          tenantId, claimNumber: `F36-${run}-${i}`, memberId: member.id, providerId: provider.id,
+          serviceType: "OUTPATIENT", benefitCategory: "OUTPATIENT", dateOfService: new Date("2026-06-01"),
+          diagnoses: [], procedures: [], billedAmount: 1000, status: "RECEIVED",
+        },
+        select: { id: true },
+      });
+      claimPool.push(created.id);
+      mintedClaimIds.push(created.id);
+    }
   });
   afterEach(() => resetClaimProcessor());
   afterAll(async () => {
@@ -44,6 +51,8 @@ describe.skipIf(!URL_SET)("F3.6 integration — processing + recovery", () => {
     await prisma.claimProcessingStage.deleteMany({ where: { run: { claimId: { in: usedClaimIds } } } });
     await prisma.claimProcessingRun.deleteMany({ where: { claimId: { in: usedClaimIds } } });
     await prisma.claimIntakeReceipt.deleteMany({ where: { id: { in: receiptIds } } });
+    await prisma.auditLog.deleteMany({ where: { tenantId, entityType: "Claim", entityId: { in: mintedClaimIds }, action: { startsWith: "CLAIM:AUTO" } } }).catch(() => undefined);
+    await prisma.claim.deleteMany({ where: { id: { in: mintedClaimIds } } }).catch(() => undefined);
     await prisma.$disconnect();
   });
 

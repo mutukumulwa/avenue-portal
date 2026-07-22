@@ -16,6 +16,7 @@ describe.skipIf(!URL_SET)("F3.7 integration — reconcilable effects", () => {
   let prisma: typeof import("@/lib/prisma").prisma;
   let tenantId: string;
   const claimPool: string[] = [];
+  const mintedClaimIds: string[] = [];
   const usedClaimIds: string[] = [];
   const receiptIds: string[] = [];
   let seq = 0;
@@ -23,27 +24,24 @@ describe.skipIf(!URL_SET)("F3.7 integration — reconcilable effects", () => {
   beforeAll(async () => {
     prisma = (await import("@/lib/prisma")).prisma;
     tenantId = (await prisma.tenant.findFirstOrThrow()).id;
-    // Disjoint claim window (by claimNumber) so parallel integration files never
-    // share seeded claims. Pool ONLY untouched claims — canonical intake (F5.1+)
-    // creates claims that already carry a run AND terminal autopilot audit, and
-    // THIS suite itself writes terminal audit to pool claims (cleanup removes the
-    // runs but audit is append-only), so candidates must also have NO terminal
-    // autopilot audit or the audit-offender fixture false-negatives on re-runs.
-    const candidates = (
-      await prisma.claim.findMany({
-        where: { tenantId, processingRuns: { none: {} }, status: { not: "VOID" } },
-        orderBy: { claimNumber: "asc" }, select: { id: true }, skip: 90, take: 60,
-      })
-    ).map((c) => c.id);
-    const audited = new Set(
-      (
-        await prisma.auditLog.findMany({
-          where: { tenantId, entityType: "Claim", entityId: { in: candidates }, action: { startsWith: "CLAIM:AUTO" } },
-          select: { entityId: true },
-        })
-      ).map((a) => a.entityId as string),
-    );
-    claimPool.push(...candidates.filter((id) => !audited.has(id)).slice(0, 25));
+    // Hermetic pool (F5.8 hardening): borrow NOTHING from the seed — earlier
+    // suites' append-only audit + accumulating VOIDs kept shrinking any seeded
+    // window run-over-run until it ran dry. Mint this suite's own bare claims.
+    const member = await prisma.member.findFirstOrThrow({ where: { tenantId, status: "ACTIVE" }, select: { id: true } });
+    const provider = await prisma.provider.findFirstOrThrow({ where: { tenantId, contractStatus: "ACTIVE" }, select: { id: true } });
+    const run = Date.now().toString(36);
+    for (let i = 0; i < 25; i += 1) {
+      const created = await prisma.claim.create({
+        data: {
+          tenantId, claimNumber: `F37-${run}-${i}`, memberId: member.id, providerId: provider.id,
+          serviceType: "OUTPATIENT", benefitCategory: "OUTPATIENT", dateOfService: new Date("2026-06-01"),
+          diagnoses: [], procedures: [], billedAmount: 1000, status: "RECEIVED",
+        },
+        select: { id: true },
+      });
+      claimPool.push(created.id);
+      mintedClaimIds.push(created.id);
+    }
   });
   afterEach(() => resetClaimProcessor());
   afterAll(async () => {
@@ -51,6 +49,8 @@ describe.skipIf(!URL_SET)("F3.7 integration — reconcilable effects", () => {
     await prisma.claimProcessingStage.deleteMany({ where: { run: { claimId: { in: usedClaimIds } } } });
     await prisma.claimProcessingRun.deleteMany({ where: { claimId: { in: usedClaimIds } } });
     await prisma.claimIntakeReceipt.deleteMany({ where: { id: { in: receiptIds } } });
+    await prisma.auditLog.deleteMany({ where: { tenantId, entityType: "Claim", entityId: { in: mintedClaimIds }, action: { startsWith: "CLAIM:AUTO" } } }).catch(() => undefined);
+    await prisma.claim.deleteMany({ where: { id: { in: mintedClaimIds } } }).catch(() => undefined);
     await prisma.$disconnect();
   });
 
