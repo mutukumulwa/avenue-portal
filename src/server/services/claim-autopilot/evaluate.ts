@@ -37,6 +37,8 @@ export interface EvalContext {
   claim: LoadedClaim;
   policy: PolicyLike & { id: string; maxAutoApproveAmount: unknown; currency: string; allowedSources: string[]; allowedServiceTypes: string[]; allowedBenefitCategories: string[] };
   mode: PolicyMode;
+  /** True when a prior duplicate exception was cleared (reprocess) — skips fuzzy dup review (F4.3). */
+  duplicateCleared: boolean;
   // Accumulated by CONTRACT:
   approveAmount?: string;
   lines: LinePlan[];
@@ -53,8 +55,10 @@ interface LoadedClaim {
   providerId: string;
   dateOfService: Date;
   invoiceNumber: string | null;
+  suspectedDuplicateFingerprint: string | null;
   member: { status: string; group: { status: string; clientId: string | null } | null } | null;
   claimLines: Array<{ id: string; cptCode: string | null; drugCode: string | null; icdCode: string | null; serviceCategory: string; billedAmount: unknown }>;
+  documents: Array<{ category: string }>;
 }
 
 export interface EvaluationResult {
@@ -91,20 +95,49 @@ async function stageCoding(ctx: EvalContext): Promise<StageOutcome> {
   return PASS;
 }
 
-// DOCUMENTS is completed in F4.3 (contract/service-date documentation rules).
-const stageDocuments = async (): Promise<StageOutcome> => PASS;
-
-async function stageDuplicate(ctx: EvalContext): Promise<StageOutcome> {
-  const { claimAdjudicationService } = await import("@/server/services/claim-adjudication.service");
-  const gates = await claimAdjudicationService.runHardGateValidation(ctx.tenantId, {
-    providerId: ctx.claim.providerId,
-    memberId: ctx.claim.memberId,
-    dateOfService: ctx.claim.dateOfService,
-    benefitCategory: ctx.claim.benefitCategory as never,
-    invoiceNumber: ctx.claim.invoiceNumber ?? undefined,
-    excludeClaimId: ctx.claimId,
+/**
+ * DOCUMENTS (F4.3): route when a mandatory, effective documentation rule for the
+ * provider's active contract has no matching claim document. Reads document
+ * METADATA (category) only — never fetches `fileUrl` (no SSRF, §11.5).
+ */
+async function stageDocuments(ctx: EvalContext): Promise<StageOutcome> {
+  const contract = await ctx.db.providerContract.findFirst({ where: { tenantId: ctx.tenantId, providerId: ctx.claim.providerId, status: "ACTIVE" }, select: { id: true } });
+  if (!contract) return PASS; // no governing contract ⇒ no documentation rules to enforce here
+  const rules = await ctx.db.documentationRule.findMany({
+    where: { tenantId: ctx.tenantId, contractId: contract.id, mandatory: true, isActive: true, effectiveFrom: { lte: ctx.claim.dateOfService }, OR: [{ effectiveTo: null }, { effectiveTo: { gte: ctx.claim.dateOfService } }] },
+    select: { documentType: true },
   });
-  if (!gates.passed) return routeOut(ROUTE_CODES.DUPLICATE_REVIEW, gates.errors[0] ?? "duplicate/double-capture");
+  if (rules.length === 0) return PASS;
+  const present = new Set(ctx.claim.documents.map((d) => d.category));
+  const missing = [...new Set(rules.map((r) => r.documentType).filter((t) => !present.has(t)))];
+  if (missing.length > 0) return routeOut(ROUTE_CODES.DOCUMENTS_INCOMPLETE, `missing required document(s): ${missing.join(", ")}`, { missing });
+  return PASS;
+}
+
+/**
+ * DUPLICATE (F4.3, §8.4/D7): a fuzzy suspected duplicate — a plausible repeat of
+ * the same provider+member+benefit within a short service-date window, with NO
+ * authoritative identity. It is NEVER auto-linked (the strong fingerprint links
+ * exact events at intake so they never create a second claim and never reach
+ * here); it ROUTES for review with safe candidate claim numbers. The exact
+ * dup-invoice case is resolved by the strong fingerprint at intake; temporal /
+ * cover checks live in ELIGIBILITY. When the exception has been cleared
+ * (reprocess trigger DUPLICATE_CLEARED) the whole stage is skipped so reprocessing
+ * can proceed.
+ */
+async function stageDuplicate(ctx: EvalContext): Promise<StageOutcome> {
+  if (ctx.duplicateCleared) return PASS;
+  const svc = ctx.claim.dateOfService.getTime();
+  const windowMs = 3 * 24 * 60 * 60 * 1000;
+  const candidates = await ctx.db.claim.findMany({
+    where: {
+      tenantId: ctx.tenantId, providerId: ctx.claim.providerId, memberId: ctx.claim.memberId, benefitCategory: ctx.claim.benefitCategory as never,
+      id: { not: ctx.claimId }, strongEventFingerprint: null, status: { notIn: ["VOID", "DECLINED", "APPEAL_DECLINED"] },
+      dateOfService: { gte: new Date(svc - windowMs), lte: new Date(svc + windowMs) },
+    },
+    select: { claimNumber: true }, take: 5,
+  });
+  if (candidates.length > 0) return routeOut(ROUTE_CODES.DUPLICATE_REVIEW, `content-similar to ${candidates.length} recent claim(s)`, { candidates: candidates.map((c) => c.claimNumber) });
   return PASS;
 }
 
@@ -211,9 +244,10 @@ async function loadClaim(db: Db, tenantId: string, claimId: string): Promise<Loa
     where: { id: claimId, tenantId },
     select: {
       id: true, source: true, serviceType: true, benefitCategory: true, billedAmount: true, currency: true,
-      memberId: true, providerId: true, dateOfService: true, invoiceNumber: true,
+      memberId: true, providerId: true, dateOfService: true, invoiceNumber: true, suspectedDuplicateFingerprint: true,
       member: { select: { status: true, group: { select: { status: true, clientId: true } } } },
       claimLines: { select: { id: true, cptCode: true, drugCode: true, icdCode: true, serviceCategory: true, billedAmount: true } },
+      documents: { select: { category: true } },
     },
   }) as unknown as Promise<LoadedClaim | null>;
 }
@@ -223,7 +257,7 @@ async function loadClaim(db: Db, tenantId: string, claimId: string): Promise<Loa
  * policy. Records each stage; stops at the first route and marks the rest
  * SKIPPED. `runId` optional — omit to evaluate without persisting stages.
  */
-export async function evaluateClaimStaged(db: Db, tenantId: string, claimId: string, runId?: string): Promise<EvaluationResult> {
+export async function evaluateClaimStaged(db: Db, tenantId: string, claimId: string, runId?: string, opts: { duplicateCleared?: boolean } = {}): Promise<EvaluationResult> {
   const { AutoAdjudicationService } = await import("@/server/services/auto-adjudication.service");
   const claim = await loadClaim(db, tenantId, claimId);
   if (!claim) return { disposition: "ROUTE", mode: "OFF", routeCode: ROUTE_CODES.ELIGIBILITY_REVIEW, routeStage: "CONTEXT", reason: "claim not found", approveAmount: null, lines: [], policyId: null };
@@ -240,7 +274,7 @@ export async function evaluateClaimStaged(db: Db, tenantId: string, claimId: str
     return { disposition: "ROUTE", mode: "OFF", routeCode: policyRow ? ROUTE_CODES.AUTO_POLICY_OFF : ROUTE_CODES.AUTO_POLICY_NOT_LIVE, routeStage: "POLICY", reason: policyRow ? "automation not LIVE" : "no approved LIVE policy", approveAmount: null, lines: [], policyId: policyRow?.id ?? null };
   }
 
-  const ctx: EvalContext = { db, tenantId, claimId, claim, policy: policyRow as never, mode, lines: [] };
+  const ctx: EvalContext = { db, tenantId, claimId, claim, policy: policyRow as never, mode, lines: [], duplicateCleared: opts.duplicateCleared ?? false };
 
   let routed = false;
   let routeInfo: { code: RouteCode; reason: string; stage: ClaimProcessingStageName } | null = null;

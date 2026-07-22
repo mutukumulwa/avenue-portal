@@ -550,3 +550,25 @@ F4.5, F7.4).
 - **Security/privacy review:** stage results store safe totals/counts only; no PHI.
 - **Next eligible task:** F4.3 — Complete coding, document and duplicate route fidelity.
 - **Blocker/options, if blocked:** n/a.
+
+---
+
+## F4.3 — Complete coding, document and duplicate route fidelity
+
+- **Status:** COMPLETE (incl. real-DB proof)
+- **Commit/branch:** `feat/claims-autopilot` (F4.3 commit)
+- **Files changed:** `src/server/services/claim-autopilot/evaluate.ts` (DOCUMENTS stage + fuzzy DUPLICATE + clearing + claim-load additions), `tests/integration/claim-autopilot-fidelity.integration.test.ts` (new); test-hygiene: `claim-autopilot-evaluate.integration.test.ts` (pre-clean + dependent cleanup).
+- **Decisions enforced:** D5 (uncoded routes), D7 (fuzzy candidate never auto-linked; strong-fp exact events resolved at intake), §11.5 (no arbitrary URL fetch — metadata only).
+- **Acceptance scenarios covered:** CA-036/CA-038 (mixed coded/uncoded ⇒ CODING route), CA-039 (missing doc ⇒ DOCUMENTS_INCOMPLETE), CA-027 (fuzzy second visit routes with safe refs, never auto-linked), CA-028 (cleared duplicate reprocess proceeds).
+- **Observable behavior before:** DOCUMENTS was a pass-through; no fuzzy duplicate detection or clearing in the staged evaluator.
+- **Observable behavior after:** DOCUMENTS routes DOCUMENTS_INCOMPLETE when a mandatory, effective `DocumentationRule` for the provider's active contract has no matching claim document (reads document category metadata only — never fetches `fileUrl`); DUPLICATE routes DUPLICATE_REVIEW for a plausible repeat (same provider+member+benefit within ±3 days, no authoritative id) with safe candidate claim numbers, skippable via `duplicateCleared` (reprocess trigger DUPLICATE_CLEARED).
+- **Forbidden effects explicitly checked:** exact strong-fp events never reach DUPLICATE (linked at intake — the fuzzy query excludes `strongEventFingerprint != null`); candidates are claim NUMBERS only (no PII — proven); no URL fetch (document category metadata only); cleared ⇒ DUPLICATE passes (proven).
+- **Tests run and exact results:**
+  - **Real DB:** `npx vitest run tests/integration/claim-autopilot-fidelity.integration.test.ts` → **3 passed** (mixed coded/uncoded → CODING; missing doc → DOCUMENTS + supply clears it; fuzzy second visit → DUPLICATE with candidate ref + cleared passes). Run with F4.2 sequentially → 6 passed.
+  - `npm run typecheck` → PASS; eslint clean.
+- **Database/audit/reconciliation evidence:** real Postgres. Test-hygiene: added policy/fraud/adjudication-dependent cleanup + defensive pre-clean; fuzzy test uses run-unique future dates so leftover claims can't pollute its window.
+- **Creator allowlist change:** none.
+- **Known gaps or skips:** contract documentation is ALSO enforced within the CONTRACT engine (pricing); the DOCUMENTS stage surfaces it as a distinct earlier route without duplicating the engine. Service-category mapping fidelity remains the CONTRACT engine's job (CODING catches missing codes).
+- **Security/privacy review:** candidate refs are claim numbers; no PHI; no SSRF (no external fetch).
+- **Next eligible task:** F4.4 — Build complete serializable `AutoDecisionPlan`.
+- **Blocker/options, if blocked:** n/a.

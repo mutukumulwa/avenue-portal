@@ -30,6 +30,8 @@ describe.skipIf(!URL_SET)("F4.2 integration — staged evaluation", () => {
     const m = await prisma.member.findFirstOrThrow({ where: { tenantId, status: "ACTIVE" }, include: { group: { select: { clientId: true } } } });
     memberId = m.id;
     clientId = m.group?.clientId ?? null;
+    // Defensive: clear any test-signature policy leaked by a prior failed run.
+    await prisma.autoAdjudicationPolicy.deleteMany({ where: { tenantId, maxAutoApproveAmount: 10_000_000 } });
     policyId = (await prisma.autoAdjudicationPolicy.create({
       data: { tenantId, clientId, mode: "LIVE", status: "APPROVED", maxAutoApproveAmount: 10_000_000, currency: "UGX", requireCleanFraud: true, requireAllLinesPriced: true, requireDocumentsComplete: true, requireEligibilityClear: true, requirePreauthWhenNeeded: true, allowedSources: ["MANUAL"], allowedServiceTypes: ["OUTPATIENT"], allowedBenefitCategories: ["OUTPATIENT"], isActive: true, effectiveFrom: new Date("2020-01-01"), version: 1 },
     })).id;
@@ -40,6 +42,8 @@ describe.skipIf(!URL_SET)("F4.2 integration — staged evaluation", () => {
     await prisma.claimProcessingStage.deleteMany({ where: { run: { claimId: { in: claimIds } } } });
     await prisma.claimProcessingRun.deleteMany({ where: { claimId: { in: claimIds } } });
     await prisma.claimIntakeReceipt.deleteMany({ where: { id: { in: receiptIds } } });
+    await prisma.claimFraudAlert.deleteMany({ where: { claimId: { in: claimIds } } });
+    await prisma.adjudicationLog.deleteMany({ where: { claimId: { in: claimIds } } });
     await prisma.claimLine.deleteMany({ where: { claimId: { in: claimIds } } });
     await prisma.claim.deleteMany({ where: { id: { in: claimIds } } });
     await prisma.autoAdjudicationPolicy.delete({ where: { id: policyId } }).catch(() => undefined);
