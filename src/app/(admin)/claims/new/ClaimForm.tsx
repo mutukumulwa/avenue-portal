@@ -60,6 +60,9 @@ export function ClaimForm({
   const [step, setStep]       = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState<string | null>(null);
+  // F5.1: a stable draft id for THIS form instance — sent as the idempotency key so
+  // a double-click / back-refresh replays the same receipt instead of duplicating.
+  const [draftId] = useState(() => crypto.randomUUID());
 
   // Step 1
   const [memberId, setMemberId]     = useState("");
@@ -102,6 +105,7 @@ export function ClaimForm({
     setError(null);
     try {
       const result = await submitClaimAction({
+        idempotencyKey: draftId,
         memberId,
         providerId,
         providerBranchId: providerBranchId || undefined,
@@ -250,7 +254,7 @@ export function ClaimForm({
                 {PREAUTH_REQUIRED_CATEGORIES.has(benefitCategory) && (
                   <div className="mt-2 flex items-start gap-1.5 text-[10px] text-[#856404] bg-[#FFF8E1] border border-[#FFC107]/40 rounded px-2.5 py-1.5">
                     <Info size={11} className="shrink-0 mt-0.5" />
-                    <span><strong>{benefitCategory.charAt(0) + benefitCategory.slice(1).toLowerCase()}</strong> claims require an approved pre-authorization. Submission will be blocked if none exists.</span>
+                    <span><strong>{benefitCategory.charAt(0) + benefitCategory.slice(1).toLowerCase()}</strong> claims require an approved pre-authorization. Without one the claim is still recorded and routed for pre-authorization review.</span>
                   </div>
                 )}
               </div>

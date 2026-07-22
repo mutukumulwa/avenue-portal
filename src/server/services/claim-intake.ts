@@ -1,13 +1,8 @@
+import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
-import { writeAudit } from "@/lib/audit";
-import { FraudService } from "@/server/services/fraud.service";
-import { AutoAdjudicationService } from "@/server/services/auto-adjudication.service";
-import { ClaimsService } from "@/server/services/claims.service";
-import { ProvidersService } from "@/server/services/providers.service";
-import { MemberNotificationService } from "@/server/services/member-notification.service";
-import { coverageService, isCoverageEnded } from "@/server/services/coverage.service";
-import { assertServiceDateNotFuture } from "@/lib/service-date";
-import { createWithDocumentNumber } from "@/lib/document-number";
+import { ClaimIntakeService, type SubmitResult } from "@/server/services/claim-intake/intake.service";
+import { IntakeError } from "@/server/services/claim-intake/errors";
+import type { CallerIdentity } from "@/server/services/claim-intake/context";
 import type { ServiceType, BenefitCategory, ClaimLineCategory } from "@prisma/client";
 
 export interface IntakeLineItem {
@@ -42,236 +37,146 @@ export interface ClaimIntakeInput {
 }
 
 /**
- * The single claim-intake path (PR-013/PR-006/PR-024). Every direct-entry
- * channel — the admin claim wizard AND the provider facility portal — funnels
- * through here so the same eligibility, provider-operational, benefit-in-package
- * and pre-auth gates, fraud evaluation and auto-adjudication run identically.
- * Callers own auth + redirect; this owns the business rules.
+ * The direct-entry caller. The admin wizard is an operator user selecting a
+ * provider; the provider portal is a provider user whose facility is derived from
+ * the session (F5.1, §7.2/D12). Both map onto a canonical `CallerIdentity`.
+ */
+export type DirectEntryCaller =
+  | { kind: "operatorUser"; tenantId: string; userId: string }
+  | { kind: "providerUser"; tenantId: string; userId: string; providerId: string };
+
+export type DirectEntryOutcome =
+  | {
+      ok: true;
+      claimId: string;
+      claimNumber: string | null;
+      receiptId: string;
+      correlationId: string;
+      billedAmount: number;
+      outcome: SubmitResult["outcome"];
+      replayed: boolean;
+    }
+  | { ok: false; code: string; error: string };
+
+/** Compose a caller-safe message: prefer specific field issues, else the top message. */
+function friendlyMessage(e: IntakeError): string {
+  if (e.issues && e.issues.length > 0) return e.issues.map((i) => i.message).join("; ");
+  return e.message;
+}
+
+/** Map the legacy direct-entry input onto the canonical `ClaimSubmissionV1` envelope. */
+function toSubmission(data: ClaimIntakeInput, idempotencyKey: string) {
+  return {
+    schemaVersion: "1" as const,
+    idempotencyKey,
+    member: { memberId: data.memberId },
+    provider: {
+      providerId: data.providerId,
+      ...(data.providerBranchId ? { branchId: data.providerBranchId } : {}),
+    },
+    encounter: {
+      serviceType: data.serviceType,
+      benefitCategory: data.benefitCategory,
+      serviceFrom: data.dateOfService,
+      ...(data.admissionDate ? { admissionDate: data.admissionDate } : {}),
+      ...(data.dischargeDate ? { dischargeDate: data.dischargeDate } : {}),
+      ...(data.attendingDoctor?.trim() ? { attendingDoctor: data.attendingDoctor.trim() } : {}),
+    },
+    diagnoses: data.diagnoses.map((d) => ({
+      code: d.code,
+      ...(d.description?.trim() ? { description: d.description.trim() } : {}),
+      isPrimary: d.isPrimary,
+    })),
+    lines: data.lineItems.map((l) => ({
+      serviceCategory: l.serviceCategory,
+      // Empty codes are omitted (the schema's codeField rejects "").
+      ...(l.cptCode?.trim() ? { cptCode: l.cptCode.trim() } : {}),
+      ...(l.icdCode?.trim() ? { icdCode: l.icdCode.trim() } : {}),
+      description: l.description,
+      quantity: l.quantity,
+      unitCost: l.unitCost,
+      billedAmount: l.billedAmount,
+    })),
+  };
+}
+
+function callerIdentity(caller: DirectEntryCaller): CallerIdentity {
+  return caller.kind === "providerUser"
+    ? { kind: "providerUser", tenantId: caller.tenantId, userId: caller.userId, providerId: caller.providerId }
+    : { kind: "operatorUser", tenantId: caller.tenantId, userId: caller.userId };
+}
+
+/**
+ * Process an accepted claim's run in-request, best-effort (D9). Interactive rails
+ * want a synchronous decision when possible — but the durable processing run and
+ * the recovery sweep (F3.6) remain the authoritative backstop, so a failure here
+ * never affects acceptance. Lease semantics (`claimRunById`) make this safe even
+ * if a worker races the same run.
+ */
+async function processAcceptedRunInline(claimId: string): Promise<void> {
+  try {
+    const [{ processClaimRun }, { claimRunById }, { registerClaimAutopilotProcessor }] = await Promise.all([
+      import("@/server/jobs/claim-autopilot.job"),
+      import("@/server/services/claim-intake/processing"),
+      import("@/server/services/claim-autopilot/processor"),
+    ]);
+    // The worker registers the real evaluate→plan→execute processor on its own
+    // boot; server actions run in the web runtime, so register it here too
+    // (idempotent) — otherwise the fail-closed default would route every claim to
+    // manual instead of auto-adjudicating.
+    registerClaimAutopilotProcessor();
+    const run = await prisma.claimProcessingRun.findFirst({
+      where: { claimId, state: { in: ["PENDING", "RETRYABLE"] } },
+      orderBy: { sequence: "desc" },
+      select: { id: true },
+    });
+    if (!run) return;
+    const owner = `web:${process.pid}:${randomUUID().slice(0, 8)}`;
+    const claimed = await claimRunById(prisma, run.id, { leaseOwner: owner });
+    if (claimed) await processClaimRun(prisma, claimed, owner);
+  } catch {
+    /* best-effort; the durable run + recovery sweep are authoritative (D8/D9) */
+  }
+}
+
+/**
+ * The admin claim wizard AND the provider facility portal converge here (F5.1).
+ * This is now a thin adapter over the canonical intake service — it OWNS no
+ * business rules: structural gates live in the schema/context, and eligibility /
+ * benefit / pre-auth are routed by the staged evaluator (D6, accepted-and-routed).
+ *
+ * `idempotencyKey` is the form's draft UUID (stable across retries) so a
+ * double-click or back/refresh REPLAYS the same receipt instead of creating a
+ * duplicate claim (§8.3). Acceptance is synchronous; the accepted claim is then
+ * processed inline when possible, with the recovery sweep as the backstop.
  */
 export async function runClaimIntake(
-  tenantId: string,
-  actorUserId: string,
+  caller: DirectEntryCaller,
   data: ClaimIntakeInput,
-) {
-  // ── Line-amount positivity gate (BB2-DEF-01 defence in depth) ─────────────
-  // No intake rail may materialise a non-positive or inconsistent line amount,
-  // whatever the caller validated. This is the canonical intake path, so the
-  // guard lives here in addition to any rail-specific validation.
-  if (!data.lineItems || data.lineItems.length === 0) {
-    throw new Error("At least one service line is required.");
-  }
-  for (const l of data.lineItems) {
-    if (!Number.isInteger(l.quantity) || l.quantity < 1) {
-      throw new Error(`Line "${l.description}": quantity must be a whole number of at least 1.`);
-    }
-    if (!Number.isFinite(l.unitCost) || l.unitCost <= 0) {
-      throw new Error(`Line "${l.description}": unit cost must be greater than 0.`);
-    }
-    if (Math.abs(l.billedAmount - l.quantity * l.unitCost) > 0.01) {
-      throw new Error(
-        `Line "${l.description}": billed amount (${l.billedAmount}) does not equal quantity × unit cost.`,
-      );
-    }
-  }
-
-  // ── Service-date gate (PR-013) ────────────────────────────────────────────
-  assertServiceDateNotFuture(new Date(data.dateOfService));
-
-  // ── Eligibility gate ──────────────────────────────────────────────────────
-  const member = await prisma.member.findUnique({
-    where: { id: data.memberId, tenantId },
-    include: { group: { select: { status: true, name: true } } },
-  });
-  if (!member) throw new Error("Member not found");
-
-  // ── Point-in-time coverage gate (FG-C5) ──────────────────────────────────
-  // When coverage periods exist they are the authoritative as-of-SERVICE-date
-  // window: a terminated/expired member's in-window historical claim files, while
-  // a service date before cover-start or after cover-end does not — resolved as
-  // of the service date, not "now". Members with no periods yet (pre-backfill, or
-  // a creation path not wired to coverage) fall back to the legacy current-status
-  // + cover-start (enrollmentDate) gate so nothing is wrongly blocked meanwhile.
-  const serviceDate = new Date(data.dateOfService);
-  const who = `${member.firstName} ${member.lastName}`;
-  const coverage = await coverageService.evaluate(prisma, member.id, serviceDate, {
-    ignoreOpenPeriods: isCoverageEnded(member.status),
-  });
-  if (coverage.hasPeriods) {
-    if (!coverage.covered) {
-      throw new Error(
-        `Service date ${serviceDate.toLocaleDateString("en-UG")} is outside ${who}'s coverage window ` +
-          `— the member was not covered on that date.`,
-      );
-    }
-    // Termination/expiry are handled by the window; once coverage is confirmed for
-    // the service date, only the transient hold states block a current claim.
-    if (["SUSPENDED", "LAPSED"].includes(member.status)) {
-      throw new Error(`Cannot submit claim: member ${who} is ${member.status}.`);
-    }
-  } else {
-    if (["SUSPENDED", "LAPSED", "TERMINATED"].includes(member.status)) {
-      throw new Error(`Cannot submit claim: member ${who} is ${member.status}.`);
-    }
-    if (member.enrollmentDate && serviceDate < member.enrollmentDate) {
-      throw new Error(
-        `Service date ${serviceDate.toLocaleDateString("en-UG")} is before ${who}'s coverage start ` +
-          `(${new Date(member.enrollmentDate).toLocaleDateString("en-UG")}) — the member was not covered on that date.`,
-      );
-    }
-  }
-  if (member.group && ["SUSPENDED", "LAPSED", "TERMINATED"].includes(member.group.status)) {
-    throw new Error(`Cannot submit claim: group "${member.group.name}" is ${member.group.status}.`);
-  }
-
-  // ── Provider gate (PR-006, server-enforced) ──────────────────────────────
-  const gateProvider = await prisma.provider.findUnique({
-    where: { id: data.providerId, tenantId },
-    select: { contractStatus: true, name: true },
-  });
-  if (!gateProvider) throw new Error("Provider not found");
-  if (!ProvidersService.isOperational(gateProvider.contractStatus)) {
-    throw new Error(
-      `Provider "${gateProvider.name}" is ${gateProvider.contractStatus} — claims can only be submitted against ACTIVE providers.`,
-    );
-  }
-  if (data.providerBranchId) {
-    const branch = await prisma.providerBranch.findUnique({
-      where: { id: data.providerBranchId },
-      select: { providerId: true, isActive: true, tenantId: true },
-    });
-    if (!branch || branch.tenantId !== tenantId || branch.providerId !== data.providerId) {
-      throw new Error("Selected branch does not belong to the selected provider.");
-    }
-    if (!branch.isActive) throw new Error("Selected branch is deactivated — pick an active branch.");
-  }
-
-  // ── Benefit-in-package gate (PR-024, server-enforced at intake) ──────────
-  const { BenefitUsageService } = await import("@/server/services/benefit-usage.service");
-  const benefitCfg = await BenefitUsageService.resolveConfig(prisma, data.memberId, data.benefitCategory);
-  if (!benefitCfg) {
-    throw new Error(
-      `Benefit "${data.benefitCategory.replace(/_/g, " ")}" is not in this member's package — ` +
-        `the claim could never be approved against it. Pick a benefit category from the member's package.`,
-    );
-  }
-
-  // ── Pre-auth gate ─────────────────────────────────────────────────────────
-  const PREAUTH_REQUIRED: BenefitCategory[] = ["INPATIENT", "SURGICAL", "MATERNITY"];
-  let approvedPA: { id: string; preauthNumber: string } | null = null;
-  if (PREAUTH_REQUIRED.includes(data.benefitCategory)) {
-    approvedPA = await prisma.preAuthorization.findFirst({
-      where: {
-        tenantId,
-        memberId: data.memberId,
-        providerId: data.providerId,
-        benefitCategory: data.benefitCategory,
-        status: "APPROVED",
-        claimId: null,
-        // IPL-PA-01 (A4): don't auto-grab a PA that secures an open case — it
-        // is read through to that case's interim slices / final bill.
-        caseId: null,
-        validUntil: { gte: new Date() },
-      },
-      select: { id: true, preauthNumber: true },
-    });
-    if (!approvedPA) {
-      throw new Error(
-        `${data.benefitCategory.charAt(0) + data.benefitCategory.slice(1).toLowerCase()} claims require an approved pre-authorization for this facility. ` +
-          `Please submit a pre-auth request (at this provider) and obtain approval before submitting this claim.`,
-      );
-    }
-  }
-
+  opts: { idempotencyKey: string },
+): Promise<DirectEntryOutcome> {
   const billedAmount = data.lineItems.reduce((s, l) => s + l.billedAmount, 0);
+  try {
+    const result = await ClaimIntakeService.submit(callerIdentity(caller), toSubmission(data, opts.idempotencyKey));
 
-  // PR-017 D2: stamp the claim currency at intake.
-  const currency = await ClaimsService.resolveClaimCurrency(tenantId, data.providerId, data.memberId);
+    // A freshly ACCEPTED claim is decided in-request when possible; a REPLAY/LINK
+    // already has (or is getting) its decision — never double-process.
+    if (result.outcome === "ACCEPTED" && result.claimId) {
+      await processAcceptedRunInline(result.claimId);
+    }
 
-  // B4: collision-safe claim number (max+1 seed + reservation-retry). This path
-  // has no externalRef idempotency index, so a P2002 here is unambiguously a
-  // claimNumber collision — safe to advance to the next candidate.
-  const claim = await createWithDocumentNumber(
-    "CLM",
-    (yp) =>
-      prisma.claim
-        .findFirst({
-          where: { tenantId, claimNumber: { startsWith: yp } },
-          orderBy: { claimNumber: "desc" },
-          select: { claimNumber: true },
-        })
-        .then((r) => r?.claimNumber ?? null),
-    (claimNumber) =>
-      prisma.claim.create({
-        data: {
-          tenantId,
-          claimNumber,
-          currency,
-          memberId: data.memberId,
-          providerId: data.providerId,
-          providerBranchId: data.providerBranchId || null,
-          preauths: approvedPA ? { connect: [{ id: approvedPA.id }] } : undefined,
-          serviceType: data.serviceType,
-          benefitCategory: data.benefitCategory,
-          dateOfService: new Date(data.dateOfService),
-          admissionDate: data.admissionDate ? new Date(data.admissionDate) : null,
-          dischargeDate: data.dischargeDate ? new Date(data.dischargeDate) : null,
-          attendingDoctor: data.attendingDoctor || null,
-          diagnoses: data.diagnoses as never,
-          procedures: data.lineItems as never,
-          billedAmount,
-          status: "RECEIVED",
-          claimLines: {
-            create: data.lineItems.map((l, i) => ({
-              lineNumber: i + 1,
-              serviceCategory: l.serviceCategory,
-              description: l.description,
-              cptCode: l.cptCode || null,
-              icdCode: l.icdCode || null,
-              quantity: l.quantity,
-              unitCost: l.unitCost,
-              billedAmount: l.billedAmount,
-            })),
-          },
-        },
-      }),
-  );
-  const claimNumber = claim.claimNumber;
-
-  if (approvedPA) {
-    await prisma.preAuthorization.update({
-      where: { id: approvedPA.id },
-      data: { status: "ATTACHED", attachedAt: new Date() },
-    });
+    return {
+      ok: true,
+      claimId: result.claimId ?? "",
+      claimNumber: result.claimNumber,
+      receiptId: result.receiptId,
+      correlationId: result.correlationId,
+      billedAmount,
+      outcome: result.outcome,
+      replayed: result.replayed,
+    };
+  } catch (err) {
+    const e = IntakeError.from(err);
+    return { ok: false, code: e.code, error: friendlyMessage(e) };
   }
-
-  // Member notification — "visit recorded". Fired before auto-adjudication so a
-  // received-then-decided claim notifies in the right order. Never throws.
-  await MemberNotificationService.notifyForClaim({
-    tenantId,
-    memberId: data.memberId,
-    type: "CLAIM_STATUS",
-    title: "Visit recorded",
-    body:
-      `${member.firstName} ${member.lastName} — ${gateProvider.name}: ` +
-      `${data.benefitCategory.replace(/_/g, " ").toLowerCase()} visit on ` +
-      `${new Date(data.dateOfService).toLocaleDateString("en-UG")} recorded (${claimNumber}). ` +
-      `Billed ${currency} ${billedAmount.toLocaleString()}. We'll notify you when it's assessed.`,
-    href: "/member/utilization",
-    metadata: { claimId: claim.id, claimNumber, event: "RECEIVED" },
-  });
-
-  await FraudService.evaluateClaim(claim.id, tenantId);
-
-  // Intake pipeline (G3.7/G9.5): drug exclusions + auto-adjudication.
-  await AutoAdjudicationService.processIntake(tenantId, claim.id, actorUserId);
-
-  await writeAudit({
-    userId: actorUserId,
-    action: "CLAIM_SUBMITTED",
-    module: "CLAIMS",
-    description: `Claim ${claimNumber} submitted — UGX ${billedAmount.toLocaleString()} (${data.benefitCategory})`,
-    metadata: { claimNumber, memberId: data.memberId, billedAmount },
-  });
-
-  return { claim, claimNumber, billedAmount };
 }

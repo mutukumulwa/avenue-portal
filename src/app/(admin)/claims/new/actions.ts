@@ -28,6 +28,7 @@ interface DiagnosisInput {
 }
 
 export async function submitClaimAction(data: {
+  idempotencyKey: string; // F5.1: the form's draft UUID — replays across retry/refresh
   memberId: string;
   providerId: string;
   providerBranchId?: string; // PR-007: optional branch for multi-branch providers
@@ -42,19 +43,19 @@ export async function submitClaimAction(data: {
 }) {
   const session = await requireRole(ROLES.OPS);
 
-  // Single shared intake path — same gates/fraud/auto-adjudication as the
-  // provider facility portal and B2B channels (see claim-intake.ts).
-  try {
-    await runClaimIntake(session.user.tenantId, session.user.id, data);
-  } catch (err) {
-    // Surface intake rejections (coverage window, provider/benefit gate, dup guard,
-    // …) as a friendly result the wizard renders. Next.js MASKS thrown server-action
-    // messages in production, so we RETURN the message instead of letting it throw.
-    if (err instanceof Error && err.message === "NEXT_REDIRECT") throw err;
-    return { ok: false as const, error: err instanceof Error ? err.message : "The claim could not be submitted." };
-  }
+  // Canonical intake (F5.1): the operator selects the provider; the same schema,
+  // scope, staged evaluation and durable receipt as every other rail apply.
+  // Structural rejections (bad amount, future date, out-of-scope provider/member)
+  // return a friendly message; eligibility/benefit/PA are accepted-and-routed (D6).
+  const result = await runClaimIntake(
+    { kind: "operatorUser", tenantId: session.user.tenantId, userId: session.user.id },
+    data,
+    { idempotencyKey: data.idempotencyKey },
+  );
+  if (!result.ok) return { ok: false as const, error: result.error };
 
-  redirect("/claims");
+  // Receipt link visible after submit: land on the accepted claim.
+  redirect(result.claimId ? `/claims/${result.claimId}` : "/claims");
 }
 
 export async function submitReimbursementClaimAction(data: {

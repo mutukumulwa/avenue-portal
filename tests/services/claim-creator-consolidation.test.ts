@@ -27,8 +27,8 @@ const SRC_ROOT = join(__dirname, "..", "..", "src");
  * the canonical persist owner (plus documented case adapters) should remain.
  */
 const ALLOWLIST: Record<string, string> = {
-  "src/server/services/claim-intake.ts":
-    "runClaimIntake — current shared direct-entry owner; becomes a wrapper over ClaimIntakeService (F5.1).",
+  // F5.1 DONE: claim-intake.ts (runClaimIntake) now delegates to ClaimIntakeService
+  // — it no longer calls Claim.create, so it is removed from the allowlist.
   "src/server/services/claims.service.ts":
     "Legacy ClaimsService.createClaim (tRPC + PA conversion) pending deprecation (F5.3/F5.7).",
   "src/app/api/v1/claims/route.ts":

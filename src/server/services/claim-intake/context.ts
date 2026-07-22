@@ -22,6 +22,7 @@ import { IntakeError } from "./errors";
 import { ProviderEntitlementService } from "../provider-entitlement.service";
 import { ProvidersService } from "../providers.service";
 import { ClaimsService } from "../claims.service";
+import { isFutureServiceDate, FUTURE_SERVICE_DATE_ERROR } from "@/lib/service-date";
 import type { ClaimSubmissionV1 } from "./schema";
 
 /** The authenticated, server-derived caller. Routes/actions build this. */
@@ -59,30 +60,40 @@ interface ChannelMeta {
   isSystemActor: boolean;
   /** true ⇒ providerId is derived from the caller (body value must match); false ⇒ selected from body within tenant. */
   providerDerived: boolean;
+  /**
+   * true ⇒ resolve the member scoped to the provider's contract entitlement
+   * (programmatic facility rails). false ⇒ resolve within the tenant only.
+   * Decoupled from `providerDerived` (F5.1): the provider PORTAL derives its
+   * provider (D12) but must NOT entitlement-scope members — that would block a
+   * facility whose `ContractApplicability` is not yet configured, a regression
+   * from the portal's tenant-wide member lookup. Case/preauth rails carry a
+   * member fixed by their source entity, so scoping is moot for them.
+   */
+  scopeMembersByEntitlement: boolean;
 }
 
 function channelMeta(caller: CallerIdentity): ChannelMeta {
   switch (caller.kind) {
     case "operatorUser":
-      return { channel: "ADMIN_PORTAL", source: "MANUAL", providerOwnsInvoiceNamespace: true, isSystemActor: false, providerDerived: false };
+      return { channel: "ADMIN_PORTAL", source: "MANUAL", providerOwnsInvoiceNamespace: true, isSystemActor: false, providerDerived: false, scopeMembersByEntitlement: false };
     case "providerUser":
-      return { channel: "PROVIDER_PORTAL", source: "MANUAL", providerOwnsInvoiceNamespace: true, isSystemActor: false, providerDerived: true };
+      return { channel: "PROVIDER_PORTAL", source: "MANUAL", providerOwnsInvoiceNamespace: true, isSystemActor: false, providerDerived: true, scopeMembersByEntitlement: false };
     case "providerKey":
       // A provider facility system; default HMS unless the key declares SMART/Slade.
-      return { channel: "API_V1", source: caller.sourceHint ?? "HMS", providerOwnsInvoiceNamespace: true, isSystemActor: false, providerDerived: true };
+      return { channel: "API_V1", source: caller.sourceHint ?? "HMS", providerOwnsInvoiceNamespace: true, isSystemActor: false, providerDerived: true, scopeMembersByEntitlement: true };
     case "integrationKey":
       // Non-provider integration: authenticated external ref (not provider invoice) is authoritative.
-      return { channel: "API_V1", source: caller.sourceHint ?? "SMART", providerOwnsInvoiceNamespace: false, isSystemActor: true, providerDerived: false };
+      return { channel: "API_V1", source: caller.sourceHint ?? "SMART", providerOwnsInvoiceNamespace: false, isSystemActor: true, providerDerived: false, scopeMembersByEntitlement: false };
     case "csvOperator":
-      return { channel: "CSV_IMPORT", source: "BATCH", providerOwnsInvoiceNamespace: true, isSystemActor: false, providerDerived: false };
+      return { channel: "CSV_IMPORT", source: "BATCH", providerOwnsInvoiceNamespace: true, isSystemActor: false, providerDerived: false, scopeMembersByEntitlement: false };
     case "offlineDevice":
-      return { channel: "OFFLINE_SYNC", source: "OFFLINE_SYNC", providerOwnsInvoiceNamespace: true, isSystemActor: true, providerDerived: true };
+      return { channel: "OFFLINE_SYNC", source: "OFFLINE_SYNC", providerOwnsInvoiceNamespace: true, isSystemActor: true, providerDerived: true, scopeMembersByEntitlement: true };
     case "reimbursement":
-      return { channel: "REIMBURSEMENT", source: "REIMBURSEMENT", providerOwnsInvoiceNamespace: false, isSystemActor: false, providerDerived: false };
+      return { channel: "REIMBURSEMENT", source: "REIMBURSEMENT", providerOwnsInvoiceNamespace: false, isSystemActor: false, providerDerived: false, scopeMembersByEntitlement: false };
     case "preauthConversion":
-      return { channel: "PREAUTH_CONVERSION", source: "PREAUTH", providerOwnsInvoiceNamespace: false, isSystemActor: true, providerDerived: true };
+      return { channel: "PREAUTH_CONVERSION", source: "PREAUTH", providerOwnsInvoiceNamespace: false, isSystemActor: true, providerDerived: true, scopeMembersByEntitlement: false };
     case "caseSystem":
-      return { channel: caller.isFinal ? "CASE_FINAL" : "CASE_INTERIM", source: caller.sourceHint ?? "HMS", providerOwnsInvoiceNamespace: false, isSystemActor: true, providerDerived: true };
+      return { channel: caller.isFinal ? "CASE_FINAL" : "CASE_INTERIM", source: caller.sourceHint ?? "HMS", providerOwnsInvoiceNamespace: false, isSystemActor: true, providerDerived: true, scopeMembersByEntitlement: false };
   }
 }
 
@@ -203,11 +214,22 @@ function buildScopeKey(caller: CallerIdentity, memberId: string): string {
  * scope/authorization failure.
  */
 export async function resolveIntakeContext(caller: CallerIdentity, submission: ClaimSubmissionV1): Promise<IntakeContext> {
+  // Structural gate that needs a clock (§7: the schema/normalization defer it here,
+  // F3.1). A captured service cannot fall on a future operating-timezone day —
+  // this is an impossible request (D6), rejected at the door for every rail, not a
+  // routed business outcome.
+  if (isFutureServiceDate(new Date(submission.encounter.serviceFrom))) {
+    throw IntakeError.validation(
+      [{ path: "encounter.serviceFrom", code: "FUTURE_DATE", message: FUTURE_SERVICE_DATE_ERROR, severity: "ERROR" }],
+      FUTURE_SERVICE_DATE_ERROR,
+    );
+  }
+
   const meta = channelMeta(caller);
   const providerId = await resolveProvider(caller, meta, submission);
   const providerBranchId = await resolveBranch(caller.tenantId, providerId, submission.provider.branchId);
 
-  const providerScoped = meta.providerDerived ? await ProviderEntitlementService.entitledMemberWhere(providerId) : null;
+  const providerScoped = meta.scopeMembersByEntitlement ? await ProviderEntitlementService.entitledMemberWhere(providerId) : null;
   const { memberId, clientId } = await resolveMember(caller.tenantId, providerScoped, submission.member);
 
   const currency = submission.currency ?? (await ClaimsService.resolveClaimCurrency(caller.tenantId, providerId, memberId));

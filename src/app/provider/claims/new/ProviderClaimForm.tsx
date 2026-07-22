@@ -44,6 +44,9 @@ export function ProviderClaimForm({
   const [lines, setLines] = useState<Line[]>([{ serviceCategory: "CONSULTATION", description: "", cptCode: "", quantity: 1, unitCost: 0 }]);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // F5.1: a stable draft id for THIS form instance — sent as the idempotency key so
+  // a double-click / back-refresh replays the same receipt instead of duplicating.
+  const [draftId] = useState(() => crypto.randomUUID());
 
   const total = useMemo(() => lines.reduce((s, l) => s + Math.max(1, l.quantity) * (l.unitCost || 0), 0), [lines]);
 
@@ -69,6 +72,7 @@ export function ProviderClaimForm({
     const diag = icdOptions.find((d) => d.code === diagCode);
     startTransition(async () => {
       const res = await submitProviderClaimAction({
+        idempotencyKey: draftId,
         memberNumber,
         serviceType,
         benefitCategory,

@@ -7,6 +7,7 @@ import { runClaimIntake } from "@/server/services/claim-intake";
 import type { ServiceType, BenefitCategory, ClaimLineCategory } from "@prisma/client";
 
 export interface ProviderClaimInput {
+  idempotencyKey: string; // F5.1: the form's draft UUID — replays across retry/refresh
   memberNumber: string;
   serviceType: ServiceType;
   benefitCategory: BenefitCategory;
@@ -64,11 +65,12 @@ export async function submitProviderClaimAction(
     };
   }
 
-  try {
-    await runClaimIntake(tenantId, session.user.id, {
+  const result = await runClaimIntake(
+    // Provider is forced to the logged-in facility — a facility can never file a
+    // claim against another provider (derived from the session, D12).
+    { kind: "providerUser", tenantId, userId: session.user.id, providerId },
+    {
       memberId: member.id,
-      // Provider is forced to the logged-in facility — a facility can never file
-      // a claim against another provider.
       providerId,
       serviceType: input.serviceType,
       benefitCategory: input.benefitCategory,
@@ -95,10 +97,10 @@ export async function submitProviderClaimAction(
           billedAmount: qty * unit,
         };
       }),
-    });
-  } catch (err) {
-    return { error: (err as Error).message };
-  }
+    },
+    { idempotencyKey: input.idempotencyKey },
+  );
+  if (!result.ok) return { error: result.error };
 
   redirect("/provider/claims");
 }

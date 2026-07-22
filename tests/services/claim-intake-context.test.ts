@@ -100,9 +100,18 @@ describe("F3.1 — cross-scope isolation", () => {
     await expect(resolveIntakeContext({ kind: "providerUser", tenantId: "t1", userId: "u1", providerId: "prv-1" }, sub())).rejects.toMatchObject({ kind: "AUTHORIZATION" });
   });
 
-  it("applies provider entitlement scoping for provider rails, not for operator rails", async () => {
-    await resolveIntakeContext({ kind: "providerUser", tenantId: "t1", userId: "u1", providerId: "prv-1" }, sub());
+  it("entitlement-scopes members for programmatic facility rails (providerKey) but NOT the portal or operator (F5.1)", async () => {
+    // Programmatic B2B facility integration → members scoped to the provider's entitlement.
+    await resolveIntakeContext({ kind: "providerKey", tenantId: "t1", providerId: "prv-1", keyId: "k1" }, sub());
     expect(entitlement.entitledMemberWhere).toHaveBeenCalledWith("prv-1");
+
+    // Provider PORTAL derives its provider (D12) but resolves members tenant-wide —
+    // enforcing entitlement here would block facilities without ContractApplicability.
+    entitlement.entitledMemberWhere.mockClear();
+    await resolveIntakeContext({ kind: "providerUser", tenantId: "t1", userId: "u1", providerId: "prv-1" }, sub({ provider: { providerId: "prv-1" } }));
+    expect(entitlement.entitledMemberWhere).not.toHaveBeenCalled();
+
+    // Operator selects any tenant member.
     entitlement.entitledMemberWhere.mockClear();
     await resolveIntakeContext({ kind: "operatorUser", tenantId: "t1", userId: "u1" }, sub({ provider: { providerId: "prv-1" } }));
     expect(entitlement.entitledMemberWhere).not.toHaveBeenCalled();

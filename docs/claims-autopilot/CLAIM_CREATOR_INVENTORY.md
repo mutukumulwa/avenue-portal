@@ -18,7 +18,7 @@ Search performed (§16 F0.2): `prisma.claim.create`, `tx.claim.create`,
 
 ---
 
-## 1. Production creators (the 9 sites in `src/`)
+## 1. Production creators (9 originally; #1 migrated in F5.1 — routes through `persist.ts` now)
 
 Legend — **Class:** `CANONICAL_NOW` (already the shared owner, still to be folded
 into `ClaimIntakeService`), `MIGRATE` (independent rail to converge in M5),
@@ -27,7 +27,7 @@ domain transaction), `TEST/SEED_ONLY`.
 
 | # | Site | Rail / caller | Auth scope (derived?) | Channel → Source (current) | Idempotency | Fraud | Auto-adj | Audit | Txn boundary | Class | Migrates in |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| 1 | `src/server/services/claim-intake.ts:204` (`runClaimIntake`) | Admin wizard + provider portal (via `submitClaimAction`, provider `actions.ts`) | ✅ tenantId + actorUserId passed by caller from session | ADMIN_PORTAL / PROVIDER_PORTAL → schema default | ❌ none | ✅ `evaluateClaim` | ✅ `processIntake` | ⚠️ plain `writeAudit` (§4.5 target) | ❌ create atomic; PA-update/notify/fraud/adjudicate are separate awaits | CANONICAL_NOW | F5.1 |
+| ~~1~~ | ~~`src/server/services/claim-intake.ts` (`runClaimIntake`)~~ **MIGRATED (F5.1)** | Admin wizard + provider portal | ✅ CallerIdentity (operator/providerUser) → context derives tenant/provider/member/scope | ADMIN_PORTAL / PROVIDER_PORTAL → MANUAL (recorded on the receipt) | ✅ form draft UUID (replay-safe) | ✅ staged (FRAUD) | ✅ evaluate→plan→execute (inline + sweep) | ✅ chain `CLAIM:INTAKE_ACCEPTED` | ✅ atomic persist (claim+lines+receipt+run) | **DONE** — now delegates to `ClaimIntakeService`; no direct `Claim.create` | F5.1 ✔ |
 | 2 | `src/server/services/claims.service.ts:374` (`ClaimsService.createClaim`) | tRPC `claims.create`; also `createClaimWithPreauth` | ✅ `ctx.tenantId` (tRPC) | TRPC → `data.source?` (caller-supplied) | ❌ none | ❌ **none** | ❌ **none** | inline `adjudicationLog` RECEIVED | ❌ | MIGRATE (legacy) | F5.3 |
 | 3 | `src/app/api/v1/claims/route.ts:274` | B2B API POST `/api/v1/claims` | ✅ API key → provider/tenant derived (`providerFromKey`) | API_V1 → **`"SMART"` (hardcoded)** | ✅ `externalRef` body **or** `Idempotency-Key` header; replay on `(tenant,provider,externalRef)`; no-key dup-block | ✅ | ✅ `processIntake` | (no receipt audit) | partial (create + number retry) | MIGRATE | F5.2 |
 | 4 | `src/app/api/claims/import/route.ts:229` | CSV/XLSX import POST `/api/claims/import` | ✅ session + `CLINICAL_ROLES` gate | CSV_IMPORT → `"BATCH"` | ❌ **none** (re-upload duplicates) | ❌ **none** | ❌ variance-only (`computeContractedRateVariance`) | inline `adjudicationLog` | ❌ per-row, no txn | MIGRATE | F5.4 |
@@ -80,7 +80,7 @@ documented `DERIVED_TRANSACTIONAL` case adapters that call it) should remain.
 
 | Allowlisted file | Reason it may still call `Claim.create` today | Removed by |
 |---|---|---|
-| `src/server/services/claim-intake.ts` | Current shared direct-entry owner (`runClaimIntake`); becomes a thin wrapper over `ClaimIntakeService`. | F5.1 |
+| ~~`src/server/services/claim-intake.ts`~~ | **REMOVED (F5.1):** `runClaimIntake` now delegates to `ClaimIntakeService` — no direct `Claim.create`. | F5.1 ✔ |
 | `src/server/services/claims.service.ts` | Legacy `createClaim` (tRPC + PA conversion) pending deprecation. | F5.3 / F5.7 |
 | `src/app/api/v1/claims/route.ts` | B2B API rail pre-migration. | F5.2 |
 | `src/app/api/claims/import/route.ts` | CSV import rail pre-migration. | F5.4 |
