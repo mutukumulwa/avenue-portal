@@ -51,6 +51,7 @@ interface LoadedClaim {
   id: string;
   source: string;
   isReimbursement: boolean;
+  caseId: string | null;
   serviceType: string;
   benefitCategory: string;
   billedAmount: unknown;
@@ -268,7 +269,7 @@ async function loadClaim(db: Db, tenantId: string, claimId: string): Promise<Loa
   return db.claim.findUnique({
     where: { id: claimId, tenantId },
     select: {
-      id: true, source: true, isReimbursement: true, serviceType: true, benefitCategory: true, billedAmount: true, currency: true,
+      id: true, source: true, isReimbursement: true, caseId: true, serviceType: true, benefitCategory: true, billedAmount: true, currency: true,
       memberId: true, providerId: true, dateOfService: true, invoiceNumber: true, suspectedDuplicateFingerprint: true,
       member: { select: { status: true, group: { select: { status: true, clientId: true } } } },
       claimLines: { select: { id: true, cptCode: true, drugCode: true, icdCode: true, serviceCategory: true, billedAmount: true } },
@@ -289,7 +290,11 @@ export async function evaluateClaimStaged(db: Db, tenantId: string, claimId: str
 
   const clientId = claim.member?.group?.clientId ?? null;
   const policyRow = await AutoAdjudicationService.resolvePolicy(tenantId, clientId);
-  const mode: PolicyMode = policyRow ? effectivePolicyMode(policyRow as unknown as PolicyLike) : "OFF";
+  let mode: PolicyMode = policyRow ? effectivePolicyMode(policyRow as unknown as PolicyLike) : "OFF";
+  // F5.8/F5.9 inpatient release gate: case-derived claims (interim slices and
+  // final bills) are FORCED to SHADOW even under a LIVE policy — automatic money
+  // on the inpatient rail requires its own explicit go-live later.
+  if (claim.caseId && mode === "LIVE") mode = "SHADOW";
 
   // D13 (F5.6): reimbursements NEVER auto-decide. Route to proof review AHEAD of
   // the policy-off short-circuit so the claim lands in the reimbursement queue

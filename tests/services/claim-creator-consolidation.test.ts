@@ -40,8 +40,9 @@ const ALLOWLIST: Record<string, string> = {
   // Claim.create in either file, removed from the allowlist.
   // F5.5 DONE: the offline sync rail submits through ClaimIntakeService — no
   // direct Claim.create, removed from the allowlist.
-  "src/server/services/case.service.ts":
-    "Inpatient interim + final; becomes DERIVED_TRANSACTIONAL calling the canonical persist owner (F5.8/F5.9).",
+  // F5.8/F5.9 DONE: the inpatient case rails call submitWithinTransaction inside
+  // their own case transactions (DERIVED_TRANSACTIONAL) — case.service.ts no
+  // longer contains a Claim.create and is removed from the allowlist.
   "src/server/services/claim-intake/persist.ts":
     "THE canonical production Claim.create owner (F3.3). The last entry standing after F5.10; every rail routes through it.",
 };

@@ -158,7 +158,6 @@ export async function persistClaimWithinTransaction(tx: Tx, input: PersistInput)
             sliceCutoffAt: origin.sliceCutoffAt ?? null,
             sliceServiceFrom: origin.sliceServiceFrom ?? null,
             sliceServiceTo: origin.sliceServiceTo ?? null,
-            ...(origin.sliceEntryIds?.length ? { sliceEntries: { connect: origin.sliceEntryIds.map((id) => ({ id })) } } : {}),
           }
         : {}),
       ...(origin.preauthId ? { preauths: { connect: [{ id: origin.preauthId }] } } : {}),
@@ -186,6 +185,24 @@ export async function persistClaimWithinTransaction(tx: Tx, input: PersistInput)
     },
     select: { id: true, claimNumber: true },
   });
+
+  // 4b. Case entry-set freeze (F5.8/F5.9) — atomic, theft-proof: stamp exactly
+  // the entries that are STILL unbilled. A rival slice that grabbed any of them
+  // leaves count < expected → abort, so no service line can ever belong to two
+  // non-void claims (SET-06 at the canonical boundary). A plain relation
+  // `connect` would silently OVERWRITE a rival's freeze — never do that.
+  if (origin.sliceEntryIds?.length) {
+    const frozen = await tx.caseServiceEntry.updateMany({
+      where: { id: { in: origin.sliceEntryIds }, billedInClaimId: null },
+      data: { billedInClaimId: claim.id },
+    });
+    if (frozen.count !== origin.sliceEntryIds.length) {
+      throw IntakeError.validation(
+        [{ path: "origin.sliceEntryIds", code: "ENTRIES_ALREADY_BILLED", message: "Some of these services were just billed on another slice — refresh the case and try again.", severity: "ERROR" }],
+        "Some of these services were just billed on another slice — refresh the case and try again.",
+      );
+    }
+  }
 
   // 5. PA attach state (atomic with creation).
   if (origin.preauthId) {
