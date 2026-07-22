@@ -413,3 +413,26 @@ F4.5, F7.4).
 - **Security/privacy review:** all scope comes from the derived context (F3.1); no body-trusted fields; fingerprints hashed.
 - **Next eligible task:** F3.4 — Implement the one public `ClaimIntakeService.submit`.
 - **Blocker/options, if blocked:** n/a.
+
+---
+
+## F3.4 — Implement the one public `ClaimIntakeService.submit`
+
+- **Status:** COMPLETE (incl. real-DB matrix)
+- **Commit/branch:** `feat/claims-autopilot` (F3.4 commit)
+- **Files changed:** `src/server/services/claim-intake/intake.service.ts` (new), `tests/services/claim-intake-service.test.ts` (new), `tests/integration/claim-intake-service.integration.test.ts` (new), `docs/claims-autopilot/VERIFICATION.md`.
+- **Decisions enforced:** D8/D9 (DB authoritative; acceptance synchronous, enqueue is an optimization); §4.5 (chained audit, not plain writeAudit); D6 (structural throw vs business route — business routing runs later in the runner).
+- **Acceptance scenarios covered:** CA-001/CA-020/CA-021/CA-024 (accept/replay), CA-022 (conflict), CA-100 (Redis unavailable ⇒ still accepted, DB authoritative), CA-107 (response-loss ⇒ getReceipt returns durable state).
+- **Observable behavior before:** each rail hand-orchestrated intake; no single acceptance boundary; audit was plain `writeAudit`.
+- **Observable behavior after:** `ClaimIntakeService.submit(caller, raw)` = parse→normalize→context→fingerprint→reserve→persist→enqueue(best-effort)→chained audit, returning a stable `SubmitResult` (ACCEPTED/REPLAYED/LINKED/PROCESSING) or throwing a safe `IntakeError` (422/401/403/409); `submitWithinTransaction` for case/preauth adapters; `getReceipt` (tenant-scoped); `setProcessingEnqueuer` hook (F3.6 wires BullMQ).
+- **Forbidden effects explicitly checked:** structural failure throws VALIDATION before any DB write (no receipt); conflict throws 409 with the original untouched (billed still 3500); a THROWING enqueuer still yields ACCEPTED with the run left PENDING for the sweeper (proven); getReceipt returns null for a foreign tenant; audit is `CLAIM:INTAKE_ACCEPTED` via audit-chain (proven with a real user), never plain writeAudit.
+- **Tests run and exact results:**
+  - `npx vitest run tests/services/claim-intake-service.test.ts` → **3 passed** (structural reject + enqueuer hooks).
+  - **Real DB:** `npx vitest run tests/integration/claim-intake-service.integration.test.ts` → **5 passed** (accepted+audit+enqueue; replayed; conflict; Redis-resilience; getReceipt).
+  - `npm run typecheck` → PASS; eslint clean.
+- **Database/audit/reconciliation evidence:** seeded Postgres; ACCEPTED submit created claim (3500), 1 PENDING run, SUCCEEDED receipt, INTAKE_ACCEPTED audit; replay created no 2nd claim.
+- **Creator allowlist change:** none (submit delegates to persist.ts — the allowlisted owner).
+- **Known gaps or skips:** the live admin/provider rails still call the legacy `runClaimIntake` — the compat switch is F5.1 (needs the runner from F4.2 so accepted claims actually adjudicate). enqueuer is a no-op until F3.6.
+- **Security/privacy review:** all scope via derived context; SubmitResult carries no PHI; audit payload is safe totals/refs.
+- **Next eligible task:** F3.5 — Implement processing-run lease and stage repository.
+- **Blocker/options, if blocked:** n/a.
