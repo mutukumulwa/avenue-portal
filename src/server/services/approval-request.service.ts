@@ -235,6 +235,34 @@ export class ApprovalRequestService {
       }
     }
 
+    // A rejected policy-change returns the policy to REJECTED so it can be
+    // corrected and resubmitted; it never becomes live.
+    if (nextStatus === "REJECTED" && req.entityType === "AutoAdjudicationPolicy" && req.actionType === "AUTO_ADJ_POLICY_CHANGE") {
+      await prisma.autoAdjudicationPolicy.updateMany({
+        where: { id: req.entityId, tenantId: req.tenantId, status: "PENDING_APPROVAL" },
+        data: { status: "REJECTED" },
+      });
+    }
+
+    // ── Claims Autopilot (F2.5, D15): a completed chain ACTIVATES the policy ──
+    // version it gated. SoD is already enforced above; activation supersedes the
+    // prior approved version and is replay-safe. A failure closes the request as
+    // REJECTED so nothing is left half-activated.
+    if (nextStatus === "APPROVED" && req.entityType === "AutoAdjudicationPolicy" && req.actionType === "AUTO_ADJ_POLICY_CHANGE") {
+      const { applyApprovedPolicyChange } = await import("./claim-autopilot/policy-approval");
+      try {
+        await applyApprovedPolicyChange(req.tenantId, req.entityId, checker.id);
+        await prisma.approvalRequest.update({ where: { id: requestId }, data: { appliedAt: new Date() } });
+      } catch (err) {
+        await prisma.approvalRequest.update({ where: { id: requestId }, data: { status: "REJECTED" } });
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Approval chain complete, but activating the policy failed: ${msg} The request was closed as REJECTED.`,
+        });
+      }
+    }
+
     return prisma.approvalRequest.findUnique({ where: { id: requestId } });
   }
 }

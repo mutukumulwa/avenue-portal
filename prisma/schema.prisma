@@ -1542,6 +1542,7 @@ enum ApprovalActionType {
   PROVIDER_TARIFF_CHANGE
   FUND_TOPUP
   WRITEOFF_REFUND
+  AUTO_ADJ_POLICY_CHANGE // Claims Autopilot governed LIVE-policy activation (D15, F2.5)
 }
 
 model ApprovalMatrix {

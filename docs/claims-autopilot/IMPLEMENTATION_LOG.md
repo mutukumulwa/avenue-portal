@@ -300,3 +300,26 @@ F4.5, F7.4).
 - **Security/privacy review:** policy is a money-control; the fail-closed resolver is the core D1 safety at the data layer.
 - **Next eligible task:** F2.5 — Add policy approval action and application contract.
 - **Blocker/options, if blocked:** n/a.
+
+---
+
+## F2.5 — Add policy approval action and application contract
+
+- **Status:** COMPLETE (incl. real-DB maker-checker proof)
+- **Commit/branch:** `feat/claims-autopilot` (F2.5 commit)
+- **Files changed:** `prisma/schema.prisma` (`AUTO_ADJ_POLICY_CHANGE` enum value), `src/server/services/claim-autopilot/policy-approval.ts` (new), `src/server/services/approval-request.service.ts` (dispatch branch, +REJECTED handler), `tests/services/claim-autopilot-policy-approval.test.ts` (new, mocked), `tests/integration/claim-autopilot-policy-approval.integration.test.ts` (new, real DB), `docs/claims-autopilot/VERIFICATION.md`.
+- **Decisions enforced:** D15 (governed activation via maker-checker; maker ≠ checker; immediate reason-required deactivation).
+- **Acceptance scenarios covered:** CA-080 (self-approval blocked, independent checker required), CA-081 (approved version activates once in scope), CA-084 (immediate deactivation).
+- **Observable behavior before:** policy `enabled` could be toggled directly with no maker-checker governance.
+- **Observable behavior after:** `submitPolicyChange` (DRAFT/REJECTED ⇒ PENDING_APPROVAL + approval request with a SAFE payload), `applyApprovedPolicyChange` (activates + supersedes prior approved in scope; idempotent; maker-guard), `deactivatePolicy` (immediate, reason-required). `ApprovalRequestService.decide` dispatches activation on final APPROVED and returns the policy to REJECTED on rejection — reusing the existing SoD/matrix path, not bypassing it.
+- **Forbidden effects explicitly checked:** maker cannot approve own policy (SoD in `decide` + defence-in-depth guard in apply — both proven); rejection never activates (policy → REJECTED, `effectivePolicyMode` OFF); apply is idempotent (already-APPROVED ⇒ no-op, no updateMany); payload is the safe subset (id/version/mode/ceiling/scope), not raw form; apply-failure closes the request REJECTED.
+- **Tests run and exact results:**
+  - `npx vitest run tests/services/claim-autopilot-policy-approval.test.ts` → **10 passed** (mocked).
+  - **Real DB:** `npx vitest run tests/integration/claim-autopilot-policy-approval.integration.test.ts` → **4 passed** — full maker→checker activation, supersession, rejection→REJECTED, immediate deactivation, all against Postgres with a minimal matrix.
+  - `npm run typecheck` → PASS; eslint clean.
+- **Database/audit/reconciliation evidence:** real Postgres; policy status transitions PENDING_APPROVAL→APPROVED/REJECTED/DEACTIVATED verified; prior version → SUPERSEDED.
+- **Creator allowlist change:** none.
+- **Known gaps or skips:** provisioning a default `AUTO_ADJ_POLICY_CHANGE` approval matrix per tenant is an ops/seed concern (surfaced as a clear PRECONDITION_FAILED if absent); the policy console UI is F6.5.
+- **Security/privacy review:** activation is a money-control governed by maker-checker; audit events for policy change land in F3.7/F4.7 (AUTO_ADJ_POLICY:* chain events).
+- **Next eligible task:** F2.6 — Add schema deployment, backfill and integrity scripts.
+- **Blocker/options, if blocked:** n/a.

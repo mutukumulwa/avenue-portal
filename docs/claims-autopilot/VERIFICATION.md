@@ -58,3 +58,4 @@ in the session scratchpad and is deleted on teardown.
 | Package | Integration suite | Status |
 |---|---|---|
 | F2.2 | `claim-intake-receipt.integration.test.ts` | **PASS** — 20-way same-key ⇒ 1 receipt + 19 replays; diff-hash ⇒ 1 reserved + 9 conflicts, original never overwritten; one-way terminal transition (Postgres 16.14). |
+| F2.5 | `claim-autopilot-policy-approval.integration.test.ts` | **PASS** — maker submits ⇒ PENDING_APPROVAL; maker self-approval blocked (SoD); checker activates ⇒ APPROVED/LIVE; new version supersedes prior; rejection ⇒ REJECTED (non-live); deactivation immediate. |
