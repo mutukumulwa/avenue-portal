@@ -33,8 +33,8 @@ const ALLOWLIST: Record<string, string> = {
     "Legacy ClaimsService.createClaim (tRPC + PA conversion) pending deprecation (F5.3/F5.7).",
   // F5.2 DONE: the B2B API route now adapts onto ClaimIntakeService — no direct
   // Claim.create, removed from the allowlist.
-  "src/app/api/claims/import/route.ts":
-    "CSV import rail pre-migration (F5.4).",
+  // F5.4 DONE: the CSV import route submits per-row through ClaimIntakeService —
+  // no direct Claim.create, removed from the allowlist.
   "src/app/(admin)/claims/new/actions.ts":
     "Admin reimbursement action pre-migration (F5.6).",
   "src/server/services/reimbursement.service.ts":

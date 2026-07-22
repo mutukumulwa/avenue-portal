@@ -90,9 +90,16 @@ export default async function ClaimsBulkImportPage() {
           </div>
 
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 text-xs text-brand-text-muted">
-              <CheckCircle2 size={12} className="text-[#28A745]" />
-              Duplicate detection runs per row before import
+            <div className="space-y-1.5 text-xs text-brand-text-muted">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={12} className="text-[#28A745]" />
+                Re-uploading the same file replays it — no duplicate claims (per-row receipts)
+              </div>
+              {/* F5.4: preview validates the whole file without creating anything */}
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="mode" value="preview" className="accent-brand-indigo" />
+                Validate only (preview — nothing is imported)
+              </label>
             </div>
             <button type="submit"
               className="bg-brand-indigo text-white px-6 py-2.5 rounded-full text-sm font-semibold hover:bg-brand-secondary transition-colors flex items-center gap-2">

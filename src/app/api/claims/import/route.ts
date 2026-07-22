@@ -1,25 +1,39 @@
 import { NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { peekNextDocumentNumber } from "@/lib/document-number";
-import { claimAdjudicationService } from "@/server/services/claim-adjudication.service";
-import { ClaimLineCategory } from "@prisma/client";
+import { ClaimIntakeService } from "@/server/services/claim-intake/intake.service";
+import { IntakeError } from "@/server/services/claim-intake/errors";
+import { ProvidersService } from "@/server/services/providers.service";
 
+/**
+ * Bulk claims import (F5.4) — an adapter over the canonical ClaimIntakeService.
+ *
+ * - `mode=preview` validates the file and EVERY row without creating anything.
+ * - Commit submits each valid row with the durable key
+ *   `csv:<fileSha256₁₆>:<sheet>:<row>:<providerId>` (channel CSV_IMPORT,
+ *   source BATCH) — re-uploading the same file REPLAYS row-by-row and creates
+ *   zero additional claims; a row whose invoice already exists on any rail
+ *   LINKS to that claim (§8.3.1) instead of duplicating.
+ * - Per-row terminal disposition + receipt reference; partial success is
+ *   explicit; a conservation block ties file total = imported + replayed +
+ *   linked + skipped.
+ * - Business gates (member status / coverage / benefit) are NOT import errors:
+ *   the claim is accepted and routed (D6). Rows are skipped only for
+ *   structural problems (unresolvable member/provider, bad amount/date).
+ */
 const MAX_SIZE_BYTES = 10 * 1024 * 1024;
+// Bounded row count (route files may only export handlers, so tests mirror this value).
+const MAX_IMPORT_ROWS = 2000;
 const ALLOWED_EXTENSIONS = [".xlsx", ".xls"];
 const CLINICAL_ROLES = ["SUPER_ADMIN", "CLAIMS_OFFICER", "MEDICAL_OFFICER"];
 
-type ImportError = {
+type RowError = { row: number; memberNumber?: string; providerName?: string; invoiceNumber?: string; errors: string[] };
+type RowResult = {
   row: number;
-  memberNumber?: string;
-  providerName?: string;
-  invoiceNumber?: string;
-  errors: string[];
-};
-
-type ImportedClaim = {
-  row: number;
-  claimNumber: string;
+  outcome: "IMPORTED" | "REPLAYED" | "LINKED" | "VALID"; // VALID = preview only
+  claimNumber: string | null;
+  receiptId: string | null;
   memberNumber: string;
   providerName: string;
   billedAmount: number;
@@ -42,26 +56,44 @@ function cellText(value: unknown) {
   return String(value ?? "").trim();
 }
 
-function parseServiceDate(value: unknown) {
-  if (value instanceof Date) return value;
+function parseServiceDate(value: unknown): string | null {
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
   const raw = cellText(value);
   if (!raw) return null;
   const date = new Date(raw);
-  return Number.isNaN(date.getTime()) ? null : date;
+  return Number.isNaN(date.getTime()) ? null : date.toISOString().slice(0, 10);
 }
 
-function renderSummary(imported: ImportedClaim[], errors: ImportError[]) {
-  const importedRows = imported.map((item) => `
+interface Conservation {
+  fileTotal: number;
+  importedTotal: number;
+  replayedTotal: number;
+  linkedTotal: number;
+  skippedTotal: number;
+}
+
+function renderSummary(preview: boolean, results: RowResult[], errors: RowError[], c: Conservation) {
+  const label = (o: RowResult["outcome"]) =>
+    o === "IMPORTED" ? "Imported" : o === "REPLAYED" ? "Replayed (already imported)" : o === "LINKED" ? "Linked to existing claim" : "Valid (not imported — preview)";
+  const resultRows = results
+    .map(
+      (item) => `
     <tr>
       <td>${item.row}</td>
-      <td><a href="/claims?search=${encodeURIComponent(item.claimNumber)}">${escapeHtml(item.claimNumber)}</a></td>
+      <td>${label(item.outcome)}</td>
+      <td>${item.claimNumber ? `<a href="/claims?search=${encodeURIComponent(item.claimNumber)}">${escapeHtml(item.claimNumber)}</a>` : "—"}</td>
+      <td class="mono">${escapeHtml(item.receiptId ?? "—")}</td>
       <td>${escapeHtml(item.memberNumber)}</td>
       <td>${escapeHtml(item.providerName)}</td>
       <td class="num">${item.billedAmount.toLocaleString("en-UG")}</td>
     </tr>
-  `).join("");
+  `,
+    )
+    .join("");
 
-  const errorRows = errors.map((item) => `
+  const errorRows = errors
+    .map(
+      (item) => `
     <tr>
       <td>${item.row}</td>
       <td>${escapeHtml(item.memberNumber)}</td>
@@ -69,7 +101,11 @@ function renderSummary(imported: ImportedClaim[], errors: ImportError[]) {
       <td>${escapeHtml(item.invoiceNumber)}</td>
       <td>${escapeHtml(item.errors.join("; "))}</td>
     </tr>
-  `).join("");
+  `,
+    )
+    .join("");
+
+  const conserved = Math.abs(c.fileTotal - (c.importedTotal + c.replayedTotal + c.linkedTotal + c.skippedTotal)) < 0.01;
 
   return `<!doctype html>
     <html lang="en">
@@ -79,33 +115,45 @@ function renderSummary(imported: ImportedClaim[], errors: ImportError[]) {
         <title>Bulk Claims Import</title>
         <style>
           body { font-family: Arial, sans-serif; margin: 32px; color: #212529; background: #f8f9fa; }
-          main { max-width: 1100px; margin: 0 auto; background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 24px; }
+          main { max-width: 1150px; margin: 0 auto; background: #fff; border: 1px solid #eee; border-radius: 8px; padding: 24px; }
           h1 { margin: 0 0 8px; color: #0B1437; }
-          .summary { display: flex; gap: 16px; margin: 20px 0; }
-          .pill { border: 1px solid #eee; border-radius: 8px; padding: 12px 16px; min-width: 160px; }
+          .summary { display: flex; gap: 16px; margin: 20px 0; flex-wrap: wrap; }
+          .pill { border: 1px solid #eee; border-radius: 8px; padding: 12px 16px; min-width: 150px; }
           .count { font-size: 28px; font-weight: 700; }
           table { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 14px; }
           th, td { border-bottom: 1px solid #eee; text-align: left; padding: 10px; vertical-align: top; }
           th { background: #eef2f4; color: #6c757d; font-size: 12px; text-transform: uppercase; }
           .num { text-align: right; font-variant-numeric: tabular-nums; }
+          .mono { font-family: ui-monospace, monospace; font-size: 12px; }
           a { color: #058a80; font-weight: 700; text-decoration: none; }
           .actions { margin-top: 24px; display: flex; gap: 12px; }
           .button { display: inline-block; border-radius: 999px; padding: 10px 16px; background: #0B1437; color: #fff; }
           .secondary { background: #fff; color: #0B1437; border: 1px solid #0B1437; }
+          .conservation { margin-top: 16px; padding: 12px 16px; border-radius: 8px; border: 1px solid ${conserved ? "#28A745" : "#DC3545"}; }
         </style>
       </head>
       <body>
         <main>
-          <h1>Bulk Claims Import Complete</h1>
-          <p>Valid rows were imported as received batch claims. Rows with errors were skipped.</p>
+          <h1>${preview ? "Bulk Claims Import — Preview (nothing created)" : "Bulk Claims Import Complete"}</h1>
+          <p>${preview ? "Every row was validated; NO claims were created. Re-submit without preview to import." : "Valid rows were accepted through the canonical intake (receipt per row). Rows with structural errors were skipped; eligibility/benefit issues route for review on the claim itself."}</p>
           <div class="summary">
-            <div class="pill"><div class="count">${imported.length}</div><div>Imported</div></div>
+            <div class="pill"><div class="count">${results.filter((r) => r.outcome !== "VALID").length || (preview ? results.length : 0)}</div><div>${preview ? "Valid rows" : "Accepted"}</div></div>
+            <div class="pill"><div class="count">${results.filter((r) => r.outcome === "REPLAYED").length}</div><div>Replayed</div></div>
+            <div class="pill"><div class="count">${results.filter((r) => r.outcome === "LINKED").length}</div><div>Linked</div></div>
             <div class="pill"><div class="count">${errors.length}</div><div>Skipped</div></div>
           </div>
-          <h2>Imported Claims</h2>
+          <div class="conservation">
+            <strong>Conservation:</strong> file total ${c.fileTotal.toLocaleString("en-UG")}
+            = imported ${c.importedTotal.toLocaleString("en-UG")}
+            + replayed ${c.replayedTotal.toLocaleString("en-UG")}
+            + linked ${c.linkedTotal.toLocaleString("en-UG")}
+            + skipped ${c.skippedTotal.toLocaleString("en-UG")}
+            — ${conserved ? "CONSERVED ✓" : "MISMATCH ✗ (investigate before relying on this import)"}
+          </div>
+          <h2>${preview ? "Validated Rows" : "Accepted Claims"}</h2>
           <table>
-            <thead><tr><th>Row</th><th>Claim</th><th>Member</th><th>Provider</th><th class="num">Billed KES</th></tr></thead>
-            <tbody>${importedRows || '<tr><td colspan="5">No claims imported.</td></tr>'}</tbody>
+            <thead><tr><th>Row</th><th>Outcome</th><th>Claim</th><th>Receipt</th><th>Member</th><th>Provider</th><th class="num">Billed</th></tr></thead>
+            <tbody>${resultRows || '<tr><td colspan="7">None.</td></tr>'}</tbody>
           </table>
           <h2>Skipped Rows</h2>
           <table>
@@ -132,6 +180,8 @@ export async function POST(request: Request) {
 
   const formData = await request.formData();
   const file = formData.get("file");
+  const preview = cellText(formData.get("mode")).toLowerCase() === "preview";
+  const wantJson = cellText(formData.get("format")).toLowerCase() === "json";
   if (!(file instanceof File)) {
     return NextResponse.json({ error: "No file provided" }, { status: 400 });
   }
@@ -144,20 +194,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "File exceeds 10 MB limit." }, { status: 400 });
   }
 
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const fileSha = createHash("sha256").update(buffer).digest("hex");
+
   const ExcelJS = (await import("exceljs")).default;
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(Buffer.from(await file.arrayBuffer()) as never);
+  await workbook.xlsx.load(buffer as never);
 
   const sheet = workbook.worksheets[0];
   if (!sheet) {
-    return new Response(renderSummary([], [{ row: 0, errors: ["Workbook has no worksheets"] }]), {
-      headers: { "content-type": "text/html; charset=utf-8" },
-    });
+    return NextResponse.json({ error: "Workbook has no worksheets" }, { status: 400 });
+  }
+  if (sheet.rowCount - 1 > MAX_IMPORT_ROWS) {
+    return NextResponse.json(
+      { error: `File has ${sheet.rowCount - 1} data rows — the limit is ${MAX_IMPORT_ROWS}. Split the file and import in parts.` },
+      { status: 400 },
+    );
   }
 
-  const imported: ImportedClaim[] = [];
-  const errors: ImportError[] = [];
   const tenantId = session.user.tenantId;
+  const results: RowResult[] = [];
+  const errors: RowError[] = [];
+  const conservation: Conservation = { fileTotal: 0, importedTotal: 0, replayedTotal: 0, linkedTotal: 0, skippedTotal: 0 };
+  let acceptedCount = 0;
 
   for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber++) {
     const row = sheet.getRow(rowNumber);
@@ -170,22 +229,17 @@ export async function POST(request: Request) {
     const invoiceNumber = cellText(row.getCell(7).value);
 
     if (!memberNumber && !providerName && !serviceDate && !diagnosisCode && !cptCode && !billedAmount && !invoiceNumber) {
-      continue;
+      continue; // fully blank row
     }
+    const rowBilled = Number.isFinite(billedAmount) && billedAmount > 0 ? billedAmount : 0;
+    conservation.fileTotal += rowBilled;
 
+    // Structural row validation (preview parity with the canonical boundary).
     const rowErrors: string[] = [];
     if (!memberNumber) rowErrors.push("MemberNumber is required");
     if (!providerName) rowErrors.push("ProviderName is required");
     if (!serviceDate) rowErrors.push("DateOfService must be a valid date");
     if (!Number.isFinite(billedAmount) || billedAmount <= 0) rowErrors.push("BilledAmount must be a positive number");
-
-    const member = memberNumber
-      ? await prisma.member.findFirst({
-          where: { tenantId, memberNumber },
-          select: { id: true, memberNumber: true, status: true, group: { select: { status: true } } },
-        })
-      : null;
-    if (memberNumber && !member) rowErrors.push(`Member ${memberNumber} not found`);
 
     const provider = providerName
       ? await prisma.provider.findFirst({
@@ -194,96 +248,93 @@ export async function POST(request: Request) {
         })
       : null;
     if (providerName && !provider) rowErrors.push(`Provider ${providerName} not found`);
-    if (provider && ["EXPIRED", "SUSPENDED"].includes(provider.contractStatus)) {
+    if (provider && !ProvidersService.isOperational(provider.contractStatus)) {
       rowErrors.push(`Provider contract is ${provider.contractStatus}`);
     }
+    const memberExists = memberNumber
+      ? (await prisma.member.count({ where: { tenantId, memberNumber } })) > 0
+      : false;
+    if (memberNumber && !memberExists) rowErrors.push(`Member ${memberNumber} not found`);
 
-    const blockedStatuses = ["SUSPENDED", "LAPSED", "TERMINATED"];
-    if (member && blockedStatuses.includes(member.status)) rowErrors.push(`Member status is ${member.status}`);
-    if (member?.group && blockedStatuses.includes(member.group.status)) rowErrors.push(`Group status is ${member.group.status}`);
-
-    if (member && provider && serviceDate) {
-      const gate = await claimAdjudicationService.runHardGateValidation(tenantId, {
-        providerId: provider.id,
-        memberId: member.id,
-        dateOfService: serviceDate,
-        benefitCategory: "OUTPATIENT",
-        invoiceNumber: invoiceNumber || undefined,
-      });
-      if (!gate.passed) rowErrors.push(...gate.errors);
-    }
-
-    if (rowErrors.length > 0 || !member || !provider || !serviceDate) {
+    if (rowErrors.length > 0 || !provider || !serviceDate) {
+      conservation.skippedTotal += rowBilled;
       errors.push({ row: rowNumber, memberNumber, providerName, invoiceNumber, errors: rowErrors });
       continue;
     }
 
-    try {
-      const claimNumber = await peekNextDocumentNumber("CLM", (yp) =>
-        prisma.claim
-          .findFirst({ where: { tenantId, claimNumber: { startsWith: yp } }, orderBy: { claimNumber: "desc" }, select: { claimNumber: true } })
-          .then((r) => r?.claimNumber ?? null),
-      );
-      const lineDescription = cptCode ? `CPT ${cptCode}` : diagnosisCode ? `Diagnosis ${diagnosisCode}` : "Imported service line";
+    if (preview) {
+      results.push({ row: rowNumber, outcome: "VALID", claimNumber: null, receiptId: null, memberNumber, providerName: provider.name, billedAmount: rowBilled });
+      continue;
+    }
 
-      const claim = await prisma.claim.create({
-        data: {
-          tenantId,
-          claimNumber,
-          invoiceNumber: invoiceNumber || null,
-          memberId: member.id,
-          providerId: provider.id,
-          source: "BATCH",
-          serviceType: "OUTPATIENT",
-          dateOfService: serviceDate,
-          diagnoses: diagnosisCode
-            ? [{ icdCode: diagnosisCode, description: diagnosisCode, isPrimary: true }]
-            : [],
-          procedures: cptCode
-            ? [{ cptCode, description: lineDescription, quantity: 1, unitCost: billedAmount, totalCost: billedAmount }]
-            : [],
-          billedAmount,
-          benefitCategory: "OUTPATIENT",
-          status: "RECEIVED",
-          claimLines: {
-            create: {
-              lineNumber: 1,
-              description: lineDescription,
-              icdCode: diagnosisCode || null,
-              cptCode: cptCode || null,
-              quantity: 1,
-              unitCost: billedAmount,
-              billedAmount,
-              approvedAmount: 0,
-              serviceCategory: ClaimLineCategory.OTHER,
-            },
-          },
-          adjudicationLogs: {
-            create: {
-              userId: session.user.id,
-              action: "RECEIVED",
-              toStatus: "RECEIVED",
-              notes: `Imported from ${file.name} row ${rowNumber}.`,
-            },
-          },
+    const lineDescription = cptCode ? `CPT ${cptCode}` : diagnosisCode ? `Diagnosis ${diagnosisCode}` : "Imported service line";
+    const submission = {
+      schemaVersion: "1" as const,
+      // §8.5: durable per-row key — same file re-uploaded ⇒ replay, zero new claims.
+      idempotencyKey: `csv:${fileSha.slice(0, 16)}:0:${rowNumber}:${provider.id}`,
+      ...(invoiceNumber ? { invoiceNumber } : {}),
+      member: { memberNumber },
+      provider: { providerId: provider.id },
+      encounter: { serviceType: "OUTPATIENT" as const, benefitCategory: "OUTPATIENT" as const, serviceFrom: serviceDate },
+      diagnoses: diagnosisCode ? [{ code: diagnosisCode, isPrimary: true }] : [],
+      lines: [
+        {
+          serviceCategory: "OTHER" as const,
+          ...(cptCode ? { cptCode } : {}),
+          ...(diagnosisCode ? { icdCode: diagnosisCode } : {}),
+          description: lineDescription,
+          quantity: 1,
+          unitCost: rowBilled,
+          billedAmount: rowBilled,
         },
-        select: { id: true, claimNumber: true },
-      });
+      ],
+      origin: { batchId: fileSha.slice(0, 16), rowNumber },
+    };
 
-      await claimAdjudicationService.computeContractedRateVariance(claim.id, tenantId);
-      imported.push({ row: rowNumber, claimNumber: claim.claimNumber, memberNumber, providerName: provider.name, billedAmount });
-    } catch (error) {
+    try {
+      const result = await ClaimIntakeService.submit(
+        { kind: "csvOperator", tenantId, userId: session.user.id },
+        submission,
+      );
+      const outcome: RowResult["outcome"] = result.outcome === "ACCEPTED" ? "IMPORTED" : result.outcome === "REPLAYED" ? "REPLAYED" : "LINKED";
+      if (outcome === "IMPORTED") {
+        conservation.importedTotal += rowBilled;
+        acceptedCount += 1;
+      } else if (outcome === "REPLAYED") conservation.replayedTotal += rowBilled;
+      else conservation.linkedTotal += rowBilled;
+      results.push({ row: rowNumber, outcome, claimNumber: result.claimNumber, receiptId: result.receiptId, memberNumber, providerName: provider.name, billedAmount: rowBilled });
+    } catch (err) {
+      const e = IntakeError.from(err);
+      conservation.skippedTotal += rowBilled;
       errors.push({
         row: rowNumber,
         memberNumber,
         providerName,
         invoiceNumber,
-        errors: [error instanceof Error ? error.message : "Import failed"],
+        errors: [e.issues?.length ? e.issues.map((i) => i.message).join("; ") : e.message],
       });
     }
   }
 
-  return new Response(renderSummary(imported, errors), {
+  // D9: accelerate processing of freshly accepted rows in-request (bounded);
+  // the durable runs + recovery sweep remain the authoritative backstop.
+  if (!preview && acceptedCount > 0) {
+    try {
+      const [{ registerClaimAutopilotProcessor }, { runClaimAutopilotRecoveryJob }] = await Promise.all([
+        import("@/server/services/claim-autopilot/processor"),
+        import("@/server/jobs/claim-autopilot.job"),
+      ]);
+      registerClaimAutopilotProcessor();
+      await runClaimAutopilotRecoveryJob({ batchSize: Math.min(acceptedCount, 25) });
+    } catch {
+      /* best-effort — the sweep will process the remainder */
+    }
+  }
+
+  if (wantJson) {
+    return NextResponse.json({ preview, results, errors, conservation });
+  }
+  return new Response(renderSummary(preview, results, errors, conservation), {
     headers: { "content-type": "text/html; charset=utf-8" },
   });
 }

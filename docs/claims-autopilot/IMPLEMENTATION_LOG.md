@@ -725,3 +725,20 @@ F4.5, F7.4).
 - **Known gaps or skips:** n/a.
 - **Security/privacy review:** removes an unaudited authenticated write path; adds client confinement to two read procedures.
 - **Next eligible task:** F5.4 — CSV import row receipts and canonical commit.
+
+---
+
+## F5.4 — CSV import row receipts and canonical commit
+
+- **Status:** COMPLETE (real-DB)
+- **Commit/branch:** `feat/claims-autopilot` (F5.4 commit)
+- **Files changed:** `src/app/api/claims/import/route.ts` (rewritten as a canonical adapter: preview mode, per-row submit, conservation report, JSON output for tests; direct `Claim.create` + `peekNextDocumentNumber` + hard-gate/variance calls removed), `src/app/(admin)/claims/import/page.tsx` (preview checkbox + copy), `tests/integration/claim-intake-csv.integration.test.ts` (new, node-env — undici formData parsing breaks under jsdom), `tests/integration/claim-autopilot-reconcile.integration.test.ts` (pool now also excludes claims with terminal autopilot audit — the suite polluted ITSELF across executions: it writes audit to pool claims, cleanup removed runs but audit is append-only), allowlist shrink in `claim-creator-consolidation.test.ts`.
+- **Decisions enforced:** §8.5 CSV key `csv:<fileSha₁₆>:<sheet>:<row>:<providerId>`; D6 (member-status/coverage no longer import errors — accepted+routed; only structural rows skip); D7/§8.3.1 (a row whose invoice already exists on ANY rail LINKS, never duplicates); D8/D9 (durable per-row receipts; bounded in-request sweep of ≤25 accepted rows, recovery sweep the backstop); correct BATCH source / CSV_IMPORT channel / `user:<id>` scope.
+- **Observable behavior before:** one-shot import, per-row direct `Claim.create`, NO idempotency (re-upload duplicated every row — the worst case in the divergence table), business-status rows rejected, HTML-only.
+- **Observable behavior after:** `mode=preview` validates the whole file with ZERO writes; commit gives every row a terminal disposition (IMPORTED / REPLAYED / LINKED / skipped+reason) + receipt reference; re-uploading the same file replays row-by-row with zero new claims; a conservation block ties file total = imported + replayed + linked + skipped; ≤2000 rows enforced; per-row failures isolate (partial success explicit).
+- **Forbidden effects explicitly checked (real DB):** duplicate-invoice row inside one file ⇒ LINKED (one claim); full-file replay ⇒ 3 REPLAYED, claim count unchanged; preview ⇒ zero receipts/claims; future-date row rejects while sibling rows import; 2001-row file ⇒ 400.
+- **Tests run and exact results:** `claim-intake-csv.integration.test.ts` → **4 passed**. Full unit suite → **1152 passed / 85 skipped**; all integration together → **76 passed / 9 skipped ×2 consecutive runs**. typecheck PASS; eslint clean; consolidation guard passes with the import route removed.
+- **Creator allowlist change:** **`src/app/api/claims/import/route.ts` REMOVED** (creator #4 migrated). 3/9 converged.
+- **Known gaps or skips:** import stays single-request (preview is a dry-run of the same request rather than a stored two-phase batch); benefitCategory fixed to OUTPATIENT as before (column addition is a template change for later).
+- **Security/privacy review:** role gate unchanged; HTML output escaped; canonical non-enumerating errors per row; bounded rows/bytes.
+- **Next eligible task:** F5.5 — offline sync adapter.

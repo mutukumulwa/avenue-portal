@@ -25,16 +25,25 @@ describe.skipIf(!URL_SET)("F3.7 integration — reconcilable effects", () => {
     tenantId = (await prisma.tenant.findFirstOrThrow()).id;
     // Disjoint claim window (by claimNumber) so parallel integration files never
     // share seeded claims. Pool ONLY untouched claims — canonical intake (F5.1+)
-    // creates claims that already carry a run AND terminal autopilot audit, which
-    // would poison both the run-uniqueness and audit-offender fixtures here.
-    claimPool.push(
-      ...(
-        await prisma.claim.findMany({
-          where: { tenantId, processingRuns: { none: {} }, status: { not: "VOID" } },
-          orderBy: { claimNumber: "asc" }, select: { id: true }, skip: 90, take: 25,
+    // creates claims that already carry a run AND terminal autopilot audit, and
+    // THIS suite itself writes terminal audit to pool claims (cleanup removes the
+    // runs but audit is append-only), so candidates must also have NO terminal
+    // autopilot audit or the audit-offender fixture false-negatives on re-runs.
+    const candidates = (
+      await prisma.claim.findMany({
+        where: { tenantId, processingRuns: { none: {} }, status: { not: "VOID" } },
+        orderBy: { claimNumber: "asc" }, select: { id: true }, skip: 90, take: 60,
+      })
+    ).map((c) => c.id);
+    const audited = new Set(
+      (
+        await prisma.auditLog.findMany({
+          where: { tenantId, entityType: "Claim", entityId: { in: candidates }, action: { startsWith: "CLAIM:AUTO" } },
+          select: { entityId: true },
         })
-      ).map((c) => c.id),
+      ).map((a) => a.entityId as string),
     );
+    claimPool.push(...candidates.filter((id) => !audited.has(id)).slice(0, 25));
   });
   afterEach(() => resetClaimProcessor());
   afterAll(async () => {
