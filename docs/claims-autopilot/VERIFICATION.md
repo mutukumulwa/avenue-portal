@@ -61,5 +61,12 @@ in the session scratchpad and is deleted on teardown.
 | F2.5 | `claim-autopilot-policy-approval.integration.test.ts` | **PASS** — maker submits ⇒ PENDING_APPROVAL; maker self-approval blocked (SoD); checker activates ⇒ APPROVED/LIVE; new version supersedes prior; rejection ⇒ REJECTED (non-live); deactivation immediate. |
 | F3.3 | `claim-intake-persist.integration.test.ts` | **PASS** — CREATED (totals 3500, MANUAL source, 2 lines, 1 PENDING run, receipt SUCCEEDED+linked, no post-effects); strong-link sequential + concurrent ⇒ one claim; suspected-content ⇒ separate claims; full rollback leaves receipt PROCESSING (seeded DB). |
 | F3.4 | `claim-intake-service.integration.test.ts` | **PASS** — submit ⇒ ACCEPTED (claim+PENDING run, enqueue called with runId, `CLAIM:INTAKE_ACCEPTED` chained audit); replay ⇒ same claim (no 2nd); conflict ⇒ 409, original untouched; throwing enqueuer still ACCEPTED (run PENDING); getReceipt authoritative + foreign-tenant null. |
+| F3.5 | `claim-intake-processing.integration.test.ts` | **PASS** — two-worker race ⇒ one claim; stale-lease reclaim; non-owner cannot complete; retry reuses run (attempt++); reprocess next-sequence + supersession; concurrent reprocess ⇒ one non-terminal run; terminal immutable; stage upsert. |
+
+**⚠️ Timezone finding (F3.5):** the DB session TZ is EAT (UTC+3). Prisma stores
+`DateTime` as UTC in a `timestamp` (no-tz) column, so raw-SQL lease/retry
+comparisons MUST use `now() AT TIME ZONE 'UTC'` — plain `now()` (timestamptz)
+mis-read a future lease as ~3h expired and let a second worker double-claim it.
+Fixed in `processing.ts`; any future raw-SQL time comparison must follow suit.
 
 **Seed:** the throwaway DB was seeded once (`SEED_PASSWORD='Mdx!Seed-2026#Rotate' npx prisma db seed`) → 1 tenant (`medvex`), 6 providers, 249 members, contracts/benefits/PA/GL. Integration tests **query** for ids at runtime (resilient to reseed) rather than hardcoding.

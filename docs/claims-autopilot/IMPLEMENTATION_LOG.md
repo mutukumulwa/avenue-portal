@@ -436,3 +436,26 @@ F4.5, F7.4).
 - **Security/privacy review:** all scope via derived context; SubmitResult carries no PHI; audit payload is safe totals/refs.
 - **Next eligible task:** F3.5 — Implement processing-run lease and stage repository.
 - **Blocker/options, if blocked:** n/a.
+
+---
+
+## F3.5 — Implement processing-run lease and stage repository
+
+- **Status:** COMPLETE (incl. real-DB lease-race proof + a real timezone bug fixed)
+- **Commit/branch:** `feat/claims-autopilot` (F3.5 commit)
+- **Files changed:** `src/server/services/claim-intake/processing.ts` (new), `tests/integration/claim-intake-processing.integration.test.ts` (new), `docs/claims-autopilot/VERIFICATION.md`.
+- **Decisions enforced:** D8 (DB-authoritative run state); §6.4/§11.2 lease + retry rules; §9.3 sequence/supersession.
+- **Acceptance scenarios covered:** CA-051 (two workers ⇒ one), CA-101/CA-104 (lease reclaim, two sweepers safe), CA-048/CA-049 (retryable reuse), CA-028/CA-059 (reprocess sequence), CA-103 (poison/terminal immutable).
+- **Observable behavior before:** no durable lease/stage repository; automation had no worker-safe claiming.
+- **Observable behavior after:** `claimNextRun`/`claimRunById` (atomic `FOR UPDATE SKIP LOCKED`), `extendLease`, `recordStage` (upsert on `(runId, stage)`), conditional terminal transitions `markRun{Routed,ShadowComplete,AutoDecided,Retryable,Failed}` (owner+RUNNING only), `createReprocessRun` (next sequence + supersession, single non-terminal run under concurrency), `safeErrorMessage`.
+- **Forbidden effects explicitly checked:** two workers racing one run ⇒ exactly one wins (real DB); non-owner transition writes nothing; terminal run immutable to a later transition; concurrent reprocess ⇒ one non-terminal run; stage upsert keeps one row.
+- **Real bug found + fixed:** the two-worker race initially DOUBLE-claimed because the DB session TZ is EAT (UTC+3) and raw SQL compared Prisma's UTC `timestamp` leases against `now()` (timestamptz), mis-reading a future lease as ~3h expired. Fixed by comparing/computing against `now() AT TIME ZONE 'UTC'`. This would have caused production lease double-processing — caught only by the real-DB test.
+- **Tests run and exact results:**
+  - **Real DB:** `npx vitest run tests/integration/claim-intake-processing.integration.test.ts` → **9 passed** (after the TZ fix; failed 1/9 before).
+  - `npm run typecheck` → PASS; eslint clean.
+- **Database/audit/reconciliation evidence:** real Postgres; SKIP LOCKED verified via a direct reproduction (A claims, B null, attemptCount 1).
+- **Creator allowlist change:** none.
+- **Known gaps or skips:** the worker/sweeper that DRIVES these (job + recurring recovery) is F3.6; the stage vocabulary is executed by the evaluator in F4.2.
+- **Security/privacy review:** stored errors sanitized (`safeErrorMessage`, no stack); no PHI in run/stage.
+- **Next eligible task:** F3.6 — Add processing job and recovery sweeper.
+- **Blocker/options, if blocked:** n/a.
