@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
 import { ApprovalMatrixService } from "./approval-matrix.service";
 import { ApprovalRequestService } from "./approval-request.service";
 import { BenefitUsageService } from "./benefit-usage.service";
@@ -83,6 +84,12 @@ export interface ClaimDecisionInput {
    * writes. Used by automatic execution; omit for human decisions.
    */
   expectedRevision?: number;
+  /**
+   * F4.7 (D18): commit-time circuit-breaker check for the auto path. Called
+   * INSIDE the decision transaction; returning true aborts with `StalePlanError`
+   * (a breaker opened between evaluation and commit blocks the money).
+   */
+  breakerCheck?: (tx: Prisma.TransactionClient) => Promise<boolean>;
 }
 
 export interface CeilingAssessment {
@@ -614,6 +621,11 @@ export class ClaimDecisionService {
       if (isApproval && decision.systemDecision) {
         const openFraud = await tx.claimFraudAlert.count({ where: { claimId, resolved: false } });
         if (openFraud > 0) throw new StalePlanError(`fraud alert raised before commit (${openFraud} open)`);
+        // F4.7 (D18): a circuit breaker opened between evaluation and commit blocks
+        // the automatic money decision.
+        if (decision.breakerCheck && (await decision.breakerCheck(tx))) {
+          throw new StalePlanError("circuit breaker open at commit");
+        }
       }
 
       // P1.3 — THE benefit-availability gate: first thing inside the
@@ -880,10 +892,16 @@ export class ClaimDecisionService {
     claimId: string,
     plan: AutoDecisionPlan,
     systemActorId: string,
-  ): Promise<{ executed: boolean; stale?: boolean; reason?: string }> {
+  ): Promise<{ executed: boolean; stale?: boolean; breakerOpen?: boolean; reason?: string }> {
     if (plan.disposition !== "APPROVE" && plan.disposition !== "PARTIAL") {
       return { executed: false, reason: `plan disposition ${plan.disposition} is not executable` };
     }
+    // F4.7 (D18): resolve the client for breaker scope and pre-check the breaker.
+    const scope = await prisma.claim.findUnique({ where: { id: claimId }, select: { member: { select: { group: { select: { clientId: true } } } } } });
+    const clientId = scope?.member?.group?.clientId ?? null;
+    const { isBreakerOpen } = await import("./claim-autopilot/circuit-breaker");
+    if (await isBreakerOpen(prisma, tenantId, clientId)) return { executed: false, breakerOpen: true, reason: "circuit breaker open" };
+
     const action = plan.disposition === "PARTIAL" ? ("PARTIALLY_APPROVED" as const) : ("APPROVED" as const);
     const lineDecisions = plan.lines.map((l) => ({
       lineId: l.claimLineId,
@@ -899,10 +917,14 @@ export class ClaimDecisionService {
         notes: `Auto-adjudicated (policy ${plan.policyId ?? "n/a"}, ${plan.mode})`,
         lineDecisions,
         expectedRevision: plan.claimRevision,
+        breakerCheck: (tx) => isBreakerOpen(tx, tenantId, clientId),
       });
       return { executed: true };
     } catch (err) {
-      if (err instanceof StalePlanError) return { executed: false, stale: true, reason: err.message };
+      if (err instanceof StalePlanError) {
+        if (err.message.includes("circuit breaker")) return { executed: false, breakerOpen: true, reason: err.message };
+        return { executed: false, stale: true, reason: err.message };
+      }
       throw err;
     }
   }

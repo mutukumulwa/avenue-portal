@@ -153,3 +153,33 @@ becomes `FAILED` with the claim mirrored to `assignedQueue=AUTOPILOT_FAILURE`
 (operator-visible). The stage evaluator is registered by F4.2 via
 `setClaimProcessor`; until then the fail-closed default routes every claim to
 manual adjudication.
+
+---
+
+## F4.7 — Circuit breaker (completes M4)
+
+**Adds** one additive model (`db push`, no data-loss warning — new empty table):
+- `ClaimAutopilotBreaker` (`tenantId`, nullable `clientId`, `isOpen @default(false)`,
+  `reason`, `autoTriggered @default(false)`, `openedById`/`openedAt`,
+  `closedById`/`closedAt`; `@@unique([tenantId, clientId])`, `@@index([tenantId, isOpen])`)
+  and the `Tenant.autopilotBreakers` back-relation.
+
+**Fail-safe on deploy:** no rows exist ⇒ `isBreakerOpen` is false everywhere ⇒ live
+automation behaves exactly as before the deploy. A tenant-wide breaker is a row with
+`clientId = null`; a client breaker names the client. Opening one is **immediate**
+and blocks only live money execution — intake/receipts/evaluation/shadow/routing
+continue (a blocked LIVE claim is downgraded to a stored shadow proposal routed to
+`MANUAL_ADJUDICATION`). Manual open/close (reason required to close) and `tripBreaker`
+auto-trips emit hash-chained `AUTO_ADJ:CIRCUIT_BREAKER_OPENED`/`CLOSED` audit rows.
+
+**Operational kill-switch (the safe way to stop all live automation instantly):**
+open a tenant-wide breaker (no policy edits, full history preserved), or run the
+F2.6 `--rollback` for a durable OFF/DEACTIVATED. The commit-time `breakerCheck`
+inside `decide` closes the eval→commit race (a breaker opened mid-flight throws
+`StalePlanError` before any money moves).
+
+**Rollback:** drop `ClaimAutopilotBreaker` + the back-relation; nothing else
+references it and no money state depends on it.
+
+**Verified on `autopilot_uat`:** `db push` applied cleanly (no data-loss prompt);
+`claim-autopilot-breaker.integration.test.ts` → 5 passed.

@@ -76,6 +76,10 @@ in the session scratchpad and is deleted on teardown.
 | F4.3 | `claim-autopilot-fidelity.integration.test.ts` | **PASS** — mixed coded/uncoded → CODING; missing doc → DOCUMENTS + supply clears; fuzzy 2nd visit → DUPLICATE + candidate ref + cleared passes. |
 | F4.4 | `claim-autopilot-plan.integration.test.ts` | **PASS** — routed plan (catalog reasons, 0 payable, conserves); any plan conserves + JSON-serializes. |
 | **F4.5g** | `claim-autopilot-execute.integration.test.ts` | **PASS (STOP CONDITION MET)** — atomic execute (claim APPROVED, line stamped, benefit consumed once); full rollback (money-tx failure ⇒ no partial line/claim/money); stale plan ⇒ no writes; fraud-at-commit ⇒ blocked; two concurrent ⇒ exactly one, benefit consumed once (not 2×). |
+| F4.6 | `claim-autopilot-shadow.integration.test.ts` | **PASS** — SHADOW moves no money (claim RECEIVED, approvedAmount 0, lines unstamped); proposal stored on the DECISION stage; `compareShadowToOutcome` null while undecided, agreement true only when disposition AND amount match, amount + disposition overturns flagged. |
+| F4.7 | `claim-autopilot-breaker.integration.test.ts` | **PASS (M4 CLOSE)** — manual open/close immediate + reason-required + hash-chain audited; client-scoped breaker isolates (no cross-client/tenant-wide bleed); open breaker blocks live execution (no money, claim RECEIVED) and closing resumes (same claim APPROVED); commit-time `breakerCheck` ⇒ `StalePlanError`, no write; `tripBreaker` auto-opens marked `autoTriggered`. |
+
+**M4 boundary (all packages):** full suite **1152 passed / 67 skipped**; all autopilot integration together (`tests/integration/ --no-file-parallelism`) **58 passed / 9 skipped** (9 = 2 pre-existing non-autopilot P1_TEST_DB suites); typecheck + brand:guard + currency:guard + eslint clean.
 
 **⚠️ Timezone finding (F3.5):** the DB session TZ is EAT (UTC+3). Prisma stores
 `DateTime` as UTC in a `timestamp` (no-tz) column, so raw-SQL lease/retry

@@ -640,3 +640,25 @@ F4.5, F7.4).
 - **Security/privacy review:** proposal stores safe totals/disposition only (no PHI).
 - **Next eligible task:** F4.7 — Add circuit breaker and live policy enforcement (completes M4).
 - **Blocker/options, if blocked:** n/a.
+
+---
+
+## F4.7 — Circuit breaker + live policy enforcement (completes M4)
+
+- **Status:** COMPLETE (real-DB) — **M4 CLOSED**
+- **Commit/branch:** `feat/claims-autopilot` (F4.7 commit)
+- **Files changed:** `prisma/schema.prisma` (new `ClaimAutopilotBreaker` model + `Tenant.autopilotBreakers` relation), `src/server/services/claim-autopilot/circuit-breaker.ts` (new — `isBreakerOpen`/`openBreaker`/`closeBreaker`/`tripBreaker`/`getBreakerState`), `src/server/services/claim-decision.service.ts` (`breakerCheck?` on the input + a commit-time gate inside `decide`'s tx; `executeAutoPlan` pre-checks the breaker and passes the commit-time check), `src/server/services/claim-autopilot/processor.ts` (breaker-blocked LIVE claims downgrade to a shadow proposal + route to a human), `tests/integration/claim-autopilot-breaker.integration.test.ts` (new), `docs/claims-autopilot/VERIFICATION.md`.
+- **Decisions enforced:** **D18** (a circuit breaker can stop LIVE automatic decisions per tenant/client immediately, without deleting policy history; intake/receipts/evaluation/shadow/routing continue while open — only live money execution is blocked). **D1** reinforced (no live money when the breaker is open). §13.3 (manual + auto trip, both audited).
+- **Acceptance scenarios covered:** breaker race with a decision (commit-time gate); client-specific breaker scoping; maker/checker (manual) activation; deactivation is immediate; no-live-bypass (an open breaker never lets money move).
+- **Observable behavior before:** F4.5's `executeAutoPlan` always executed an APPROVE/PARTIAL plan; there was no operational kill-switch — stopping live automation meant deactivating each policy.
+- **Observable behavior after:** `isBreakerOpen(db, tenantId, clientId?)` is true when a tenant-wide OR the client's breaker is open; `executeAutoPlan` pre-checks it (returns `{ executed:false, breakerOpen:true }`, moves no money) AND passes a `breakerCheck` closure that `decide` re-runs INSIDE its commit tx (a breaker opened during the eval→commit window throws `StalePlanError` before any write); the processor downgrades a breaker-blocked LIVE claim to a stored shadow proposal routed to `MANUAL_ADJUDICATION`; manual open/close (reason required to close) and auto-trips are hash-chain audited (`AUTO_ADJ:CIRCUIT_BREAKER_OPENED`/`CLOSED`).
+- **Forbidden effects explicitly checked (real DB):** open breaker ⇒ `executeAutoPlan` moves no money, claim stays RECEIVED; commit-time `breakerCheck` true ⇒ `decide` throws `StalePlanError`, claim stays RECEIVED (no line/claim/money write); a client-scoped breaker does not block a different client or the tenant-wide path; closing the breaker immediately resumes live execution (same claim then APPROVED).
+- **Tests run and exact results:**
+  - **Real DB:** `npx vitest run tests/integration/claim-autopilot-breaker.integration.test.ts` → **5 passed** (manual open/close + audit + reason-required; client-scope isolation; open blocks live execution / close resumes; commit-time gate; auto-trip marked `autoTriggered`).
+  - **M4 boundary:** full suite `npx vitest run` → **1152 passed / 67 skipped**; all autopilot integration together `npx vitest run tests/integration/ --no-file-parallelism` → **58 passed / 9 skipped** (the 9 = 2 pre-existing non-autopilot P1_TEST_DB suites). `npm run typecheck` PASS; `npm run brand:guard` + `npm run currency:guard` PASS; eslint clean.
+- **Database/audit/reconciliation evidence:** real Postgres; breaker state persisted in `ClaimAutopilotBreaker` (`@@unique([tenantId, clientId])`); open/close/trip emit hash-chained audit rows; no money moves while open.
+- **Creator allowlist change:** none.
+- **Known gaps or skips:** the breaker's operator UI (a settings toggle) and the auto-trip wiring from F7.2 invariant alerts land in M6/M7 — the service + audit + enforcement are complete and covered here; `tripBreaker` is the ready hook.
+- **Security/privacy review:** breaker mutations are RBAC-gated at the action layer (service takes an explicit `actorId`); close requires a reason; the enforcement is fail-safe (open ⇒ no money) and the commit-time re-check closes the eval→commit race.
+- **Next eligible task:** **M4 COMPLETE.** M5 — F5.1 (route the live claim-creation rails through the canonical intake). Awaiting go-ahead (bounded request ended at F4.7).
+- **Blocker/options, if blocked:** n/a.

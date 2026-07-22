@@ -36,6 +36,14 @@ const claimAutopilotProcessor: ClaimProcessor = async (db: PrismaClient, run): P
 
   if (result.executed) return { kind: "AUTO_DECIDED", modeResolved: "LIVE", policyId: plan.policyId };
 
+  // F4.7 (D18): breaker open ⇒ move NO money — downgrade to a shadow proposal and
+  // route to a human (evaluation continues while the breaker is open).
+  if (result.breakerOpen) {
+    const { storeShadowProposal } = await import("./shadow");
+    await storeShadowProposal(db, run.id, plan);
+    return { kind: "SHADOW_COMPLETE", routeCode: null, assignedQueue: "MANUAL_ADJUDICATION", modeResolved: "SHADOW", policyId: plan.policyId };
+  }
+
   // Not executed. If the claim is already decided (a crash after the money
   // committed but before the run terminated), reconcile to AUTO_DECIDED — never
   // move money twice. Otherwise the plan is stale ⇒ re-evaluate on the next run.

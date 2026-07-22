@@ -119,6 +119,7 @@ model Tenant {
   wellnessActivities             WellnessActivity[]
   intakeReceipts                 ClaimIntakeReceipt[]
   processingRuns                 ClaimProcessingRun[]
+  autopilotBreakers              ClaimAutopilotBreaker[]
 }
 
 // ── Multi-client TPA tenancy (Medvex spec §2.1 / gap G2.1) ──────────────
@@ -6604,4 +6605,29 @@ enum AutoAdjudicationPolicyStatus {
   REJECTED
   SUPERSEDED
   DEACTIVATED
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CLAIMS AUTOPILOT — circuit breaker (F4.7, §13.3). Ops can stop LIVE automatic
+// decisions per tenant/client immediately without deleting policy history; a
+// critical invariant/failure can trip it automatically. History is preserved via
+// audit-chain events (AUTO_ADJ:CIRCUIT_BREAKER_OPENED/CLOSED).
+// ═══════════════════════════════════════════════════════════════════════════
+model ClaimAutopilotBreaker {
+  id            String    @id @default(cuid())
+  tenantId      String
+  tenant        Tenant    @relation(fields: [tenantId], references: [id])
+  clientId      String? // null = tenant-wide breaker
+  isOpen        Boolean   @default(false)
+  reason        String?
+  autoTriggered Boolean   @default(false)
+  openedById    String?
+  openedAt      DateTime?
+  closedById    String?
+  closedAt      DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([tenantId, clientId])
+  @@index([tenantId, isOpen])
 }
