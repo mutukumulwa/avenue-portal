@@ -346,3 +346,25 @@ F4.5, F7.4).
 - **Security/privacy review:** scripts use safe identifiers; backfill computes only non-unique content hashes; no PHI printed.
 - **Next eligible task:** F3.1 — Implement derived intake context (M3).
 - **Blocker/options, if blocked:** n/a.
+
+---
+
+## F3.1 — Implement derived intake context
+
+- **Status:** COMPLETE
+- **Commit/branch:** `feat/claims-autopilot` (F3.1 commit)
+- **Files changed:** `src/server/services/claim-intake/context.ts` (new), `tests/services/claim-intake-context.test.ts` (new).
+- **Decisions enforced:** D12 (provider/tenant identity derived; supplied provider rejected if it differs); §7.2 (no trusted body fields); §11.5 (non-enumerating scope errors).
+- **Acceptance scenarios covered:** CA-006 (privilege/provider fields ignored/rejected), CA-071 (provider scope from membership), CA-086/CA-090 (foreign scope unreadable, non-enumerating).
+- **Observable behavior before:** each rail derived scope ad hoc; provider portal trusted the session but there was no single scope resolver or spoof guard.
+- **Observable behavior after:** `resolveIntakeContext(caller, submission)` derives tenant/provider/branch/client/member/scopeKey/channel/source/currency for all 9 caller kinds; provider rails derive providerId (spoof rejected, D12); operator rails select+validate a provider within tenant; members resolve scoped to tenant and (for provider rails) `entitledMemberWhere`; ambiguous member number and foreign member fail safe; frozen typed context, no mutation.
+- **Forbidden effects explicitly checked:** body providerId spoof rejected on provider rails (proven); provider not in tenant → AUTHORIZATION; non-operational provider → AUTHORIZATION; foreign member → non-enumerating AUTHORIZATION; ambiguous number → VALIDATION; entitlement scoping applied for provider rails only (asserted); read-only (no writes).
+- **Tests run and exact results:**
+  - `npx vitest run tests/services/claim-intake-context.test.ts` → **23 passed** (all 9 channels + spoof/cross-tenant/ambiguity/branch/currency).
+  - `npm run typecheck` → PASS; eslint clean.
+- **Database/audit/reconciliation evidence:** n/a (read-only resolver, mocked). Composes `ProviderEntitlementService`, `ProvidersService.isOperational`, `ClaimsService.resolveClaimCurrency` (existing owners).
+- **Creator allowlist change:** none.
+- **Known gaps or skips:** source for a provider API key defaults to HMS (SLADE360/SMART via `sourceHint`); integration key defaults to SMART with `providerOwnsInvoiceNamespace=false` (external ref authoritative per §8.3). These map cleanly to the fingerprint precedence in F1.3.
+- **Security/privacy review:** THE intake security boundary; all scope is server-derived; errors never enumerate member/provider existence.
+- **Next eligible task:** F3.2 — Separate structural acceptance from business routing.
+- **Blocker/options, if blocked:** n/a.
