@@ -48,5 +48,36 @@ passes.
 **Rollback:** unwired (no route writes to `ClaimIntakeReceipt` until F3.x). Drop
 the new model/enums if strictly required; nothing else references them.
 
-**Not run here:** `db push` against a live DB — no `DATABASE_URL` in this
-environment. Applied during F8.1 against an approved environment.
+**Applied to the throwaway `autopilot_uat` DB** (F2.2 onward): `db push` OK,
+receipt table + indexes present.
+
+---
+
+## F2.3 — Processing run + stage + Claim provenance
+
+**Adds:**
+- enums `ClaimProcessingTrigger`, `ClaimProcessingState`, `ClaimProcessingStageName` (14 stages), `ClaimProcessingStageState`.
+- models `ClaimProcessingRun` (lease/retry/sequence/supersession) and `ClaimProcessingStage`.
+- `Claim` provenance columns: `intakeSchemaVersion`, `claimRevision @default(1)`, `strongEventFingerprint`, `suspectedDuplicateFingerprint`, `processingState`, `processingRouteCode` (all additive; nullable or defaulted).
+- back-relations `Tenant.processingRuns`, `Claim.processingRuns`, `ClaimIntakeReceipt.processingRuns`.
+
+**Indexes/uniques added:**
+- run `@@unique([claimId, claimRevision, workflowVersion, sequence])` (at most one run per revision/workflow/sequence).
+- run `@@index([tenantId, state, nextAttemptAt])` (sweeper), `@@index([tenantId, assignedQueue, state])` (queues), `@@index([claimId])`, `@@index([receiptId])`.
+- stage `@@unique([runId, stage])`.
+- `Claim @@unique([tenantId, strongEventFingerprint])` and `@@index([tenantId, suspectedDuplicateFingerprint])`.
+
+**⚠️ Deploy note — expected `db push` data-loss warning (safe here):** adding
+`Claim @@unique([tenantId, strongEventFingerprint])` triggers Prisma's
+conservative warning *"A unique constraint … will be added. If there are existing
+duplicate values, this will fail."* This is a **false positive** for this change:
+`strongEventFingerprint` is a NEW, all-`NULL` column and Postgres treats `NULL`s
+as distinct, so no existing row can collide. Apply with
+`npm run db:push -- --accept-data-loss` (or `prisma db push --accept-data-loss`).
+Verified on `autopilot_uat`: constraint created, 0 rows affected. Before the
+production run (F8.1), still confirm `SELECT tenantId, strongEventFingerprint,
+count(*) FROM "Claim" WHERE strongEventFingerprint IS NOT NULL GROUP BY 1,2 HAVING
+count(*)>1` returns no rows (it will — the column is unpopulated pre-backfill).
+
+**Rollback:** unwired until F3.x. Drop the two new models + Claim columns/indexes
+if strictly required; the legacy `autoAdj*` columns remain the compatibility path.

@@ -118,6 +118,7 @@ model Tenant {
   wellnessEnrollments            WellnessEnrollment[]
   wellnessActivities             WellnessActivity[]
   intakeReceipts                 ClaimIntakeReceipt[]
+  processingRuns                 ClaimProcessingRun[]
 }
 
 // ── Multi-client TPA tenancy (Medvex spec §2.1 / gap G2.1) ──────────────
@@ -2301,6 +2302,17 @@ model Claim {
   autoAdjPolicyId    String? // resolved AutoAdjudicationPolicy id (null = built-in default)
   autoAdjudicatedAt  DateTime?
 
+  // ── Claims Autopilot intake/processing provenance (F2.3, §9.5) ────────────
+  // Populated from terminal processing results; the legacy autoAdj* fields above
+  // are kept during migration for compatibility.
+  intakeSchemaVersion           String?
+  claimRevision                 Int                   @default(1)
+  strongEventFingerprint        String? // authoritative event id (unique per tenant; multiple nulls allowed)
+  suspectedDuplicateFingerprint String? // non-unique content signature
+  processingState               ClaimProcessingState?
+  processingRouteCode           String?
+  processingRuns                ClaimProcessingRun[]
+
   // ── Cost-share components (G9.1) — deductible + co-insurance, distinct from copay ──
   costShareDeductible  Decimal @default(0) @db.Decimal(14, 2)
   costShareCoInsurance Decimal @default(0) @db.Decimal(14, 2)
@@ -2360,6 +2372,10 @@ model Claim {
   // returns the original claim (NULLs are distinct in Postgres, so untagged claims
   // are unaffected).
   @@unique([tenantId, providerId, externalRef])
+  // Claims Autopilot (§9.5): one claim per authoritative strong event fingerprint.
+  // Postgres treats NULLs as distinct, so unlabelled claims are unaffected.
+  @@unique([tenantId, strongEventFingerprint])
+  @@index([tenantId, suspectedDuplicateFingerprint])
   // Double-capture detection index — (provider, member, date, category) lookups at adjudication
   @@index([tenantId, providerId, memberId, dateOfService, benefitCategory])
   @@index([tenantId])
@@ -6420,6 +6436,7 @@ model ClaimIntakeReceipt {
   safeMessage                   String? // caller-safe message; never raw internals
   httpStatus                    Int?
   correlationId                 String
+  processingRuns                ClaimProcessingRun[]
   // Set when this receipt replayed/linked to an earlier receipt (plain ref, no FK
   // self-relation to keep queries simple).
   replayedFromReceiptId         String?
@@ -6432,4 +6449,113 @@ model ClaimIntakeReceipt {
   @@index([tenantId, suspectedDuplicateFingerprint])
   @@index([tenantId, state, createdAt])
   @@index([claimId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// CLAIMS AUTOPILOT — durable processing run + stage history (F2.3, §9.3–§9.4)
+// Database is authoritative (D8): the run/stage rows are the source of truth for
+// automated evaluation; BullMQ only accelerates execution.
+// ═══════════════════════════════════════════════════════════════════════════
+
+enum ClaimProcessingTrigger {
+  INITIAL
+  MANUAL_REPROCESS
+  DUPLICATE_CLEARED
+  DOCUMENTS_UPDATED
+  CONFIG_CHANGED
+  RECOVERY
+}
+
+enum ClaimProcessingState {
+  PENDING
+  RUNNING
+  ROUTED
+  SHADOW_COMPLETE
+  AUTO_DECIDED
+  RETRYABLE
+  FAILED
+}
+
+enum ClaimProcessingStageName {
+  CONTEXT
+  ELIGIBILITY
+  CODING
+  DOCUMENTS
+  DUPLICATE
+  CONTRACT
+  PREAUTH
+  BENEFIT
+  FRAUD
+  COST_SHARE
+  POLICY
+  DECISION
+  NOTIFICATION
+  AUDIT
+}
+
+enum ClaimProcessingStageState {
+  PENDING
+  RUNNING
+  PASSED
+  ROUTED
+  SKIPPED
+  RETRYABLE
+  FAILED
+}
+
+model ClaimProcessingRun {
+  id              String                 @id @default(cuid())
+  tenantId        String
+  tenant          Tenant                 @relation(fields: [tenantId], references: [id])
+  claimId         String
+  claim           Claim                  @relation(fields: [claimId], references: [id])
+  receiptId       String
+  receipt         ClaimIntakeReceipt     @relation(fields: [receiptId], references: [id])
+  claimRevision   Int                    @default(1)
+  workflowVersion String                 @default("v1")
+  sequence        Int                    @default(1) // 1 = initial; authorized reprocess increments
+  trigger         ClaimProcessingTrigger @default(INITIAL)
+  supersedesRunId String? // terminal run this reprocess supersedes
+  modeResolved    String? // resolved OFF/SHADOW/LIVE (text — decoupled from the policy enum)
+  policyId        String?
+  state           ClaimProcessingState   @default(PENDING)
+  currentStage    ClaimProcessingStageName?
+  routeCode       String?
+  assignedQueue   String?
+  safeMessage     String? // no raw stack/payload
+  attemptCount    Int                    @default(0)
+  nextAttemptAt   DateTime?
+  leaseOwner      String?
+  leaseExpiresAt  DateTime?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime               @default(now())
+  updatedAt       DateTime               @updatedAt
+
+  stages ClaimProcessingStage[]
+
+  // At most one run per (claim revision, workflow, sequence).
+  @@unique([claimId, claimRevision, workflowVersion, sequence])
+  @@index([tenantId, state, nextAttemptAt])
+  @@index([tenantId, assignedQueue, state])
+  @@index([claimId])
+  @@index([receiptId])
+}
+
+model ClaimProcessingStage {
+  id           String                    @id @default(cuid())
+  runId        String
+  run          ClaimProcessingRun        @relation(fields: [runId], references: [id])
+  stage        ClaimProcessingStageName
+  state        ClaimProcessingStageState @default(PENDING)
+  attemptCount Int                       @default(0)
+  reasonCode   String?
+  safeMessage  String?
+  result       Json? // safe machine-readable refs/totals only — never raw docs/credentials
+  durationMs   Int?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  updatedAt    DateTime                  @updatedAt
+
+  @@unique([runId, stage])
 }

@@ -254,3 +254,26 @@ F4.5, F7.4).
 - **Security/privacy review:** scope-key format validated; receipt stores hashes/outcome only.
 - **Next eligible task:** F2.3 — Add processing run and stage schema.
 - **Blocker/options, if blocked:** n/a.
+
+---
+
+## F2.3 — Add processing run and stage schema
+
+- **Status:** COMPLETE (schema applied to throwaway DB + tests)
+- **Commit/branch:** `feat/claims-autopilot` (F2.3 commit)
+- **Files changed:** `prisma/schema.prisma` (additive: 4 enums + `ClaimProcessingRun` + `ClaimProcessingStage` + 6 Claim provenance columns + 3 back-relations + uniques/indexes), `tests/services/claim-processing-schema.test.ts` (new), `docs/claims-autopilot/DEPLOYMENT.md` (F2.3 section).
+- **Decisions enforced:** D8 (DB is authoritative — durable run/stage state); §6.4 state machine; §6.5 14-stage vocabulary; §9.3–§9.5.
+- **Acceptance scenarios covered:** foundation for CA-025/CA-048/CA-101..104 (durable runs, retry, recovery) and CA-026 (Claim strong-fp unique = one claim per authoritative event).
+- **Observable behavior before:** automation had no durable run/stage; a pipeline error left only a `Claim.autoAdj*` flag (characterized in F0.4 #5).
+- **Observable behavior after:** `ClaimProcessingRun` (revision/workflow/sequence unique, lease fields, `nextAttemptAt`, supersession) + `ClaimProcessingStage` (`(runId, stage)` unique, safe `result` JSON) exist; Claim carries `claimRevision`/`strongEventFingerprint`(unique)/`suspectedDuplicateFingerprint`/`processingState`/`processingRouteCode`/`intakeSchemaVersion`. No runtime behavior yet (F3.5 wires the repository).
+- **Forbidden effects explicitly checked:** additive only; legacy `autoAdj*` columns retained (not removed) per §9.5; `stage.result`/`run.safeMessage` documented as safe-only (no raw docs/credentials/stack); strong-fp unique permits multiple NULLs (verified).
+- **Tests run and exact results:**
+  - `npx prisma validate` OK; `npx prisma generate` OK; `npx prisma db push --accept-data-loss` → in sync (0 rows affected).
+  - `npx vitest run tests/services/claim-processing-schema.test.ts` → **8 passed**.
+  - `npm run typecheck` → PASS.
+- **Database/audit/reconciliation evidence:** applied to `autopilot_uat`; `ClaimProcessingRun`/`ClaimProcessingStage` tables + run compound unique + `Claim_tenantId_strongEventFingerprint_key` all present.
+- **Creator allowlist change:** none.
+- **Known gaps or skips:** `run.modeResolved` is `String?` (decoupled from the F2.4 `AutoAdjudicationMode` enum — the run is a trace). **Deploy finding:** the Claim strong-fp unique triggers a conservative `db push` data-loss warning that is a false positive (new all-NULL column, NULLs distinct) — documented in `DEPLOYMENT.md` with the `--accept-data-loss` flag and a pre-prod dup-check query.
+- **Security/privacy review:** run/stage store safe messages/reason codes/JSON refs only.
+- **Next eligible task:** F2.4 — Add policy modes and fail-safe schema defaults.
+- **Blocker/options, if blocked:** n/a.
