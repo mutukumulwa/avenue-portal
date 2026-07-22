@@ -220,12 +220,17 @@ async function linkReceipt(tx: Tx, receiptId: string, claimId: string): Promise<
   });
 }
 
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
 /**
  * Open a transaction and persist, with a bounded retry that re-resolves a
  * concurrent strong-fingerprint collision to a link (no duplicate claim) and
- * retries a claim-number/serialization conflict.
+ * retries a claim-number/serialization conflict. Retries are jitter-paced so a
+ * burst of concurrent submissions (a thundering herd all reading the same max
+ * claim number) de-synchronizes and converges instead of exhausting in lockstep
+ * — F5.2's 20-way burst proof relies on this.
  */
-export async function persistClaim(prisma: PrismaClient, input: PersistInput, maxAttempts = 5): Promise<PersistResult> {
+export async function persistClaim(prisma: PrismaClient, input: PersistInput, maxAttempts = 8): Promise<PersistResult> {
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       return await prisma.$transaction((tx) => persistClaimWithinTransaction(tx, input));
@@ -248,6 +253,7 @@ export async function persistClaim(prisma: PrismaClient, input: PersistInput, ma
         throw err;
       }
       if (attempt === maxAttempts) throw IntakeError.retryable(undefined, { reason: "persist retries exhausted" });
+      await sleep(5 + Math.floor(Math.random() * 20 * attempt));
     }
   }
   // Unreachable, but satisfies the type checker.

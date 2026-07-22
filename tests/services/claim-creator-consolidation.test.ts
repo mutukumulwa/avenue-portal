@@ -31,8 +31,8 @@ const ALLOWLIST: Record<string, string> = {
   // — it no longer calls Claim.create, so it is removed from the allowlist.
   "src/server/services/claims.service.ts":
     "Legacy ClaimsService.createClaim (tRPC + PA conversion) pending deprecation (F5.3/F5.7).",
-  "src/app/api/v1/claims/route.ts":
-    "B2B API rail pre-migration (F5.2).",
+  // F5.2 DONE: the B2B API route now adapts onto ClaimIntakeService — no direct
+  // Claim.create, removed from the allowlist.
   "src/app/api/claims/import/route.ts":
     "CSV import rail pre-migration (F5.4).",
   "src/app/(admin)/claims/new/actions.ts":
@@ -94,9 +94,10 @@ describe("Claims Autopilot — claim-creator consolidation guard (F0.2)", () => 
   const filesWithCreates = [...new Set(sites.map((s) => s.file))].sort();
 
   it("finds the inventoried set of creators (guard is actually scanning)", () => {
-    // Sanity: the scan must locate creators. A zero result means the regex or
-    // the src root broke, which would silently disable the guard.
-    expect(sites.length).toBeGreaterThanOrEqual(9);
+    // Sanity: the scan must locate at least one create site per allowlisted file.
+    // A zero/short result means the regex or the src root broke, which would
+    // silently disable the guard. Self-adjusts as F5 migrations shrink the list.
+    expect(sites.length).toBeGreaterThanOrEqual(Object.keys(ALLOWLIST).length);
   });
 
   it("has no production Claim.create outside the allowlist", () => {

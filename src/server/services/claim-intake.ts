@@ -107,13 +107,14 @@ function callerIdentity(caller: DirectEntryCaller): CallerIdentity {
 }
 
 /**
- * Process an accepted claim's run in-request, best-effort (D9). Interactive rails
- * want a synchronous decision when possible — but the durable processing run and
- * the recovery sweep (F3.6) remain the authoritative backstop, so a failure here
- * never affects acceptance. Lease semantics (`claimRunById`) make this safe even
- * if a worker races the same run.
+ * Process an accepted claim's run in-request, best-effort (D9). Interactive and
+ * synchronous API rails want a decision as soon as possible — but the durable
+ * processing run and the recovery sweep (F3.6) remain the authoritative
+ * backstop, so a failure here never affects acceptance. Lease semantics
+ * (`claimRunById`) make this safe even if a worker races the same run.
+ * Exported for the B2B API adapter (F5.2).
  */
-async function processAcceptedRunInline(claimId: string): Promise<void> {
+export async function processAcceptedRunInline(claimId: string): Promise<void> {
   try {
     const [{ processClaimRun }, { claimRunById }, { registerClaimAutopilotProcessor }] = await Promise.all([
       import("@/server/jobs/claim-autopilot.job"),

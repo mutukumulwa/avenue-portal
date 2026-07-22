@@ -25,8 +25,18 @@ describe.skipIf(!URL_SET)("F3.6 integration — processing + recovery", () => {
   beforeAll(async () => {
     prisma = (await import("@/lib/prisma")).prisma;
     tenantId = (await prisma.tenant.findFirstOrThrow()).id;
-    // Disjoint claim window (by claimNumber) so parallel integration files never share seeded claims.
-    claimPool.push(...(await prisma.claim.findMany({ where: { tenantId }, orderBy: { claimNumber: "asc" }, select: { id: true }, skip: 40, take: 25 })).map((c) => c.id));
+    // Disjoint claim window (by claimNumber) so parallel integration files never
+    // share seeded claims. Pool ONLY untouched claims — canonical intake (F5.1+)
+    // creates claims that already carry a sequence-1 run, and VOIDed test
+    // leftovers must never re-enter a fixture pool.
+    claimPool.push(
+      ...(
+        await prisma.claim.findMany({
+          where: { tenantId, processingRuns: { none: {} }, status: { not: "VOID" } },
+          orderBy: { claimNumber: "asc" }, select: { id: true }, skip: 40, take: 25,
+        })
+      ).map((c) => c.id),
+    );
   });
   afterEach(() => resetClaimProcessor());
   afterAll(async () => {

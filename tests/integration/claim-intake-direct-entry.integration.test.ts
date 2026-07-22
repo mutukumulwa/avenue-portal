@@ -65,7 +65,16 @@ describe.skipIf(!URL_SET)("F5.1 integration — admin & provider direct-entry co
 
   afterAll(async () => {
     if (!prisma) return;
+    // Money-decided claims void through the decision service (reverses postings);
+    // undecided ones just flip to VOID (nothing to reverse) so no fixture pool or
+    // duplicate scan ever sees them again.
     for (const id of createdClaimIds) await ClaimDecisionService.voidClaim(tenantId, id, { actorId: systemActorId, reason: "F5.1 cleanup" }).catch(() => undefined);
+    await prisma.claim.updateMany({ where: { id: { in: createdClaimIds }, status: { notIn: ["APPROVED", "PARTIALLY_APPROVED", "VOID"] } }, data: { status: "VOID" } }).catch(() => undefined);
+    // Remove this file's processing artifacts (stages → runs → receipts, FK order)
+    // so later fixture pools never see canonical-intake leftovers.
+    await prisma.claimProcessingStage.deleteMany({ where: { run: { claimId: { in: createdClaimIds } } } }).catch(() => undefined);
+    await prisma.claimProcessingRun.deleteMany({ where: { claimId: { in: createdClaimIds } } }).catch(() => undefined);
+    await prisma.claimIntakeReceipt.deleteMany({ where: { tenantId, idempotencyKey: { startsWith: "f51-" } } }).catch(() => undefined);
     resetClaimProcessor();
     await prisma.$disconnect();
   });

@@ -101,11 +101,17 @@ function callerProviderId(caller: CallerIdentity): string | null {
   return "providerId" in caller ? caller.providerId : null;
 }
 
-function actorId(caller: CallerIdentity): string {
+/**
+ * The audit-attribution actor. `AuditLog.userId` is a REQUIRED FK to `User`, so
+ * key/device rails (which have no human user) resolve the tenant's system actor
+ * — exactly how the legacy B2B route attributed API submissions. The caller's
+ * own identity is still fully recorded via `scopeKey`/`channel` on the receipt.
+ */
+async function resolveActorId(caller: CallerIdentity): Promise<string> {
   if ("userId" in caller) return caller.userId;
   if ("systemActorId" in caller) return caller.systemActorId;
-  if ("keyId" in caller) return caller.keyId;
-  return "SYSTEM";
+  const { getSystemActorId } = await import("../system-actor.service");
+  return getSystemActorId(caller.tenantId);
 }
 
 function integrationKeyId(caller: CallerIdentity): string | null {
@@ -239,7 +245,7 @@ export async function resolveIntakeContext(caller: CallerIdentity, submission: C
     channel: meta.channel,
     source: meta.source,
     scopeKey: buildScopeKey(caller, memberId),
-    actorId: actorId(caller),
+    actorId: await resolveActorId(caller),
     isSystemActor: meta.isSystemActor,
     providerId,
     providerBranchId,

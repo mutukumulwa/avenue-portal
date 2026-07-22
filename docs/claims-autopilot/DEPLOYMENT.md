@@ -183,3 +183,34 @@ references it and no money state depends on it.
 
 **Verified on `autopilot_uat`:** `db push` applied cleanly (no data-loss prompt);
 `claim-autopilot-breaker.integration.test.ts` → 5 passed.
+
+---
+
+## F5.2 — B2B API contract changes (integrator-facing; no schema change)
+
+No `db push` needed. The POST `/api/v1/claims` body shape is unchanged
+(additive optional `benefitCategory`, `invoiceNumber`), but the transport
+contract tightens per §8.5/§8.6 — notify any HMS integrator before deploy:
+
+- **`Idempotency-Key` header is now REQUIRED** for new submissions (422
+  `IDEMPOTENCY_KEY_REQUIRED` without it). A resend of an EXISTING claim's
+  `externalRef` still replays 200 — including claims accepted before this
+  deploy — so in-flight integrations that only retry known submissions keep
+  working; anything that CREATES needs the header.
+- Validation failures are **422** with field issues (was 400); invalid JSON
+  stays 400. Member existence is no longer leaked: unknown/foreign member is a
+  non-enumerating **403** (was 404).
+- Eligibility/coverage failures no longer reject: the claim is **accepted and
+  routed** (D6) — integrators receive 201 + receipt and see the routed state in
+  `processingState` / GET claim status.
+- Same key + changed payload ⇒ **409 `IDEMPOTENCY_KEY_REUSED`** (stable code +
+  `originalReceiptRef`). The 2-minute no-key heuristic dup-block is retired.
+- `source` is no longer hardcoded `SMART`: facility keys record **HMS**,
+  the operator key records SMART.
+- **Operator-key writes require the tenant binding** (`OPERATOR_TENANT_ID`,
+  BD-06 runbook) — an unbound operator key gets 403 on POST (reads unchanged).
+- **Facility keys require provider entitlement** (`ContractApplicability`) to
+  file for a member — consistent with the eligibility/benefits read endpoints
+  since E2E-D04. Issue keys only for facilities with an active contract scope.
+- New: **GET `/api/v1/claims/receipts/{receiptId}`** — authoritative receipt
+  state for timeout recovery, facility-scoped.

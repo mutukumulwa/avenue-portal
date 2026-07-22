@@ -86,8 +86,13 @@ async function fetchClaimState(claimId: string): Promise<{ claimNumber: string; 
 }
 
 export class ClaimIntakeService {
-  /** The single public acceptance boundary. */
-  static async submit(caller: CallerIdentity, raw: unknown): Promise<SubmitResult> {
+  /**
+   * The single public acceptance boundary. `opts.origin` carries rail-specific
+   * origin links (pre-auth attach, reimbursement fields, case provenance —
+   * F5.2/F5.6+); it participates in the strong fingerprint and is persisted
+   * atomically with the claim.
+   */
+  static async submit(caller: CallerIdentity, raw: unknown, opts: { origin?: PersistOrigin } = {}): Promise<SubmitResult> {
     // 1–2. Structural parse + normalize (structural failure ⇒ 422, no receipt).
     const parsed = parseClaimSubmissionV1(raw);
     if (!parsed.success) throw IntakeError.fromZod(parsed.error);
@@ -98,7 +103,7 @@ export class ClaimIntakeService {
 
     // 4. Fingerprints.
     const requestHash = computeRequestHash(normalized);
-    const strong = strongFingerprintFor(ctx, normalized);
+    const strong = strongFingerprintFor(ctx, normalized, opts.origin);
     const suspect = suspectFingerprintFor(ctx, normalized);
     const correlationId = randomUUID();
 
@@ -133,6 +138,7 @@ export class ClaimIntakeService {
         requestHash,
         strongEventFingerprint: strong,
         suspectedDuplicateFingerprint: suspect,
+        origin: opts.origin,
       });
     } catch (err) {
       const e = IntakeError.from(err);

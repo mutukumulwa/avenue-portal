@@ -14,6 +14,9 @@ const claims = vi.hoisted(() => ({ resolveClaimCurrency: vi.fn(async () => "UGX"
 
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
 vi.mock("@/server/services/provider-entitlement.service", () => ({ ProviderEntitlementService: entitlement }));
+// Key/device rails resolve the tenant's system actor for audit attribution
+// (AuditLog.userId is a required User FK).
+vi.mock("@/server/services/system-actor.service", () => ({ getSystemActorId: vi.fn(async () => "sys-actor-1") }));
 vi.mock("@/server/services/providers.service", () => ({ ProvidersService: providers }));
 vi.mock("@/server/services/claims.service", () => ({ ClaimsService: claims }));
 
