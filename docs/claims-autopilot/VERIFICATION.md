@@ -40,8 +40,16 @@ The connection env is saved at `<scratchpad>/db.env` — `source` it in any shel
 
 ```bash
 source <scratchpad>/db.env
+# a single suite:
 npx vitest run tests/integration/claim-intake-receipt.integration.test.ts
+# ALL autopilot suites together — MUST be sequential (the recovery sweep is global;
+# suites also use disjoint seeded-claim windows by claimNumber to avoid sharing):
+npx vitest run tests/integration/ --no-file-parallelism
 ```
+
+Run all together (with a throwaway Redis also up) → **38 passed / 9 skipped**
+(the 9 = 2 pre-existing suites gated on `P1_TEST_DB`). Integration suites are
+opt-in, so the standard `npx vitest run` (no DB env) skips them and stays green.
 
 ### Teardown (fully disposable)
 

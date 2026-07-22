@@ -483,3 +483,25 @@ F4.5, F7.4).
 - **Security/privacy review:** stored run/stage errors sanitized; no PHI in job payloads (runId/tenantId only).
 - **Next eligible task:** F3.7 — Make receipt, processing, notification and audit effects reconcilable.
 - **Blocker/options, if blocked:** n/a.
+
+---
+
+## F3.7 — Make receipt, processing, notification and audit effects reconcilable
+
+- **Status:** COMPLETE — **completes M3**
+- **Commit/branch:** `feat/claims-autopilot` (F3.7 commit)
+- **Files changed:** `src/server/jobs/claim-autopilot.job.ts` (+exact-once terminal audit + notification), `src/server/services/claim-intake/reconciliation.ts` (new — timeline + reconciliation queries), `tests/integration/claim-autopilot-reconcile.integration.test.ts` (new), plus test-isolation fixes to the F3.5/F3.6 integration files (disjoint `claimNumber` windows), `docs/claims-autopilot/VERIFICATION.md`.
+- **Decisions enforced:** §4.5 (audit-chain, not plain writeAudit — the canonical path already uses chained audit), §11.4 (exact-once notification/audit), §11.6 (chain-linked autopilot events), §11.7 (reconciliation invariants as queries).
+- **Acceptance scenarios covered:** CA-060/CA-061 (notification/terminal-projection idempotent), CA-091 (audit present for privileged actions), CA-109/CA-126 (reconciliation of impossible states, safe correlation).
+- **Observable behavior before:** terminal processing had no audit event and no member notification; no timeline/reconciliation queries.
+- **Observable behavior after:** `processClaimRun` appends a chain-linked terminal audit (`CLAIM:AUTOPILOT_ROUTED` / `AUTOPILOT_SHADOW_PROPOSED` / `AUTO_APPROVED` / `AUTOPILOT_RETRY_EXHAUSTED`) + a member notification **exactly once** (gated on the terminal transition actually applying), using the existing `getSystemActorId` (worker-safe) and `MemberNotificationService`; `reconciliation.ts` provides `getClaimProcessingTimeline` and `find{AcceptedReceiptsWithoutClaim,ClaimsWithoutRun,StuckRuns,TerminalRunsWithoutAudit}`.
+- **Forbidden effects explicitly checked:** terminal audit fires once even when `processClaimRun` is called twice (delta proven); audit/notification are best-effort (`.catch`) so a missing actor never breaks processing (fail-safe); processing runs in worker context (no request-scope headers) — proven; reconciliation flags a terminal run WITHOUT audit but not one WITH.
+- **Tests run and exact results:**
+  - **Real DB:** reconcile suite → **6 passed**.
+  - **M3 boundary:** `npm run typecheck` PASS; `npx vitest run` (no env) → **1140 passed / 47 skipped**; `brand:guard` + `currency:guard` PASS; eslint clean. **All integration suites together** (`--no-file-parallelism`, DB+Redis) → **38 passed / 9 skipped**.
+- **Database/audit/reconciliation evidence:** real Postgres; exact-once terminal audit + timeline + reconciliation queries verified.
+- **Creator allowlist change:** none.
+- **Known gaps or skips:** intake AUDIT on structural-reject/conflict is emitted at the transport by F1.4/F3.4 mapping; the full §11.7 report (assembling these queries with pass/fail gates) is F7.2. Integration suites must run sequentially (global sweep) — documented.
+- **Security/privacy review:** audit/notification carry only safe refs (runId/claimId/routeCode); member notification uses the audience-safe reason text; timeline selects no PHI. **M3 COMPLETE.**
+- **Next eligible task:** F4.1 — Remove implicit no-policy auto-approval (M4) — the D1 safety fix.
+- **Blocker/options, if blocked:** n/a.

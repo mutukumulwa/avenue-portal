@@ -35,7 +35,8 @@ describe.skipIf(!URL_SET || !REDIS_SET)("F3.6 integration — BullMQ queue", () 
   });
 
   async function makeRun(): Promise<{ runId: string; claimId: string }> {
-    const claimId = (await prisma.claim.findFirstOrThrow({ where: { tenantId, id: { notIn: claimIds } }, select: { id: true } })).id;
+    // Disjoint window (from the end by claimNumber) so it never shares seeded claims with the front-window files.
+    const claimId = (await prisma.claim.findFirstOrThrow({ where: { tenantId, id: { notIn: claimIds } }, orderBy: { claimNumber: "desc" }, select: { id: true } })).id;
     claimIds.push(claimId);
     const receipt = await prisma.claimIntakeReceipt.create({ data: { tenantId, scopeKey: "user:f36q", channel: "ADMIN_PORTAL", idempotencyKey: `f36q-${Date.now()}-${claimIds.length}`, schemaVersion: "1", requestHash: "req:v1:h", suspectedDuplicateFingerprint: "suspect:v1:s", correlationId: "c", state: "SUCCEEDED", claimId } });
     receiptIds.push(receipt.id);

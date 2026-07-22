@@ -25,7 +25,8 @@ describe.skipIf(!URL_SET)("F3.6 integration — processing + recovery", () => {
   beforeAll(async () => {
     prisma = (await import("@/lib/prisma")).prisma;
     tenantId = (await prisma.tenant.findFirstOrThrow()).id;
-    claimPool.push(...(await prisma.claim.findMany({ where: { tenantId }, select: { id: true }, take: 20 })).map((c) => c.id));
+    // Disjoint claim window (by claimNumber) so parallel integration files never share seeded claims.
+    claimPool.push(...(await prisma.claim.findMany({ where: { tenantId }, orderBy: { claimNumber: "asc" }, select: { id: true }, skip: 40, take: 25 })).map((c) => c.id));
   });
   afterEach(() => resetClaimProcessor());
   afterAll(async () => {

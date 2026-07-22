@@ -26,6 +26,10 @@ import {
   safeErrorMessage,
   type ClaimedRun,
 } from "@/server/services/claim-intake/processing";
+import { auditChainService } from "@/server/services/audit-chain.service";
+import { getSystemActorId } from "@/server/services/system-actor.service";
+import { MemberNotificationService } from "@/server/services/member-notification.service";
+import { getReason, type RouteCode } from "@/server/services/claim-intake/reason-catalog";
 
 export const MAX_RUN_ATTEMPTS = 5;
 const RETRY_BASE_DELAY_MS = 30_000;
@@ -70,10 +74,44 @@ async function mirrorToClaim(
     .catch(() => undefined);
 }
 
+/**
+ * Exact-once terminal effects (audit + member notification). Called ONLY when a
+ * terminal transition actually applied (`markRun*` returned true), which happens
+ * at most once per run — so these effects fire exactly once even under retries or
+ * two workers (F3.7, §11.4). Both are best-effort and never fail processing.
+ */
+async function onTerminal(db: PrismaClient, run: ClaimedRun, action: string, routeCode: string | null): Promise<void> {
+  try {
+    const actorId = await getSystemActorId(run.tenantId);
+    await auditChainService.append({
+      actorId, action, module: "CLAIMS", entityType: "Claim", entityId: run.claimId,
+      payload: { runId: run.id, sequence: run.sequence, routeCode }, tenantId: run.tenantId,
+      description: `${action} — run ${run.id} (claim ${run.claimId})`,
+    });
+  } catch {
+    /* audit is best-effort; the run state is the authoritative terminal record */
+  }
+  try {
+    const claim = await db.claim.findUnique({ where: { id: run.claimId }, select: { memberId: true, claimNumber: true } });
+    if (claim) {
+      const reason = routeCode ? getReason(routeCode as RouteCode) : null;
+      await MemberNotificationService.notifyForClaim({
+        tenantId: run.tenantId, memberId: claim.memberId, type: "CLAIM_STATUS",
+        title: action === "CLAIM:AUTO_APPROVED" ? "Claim approved" : "Claim update",
+        body: reason?.member ?? `Your claim ${claim.claimNumber} has been processed.`,
+        href: "/member/utilization", metadata: { claimId: run.claimId, runId: run.id, action },
+      });
+    }
+  } catch {
+    /* notification is best-effort */
+  }
+}
+
 async function handleFailureOrRetry(db: PrismaClient, run: ClaimedRun, owner: string, safeMessage: string, delayMs = RETRY_BASE_DELAY_MS): Promise<void> {
   if (run.attemptCount >= MAX_RUN_ATTEMPTS) {
-    await markRunFailed(db, run.id, owner, { safeMessage });
+    const applied = await markRunFailed(db, run.id, owner, { safeMessage });
     await mirrorToClaim(db, run.claimId, "FAILED", "PIPELINE_FAILED", "AUTOPILOT_FAILURE");
+    if (applied) await onTerminal(db, run, "CLAIM:AUTOPILOT_RETRY_EXHAUSTED", "PIPELINE_FAILED");
   } else {
     // exponential-ish backoff on the attempt already recorded by claiming.
     const backoff = delayMs * Math.max(1, run.attemptCount);
@@ -86,18 +124,24 @@ export async function processClaimRun(db: PrismaClient, run: ClaimedRun, owner: 
   try {
     const outcome = await processor(db, run);
     switch (outcome.kind) {
-      case "ROUTED":
-        await markRunRouted(db, run.id, owner, { routeCode: outcome.routeCode, assignedQueue: outcome.assignedQueue, safeMessage: outcome.safeMessage, modeResolved: outcome.modeResolved, policyId: outcome.policyId });
+      case "ROUTED": {
+        const applied = await markRunRouted(db, run.id, owner, { routeCode: outcome.routeCode, assignedQueue: outcome.assignedQueue, safeMessage: outcome.safeMessage, modeResolved: outcome.modeResolved, policyId: outcome.policyId });
         await mirrorToClaim(db, run.claimId, "ROUTED", outcome.routeCode, outcome.assignedQueue ?? null);
+        if (applied) await onTerminal(db, run, "CLAIM:AUTOPILOT_ROUTED", outcome.routeCode);
         break;
-      case "SHADOW_COMPLETE":
-        await markRunShadowComplete(db, run.id, owner, { routeCode: outcome.routeCode, assignedQueue: outcome.assignedQueue, safeMessage: outcome.safeMessage, modeResolved: outcome.modeResolved, policyId: outcome.policyId });
+      }
+      case "SHADOW_COMPLETE": {
+        const applied = await markRunShadowComplete(db, run.id, owner, { routeCode: outcome.routeCode, assignedQueue: outcome.assignedQueue, safeMessage: outcome.safeMessage, modeResolved: outcome.modeResolved, policyId: outcome.policyId });
         await mirrorToClaim(db, run.claimId, "SHADOW_COMPLETE", outcome.routeCode ?? null, outcome.assignedQueue ?? null);
+        if (applied) await onTerminal(db, run, "CLAIM:AUTOPILOT_SHADOW_PROPOSED", outcome.routeCode ?? null);
         break;
-      case "AUTO_DECIDED":
-        await markRunAutoDecided(db, run.id, owner, { safeMessage: outcome.safeMessage, modeResolved: outcome.modeResolved, policyId: outcome.policyId });
+      }
+      case "AUTO_DECIDED": {
+        const applied = await markRunAutoDecided(db, run.id, owner, { safeMessage: outcome.safeMessage, modeResolved: outcome.modeResolved, policyId: outcome.policyId });
         await mirrorToClaim(db, run.claimId, "AUTO_DECIDED", null, null);
+        if (applied) await onTerminal(db, run, "CLAIM:AUTO_APPROVED", null);
         break;
+      }
       case "RETRY":
         await handleFailureOrRetry(db, run, owner, outcome.safeMessage ?? "transient failure", outcome.delayMs);
         break;
