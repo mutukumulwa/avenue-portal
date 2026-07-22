@@ -59,3 +59,6 @@ in the session scratchpad and is deleted on teardown.
 |---|---|---|
 | F2.2 | `claim-intake-receipt.integration.test.ts` | **PASS** — 20-way same-key ⇒ 1 receipt + 19 replays; diff-hash ⇒ 1 reserved + 9 conflicts, original never overwritten; one-way terminal transition (Postgres 16.14). |
 | F2.5 | `claim-autopilot-policy-approval.integration.test.ts` | **PASS** — maker submits ⇒ PENDING_APPROVAL; maker self-approval blocked (SoD); checker activates ⇒ APPROVED/LIVE; new version supersedes prior; rejection ⇒ REJECTED (non-live); deactivation immediate. |
+| F3.3 | `claim-intake-persist.integration.test.ts` | **PASS** — CREATED (totals 3500, MANUAL source, 2 lines, 1 PENDING run, receipt SUCCEEDED+linked, no post-effects); strong-link sequential + concurrent ⇒ one claim; suspected-content ⇒ separate claims; full rollback leaves receipt PROCESSING (seeded DB). |
+
+**Seed:** the throwaway DB was seeded once (`SEED_PASSWORD='Mdx!Seed-2026#Rotate' npx prisma db seed`) → 1 tenant (`medvex`), 6 providers, 249 members, contracts/benefits/PA/GL. Integration tests **query** for ids at runtime (resilient to reseed) rather than hardcoding.

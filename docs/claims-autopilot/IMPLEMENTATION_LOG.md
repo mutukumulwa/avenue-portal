@@ -390,3 +390,26 @@ F4.5, F7.4).
 - **Security/privacy review:** the audience-safe wording contract is the privacy core of routed-claim messaging.
 - **Next eligible task:** F3.3 — Implement transaction-aware canonical persistence.
 - **Blocker/options, if blocked:** n/a.
+
+---
+
+## F3.3 — Implement transaction-aware canonical persistence
+
+- **Status:** COMPLETE (incl. real-DB proof)
+- **Commit/branch:** `feat/claims-autopilot` (F3.3 commit)
+- **Files changed:** `src/server/services/claim-intake/persist.ts` (new — THE canonical creator), `tests/services/claim-intake-persist.test.ts` (new, mocked), `tests/integration/claim-intake-persist.integration.test.ts` (new, real DB), `tests/services/claim-creator-consolidation.test.ts` (+persist.ts allowlist), `docs/claims-autopilot/CLAIM_CREATOR_INVENTORY.md` (persist.ts = canonical owner), `docs/claims-autopilot/VERIFICATION.md`.
+- **Decisions enforced:** D7/§8.3 (strong-fingerprint links, suspected never links), D8 (DB authoritative), D16 (no payload beyond claim/lines), §11.1 (intake transaction includes receipt success + claim + lines + run + origin links atomically), §F3.3 step 10 (no fraud/notify/decide here).
+- **Acceptance scenarios covered:** CA-001 (accepted, normalized totals, run scheduled, one claim), CA-026 (strong link, no 2nd claim), CA-027 (suspected content persists separately), and the intake-transaction rollback (CA-050 foundation).
+- **Observable behavior before:** 9 divergent `Claim.create` sites; no single atomic owner; no strong-fingerprint concurrency handling.
+- **Observable behavior after:** `persistClaimWithinTransaction(tx, input)` = the sanctioned in-tx creator (claim+lines+run+receipt-success+PA/case/reimbursement origin links); `persistClaim(prisma, input)` = the tx-open wrapper with bounded retry that re-resolves a concurrent strong-fingerprint collision to a link. Now the ONLY allowlisted `Claim.create` for new rails.
+- **Forbidden effects explicitly checked:** persist runs NO fraud/notification/decision (mocked tx exposes only claim/run/receipt/preauth — proven); sequential + concurrent strong-fp ⇒ exactly one claim (real DB); suspected-content ⇒ separate claims (real DB); FK failure mid-tx rolls back fully — receipt stays PROCESSING, no run, no claim (real DB); request-hash mismatch ⇒ idempotency conflict.
+- **Tests run and exact results:**
+  - `npx vitest run tests/services/claim-intake-persist.test.ts` → **5 passed** (mocked).
+  - **Real DB:** `npx vitest run tests/integration/claim-intake-persist.integration.test.ts` → **5 passed** (totals/source/run/receipt/no-post-effects; strong-link seq+concurrent; suspected-separate; rollback).
+  - `npm run typecheck` → PASS; eslint clean; consolidation guard PASS (persist.ts allowlisted).
+- **Database/audit/reconciliation evidence:** seeded Postgres (`medvex` tenant, 6 providers, 249 members); a persisted claim has billed 3500 = Σ lines, 1 PENDING run, SUCCEEDED linked receipt; concurrent invoice ⇒ 1 claim by DB unique.
+- **Creator allowlist change:** **ADDED** `src/server/services/claim-intake/persist.ts` (the canonical owner). This is the entry that remains after F5.10; every F5 rail migration removes another legacy entry.
+- **Known gaps or skips:** case entry-freezing and ReimbursementRequest creation are the caller adapters' concern (F5.6/5.8/5.9) — persist accepts typed origin links (PA connect + ATTACHED implemented; case/reimbursement claim-level fields set). Notification/audit exact-once is F3.7.
+- **Security/privacy review:** all scope comes from the derived context (F3.1); no body-trusted fields; fingerprints hashed.
+- **Next eligible task:** F3.4 — Implement the one public `ClaimIntakeService.submit`.
+- **Blocker/options, if blocked:** n/a.

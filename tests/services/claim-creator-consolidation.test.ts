@@ -43,6 +43,8 @@ const ALLOWLIST: Record<string, string> = {
     "Offline sync rail pre-migration (F5.5).",
   "src/server/services/case.service.ts":
     "Inpatient interim + final; becomes DERIVED_TRANSACTIONAL calling the canonical persist owner (F5.8/F5.9).",
+  "src/server/services/claim-intake/persist.ts":
+    "THE canonical production Claim.create owner (F3.3). The last entry standing after F5.10; every rail routes through it.",
 };
 
 /** Matches a genuine Prisma claim-create call, not `.claimLine.create` etc. */

@@ -89,6 +89,9 @@ documented `DERIVED_TRANSACTIONAL` case adapters that call it) should remain.
 | `src/server/services/sync.service.ts` | Offline sync rail pre-migration. | F5.5 |
 | `src/server/services/case.service.ts` | Inpatient interim + final; becomes `DERIVED_TRANSACTIONAL` calling the canonical persist owner inside the case txn. | F5.8 / F5.9 (reclassified, not removed) |
 
-**Not yet present:** `src/server/services/claim-intake/persist.ts` — the future
-single canonical `Claim.create` owner (added in F3.3). It joins the allowlist when
-created and is the last entry standing after F5.10.
+| `src/server/services/claim-intake/persist.ts` | **THE canonical owner** (F3.3, added) — `persistClaimWithinTransaction`. Every rail routes through it; the last entry standing after F5.10. | — (permanent) |
+
+`persist.ts` is now the sanctioned canonical `Claim.create`. As each F5 rail
+migrates onto it, that rail's row is removed from this table and the guard
+allowlist, until only `persist.ts` (plus documented `DERIVED_TRANSACTIONAL` case
+adapters that call it) remains.
