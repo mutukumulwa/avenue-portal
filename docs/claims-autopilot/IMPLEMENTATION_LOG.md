@@ -618,3 +618,25 @@ F4.5, F7.4).
 - **Security/privacy review:** all money flows through the single audited `decide` transaction; the auto path uses `systemDecision` + the F4.1 policy gates as its authorization; commit-time fraud re-check closes the eval→commit window.
 - **Next eligible task:** F4.6 — Implement shadow mode.
 - **Blocker/options, if blocked:** n/a.
+
+---
+
+## F4.6 — Implement shadow mode
+
+- **Status:** COMPLETE (real-DB)
+- **Commit/branch:** `feat/claims-autopilot` (F4.6 commit)
+- **Files changed:** `src/server/services/claim-autopilot/shadow.ts` (new), `src/server/services/claim-autopilot/processor.ts` (SHADOW branch stores proposal + routes to human), `tests/integration/claim-autopilot-shadow.integration.test.ts` (new).
+- **Decisions enforced:** D2 (SHADOW proposes but moves no money); §14.2 (shadow accuracy evidence for the LIVE exit gate).
+- **Acceptance scenarios covered:** CA-031 (shadow proposal + zero money mutation), CA-122/CA-127 (proposal visible to staff, agreement metrics).
+- **Observable behavior before:** SHADOW mode just returned SHADOW_COMPLETE with no stored proposal or comparison.
+- **Observable behavior after:** the processor's SHADOW branch stores the proposal on the run's DECISION stage (safe totals only) and routes the claim to `MANUAL_ADJUDICATION` for a human; `compareShadowToOutcome` computes disposition/amount agreement once the claim is humanly decided; `shadowAgreementMetrics` aggregates the agreement rate.
+- **Forbidden effects explicitly checked:** SHADOW processing leaves the claim RECEIVED, approvedAmount 0, lines unstamped (proven — zero automatic money writes); comparison returns null while undecided; agreement true only when disposition AND amount match; amount overturn and disposition overturn both flagged.
+- **Tests run and exact results:**
+  - **Real DB:** `npx vitest run tests/integration/claim-autopilot-shadow.integration.test.ts` → **2 passed** (no-money under SHADOW; store + agreement/amount-overturn/disposition-overturn comparison).
+  - `npm run typecheck` → PASS; eslint clean.
+- **Database/audit/reconciliation evidence:** real Postgres; proposal stored as a DECISION stage result.
+- **Creator allowlist change:** none.
+- **Known gaps or skips:** capturing the human outcome is passive (read at comparison time); the ops dashboard surfaces the metrics in F6.5.
+- **Security/privacy review:** proposal stores safe totals/disposition only (no PHI).
+- **Next eligible task:** F4.7 — Add circuit breaker and live policy enforcement (completes M4).
+- **Blocker/options, if blocked:** n/a.

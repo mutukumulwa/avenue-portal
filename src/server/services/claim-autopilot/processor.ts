@@ -20,9 +20,12 @@ const claimAutopilotProcessor: ClaimProcessor = async (db: PrismaClient, run): P
     return { kind: "ROUTED", routeCode: plan.routeCode ?? "AUTO_POLICY_NOT_LIVE", assignedQueue: plan.assignedQueue ?? null, modeResolved: plan.mode, policyId: plan.policyId };
   }
 
-  // SHADOW: record the proposal, move no money (D2). F4.6 stores the projection.
+  // SHADOW: record the proposal, move NO money (D2), and route the claim to
+  // normal human processing so a human decides it (F4.6).
   if (plan.mode === "SHADOW") {
-    return { kind: "SHADOW_COMPLETE", routeCode: plan.routeCode ?? null, modeResolved: "SHADOW", policyId: plan.policyId };
+    const { storeShadowProposal } = await import("./shadow");
+    await storeShadowProposal(db, run.id, plan);
+    return { kind: "SHADOW_COMPLETE", routeCode: plan.routeCode ?? null, assignedQueue: "MANUAL_ADJUDICATION", modeResolved: "SHADOW", policyId: plan.policyId };
   }
 
   // LIVE APPROVE / PARTIAL → execute atomically through the one decision stack.
