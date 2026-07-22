@@ -35,10 +35,9 @@ const ALLOWLIST: Record<string, string> = {
   // Claim.create, removed from the allowlist.
   // F5.4 DONE: the CSV import route submits per-row through ClaimIntakeService —
   // no direct Claim.create, removed from the allowlist.
-  "src/app/(admin)/claims/new/actions.ts":
-    "Admin reimbursement action pre-migration (F5.6).",
-  "src/server/services/reimbursement.service.ts":
-    "Reimbursement service rail pre-migration (F5.6).",
+  // F5.6 DONE: both reimbursement creators collapsed onto reimbursementService
+  // .submit -> ClaimIntakeService (admin action delegates); no direct
+  // Claim.create in either file, removed from the allowlist.
   // F5.5 DONE: the offline sync rail submits through ClaimIntakeService — no
   // direct Claim.create, removed from the allowlist.
   "src/server/services/case.service.ts":

@@ -50,6 +50,7 @@ export interface EvalContext {
 interface LoadedClaim {
   id: string;
   source: string;
+  isReimbursement: boolean;
   serviceType: string;
   benefitCategory: string;
   billedAmount: unknown;
@@ -77,8 +78,15 @@ export interface EvaluationResult {
 
 // ── Stage adapters (each thin over an existing owner) ─────────────────────────
 
-const stageContext = async (ctx: EvalContext): Promise<StageOutcome> =>
-  ctx.claim ? { disposition: "PASS", result: { memberId: ctx.claim.memberId, providerId: ctx.claim.providerId, source: ctx.claim.source } } : routeOut(ROUTE_CODES.ELIGIBILITY_REVIEW, "claim context missing");
+const stageContext = async (ctx: EvalContext): Promise<StageOutcome> => {
+  if (!ctx.claim) return routeOut(ROUTE_CODES.ELIGIBILITY_REVIEW, "claim context missing");
+  // D13 (F5.6): a reimbursement is ALWAYS a manual proof-of-payment review —
+  // no automatic money decision, regardless of policy configuration.
+  if (ctx.claim.isReimbursement) {
+    return routeOut(ROUTE_CODES.REIMBURSEMENT_PROOF_REVIEW, "reimbursement — manual proof verification (D13)");
+  }
+  return { disposition: "PASS", result: { memberId: ctx.claim.memberId, providerId: ctx.claim.providerId, source: ctx.claim.source } };
+};
 
 async function stageEligibility(ctx: EvalContext): Promise<StageOutcome> {
   const { coverageService, isCoverageEnded } = await import("@/server/services/coverage.service");
@@ -260,7 +268,7 @@ async function loadClaim(db: Db, tenantId: string, claimId: string): Promise<Loa
   return db.claim.findUnique({
     where: { id: claimId, tenantId },
     select: {
-      id: true, source: true, serviceType: true, benefitCategory: true, billedAmount: true, currency: true,
+      id: true, source: true, isReimbursement: true, serviceType: true, benefitCategory: true, billedAmount: true, currency: true,
       memberId: true, providerId: true, dateOfService: true, invoiceNumber: true, suspectedDuplicateFingerprint: true,
       member: { select: { status: true, group: { select: { status: true, clientId: true } } } },
       claimLines: { select: { id: true, cptCode: true, drugCode: true, icdCode: true, serviceCategory: true, billedAmount: true } },
@@ -282,6 +290,17 @@ export async function evaluateClaimStaged(db: Db, tenantId: string, claimId: str
   const clientId = claim.member?.group?.clientId ?? null;
   const policyRow = await AutoAdjudicationService.resolvePolicy(tenantId, clientId);
   const mode: PolicyMode = policyRow ? effectivePolicyMode(policyRow as unknown as PolicyLike) : "OFF";
+
+  // D13 (F5.6): reimbursements NEVER auto-decide. Route to proof review AHEAD of
+  // the policy-off short-circuit so the claim lands in the reimbursement queue
+  // (not generic manual adjudication) whatever the automation mode is.
+  if (claim.isReimbursement) {
+    if (runId) {
+      await recordStage(db, runId, "CONTEXT", { state: "ROUTED", reasonCode: ROUTE_CODES.REIMBURSEMENT_PROOF_REVIEW, safeMessage: "reimbursement — manual proof verification (D13)", currentStage: true });
+      for (const s of EVALUATION_STAGES) if (s.name !== "CONTEXT") await recordStage(db, runId, s.name, { state: "SKIPPED", reasonCode: "reimbursement" });
+    }
+    return { disposition: "ROUTE", mode, routeCode: ROUTE_CODES.REIMBURSEMENT_PROOF_REVIEW, routeStage: "CONTEXT", reason: "reimbursement — manual proof verification (D13)", approveAmount: null, lines: [], policyId: policyRow?.id ?? null };
+  }
 
   if (mode === "OFF") {
     if (runId) {

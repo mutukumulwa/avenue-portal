@@ -198,7 +198,8 @@ describe.skipIf(!URL_SET)("F5.2 integration — B2B API converges on canonical i
     const spoof = await post(body({ providerCode: slladeA }), keyB, key());
     expect(spoof.status).toBe(403);
     expect((await spoof.json()).error).toMatch(/does not match the authenticated provider/i);
-    expect(await prisma.claim.count({ where: { tenantId, providerId: providerBId, memberId } })).toBe(0);
+    // (status filter: VOIDed leftovers from other suites' cleanup are not live claims)
+    expect(await prisma.claim.count({ where: { tenantId, providerId: providerBId, memberId, status: { not: "VOID" } } })).toBe(0);
   });
 
   it("attaches an APPROVED pre-auth atomically via the canonical origin", async () => {

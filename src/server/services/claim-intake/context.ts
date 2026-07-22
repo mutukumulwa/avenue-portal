@@ -61,6 +61,14 @@ interface ChannelMeta {
   /** true ⇒ providerId is derived from the caller (body value must match); false ⇒ selected from body within tenant. */
   providerDerived: boolean;
   /**
+   * false ⇒ the provider only has to EXIST in the tenant (reimbursement: the
+   * member already paid, possibly at an out-of-network/expired facility — the
+   * claim documents it; D13 routes it to manual proof review regardless).
+   * true everywhere else: claims cannot be filed AGAINST a non-operational
+   * provider.
+   */
+  requireOperationalProvider: boolean;
+  /**
    * true ⇒ resolve the member scoped to the provider's contract entitlement
    * (programmatic facility rails). false ⇒ resolve within the tenant only.
    * Decoupled from `providerDerived` (F5.1): the provider PORTAL derives its
@@ -75,25 +83,25 @@ interface ChannelMeta {
 function channelMeta(caller: CallerIdentity): ChannelMeta {
   switch (caller.kind) {
     case "operatorUser":
-      return { channel: "ADMIN_PORTAL", source: "MANUAL", providerOwnsInvoiceNamespace: true, isSystemActor: false, providerDerived: false, scopeMembersByEntitlement: false };
+      return { channel: "ADMIN_PORTAL", source: "MANUAL", providerOwnsInvoiceNamespace: true, isSystemActor: false, providerDerived: false, requireOperationalProvider: true, scopeMembersByEntitlement: false };
     case "providerUser":
-      return { channel: "PROVIDER_PORTAL", source: "MANUAL", providerOwnsInvoiceNamespace: true, isSystemActor: false, providerDerived: true, scopeMembersByEntitlement: false };
+      return { channel: "PROVIDER_PORTAL", source: "MANUAL", providerOwnsInvoiceNamespace: true, isSystemActor: false, providerDerived: true, requireOperationalProvider: true, scopeMembersByEntitlement: false };
     case "providerKey":
       // A provider facility system; default HMS unless the key declares SMART/Slade.
-      return { channel: "API_V1", source: caller.sourceHint ?? "HMS", providerOwnsInvoiceNamespace: true, isSystemActor: false, providerDerived: true, scopeMembersByEntitlement: true };
+      return { channel: "API_V1", source: caller.sourceHint ?? "HMS", providerOwnsInvoiceNamespace: true, isSystemActor: false, providerDerived: true, requireOperationalProvider: true, scopeMembersByEntitlement: true };
     case "integrationKey":
       // Non-provider integration: authenticated external ref (not provider invoice) is authoritative.
-      return { channel: "API_V1", source: caller.sourceHint ?? "SMART", providerOwnsInvoiceNamespace: false, isSystemActor: true, providerDerived: false, scopeMembersByEntitlement: false };
+      return { channel: "API_V1", source: caller.sourceHint ?? "SMART", providerOwnsInvoiceNamespace: false, isSystemActor: true, providerDerived: false, requireOperationalProvider: true, scopeMembersByEntitlement: false };
     case "csvOperator":
-      return { channel: "CSV_IMPORT", source: "BATCH", providerOwnsInvoiceNamespace: true, isSystemActor: false, providerDerived: false, scopeMembersByEntitlement: false };
+      return { channel: "CSV_IMPORT", source: "BATCH", providerOwnsInvoiceNamespace: true, isSystemActor: false, providerDerived: false, requireOperationalProvider: true, scopeMembersByEntitlement: false };
     case "offlineDevice":
-      return { channel: "OFFLINE_SYNC", source: "OFFLINE_SYNC", providerOwnsInvoiceNamespace: true, isSystemActor: true, providerDerived: true, scopeMembersByEntitlement: true };
+      return { channel: "OFFLINE_SYNC", source: "OFFLINE_SYNC", providerOwnsInvoiceNamespace: true, isSystemActor: true, providerDerived: true, requireOperationalProvider: true, scopeMembersByEntitlement: true };
     case "reimbursement":
-      return { channel: "REIMBURSEMENT", source: "REIMBURSEMENT", providerOwnsInvoiceNamespace: false, isSystemActor: false, providerDerived: false, scopeMembersByEntitlement: false };
+      return { channel: "REIMBURSEMENT", source: "REIMBURSEMENT", providerOwnsInvoiceNamespace: false, isSystemActor: false, providerDerived: false, requireOperationalProvider: false, scopeMembersByEntitlement: false };
     case "preauthConversion":
-      return { channel: "PREAUTH_CONVERSION", source: "PREAUTH", providerOwnsInvoiceNamespace: false, isSystemActor: true, providerDerived: true, scopeMembersByEntitlement: false };
+      return { channel: "PREAUTH_CONVERSION", source: "PREAUTH", providerOwnsInvoiceNamespace: false, isSystemActor: true, providerDerived: true, requireOperationalProvider: true, scopeMembersByEntitlement: false };
     case "caseSystem":
-      return { channel: caller.isFinal ? "CASE_FINAL" : "CASE_INTERIM", source: caller.sourceHint ?? "HMS", providerOwnsInvoiceNamespace: false, isSystemActor: true, providerDerived: true, scopeMembersByEntitlement: false };
+      return { channel: caller.isFinal ? "CASE_FINAL" : "CASE_INTERIM", source: caller.sourceHint ?? "HMS", providerOwnsInvoiceNamespace: false, isSystemActor: true, providerDerived: true, requireOperationalProvider: true, scopeMembersByEntitlement: false };
   }
 }
 
@@ -142,7 +150,7 @@ async function resolveProvider(caller: CallerIdentity, meta: ChannelMeta, submis
     select: { id: true, contractStatus: true, name: true },
   });
   if (!provider) throw IntakeError.authorization("Provider is not in this tenant's scope.");
-  if (!ProvidersService.isOperational(provider.contractStatus)) {
+  if (meta.requireOperationalProvider && !ProvidersService.isOperational(provider.contractStatus)) {
     throw IntakeError.authorization(`Provider "${provider.name}" is ${provider.contractStatus} — claims cannot be submitted against it.`);
   }
   return providerId;

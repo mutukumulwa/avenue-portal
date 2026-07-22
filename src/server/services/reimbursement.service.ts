@@ -9,12 +9,14 @@
  *   - M-Pesa verification is a stub (Decision #7)
  */
 
+import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/prisma";
-import { peekNextDocumentNumber } from "@/lib/document-number";
 import { TRPCError } from "@trpc/server";
-import { ProofType, ReimbursementPaymentMethod } from "@prisma/client";
+import { ProofType, ReimbursementPaymentMethod, type BenefitCategory, type ClaimLineCategory } from "@prisma/client";
 import { auditChainService } from "./audit-chain.service";
 import { MobileMoneyService } from "./integrations/mobile-money.service";
+import { ClaimIntakeService } from "./claim-intake/intake.service";
+import { processAcceptedRunInline } from "./claim-intake";
 
 // Default reimbursement window: 90 days from service date
 const DEFAULT_REIMBURSEMENT_WINDOW_DAYS = 90;
@@ -24,8 +26,13 @@ export const reimbursementService = {
   // ── 1. Submit a reimbursement claim ────────────────────────────────────────
 
   /**
-   * Creates a Claim with isReimbursement=true and a linked ReimbursementRequest.
-   * Validates the submission is within the reimbursement window.
+   * The ONE reimbursement intake path (F5.6) — both the admin action and any
+   * service caller converge here, and the claim itself is created by the
+   * canonical ClaimIntakeService (channel REIMBURSEMENT, source REIMBURSEMENT).
+   * Proof / window / payment-destination / mobile-money metadata are preserved
+   * on the linked ReimbursementRequest; the staged evaluator ALWAYS routes
+   * reimbursements to REIMBURSEMENT_PROOF_REVIEW (D13) — no automatic money
+   * decision. Disbursement stays on the existing guarded `disburse`.
    */
   async submit({
     tenantId,
@@ -39,10 +46,16 @@ export const reimbursementService = {
     mpesaConfirmationCode,
     providerName,
     diagnoses,
-    procedures,
+    lineItems,
     benefitCategory,
     disbursementMethod,
     windowDays = DEFAULT_REIMBURSEMENT_WINDOW_DAYS,
+    idempotencyKey,
+    attendingDoctor,
+    invoiceNumber,
+    bankName,
+    accountNo,
+    mpesaPhone,
   }: {
     tenantId: string;
     submittedById: string;
@@ -50,36 +63,37 @@ export const reimbursementService = {
     providerId: string;
     serviceDate: Date;
     totalPaidByMember: number;
-    proofType: ProofType;
-    proofFileUrl: string;
+    proofType?: ProofType;
+    proofFileUrl?: string;
     mpesaConfirmationCode?: string;
-    providerName: string;
-    diagnoses: unknown;
-    procedures: unknown;
-    benefitCategory: string;
+    providerName?: string;
+    diagnoses: Array<{ code: string; description?: string; isPrimary?: boolean }>;
+    lineItems: Array<{ serviceCategory: ClaimLineCategory; cptCode?: string; icdCode?: string; description: string; quantity: number; unitCost: number }>;
+    benefitCategory: BenefitCategory;
     disbursementMethod?: ReimbursementPaymentMethod;
     windowDays?: number;
+    /** Client draft UUID (§8.5) — replays across retry. Defaults to a one-shot key. */
+    idempotencyKey?: string;
+    attendingDoctor?: string;
+    invoiceNumber?: string;
+    bankName?: string;
+    accountNo?: string;
+    mpesaPhone?: string;
   }) {
     const member = await prisma.member.findUnique({
       where: { id: memberId, tenantId },
       select: { status: true, firstName: true, lastName: true, phone: true },
     });
     if (!member) throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
-    if (!["ACTIVE"].includes(member.status)) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: `Member ${member.firstName} ${member.lastName} is ${member.status} — reimbursement not available`,
-      });
-    }
+    // NOTE (D6/F5.6): an inactive membership no longer blocks submission — the
+    // claim is recorded and lands in proof review where the reviewer decides.
 
-    // Check submission window
+    // Submission window (metadata for the reviewer, not a gate).
     const windowCutoff = new Date(serviceDate.getTime() + windowDays * 24 * 60 * 60 * 1000);
     const submittedWithinWindow = new Date() <= windowCutoff;
 
-    // Mobile-money verification (G5.10): MTN MoMo / Airtel Money via the
-    // provider-agnostic facade, inferred from the member's MSISDN. Never trust
-    // the confirmation SMS itself — verify against the provider API.
-    // (mpesa* field names are the legacy DB columns; rename deferred.)
+    // Mobile-money verification (G5.10): provider-agnostic facade; never trust
+    // the confirmation SMS itself. (mpesa* names are the legacy DB columns.)
     let mpesaNote: string | undefined;
     let mpesaVerified = false;
     if (proofType === "MPESA_SMS" && mpesaConfirmationCode) {
@@ -90,43 +104,63 @@ export const reimbursementService = {
       mpesaNote     = result.note;
     }
 
-    // Generate claim number
-    const claimNumber = await peekNextDocumentNumber("CLM-REIMB", (yp) =>
-      prisma.claim
-        .findFirst({ where: { tenantId, claimNumber: { startsWith: yp } }, orderBy: { claimNumber: "desc" }, select: { claimNumber: true } })
-        .then((r) => r?.claimNumber ?? null),
+    // Exactly-one-primary normalization (first flagged wins; none => first).
+    const flagged = diagnoses.findIndex((d) => d.isPrimary);
+    const primaryIdx = flagged === -1 ? 0 : flagged;
+
+    const result = await ClaimIntakeService.submit(
+      { kind: "reimbursement", tenantId, userId: submittedById },
+      {
+        schemaVersion: "1" as const,
+        idempotencyKey: idempotencyKey ?? `reimb-${randomUUID()}`,
+        ...(invoiceNumber ? { invoiceNumber } : {}),
+        member: { memberId },
+        provider: { providerId },
+        encounter: {
+          serviceType: "OUTPATIENT" as const,
+          benefitCategory,
+          serviceFrom: serviceDate.toISOString().slice(0, 10),
+          ...(attendingDoctor?.trim() ? { attendingDoctor: attendingDoctor.trim() } : {}),
+        },
+        diagnoses: diagnoses.map((d, i) => ({
+          code: d.code,
+          ...(d.description?.trim() ? { description: d.description.trim() } : {}),
+          isPrimary: i === primaryIdx,
+        })),
+        lines: lineItems.map((l) => ({
+          serviceCategory: l.serviceCategory,
+          ...(l.cptCode?.trim() ? { cptCode: l.cptCode.trim() } : {}),
+          ...(l.icdCode?.trim() ? { icdCode: l.icdCode.trim() } : {}),
+          description: l.description,
+          quantity: l.quantity,
+          unitCost: l.unitCost,
+          billedAmount: Math.round(l.quantity * l.unitCost * 100) / 100,
+        })),
+      },
+      {
+        origin: {
+          isReimbursement: true,
+          reimbursement: { bankName: bankName ?? null, accountNo: accountNo ?? null, mpesaPhone: mpesaPhone ?? null },
+        },
+      },
     );
 
-    const claim = await prisma.$transaction(async (tx) => {
-      const newClaim = await tx.claim.create({
+    // Proof metadata rides on the linked request row (adapter concern — the
+    // canonical persist owns only the claim). Best-effort AFTER acceptance:
+    // the claim is already routed to proof review either way.
+    if (result.claimId && result.outcome === "ACCEPTED" && proofFileUrl) {
+      const facilityName = providerName
+        ?? (await prisma.provider.findUnique({ where: { id: providerId }, select: { name: true } }))?.name
+        ?? "Unknown Provider";
+      await prisma.reimbursementRequest.create({
         data: {
           tenantId,
-          claimNumber,
+          claimId:              result.claimId,
           memberId,
-          providerId,
-          serviceType:    "OUTPATIENT",
-          dateOfService:  serviceDate,
-          diagnoses:      diagnoses as never,
-          procedures:     procedures as never,
-          billedAmount:   totalPaidByMember,
-          benefitCategory: benefitCategory as never,
-          isReimbursement: true,
-          status:          "RECEIVED",
-          source:          "MANUAL",
-          reimbursementBankName:   disbursementMethod === "BANK_TRANSFER" ? undefined : undefined,
-          reimbursementMpesaPhone: disbursementMethod === "MPESA" ? undefined : undefined,
-        },
-      });
-
-      await tx.reimbursementRequest.create({
-        data: {
-          tenantId,
-          claimId:              newClaim.id,
-          memberId,
-          providerName,
+          providerName:         facilityName,
           serviceDate,
           totalPaidByMember,
-          proofType,
+          proofType:            proofType ?? "RECEIPT_PHOTO",
           proofFileUrl,
           mpesaConfirmationCode,
           mpesaVerified,
@@ -135,30 +169,33 @@ export const reimbursementService = {
           reimbursementWindowDays: windowDays,
           disbursementMethod,
         },
-      });
-
-      return newClaim;
-    });
+      }).catch((err) => console.warn("[reimbursement] request-row write failed (claim still routed to proof review):", err));
+    }
 
     await auditChainService.append({
       actorId:    submittedById,
       action:     "REIMBURSEMENT:SUBMITTED",
       module:     "REIMBURSEMENT",
       entityType: "Claim",
-      entityId:   claim.id,
+      entityId:   result.claimId ?? result.receiptId,
       payload: {
-        claimNumber, totalPaidByMember, proofType,
-        submittedWithinWindow, mpesaVerified: mpesaVerified ?? false,
+        claimNumber: result.claimNumber, totalPaidByMember, proofType: proofType ?? null,
+        submittedWithinWindow, mpesaVerified: mpesaVerified ?? false, receiptId: result.receiptId,
       },
       tenantId,
-      description: `Reimbursement claim ${claimNumber} submitted — UGX ${totalPaidByMember.toLocaleString()} — proof: ${proofType}`,
+      description: `Reimbursement claim ${result.claimNumber} submitted — UGX ${totalPaidByMember.toLocaleString()} — proof: ${proofType ?? "none"}`,
     });
 
     if (!submittedWithinWindow) {
-      console.warn(`[reimbursement] Claim ${claimNumber} submitted outside ${windowDays}-day window — flagged for reviewer`);
+      console.warn(`[reimbursement] Claim ${result.claimNumber} submitted outside ${windowDays}-day window — flagged for reviewer`);
     }
 
-    return claim;
+    // D9: route it to the reimbursement review queue in-request when possible.
+    if (result.outcome === "ACCEPTED" && result.claimId) {
+      await processAcceptedRunInline(result.claimId);
+    }
+
+    return { claimId: result.claimId, claimNumber: result.claimNumber, receiptId: result.receiptId, replayed: result.replayed };
   },
 
   // ── 2. Disburse reimbursement to member ────────────────────────────────────

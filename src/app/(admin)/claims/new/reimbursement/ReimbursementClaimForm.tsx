@@ -34,6 +34,8 @@ const emptyLine = (): LineItem => ({
 export function ReimbursementClaimForm({ members, providers }: { members: Member[]; providers: Provider[] }) {
   const [lines, setLines]         = useState<LineItem[]>([emptyLine()]);
   const [error, setError]         = useState<string | null>(null);
+  // F5.6: stable draft id — the idempotency key so a double-submit replays.
+  const [draftId] = useState(() => crypto.randomUUID());
   const [isPending, startTrans]   = useTransition();
   const [payMethod, setPayMethod] = useState<"bank" | "mpesa">("mpesa");
 
@@ -63,7 +65,8 @@ export function ReimbursementClaimForm({ members, providers }: { members: Member
 
     startTrans(async () => {
       try {
-        await submitReimbursementClaimAction({
+        const res = await submitReimbursementClaimAction({
+          idempotencyKey:          draftId,
           memberId:                fd.get("memberId") as string,
           providerId:              fd.get("providerId") as string,
           benefitCategory:         fd.get("benefitCategory") as never,
@@ -76,6 +79,7 @@ export function ReimbursementClaimForm({ members, providers }: { members: Member
           reimbursementAccountNo:  payMethod === "bank" ? (fd.get("accountNo") as string) || undefined : undefined,
           reimbursementMpesaPhone: payMethod === "mpesa" ? (fd.get("mpesaPhone") as string) || undefined : undefined,
         });
+        if (res && !res.ok) setError(res.error);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Submission failed.");
       }
