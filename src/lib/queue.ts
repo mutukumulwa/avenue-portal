@@ -25,7 +25,7 @@ export function getConnection(): Redis {
   return _connection;
 }
 
-type QueueName = "notifications" | "billing" | "clinical" | "system" | "analytics";
+type QueueName = "notifications" | "billing" | "clinical" | "system" | "analytics" | "claims";
 
 const _queues = new Map<QueueName, Queue>();
 
@@ -45,7 +45,30 @@ export const Queues = {
   get clinical()      { return getQueue("clinical"); },
   get system()        { return getQueue("system"); },
   get analytics()     { return getQueue("analytics"); },
+  get claims()        { return getQueue("claims"); },
 };
+
+/**
+ * Claims Autopilot (F3.6): enqueue processing of a specific accepted run. Keyed
+ * by run id so a duplicate dispatch (e.g. a retried enqueue) collapses to one
+ * job. Acceptance never depends on this — the recovery sweep is the safety net.
+ */
+export async function enqueueClaimAutopilotRun(runId: string, tenantId: string) {
+  await Queues.claims.add(
+    "claim-autopilot-run",
+    { runId, tenantId },
+    { jobId: `car-${runId}`, attempts: 3, backoff: { type: "exponential", delay: 2000 }, removeOnComplete: 1000, removeOnFail: 5000 },
+  );
+}
+
+/** Recurring recovery sweep — recovers PENDING/due-RETRYABLE/stale runs (D8). */
+export async function scheduleClaimAutopilotRecovery() {
+  await Queues.claims.add(
+    "claim-autopilot-recovery",
+    {},
+    { repeat: { every: 60_000 }, jobId: "claim-autopilot-recovery", removeOnComplete: 100, removeOnFail: 100 },
+  );
+}
 
 /**
  * Schedule the pre-auth escalation scan to run every 30 minutes.

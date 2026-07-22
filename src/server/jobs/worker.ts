@@ -25,6 +25,8 @@ import { runAdminFeeAccrualJob } from "./admin-fee-accrual.job";
 import { runFraudScanJob } from "./fraud-scan.job";
 import { runContractLifecycleJob } from "./contract-lifecycle.job";
 import { runOfflinePackJob } from "./offline-pack.job";
+import { runClaimAutopilotRunJob, runClaimAutopilotRecoveryJob } from "./claim-autopilot.job";
+import { scheduleClaimAutopilotRecovery } from "../../lib/queue";
 
 // PR-002 #2: fail fast on missing/placeholder config — never fall back to
 // defaults (the OS-username DB fallback caused June's silent failure storm).
@@ -83,6 +85,7 @@ scheduleLapseDetectionJob().catch(err => console.error("[Worker] Failed to sched
 scheduleReportGenerationJob().catch(err => console.error("[Worker] Failed to schedule report generation job:", err));
 scheduleAdminFeeAccrualJob().catch(err => console.error("[Worker] Failed to schedule admin-fee accrual job:", err));
 scheduleFraudScanJob().catch(err => console.error("[Worker] Failed to schedule fraud-scan job:", err));
+scheduleClaimAutopilotRecovery().catch(err => console.error("[Worker] Failed to schedule claim-autopilot recovery:", err));
 
 /**
  * NOTIFICATIONS WORKER
@@ -220,6 +223,20 @@ analyticsWorker.on('failed', (job: Job | undefined, err: Error) => {
   console.error(`[Worker] Analytics job ${job?.id} failed:`, err);
 });
 
+// Claims Autopilot (F3.6): process accepted runs + recover interrupted ones.
+const claimsWorker = new Worker("claims", async (job: Job) => {
+  if (job.name === "claim-autopilot-run") {
+    await runClaimAutopilotRunJob(job as unknown as { data: { runId: string; tenantId?: string } });
+  } else if (job.name === "claim-autopilot-recovery") {
+    const { processed, backlog } = await runClaimAutopilotRecoveryJob();
+    if (processed > 0 || backlog > 0) console.log(`[Worker] claim-autopilot recovery: processed ${processed}, backlog ${backlog}`);
+  }
+}, { connection });
+
+claimsWorker.on('failed', (job: Job | undefined, err: Error) => {
+  console.error(`[Worker] Claims-autopilot job ${job?.id} failed:`, err);
+});
+
 // Process exit handling loop
 process.on("SIGTERM", async () => {
   console.log("Gracefully closing workers...");
@@ -228,4 +245,5 @@ process.on("SIGTERM", async () => {
   await systemWorker.close();
   await clinicalWorker.close();
   await analyticsWorker.close();
+  await claimsWorker.close();
 });

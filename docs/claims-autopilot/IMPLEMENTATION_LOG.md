@@ -459,3 +459,27 @@ F4.5, F7.4).
 - **Security/privacy review:** stored errors sanitized (`safeErrorMessage`, no stack); no PHI in run/stage.
 - **Next eligible task:** F3.6 — Add processing job and recovery sweeper.
 - **Blocker/options, if blocked:** n/a.
+
+---
+
+## F3.6 — Add processing job and recovery sweeper
+
+- **Status:** COMPLETE (incl. real-DB recovery + Redis dedup proofs)
+- **Commit/branch:** `feat/claims-autopilot` (F3.6 commit)
+- **Files changed:** `src/lib/queue.ts` (+`claims` queue, `enqueueClaimAutopilotRun`, `scheduleClaimAutopilotRecovery`), `src/server/jobs/claim-autopilot.job.ts` (new), `src/server/jobs/worker.ts` (register claims worker + schedule recovery + graceful close), `tests/services/claim-autopilot-job.test.ts` (new), `tests/integration/claim-autopilot-recovery.integration.test.ts` (new), `tests/integration/claim-autopilot-queue.integration.test.ts` (new), `docs/claims-autopilot/{VERIFICATION,DEPLOYMENT}.md`.
+- **Decisions enforced:** D8 (DB-authoritative; sweep recovers regardless of Redis); §11.2/§11.3 (lease, bounded retry, recovery sweep); §11.2 (exhausted ⇒ FAILED + alert-visible).
+- **Acceptance scenarios covered:** CA-025 (dispatch fails ⇒ sweeper recovers), CA-100 (Redis unavailable ⇒ recoverable), CA-101/CA-104 (worker crash / two sweepers), CA-103 (poison claim exhausts ⇒ FAILED visible).
+- **Observable behavior before:** accepted runs stayed PENDING with nothing to drive them (F3.4 enqueuer was a no-op).
+- **Observable behavior after:** `claim-autopilot-run` job (keyed `car-<runId>`, dedup) + `claim-autopilot-recovery` recurring sweep (60s) claim and process runs; `processClaimRun` applies ROUTE/SHADOW/AUTO outcomes + mirrors to `Claim.processingState`/`processingRouteCode`/`assignedQueue`, retries below the cap, FAILS visibly at the cap; pluggable `setClaimProcessor` (fail-closed default routes to manual until F4.2).
+- **Forbidden effects explicitly checked:** enqueue-never-happened ⇒ recovery sweep still processes (proven); crashed worker's stale lease reclaimed by the sweep (proven); processor error sanitized + retried, then FAILED at the cap with `assignedQueue=AUTOPILOT_FAILURE` (proven); duplicate enqueue ⇒ one job (Redis proven).
+- **Tests run and exact results:**
+  - `npx vitest run tests/services/claim-autopilot-job.test.ts` → **2 passed**.
+  - **Real DB:** recovery suite → **4 passed** (route+mirror; retry→FAILED; sweep-recovers-unenqueued; sweep-reclaims-stale).
+  - **Redis+DB:** queue suite → **2 passed** (enqueue dedup; handler processes).
+  - `npm run typecheck` → PASS; eslint clean.
+- **Database/audit/reconciliation evidence:** real Postgres + throwaway Redis (`:56379`).
+- **Creator allowlist change:** none.
+- **Known gaps or skips:** web-side `setProcessingEnqueuer` wiring is F5.1 (the sweep covers latency meanwhile); intake/decision AUDIT for routed/failed runs is F3.7; the real stage evaluator (replacing the fail-closed default processor) is F4.2. BullMQ job ids may not contain `:` — used `car-<runId>`.
+- **Security/privacy review:** stored run/stage errors sanitized; no PHI in job payloads (runId/tenantId only).
+- **Next eligible task:** F3.7 — Make receipt, processing, notification and audit effects reconcilable.
+- **Blocker/options, if blocked:** n/a.

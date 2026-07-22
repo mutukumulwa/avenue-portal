@@ -131,3 +131,25 @@ the circuit breaker (F4.7), this stops all live automation immediately.
 **Verified on `autopilot_uat`:** integrity script → "✓ … claims autopilot";
 backfill report → 0 claims/policies, `policiesResolvingLive: []`, `--verify-non-live`
 exits 0.
+
+---
+
+## F3.6 — Worker & queue config
+
+**Adds** a BullMQ `claims` queue with two job kinds (`src/lib/queue.ts`,
+`src/server/jobs/claim-autopilot.job.ts`, registered in `src/server/jobs/worker.ts`):
+- `claim-autopilot-run` — processes one accepted run; enqueued best-effort by
+  `enqueueClaimAutopilotRun(runId, tenantId)` with `jobId=car-<runId>` so a
+  duplicate dispatch collapses to one job. Web-side wiring (`setProcessingEnqueuer`)
+  lands in F5.1; until then the recovery sweep drives everything.
+- `claim-autopilot-recovery` — recurring every 60s (`scheduleClaimAutopilotRecovery`),
+  claims PENDING/due-RETRYABLE/stale runs in bounded batches and processes them.
+  **This is the safety net (D8):** accepted claims process even if an enqueue or
+  worker was interrupted. Runs are worker-safe via `FOR UPDATE SKIP LOCKED`.
+
+The worker (`npm run worker`) registers the `claims` Worker and schedules recovery
+on boot; SIGTERM closes it gracefully. A run that exhausts `MAX_RUN_ATTEMPTS` (5)
+becomes `FAILED` with the claim mirrored to `assignedQueue=AUTOPILOT_FAILURE`
+(operator-visible). The stage evaluator is registered by F4.2 via
+`setClaimProcessor`; until then the fail-closed default routes every claim to
+manual adjudication.

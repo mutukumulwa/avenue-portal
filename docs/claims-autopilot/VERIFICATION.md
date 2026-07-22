@@ -62,6 +62,8 @@ in the session scratchpad and is deleted on teardown.
 | F3.3 | `claim-intake-persist.integration.test.ts` | **PASS** — CREATED (totals 3500, MANUAL source, 2 lines, 1 PENDING run, receipt SUCCEEDED+linked, no post-effects); strong-link sequential + concurrent ⇒ one claim; suspected-content ⇒ separate claims; full rollback leaves receipt PROCESSING (seeded DB). |
 | F3.4 | `claim-intake-service.integration.test.ts` | **PASS** — submit ⇒ ACCEPTED (claim+PENDING run, enqueue called with runId, `CLAIM:INTAKE_ACCEPTED` chained audit); replay ⇒ same claim (no 2nd); conflict ⇒ 409, original untouched; throwing enqueuer still ACCEPTED (run PENDING); getReceipt authoritative + foreign-tenant null. |
 | F3.5 | `claim-intake-processing.integration.test.ts` | **PASS** — two-worker race ⇒ one claim; stale-lease reclaim; non-owner cannot complete; retry reuses run (attempt++); reprocess next-sequence + supersession; concurrent reprocess ⇒ one non-terminal run; terminal immutable; stage upsert. |
+| F3.6 | `claim-autopilot-recovery.integration.test.ts` | **PASS** — processClaimRun route+mirror; error ⇒ retry below cap, FAILED (visible) at cap; recovery sweep processes un-enqueued runs; sweep reclaims a crashed worker's stale-leased run. |
+| F3.6 | `claim-autopilot-queue.integration.test.ts` (Redis) | **PASS** — enqueue dedup by run id (one job); run-job handler claims+processes. Throwaway Redis on `:56379` (`redis-server --port 56379 --save "" --appendonly no`; gate `AUTOPILOT_TEST_REDIS===REDIS_URL`). |
 
 **⚠️ Timezone finding (F3.5):** the DB session TZ is EAT (UTC+3). Prisma stores
 `DateTime` as UTC in a `timestamp` (no-tz) column, so raw-SQL lease/retry
