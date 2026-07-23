@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireProvider } from "@/lib/provider-portal";
+import { ProviderAccessService } from "@/server/services/provider-access.service";
 import { prisma } from "@/lib/prisma";
 import { FilePlus2, UserCheck, FileText, Banknote } from "lucide-react";
 
@@ -18,7 +18,12 @@ const STATUS_TONE: Record<string, string> = {
 };
 
 export default async function ProviderDashboard() {
-  const { provider, tenantId } = await requireProvider();
+  // F1.3 proof route: scope is resolved through the canonical access context
+  // (session-derived provider/tenant + permissions + branch scope), not bare
+  // requireProvider. Behavior is unchanged — the dashboard still hard-scopes
+  // every query to the context's provider/tenant.
+  const { ctx, provider } = await ProviderAccessService.resolveUserContext();
+  const tenantId = ctx.tenantId;
 
   const [counts, recent, sums] = await Promise.all([
     prisma.claim.groupBy({

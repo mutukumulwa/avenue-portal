@@ -254,3 +254,29 @@ Stop condition observed: yes — schema+service+tests+backfill done; NO provider
 ```
 
 ---
+
+## F1.3 — Build canonical ProviderAccessService
+
+```text
+Work package: F1.3
+Status: COMPLETE
+Proof-before-build classification: MISSING (no unified access-context resolver; requireProvider returns {session,provider,providerId,tenantId} with no permissions/branch scope and no isActive check)
+Files changed: src/server/services/provider-access.service.ts (new), tests/services/provider-access.service.test.ts (new), src/app/provider/dashboard/page.tsx (ONE proof route migrated), PROGRESS.md + IMPLEMENTATION_LOG.md
+Schema/data changes: none
+Behavior delivered: ProviderAccessContext (§6.5) + resolvers + pure helpers. buildUserContext (testable core) validates user active + in-tenant + bound-to-claimed-provider, then loads permissions from the RBAC owner (F1.1) and active branch ids from ProviderBranchAssignmentService (F1.2) into one context. resolveUserContext wraps requireProvider (preserving login/role/provider redirects) then enriches. Helpers: hasPermission/requirePermission, hasBranch/requireBranch (empty set denies), assertProviderOwned, narrowToBranches (shrink-only). buildCredentialContext is a deny-by-default stub for API keys (scopes/branches filled in F1.6/F1.7). Composes existing owners only — owns no eligibility/PA/claim decision (§6.2).
+Authorization evidence: pure tests — permission check independent of branch (has perm, empty branches still denies branch-scoped), empty/forged branch denied, assertProviderOwned rejects other provider, narrow never widens, credential ctx empty scopes. DB tests — denies inactive (USER_INACTIVE), denies user-not-bound-to-claimed-provider (FORBIDDEN_PROVIDER, the anti-forge case), safe NOT_FOUND for cross-tenant user, empty branch set for unassigned user, and correct assembly of F1.1 perms + F1.2 branches. Scope is server-derived; the session's serialized permissions array is treated as a cache, not authority (loaded fresh from RBAC).
+Idempotency/concurrency evidence: n/a (read-only resolver + pure helpers)
+Privacy/security evidence: NOT_FOUND is returned identically for absent and out-of-tenant users (§9.1 — no existence leak). Context is not serialized to the browser as authority. requireProvider (→ next-auth) is dynamically imported inside resolveUserContext ONLY, so the testable core imports without dragging next/server under jsdom.
+Money/reconciliation evidence: n/a
+Focused tests and results: npx vitest run --config ./vitest.worktree.config.ts tests/services/provider-access.service.test.ts → pure 5/5 (no DB); with AUTOPILOT_TEST_DB → 10/10 (incl. inactive/mismatch/not-found/assembly). Full suite (no DB) 1139 passed / 125 skipped (was 1134/120 — +5 pure, +5 DB-gated). tsc exit 0; brand:guard PASS; currency:guard PASS (664 files).
+Typecheck/schema result: tsc exit 0
+Manual/visual evidence: dashboard proof route migrated (requireProvider → ProviderAccessService.resolveUserContext). Browser QA deferred by design: the change is behavior-neutral (identical provider/tenant values + identical queries) and the page requires an authenticated provider session the seed does not contain; tsc + the service tests are the proof.
+Feature-flag state: none (resolver is additive; only the dashboard reads it, with unchanged output)
+Backfill/rollout impact: none
+Known limitations: only ONE route migrated (stop condition) — layout/nav + remaining pages are F1.4+. API_KEY/CONNECTOR context is a documented deny-by-default stub until F1.6/F1.7. No session-id is exposed by auth, so sessionId currently mirrors the user id.
+Unrelated worktree changes preserved: yes (all edits worktree-prefixed)
+Next allowed package: F1.4 — Migrate provider layout/navigation guards (S)
+Stop condition observed: yes — service + tests + exactly one proof route; no further routes migrated
+```
+
+---

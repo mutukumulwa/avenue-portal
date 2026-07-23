@@ -51,7 +51,7 @@
 |---|---|---|---|---|
 | F1.1 | Define and seed provider permission catalog | S | COMPLETE | `prisma/seeds/provider-rbac.ts` + `tests/services/provider-rbac-catalog.test.ts` (7 pass) |
 | F1.2 | Add provider branch assignments | S | COMPLETE | `ProviderUserBranchAssignment` + `provider-branch-assignment.service.ts` + test (7 pass on DB) |
-| F1.3 | Build canonical ProviderAccessService | M | NOT_STARTED | — |
+| F1.3 | Build canonical ProviderAccessService | M | COMPLETE | `provider-access.service.ts` + test (10 pass); dashboard = proof route |
 | F1.4 | Migrate provider layout/navigation guards | S | NOT_STARTED | — |
 | F1.5 | Harden provider user administration/offboarding | M | NOT_STARTED | — |
 | F1.6 | Extend API keys: scope, expiry, branch, rotation | M | NOT_STARTED | — |
