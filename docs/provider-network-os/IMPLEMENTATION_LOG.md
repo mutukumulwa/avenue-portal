@@ -463,3 +463,32 @@ Stop condition observed: yes — did NOT change claim submission.
 ```
 
 ---
+
+## F1.12 — Enforce entitlement on provider claim submission (BUILT; bypass removal GATED OFF)
+
+```text
+Work package: F1.12
+Status: COMPLETE (flag-gated enforcement built + wired). Bypass removed ONLY under the D3 flag (default OFF) — production bypass preserved until network-ops/claims/security sign-off.
+Proof-before-build: F0.3 — provider-portal claim intake uses channel PROVIDER_PORTAL with scopeMembersByEntitlement:false (claim-intake/context.ts); the action resolved the member tenant-only. B2B API uses apiProvider scope true. Reused ProviderEntitlementService (entitledMemberWhere) + ProviderAccessSettings flag (F1.11).
+Files changed: src/server/services/provider-claim-entitlement-gate.service.ts (new), src/app/provider/claims/new/actions.ts (member resolution now goes through the gate), tests/services/provider-claim-entitlement-gate.test.ts (new), PROGRESS.md + IMPLEMENTATION_LOG.md
+Schema/data changes: none
+Behavior delivered: ProviderClaimEntitlementGate.resolveSubmittableMember — flag OFF (default) resolves tenant-only (documented bypass preserved); flag ON resolves entitlement-scoped at the CLAIM'S service date, so an out-of-entitlement member is unresolvable ⇒ the action returns its normal "no member found" ⇒ structural reject, NO claim created (matches the B2B API). Receipt/idempotency/routing remain with Claims Autopilot (the gate only gates member resolution before intake; runClaimIntake unchanged).
+Authorization evidence: 3 DB tests — OFF: EXCLUDEd member still resolves (bypass); ON: EXCLUDEd member null (structural reject) + INCLUDEd resolves; ON: service date before applicability effectiveFrom ⇒ even in-group member null (date-correct).
+Idempotency/concurrency evidence: unchanged — the gate does not touch receipts; runClaimIntake keeps the form draft-UUID idempotency (F0.3).
+Privacy/security evidence: out-of-scope member is a safe not-found (same error string as a genuinely missing member — no enumeration). Provider derived from session (action), never the body (D1).
+Money/reconciliation evidence: n/a (no money path change; a rejected member creates no claim)
+Focused tests and results: 3/3 (opt-in DB). Full suite (no DB env) 1164 passed / 149 skipped (+3 DB). tsc 0; brand PASS; currency PASS (673).
+Feature-flag state: providerAccess.entitlementEnforcement (Tenant.config) — DEFAULT OFF. Bypass removal per provider/client is the D3 human gate.
+Manual/visual evidence: claim action typechecks; enforcement OFF ⇒ claim submission behavior unchanged; browser QA of the ON path deferred to the pilot gate (needs a seeded provider session + flipped flag).
+Known limitations: branch context not yet required on claim submission (the provider claim form has no branch selector — added when the form gains one); channel matrix (context.ts) left as-is (gate sits in the provider action, not the shared Claims Autopilot channel config).
+Next allowed package: F2.1 — Private document metadata + upload-intent schema (Phase F2). Remaining F1.7 route groups (b..) also open as separate units.
+Stop condition observed: yes — did NOT build corrections (F5).
+```
+
+---
+
+# Phase F1 COMPLETE (2026-07-23)
+
+All 12 packages built on the worktree branch (`9b48962`→`df03532`→ this). Provider access foundation: RBAC permission catalog + persona roles, effective branch assignments, canonical ProviderAccessService (context = provider + permissions + branch scope), permission-filtered nav, hardened user admin/offboarding (session-revoking suspend, last-admin safeguard), scoped/expiring/rotatable API keys + per-route scope enforcement (eligibility group), applicability readiness report, reviewed-input backfill mechanism, entitlement shadow comparison, canonical eligibility (data-minimised), and the claim-submission entitlement gate. **Deny-by-default entitlement (F1.9 apply / F1.11 / F1.12) is built behind Tenant.config providerAccess flags defaulting OFF — production activation is the D3 network-ops/claims/security sign-off (Gate A activation), deliberately not flipped in code.** Full suite 1164 passed / 149 skipped; tsc/brand/currency green throughout. Next phase: **F2 — private document foundation** (Gate B).
+
+---

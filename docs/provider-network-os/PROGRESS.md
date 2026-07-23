@@ -60,7 +60,9 @@
 | F1.9 | Backfill applicability (reviewed batches) | S/batch | BUILT · GATED(prod --apply needs network-ops signed input) | `provider-applicability-backfill.service.ts` + test (3 pass) |
 | F1.10 | Add entitlement shadow comparison | M | COMPLETE | `provider-entitlement-shadow.service.ts` + `ProviderEntitlementShadowSample` + test (4 pass) |
 | F1.11 | Make provider browser eligibility canonical | M | BUILT · GATED(enforcement flip needs D3 sign-off; default OFF) | `provider-eligibility.service.ts` + `ProviderEligibilityCheck` + flag + eligibility page rewired + test (5 pass) |
-| F1.12 | Enforce entitlement on provider claim submission | M | GATED(approved flag per D3) | — |
+| F1.12 | Enforce entitlement on provider claim submission | M | BUILT · GATED(bypass removed only under D3 flag; default OFF) | `provider-claim-entitlement-gate.service.ts` + claim action wired + test (3 pass) |
+
+**Phase F1 COMPLETE (2026-07-23)** — all 12 packages built. Foundation: permission catalog + persona roles (F1.1), branch assignments (F1.2), ProviderAccessService (F1.3), permission-filtered nav (F1.4), user admin/offboarding (F1.5), scoped/expiring/rotatable API keys (F1.6), per-route scope enforcement — eligibility group (F1.7a), applicability readiness report (F1.8), reviewed backfill mechanism (F1.9), entitlement shadow comparison (F1.10), canonical eligibility (F1.11), claim-submission entitlement gate (F1.12). **Deny-by-default entitlement enforcement (F1.11/F1.12) + backfill apply (F1.9) default OFF/unrun — flipping requires the D3 network-ops/claims/security sign-off (Gate A activation).** Remaining F1.7 route groups (benefits/preauth/claims/upload/hms-batch) are separate per-group units. **Gate A:** foundation server-derived + tested; full per-route permission/branch enforcement activates via the D3 flags at the pilot gate — not flipped in code.
 
 ## F2 — Private document foundation
 
