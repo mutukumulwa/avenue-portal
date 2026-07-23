@@ -2983,6 +2983,67 @@ model ProviderEntitlementShadowSample {
   @@index([createdAt])
 }
 
+// PNOS F3.2 — canonical PA intake receipt (§7.5). One row per submission
+// attempt, keyed by the caller's idempotency key within a tenant+provider+
+// channel scope. Same key + same requestHash ⇒ replay the original; same key +
+// different hash ⇒ conflict with NO mutation (D26). Carries ids and a
+// structural failure code only — never a clinical body or document content.
+enum PreauthIntakeStatus {
+  ACCEPTED // PA created; adjudication proceeds through the canonical owner
+  REJECTED // structurally invalid — no PA exists
+  PROCESSING // accepted, post-commit processing not yet confirmed
+}
+
+model PreauthIntakeReceipt {
+  id                 String              @id @default(cuid())
+  tenantId           String
+  providerId         String?
+  clientId           String?
+  memberId           String?
+  providerBranchId   String?
+  channel            String // PreauthChannel (F3.1 contract)
+  idempotencyKey     String
+  requestHash        String // canonical normalized hash (F3.1)
+  status             PreauthIntakeStatus
+  preAuthorizationId String? // set when ACCEPTED
+  failureCode        String? // structural failure code when REJECTED
+  actorType          String
+  actorId            String
+  credentialId       String?
+  requestId          String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  // idempotency scope: tenant + submitting provider + command channel + key
+  @@unique([tenantId, providerId, channel, idempotencyKey])
+  @@index([tenantId, providerId, createdAt])
+  @@index([requestHash])
+  @@index([preAuthorizationId])
+}
+
+// PNOS F3.2 — append-only PA lifecycle events (§7.5). Ordering is explicit via
+// `sequence` (unique per PA). Metadata is SAFE only (ids/labels/codes): an
+// internal reason is referenced, never inlined.
+model PreAuthorizationEvent {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  preAuthorizationId String
+  sequence           Int
+  eventType          String // SUBMITTED | ASSIGNED | INFO_REQUESTED | APPROVED | DECLINED | CANCELLED | AMENDED | HOLD_CREATED | HOLD_RELEASED | CONVERTED_TO_CLAIM | GOP_ISSUED …
+  priorStatus        String?
+  newStatus          String?
+  safeReasonCode     String? // provider-safe code from the approved catalog
+  internalReasonRef  String? // pointer to internal detail — never the detail itself
+  actorType          String
+  actorId            String?
+  dataVersionRef     String? // contract/policy version in force
+  metadata           Json? // SAFE metadata only (validated before write)
+  createdAt          DateTime @default(now())
+
+  @@unique([preAuthorizationId, sequence])
+  @@index([tenantId, preAuthorizationId, createdAt])
+}
+
 // PNOS F1.11 — audited, point-in-time provider eligibility evidence (§7.3).
 // Distinct from EligibilitySnapshot (an offline-pack balance cache). Carries
 // member/client identifiers + a SAFE result category + explanation — never a

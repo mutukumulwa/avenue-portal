@@ -698,3 +698,22 @@ Stop condition observed: yes — nothing persisted through the new contract.
 ```
 
 ---
+
+## F3.2 — PA intake receipt + event schema
+
+```text
+Work package: F3.2
+Status: COMPLETE
+Files changed: prisma/schema.prisma (PreauthIntakeStatus enum + PreauthIntakeReceipt + PreAuthorizationEvent), src/server/services/preauth-intake/events.ts (new), tests/factories/provider-network.ts (teardown clears the new tables), tests/services/preauth-intake-schema.test.ts, PROGRESS.md + IMPLEMENTATION_LOG.md
+Schema/data changes: additive via db push (in sync). Both models are relation-less (scalar ids) — consistent with the other PNOS evidence models and leaves the shared PreAuthorization model untouched; existing PA rows stay readable.
+Behavior delivered: receipt carries provider/client/member/branch/channel + idempotencyKey + requestHash + status + preAuthorizationId|failureCode + actor/credential/requestId, with the idempotency scope enforced as UNIQUE(tenantId, providerId, channel, idempotencyKey). Events are append-only with an explicit per-PA `sequence` (UNIQUE(preAuthorizationId, sequence)); appendPreauthEvent derives the next sequence and validates metadata; listPreauthEvents returns the ordered timeline. assertSafeEventMetadata rejects clinical/raw keys (notes/body/payload/document/description…), over-long strings and nested structures.
+Authorization evidence: n/a (schema + helpers)
+Idempotency/concurrency evidence: DB test proves the same tenant+provider+channel+key is rejected outright (the caller must be given a replay or conflict, never a 2nd row), while a different provider or channel may reuse the key value. A duplicate event sequence is impossible — history cannot be silently reordered or overwritten.
+Privacy/security evidence: a REJECTED receipt is fully expressible with ids + a structural failure code (no PA, no clinical body); unsafe event metadata is refused BEFORE any write.
+Focused tests and results: 7/7 (3 pure metadata + 4 DB). Full suite (no DB env) 1191 passed / 183 skipped (+3 pure, +4 DB). tsc 0; brand PASS; currency PASS (681).
+Known limitations: no route migration (stop condition) — nothing writes receipts/events yet; F3.3 does. NOTE: `prisma generate` must run WITH DIRECT_URL set (prisma.config.ts reads it) or it fails silently and tests run against a stale client — that bit once here and cost a red run.
+Next allowed package: F3.3 — Implement PreauthIntakeService (M)
+Stop condition observed: yes — no route migration.
+```
+
+---
