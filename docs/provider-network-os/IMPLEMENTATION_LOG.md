@@ -492,3 +492,25 @@ Stop condition observed: yes — did NOT build corrections (F5).
 All 12 packages built on the worktree branch (`9b48962`→`df03532`→ this). Provider access foundation: RBAC permission catalog + persona roles, effective branch assignments, canonical ProviderAccessService (context = provider + permissions + branch scope), permission-filtered nav, hardened user admin/offboarding (session-revoking suspend, last-admin safeguard), scoped/expiring/rotatable API keys + per-route scope enforcement (eligibility group), applicability readiness report, reviewed-input backfill mechanism, entitlement shadow comparison, canonical eligibility (data-minimised), and the claim-submission entitlement gate. **Deny-by-default entitlement (F1.9 apply / F1.11 / F1.12) is built behind Tenant.config providerAccess flags defaulting OFF — production activation is the D3 network-ops/claims/security sign-off (Gate A activation), deliberately not flipped in code.** Full suite 1164 passed / 149 skipped; tsc/brand/currency green throughout. Next phase: **F2 — private document foundation** (Gate B).
 
 ---
+
+## F2.1 — Private document metadata + upload-intent schema
+
+```text
+Work package: F2.1
+Status: COMPLETE
+Proof-before-build: F0.4 map — Document lacks tenantId/providerId/storageKey/hash/scan; public-read bucket; no intent model. No enum collisions. MISSING.
+Files changed: prisma/schema.prisma (Document §7.4 fields + DocumentUploadIntent + DocumentScanStatus/DocumentSourceType/DocumentTargetType enums), src/server/services/provider-document.service.ts (new, minimal), tests/services/provider-document.f21.test.ts (new), PROGRESS.md + IMPLEMENTATION_LOG.md
+Schema/data changes: additive via db push. scanStatus is NULLABLE (null=legacy readable; F2.7 backfills). fileUrl retained (legacy readability, step 2). db push flagged ONE data-loss warning = the new uploadIntentId unique on Document — SAFE because the column is brand-new all-NULL (Postgres NULLs distinct) → no duplicates; accepted on throwaway. SAME reasoning applies to prod (all-null new column, no dupes) — DEPLOYMENT note.
+Behavior delivered: private/scanned/scoped document schema + single-use upload intent + target-type constraints (assertProviderUploadTarget: unknown → INVALID_TARGET_TYPE; provider source to a legacy target → TARGET_NOT_PROVIDER_UPLOADABLE). NO bucket-policy change (stop condition). No finalize/scan/download yet (F2.2-F2.6).
+Authorization evidence: target-type constraint is the F2.1 slice; resource authorization is F2.2.
+Idempotency/concurrency evidence: Document.uploadIntentId @unique + DocumentUploadIntent.finalizedDocumentId @unique = finalize-once guarantee (DB test: 2nd document for the same intent rejected).
+Privacy/security evidence: storageKey stored (not URL); scanStatus gates usability later. No object/bucket change.
+Money/reconciliation evidence: n/a
+Focused tests and results: 6/6 (4 pure target-type + 2 DB: finalize-once unique + legacy null-scan readable). Full suite (no DB env) 1168 passed / 151 skipped (+4 pure, +2 DB). tsc 0; brand PASS; currency PASS (674).
+Feature-flag state: none (inert schema until F2.3+ flow uses it)
+Known limitations: DocumentTargetType lists forward values (INFORMATION_REQUEST/RECONSIDERATION/PAYMENT_QUERY/PROFILE_CHANGE) whose target models arrive in F4-F7; intent stores targetType+targetId as scalars so no dangling FK. Legacy MemberHealthFile not folded in (separate model; F2.7/F2.8 decide).
+Next allowed package: F2.2 — Build resource-level document authorization (M)
+Stop condition observed: yes — no bucket-policy change.
+```
+
+---

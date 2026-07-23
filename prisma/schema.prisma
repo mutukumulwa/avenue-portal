@@ -4668,6 +4668,46 @@ model ContributionRateTable {
 
 // ─── SUPPORTING ENTITIES ────────────────────────────────
 
+// PNOS F2 — document security regime. Scan status is NULLABLE on purpose: a null
+// value means a LEGACY (pre-F2) row that stays readable via fileUrl during
+// migration (F2.1 step 2); F2.7 backfills a disposition. New documents created
+// through the intent→finalize flow (F2.4) carry PENDING→CLEAN.
+enum DocumentScanStatus {
+  PENDING
+  CLEAN
+  REJECTED
+  QUARANTINED
+  ERROR
+}
+
+enum DocumentSourceType {
+  OPERATOR
+  PROVIDER_USER
+  PROVIDER_API
+  CONNECTOR
+  MEMBER
+}
+
+// Polymorphic upload targets. Values for not-yet-built targets (INFORMATION_
+// REQUEST F4, RECONSIDERATION F5, PAYMENT_QUERY F6, PROFILE_CHANGE F7) are
+// listed for forward-compatibility — the intent stores targetType+targetId as
+// scalars, so a value does not require the target model to exist yet.
+enum DocumentTargetType {
+  CLAIM
+  PREAUTH
+  CASE
+  INFORMATION_REQUEST
+  RECONSIDERATION
+  PAYMENT_QUERY
+  PROFILE_CHANGE
+  GROUP
+  ENDORSEMENT
+  QUOTATION
+  BROKER
+  MEMBER_HEALTH
+  OTHER
+}
+
 model Document {
   id            String            @id @default(cuid())
   fileName      String
@@ -4692,6 +4732,56 @@ model Document {
   quotationId   String?
   quotation     Quotation?        @relation(fields: [quotationId], references: [id])
   createdAt     DateTime          @default(now())
+  // PNOS F2.1 — private, scanned, resource-scoped document metadata (§7.4).
+  tenantId               String?
+  providerId             String?
+  providerBranchId       String?
+  sourceType             DocumentSourceType?
+  sourceActorId          String?
+  storageKey             String? // private object key — NOT a public URL
+  originalFileName       String?
+  declaredMimeType       String?
+  detectedMimeType       String?
+  sizeBytes              Int?
+  sha256                 String?
+  scanStatus             DocumentScanStatus? // null = legacy (readable via fileUrl until F2.7)
+  scanEngine             String?
+  scannedAt              DateTime?
+  retentionClass         String?
+  uploadedAt             DateTime?
+  finalizedAt            DateTime?
+  supersededByDocumentId String?
+  uploadIntentId         String?   @unique // one finalized document per intent (finalize-once guarantee)
+
+  @@index([tenantId, providerId])
+  @@index([storageKey])
+  @@index([sha256])
+  @@index([scanStatus])
+}
+
+// PNOS F2.1 — staged upload intent (§7.4). Binds the authorized target + actor +
+// expected type/size to a single-use token before any object is finalized;
+// finalize (F2.4) re-checks scope and consumes it exactly once.
+model DocumentUploadIntent {
+  id                       String    @id @default(cuid())
+  tenantId                 String
+  targetType               DocumentTargetType
+  targetId                 String
+  expectedProviderId       String?
+  expectedProviderBranchId String?
+  sourceType               DocumentSourceType
+  sourceActorId            String
+  expectedMimeTypes        String[]  @default([])
+  maxSizeBytes             Int
+  token                    String    @unique // single-use
+  idempotencyKey           String?
+  expiresAt                DateTime
+  finalizedAt              DateTime?
+  finalizedDocumentId      String?   @unique
+  createdAt                DateTime  @default(now())
+
+  @@index([tenantId, targetType, targetId])
+  @@index([expiresAt])
 }
 
 model Correspondence {

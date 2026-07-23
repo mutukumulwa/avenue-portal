@@ -68,7 +68,7 @@
 
 | Pkg | Title | Size | Status | Evidence |
 |---|---|---|---|---|
-| F2.1 | Private doc metadata + upload-intent schema | M | NOT_STARTED | — |
+| F2.1 | Private doc metadata + upload-intent schema | M | COMPLETE | `Document` §7.4 fields + `DocumentUploadIntent` + `provider-document.service.ts` + test (6 pass) |
 | F2.2 | Resource-level document authorization | M | NOT_STARTED | — |
 | F2.3 | Upload intent creation | S | NOT_STARTED | — |
 | F2.4 | Upload finalize + content validation | M | NOT_STARTED | — |
