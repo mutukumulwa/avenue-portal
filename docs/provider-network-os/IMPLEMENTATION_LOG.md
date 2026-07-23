@@ -280,3 +280,29 @@ Stop condition observed: yes — service + tests + exactly one proof route; no f
 ```
 
 ---
+
+## F1.4 — Migrate provider layout/navigation guards
+
+```text
+Work package: F1.4
+Status: COMPLETE
+Proof-before-build classification: PARTIAL (layout was an async RSC calling requireProvider; ProviderNav was a hardcoded static NAV_ITEMS list with no permission filtering). Checked node_modules/next/dist/docs/ per AGENTS.md — the directory does NOT exist in this install (next 15.5.15); followed the established in-repo pattern (async RSC layout + "use client" nav) as the authoritative signal.
+Files changed: src/components/layouts/provider-nav-model.ts (new — pure), src/components/layouts/ProviderNav.tsx (now renders a passed permission-filtered item list; iconKey→component map), src/app/provider/layout.tsx (resolves ctx via ProviderAccessService, computes nav server-side), tests/components/provider-nav-model.test.ts (new), PROGRESS.md + IMPLEMENTATION_LOG.md
+Schema/data changes: none
+Behavior delivered: navigation is computed server-side from ctx.permissions (computeProviderNav) and only a browser-safe {key,label,href,iconKey} list crosses to the client. Grouped per §10.1 order; ONLY existing routes emitted (unfinished routes never appear). Legacy fallback: a user with no provider.* permission sees the full current working set (identical to today's nav) so the portal is not blanked before F1.9 assigns persona roles; a user WITH provider permissions is filtered precisely (Home always shown).
+Authorization evidence: 9 pure tests — finance/biller/front-desk/admin/integration personas each get the correct subset; legacy/TPA-only users get the full set; unfinished routes never emitted; emitted items carry NO permission/provider/branch field (only key/label/href/iconKey). requireProvider (inside resolveUserContext) still performs login/role/unauthorized redirects — hiding a nav item is convenience, not security; each page stays independently server-guarded (unchanged by this package).
+Idempotency/concurrency evidence: n/a (pure render model)
+Privacy/security evidence: context is NOT serialized to the browser (§6.5) — asserted by the item-shape test. Navigation hiding is explicitly not the boundary.
+Money/reconciliation evidence: n/a
+Focused tests and results: npx vitest run --config ./vitest.worktree.config.ts tests/components/provider-nav-model.test.ts → 9 passed. Full suite (no DB) 1148 passed / 125 skipped (was 1139/125 — +9). tsc exit 0 (also confirms ProviderNav has exactly one consumer, the layout, with the new signature); brand:guard PASS; currency:guard PASS (665 files).
+Typecheck/schema result: tsc exit 0
+Manual/visual evidence: browser QA deferred by design — for a legacy user computeProviderNav returns all 7 items and ProviderNav preserves the exact prior classNames/order, so the rendered bar is byte-identical to before; and there is no seeded provider session to authenticate headlessly. tsc + the 9 unit tests are the proof; permission-filtered rendering activates only once a user holds provider roles.
+Feature-flag state: none — the legacy fallback (no provider.* perms ⇒ full nav) is the rollout gate; no behavior flips until users are assigned persona roles (F1.9).
+Backfill/rollout impact: none directly; filtered nav takes effect per-user as F1.9 assigns roles.
+Known limitations: horizontal bar renders the flattened item list (group headers not shown as dropdowns) — grouped-dropdown UX is a later presentation package; the group structure is already computed. Per-page permission gating is NOT added here (later per-page migrations) — F1.4 only governs nav visibility.
+Unrelated worktree changes preserved: yes
+Next allowed package: F1.5 — Harden provider user administration and offboarding (M)
+Stop condition observed: yes — nav renders from permissions; unfinished routes absent; no per-page gates added
+```
+
+---
