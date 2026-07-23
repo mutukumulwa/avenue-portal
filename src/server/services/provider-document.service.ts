@@ -3,6 +3,15 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma, PrismaClient, DocumentTargetType, DocumentSourceType } from "@prisma/client";
 import { ProviderAccessService, type ProviderAccessContext } from "./provider-access.service";
 import { resolveAcceptableMime } from "@/lib/document-mime";
+import { isDocumentUsable } from "./provider-document-scan.service";
+
+/** Short-lived private read access (F2.6). No permanent/public URL. */
+export interface DocumentDownloadPort {
+  presignRead(key: string, ttlSeconds: number): Promise<{ url: string; expiresAt: Date }>;
+}
+
+/** Signed-URL lifetime — minute-scale (§9.9), never days. */
+export const DOCUMENT_DOWNLOAD_TTL_SECONDS = 120;
 
 /**
  * Private-object staging port (F2.4). Production wires a MinIO-backed adapter at
@@ -72,7 +81,8 @@ export type DocumentServiceErrorCode =
   | "INTENT_INVALID"
   | "STAGING_OBJECT_MISSING"
   | "OVERSIZE"
-  | "CONTENT_REJECTED";
+  | "CONTENT_REJECTED"
+  | "DOCUMENT_NOT_AVAILABLE";
 
 export type DocumentAction = "VIEW" | "UPLOAD";
 
@@ -221,6 +231,46 @@ export const ProviderDocumentService = {
     if (intent.finalizedAt) return null;
     if (intent.expiresAt.getTime() <= now.getTime()) return null;
     return intent;
+  },
+
+  /**
+   * F2.6 — authorize a download and return a short-lived signed URL. Reauthorizes
+   * the caller against the document's OWN target (so a document can never be
+   * pulled through a target the caller can't access), requires CLEAN scan, then
+   * mints a minute-scale signed URL. Absent/other-tenant/other-provider all →
+   * safe NOT_FOUND; PENDING/QUARANTINED/REJECTED/ERROR → DOCUMENT_NOT_AVAILABLE.
+   */
+  async authorizeDownload(
+    ctx: ProviderAccessContext,
+    input: { documentId: string },
+    port: DocumentDownloadPort,
+    db: Db = prisma,
+  ): Promise<{ url: string; expiresAt: Date; documentId: string }> {
+    const doc = await db.document.findFirst({
+      where: { id: input.documentId, tenantId: ctx.tenantId },
+      select: { id: true, claimId: true, preauthId: true, caseId: true, scanStatus: true, storageKey: true },
+    });
+    if (!doc) throw new ProviderDocumentError("NOT_FOUND", "No such document"); // absent/other-tenant
+
+    // derive the document's OWN target and reauthorize against it (D8 — every
+    // download reauthorizes; a doc cannot be fetched under a different target)
+    const target: { t: DocumentTargetType; id: string } | null =
+      doc.claimId ? { t: "CLAIM", id: doc.claimId }
+      : doc.preauthId ? { t: "PREAUTH", id: doc.preauthId }
+      : doc.caseId ? { t: "CASE", id: doc.caseId }
+      : null;
+    if (!target) throw new ProviderDocumentError("NOT_FOUND", "Document has no provider target"); // legacy/non-provider
+    await this.authorizeTarget(ctx, { targetType: target.t, targetId: target.id, action: "VIEW" }, db);
+
+    // scan gate — only CLEAN is downloadable
+    if (!isDocumentUsable(doc.scanStatus)) throw new ProviderDocumentError("DOCUMENT_NOT_AVAILABLE", "Document is not available");
+    if (!doc.storageKey) throw new ProviderDocumentError("NOT_FOUND", "Document has no stored object");
+
+    const { url, expiresAt } = await port.presignRead(doc.storageKey, DOCUMENT_DOWNLOAD_TTL_SECONDS);
+    await db.auditLog.create({
+      data: { userId: ctx.actorId, tenantId: ctx.tenantId, action: "PROVIDER_DOCUMENT_DOWNLOADED", module: "PROVIDERS", description: "Document download authorized", entityType: "DOCUMENT", entityId: doc.id, metadata: { providerId: ctx.providerId, targetType: target.t } },
+    });
+    return { url, expiresAt, documentId: doc.id };
   },
 
   /**

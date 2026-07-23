@@ -594,3 +594,23 @@ Stop condition observed: yes — legacy documents not switched.
 ```
 
 ---
+
+## F2.6 — Authorized document download
+
+```text
+Work package: F2.6
+Status: COMPLETE
+Files changed: src/server/services/provider-document.service.ts (authorizeDownload + DocumentDownloadPort + DOCUMENT_DOWNLOAD_TTL_SECONDS + DOCUMENT_NOT_AVAILABLE), src/lib/document-storage.ts (new — MinIO port adapter), src/app/provider/documents/[id]/download/route.ts (new — proof consumer), tests/services/provider-document-download.test.ts, PROGRESS.md + IMPLEMENTATION_LOG.md
+Behavior delivered: authorizeDownload loads the doc (tenant-scoped), reauthorizes against the doc's OWN target (VIEW — provider/branch/permission), requires CLEAN, then mints a 120s signed URL via an injectable port + audits. minioDocumentPort implements presignRead (presignedGetObject) + staging stat/read/promote (reusable by F2.4/F2.8). Proof consumer: /provider/documents/[id]/download route → 302 to signed URL; forbidden→403, absent/cross-provider/pending/quarantined→safe 404.
+Authorization evidence: 4 DB tests — CLEAN own-claim → signed URL with expiry; PENDING+QUARANTINED → DOCUMENT_NOT_AVAILABLE; cross-provider NOT_FOUND + missing perm FORBIDDEN_PERMISSION; branch scope. A document is only reachable through its OWN target (target derived from the doc, not the request) — closes the F2.2 cross-target-reuse concern.
+Idempotency/concurrency evidence: n/a (read)
+Privacy/security evidence: minute-scale signed URL (expiry asserted), never a permanent/public URL; scan gate (CLEAN only); safe 404 hides existence + scan state.
+Focused tests and results: 4/4. Full suite (no DB env) 1169 passed / 175 skipped (+4 DB). tsc 0 (route + MinIO adapter compile); brand PASS; currency PASS (678).
+Feature-flag state: none
+Manual/visual evidence: download route typechecks; browser QA deferred (no seeded provider session). copyObject/promote signature to be verified against live MinIO at F2.8 wiring.
+Known limitations: only ONE proof consumer (the download route) per stop condition; migrating the existing admin/member fileUrl consumers is F2.8. Public bucket still readable (F2.9 gated).
+Next allowed package: F2.7 — Backfill legacy document metadata (S per class/batch)
+Stop condition observed: yes — one proof consumer.
+```
+
+---
