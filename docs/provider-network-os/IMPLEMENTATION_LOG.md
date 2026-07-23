@@ -140,3 +140,29 @@ Stop condition observed: yes — path traced, baseline queries written, no disbu
 ```
 
 ---
+
+## F0.2 — Characterize provider access leakage
+
+```text
+Work package: F0.2
+Status: COMPLETE
+Proof-before-build classification: PARTIAL — cross-provider claim/eligibility + client-entitlement + operator-span boundaries ALREADY COVERED by tests/api/provider-read-scope.test.ts, provider-preauth-scope.test.ts, api-auth-operator-key.test.ts (referenced, not duplicated); the uncovered boundaries (upload target/content, branch-scope absence) were MISSING → added
+Files changed: tests/api/provider-access-characterization.test.ts (new); docs/provider-network-os/TEST_DB_HARNESS.md (new — bring-up recipe + seed-gap findings); PROGRESS.md row
+Schema/data changes: none
+Behavior delivered: none (characterization only, per stop condition "do not implement fixes")
+Authorization evidence: UPLOAD — any valid provider key uploads with an unrelated/foreign claimId as target with NO authorization and NO Document row (characterization → flips at F2.3/F2.4); BRANCH — entitledMemberWhere has no branch dimension in signature or where-fragment (→ F1.3 ProviderAccessContext.allowedProviderBranchIds); PERMISSION — characterized structurally in PROVIDER_ROUTE_INVENTORY (rbac import pulls next-auth graph that won't resolve under jsdom; noted, deferred to F1.1 seed test)
+Idempotency/concurrency evidence: n/a (read/probe)
+Privacy/security evidence: upload accepts arbitrary MIME + no size cap (public URL) — pinned as red line for F2; no PHI/secrets in fixtures (synthetic ids)
+Money/reconciliation evidence: n/a
+Focused tests and results: npx vitest run tests/api/provider-access-characterization.test.ts → 4 passed. Mock-based (prisma/minio/apiAuth seams), CI-safe, no DB dependency — matches tests/api/ convention
+Typecheck/schema result: npx tsc --noEmit → exit 0
+Manual/visual evidence: n/a (API/service layer)
+Feature-flag state: none
+Backfill/rollout impact: none. Also stood up the reusable throwaway PG16 harness (TEST_DB_HARNESS.md) — surfaced that the seed has 0 branches/contracts/applicability/provider-users, so F0.6 fixtures must build all provider infra themselves
+Known limitations: RSC page-level auth (requireProvider) not unit-tested here (needs next-auth session mock — deferred to F11.1 security suite + F1 page migrations); settlement boundary is a page not an API, characterized in SETTLEMENT_MONEY_MAP instead
+Unrelated worktree changes preserved: yes
+Next allowed package: F0.6
+Stop condition observed: yes — reproducible evidence captured, no fixes implemented
+```
+
+---
