@@ -197,4 +197,34 @@ Stop condition observed: yes — fixtures + smoke complete, no feature implement
 
 All six baseline/characterization packages done: provider route inventory, access-leakage characterization, claim/PA ownership graph, document storage map, settlement money map, deterministic fixtures. Evidence: `PROVIDER_ROUTE_INVENTORY.md`, `CLAIM_PA_OWNERSHIP_PATHS.md`, `DOCUMENT_STORAGE_MAP.md`, `SETTLEMENT_MONEY_MAP.md`, `TEST_DB_HARNESS.md`, `tests/api/provider-access-characterization.test.ts`, `tests/factories/provider-network.*`. No product behavior changed; no schema changed; branch isolated from Claims Autopilot. **F1 next — first schema/code changes.**
 
+> **Working location note:** from F1.1 the engagement runs inside the git worktree `.claude/worktrees/pnos` (concurrent claims-autopilot session shares the main checkout HEAD). Run vitest there with `--config ./vitest.worktree.config.ts` (a local, un-committed override that drops the `**/.claude/worktrees/**` exclude which would otherwise hide the worktree's own tests). All Write/Edit paths must be worktree-prefixed.
+
+---
+
+## F1 — Provider access and entitlement foundation
+
+## F1.1 — Define and seed provider permission catalog
+
+```text
+Work package: F1.1
+Status: COMPLETE
+Proof-before-build classification: MISSING (no provider permissions/roles in the dynamic RBAC — provider users are gated only by requireProvider + UserRole.PROVIDER_USER; PROVIDER_USER was absent from ROLE_CODES/ROLE_PERMISSIONS entirely)
+Files changed: prisma/seeds/provider-rbac.ts (new — pure catalog + bundles), prisma/seeds/rbac.ts (additive merge: PERMISSIONS.push + Object.assign ROLE_PERMISSIONS + ROLE_CODES spread), tests/services/provider-rbac-catalog.test.ts (new), scripts/pnos-map-provider-users.ts (new — explicit legacy mapping), PROGRESS.md + IMPLEMENTATION_LOG.md
+Schema/data changes: NO schema change (uses existing Role/Permission/RolePermission/UserRoleAssignment). Seed DATA additively adds 22 provider permissions + 7 provider roles (6 persona + 1 deprecated PROVIDER_LEGACY). Idempotent (upsert). No backfill auto-runs — provider-user→role mapping is an explicit report-by-default script.
+Behavior delivered: the §7.1 provider permission catalog and §2.4 least-privilege persona bundles now seed into the dynamic RBAC on every tenant (main seed + TenantProvisioningService.provisionTenant both call seedRbac, which now merges these). rbacService.hasPermission("provider.*") is now answerable. NO route wired to them yet (stop condition).
+Authorization evidence: pure test asserts the deny matrix (front desk: no settlement/api-keys/clinical-respond; finance: no clinical; integration admin: no settlement/claim; etc.) and that every bundle contains ONLY provider.* codes. DB test proves PROVIDER_BILLER resolves only provider.* and CLAIMS_OFFICER resolves ZERO provider.* (boundary both directions). Provider boundary checks left independent of role (D4 — requireProvider untouched).
+Idempotency/concurrency evidence: DB test runs seedRbac twice → permission count and role-permission count unchanged (upsert idempotent).
+Privacy/security evidence: PROVIDER_LEGACY flagged deprecated + excluded from PROVIDER_PERSONA_ROLE_CODES; it intentionally preserves today's reach (incl. api_keys.manage, gap #5) so enabling enforcement later doesn't lock users out before F1.5 re-maps them — documented in-file.
+Money/reconciliation evidence: n/a
+Focused tests and results: npx vitest run --config ./vitest.worktree.config.ts tests/services/provider-rbac-catalog.test.ts → pure 6/6 (no DB); with AUTOPILOT_TEST_DB → 7/7 (incl. idempotency + boundary). Full suite 1134 passed / 113 skipped (was 1128/112 — +6 pure, +1 DB-gated). tsc exit 0; brand:guard PASS; currency:guard PASS (662 files). Mapping script report-mode runs clean (0 provider users in throwaway).
+Typecheck/schema result: tsc exit 0; no prisma schema change (npx prisma db push not needed)
+Manual/visual evidence: n/a (seed/RBAC layer)
+Feature-flag state: none — seeding a catalog is inert until a route checks it (later packages, behind the F1 flags)
+Backfill/rollout impact: seedRbac upserts are safe to re-run on existing envs to add the provider catalog. Existing provider users get NO role until scripts/pnos-map-provider-users.ts --apply is run (reviewed) — deliberately deferred so nothing changes behavior now.
+Known limitations: PROVIDER_LEGACY over-grants relative to persona least-privilege by design (temporary); real per-user persona assignment + api-key permission gating land in F1.5. Route enforcement is F1.4+.
+Unrelated worktree changes preserved: yes. NOTE: F1.1 files were first written to the main checkout by path error, then relocated to the worktree and the main checkout restored to pristine (git restore rbac.ts + removed 3 new files) — verified clean.
+Next allowed package: F1.2 — Add provider branch assignments (additive schema; needs prisma db push to the throwaway)
+Stop condition observed: yes — catalog seeded + tested; NO routes wired
+```
+
 ---

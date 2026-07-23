@@ -1,4 +1,9 @@
 import { PrismaClient } from "@prisma/client";
+import {
+  PROVIDER_PERMISSIONS,
+  PROVIDER_ROLE_PERMISSIONS,
+  PROVIDER_ROLE_CODES,
+} from "./provider-rbac";
 
 // ─── PERMISSION DEFINITIONS ──────────────────────────────────────────────────
 
@@ -80,6 +85,10 @@ const PERMISSIONS: Array<{
   { code: "REPORT:VIEW",     module: "REPORT", action: "VIEW",     resource: "REPORT", description: "View reports" },
   { code: "REPORT:GENERATE", module: "REPORT", action: "GENERATE", resource: "REPORT", description: "Generate and download reports" },
 ];
+
+// PNOS F1.1: merge the provider permission catalog additively (before
+// ALL_PERMISSION_CODES is computed below, so SUPER_ADMIN also receives them).
+PERMISSIONS.push(...PROVIDER_PERMISSIONS);
 
 // ─── ROLE PERMISSION MAPPINGS ────────────────────────────────────────────────
 
@@ -219,6 +228,11 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
   ],
 };
 
+// PNOS F1.1: merge provider persona role bundles additively (before SUPER_ADMIN
+// is computed, so SUPER_ADMIN — which takes ALL_PERMISSION_CODES — still spans
+// provider permissions too).
+Object.assign(ROLE_PERMISSIONS, PROVIDER_ROLE_PERMISSIONS);
+
 // SUPER_ADMIN gets all permissions
 const ALL_PERMISSION_CODES = PERMISSIONS.map((p) => p.code);
 ROLE_PERMISSIONS["SUPER_ADMIN"] = ALL_PERMISSION_CODES;
@@ -233,6 +247,8 @@ const ROLE_CODES = [
   // New roles
   "SENIOR_UNDERWRITER", "PRE_AUTH_OFFICER", "SENIOR_CLAIMS_OFFICER",
   "SCHEME_MANAGER", "COMPLIANCE_OFFICER", "MEDICAL_ADVISOR",
+  // PNOS F1.1: provider persona roles (+ deprecated PROVIDER_LEGACY)
+  ...PROVIDER_ROLE_CODES,
 ];
 
 // These role codes match UserRole enum values — used for migrating existing user assignments

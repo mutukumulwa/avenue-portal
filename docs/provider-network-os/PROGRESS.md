@@ -49,7 +49,7 @@
 
 | Pkg | Title | Size | Status | Evidence |
 |---|---|---|---|---|
-| F1.1 | Define and seed provider permission catalog | S | NOT_STARTED | — |
+| F1.1 | Define and seed provider permission catalog | S | COMPLETE | `prisma/seeds/provider-rbac.ts` + `tests/services/provider-rbac-catalog.test.ts` (7 pass) |
 | F1.2 | Add provider branch assignments | S | NOT_STARTED | — |
 | F1.3 | Build canonical ProviderAccessService | M | NOT_STARTED | — |
 | F1.4 | Migrate provider layout/navigation guards | S | NOT_STARTED | — |
