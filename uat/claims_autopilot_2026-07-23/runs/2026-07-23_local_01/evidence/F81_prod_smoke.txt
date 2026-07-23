@@ -1,0 +1,55 @@
+# F8.1 — production deploy smoke (2026-07-23, avenue-portal.vercel.app @ 18254fa)
+# Policies OFF; no worker; temporary key on AAR Health Care Buganda Road (revoked+deleted after)
+
+## 1. Health
+{"ok":true,"db":"up","defaultClientPresent":false,"workerLastSeenAt":null,"workerFresh":false,"version":"18254fa","time":"2026-07-23T04:31:11.843Z"}
+
+## 2. POST /api/v1/claims — NO key (fail-closed)
+
+HTTP 401
+
+## 3. POST — BOGUS key
+HTTP 401
+
+## 4. POST — VALID key, un-entitled facility→member (expect non-enumerating 403 + REJECTED receipt, ZERO claims)
+{"error":"Member is not accessible to this caller.","success":false,"code":"FORBIDDEN_SCOPE","message":"Member is not accessible to this caller."}
+HTTP 403
+
+## 5. POST — missing Idempotency-Key (F5.2 contract: 422)
+{"error":"Idempotency-Key header is required. Send a stable unique key per submission so retries are safe.","success":false,"code":"IDEMPOTENCY_KEY_REQUIRED"}
+HTTP 422
+
+## 6. GET receipts/<unknown> — non-enumerating 404
+{"error":"Receipt not found"}
+HTTP 404
+
+## 7. Oversized body — 413 pre-parse (F7.3)
+HTTP 413
+
+## 8. Durable-side verification (prod DB, read-only SQL after the probes)
+
+  new claims minted by the probes ........ 0
+  receipts minted by the probes .......... 0  — CANONICAL: intake.service.ts
+       reserves a receipt only AFTER schema + scope pass ("auth/scope failure
+       => 401/403, no receipt"): probes never mint rows (anti-enumeration)
+  CLAIM:RECEIPT_LOOKUP_MISS audit ........ 1  (the unknown-receipt GET — F6.1
+       miss-audit live in prod, hash-chained)
+  smoke key used then REVOKED+DELETED .... lastUsedAt set; row deleted; local
+       key material shredded
+
+## 9. Production integrity sweep (invariant equivalents, read-only)
+
+  inv1 SUCCEEDED receipt w/o claim ....... 0
+  inv2 claim w/ receipt, no run .......... 0
+  inv4 terminal run w/o completedAt ...... 0
+  inv10 duplicate strong fingerprints .... 0
+  AUTO_DECIDED runs ...................... 0
+  policies resolving LIVE ................ 0   (legacy enabled=true row now
+       mode=OFF status=DRAFT — D1 fail-safe applied by column defaults;
+       row left untouched per D15, superseded via the console later)
+  breaker rows ........................... 0   (fail-safe: absent = closed)
+  active API keys ........................ 0
+
+F8.1 VERDICT: deployed OFF, fail-closed everywhere, zero residue beyond one
+legitimate immutable audit row. Rollback posture unchanged (schema additive,
+policies OFF, no worker, breaker available).

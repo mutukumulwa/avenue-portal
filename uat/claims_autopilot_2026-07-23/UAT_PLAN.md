@@ -1,14 +1,19 @@
 # Claims Autopilot — Cross-Role E2E UAT Campaign (F7.6)
 
 **Status: ENGINEERING PRE-UAT DONE (run `2026-07-23_local_01`) — the human
-cross-role UI campaign + sign-offs remain, and they gate F8.1.**
+cross-role UI campaign + sign-offs remain. F8.1 gate WAIVED by the sponsor
+(2026-07-23): production deployed with every policy OFF at `18254fa` (see
+`docs/claims-autopilot/DEPLOYMENT.md` §F8.1), so the campaign now runs against
+prod-OFF. F8.2 shadow activation remains HARD-GATED on this campaign's
+sign-offs.**
 Automated evidence below is green on the disposable-DB battery (100 passed /
 9 skipped ×3 consecutive passes, 2026-07-23, branch `feat/claims-autopilot`);
 the integrity gate is green clean AND after a 2,689-request load burst. Story 3
 is additionally proven end-to-end through the production HTTP surface (see
 `runs/2026-07-23_local_01/`). Each remaining story needs its through-the-UI run
-and role sign-off before F8.1. The local environment is left running for the
-campaign (see the RUN_LOG's environment handover).
+and role sign-off before F8.2 shadow activation — run them against prod-OFF
+(preferred, higher fidelity) or the local environment from the RUN_LOG's
+environment handover.
 
 Conventions: per-story evidence in `runs/<date>_<n>/evidence/` (screens, exports,
 SQL tie-outs), actor log CSV, defect register — same portable format as
