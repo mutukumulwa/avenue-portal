@@ -62,3 +62,29 @@ Stop condition observed: yes — inventory written and reviewed; no route fixed
 ```
 
 ---
+
+## F0.3 — Characterize claim and PA ownership paths
+
+```text
+Work package: F0.3
+Status: COMPLETE
+Proof-before-build classification: PARTIAL (claim side COVERED by docs/claims-autopilot/CLAIM_CREATOR_INVENTORY.md + guard tests — reconciled, not rebuilt; PA side was MISSING — built here)
+Files changed: docs/provider-network-os/CLAIM_PA_OWNERSHIP_PATHS.md (new); PROGRESS.md row
+Schema/data changes: none
+Behavior delivered: none (read-only characterization; package rule "Do not refactor" observed)
+Authorization evidence: per-rail auth recorded (B2B entitledMemberWhere + tenant cross-check; admin/tRPC protectedProcedure; member self+dependants scope)
+Idempotency/concurrency evidence: recorded, not built — ALL 5 PA rails have NO idempotency (D26 gap; B2B retry duplicates); decision txns use inSerializableTx; PA-conversion has durable key <preauthId>:claim-create:v1; consumption inside decision tx (IPL-PA-01)
+Privacy/security evidence: B2B PA rail skips fraud screen + benefit-in-package gate that other rails enforce (recorded as CONFLICTING for F3.1); no PHI in the doc
+Money/reconciliation evidence: hold placement/release/consumption ownership mapped (approveByHuman always places hold; decision-tx consumption; case close/cancel guards) — conservation queries deferred to F0.5 as scoped
+Focused tests and results: none required (characterization); existing per-path evidence mapped in doc §6; two named coverage holes (member 15k auto path, B2B duplicate-on-retry)
+Typecheck/schema result: no code changed; tree baseline unchanged (typecheck PASS at cb28605)
+Manual/visual evidence: n/a
+Feature-flag state: none
+Backfill/rollout impact: none
+Known limitations: LOU (letterOfUndertaking) lifecycle only touched where case close consumes it — full GOP/LOU characterization lands in F3.14 proof-before-build; escalation job read at excerpt level
+Unrelated worktree changes preserved: yes
+Next allowed package: F0.4
+Stop condition observed: yes — call graph + path matrix complete; no refactor performed
+```
+
+---
