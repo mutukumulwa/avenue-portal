@@ -1,0 +1,46 @@
+# F7.5 — Local load & performance baseline (2026-07-23)
+
+Environment: production `next start` (single node, MacBook), throwaway seeded
+Postgres 16.14 (:55432) + Redis (:56379), minted ProviderApiKey, entitlement
+contract PC-F75-LOAD. Web enqueuer UNSET (by design) ⇒ every request runs the
+FULL canonical pipeline INLINE: receipt reservation → claim+lines+run persist →
+staged evaluation → route/decide. This measures the worst-case synchronous
+path; production offloads processing to the BullMQ worker after acceptance.
+
+Profile: k6 `load/k6-claims-autopilot.js`, PROFILE=mixed
+(70% clean / 20% routed [inpatient-missing-PA] / 10% replay), ramp
+0→10 VUs (1m) → 50 (2m) → 100 (2m) → 0 (1m). Total 6m00s.
+
+## Results (k6 TOTAL)
+
+  iterations ............ 2,689 (7.47/s sustained across the whole ramp)
+  checks_succeeded ...... 100.00% — every response in the expected class
+                          {200 replay, 201 accepted, 202, 409, 422, 503}
+  server_errors_5xx ..... 0  (503 excluded by design: clean retryable
+                          fail-closed, receipt PROCESSING, no claim)
+  http_req_failed ....... 4.31% (116) — all expected-class conflict/backpressure
+  replays ............... 215 (the 10% replay cohort — zero duplicates minted)
+
+  receipt_latency_ms:
+    min 129 ms · med 4.93 s · avg 5.48 s · p90 10.44 s · p95 12.61 s · p99 17.05 s
+
+  Thresholds p95<1500ms / p99<3000ms: **NOT MET at 100 concurrent VUs on this
+  single-node inline-processing laptop baseline.**
+
+## Post-load integrity
+
+`scripts/claims-autopilot-integrity.ts` immediately after the burst:
+  ✓ all invariants hold — exit 0
+(zero orphaned receipts, zero duplicate fingerprints, billed = Σ lines across
+every load-minted claim, every claim carries its processing run.)
+
+## Reading
+
+- Correctness under pressure: PROVEN — no lost/duplicated/partial claim in
+  2,689 concurrent submissions; overload degrades to clean retryable 503s.
+- The latency SLO hypothesis is NOT ratified by this baseline and MUST be
+  measured on staging with the worker enabled (acceptance returns after
+  receipt+persist; processing async) before F8.3 sets real SLOs. At 10 VUs the
+  floor (129 ms min) shows the pipeline itself is not inherently slow; the
+  breach is contention at 100-way concurrency on one node.
+- Validation/isolation were NOT weakened to chase the target (plan rule).

@@ -3,6 +3,7 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { assertClaimTransition } from "@/server/services/claim-lifecycle";
 import { safeActionError } from "@/lib/safe-action-error";
 import { ClaimsService } from "@/server/services/claims.service";
 import { ClaimDecisionService } from "@/server/services/claim-decision.service";
@@ -27,6 +28,9 @@ export async function adjudicateClaimAction(formData: FormData) {
   try {
     // CAPTURED is a state transition only — mark claim as data-entry complete
     if (action === "CAPTURED") {
+      const current = await prisma.claim.findFirst({ where: { id: claimId, tenantId }, select: { status: true } });
+      if (!current) throw new Error("Claim not found");
+      assertClaimTransition(current.status, "CAPTURED", "capture"); // F7.1
       const captured = await prisma.claim.update({
         where: { id: claimId, tenantId },
         data: { status: "CAPTURED" },

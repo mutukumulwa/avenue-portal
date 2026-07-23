@@ -92,3 +92,32 @@ mis-read a future lease as ~3h expired and let a second worker double-claim it.
 Fixed in `processing.ts`; any future raw-SQL time comparison must follow suit.
 
 **Seed:** the throwaway DB was seeded once (`SEED_PASSWORD='Mdx!Seed-2026#Rotate' npx prisma db seed`) → 1 tenant (`medvex`), 6 providers, 249 members, contracts/benefits/PA/GL. Integration tests **query** for ids at runtime (resilient to reseed) rather than hardcoding.
+
+## M7 boundary — hardening & proof (2026-07-23)
+
+Battery + gates re-run from a clean session against the same throwaway stack
+(PG 16.14 `:55432` + Redis `:56379`, seeded):
+
+- **Full integration battery** (`tests/integration/ --no-file-parallelism`):
+  **100 passed / 9 skipped** on THREE consecutive full passes (the 9 = two
+  pre-existing non-autopilot `P1_TEST_DB` suites). New M7 suites included:
+  `claim-autopilot-campaign` (F7.4 S4/S5) and `claim-intake-security` (F7.3).
+- **Integrity gate** (`scripts/claims-autopilot-integrity.ts`, F7.2):
+  - seeded-broken-invariant probe (isolated `probe_t2` tenant): **exit 1** with
+    exact refs for **all 11 seedable families** (8 CRITICAL + 3 WARNING);
+    family 10 (duplicate strong fingerprints) proven **constraint-enforced** —
+    the duplicate INSERT is refused by `Claim_tenantId_strongEventFingerprint_key`;
+  - full-DB run immediately after the final battery pass: **exit 0 —
+    "all invariants hold"**.
+  - The gate's FIRST full-DB run caught a REAL orphan-producing cleanup bug in
+    the F7.4 suite (receipt delete hitting a live run FK, error swallowed) —
+    fixed; record in `CONCURRENCY_CAMPAIGN.md`.
+- **Unit suite:** 117 files / **1124 passed** (includes the F7.1 lifecycle
+  graph tests and both source guards). `npm run typecheck` clean; eslint clean
+  on every M7-touched file (2 pre-existing warnings elsewhere unchanged).
+- **`next build`: PASS** with all M7 changes (production compile of the fraud
+  actions, API 413 cap, lifecycle wiring).
+- **F7.5 local load baseline:** production `next start` against the throwaway
+  DB; entitlement contract + minted key; k6 mixed profile ramp 10→50→100 VUs —
+  results recorded in `IMPLEMENTATION_LOG.md` F7.5 (staging-scale measurement
+  deferred to F8.x by design — a laptop baseline is a smoke SLO, not the SLO).

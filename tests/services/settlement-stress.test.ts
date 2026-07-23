@@ -62,7 +62,7 @@ function seedBatch(size: number) {
     totalAmount: size * 1000, claimCount: size, makerId: "maker", currency: "UGX",
   });
   const claims = Array.from({ length: size }, (_, i) => ({
-    id: `c${i}`, approvedAmount: 1000, approvedBaseAmount: 1000, currency: "UGX",
+    id: `c${i}`, claimNumber: `CLM-${i}`, status: "APPROVED", approvedAmount: 1000, approvedBaseAmount: 1000, currency: "UGX",
   }));
   db.claim.findMany.mockResolvedValue(claims);
 }

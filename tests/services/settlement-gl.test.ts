@@ -55,8 +55,8 @@ beforeEach(() => {
     totalAmount: 50000, claimCount: 2, makerId: "maker",
   });
   db.claim.findMany.mockResolvedValue([
-    { id: "c1", approvedAmount: 30000 },
-    { id: "c2", approvedAmount: 20000 },
+    { id: "c1", claimNumber: "CLM-1", status: "APPROVED", approvedAmount: 30000 },
+    { id: "c2", claimNumber: "CLM-2", status: "APPROVED", approvedAmount: 20000 },
   ]);
 });
 
@@ -128,8 +128,8 @@ describe("markSettlementBatchPaid (PR-018 D1)", () => {
       totalAmount: 50000, claimCount: 2, makerId: "maker", currency: "KES",
     });
     db.claim.findMany.mockResolvedValue([
-      { id: "c1", approvedAmount: 30000, approvedBaseAmount: 810000, currency: "KES" }, // ×27
-      { id: "c2", approvedAmount: 20000, approvedBaseAmount: 540000, currency: "KES" },
+      { id: "c1", claimNumber: "CLM-1", status: "APPROVED", approvedAmount: 30000, approvedBaseAmount: 810000, currency: "KES" }, // ×27
+      { id: "c2", claimNumber: "CLM-2", status: "APPROVED", approvedAmount: 20000, approvedBaseAmount: 540000, currency: "KES" },
     ]);
 
     await claimAdjudicationService.markSettlementBatchPaid("batch1", T, "finance1");

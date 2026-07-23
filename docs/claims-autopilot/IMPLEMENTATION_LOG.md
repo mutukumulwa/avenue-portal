@@ -842,3 +842,95 @@ F4.5, F7.4).
 - **Known gaps or skips:** shadow metrics compute per-claim (fine at console scale; a materialized read model can come later); queue "ownership" column deferred (no reviewer-assignment field exists on Claim — the plan allows assignment only by extending an existing field, which does not exist).
 - **Security/privacy review:** console is ADMIN_ONLY; dashboards are counts/states only (no PHI); receipt lookups rate-limited + miss-audited; reprocess is role-gated and append-only.
 - **Next eligible task:** M7 — hardening and proof.
+
+---
+
+## F7.1 — Centralize claim lifecycle transitions
+
+- **Status:** COMPLETE
+- **Commit/branch:** `feat/claims-autopilot` (M7 commit)
+- **Files changed:** `src/server/services/claim-lifecycle.ts` (NEW — THE transition graph: `TRANSITIONS` map, `canTransitionClaim`/`assertClaimTransition`/`isTerminalClaimStatus`/`AUTO_DECIDABLE_STATUSES`, same-state re-assert = idempotent no-op), wired into every sanctioned status owner: `claim-decision.service.ts` (`decide` asserts before the money write; `voidClaim` asserts → VOID), `claim-adjudication.service.ts` (`initiateAppeal` asserts → APPEALED; `markSettlementBatchPaid` asserts EVERY batch claim → PAID inside the settlement tx), `reimbursement.service.ts` (guarded disburse asserts → PAID), `claims/[id]/actions.ts` (capture asserts → CAPTURED), both fraud escalate actions (assert → UNDER_REVIEW), `tests/services/claim-lifecycle.test.ts` (NEW graph contract), settlement unit mocks extended with `claimNumber`/`status`.
+- **Decisions enforced:** F7.1 (guard, NOT a decision replacement — owners still decide WHETHER; the graph decides whether the move is structurally legal); D10 defence-in-depth with the F5.10 source guard (files that may write status ∧ moves those files may make).
+- **Observable behavior before:** each owner carried (or lacked) its own ad-hoc status pre-checks; a coding mistake inside an owner could regress PAID→APPROVED, double-pay, or drag a decided claim back to review. The fraud escalate actions would put ANY claim (even APPROVED/PAID) to UNDER_REVIEW — stranding GL/benefit effects with no reversal.
+- **Observable behavior after:** illegal backward/terminal moves throw `IllegalClaimTransition` everywhere; fraud escalation on a decided/paid claim returns a clean actionable error ("place holds before the decision; use void/settlement reversal after") surfaced in the UI instead of corrupting state; both fraud actions are now also tenant-scoped (read+update keyed by `session.user.tenantId` — previously unkeyed by tenant); repeated pay/void re-asserts are no-ops (idempotent settlement re-runs unaffected).
+- **Forbidden effects explicitly checked:** PAID→APPROVED/RECEIVED/VOID, VOID→anything, APPEAL_DECLINED→APPEALED, DECLINED→APPROVED (re-open only via appeal), RECEIVED→PAID (money cannot skip the decision), RECEIVED→VOID all refuse; `decide()` remains additionally pre-gated to RECEIVED/CAPTURED/UNDER_REVIEW so appeal resolution (a future surface — nothing writes APPEAL_APPROVED/APPEAL_DECLINED today) cannot leak through `decide`.
+- **Tests run and exact results:** lifecycle unit 4 passed; settlement-gl 8 passed / settlement-stress 2 passed (mocks now carry status); full unit 1124 passed; both source guards green (creator allowlist `persist.ts` only; status allowlist = exactly the six owners).
+- **Known gaps or skips:** the appeal RESOLUTION path (APPEALED→APPEAL_APPROVED/APPEAL_DECLINED) has no owner surface yet anywhere in the app — the graph already encodes it for when that surface is built.
+- **Security/privacy review:** fraud escalate tenant-scoping closes a cross-tenant status-write hole (unkeyed claim id).
+- **Next eligible task:** F7.2.
+
+---
+
+## F7.2 — Permanent reconciliation report and integrity gate
+
+- **Status:** COMPLETE (real-DB, seeded-broken proof for every family)
+- **Commit/branch:** `feat/claims-autopilot` (M7 commit)
+- **Files changed:** `scripts/claims-autopilot-integrity.ts` (NEW — read-only, per-tenant, `--tenant/--since/--json`, refs capped at 25, identifier-safe output, exit 1 on any CRITICAL, exit 2 on runtime failure; raw-SQL time comparisons use `now() AT TIME ZONE 'UTC'` per the F3.5 landmine).
+- **Invariant families:** accepted receipt→linked claim; claim-with-receipt→run; stale nonterminal runs (WARN); terminal-run coherence; canonical billed=Σlines; approved=Σstamped lines (WARN); auto-decided⇒approved policy exists; ⇒within the largest approved ceiling; ⇒no unresolved fraud alert; duplicate strong fingerprints; case entry billed on VOID claim (WARN); SYNCED op⇒receipt+result linkage.
+- **Seeded-broken proof (throwaway DB, isolated probe tenant `probe_t2`):** every seedable family planted and detected with EXACT refs — **exit 1, 8 CRITICAL + 3 WARNING findings**; duplicate-fingerprint family proven **structurally unreachable** (unique constraint refuses the INSERT — the check is belt-and-braces against a future constraint drop); probe rows deleted; **clean full-DB run after the final battery pass → exit 0 "all invariants hold"**.
+- **The gate already caught a real bug:** its first full-DB run flagged 5 orphaned VOID claims (SUCCEEDED receipt, zero runs) stranded by the F7.4 suite's own cleanup — see F7.4 below. Fixed, residue purged, gate green. This is the acceptance criterion working.
+- **Tests run and exact results:** probe run exit 1 with refs `probe_r1`, `INTEG-PROBE-2/-5/-7`, `probe_run3/4`, `probe_e11`, `probe-op-1`; clean run exit 0; `--tenant` filter exercised by the probe itself.
+- **Known gaps or skips:** invariant 8 compares against the LARGEST approved ceiling (per-scope refinement lives in the console views); member/claim tenant-coherence (claim.tenantId vs member.tenantId) is a candidate future family.
+- **Security/privacy review:** report emits ids/claim numbers only — no PHI, no amounts beyond the invariant context; read-only by construction.
+- **Next eligible task:** F7.3.
+
+---
+
+## F7.3 — Security isolation and abuse matrix
+
+- **Status:** COMPLETE
+- **Commit/branch:** `feat/claims-autopilot` (M7 commit)
+- **Files changed:** `docs/claims-autopilot/SECURITY_EVIDENCE.md` (NEW — the 13-row abuse matrix, each row mapped to its enforcing boundary AND its automated proof), `tests/integration/claim-intake-security.integration.test.ts` (NEW — the probes not already covered elsewhere: missing/bogus key 401 without leakage, oversized body 413 pre-parse, REVOKED key immediate 401), `src/app/api/v1/claims/route.ts` (NEW `MAX_BODY_BYTES` content-length cap → 413 BEFORE parsing; `LIMITS.MAX_BODY_BYTES = 1_000_000` in the canonical schema module).
+- **Matrix coverage (see the doc for the full mapping):** key lifecycle (missing/bogus/revoked), provider A vs B (member/receipt/claim — D12 + entitlement + `providerScopeWhere`), client A vs B (F5.3 confinement), tenant A vs B (server-derived tenant everywhere), IDOR on receipt/run/policy ids (non-enumerating 404 + `CLAIM:RECEIPT_LOOKUP_MISS` audit; runs/policies have NO public surface), spoofed privilege fields (`.strict()` + context derivation), huge bodies (schema LIMITS + the new 413 + CSV bounds), injection (textField/codeField refinements + M25 UAT), replay/enumeration (rate limiter + cheap-by-design replays), redaction (D16 receipts, sanitized errors, count-only dashboards), maker self-approval (SoD, F2.5-proven), unauthorized breaker/reprocess (role gates + chain audit).
+- **Observable behavior before/after:** the only runtime change is the 413 pre-parse cap; everything else was already enforced and is now PROVEN + documented in one place.
+- **Forbidden effects explicitly checked (real DB):** 1.1 MB body refused with 413 before JSON parsing; revoked key rejected on the very next request; missing/bogus keys 401 with no existence signal.
+- **Tests run and exact results:** security integration suite → **3 passed** (inside the 100-passed battery); the referenced earlier suites all green in the same battery.
+- **Known gaps or skips:** receipt-lookup rate limiter is per-instance (documented residual — Redis-backed quota when the B2B channel grows); no public policy/run API exists to probe.
+- **Security/privacy review:** the document itself contains no secrets (verified — key material only as `mvxk_` prefix references).
+- **Next eligible task:** F7.4.
+
+---
+
+## F7.4 — Real-DB concurrency and failure campaign
+
+- **Status:** COMPLETE (real-DB)
+- **Commit/branch:** `feat/claims-autopilot` (M7 commit)
+- **Files changed:** `docs/claims-autopilot/CONCURRENCY_CAMPAIGN.md` (NEW — all 14 §F7.4 scenarios mapped to their proving suite+test), `tests/integration/claim-autopilot-campaign.integration.test.ts` (NEW — the two scenarios no earlier suite covered: S4 exact cross-rail race, S5 legitimate-similar-visits), cleanup-order fix in the same file (below), hermetic-sweep additions to the recovery/reconcile suites (crashed-execution leftovers with the suite's own receipt prefix are now swept in `afterAll` — orphans are CRITICAL to the integrity gate).
+- **S4 (cross-rail exact race):** the SAME provider invoice submitted through the B2B API and the CSV import CONCURRENTLY ⇒ exactly ONE claim; response truthfulness asserted — EXACTLY ONE rail may report fresh creation, the other must confess the link (`LINKED` / `duplicate: true`); DB count is the authoritative assertion.
+- **S5 (two legitimate similar visits):** same content, different days, no authoritative id ⇒ BOTH persist (D7 — fuzzy dup routes for review, never merges).
+- **Defect found & fixed (by the F7.2 gate):** the suite's `afterAll` collected claims by invoice prefix only; S5's claims (no invoice) kept live runs while the receipt `deleteMany` matched their `f74-*` receipts ⇒ FK violation ⇒ whole delete swallowed by `.catch` ⇒ ONE stranded orphan (VOID claim + SUCCEEDED receipt + zero runs) per execution. Fix: ids = union of invoice-matched AND receipt-linked claims; stages→runs→receipts delete order; NO swallowed errors on the structural deletes (a future FK break fails the suite loudly). Residue purged; gate re-run green.
+- **Scenario map:** #1 20-way identical (F5.2 suite), #2 40 distinct (F5.2 + direct-entry + case), #3 same-key/diff-payload 409 (F2.2/F5.2), #4 S4 here, #5 S5 here, #6 worker-killed-post-commit (F3.6 sweep), #7 killed mid-stage (stale-lease reclaim), #8 Redis down ⇒ acceptance unaffected (D8), #9 serialization conflict ⇒ one commit (F4.5), #10 one benefit balance ⇒ consumed once, #11 one PA/hold ⇒ conserved (F5.7 + IPL A4), #12 breaker at commit ⇒ `StalePlanError`, #13 policy superseded ⇒ stale plan never commits (D17), #14 notify/audit transient ⇒ exact-once effects (F3.7).
+- **Tests run and exact results:** campaign suite 2 passed; **full battery 100 passed / 9 skipped on THREE consecutive full passes**; integrity gate exit 0 after the final pass.
+- **Known gaps or skips:** none for the 14 scenarios; the "clean reconciliation" acceptance is now the F7.2 gate itself.
+- **Security/privacy review:** n/a (test+doc package; fixtures self-clean).
+- **Next eligible task:** F7.5.
+
+---
+
+## F7.5 — Load and performance proof
+
+- **Status:** COMPLETE as a LOCAL baseline + committed profile; **staging-scale SLO measurement deferred to F8.x by design** (a laptop cannot ratify a production SLO).
+- **Commit/branch:** `feat/claims-autopilot` (M7 commit)
+- **Files changed:** `load/k6-claims-autopilot.js` (NEW — ramping 10→50→100 VU submissions profile; mixed 70% clean / 20% routed / 10% replay; receipt-latency Trend + expected-conflict/replay/5xx Counters; thresholds = the initial SLO HYPOTHESIS p95<1.5s/p99<3s; never run against production).
+- **Executed (2026-07-23, local):** production `next start` against the throwaway seeded DB, minted key + entitlement contract; k6 mixed ramp 6m00s → **2,689 iterations, 100% expected-class responses, 0 raw 5xx, 215 replays with ZERO duplicate claims**; receipt latency min 129 ms / p50 4.93 s / p95 12.61 s / p99 17.05 s — **thresholds NOT met at 100 concurrent VUs on a single-node inline-processing laptop** (web enqueuer unset ⇒ full pipeline runs synchronously per request; production offloads to the worker after acceptance). Post-burst integrity gate: **exit 0 — all invariants hold** over the entire load-minted population. Validation/isolation untouched (plan rule).
+- **Decisions enforced:** D8/D9 (overload degrades to clean retryable 503s — receipt PROCESSING, no claim, no orphan: proven by the post-load gate), §F7.5 "do not weaken validation to hit a target".
+- **Forbidden effects explicitly checked:** zero 5xx; zero duplicates in the replay cohort; zero integrity findings after ~2,500 concurrent-minted claims.
+- **Tests run and exact results:** see `uat/claims_autopilot_2026-07-23/runs/2026-07-23_local_01/evidence/F75_load_baseline.txt` (full k6 summary + reading).
+- **Known gaps or skips:** import-10k/offline-burst/queue-query/backlog-recovery profiles are documented in the script header and run at staging where files/devices/UI sessions exist; per-VU latency-by-stage breakdown deferred (aggregate hides the 10-VU floor — min 129 ms shows the pipeline is not inherently slow).
+- **Security/privacy review:** load key minted on the throwaway and used only locally; evidence redacts key material.
+- **Next eligible task:** F7.6.
+
+---
+
+## F7.6 — Cross-role end-to-end UAT
+
+- **Status:** SCAFFOLD + ENGINEERING PRE-UAT EXECUTED; **human cross-role campaign + sign-offs = the ONLY remaining M7 item, and it gates F8.1.**
+- **Commit/branch:** `feat/claims-autopilot` (M7 commit)
+- **Files changed:** `uat/claims_autopilot_2026-07-23/UAT_PLAN.md` (14-story × sign-off matrix mapped to its automated evidence), `runs/2026-07-23_local_01/` (RUN_LOG + evidence: B2B story transcript, load baseline).
+- **Executed this run (agent, local prod build):** Story 3 (B2B accepted → replay `duplicate:true` same claim → 409 conflict original untouched → receipt lookup with `nextAction` → foreign-receipt 404 → 413 oversize → 401 no-key) PASSED end-to-end through the REAL production HTTP surface; entitlement negative probe (`FORBIDDEN_SCOPE`, zero claims) observed live; Stories 11/13/14's automated backing (recovery, execute-benefit-once, security matrix) green inside the battery ×3.
+- **Not executed (by policy + by design):** authenticated UI stories and every role sign-off — the agent does not type credentials into login forms, and sign-off is a human act. The local environment is left running and documented in the RUN_LOG for the human campaign.
+- **Decisions enforced:** evidence conventions match `uat/inpatient_longitudinal_2026-07-17` (portable runs/<date>/evidence layout).
+- **Tests run and exact results:** battery 100/9 ×3; gate exit 0 (clean + post-load); see RUN_LOG.
+- **Known gaps or skips:** the 14-row sign-off table is open — that is the M7→M8 gate, not a code gap.
+- **Security/privacy review:** evidence files contain no secrets (Bearer redacted) and no member PHI beyond seeded test identifiers.
+- **Next eligible task:** M8 (F8.1 deploy-OFF) — **requires the signed F7.6 campaign first.**

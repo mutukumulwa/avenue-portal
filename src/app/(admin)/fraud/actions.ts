@@ -2,6 +2,7 @@
 
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
+import { canTransitionClaim } from "@/server/services/claim-lifecycle";
 import { writeAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
 
@@ -50,12 +51,22 @@ export async function openInvestigationFromAlertAction(alertId: string, claimId:
   revalidatePath("/fraud/investigations");
 }
 
-export async function escalateClaimAction(claimId: string) {
+export async function escalateClaimAction(claimId: string): Promise<{ error: string } | void> {
   const session = await requireRole(ROLES.OPS);
 
   // Lock claim to HELD status so it cannot be paid until resolved
+  const current = await prisma.claim.findFirst({
+    where: { id: claimId, tenantId: session.user.tenantId },
+    select: { status: true },
+  });
+  if (!current) return { error: "Claim not found." };
+  // F7.1: a decided/paid claim can no longer be dragged back to review — that
+  // would strand its money effects. Void or reverse through settlement instead.
+  if (!canTransitionClaim(current.status, "UNDER_REVIEW")) {
+    return { error: `Claim is ${current.status.replace(/_/g, " ")} — place holds before the decision; use void/settlement reversal after.` };
+  }
   const claim = await prisma.claim.update({
-    where: { id: claimId },
+    where: { id: claimId, tenantId: session.user.tenantId },
     data: { status: "UNDER_REVIEW" },
     select: { claimNumber: true },
   });

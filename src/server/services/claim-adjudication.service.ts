@@ -11,6 +11,7 @@
  * - Excel bulk claims import (ExcelJS)
  */
 
+import { assertClaimTransition } from "./claim-lifecycle";
 import { prisma } from "@/lib/prisma";
 import { peekNextDocumentNumber } from "@/lib/document-number";
 import { TRPCError } from "@trpc/server";
@@ -290,6 +291,7 @@ export const claimAdjudicationService = {
       throw new TRPCError({ code: "FORBIDDEN", message: "Appeal must be reviewed by a different person than the original adjudicator" });
     }
 
+    assertClaimTransition(claim.status, "APPEALED", "appeal"); // F7.1
     await prisma.claim.update({
       where: { id: claimId },
       data: {
@@ -702,6 +704,9 @@ export const claimAdjudicationService = {
       //   1) constant fields for every claim in the batch, then
       //   2) paidAmount = approvedAmount per row (NW-D05: member "plan paid" and
       //      provider statements reflect the money actually settled).
+      // F7.1: every claim in the batch must legally move to PAID.
+      const batchStatuses = await tx.claim.findMany({ where: { settlementBatchId: batchId }, select: { claimNumber: true, status: true } });
+      for (const bc of batchStatuses) assertClaimTransition(bc.status, "PAID", `settlement paid (${bc.claimNumber})`);
       await tx.claim.updateMany({
         where: { settlementBatchId: batchId },
         data: { status: "PAID", paidAt, paymentVoucherId: voucher.id },

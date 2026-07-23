@@ -49,6 +49,9 @@ describe.skipIf(!URL_SET)("F3.7 integration — reconcilable effects", () => {
     await prisma.claimProcessingStage.deleteMany({ where: { run: { claimId: { in: usedClaimIds } } } });
     await prisma.claimProcessingRun.deleteMany({ where: { claimId: { in: usedClaimIds } } });
     await prisma.claimIntakeReceipt.deleteMany({ where: { id: { in: receiptIds } } });
+    // Sweep any leftovers from a CRASHED prior execution too (fixture receipts
+    // are prefix-namespaced) — the integrity gate treats orphans as CRITICAL.
+    await prisma.claimIntakeReceipt.deleteMany({ where: { tenantId, idempotencyKey: { startsWith: "f37" } } }).catch(() => undefined);
     await prisma.auditLog.deleteMany({ where: { tenantId, entityType: "Claim", entityId: { in: mintedClaimIds }, action: { startsWith: "CLAIM:AUTO" } } }).catch(() => undefined);
     await prisma.claim.deleteMany({ where: { id: { in: mintedClaimIds } } }).catch(() => undefined);
     await prisma.$disconnect();

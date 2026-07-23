@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { withApiKey, getApiCredential, providerScopeWhere, operatorTenantWhere, type ApiCredential } from "@/lib/apiAuth";
 import { ClaimLineCategory, ServiceType, BenefitCategory } from "@prisma/client";
 import { z } from "zod";
+import { LIMITS } from "@/server/services/claim-intake/schema";
 import { ClaimIntakeService } from "@/server/services/claim-intake/intake.service";
 import { processAcceptedRunInline } from "@/server/services/claim-intake";
 import { IntakeError, toHttpResponse } from "@/server/services/claim-intake/errors";
@@ -126,6 +127,11 @@ async function resolveCaller(credential: ApiCredential, providerCode: string | u
 
 async function postClaim(req: Request) {
   try {
+    // F7.3: bounded request body — refuse oversized payloads before parsing.
+    const contentLength = Number(req.headers.get("content-length") ?? 0);
+    if (contentLength > LIMITS.MAX_BODY_BYTES) {
+      return NextResponse.json({ error: `Request body exceeds ${LIMITS.MAX_BODY_BYTES} bytes.` }, { status: 413 });
+    }
     let body: unknown;
     try {
       body = await req.json();

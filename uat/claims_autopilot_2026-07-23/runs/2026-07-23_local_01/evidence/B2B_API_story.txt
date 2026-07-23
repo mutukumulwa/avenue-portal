@@ -1,0 +1,27 @@
+# F7.6 Story 3 — B2B API accepted / replay / conflict / status lookup
+# 2026-07-23, prod-mode next start @127.0.0.1:3000, throwaway DB, minted ProviderApiKey (Kampala Hospital)
+
+## 1. ACCEPTED (fresh idempotency key)
+{"success":true,"claimNumber":"CLM-2026-03706","status":"RECEIVED","billedAmount":4500,"receiptId":"cmrwyv24812if6wvqhxkr13qi","correlationId":"36314840-acbd-4919-841b-5b1480e06e53","processingState":"ROUTED","message":"Claim received and queued for adjudication."}
+
+## 2. REPLAY (same key, same payload) — must return the SAME claim, no duplicate
+{"success":true,"duplicate":true,"replayed":true,"claimNumber":"CLM-2026-03706","status":"RECEIVED","billedAmount":4500,"receiptId":"cmrwyv24812if6wvqhxkr13qi","correlationId":"36314840-acbd-4919-841b-5b1480e06e53","processingState":"ROUTED","message":"Duplicate submission — original claim returned (idempotent replay)."}
+HTTP 200
+
+## 3. CONFLICT (same key, DIFFERENT payload) — 409, original untouched
+{"error":"This idempotency key was already used for a different claim. Open the original submission or start a correction.","success":false,"code":"IDEMPOTENCY_KEY_REUSED","message":"This idempotency key was already used for a different claim. Open the original submission or start a correction.","originalReceiptRef":"cmrwyv24812if6wvqhxkr13qi"}
+HTTP 409
+
+## 4. RECEIPT STATUS LOOKUP (F6.1) — authoritative state + nextAction
+{"nextAction":"This claim was received and will be assessed by our team.","receiptId":"cmrwyv24812if6wvqhxkr13qi","state":"SUCCEEDED","outcomeCode":"ACCEPTED","correlationId":"36314840-acbd-4919-841b-5b1480e06e53","claimNumber":"CLM-2026-03706","claimStatus":"RECEIVED","processingState":"ROUTED","submittedAt":"2026-07-23T03:43:26.840Z","completedAt":"2026-07-23T03:43:26.853Z"}
+HTTP 200
+
+## 5. FOREIGN/UNKNOWN receipt id — non-enumerating 404 (miss is hash-chain audited)
+{"error":"Receipt not found"}
+HTTP 404
+
+## 6. OVERSIZED BODY — 413 before parsing (F7.3)
+HTTP 413
+
+## 7. NO KEY — 401 fail-closed
+HTTP 401

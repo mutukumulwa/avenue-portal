@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { assertClaimTransition } from "./claim-lifecycle";
 import type { Prisma } from "@prisma/client";
 import { ApprovalMatrixService } from "./approval-matrix.service";
 import { ApprovalRequestService } from "./approval-request.service";
@@ -759,6 +760,9 @@ export class ClaimDecisionService {
         });
       }
 
+      // F7.1: one lifecycle graph — an illegal move (e.g. deciding a PAID/VOID
+      // claim) aborts before any money effect.
+      assertClaimTransition(claim.status, decision.action, "decide");
       const row = await tx.claim.update({
         where: { id: claimId },
         data: {
@@ -955,6 +959,7 @@ export class ClaimDecisionService {
     if (claim.settlementBatchId) {
       throw new Error("Claim is already queued/settled in a settlement batch — reverse it through settlement, not a void.");
     }
+    assertClaimTransition(claim.status, "VOID", "voidClaim"); // F7.1
     const amount = Number(claim.approvedAmount);
     // OBS-2 Ticket 6: the reversal must mirror the approval JE, which posted the
     // base amount. Older claims (pre-snapshot) have approvedBaseAmount 0 → fall

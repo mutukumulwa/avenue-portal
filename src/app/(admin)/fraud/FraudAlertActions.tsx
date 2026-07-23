@@ -58,7 +58,11 @@ export function FraudAlertActions({
             onClick={() => {
               if (!confirm(`Escalate ${claimNumber} to fraud review? This will place the claim on hold.`)) return;
               startTransition(async () => {
-                await escalateClaimAction(claimId);
+                const res = await escalateClaimAction(claimId);
+                if (res?.error) {
+                  alert(res.error); // F7.1: decided/paid claims can no longer be dragged back on hold
+                  return;
+                }
                 setDone("escalated");
               });
             }}

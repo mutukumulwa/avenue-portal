@@ -16,6 +16,7 @@ import { ProofType, ReimbursementPaymentMethod, type BenefitCategory, type Claim
 import { auditChainService } from "./audit-chain.service";
 import { MobileMoneyService } from "./integrations/mobile-money.service";
 import { ClaimIntakeService } from "./claim-intake/intake.service";
+import { assertClaimTransition } from "./claim-lifecycle";
 import { processAcceptedRunInline } from "./claim-intake";
 
 // Default reimbursement window: 90 days from service date
@@ -230,6 +231,7 @@ export const reimbursementService = {
       throw new TRPCError({ code: "CONFLICT", message: "Claim has already been reimbursed" });
     }
 
+    assertClaimTransition(claim.status, "PAID", "reimbursement disburse"); // F7.1
     const disbursedAmount = Number(claim.approvedAmount ?? claim.billedAmount);
 
     await prisma.$transaction(async (tx) => {
