@@ -166,3 +166,35 @@ Stop condition observed: yes — reproducible evidence captured, no fixes implem
 ```
 
 ---
+
+## F0.6 — Create deterministic provider test fixtures
+
+```text
+Work package: F0.6
+Status: COMPLETE
+Proof-before-build classification: MISSING — no DB-factory convention existed (claims-autopilot fixtures are pure oracle objects; integration suites use seed findFirstOrThrow). Established a new factory.
+Files changed: tests/factories/provider-network.ts (new), tests/factories/provider-network.smoke.test.ts (new); PROGRESS.md rows
+Schema/data changes: none (test-only creates; direct model creates are TEST_ONLY per CLAIM_CREATOR_INVENTORY §2 — outside runtime allowlist by design)
+Behavior delivered: buildProviderWorld(prisma) → 2 tenants (Alpha UGX / Beta KES), providers A+B in Alpha + C in Beta, branches A1/A2/B1/C1 (rows only — no user→branch assignment; that field lands F1.2), client/group/package/version/benefit per tenant, active+inactive members, 6 persona provider users + provider-B + provider-C + suspended (all coarse PROVIDER_USER), contracts ACTIVE/EXPIRED/future-APPROVED, INCLUDE + EXCLUDE applicability. Namespaced per run token; idempotent teardown in FK order; no shared mutable state.
+Authorization evidence: smoke test drives the REAL ProviderEntitlementService against real applicability rows — A sees INCLUDEd Alpha client, denies the EXCLUDEd group and cross-tenant Beta member; B sees only its group-level INCLUDE. This is the F1.8/F1.10/F1.11 exercise substrate.
+Idempotency/concurrency evidence: teardown idempotent (second call resolves, asserted); per-run token prevents parallel collision
+Privacy/security evidence: synthetic data only; placeholder passwordHash is not a login target
+Money/reconciliation evidence: n/a (claim/settlement rows deferred — added by the tests that need them via canonical services)
+Focused tests and results: AUTOPILOT_TEST_DB set → 3 passed (build, entitlement, teardown) on throwaway PG16; unset → 3 skipped (CI-safe). Full suite 1128 passed / 112 skipped (no regression vs 1124/109 baseline + F0.2's 4 + F0.6's 3 skips)
+Typecheck/schema result: npx tsc --noEmit → exit 0; brand:guard PASS; currency:guard PASS (662 files)
+Manual/visual evidence: n/a
+Feature-flag state: none
+Backfill/rollout impact: none. Grounded every model's required fields via a schema scan before writing (caught Client.type/slug, Member.gender, Provider.type) — recipe in TEST_DB_HARNESS.md
+Known limitations: no claim/PA/settlement rows in the base graph (spec lists them, but they belong to the canonical services the consuming tests call; adding a direct-create claim helper deferred until an F5/F6 test needs it); branch-assignment dimension intentionally absent until F1.2 schema
+Unrelated worktree changes preserved: yes
+Next allowed package: F1.1 — Define and seed provider permission catalog (phase F1 begins; additive schema + code, flags default OFF)
+Stop condition observed: yes — fixtures + smoke complete, no feature implementation
+```
+
+---
+
+# Phase F0 COMPLETE (2026-07-23)
+
+All six baseline/characterization packages done: provider route inventory, access-leakage characterization, claim/PA ownership graph, document storage map, settlement money map, deterministic fixtures. Evidence: `PROVIDER_ROUTE_INVENTORY.md`, `CLAIM_PA_OWNERSHIP_PATHS.md`, `DOCUMENT_STORAGE_MAP.md`, `SETTLEMENT_MONEY_MAP.md`, `TEST_DB_HARNESS.md`, `tests/api/provider-access-characterization.test.ts`, `tests/factories/provider-network.*`. No product behavior changed; no schema changed; branch isolated from Claims Autopilot. **F1 next — first schema/code changes.**
+
+---

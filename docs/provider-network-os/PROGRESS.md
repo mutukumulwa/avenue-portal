@@ -39,7 +39,9 @@
 | F0.3 | Characterize claim and PA ownership paths | S | COMPLETE | `CLAIM_PA_OWNERSHIP_PATHS.md` |
 | F0.4 | Characterize document storage and consumers | S | COMPLETE | `DOCUMENT_STORAGE_MAP.md` |
 | F0.5 | Characterize settlement and money conservation | S | COMPLETE | `SETTLEMENT_MONEY_MAP.md` |
-| F0.6 | Create deterministic provider test fixtures | S | IN_PROGRESS | — |
+| F0.6 | Create deterministic provider test fixtures | S | COMPLETE | `tests/factories/provider-network.ts` + smoke (3 pass on DB, skip w/o) |
+
+**Phase F0 COMPLETE** (2026-07-23) — all 6 characterization/fixture packages done. Next: **F1 Provider access foundation**, starting F1.1 (seed provider permission catalog). F1 begins actual schema+code changes (additive; flags default OFF). Gate A is the F1 exit.
 
 ## F1 — Provider access and entitlement foundation
 
