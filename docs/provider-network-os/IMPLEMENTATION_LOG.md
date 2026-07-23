@@ -614,3 +614,23 @@ Stop condition observed: yes — one proof consumer.
 ```
 
 ---
+
+## F2.7 — Backfill legacy document metadata (CLAIM class)
+
+```text
+Work package: F2.7
+Status: COMPLETE for the CLAIM target class (F2.7 is per-class/batch; other classes = future units)
+Files changed: src/server/services/provider-document-backfill.service.ts (new), tests/services/provider-document-backfill.test.ts, PROGRESS.md + IMPLEMENTATION_LOG.md
+Behavior delivered: backfillClaimDocuments — dry-run by default; classifies each legacy claim doc UNAMBIGUOUS/MISSING_TARGET/BROKEN_URL/ALREADY_MIGRATED; apply stamps storageKey (parsed from fileUrl), tenant/provider/branch scope (from the owning claim), sourceType OPERATOR, retentionClass LEGACY_BACKFILL, and a scan disposition (default PENDING → rescan). Only UNAMBIGUOUS rows written; ambiguous/broken → exceptions (never guessed). Legacy fileUrl untouched (stays readable).
+Authorization evidence: n/a (ops backfill; scope derived from the owning claim, not guessed)
+Idempotency/concurrency evidence: rows with storageKey already set → ALREADY_MIGRATED (skipped); rerun applies 0 (test).
+Privacy/security evidence: no object contents read/logged (URL string parsing only); disposition defaults PENDING so backfilled docs are not silently usable via the new path until scanned.
+Money/reconciliation evidence: row conservation — counts sum to total (test).
+Focused tests and results: 4/4 (2 pure URL-parse + 2 DB dry-run/apply/idempotent). Full suite (no DB env) 1171 passed / 177 skipped (+2 pure, +2 DB). tsc 0; brand PASS; currency PASS (679).
+Feature-flag state: none (ops tool)
+Known limitations: CLAIM class only (PREAUTH/CASE/etc. classes are separate F2.7 batches); scan disposition policy (PENDING vs grandfather-CLEAN) is a security decision — mechanism parameterizes it, default PENDING. Real MinIO object existence not verified per row (URL→key mapping only).
+Next allowed package: F2.8 — Migrate document consumers (S per group) — then F2.9 (GATED security approval)
+Stop condition observed: yes — one target class.
+```
+
+---

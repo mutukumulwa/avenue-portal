@@ -74,7 +74,7 @@
 | F2.4 | Upload finalize + content validation | M | COMPLETE | `finalizeUpload` + `document-mime.ts` (magic-byte) + staging port + test (5 pass) |
 | F2.5 | Malware scan + quarantine lifecycle | M | COMPLETE | `provider-document-scan.service.ts` (lease/retry) + `isDocumentUsable` + test (5 pass) |
 | F2.6 | Authorized document download | M | COMPLETE | `authorizeDownload` + `document-storage.ts` (MinIO port) + download route (proof) + test (4 pass) |
-| F2.7 | Backfill legacy document metadata (per class/batch) | S/batch | NOT_STARTED | — |
+| F2.7 | Backfill legacy document metadata (per class/batch) | S/batch | COMPLETE (CLAIM class) | `provider-document-backfill.service.ts` + test (4 pass) |
 | F2.8 | Migrate document consumers (per group) | S/grp | NOT_STARTED | — |
 | F2.9 | Remove provider public-object access | M | GATED(security approval) | — |
 
