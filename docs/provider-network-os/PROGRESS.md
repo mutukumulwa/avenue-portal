@@ -56,7 +56,7 @@
 | F1.5 | Harden provider user administration/offboarding | M | COMPLETE | `provider-user-admin.service.ts` + test (6 pass) |
 | F1.6 | Extend API keys: scope, expiry, branch, rotation | M | COMPLETE | `ProviderApiKey` fields + service + `provider-api-scopes.ts` + test (7 pass) |
 | F1.7 | Enforce API scopes route by route (per group: a,b,c…) | S/grp | PARTIAL | (a) eligibility group DONE — `providerScopeError` + test (4 pass); remaining groups per-unit |
-| F1.8 | Audit applicability data readiness | M | NOT_STARTED | — |
+| F1.8 | Audit applicability data readiness | M | COMPLETE | `provider-applicability-readiness.service.ts` + script + test (8 pass) |
 | F1.9 | Backfill applicability (reviewed batches) | S/batch | GATED(network-ops signed input) | — |
 | F1.10 | Add entitlement shadow comparison | M | NOT_STARTED | — |
 | F1.11 | Make provider browser eligibility canonical | M | GATED(D3 readiness-gate approval) | — |

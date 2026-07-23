@@ -372,3 +372,25 @@ Stop condition observed: yes — exactly one route group.
 ```
 
 ---
+
+## F1.8 — Audit applicability data readiness
+
+```text
+Work package: F1.8
+Status: COMPLETE
+Proof-before-build: ProviderEntitlementService reads ProviderContract→ContractApplicability; no readiness report existed. MISSING.
+Files changed: src/server/services/provider-applicability-readiness.service.ts (new), scripts/pnos-applicability-readiness.ts (new), tests/services/provider-applicability-readiness.test.ts (new), PROGRESS.md + IMPLEMENTATION_LOG.md
+Schema/data changes: none — READ-ONLY report (stop condition: no enforcement)
+Behavior delivered: classifyApplicability (pure, priority-ordered: INACTIVE_PROVIDER → ORPHANED_RULES → CONTRADICTORY → NO_ACTIVE_CONTRACT → MISSING_APPLICABILITY → COMPLETE) + report() gathering per-provider summaries (active/expired/future contracts, effective INCLUDE/EXCLUDE, contradictions, orphans) with control totals + gateReady flag. Script prints repair-input grouped by classification. This is the network-ops sign-off artifact for the D3 gate (F1.9/F1.11).
+Authorization evidence: n/a (read-only report; no actor mutation)
+Idempotency/concurrency evidence: rerunnable; DB test asserts row counts unchanged after report.
+Privacy/security evidence: report carries ids/counts/classification only (no member/PHI). Produces safe repair input, never auto-assumptions (spec F1.8 step 5).
+Money/reconciliation evidence: control totals sum to reported provider count (asserted).
+Focused tests and results: 8/8 (6 pure classifier + 2 DB: factory A/B/C COMPLETE with EXCLUDE/expired/future counted + read-only; retiring B's INCLUDE flips B to MISSING_APPLICABILITY + gateReady false). Full suite 1161 passed / 137 skipped (+6 pure, +2 DB). tsc 0; brand PASS; currency PASS (668). Script smoke prints totals.
+Feature-flag state: none
+Known limitations: "define required relationship set WITH network operations" + "spot-check with contract owners" are human review steps — the report is the input to them, not a substitute. Package/benefit-level completeness beyond client/group INCLUDE is not scored (client-level is the entitlement key today).
+Next allowed package: F1.9 — Backfill applicability through reviewed inputs (GATED: needs network-ops signed input; build mechanism + dry-run, do NOT --apply)
+Stop condition observed: yes — no enforcement.
+```
+
+---
