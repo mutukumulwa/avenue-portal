@@ -53,7 +53,7 @@ vi.mock("@/lib/apiAuth", async (importOriginal) => {
 import { POST as postUpload } from "@/app/api/v1/upload/route";
 import { ProviderEntitlementService } from "@/server/services/provider-entitlement.service";
 
-const providerCred = (id: string): ApiCredential => ({ kind: "provider", tenantId: "tenant-1", providerId: id, keyId: `k-${id}` });
+const providerCred = (id: string): ApiCredential => ({ kind: "provider", tenantId: "tenant-1", providerId: id, keyId: `k-${id}`, scopes: [], allowedBranchIds: [] });
 
 // Duck-typed Request: the route only calls `await req.formData()` then
 // `.get("file")`/`.get(field)` and `file.arrayBuffer()`. Building a real

@@ -2941,10 +2941,23 @@ model ProviderApiKey {
   createdById String?
   createdAt   DateTime  @default(now())
   revokedAt   DateTime?
+  // PNOS F1.6 — least-privilege + operationally governable credentials (§7.2).
+  scopes             String[]  @default([]) // route-scope catalog codes this key may exercise
+  allowedBranchIds   String[]  @default([]) // empty ⇒ not branch-restricted (F1.7 decides per route)
+  expiresAt          DateTime? // hard expiry — verify() rejects at/after this
+  lastSuccessAt      DateTime? // operational health, distinct from lastUsedAt (attempt)
+  lastFailureAt      DateTime?
+  rotationFamilyId   String? // groups a key with its rotated successors
+  previousKeyId      String? // the key this one rotated from
+  revokedById        String?
+  revokeReason       String?
+  allowedIpPolicyRef String? // optional network/IP allowlist reference (unused until enforced)
 
   @@index([tenantId])
   @@index([providerId])
   @@index([keyPrefix])
+  @@index([rotationFamilyId])
+  @@index([expiresAt])
 }
 
 // A physical branch/facility of a provider network (spec §5.2). Branch-level

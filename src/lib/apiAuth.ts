@@ -4,7 +4,9 @@ import { ProviderApiKeyService } from "@/server/services/provider-api-key.servic
 
 export type ApiCredential =
   | { kind: "operator"; tenantId?: string }
-  | { kind: "provider"; tenantId: string; providerId: string; keyId: string };
+  // PNOS F1.6: a verified provider key now also carries its scopes + optional
+  // branch restriction so route handlers (F1.7) can enforce least privilege.
+  | { kind: "provider"; tenantId: string; providerId: string; keyId: string; scopes: string[]; allowedBranchIds: string[] };
 
 function extractKey(req: Request): string | null {
   const raw = req.headers.get("authorization") || req.headers.get("x-api-key");

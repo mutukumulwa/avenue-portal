@@ -79,7 +79,7 @@ vi.mock("@/lib/apiAuth", async (importOriginal) => {
 
 import { POST as postPreauth } from "@/app/api/v1/preauth/route";
 
-const provider = (id: string): ApiCredential => ({ kind: "provider", tenantId: "tenant-1", providerId: id, keyId: `k-${id}` });
+const provider = (id: string): ApiCredential => ({ kind: "provider", tenantId: "tenant-1", providerId: id, keyId: `k-${id}`, scopes: [], allowedBranchIds: [] });
 const operator: ApiCredential = { kind: "operator" };
 
 const preauthReq = (body: Record<string, unknown>) =>

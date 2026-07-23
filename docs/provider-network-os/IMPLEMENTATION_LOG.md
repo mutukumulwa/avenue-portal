@@ -328,3 +328,25 @@ Stop condition observed: yes — no profile/master-data changes
 ```
 
 ---
+
+## F1.6 — Extend API keys with scope, expiry, branch, rotation
+
+```text
+Work package: F1.6
+Status: COMPLETE
+Proof-before-build: ProviderApiKey had only label/prefix/hash/isActive/lastUsedAt; verify() checked isActive only. ProviderApiKeyService.generate/verify/list/revoke existed. Classification: PARTIAL (credential exists; least-privilege/expiry/rotation/health MISSING).
+Files changed: prisma/schema.prisma (ProviderApiKey additive: scopes, allowedBranchIds, expiresAt, lastSuccessAt/lastFailureAt, rotationFamilyId, previousKeyId, revokedById, revokeReason, allowedIpPolicyRef + 2 indexes), src/server/services/provider-api-key.service.ts (extended), src/lib/apiAuth.ts (ApiCredential provider variant now carries scopes/allowedBranchIds), src/lib/provider-api-scopes.ts (new — scope catalog + route→scope map + permissionsAllowKeyAdmin), src/app/provider/api-keys/actions.ts (gap #5: admin gated behind provider.api_keys.manage, legacy-aware), tests/services/provider-api-key.service.test.ts (new), 3 existing api tests updated for the additive credential type, PROGRESS.md + IMPLEMENTATION_LOG.md
+Schema/data changes: additive via db push (validated, in sync, no data loss). No prod DB.
+Behavior delivered: generate(scopes/allowedBranchIds/expiresAt/family); verify() rejects expired keys (hard gate) + records success/failure health + returns scopes/branches; overlap-safe rotate() (successor inherits scopes/branches/family, predecessor expiresAt=cutoff so both valid during overlap, only successor after); revoke() records actor+reason; list() safe projection (no hash/plaintext). Route→scope catalog is data for F1.7. api-keys admin action now requires provider.api_keys.manage (legacy users unaffected). hasScope/allowsBranch pure helpers for F1.7.
+Authorization evidence: DB — plaintext returned once, never in row/list; expired key → verify null; revoked key → verify null (+ reason stored); rotation overlap/cutoff proven with time-parameterized verify. Pure — hasScope (unscoped permissive / scoped exact), allowsBranch (empty unrestricted / listed only), permissionsAllowKeyAdmin (legacy allowed, migrated needs manage).
+Idempotency/concurrency evidence: n/a (each generate is a new credential by design); rotation is a single explicit action.
+Privacy/security evidence: only bcrypt hash stored; list() select excludes keyHash; §7.2 "never plaintext after creation" upheld (test asserts absence). Scope enforcement per route deferred to F1.7 (catalog shipped).
+Money/reconciliation evidence: n/a
+Focused tests and results: 7/7 (3 pure + 4 DB). Full suite (no DB) 1151 passed / 135 skipped (+3 pure, +4 DB-gated). tsc 0 (fixed 3 pre-existing api tests for the additive credential type); brand PASS; currency PASS (667).
+Feature-flag state: none — additive; keys default to empty scopes (unscoped/legacy) so existing integrations keep working until F1.7 requires scopes per route.
+Known limitations: scope/branch ENFORCEMENT on routes is F1.7 (this ships the fields + catalog + helpers only). api-keys UI still submits label only — scope/expiry selection is a later UI package (service supports it). IP allowlist field present but unused.
+Next allowed package: F1.7 — Enforce API scopes route by route (S per group; do ONE group)
+Stop condition observed: yes — did NOT migrate all API routes
+```
+
+---
