@@ -70,7 +70,7 @@
 |---|---|---|---|---|
 | F2.1 | Private doc metadata + upload-intent schema | M | COMPLETE | `Document` §7.4 fields + `DocumentUploadIntent` + `provider-document.service.ts` + test (6 pass) |
 | F2.2 | Resource-level document authorization | M | COMPLETE | `ProviderDocumentService.authorizeTarget` + factory createClaim/createPreauth + test (6 pass) |
-| F2.3 | Upload intent creation | S | NOT_STARTED | — |
+| F2.3 | Upload intent creation | S | COMPLETE | `createUploadIntent`/`resolveOpenIntent` + `DOCUMENT_UPLOAD_POLICY` + test (5 pass) |
 | F2.4 | Upload finalize + content validation | M | NOT_STARTED | — |
 | F2.5 | Malware scan + quarantine lifecycle | M | NOT_STARTED | — |
 | F2.6 | Authorized document download | M | NOT_STARTED | — |

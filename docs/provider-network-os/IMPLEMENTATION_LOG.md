@@ -536,3 +536,21 @@ Stop condition observed: yes — download not exposed.
 ```
 
 ---
+
+## F2.3 — Upload intent creation
+
+```text
+Work package: F2.3
+Status: COMPLETE
+Files changed: src/server/services/provider-document.service.ts (DOCUMENT_UPLOAD_POLICY + createUploadIntent + resolveOpenIntent + POLICY_MIME code), tests/services/provider-document-intent.test.ts, PROGRESS.md + IMPLEMENTATION_LOG.md
+Behavior delivered: createUploadIntent authorizes the target (UPLOAD) → validates MIME against the small policy allowlist → caps size at 10MB → mints a single-use hex token + 15-min expiry → audits. Returns token/expiry/constraints, NO public-read URL. Target+actor binding fixed at creation. resolveOpenIntent returns the intent only if unexpired + unfinalized (expired/used/unknown all → null).
+Authorization evidence: 5 DB tests — bound intent (token+expiry, no url, actor/provider stored); forbidden target NOT_FOUND + missing perm FORBIDDEN_PERMISSION; disallowed MIME POLICY_MIME; expired/unknown → resolveOpenIntent null; size capped at policy.
+Idempotency/concurrency evidence: single-use token (unique); finalize-once enforced at F2.4 via resolveOpenIntent + schema uniques.
+Privacy/security evidence: no public-read access issued (asserted no url/http/bucket in the result); MIME policy is a small allowlist (§9.9).
+Focused tests and results: 5/5. Full suite (no DB env) 1168 passed / 162 skipped (+5 DB). tsc 0; brand PASS; currency PASS.
+Feature-flag state: none (not wired to live routes until F2.8)
+Next allowed package: F2.4 — Upload finalize + content validation (M)
+Stop condition observed: yes — no finalize/scan in this package.
+```
+
+---
