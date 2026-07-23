@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { withApiKey, getApiCredential, operatorTenantWhere } from "@/lib/apiAuth";
+import { withApiKey, getApiCredential, operatorTenantWhere, providerScopeError } from "@/lib/apiAuth";
+import { ROUTE_SCOPE_CATALOG } from "@/lib/provider-api-scopes";
 import { ProviderEntitlementService } from "@/server/services/provider-entitlement.service";
 
 async function getEligibility(req: Request) {
@@ -16,6 +17,10 @@ async function getEligibility(req: Request) {
     // contracts cover; a member outside that entitlement returns 404. The
     // operator key is confined to its bound tenant (BD-06 / operatorTenantWhere).
     const credential = await getApiCredential(req);
+    // F1.7: this route group requires the eligibility read scope. Unscoped legacy
+    // keys pass; a scoped key must carry api.eligibility.read (operator exempt).
+    const scopeErr = providerScopeError(credential, ROUTE_SCOPE_CATALOG.eligibility);
+    if (scopeErr) return scopeErr;
     const scope =
       credential?.kind === "provider"
         ? await ProviderEntitlementService.entitledMemberWhere(credential.providerId)

@@ -96,6 +96,26 @@ export function operatorTenantWhere(credential: ApiCredential | null): { tenantI
 }
 
 /**
+ * PNOS F1.7 — per-route scope enforcement for provider credentials.
+ *
+ * Returns a safe 403 response when a PROVIDER key that HAS scopes does not carry
+ * the route's required scope; returns null (allowed) otherwise. Unscoped legacy
+ * keys pass (ProviderApiKeyService.hasScope is permissive for empty scopes), so
+ * enabling enforcement does not break existing integrations — it tightens
+ * automatically as keys are minted with scopes. Operator keys are not
+ * scope-restricted (they are the global integration channel).
+ */
+export function providerScopeError(credential: ApiCredential | null, requiredScope: string): NextResponse | null {
+  if (credential?.kind === "provider" && !ProviderApiKeyService.hasScope(credential, requiredScope)) {
+    return NextResponse.json(
+      { error: "Forbidden: this API key is not authorized for this operation.", code: "FORBIDDEN_SCOPE", requiredScope },
+      { status: 403 },
+    );
+  }
+  return null;
+}
+
+/**
  * Wrapper for B2B API endpoints ensuring stateless API-key auth. Handlers that
  * need the resolved facility can call getApiCredential(req) themselves.
  */

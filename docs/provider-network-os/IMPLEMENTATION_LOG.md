@@ -350,3 +350,25 @@ Stop condition observed: yes — did NOT migrate all API routes
 ```
 
 ---
+
+## F1.7(a) — Enforce API scopes: eligibility group
+
+```text
+Work package: F1.7 (route group (a): eligibility — ONE group only, per stop condition)
+Status: COMPLETE for group (a); F1.7(b..) remain (benefits/preauth/claims/upload/remittance/hms-batch) as separate future units
+Proof-before-build: /api/v1/eligibility (withApiKey → getApiCredential → entitledMemberWhere/operatorTenantWhere → member). No scope check existed. F1.6 shipped the catalog + hasScope. Classification: PARTIAL→extend.
+Files changed: src/lib/apiAuth.ts (providerScopeError helper), src/app/api/v1/eligibility/route.ts (enforce ROUTE_SCOPE_CATALOG.eligibility), tests/api/provider-api-scope-eligibility.test.ts (new), PROGRESS.md + IMPLEMENTATION_LOG.md
+Schema/data changes: none
+Behavior delivered: eligibility route rejects a scoped provider key lacking api.eligibility.read with 403 FORBIDDEN_SCOPE, BEFORE any member query. Unscoped legacy keys pass (no silent break); operator keys exempt. Branch constraint N/A for eligibility (no branch in the request) — allowsBranch will be applied by route groups that carry a branch (F3/F5).
+Authorization evidence: 4 mock tests — correct scope 200; wrong scope 403 + members never queried; unscoped legacy 200; operator 200.
+Idempotency/concurrency evidence: n/a (read)
+Privacy/security evidence: denial precedes data access; safe error envelope (code FORBIDDEN_SCOPE, requiredScope) with no internal detail.
+Money/reconciliation evidence: n/a
+Focused tests and results: 4/4. Full suite 1155 passed / 135 skipped (+4). tsc 0; brand PASS; currency PASS.
+Feature-flag state: none — legacy-permissive by the F1.6 hasScope design; tightens as keys gain scopes.
+Known limitations: only the eligibility group enforced (stop condition). Other groups (benefits, preauth.submit, claims.submit/read, upload, hms-batch) each become their own F1.7(x) unit reusing providerScopeError + ROUTE_SCOPE_CATALOG.
+Next allowed package: F1.8 — Audit applicability data readiness (M)
+Stop condition observed: yes — exactly one route group.
+```
+
+---
