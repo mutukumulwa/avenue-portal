@@ -634,3 +634,22 @@ Stop condition observed: yes — one target class.
 ```
 
 ---
+
+## F2.8 — Migrate document consumers (provider claim-documents group)
+
+```text
+Work package: F2.8
+Status: COMPLETE for ONE consumer group (provider claim documents). Other groups (admin ClaimDocuments/PreAuthDocuments, member pages, HR endorsements) remain separate units.
+Proof-before-build: existing fileUrl consumers are operator/member-scoped and F2.2 deliberately left operator access to a separate admin path that does not exist yet — migrating them would exceed one group and require unbuilt operator authz. The provider claim detail page rendered NO documents at all, so the provider group is built authorized-only from the start (it never uses fileUrl). This is the group Gate B is about.
+Files changed: src/server/services/provider-document.service.ts (listTargetDocuments + safeScanLabel), src/app/provider/claims/[id]/page.tsx (context-resolved + Documents section), tests/services/provider-document-list.test.ts, PROGRESS.md + IMPLEMENTATION_LOG.md
+Behavior delivered: listTargetDocuments authorizes the target (VIEW) then returns a SAFE projection (id/fileName/category/size/createdAt/statusLabel/usable/downloadHref) — never fileUrl, storageKey, or sha256. Only CLEAN docs get an authorized /provider/documents/[id]/download href; PENDING/QUARANTINED/REJECTED/ERROR/legacy show a safe label and NO link. Provider claim detail now renders the section; a caller lacking provider.claim.read (legacy, un-migrated) gets no section at all — today's page exactly, never a broken one.
+Authorization evidence: 3 tests — safe labels leak no scanner detail; list denies without permission (FORBIDDEN_PERMISSION) and for another provider's claim (NOT_FOUND); serialized payload contains no fileUrl/storageKey.
+Privacy/security evidence: legacy (null scanStatus) documents are deliberately NOT served via a public URL on this surface — private-by-default; the public fileUrl is never emitted to the provider client.
+Focused tests and results: 3/3. Full suite (no DB env) 1172 passed / 179 skipped (+1 pure, +2 DB). tsc 0; brand PASS; currency PASS (679).
+Manual/visual evidence: page typechecks; browser QA deferred (no seeded provider session). Section is additive + permission-guarded, so the legacy rendering path is unchanged.
+Known limitations: one group only (stop condition). Admin/member fileUrl consumers still direct — they need an operator-scoped download path (separate unit) before F2.9 can remove public read.
+Next allowed package: F2.9 — Remove provider public-object access (M) — GATED on security approval + zero active direct consumers
+Stop condition observed: yes — one consumer group.
+```
+
+---

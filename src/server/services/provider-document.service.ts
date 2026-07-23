@@ -5,6 +5,21 @@ import { ProviderAccessService, type ProviderAccessContext } from "./provider-ac
 import { resolveAcceptableMime } from "@/lib/document-mime";
 import { isDocumentUsable } from "./provider-document-scan.service";
 
+/**
+ * Provider-safe label for a document's scan state (F2.8). Never reveals engine
+ * detail or raw scanner output — just whether the file is usable and why not.
+ */
+export function safeScanLabel(scanStatus: string | null): string {
+  switch (scanStatus) {
+    case "CLEAN": return "Available";
+    case "PENDING": return "Scanning…";
+    case "QUARANTINED": return "Unavailable — failed security check";
+    case "REJECTED": return "Unavailable — could not be validated";
+    case "ERROR": return "Unavailable — scan error";
+    default: return "Unavailable — not migrated to secure storage";
+  }
+}
+
 /** Short-lived private read access (F2.6). No permanent/public URL. */
 export interface DocumentDownloadPort {
   presignRead(key: string, ttlSeconds: number): Promise<{ url: string; expiresAt: Date }>;
@@ -231,6 +246,46 @@ export const ProviderDocumentService = {
     if (intent.finalizedAt) return null;
     if (intent.expiresAt.getTime() <= now.getTime()) return null;
     return intent;
+  },
+
+  /**
+   * F2.8 — provider-safe document list for one authorized target. NEVER exposes
+   * fileUrl or storageKey: a usable (CLEAN) document gets an authorized download
+   * href; anything else gets a safe status label and no link. Legacy rows (null
+   * scanStatus) surface as unavailable via this path — the private-by-default
+   * posture — rather than leaking a public URL.
+   */
+  async listTargetDocuments(
+    ctx: ProviderAccessContext,
+    input: { targetType: DocumentTargetType; targetId: string },
+    db: Db = prisma,
+  ): Promise<Array<{ id: string; fileName: string; category: string; sizeBytes: number | null; createdAt: Date; statusLabel: string; usable: boolean; downloadHref: string | null }>> {
+    await this.authorizeTarget(ctx, { targetType: input.targetType, targetId: input.targetId, action: "VIEW" }, db);
+    const where =
+      input.targetType === "CLAIM" ? { claimId: input.targetId }
+      : input.targetType === "PREAUTH" ? { preauthId: input.targetId }
+      : { caseId: input.targetId };
+
+    const docs = await db.document.findMany({
+      where,
+      // safe projection only — no fileUrl, no storageKey, no sha256
+      select: { id: true, fileName: true, originalFileName: true, category: true, sizeBytes: true, fileSize: true, createdAt: true, scanStatus: true },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return docs.map((d) => {
+      const usable = isDocumentUsable(d.scanStatus);
+      return {
+        id: d.id,
+        fileName: d.originalFileName ?? d.fileName,
+        category: d.category,
+        sizeBytes: d.sizeBytes ?? d.fileSize ?? null,
+        createdAt: d.createdAt,
+        statusLabel: safeScanLabel(d.scanStatus),
+        usable,
+        downloadHref: usable ? `/provider/documents/${d.id}/download` : null,
+      };
+    });
   },
 
   /**

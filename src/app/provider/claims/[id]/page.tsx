@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
-import { requireProvider } from "@/lib/provider-portal";
+import { ArrowLeft, FileText, Download } from "lucide-react";
+import { ProviderAccessService } from "@/server/services/provider-access.service";
+import { ProviderDocumentService } from "@/server/services/provider-document.service";
 import { prisma } from "@/lib/prisma";
 
 function money(n: number, ccy = "KES") {
@@ -15,7 +16,10 @@ const LINE_TONE: Record<string, string> = {
 };
 
 export default async function ProviderClaimDetail({ params }: { params: Promise<{ id: string }> }) {
-  const { provider, tenantId } = await requireProvider();
+  // F2.8: resolve the canonical access context so the documents section can be
+  // authorized through ProviderDocumentService (never a direct fileUrl).
+  const { ctx, provider } = await ProviderAccessService.resolveUserContext();
+  const tenantId = ctx.tenantId;
   const { id } = await params;
 
   const claim = await prisma.claim.findFirst({
@@ -36,6 +40,13 @@ export default async function ProviderClaimDetail({ params }: { params: Promise<
   if (!claim) notFound();
 
   const diagnoses = (claim.diagnoses as unknown as Array<{ code: string; description: string }>) ?? [];
+
+  // F2.8 consumer: authorized document list. A caller without provider.claim.read
+  // (e.g. a legacy user not yet migrated to the provider RBAC) simply gets no
+  // documents section — exactly today's page, never a broken one.
+  const documents = await ProviderDocumentService
+    .listTargetDocuments(ctx, { targetType: "CLAIM", targetId: claim.id })
+    .catch(() => null);
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -68,6 +79,33 @@ export default async function ProviderClaimDetail({ params }: { params: Promise<
           <div className="flex flex-wrap gap-2">
             {diagnoses.map((d) => (
               <span key={d.code} className="text-xs bg-[#E6E7E8] text-[#495057] rounded-full px-2.5 py-0.5">{d.code} — {d.description}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {documents && documents.length > 0 && (
+        <div className="bg-white border border-[#EEEEEE] rounded-lg overflow-hidden">
+          <div className="px-5 py-3 border-b border-[#EEEEEE]">
+            <h2 className="font-bold text-brand-text-heading font-heading flex items-center gap-2"><FileText size={16} /> Documents</h2>
+          </div>
+          <div className="divide-y divide-[#F4F4F4]">
+            {documents.map((d) => (
+              <div key={d.id} className="flex items-center gap-3 px-5 py-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-brand-text-heading truncate">{d.fileName}</p>
+                  <p className="text-xs text-brand-text-muted">
+                    {d.category.replace(/_/g, " ")} · {new Date(d.createdAt).toLocaleDateString("en-UG")}
+                  </p>
+                </div>
+                {d.usable && d.downloadHref ? (
+                  <Link href={d.downloadHref} className="shrink-0 flex items-center gap-1 text-xs font-bold text-brand-indigo hover:text-brand-secondary">
+                    <Download size={13} /> Download
+                  </Link>
+                ) : (
+                  <span className="shrink-0 text-xs font-semibold text-brand-text-muted">{d.statusLabel}</span>
+                )}
+              </div>
             ))}
           </div>
         </div>
