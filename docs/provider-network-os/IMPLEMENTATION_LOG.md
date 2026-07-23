@@ -114,3 +114,29 @@ Stop condition observed: yes — inventory complete; no bucket-policy change
 ```
 
 ---
+
+## F0.5 — Characterize settlement and money conservation
+
+```text
+Work package: F0.5
+Status: COMPLETE
+Proof-before-build classification: PARTIAL (settlement path + atomic paid-gate + existing recon invariant COVERED and shipping; ProviderDisbursement + ProviderRemittanceService + payment-query MISSING — confirmed gaps #16/#17)
+Files changed: docs/provider-network-os/SETTLEMENT_MONEY_MAP.md (new); PROGRESS.md rows
+Schema/data changes: none — no production mutation (stop condition)
+Behavior delivered: none (read-only)
+Authorization evidence: n/a this package
+Idempotency/concurrency evidence: documented the shipped FG-C7 atomic exactly-once Mark-Paid gate (updateMany status guard = first write, count!=1 → rollback) — must be preserved by F6
+Privacy/security evidence: n/a
+Money/reconciliation evidence: full claim→decision→batch→voucher→GL path traced with file:line; the ONE paid-setter identified (markSettlementBatchPaid); existing data-integrity invariant formula captured (claim approvedAmount ↔ 1010 SETTLEMENT_PAID credits); spec D25/I5 target formula documented; frozen-example capture SQL drafted (not run — no sanctioned DB from workstation); ProviderDisbursement absence confirmed (paid = accounting state, no real reference/value-date)
+Focused tests and results: none required (characterization)
+Typecheck/schema result: no code changed
+Manual/visual evidence: n/a
+Feature-flag state: none
+Backfill/rollout impact: F6.7/6.8 disbursement additive; F6.9 recon extends shipped check; single-currency Phase-1 = finance decision (F6.1)
+Known limitations: admin settlement pages/actions read at service level only (full admin-field parity is F6.3's proof-before-build); frozen examples require environment DB (queries provided)
+Unrelated worktree changes preserved: yes
+Next allowed package: F0.6
+Stop condition observed: yes — path traced, baseline queries written, no disbursement added, no production mutation
+```
+
+---

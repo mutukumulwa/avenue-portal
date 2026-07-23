@@ -38,8 +38,8 @@
 | F0.2 | Characterize provider access leakage (tests) | S | NOT_STARTED | — |
 | F0.3 | Characterize claim and PA ownership paths | S | COMPLETE | `CLAIM_PA_OWNERSHIP_PATHS.md` |
 | F0.4 | Characterize document storage and consumers | S | COMPLETE | `DOCUMENT_STORAGE_MAP.md` |
-| F0.5 | Characterize settlement and money conservation | S | NOT_STARTED | — |
-| F0.6 | Create deterministic provider test fixtures | S | NOT_STARTED | — |
+| F0.5 | Characterize settlement and money conservation | S | COMPLETE | `SETTLEMENT_MONEY_MAP.md` |
+| F0.6 | Create deterministic provider test fixtures | S | IN_PROGRESS | — |
 
 ## F1 — Provider access and entitlement foundation
 
