@@ -29,8 +29,8 @@ const SRC_ROOT = join(__dirname, "..", "..", "src");
 const ALLOWLIST: Record<string, string> = {
   // F5.1 DONE: claim-intake.ts (runClaimIntake) now delegates to ClaimIntakeService
   // — it no longer calls Claim.create, so it is removed from the allowlist.
-  "src/server/services/claims.service.ts":
-    "Legacy ClaimsService.createClaim (tRPC + PA conversion) pending deprecation (F5.3/F5.7).",
+  // F5.10 DONE: the legacy ClaimsService.createClaim is DELETED — zero callers
+  // remained after F5.3 (tRPC removal) + F5.7 (canonical PA conversion).
   // F5.2 DONE: the B2B API route now adapts onto ClaimIntakeService — no direct
   // Claim.create, removed from the allowlist.
   // F5.4 DONE: the CSV import route submits per-row through ClaimIntakeService —

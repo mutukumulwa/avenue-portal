@@ -810,3 +810,19 @@ F4.5, F7.4).
 - **Known gaps or skips:** claim `procedures` JSON now uses the canonical shape (cptCode/…/totalCost) instead of the case shape (code/qty/total) — display-equivalent; PA/hold decision-time semantics untouched (IPL suite remains authoritative).
 - **Security/privacy review:** case identity fully server-derived; the case-system channel does not entitlement-scope (member fixed by the admission) but still validates member/provider in-tenant.
 - **Next eligible task:** F5.10 — remove legacy creators and lock consolidation (closes M5).
+
+---
+
+## F5.10 — Remove legacy creators and lock consolidation (M5 CLOSED)
+
+- **Status:** COMPLETE — **M5 CLOSED: every production rail converges on the canonical intake.**
+- **Commit/branch:** `feat/claims-autopilot` (F5.10 commit)
+- **Files changed:** `src/server/services/claims.service.ts` (legacy `createClaim` DELETED — zero callers remained), `tests/services/claim-creator-consolidation.test.ts` (allowlist = `persist.ts` ONLY), `tests/services/claim-status-mutation-guard.test.ts` (NEW second source guard: claim STATUS writes locked to the sanctioned lifecycle owners), `docs/claims-autopilot/CLAIM_CREATOR_INVENTORY.md` (final state recorded).
+- **Exhaustive creator search (recorded):** `.claim.create(`/`.claim.createMany(` across `src/**` → exactly ONE file: `src/server/services/claim-intake/persist.ts`. `ClaimsService.createClaim` references → none (deleted). Status-write scan → exactly the six sanctioned owners (decision service, adjudication/settlement, guarded disburse, capture/fraud-hold actions) — zero strays.
+- **Decisions enforced:** the M5 outcome ("no unapproved production claim creator remains"); D10 defence-in-depth via the new status guard (a stray decision/settlement path turns the build red).
+- **Observable behavior before/after:** no runtime behavior change in this package — it deletes dead code and locks the invariants the previous nine packages established.
+- **Tests run and exact results (M5 boundary):** full unit (clean env) → **1118 passed / 104 skipped**; both guards PASS; ALL integration together → **95 passed / 9 skipped ×2 consecutive runs**; consolidation guard green with the persist-only allowlist; status guard green; typecheck + eslint clean.
+- **Creator allowlist change:** **FINAL — `src/server/services/claim-intake/persist.ts` is the only entry.** 9/9 rails converged (8 migrated + case rails DERIVED_TRANSACTIONAL through the same owner).
+- **Known gaps or skips:** seed/test direct creates remain by design (guard scans `src/**` only, documented in the inventory).
+- **Security/privacy review:** two independent source guards now police creation AND status mutation.
+- **Next eligible task:** M6 — operational surfaces (F6.1 …).

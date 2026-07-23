@@ -5,6 +5,14 @@
 **Captured:** 2026-07-21 at HEAD `c56eaf1` (+ branch `feat/claims-autopilot`)
 **Machine guard:** [`tests/services/claim-creator-consolidation.test.ts`](../../tests/services/claim-creator-consolidation.test.ts)
 
+> **FINAL STATE (F5.10, M5 CLOSED):** every production rail converged. The ONLY
+> `Claim.create` in `src/**` is the canonical owner
+> `src/server/services/claim-intake/persist.ts` (the case rails call it
+> transactionally via `submitWithinTransaction`). The legacy
+> `ClaimsService.createClaim` is DELETED. A second source guard
+> (`tests/services/claim-status-mutation-guard.test.ts`) now also locks claim
+> STATUS writes to the sanctioned lifecycle owners.
+
 This document and the guard test **must agree exactly** (F0.2 "Done when"). The
 guard scans `src/**` for real `*.claim.create(` / `*.claim.createMany(` calls and
 fails if any live in a file that is not on the allowlist below, or if an
@@ -28,14 +36,14 @@ domain transaction), `TEST/SEED_ONLY`.
 | # | Site | Rail / caller | Auth scope (derived?) | Channel → Source (current) | Idempotency | Fraud | Auto-adj | Audit | Txn boundary | Class | Migrates in |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | ~~1~~ | ~~`src/server/services/claim-intake.ts` (`runClaimIntake`)~~ **MIGRATED (F5.1)** | Admin wizard + provider portal | ✅ CallerIdentity (operator/providerUser) → context derives tenant/provider/member/scope | ADMIN_PORTAL / PROVIDER_PORTAL → MANUAL (recorded on the receipt) | ✅ form draft UUID (replay-safe) | ✅ staged (FRAUD) | ✅ evaluate→plan→execute (inline + sweep) | ✅ chain `CLAIM:INTAKE_ACCEPTED` | ✅ atomic persist (claim+lines+receipt+run) | **DONE** — now delegates to `ClaimIntakeService`; no direct `Claim.create` | F5.1 ✔ |
-| 2 | `src/server/services/claims.service.ts:374` (`ClaimsService.createClaim`) | tRPC `claims.create`; also `createClaimWithPreauth` | ✅ `ctx.tenantId` (tRPC) | TRPC → `data.source?` (caller-supplied) | ❌ none | ❌ **none** | ❌ **none** | inline `adjudicationLog` RECEIVED | ❌ | MIGRATE (legacy) | F5.3 |
+| ~~2~~ | ~~`ClaimsService.createClaim`~~ **DELETED (F5.10)** | tRPC create REMOVED (F5.3, zero callers); PA conversion canonical (F5.7) | — | — | — | — | — | — | — | **DONE** | F5.3/F5.7/F5.10 ✔ |
 | ~~3~~ | ~~`src/app/api/v1/claims/route.ts`~~ **MIGRATED (F5.2)** | B2B API POST `/api/v1/claims` (+ new receipt status route) | ✅ credential → `providerKey`/tenant-bound `integrationKey` (unbound operator refused) | API_V1 → **HMS** (facility key) / SMART (operator) — recorded on receipt | ✅ `Idempotency-Key` header REQUIRED; legacy `(tenant,provider,externalRef)` replay retained cross-boundary; request-hash 409 on changed payload | ✅ staged | ✅ evaluate→plan→execute (inline + sweep) | ✅ chain `CLAIM:INTAKE_ACCEPTED` | ✅ atomic persist (+PA attach via `origin`) | **DONE** — adapter over `ClaimIntakeService`; no direct `Claim.create` | F5.2 ✔ |
-| 4 | `src/app/api/claims/import/route.ts:229` | CSV/XLSX import POST `/api/claims/import` | ✅ session + `CLINICAL_ROLES` gate | CSV_IMPORT → `"BATCH"` | ❌ **none** (re-upload duplicates) | ❌ **none** | ❌ variance-only (`computeContractedRateVariance`) | inline `adjudicationLog` | ❌ per-row, no txn | MIGRATE | F5.4 |
-| 5 | `src/app/(admin)/claims/new/actions.ts:105` (`submitReimbursementClaimAction`) | Admin reimbursement form | ✅ `requireRole(OPS)` | REIMBURSEMENT → `"REIMBURSEMENT"` | ❌ none | ✅ | ✅ `processIntake` (routes) | plain `writeAudit` | ❌ | MIGRATE | F5.6 |
-| 6 | `src/server/services/reimbursement.service.ts:101` (`ReimbursementService.submit`) | tRPC reimbursement submit | ✅ tenantId + submittedById | REIMBURSEMENT → `"MANUAL"` | ❌ none | ❌ none | ❌ none | ✅ audit-chain `REIMBURSEMENT:SUBMITTED` | ✅ claim + reimbursementRequest atomic | MIGRATE | F5.6 |
-| 7 | `src/server/services/sync.service.ts:231` | Offline sync reconcile (BullMQ) | ✅ offline op / work-code / Slade match | OFFLINE_SYNC → `"OFFLINE_SYNC"` | ✅ `externalRef = clientUuid` (pre-check + unique index) | ✅ (`.catch`) | ✅ `processIntake` (system actor) | (SyncOperation state) | ❌ create then post-effects | MIGRATE | F5.5 |
-| 8 | `src/server/services/case.service.ts:384` (`cutInterimSliceTx`) | Inpatient interim slice | ✅ tenant + case ownership | CASE_INTERIM → case-derived (`isInterimBill:true`) | implicit (entry-freeze + slice seq in txn) | ✅ after txn | ❌ (interim ⇒ shadow) | case logs | ✅ slice txn (entry freeze + claim) | DERIVED_TRANSACTIONAL | F5.8 |
-| 9 | `src/server/services/case.service.ts:580` (`closeAndFile`) | Inpatient final residual | ✅ tenant + case ownership | CASE_FINAL → case-derived (`isInterimBill:false`) | first-write case-close race guard | ✅ after txn | ❌ | case logs | ✅ close txn (residual freeze + claim) | DERIVED_TRANSACTIONAL | F5.9 |
+| ~~4~~ | ~~CSV import route~~ **MIGRATED (F5.4)** | per-row canonical receipts `csv:<sha₁₆>:<sheet>:<row>:<provider>`; preview mode; replay ⇒ zero new; invoice rows LINK | ✅ | CSV_IMPORT → BATCH | ✅ | ✅ staged | ✅ | ✅ chain | ✅ atomic per row | **DONE** | F5.4 ✔ |
+| ~~5~~ | ~~admin reimbursement action~~ **MIGRATED (F5.6)** | delegates to `reimbursementService.submit` → canonical | ✅ | REIMBURSEMENT → REIMBURSEMENT | ✅ draft UUID | ✅ | D13 always-manual | ✅ chain | ✅ atomic | **DONE** | F5.6 ✔ |
+| ~~6~~ | ~~`ReimbursementService.submit`~~ **NOW THE ONE PATH (F5.6)** | canonical adapter (both surfaces converge here) | ✅ | REIMBURSEMENT → REIMBURSEMENT | ✅ | ✅ | D13 `REIMBURSEMENT_PROOF_REVIEW` forced | ✅ chain | ✅ | **DONE** | F5.6 ✔ |
+| ~~7~~ | ~~offline sync reconcile~~ **MIGRATED (F5.5)** | `opKey` canonical key; op links receipt+claim; RETRY stays PENDING; D6 routes | ✅ | OFFLINE_SYNC → OFFLINE_SYNC | ✅ opKey + clientUuid continuity | ✅ staged | ✅ | ✅ chain | ✅ atomic | **DONE** | F5.5 ✔ |
+| ~~8~~ | ~~`cutInterimSliceTx`~~ **CANONICAL (F5.8)** | `submitWithinTransaction` in the slice txn; key `case:slice:<seq>:<entrySet>`; theft-proof freeze in persist | ✅ | CASE_INTERIM → MANUAL | ✅ | ✅ | SHADOW-forced | ✅ chain | ✅ same txn | **DONE** | F5.8 ✔ |
+| ~~9~~ | ~~`closeAndFile`~~ **CANONICAL (F5.9)** | `submitWithinTransaction` after the first-write close guard; key `case:final:<entrySet>`; all-sliced ⇒ no phantom | ✅ | CASE_FINAL → MANUAL | ✅ | ✅ | SHADOW-forced | ✅ chain | ✅ same txn | **DONE** | F5.9 ✔ |
 
 ### Derived / wrapper paths (no independent `Claim.create`)
 
@@ -80,9 +88,13 @@ documented `DERIVED_TRANSACTIONAL` case adapters that call it) should remain.
 
 | Allowlisted file | Reason it may still call `Claim.create` today | Removed by |
 |---|---|---|
-| ~~`src/server/services/claim-intake.ts`~~ | **REMOVED (F5.1):** `runClaimIntake` now delegates to `ClaimIntakeService` — no direct `Claim.create`. | F5.1 ✔ |
-| ~~`src/app/api/v1/claims/route.ts`~~ | **REMOVED (F5.2):** the B2B route adapts onto `ClaimIntakeService` — no direct `Claim.create`, no claim-number loop. | F5.2 ✔ |
-| `src/server/services/claims.service.ts` | Legacy `createClaim` (tRPC + PA conversion) pending deprecation. | F5.3 / F5.7 |
+| ~~`src/server/services/claim-intake.ts`~~ | **REMOVED (F5.1)** | F5.1 ✔ |
+| ~~`src/app/api/v1/claims/route.ts`~~ | **REMOVED (F5.2)** | F5.2 ✔ |
+| ~~`src/server/services/claims.service.ts`~~ | **REMOVED (F5.10):** legacy `createClaim` DELETED. | F5.10 ✔ |
+| ~~`src/app/api/claims/import/route.ts`~~ | **REMOVED (F5.4)** | F5.4 ✔ |
+| ~~`src/app/(admin)/claims/new/actions.ts`~~ + ~~`reimbursement.service.ts`~~ | **REMOVED (F5.6)** | F5.6 ✔ |
+| ~~`src/server/services/sync.service.ts`~~ | **REMOVED (F5.5)** | F5.5 ✔ |
+| ~~`src/server/services/case.service.ts`~~ | **REMOVED (F5.8/F5.9):** DERIVED_TRANSACTIONAL via `submitWithinTransaction`; no direct create remains. | F5.8/F5.9 ✔ |
 | `src/app/api/claims/import/route.ts` | CSV import rail pre-migration. | F5.4 |
 | `src/app/(admin)/claims/new/actions.ts` | Admin reimbursement action pre-migration. | F5.6 |
 | `src/server/services/reimbursement.service.ts` | Reimbursement service rail pre-migration. | F5.6 |
