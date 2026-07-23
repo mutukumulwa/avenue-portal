@@ -672,3 +672,29 @@ Stop condition observed: yes — legacy DB URLs untouched; no bucket policy chan
 ```
 
 ---
+
+# Phase F2 COMPLETE (2026-07-23) — private document foundation
+
+F2.1–F2.8 built and proven the whole engine: §7.4 metadata + single-use upload intents, resource-level target authorization, policy-gated intent creation, finalize with magic-byte content validation + sha256 + atomic single-use consume, lease-based scan/quarantine with retry exhaustion, authorized minute-scale signed download (+ MinIO adapter + provider download route), legacy backfill (CLAIM class), and the provider claim-documents consumer that never touches `fileUrl`. **F2.9's public-read switch is deliberately NOT thrown** — its own readiness report proves the gate is not met (15 direct-`fileUrl` consumers remain; admin/member/HR need an operator download path) and security must sign off. **Gate B therefore remains OPEN by design.** Suite at phase end: 1174 passed / 179 skipped.
+
+---
+
+## F3.1 — Freeze PA submission and decision contracts
+
+```text
+Work package: F3.1
+Status: COMPLETE
+Proof-before-build: field union taken from the real rails — /api/v1/preauth body (memberNumber, providerCode, benefitCategory, estimatedCost, diagnoses, notes; procedures hardcoded []) and ClaimsService.createPreAuth (memberId, providerId, serviceType, expectedDateOfService?, diagnoses[], procedures[], estimatedCost, clinicalNotes?, benefitCategory, submittedBy). Confirmed PreAuthorization.serviceType is NOT required by the schema, matching the API rail that omits it.
+Files changed: src/server/services/preauth-intake/contract.ts (new, pure), tests/services/preauth-contract.test.ts, PROGRESS.md + IMPLEMENTATION_LOG.md
+Schema/data changes: none — NOTHING is persisted through the new contract (stop condition)
+Behavior delivered: PreauthSubmissionV1 (untrusted) + PreauthCallerContext (trusted) + NormalizedPreauthV1; deterministic normalization (codes upper-trim, whitespace-collapsed text, EXACT 2dp decimal strings via Prisma.Decimal — never floats, date-level YYYY-MM-DD with no timezone drift, derived procedure totals); per-channel required-field matrix; resolveProviderId; canonical sha256 request hash scoped by tenant+provider; safe error-code union; receipt shape; documented handoff to preauthAdjudicationService as the sole decision/hold owner.
+Authorization evidence: provider-bound channels take providerId from the trusted context and return PROVIDER_FORGERY when the body disagrees; the API channel refuses an internal memberId (external callers identify by memberNumber); admin/member channels may choose a facility (service validates in-tenant later).
+Idempotency/concurrency evidence: request hash is stable for equivalent submissions and differs across providers for the same payload — the basis for same-key replay vs conflict (D26).
+Privacy/security evidence: no PHI in error codes; money never floats.
+Focused tests and results: 14/14 pure. Full suite (no DB env) 1188 passed / 179 skipped (+14). tsc 0; brand PASS; currency PASS (680).
+Known limitations: two divergent auto-approve policies (member 15k vs pipeline 50k) remain a CONFLICTING decision recorded in F0.3 — the contract does not resolve it; that is an architecture decision for F3.3's handoff. The API rail's missing fraud/benefit-in-package gates are likewise recorded, not silently changed.
+Next allowed package: F3.2 — Add PA intake receipt and event schema (S)
+Stop condition observed: yes — nothing persisted through the new contract.
+```
+
+---

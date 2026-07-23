@@ -84,7 +84,7 @@
 
 | Pkg | Title | Size | Status | Evidence |
 |---|---|---|---|---|
-| F3.1 | Freeze PA submission/decision contracts | S | NOT_STARTED | — |
+| F3.1 | Freeze PA submission/decision contracts | S | COMPLETE | `preauth-intake/contract.ts` (v1 normalize/validate/hash) + test (14 pass) |
 | F3.2 | PA intake receipt + event schema | S | NOT_STARTED | — |
 | F3.3 | Implement PreauthIntakeService | M | NOT_STARTED | — |
 | F3.4 | Migrate provider B2B PA submit | S | NOT_STARTED | — |
