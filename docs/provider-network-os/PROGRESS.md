@@ -59,7 +59,7 @@
 | F1.8 | Audit applicability data readiness | M | COMPLETE | `provider-applicability-readiness.service.ts` + script + test (8 pass) |
 | F1.9 | Backfill applicability (reviewed batches) | S/batch | BUILT · GATED(prod --apply needs network-ops signed input) | `provider-applicability-backfill.service.ts` + test (3 pass) |
 | F1.10 | Add entitlement shadow comparison | M | COMPLETE | `provider-entitlement-shadow.service.ts` + `ProviderEntitlementShadowSample` + test (4 pass) |
-| F1.11 | Make provider browser eligibility canonical | M | GATED(D3 readiness-gate approval) | — |
+| F1.11 | Make provider browser eligibility canonical | M | BUILT · GATED(enforcement flip needs D3 sign-off; default OFF) | `provider-eligibility.service.ts` + `ProviderEligibilityCheck` + flag + eligibility page rewired + test (5 pass) |
 | F1.12 | Enforce entitlement on provider claim submission | M | GATED(approved flag per D3) | — |
 
 ## F2 — Private document foundation

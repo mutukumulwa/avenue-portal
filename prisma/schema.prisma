@@ -2983,6 +2983,36 @@ model ProviderEntitlementShadowSample {
   @@index([createdAt])
 }
 
+// PNOS F1.11 — audited, point-in-time provider eligibility evidence (§7.3).
+// Distinct from EligibilitySnapshot (an offline-pack balance cache). Carries
+// member/client identifiers + a SAFE result category + explanation — never a
+// payment guarantee, never broad utilization/diagnoses. Relation-less.
+model ProviderEligibilityCheck {
+  id                   String    @id @default(cuid())
+  tenantId             String
+  providerId           String
+  providerBranchId     String?
+  actorType            String // USER | API_KEY | CONNECTOR
+  actorId              String
+  credentialId         String?
+  memberId             String? // internal id (correlation), not PHI
+  clientId             String?
+  groupId              String?
+  packageId            String?
+  requestedServiceDate DateTime
+  benefitCategory      String?
+  resultCode           String // ELIGIBLE | NOT_ELIGIBLE | NEEDS_PREAUTH | OUT_OF_NETWORK | DATA_INCOMPLETE | MANUAL_CONFIRMATION
+  safeExplanation      String?
+  contractId           String?
+  enforcementApplied   Boolean   @default(false) // was deny-by-default entitlement enforced for this check?
+  requestId            String?
+  displayValidUntil    DateTime?
+  createdAt            DateTime  @default(now())
+
+  @@index([tenantId, providerId, createdAt])
+  @@index([memberId])
+}
+
 // A physical branch/facility of a provider network (spec §5.2). Branch-level
 // rates (O10) and branch-scoped contracts (Britam, SHA per-branch) are
 // unmatchable without this.

@@ -437,4 +437,29 @@ Next allowed package: F1.11 — Make provider browser eligibility canonical (GAT
 Stop condition observed: yes — enforcement flag remains off.
 ```
 
+> **Test run-mode landmine (F1.11):** NEVER run the FULL vitest suite with AUTOPILOT_TEST_DB set — the many DB-integration suites (claims-autopilot, benefit-race, PNOS) are not hermetic under parallelism against one throwaway DB and collide (saw 12 spurious failures). Standard regression = full suite WITHOUT the DB env (DB suites skip). Focused DB suites = WITH the env + `--no-file-parallelism`.
+
+---
+
+## F1.11 — Make provider browser eligibility canonical (BUILT; enforcement GATED OFF)
+
+```text
+Work package: F1.11
+Status: COMPLETE (canonical service + evidence + flag + page wired). Deny-by-default entitlement ENFORCEMENT defaults OFF and is flipped per tenant/provider ONLY via the D3 readiness sign-off — NOT flipped here.
+Proof-before-build: EligibilitySnapshot is an offline-pack balance cache (balances Json, offline validity) — §7.3 says do not overload it → ADDED ProviderEligibilityCheck. Tenant.config JSON is the flag store (TenantSettingsService pattern). Browser eligibility (eligibility/page.tsx) did tenant-only member search + exposed annual limit/used/remaining (gap #2 / D2).
+Files changed: prisma/schema.prisma (ProviderEligibilityCheck, relation-less), src/server/services/provider-access-settings.service.ts (new — flag reader, default OFF), src/server/services/provider-eligibility.service.ts (new — canonical check), src/app/provider/eligibility/page.tsx (rewired to the service, data minimised), tests/services/provider-eligibility.service.test.ts (new), PROGRESS.md + IMPLEMENTATION_LOG.md
+Schema/data changes: additive ProviderEligibilityCheck via db push (in sync). No prod DB.
+Behavior delivered: ProviderEligibilityService.check resolves via the F1.3 ctx, records a point-in-time evidence row, returns a MINIMUM safe result (name, eligible, scheme/package, PA flag, disclaimer) — NO annual limit/usage (D2/§8.1 privacy fix, applied regardless of the flag). Flag OFF (default) = today's permissive tenant-only resolution + shadow sample (F1.10); flag ON (per tenant/provider) = entitlement-scoped + branch must be in ctx, out-of-scope member → safe NOT_ELIGIBLE with no enumeration. Every result carries a not-a-payment-guarantee disclaimer. Eligibility page now delegates to the service.
+Authorization evidence: 5 tests — flag parser default OFF + garbage-tolerant + per-provider list; OFF permissive + evidence-not-guarantee + no annual-limit in payload; ON EXCLUDEd member → NOT_ELIGIBLE no member details; ON branch-not-in-context → OUT_OF_NETWORK; ON cross-tenant → safe not-found.
+Idempotency/concurrency evidence: n/a (read + evidence append)
+Privacy/security evidence: response minimised (no limit/used/remaining — asserted absent); safe not-found for out-of-scope (no enumeration); evidence row carries member/client ids + safe result code only (no DOB/diagnosis/utilization).
+Money/reconciliation evidence: n/a
+Focused tests and results: 5/5 (opt-in DB). Full suite (no DB env) 1164 passed / 146 skipped (+1 pure flag-parse, +4 F1.11 DB). tsc 0; brand PASS; currency PASS (672).
+Feature-flag state: providerAccess.entitlementEnforcement in Tenant.config — DEFAULT OFF (global + per-provider list). Flipping ON is the D3 human gate.
+Manual/visual evidence: eligibility page rewired + typechecks; browser QA deferred (no seeded provider session; enforcement OFF ⇒ member resolution unchanged, only the over-exposed annual-limit/usage block removed). This must be browser-verified at the pilot gate before enforcement flips.
+Known limitations: page has no branch selector yet (branch optional while OFF; required-branch UX lands with the enforcement flip). B2B /api/v1/eligibility route not yet switched to this service (it already entitlement-scopes via F1.7(a) + entitledMemberWhere) — a later convergence unit.
+Next allowed package: F1.12 — Enforce entitlement on provider claim submission (GATED: approved provider/client flag; build flagged, do NOT remove bypass in prod)
+Stop condition observed: yes — did NOT change claim submission.
+```
+
 ---
