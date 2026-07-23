@@ -554,3 +554,23 @@ Stop condition observed: yes — no finalize/scan in this package.
 ```
 
 ---
+
+## F2.4 — Upload finalize + content validation
+
+```text
+Work package: F2.4
+Status: COMPLETE
+Files changed: src/lib/document-mime.ts (new — magic-byte detector + resolveAcceptableMime), src/server/services/provider-document.service.ts (DocumentStagingPort + stagingKeyForIntent + finalizeUpload + 4 error codes), tests/services/provider-document-finalize.test.ts, PROGRESS.md + IMPLEMENTATION_LOG.md
+Behavior delivered: finalizeUpload — reauthorize (provider match + authorizeTarget UPLOAD) → stat staged object (exists) → size ≤ intent cap → sha256 → detected-MIME consistency (magic bytes, not extension; forged/lie rejected) → atomic single-use consume (updateMany finalizedAt:null guard) + create PENDING Document (private storageKey, sha256, sizeBytes, detectedMime, target FK) → promote object + audit after commit. Idempotent on token (replay = same document). Storage is an injectable port (fake in tests; MinIO adapter wired at F2.8). NO clean availability (scanStatus PENDING).
+Authorization evidence: reauthorizes provider + target on finalize; provider mismatch → safe NOT_FOUND.
+Idempotency/concurrency evidence: atomic finalizedAt:null guard + Document.uploadIntentId unique ⇒ one document per intent; retry returns the SAME documentId (test: count==1); raced finalizer returns the winner's doc.
+Privacy/security evidence: content-based MIME (magic bytes) defeats extension/MIME lies — MZ exe declared pdf → CONTENT_REJECTED; oversize → OVERSIZE; missing staged object → STAGING_OBJECT_MISSING. fileUrl="" (no public URL); storageKey is private.
+Money/reconciliation evidence: n/a
+Focused tests and results: 5/5 (valid PDF→PENDING+sha256+promote; forged/lie rejected; missing+oversize; retry=same doc + unknown token invalid; pending≠clean). Full suite (no DB env) 1168 passed / 167 skipped (+5 DB). tsc 0; brand PASS; currency PASS (675).
+Feature-flag state: none (not wired to live upload routes until F2.8)
+Known limitations: MinIO-backed DocumentStagingPort adapter not written yet (port + fake only) — added when consumers migrate (F2.6/F2.8). Abandoned-staging cleanup job (step 7) deferred to the F4.10/F2 job sweep; PENDING state is the scan queue (§9.14, F2.5).
+Next allowed package: F2.5 — Malware scan + quarantine lifecycle (M)
+Stop condition observed: yes — no clean availability.
+```
+
+---

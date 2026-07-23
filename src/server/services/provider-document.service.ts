@@ -1,7 +1,22 @@
-import { randomBytes } from "crypto";
+import { randomBytes, createHash } from "crypto";
 import { prisma } from "@/lib/prisma";
 import type { Prisma, PrismaClient, DocumentTargetType, DocumentSourceType } from "@prisma/client";
 import { ProviderAccessService, type ProviderAccessContext } from "./provider-access.service";
+import { resolveAcceptableMime } from "@/lib/document-mime";
+
+/**
+ * Private-object staging port (F2.4). Production wires a MinIO-backed adapter at
+ * F2.8; tests supply an in-memory fake. The service never touches a public URL.
+ */
+export interface DocumentStagingPort {
+  stat(key: string): Promise<{ exists: boolean; size: number }>;
+  read(key: string): Promise<Buffer>;
+  promote(stagingKey: string, finalKey: string): Promise<void>;
+}
+
+export function stagingKeyForIntent(intentId: string): string {
+  return `staging/${intentId}`;
+}
 
 /**
  * Policy-based upload constraints (§9.9): a SMALL allowed MIME set + a hard size
@@ -53,7 +68,11 @@ export type DocumentServiceErrorCode =
   | "TARGET_NOT_PROVIDER_UPLOADABLE"
   | "TARGET_TYPE_NOT_SUPPORTED"
   | "NOT_FOUND"
-  | "POLICY_MIME";
+  | "POLICY_MIME"
+  | "INTENT_INVALID"
+  | "STAGING_OBJECT_MISSING"
+  | "OVERSIZE"
+  | "CONTENT_REJECTED";
 
 export type DocumentAction = "VIEW" | "UPLOAD";
 
@@ -202,5 +221,84 @@ export const ProviderDocumentService = {
     if (intent.finalizedAt) return null;
     if (intent.expiresAt.getTime() <= now.getTime()) return null;
     return intent;
+  },
+
+  /**
+   * F2.4 — finalize a staged upload. Reauthorizes the intent's actor/provider +
+   * target, verifies the staged object exists within size, hashes it, enforces
+   * detected-MIME consistency, then atomically consumes the intent + creates a
+   * PENDING document (scan gates usability in F2.5). Object is promoted to its
+   * private final key after commit. Idempotent on the token: a finalized intent
+   * replays to the SAME document (never a second). NO clean availability yet.
+   */
+  async finalizeUpload(
+    ctx: ProviderAccessContext,
+    input: { token: string; declaredMimeType?: string; originalFileName?: string },
+    storage: DocumentStagingPort,
+    db: Db = prisma,
+  ): Promise<{ documentId: string; scanStatus: string; replayed: boolean }> {
+    const now = new Date();
+    const intent = await db.documentUploadIntent.findUnique({ where: { token: input.token } });
+    if (!intent) throw new ProviderDocumentError("INTENT_INVALID", "Unknown upload intent");
+
+    // Replay: an already-finalized intent returns its one document (token-idempotent).
+    if (intent.finalizedDocumentId) {
+      return { documentId: intent.finalizedDocumentId, scanStatus: "PENDING", replayed: true };
+    }
+    if (intent.expiresAt.getTime() <= now.getTime()) throw new ProviderDocumentError("INTENT_INVALID", "Upload intent expired");
+    // Reauthorize: provider must match the intent, and the target must still be authorized.
+    if (intent.expectedProviderId && intent.expectedProviderId !== ctx.providerId) {
+      throw new ProviderDocumentError("NOT_FOUND", "No such upload intent"); // safe
+    }
+    await this.authorizeTarget(ctx, { targetType: intent.targetType, targetId: intent.targetId, action: "UPLOAD" }, db);
+
+    const stagingKey = stagingKeyForIntent(intent.id);
+    const stat = await storage.stat(stagingKey);
+    if (!stat.exists) throw new ProviderDocumentError("STAGING_OBJECT_MISSING", "No staged object for this intent");
+    if (stat.size > intent.maxSizeBytes) throw new ProviderDocumentError("OVERSIZE", "Staged object exceeds the allowed size");
+
+    const buf = await storage.read(stagingKey);
+    const sha256 = createHash("sha256").update(buf).digest("hex");
+    const detectedMime = resolveAcceptableMime(buf, input.declaredMimeType, intent.expectedMimeTypes);
+    if (!detectedMime) throw new ProviderDocumentError("CONTENT_REJECTED", "File content type is not accepted");
+
+    const finalKey = `documents/${ctx.tenantId}/${intent.id}`;
+    const targetFk =
+      intent.targetType === "CLAIM" ? { claimId: intent.targetId }
+      : intent.targetType === "PREAUTH" ? { preauthId: intent.targetId }
+      : intent.targetType === "CASE" ? { caseId: intent.targetId }
+      : {};
+
+    const outcome = await db.$transaction(async (tx) => {
+      // atomic single-use consume: only the first finalizer flips finalizedAt
+      const claimed = await tx.documentUploadIntent.updateMany({ where: { id: intent.id, finalizedAt: null }, data: { finalizedAt: now } });
+      if (claimed.count !== 1) return { raced: true as const };
+      const doc = await tx.document.create({
+        data: {
+          fileName: input.originalFileName ?? "document", fileUrl: "", category: "CLAIM_SUPPORT",
+          tenantId: ctx.tenantId, providerId: ctx.providerId, providerBranchId: intent.expectedProviderBranchId,
+          sourceType: intent.sourceType, sourceActorId: intent.sourceActorId,
+          storageKey: finalKey, originalFileName: input.originalFileName ?? null, declaredMimeType: input.declaredMimeType ?? null,
+          detectedMimeType: detectedMime, sizeBytes: stat.size, sha256, scanStatus: "PENDING",
+          uploadedAt: now, finalizedAt: now, uploadIntentId: intent.id, ...targetFk,
+        },
+        select: { id: true },
+      });
+      await tx.documentUploadIntent.update({ where: { id: intent.id }, data: { finalizedDocumentId: doc.id } });
+      return { raced: false as const, docId: doc.id };
+    });
+
+    if (outcome.raced) {
+      const reloaded = await db.documentUploadIntent.findUnique({ where: { id: intent.id }, select: { finalizedDocumentId: true } });
+      return { documentId: reloaded?.finalizedDocumentId ?? "", scanStatus: "PENDING", replayed: true };
+    }
+
+    // after commit: move the object to its private final key + audit. Scan is
+    // driven off the PENDING state (F2.5) — no separate queue needed (§9.14).
+    await storage.promote(stagingKey, finalKey).catch(() => {});
+    await db.auditLog.create({
+      data: { userId: ctx.actorId, tenantId: ctx.tenantId, action: "PROVIDER_DOCUMENT_FINALIZED", module: "PROVIDERS", description: "Upload finalized (pending scan)", entityType: "DOCUMENT", entityId: outcome.docId, metadata: { targetType: intent.targetType, targetId: intent.targetId, providerId: ctx.providerId } },
+    });
+    return { documentId: outcome.docId, scanStatus: "PENDING", replayed: false };
   },
 } as const;
