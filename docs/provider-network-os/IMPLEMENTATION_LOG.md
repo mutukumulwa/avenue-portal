@@ -416,3 +416,25 @@ Stop condition observed: yes — one mechanism, no real-data apply.
 ```
 
 ---
+
+## F1.10 — Add entitlement shadow comparison
+
+```text
+Work package: F1.10
+Status: COMPLETE
+Proof-before-build: ProviderEntitlementService exists; no shadow/telemetry. MISSING.
+Files changed: prisma/schema.prisma (ProviderEntitlementShadowSample — relation-less, safe fields only), src/server/services/provider-entitlement-shadow.service.ts (new), tests/services/provider-entitlement-shadow.test.ts (new), PROGRESS.md + IMPLEMENTATION_LOG.md
+Schema/data changes: additive model via db push (validated, in sync). No relations added to other models.
+Behavior delivered: classifyShadow (pure: AGREE_ALLOW/AGREE_DENY/TARGET_DENY_CURRENT_ALLOW/TARGET_ALLOW_CURRENT_DENY/ERROR) + shadowCompareMemberLookup (runs target entitlement beside today's tenant-only lookup, records a safe sample, returns classification) + metrics(). NEVER throws to the caller (both the query and the record are wrapped) and NEVER changes the live response. Enforcement stays OFF.
+Authorization evidence: n/a (observational). It reads the same entitlement the gate will enforce.
+Idempotency/concurrency evidence: deterministic at a fixed service date (test).
+Privacy/security evidence: sample row has NO memberId/memberNumber (test asserts absent keys); only tenant/provider/client/branch/date/classification. clientId is a safe identifier.
+Money/reconciliation evidence: n/a
+Focused tests and results: 4/4 (pure classifier; failure-injection ⇒ ERROR not throw; DB divergence AGREE_ALLOW vs TARGET_DENY_CURRENT_ALLOW; deterministic + PHI-free sample + metrics). Full suite 1163 passed / 142 skipped (+2 pure/inject, +2 DB). tsc 0; brand PASS; currency PASS (670).
+Feature-flag state: enforcement OFF (spec stop condition) — this only observes.
+Known limitations: not yet wired INTO the live eligibility path (that call site is added in F1.11 in shadow-then-enforce order). The service is ready to be invoked fire-and-forget.
+Next allowed package: F1.11 — Make provider browser eligibility canonical (GATED: D3 readiness-gate approval; build flagged code OFF, do NOT flip enforcement)
+Stop condition observed: yes — enforcement flag remains off.
+```
+
+---

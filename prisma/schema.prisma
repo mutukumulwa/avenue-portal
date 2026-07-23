@@ -2960,6 +2960,29 @@ model ProviderApiKey {
   @@index([expiresAt])
 }
 
+// PNOS F1.10 — shadow-comparison telemetry for the deny-by-default entitlement
+// gate (D3). Records the divergence between today's permissive provider lookup
+// and the target entitlement result, WITHOUT changing live behavior. Relation-
+// less by design; carries only SAFE identifiers + result categories (never
+// member PII / PHI). Reviewed before F1.11 flips enforcement per client/provider.
+model ProviderEntitlementShadowSample {
+  id               String   @id @default(cuid())
+  tenantId         String
+  providerId       String
+  clientId         String? // member's client — a safe identifier, enables by-client metrics
+  providerBranchId String?
+  serviceDate      DateTime
+  classification   String // AGREE_ALLOW | AGREE_DENY | TARGET_DENY_CURRENT_ALLOW | TARGET_ALLOW_CURRENT_DENY | ERROR
+  currentAllowed   Boolean
+  targetAllowed    Boolean
+  errored          Boolean  @default(false)
+  requestId        String?
+  createdAt        DateTime @default(now())
+
+  @@index([tenantId, providerId, classification])
+  @@index([createdAt])
+}
+
 // A physical branch/facility of a provider network (spec §5.2). Branch-level
 // rates (O10) and branch-scoped contracts (Britam, SHA per-branch) are
 // unmatchable without this.
