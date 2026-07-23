@@ -31,6 +31,7 @@ model Tenant {
   providers                      Provider[]
   providerApiKeys                ProviderApiKey[]
   providerContracts              ProviderContract[]
+  providerUserBranchAssignments  ProviderUserBranchAssignment[]
   brokers                        Broker[]
   endorsements                   Endorsement[]
   invoices                       Invoice[]
@@ -323,6 +324,7 @@ model User {
 
   managedFundGroups           Group[]                          @relation("FundAdminGroups")
   auditLogs                   AuditLog[]
+  providerBranchAssignments   ProviderUserBranchAssignment[]
   claimReviews                Claim[]                          @relation("ClaimReviewer")
   raisedExceptions            ExceptionLog[]                   @relation("ExceptionRaisedBy")
   resolvedExceptions          ExceptionLog[]                   @relation("ExceptionResolvedBy")
@@ -2907,6 +2909,7 @@ model Provider {
   eligibilityRules   PackageProviderEligibility[]
   practitioners      ProviderPractitioner[]
   branches           ProviderBranch[]
+  userBranchAssignments ProviderUserBranchAssignment[]
   aliases            ProviderAlias[]
   offlineWorkAuths   OfflineWorkAuthorization[]
   offlineDataPacks   OfflineDataPack[]
@@ -2969,9 +2972,44 @@ model ProviderBranch {
   tariffLines      ProviderTariff[]
   offlineWorkAuths OfflineWorkAuthorization[]
   clinicalCases    ClinicalCase[]
+  userAssignments  ProviderUserBranchAssignment[]
 
   @@index([tenantId, providerId])
   @@index([providerId, isActive])
+}
+
+// PNOS F1.2 — effective, auditable assignment of a provider USER to a provider
+// BRANCH. This is the resource-scope leg of provider authorization: action
+// permissions come from the dynamic RBAC (F1.1), branch scope comes from these
+// rows. UserRole.PROVIDER_USER / User.providerId alone is NOT authorization (D4).
+// Additive; no existing behavior reads it until ProviderAccessService (F1.3).
+model ProviderUserBranchAssignment {
+  id               String    @id @default(cuid())
+  tenantId         String
+  providerId       String
+  userId           String
+  providerBranchId String
+  // Effective interval. activeTo == null ⇒ currently active (no end).
+  activeFrom       DateTime  @default(now())
+  activeTo         DateTime?
+  // Audit facts on the row itself (soft-retire; rows are never hard-deleted).
+  createdBy        String
+  createdAt        DateTime  @default(now())
+  retiredBy        String?
+  retiredAt        DateTime?
+  retireReason     String?
+
+  tenant         Tenant         @relation(fields: [tenantId], references: [id])
+  provider       Provider       @relation(fields: [providerId], references: [id])
+  user           User           @relation(fields: [userId], references: [id])
+  providerBranch ProviderBranch @relation(fields: [providerBranchId], references: [id])
+
+  // Overlap of active duplicates is enforced in service code (a partial unique
+  // on activeTo IS NULL is not expressible portably; NULLs are distinct in a
+  // plain unique index). These indexes serve the active-scope query.
+  @@index([tenantId, userId, activeTo])
+  @@index([providerId, providerBranchId, activeTo])
+  @@index([userId, activeTo])
 }
 
 // Name variants for a provider (spec §5.2, O1) — resolves the legal/trading

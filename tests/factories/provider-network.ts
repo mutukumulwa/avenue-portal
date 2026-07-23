@@ -183,10 +183,20 @@ export async function buildProviderWorld(prisma: Prisma, opts: BuildOptions = {}
   const tenantIds = [alpha.id, beta.id];
 
   async function teardown() {
-    // FK-safe order: applicability → contracts → members → groups → benefit →
-    // version → package → branches → users → providers → clients → tenants.
+    // FK-safe order: branch assignments → applicability → contracts → members →
+    // groups → benefit → version → package → branches → users → providers →
+    // clients → tenants.
     const providerIds = [providerA.id, providerB.id, providerC.id];
     const contractIds = [contractAActive.id, contractAExpired.id, contractAFuture.id, contractBActive.id, contractCActive.id];
+    // PNOS F1.2: assignments reference tenant/provider/user/branch — clear first.
+    await prisma.providerUserBranchAssignment.deleteMany({ where: { tenantId: { in: tenantIds } } });
+    // Provider services audit against this world's users (AuditLog.userId FK) —
+    // clear those rows before the users are deleted. Scoped to this world's users.
+    const worldUserIds = [
+      ...Object.values(usersA).map((u) => u.id),
+      userB.id, userC.id, userASuspended.id,
+    ];
+    await prisma.auditLog.deleteMany({ where: { userId: { in: worldUserIds } } });
     await prisma.contractApplicability.deleteMany({ where: { contractId: { in: contractIds } } });
     await prisma.providerContract.deleteMany({ where: { id: { in: contractIds } } });
     await prisma.member.deleteMany({ where: { tenantId: { in: tenantIds } } });

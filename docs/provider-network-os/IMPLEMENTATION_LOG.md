@@ -228,3 +228,29 @@ Stop condition observed: yes — catalog seeded + tested; NO routes wired
 ```
 
 ---
+
+## F1.2 — Add provider branch assignments
+
+```text
+Work package: F1.2
+Status: COMPLETE
+Proof-before-build classification: MISSING (grep confirmed no user↔branch assignment concept anywhere; ProviderBranch existed only for contracts/tariffs/claims)
+Files changed: prisma/schema.prisma (new model ProviderUserBranchAssignment + 4 additive back-relations on Tenant/Provider/User/ProviderBranch), src/server/services/provider-branch-assignment.service.ts (new), tests/services/provider-branch-assignment.test.ts (new), tests/factories/provider-network.ts (teardown now clears assignments + this world's AuditLog rows before deleting users), scripts/pnos-backfill-branch-assignments.ts (new), PROGRESS.md + IMPLEMENTATION_LOG.md
+Schema/data changes: additive model + indexes via prisma db push to the throwaway (validated, "in sync", no data loss). No migration file (repo is db-push managed, INSTALL §3). No production DB touched. Client regenerated into the shared node_modules/.prisma (superset — harmless to the concurrent claims-autopilot session, which never references the model).
+Behavior delivered: ProviderBranchAssignmentService.{assign,retire,activeAssignmentsForUser,activeBranchIdsForUser,listAllForUser}. Full server-side scope validation (branch∈tenant/provider, user∈tenant & bound to provider), overlapping-active-duplicate rejection, soft-retire with audit facts on the row + an AuditLog row (written inline, not via headers-bound writeAudit, so it runs in tests/scripts/jobs). activeBranchIdsForUser is the scope primitive F1.3 ProviderAccessService will consume. NOTHING reads it yet (stop condition).
+Authorization evidence: tests prove cross-provider denied two ways (BRANCH_NOT_IN_SCOPE when branch∉provider; USER_PROVIDER_MISMATCH when user not bound to provider), overlapping active duplicate → DUPLICATE_ACTIVE, retire scoped by tenant (NOT_FOUND otherwise). Scope is caller-supplied trusted context, never a request body (D1).
+Idempotency/concurrency evidence: retire is idempotent (already-retired row returned unchanged, no second audit). Re-assignment after retirement is allowed (test) — retirement genuinely frees the active slot.
+Privacy/security evidence: audit metadata carries ids only (no PHI). Overlap rule enforced in service (partial-unique-on-null not portable — documented in schema).
+Money/reconciliation evidence: n/a
+Focused tests and results: npx vitest run --config ./vitest.worktree.config.ts (AUTOPILOT_TEST_DB set) tests/services/provider-branch-assignment.test.ts → 7 passed; co-run with the F0.6 smoke → 2 files/10 passed (factory teardown fix verified). Full suite (no DB) 1134 passed / 120 skipped (was 1134/113 — +7 F1.2 DB-gated skips). tsc exit 0; brand:guard PASS; currency:guard PASS (663 files). Backfill script report-mode runs and correctly classifies assignable vs review users.
+Typecheck/schema result: tsc exit 0; prisma validate OK; db push in sync
+Manual/visual evidence: n/a (service/schema layer)
+Feature-flag state: none (inert until F1.3 reads it)
+Backfill/rollout impact: existing envs need `prisma db push` to add the table, then the reviewed `scripts/pnos-backfill-branch-assignments.ts` (report-by-default; --apply assigns each provider user to all their provider's active branches; ambiguous users — no providerId / inactive / provider with 0 branches — reported REVIEW, never auto-assigned).
+Known limitations: overlap detection covers same-tuple open/future-open rows (not arbitrary interval intersection) — sufficient for the "one open assignment per user+branch" invariant. Session revocation on last-branch removal is policy for F1.3/F1.5, not enforced here.
+Unrelated worktree changes preserved: yes (all edits worktree-prefixed; main checkout untouched)
+Next allowed package: F1.3 — Build canonical ProviderAccessService (M; wraps requireProvider, loads permissions + branch scope, proves on ONE route)
+Stop condition observed: yes — schema+service+tests+backfill done; NO provider pages/routes updated
+```
+
+---
