@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
 import { inviteUserAction } from "./actions";
 import { X } from "lucide-react";
@@ -32,17 +32,22 @@ export function InviteUserModal({ groups = [], brokers = [], fundGroups = [], pr
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState("");
-  const [state, action, pending] = useActionState(inviteUserAction, null);
-
   // OBS-1: on a successful invite, close the modal and refresh so the Users &
-  // Access list re-renders immediately (previously it stayed blank until reload).
-  useEffect(() => {
-    if (state?.ok) {
-      setOpen(false);
-      setSelectedRole("");
-      router.refresh();
-    }
-  }, [state, router]);
+  // Access list re-renders immediately (previously it stayed blank until
+  // reload). Handled in the action callback, not an effect, so there is no
+  // render-phase setState (react-hooks/set-state-in-effect).
+  const [state, action, pending] = useActionState(
+    async (prev: { error?: string; ok?: boolean } | null, formData: FormData) => {
+      const res = await inviteUserAction(prev, formData);
+      if (res.ok) {
+        setOpen(false);
+        setSelectedRole("");
+        router.refresh();
+      }
+      return res;
+    },
+    null,
+  );
 
   return (
     <>
@@ -155,8 +160,8 @@ export function InviteUserModal({ groups = [], brokers = [], fundGroups = [], pr
               )}
               <div>
                 <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Temporary Password</label>
-                <input name="password" type="password" minLength={8} required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo" />
-                <p className="text-[10px] text-brand-text-muted mt-1">Min. 8 characters. User should change on first login.</p>
+                <input name="password" type="password" minLength={10} required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo" />
+                <p className="text-[10px] text-brand-text-muted mt-1">Min. 10 characters incl. an uppercase letter, a lowercase letter and a digit. User should change on first login.</p>
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setOpen(false)} className="px-4 py-2 text-sm text-brand-text-body border border-[#EEEEEE] rounded-full hover:bg-[#F8F9FA] transition-colors">
