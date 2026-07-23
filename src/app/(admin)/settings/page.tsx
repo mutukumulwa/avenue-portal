@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requireRole, ROLES } from "@/lib/rbac";
 import { InviteUserModal } from "./InviteUserModal";
+import { ResetPasswordModal } from "./ResetPasswordModal";
 import { ROLE_PERMISSIONS, STAFF_ROLES, isPortalRole } from "@/lib/constants";
 import { updateUserAccessAction } from "./actions";
 
@@ -81,34 +82,40 @@ export default async function SettingsPage() {
                     </span>
                   </td>
                   <td className="px-5 py-3">
-                    <form action={updateUserAccessAction} className="flex flex-wrap items-center gap-2">
-                      <input type="hidden" name="userId" value={u.id} />
-                      {isPortalRole(u.role) ? (
-                        // BD-01: portal roles are facility/member/group-scoped and
-                        // cannot be re-bound inline — lock the role (preserve it via
-                        // a hidden field) so Save can only toggle active/inactive.
-                        <>
-                          <input type="hidden" name="role" value={u.role} />
-                          <span
-                            className="border border-[#EEEEEE] rounded-md px-2 py-1 text-xs bg-[#F8F9FA] text-brand-text-muted"
-                            title="Portal roles are scoped to a facility / member / group and are managed through Invite User."
-                          >
-                            {u.role.replace(/_/g, " ")} (locked)
-                          </span>
-                        </>
-                      ) : (
-                        <select name="role" defaultValue={u.role} className="border border-[#EEEEEE] rounded-md px-2 py-1 text-xs bg-white">
-                          {STAFF_ROLES.map(role => (
-                            <option key={role} value={role}>{role.replace(/_/g, " ")}</option>
-                          ))}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <form action={updateUserAccessAction} className="flex flex-wrap items-center gap-2">
+                        <input type="hidden" name="userId" value={u.id} />
+                        {isPortalRole(u.role) ? (
+                          // BD-01: portal roles are facility/member/group-scoped and
+                          // cannot be re-bound inline — lock the role (preserve it via
+                          // a hidden field) so Save can only toggle active/inactive.
+                          <>
+                            <input type="hidden" name="role" value={u.role} />
+                            <span
+                              className="border border-[#EEEEEE] rounded-md px-2 py-1 text-xs bg-[#F8F9FA] text-brand-text-muted"
+                              title="Portal roles are scoped to a facility / member / group and are managed through Invite User."
+                            >
+                              {u.role.replace(/_/g, " ")} (locked)
+                            </span>
+                          </>
+                        ) : (
+                          <select name="role" defaultValue={u.role} className="border border-[#EEEEEE] rounded-md px-2 py-1 text-xs bg-white">
+                            {STAFF_ROLES.map(role => (
+                              <option key={role} value={role}>{role.replace(/_/g, " ")}</option>
+                            ))}
+                          </select>
+                        )}
+                        <select name="isActive" defaultValue={String(u.isActive)} className="border border-[#EEEEEE] rounded-md px-2 py-1 text-xs bg-white">
+                          <option value="true">Active</option>
+                          <option value="false">Inactive</option>
                         </select>
-                      )}
-                      <select name="isActive" defaultValue={String(u.isActive)} className="border border-[#EEEEEE] rounded-md px-2 py-1 text-xs bg-white">
-                        <option value="true">Active</option>
-                        <option value="false">Inactive</option>
-                      </select>
-                      <button type="submit" className="text-xs font-bold text-brand-indigo hover:text-brand-secondary">Save</button>
-                    </form>
+                        <button type="submit" className="text-xs font-bold text-brand-indigo hover:text-brand-secondary">Save</button>
+                      </form>
+                      <span aria-hidden className="text-[#EEEEEE]">|</span>
+                      {/* Credential-only reset — allowed on locked portal rows too (BD-01:
+                          the action never touches role or bindings). */}
+                      <ResetPasswordModal userId={u.id} userName={`${u.firstName} ${u.lastName}`} userEmail={u.email} />
+                    </div>
                   </td>
                 </tr>
               ))}

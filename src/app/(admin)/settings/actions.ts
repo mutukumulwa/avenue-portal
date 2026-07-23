@@ -179,6 +179,69 @@ export async function updateUserAccessAction(formData: FormData) {
   revalidatePath("/settings");
 }
 
+/**
+ * Admin password reset for an existing user (Settings → Users & Access).
+ *
+ * Sets the new password DIRECTLY: the User model has no mustChangePassword
+ * column and adding one is a prod DDL in the db-push-only pipeline, so no
+ * change-on-next-login is enforced — the admin hands the password over and the
+ * user should change it themselves (self-service /reset stays available where
+ * the email worker runs). Compensating control: the sessionVersion bump rides
+ * the single-session rail (R25), so any live session on the old credential —
+ * including the admin's own when self-resetting — is invalidated within the
+ * enforcement cache TTL.
+ *
+ * BD-01: only the credential changes. Role, portal bindings and isActive are
+ * never touched, so locked portal rows (provider/member/broker/HR/fund) can be
+ * reset without any path to re-binding or escalation.
+ */
+export async function resetUserPasswordAction(
+  _prev: { error?: string; ok?: boolean } | null,
+  formData: FormData
+): Promise<{ error?: string; ok?: boolean }> {
+  const session = await requireRole(ROLES.ADMIN_ONLY);
+
+  const userId = ((formData.get("userId") as string | null) || "").trim();
+  const password = (formData.get("password") as string | null) || "";
+
+  if (!userId || !password) return { error: "User and new password are required." };
+
+  const pwError = validatePassword(password);
+  if (pwError) return { error: pwError };
+
+  // Tenant-scoped target load (defence in depth: a hand-crafted POST cannot
+  // reach a user outside the actor's tenant).
+  const target = await prisma.user.findFirst({
+    where: { id: userId, tenantId: session.user.tenantId },
+    select: { id: true, email: true, role: true, firstName: true, lastName: true },
+  });
+  if (!target) return { error: "User not found." };
+
+  const passwordHash = await bcrypt.hash(password, 12);
+
+  await prisma.user.update({
+    where: { id: userId, tenantId: session.user.tenantId },
+    data: { passwordHash, sessionVersion: { increment: 1 } },
+  });
+
+  // Audit the reset (never the password itself).
+  await writeAudit({
+    userId: session.user.id,
+    action: "USER_PASSWORD_RESET",
+    module: "SETTINGS",
+    description: `Password reset for ${target.firstName} ${target.lastName} (${target.email})`,
+    metadata: {
+      targetUserId: target.id,
+      targetEmail: target.email,
+      targetRole: target.role,
+      sessionsRevoked: true,
+    },
+  });
+
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
 export async function upsertNotificationTemplateAction(formData: FormData) {
   const session = await requireRole(ROLES.ADMIN_ONLY);
   const id = (formData.get("templateId") as string | null) || undefined;
