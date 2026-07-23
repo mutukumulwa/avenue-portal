@@ -113,6 +113,11 @@ export const REASON_CATALOG: Record<RouteCode, ReasonEntry> = {
   PIPELINE_FAILED: { queue: QUEUES.AUTOPILOT_FAILURE, internal: "Processing exhausted its retries — unrecoverable technical failure.", provider: "This claim was received; our team is completing processing.", member: GENERIC_MEMBER_REVIEW, remedy: "Investigate the failure and reprocess or adjudicate manually.", resubmissionAllowed: false, overrideAllowed: true, overrideType: "MANUAL_APPROVAL" },
 };
 
+/** Type guard: is this string a catalogued route code? (F6.1) */
+export function isRouteCode(code: string): code is RouteCode {
+  return code in REASON_CATALOG;
+}
+
 export function getReason(code: RouteCode): ReasonEntry {
   return REASON_CATALOG[code];
 }

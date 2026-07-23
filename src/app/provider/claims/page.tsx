@@ -22,10 +22,10 @@ const FILTERS = ["all", "RECEIVED", "CAPTURED", "UNDER_REVIEW", "APPROVED", "PAR
 export default async function ProviderClaims({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; submitted?: string; replayed?: string }>;
 }) {
   const { provider, tenantId } = await requireProvider();
-  const { status } = await searchParams;
+  const { status, submitted, replayed } = await searchParams;
   const active = status && FILTERS.includes(status) ? status : "all";
 
   const claims = await prisma.claim.findMany({
@@ -45,6 +45,13 @@ export default async function ProviderClaims({
 
   return (
     <div className="space-y-5">
+      {submitted && (
+        <div className="mb-4 bg-brand-indigo/5 border border-brand-indigo/30 rounded-lg px-4 py-3 text-sm font-semibold text-brand-indigo" role="status">
+          {replayed
+            ? `Already received — claim ${submitted} (idempotent replay, nothing was duplicated).`
+            : `Claim ${submitted} received. It is now in the adjudication pipeline.`}
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Claims</h1>
         <Link href="/provider/claims/new" className="flex items-center gap-1.5 rounded-full bg-brand-indigo px-4 py-2 text-sm font-semibold text-white hover:bg-brand-secondary">

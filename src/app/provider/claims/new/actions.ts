@@ -102,5 +102,5 @@ export async function submitProviderClaimAction(
   );
   if (!result.ok) return { error: result.error };
 
-  redirect("/provider/claims");
+  redirect(`/provider/claims?submitted=${encodeURIComponent(result.claimNumber ?? "")}${result.replayed ? "&replayed=1" : ""}`);
 }

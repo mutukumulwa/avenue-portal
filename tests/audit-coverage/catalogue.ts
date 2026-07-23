@@ -22,6 +22,9 @@ export const KNOWN_AUDITING_TOKENS = [
   "auditManage(",
   "runClaimIntake(", // shared claim-intake path — chain-audits CLAIM:INTAKE_ACCEPTED internally
   "reimbursementService.submit(", // F5.6 — appends REIMBURSEMENT:SUBMITTED + canonical intake audit internally
+  "auditPolicy(", // F6.5 — local helper wrapping auditChainService.append for the policy console
+  "openBreaker(", // F4.7/F6.5 — hash-chain audits CIRCUIT_BREAKER_OPENED internally
+  "closeBreaker(", // F4.7/F6.5 — hash-chain audits CIRCUIT_BREAKER_CLOSED internally
   "ClaimDecisionService.decide(",
   "ClaimDecisionService.voidClaim(",
   "preauthAdjudicationService.",

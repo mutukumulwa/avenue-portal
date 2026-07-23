@@ -4,6 +4,7 @@ import { slaState, type ContractSlaTerms } from "@/lib/claims-sla";
 import { LayoutGrid, Clock, Building2, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { QueueAlerts } from "./QueueAlerts";
+import { ExceptionQueues } from "./ExceptionQueues";
 
 // Ordered active-work lanes. "Ready to pay" folds the approved states.
 const LANES: { key: string; label: string; statuses: string[] }[] = [
@@ -63,7 +64,12 @@ function ClaimCard({ c }: { c: QueueClaim }) {
   );
 }
 
-export default async function ClaimQueuesPage() {
+export default async function ClaimQueuesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ queue?: string; route?: string }>;
+}) {
+  const { queue, route } = await searchParams;
   const session = await requireRole(ROLES.OPS);
   const [claims, facilities] = await Promise.all([
     ClaimsService.getActiveQueues(session.user.tenantId, session.user.clientId, { take: 500 }),
@@ -106,6 +112,9 @@ export default async function ClaimQueuesPage() {
       </div>
 
       <QueueAlerts initialCount={receivedTotal} />
+
+      {/* F6.4 — named autopilot exception queues */}
+      <ExceptionQueues tenantId={session.user.tenantId} queue={queue} route={route} />
 
       {facilitySections.length === 0 && (
         <p className="rounded-lg border border-brand-border bg-brand-bg-alt/40 p-8 text-center text-sm text-brand-text-muted">

@@ -51,7 +51,7 @@ export async function submitClaimAction(data: {
   if (!result.ok) return { ok: false as const, error: result.error };
 
   // Receipt link visible after submit: land on the accepted claim.
-  redirect(result.claimId ? `/claims/${result.claimId}` : "/claims");
+  redirect(result.claimId ? `/claims/${result.claimId}?submitted=1${result.replayed ? "&replayed=1" : ""}` : "/claims");
 }
 
 export async function submitReimbursementClaimAction(data: {

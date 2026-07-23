@@ -17,6 +17,8 @@ import Link from "next/link";
 import { ClaimDocuments } from "./ClaimDocuments";
 import { CoContributionCollectionForm } from "./CoContributionCollectionForm";
 import { ContractPanel } from "./ContractPanel";
+import { AutomationPanel } from "./AutomationPanel";
+import { ProcessingStatePoller } from "./ProcessingStatePoller";
 import { PreauthPanel } from "./PreauthPanel";
 
 const LINE_CAT_META: Record<string, { label: string; color: string; Icon: React.ElementType }> = {
@@ -33,9 +35,9 @@ export default async function ClaimDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; notice?: string }>;
+  searchParams: Promise<{ error?: string; notice?: string; submitted?: string; replayed?: string }>;
 }) {
-  const { error, notice } = await searchParams;
+  const { error, notice, submitted, replayed } = await searchParams;
   const session = await requireRole(ROLES.OPS);
 
   const { id } = await params;
@@ -180,6 +182,16 @@ export default async function ClaimDetailPage({
       )}
 
       {/* Notice banner (success / preview feedback) */}
+      {submitted && (
+        <div className="flex items-start gap-3 bg-brand-indigo/5 border border-brand-indigo/30 rounded-lg px-4 py-3">
+          <p className="text-sm font-semibold text-brand-indigo flex-1">
+            {replayed
+              ? `This submission was already received — showing the original claim ${claim.claimNumber} (idempotent replay, nothing was duplicated).`
+              : `Claim ${claim.claimNumber} received. A durable intake receipt was recorded.`}
+          </p>
+          <ProcessingStatePoller processingState={claim.processingState} />
+        </div>
+      )}
       {notice && (
         <div className="flex items-center gap-3 bg-[#28A745]/10 border border-[#28A745]/40 rounded-lg px-4 py-3">
           <CheckCircle2 size={18} className="text-[#28A745] shrink-0" />
@@ -334,6 +346,9 @@ export default async function ClaimDetailPage({
 
       {/* Digital contract engine panel (spec §11.6) */}
       <ContractPanel tenantId={tenantId} claimId={id} />
+
+      {/* F6.3 — the claim's automation story (runs, stages, reasons, reprocess) */}
+      <AutomationPanel tenantId={tenantId} claimId={id} claimStatus={claim.status} />
 
       {/* Tariff variance banner */}
       {overbilledLines.length > 0 && (

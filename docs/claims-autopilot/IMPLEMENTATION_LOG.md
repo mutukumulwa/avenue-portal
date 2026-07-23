@@ -826,3 +826,19 @@ F4.5, F7.4).
 - **Known gaps or skips:** seed/test direct creates remain by design (guard scans `src/**` only, documented in the inventory).
 - **Security/privacy review:** two independent source guards now police creation AND status mutation.
 - **Next eligible task:** M6 — operational surfaces (F6.1 …).
+
+---
+
+## F6.1–F6.5 — Operational surfaces (M6 COMPLETE)
+
+- **Status:** COMPLETE — **M6 CLOSED** (one commit; the packages share surfaces)
+- **Commit/branch:** `feat/claims-autopilot` (M6 commit)
+- **F6.1 (receipt lookup):** the B2B receipt-status route gains per-credential rate limiting (60/min sliding window, `src/lib/rate-limit.ts`), hash-chain audit of lookup MISSES (`CLAIM:RECEIPT_LOOKUP_MISS` — enumeration probes become visible), and a caller-actionable `nextAction` derived from the routed reason catalog. Scope/404-safety unchanged (F5.2-proven). `isRouteCode` guard added to the catalog.
+- **F6.2 (submission result UX):** submit actions redirect with `?submitted[&replayed]`; the claim page shows a received/replayed banner ("nothing was duplicated" on replay) with a **bounded** processing poller (4 s × ≤10, stops at terminal state/unmount, `role=status` for screen readers); the provider claims list shows the same banner via `?submitted=<claimNumber>`. Draft-UUID retention was F5.1.
+- **F6.3 (automation timeline):** `AutomationPanel` on the claim page renders every receipt + processing run + staged trace (append-only history), the routed reason with internal text/remedy AND what the provider/member were told, the automation audit trail, and an authorized **Reprocess** (CLINICAL roles) that creates a NEW run via `createReprocessRun` (idempotent, revision-guarded, chain-audited `CLAIM:REPROCESS_REQUESTED`) and processes it in-request. Decided claims cannot be reprocessed.
+- **F6.4 (exception queues):** `/claims/queues` gains named autopilot exception queues — grouped counts by `assignedQueue` with per-route chips, the catalog remedy, oldest-age, and a drill-down list (50, oldest-first) linking to claims. A claim leaves the queue the moment it is decided (pre-decision statuses only).
+- **F6.5 (ops console + governed policy):** `/settings/auto-adjudication` REWRITTEN — the legacy form (which silently created inert OFF/DRAFT rows post-F2.4) is gone. a) Dashboard: **circuit breaker prominent** (open/close with mandatory audited reason), pending/retryable backlog, stale >15 min, failed 24 h, worker freshness, shadow agreement %, 7-day processing-state distribution. b) Policy console: versioned DRAFT creation (LIVE requires a ceiling — unbounded live money is refused at the form), maker submit into the approval matrix (`AUTO_ADJ_POLICY_CHANGE`; checker approves in the approvals surface; SoD enforced in-service), immediate deactivation with reason. All console actions hash-chain audited (`AUTO_ADJ:POLICY_DRAFTED/SUBMITTED/DEACTIVATED`; breaker audits in-service); audit-coverage harness extended accordingly.
+- **Tests/verification:** rate-limit unit 2 passed; audit-coverage 4 passed; full unit → **1120 passed / 104 skipped**; all integration → **95 passed / 9 skipped**; **`next build` PASSES** (every new/changed page+action compiles in production mode); typecheck + eslint clean.
+- **Known gaps or skips:** shadow metrics compute per-claim (fine at console scale; a materialized read model can come later); queue "ownership" column deferred (no reviewer-assignment field exists on Claim — the plan allows assignment only by extending an existing field, which does not exist).
+- **Security/privacy review:** console is ADMIN_ONLY; dashboards are counts/states only (no PHI); receipt lookups rate-limited + miss-audited; reprocess is role-gated and append-only.
+- **Next eligible task:** M7 — hardening and proof.
