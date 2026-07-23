@@ -88,3 +88,29 @@ Stop condition observed: yes — call graph + path matrix complete; no refactor 
 ```
 
 ---
+
+## F0.4 — Characterize document storage and consumers
+
+```text
+Work package: F0.4
+Status: COMPLETE
+Proof-before-build classification: MISSING (no prior storage/consumer inventory; spec §7.4 target fields almost entirely absent on Document)
+Files changed: docs/provider-network-os/DOCUMENT_STORAGE_MAP.md (new); PROGRESS.md row
+Schema/data changes: none — bucket policy NOT touched (stop condition)
+Behavior delivered: none (read-only)
+Authorization evidence: per-target app-level "who is handed the URL" matrix + the overriding fact that public-read bucket makes effective viewer = anyone with the URL, unauthenticated (minio.ts:14-36); U1 accepts unvalidated target IDs (api/upload/route.ts:60-67); U2 no auth-scope/validation/record at all
+Idempotency/concurrency evidence: n/a (characterization)
+Privacy/security evidence: PUBLIC-READ bucket + permanent guessable URLs confirmed (gap #8); SSRF surface found (intake.parseCensusFile arbitrary-URL fetch, trpc/routers/intake.ts:58); counter-example recorded (autopilot evaluate reads metadata only). No object contents downloaded/logged (package rule)
+Money/reconciliation evidence: n/a
+Focused tests and results: none required; migration-count SQL drafted (§6) for later read-only run (no prod DB access from workstation)
+Typecheck/schema result: no code changed
+Manual/visual evidence: n/a
+Feature-flag state: none
+Backfill/rollout impact: documented F2.7 legacy inputs + F2.9 gate blockers (9 consumer groups, break-glass on ensureBucket policy re-application)
+Known limitations: row/object counts require environment DB access (queries provided, not executed); MemberHealthShare share-grant lifecycle read at model level only
+Unrelated worktree changes preserved: yes
+Next allowed package: F0.5
+Stop condition observed: yes — inventory complete; no bucket-policy change
+```
+
+---
