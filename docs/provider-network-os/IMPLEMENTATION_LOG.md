@@ -394,3 +394,25 @@ Stop condition observed: yes — no enforcement.
 ```
 
 ---
+
+## F1.9 — Backfill applicability through reviewed inputs (mechanism BUILT; prod apply GATED)
+
+```text
+Work package: F1.9
+Status: COMPLETE (mechanism + tests). PROD --apply GATED on network-ops signed input — NOT run against any real data (D3/spec F1.9 step 1). Tested against the throwaway only.
+Proof-before-build: F1.8 report identifies gaps; no backfill mechanism existed. MISSING.
+Files changed: src/server/services/provider-applicability-backfill.service.ts (new: dryRun/apply/retire + ReviewedApplicabilityRow), tests/services/provider-applicability-backfill.test.ts (new), PROGRESS.md + IMPLEMENTATION_LOG.md
+Schema/data changes: none (writes ContractApplicability rows only on explicit --apply against signed input; none run on real data). Uses existing model.
+Behavior delivered: dryRun classifies every row (VALID/ALREADY_EXISTS/MISSING_CLIENT/INVALID_PROVIDER|CONTRACT|CLIENT|GROUP|PACKAGE|INPUT), writes nothing; apply writes only VALID rows idempotently with audit; retire rolls back via additive isActive=false (never delete). Full reference validation (provider∈tenant, contract∈provider & ACTIVE, client/group/package resolve). NO all-clients default — a row without clientId is MISSING_CLIENT.
+Authorization evidence: n/a (operator/ops tool; actorId recorded on audit). Real apply requires signed input (human gate).
+Idempotency/concurrency evidence: apply rerun → ALREADY_EXISTS, applied 0 (test).
+Privacy/security evidence: audit metadata = ids/inclusionType only. Rollback retains rows (evidence never erased, D28).
+Money/reconciliation evidence: row conservation — dryRun counts sum to input total (test).
+Focused tests and results: 3/3 DB (dry-run conservation + no-all-clients + nothing-written; idempotent apply; retire=retire-not-delete). Full suite 1161 passed / 140 skipped (+3 DB). tsc 0; brand PASS; currency PASS (669).
+Feature-flag state: n/a — gated by process (signed input), not a flag.
+Known limitations: production run pending network-ops signed batch (the F1.8 report is the input). A CLI wrapper reading a JSON batch file can be added when the first signed batch exists.
+Next allowed package: F1.10 — Add entitlement shadow comparison (M)
+Stop condition observed: yes — one mechanism, no real-data apply.
+```
+
+---
