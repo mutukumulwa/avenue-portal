@@ -306,3 +306,25 @@ Stop condition observed: yes — nav renders from permissions; unfinished routes
 ```
 
 ---
+
+## F1.5 — Harden provider user administration and offboarding
+
+```text
+Work package: F1.5
+Status: COMPLETE
+Proof-before-build: existing invite flow is TPA-admin-only (settings/actions.ts inviteUserAction/updateUserAccessAction, ROLES.ADMIN_ONLY) creating raw User.role+providerId; no provider-side self-administration; session revocation = User.sessionVersion bump (auth.ts invalidates stale sessions within ~15s cache TTL). Classification: PARTIAL (TPA invite exists; provider-scoped admin + guardrails MISSING).
+Files changed: src/server/services/provider-user-admin.service.ts (new), tests/services/provider-user-admin.service.test.ts (new), PROGRESS.md + IMPLEMENTATION_LOG.md
+Schema/data changes: none (reuses RBAC UserRoleAssignment + F1.2 branch assignments + User.isActive/sessionVersion)
+Behavior delivered: ProviderUserAdminService.{assignRole,revokeRole,assignBranches,suspendUser,reactivateUser} — all actor authority from the F1.3 ctx (provider.users.manage). assignRole only grants PROVIDER_PERSONA roles (TPA/SUPER_ADMIN/PROVIDER_LEGACY rejected FORBIDDEN_ROLE), only to own-provider users (cross-provider FORBIDDEN_PROVIDER), idempotent. suspendUser deactivates + bumps sessionVersion (revokes live session) + retires all active branch assignments. Last-admin safeguard blocks suspending/demoting the final provider.users.manage holder. PHI-free audit on every mutation.
+Authorization evidence: 6 DB tests — TPA/legacy role grant denied; cross-provider denied (assign + suspend); non-manage actor denied (FORBIDDEN_PERMISSION); suspend revokes session (sessionVersion+1, isActive false) + retires 2 branches; last-admin blocked then released once a 2nd admin exists; grant idempotent (replay = same assignment id).
+Idempotency/concurrency evidence: assignRole/assignBranches idempotent; revoke via updateMany conditional.
+Privacy/security evidence: audit metadata = ids/roleCode/counts only. MFA enforced upstream (requireRole mustEnrollTotp) — documented, not re-implemented.
+Money/reconciliation evidence: n/a
+Focused tests and results: 6/6 (opt-in DB). Full suite (no DB) 1148 passed / 131 skipped (+6 DB-gated). tsc 0; brand PASS; currency PASS (666 files).
+Feature-flag state: none (service is additive; no route wired to it yet — provider-side admin UI is a later presentation package)
+Known limitations: no provider-admin UI built here (service + invariants only); "invitation replay after expiry/use" maps to grant-idempotency in the current password-invite model (no separate invite token exists). Per-route wiring deferred.
+Next allowed package: F1.6 — Extend API keys with scope, expiry, branch, rotation (M)
+Stop condition observed: yes — no profile/master-data changes
+```
+
+---
