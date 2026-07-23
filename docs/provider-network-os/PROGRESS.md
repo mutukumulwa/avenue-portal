@@ -5,11 +5,13 @@
 **Why that base:** PNOS consumes the Claims Autopilot rail (§0.1/D5); the rail exists only on `feat/claims-autopilot` (43 commits ahead of `main`, 0 behind, at branch time).
 **Isolation rule:** the Claims Autopilot engagement (its F8.2 worker provisioning + human F7.6 campaign + F8.3 k6 staging) continues on ITS branch/prod untouched. Nothing from this engagement is committed to `feat/claims-autopilot` or `main`, and the dirty UAT worktree files (uat/*, scripts/uat-*, the two root plan .md files) are NEVER staged here.
 
+**WORKTREE ISOLATION (2026-07-23):** a concurrent claims-autopilot session shares the main checkout's HEAD. To stop interleaving, `feat/provider-network-os` now lives in a dedicated git worktree at `.claude/worktrees/pnos` (main checkout returned to `feat/claims-autopilot` for the concurrent session). **All PNOS work happens in the worktree.** `node_modules` is symlinked from the main checkout; there is no `.env` in the worktree (intentional — prisma/tests take explicit `DIRECT_URL`/`DATABASE_URL` exports, never the real `aicare_uat`). Throwaway test DB: `postgresql://postgres@127.0.0.1:54329/pnos_uat` (see `TEST_DB_HARNESS.md`).
+
 ---
 
 ## RESUME PROTOCOL (read this first after any interruption)
 
-1. `git checkout feat/provider-network-os` (dirty UAT files in the worktree are expected — leave them).
+1. `cd .claude/worktrees/pnos` (the PNOS worktree; HEAD = `feat/provider-network-os`). If the worktree is gone, recreate: `git worktree add .claude/worktrees/pnos feat/provider-network-os` then `ln -s ../../../node_modules node_modules`. Dirty UAT files live in the MAIN checkout, not here.
 2. Read this file's status board; the next package = first `NOT_STARTED` whose dependencies are `COMPLETE` (respect gates below).
 3. Read `IMPLEMENTATION_LOG.md` last entry — it names "Next eligible task" and any in-flight partial state.
 4. Follow the spec's §0.2 mandatory protocol + §0.3 proof-before-build for that one package. One package per unit of work. Stop at its stop condition, append the §24.5 result note, update this board, commit.
