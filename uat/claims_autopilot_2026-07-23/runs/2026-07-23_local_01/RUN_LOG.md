@@ -28,7 +28,16 @@ tie-out) and ALL role sign-offs. The plan's sign-off table remains open in
 battery. Agent policy: no credentials are typed into login forms — the human
 actors run the UI campaign.
 
-## Environment handover
+## Environment handover (updated 2026-07-23: worker live)
+
+**Worker (staffed-window posture):** running locally against PROD via the
+Supabase session pooler — prod `/api/health` shows `workerFresh: true`. Restart:
+`redis-server --port 56380 --save "" --appendonly no --daemonize yes` then
+`set -a; source .env.worker.local; set +a; npm run worker` (see
+`docs/WORKER_DEPLOYMENT.md` §F8.2 interim posture). Campaign Stories 11/12 need
+it up; everything else survives it being off.
+
+## Environment handover (original)
 
 The stack is left RUNNING for the human campaign: PG `:55432`
 (`autopilot_uat`), Redis `:56379`, app `:3000` (restart:

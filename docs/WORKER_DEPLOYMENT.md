@@ -61,3 +61,33 @@ npm run worker                      # reads .env (DATABASE_URL/DIRECT_URL/REDIS_
 3. Membership-activation and lapse jobs visible in host logs on their
    schedules; fund-balance alert fires when a self-funded balance crosses its
    minimum.
+
+## F8.2 interim posture — staffed-window LOCAL worker (2026-07-23)
+
+DEC-08 cloud provisioning is deferred to the F8.3 entry (always-on becomes
+mandatory only when live money needs the sweep as a safety net). During the
+UAT/shadow phase the worker runs LOCALLY during staffed windows — $0, fully
+sufficient because claims process inline on the web (D9) and Redis job loss is
+survivable by design (DB-authoritative recovery sweep).
+
+Run it (repo root; `.env.worker.local` is gitignored and holds the prod
+session-pooler URL + local Redis):
+
+```bash
+redis-server --port 56380 --save "" --appendonly no --daemonize yes
+set -a; source .env.worker.local; set +a; npm run worker
+```
+
+Verified live 2026-07-23: heartbeats 60s, prod `/api/health` →
+`workerFresh: true`, zero job errors on boot. When the worker is off,
+`workerFresh` flips false after 5 min — expected and harmless in OFF/shadow.
+
+**Two gotchas discovered live (bake into the F8.3 Railway setup):**
+1. This project's session pooler is **`aws-1`**-eu-central-1.pooler.supabase.com
+   (the aws-0 host answers but rejects the tenant) — always copy the string
+   from the dashboard's Connect dialog.
+2. Node `pg` treats `sslmode=require` as **verify-full** → "self-signed
+   certificate in certificate chain" against the pooler. Interim fix (encrypted,
+   libpq semantics): `?uselibpqcompat=true&sslmode=require`. The PERMANENT
+   Railway deploy should instead download the project CA (dashboard → Database
+   → SSL) and use `sslmode=verify-full&sslrootcert=<path>`.
