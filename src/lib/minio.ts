@@ -11,24 +11,43 @@ export const minioClient = new Minio.Client({
 
 const DEFAULT_BUCKET = "aicare-documents";
 
+/**
+ * PNOS F2.9 — whether a NEWLY created documents bucket gets a public-read
+ * policy. Defaults to TRUE = today's behaviour, because the admin/member/HR
+ * pages still render documents from a direct public `fileUrl`; flipping this
+ * before those consumers are migrated (remaining F2.8 groups) would break them.
+ * Set MINIO_PUBLIC_DOCUMENTS=false for a private-by-default environment once
+ * the §11.4 document-privacy migration gate is signed off.
+ *
+ * NOTE: this only governs bucket CREATION. An existing public bucket keeps its
+ * policy until an operator changes it — deliberately, so nothing flips silently.
+ */
+export function publicDocumentsEnabled(): boolean {
+  return process.env.MINIO_PUBLIC_DOCUMENTS !== "false";
+}
+
 export async function ensureBucket() {
   try {
     const exists = await minioClient.bucketExists(DEFAULT_BUCKET);
     if (!exists) {
       await minioClient.makeBucket(DEFAULT_BUCKET, "us-east-1");
-      // Set read-only policy for public access to files if needed, or keep private
-      const bucketPolicy = {
-        Version: "2012-10-17",
-        Statement: [
-          {
-            Action: ["s3:GetObject"],
-            Effect: "Allow",
-            Principal: { AWS: ["*"] },
-            Resource: [`arn:aws:s3:::${DEFAULT_BUCKET}/*`],
-          },
-        ],
-      };
-      await minioClient.setBucketPolicy(DEFAULT_BUCKET, JSON.stringify(bucketPolicy));
+      if (publicDocumentsEnabled()) {
+        // legacy public-read policy (retained until the privacy gate is passed)
+        const bucketPolicy = {
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Action: ["s3:GetObject"],
+              Effect: "Allow",
+              Principal: { AWS: ["*"] },
+              Resource: [`arn:aws:s3:::${DEFAULT_BUCKET}/*`],
+            },
+          ],
+        };
+        await minioClient.setBucketPolicy(DEFAULT_BUCKET, JSON.stringify(bucketPolicy));
+      }
+      // else: no policy applied — the bucket stays private and documents are
+      // served only through authorized, short-lived signed URLs (F2.6).
     }
   } catch (err) {
     console.error("MinIO Bucket Check Failed:", err);

@@ -653,3 +653,22 @@ Stop condition observed: yes — one consumer group.
 ```
 
 ---
+
+## F2.9 — Remove provider public-object access (MECHANISM BUILT; BLOCKED — gate not ready)
+
+```text
+Work package: F2.9
+Status: PARTIAL / BLOCKED. The mechanism + gate evidence are built and tested; the public-read switch is deliberately NOT thrown. Its precondition ("prove zero active direct consumers", step 1) is objectively UNMET.
+Proof-before-build: re-ran the inventory — 15 source files still dereference a document `fileUrl` (admin providers/claims/preauth pages, HR endorsements, member documents/health-vault/preauth, DocumentList, FileUpload, member-app/health-vault/preauth services, quotation-builder, secure-checkin, contracts/intake routers). Those are operator/member-scoped and need an operator download path (not built — F2.2 scoped it out). Removing public read now WOULD break live pages.
+Files changed: src/lib/minio.ts (publicDocumentsEnabled flag; ensureBucket only applies the public policy when enabled), scripts/pnos-document-privacy-readiness.ts (new — gate evidence), tests/services/document-public-policy.test.ts, PROGRESS.md + IMPLEMENTATION_LOG.md
+Behavior delivered: (a) NEW buckets can be created private-by-default via MINIO_PUBLIC_DOCUMENTS=false; default remains the legacy public policy so nothing flips silently, and an EXISTING bucket's policy is never touched by code. (b) A read-only readiness report answering the three gate questions: backfill progress (docs with/without private storageKey, by scanStatus), remaining direct-fileUrl consumers (static scan), and current public-read posture (+ optional anonymous --probe of a real object URL). It prints an explicit GATE ready/NOT-ready verdict.
+Authorization evidence: n/a (posture/config)
+Privacy/security evidence: the report is the §11.4 artifact. Current verdict on the throwaway: NOT ready (consumers remain, un-backfilled docs remain). Anonymous-GET probe is available but was NOT run against any real environment.
+Focused tests and results: 2/2 (default = legacy public, fail-safe: only an explicit "false" disables). Full suite (no DB env) 1174 passed / 179 skipped (+2 pure). tsc 0; brand PASS; currency PASS.
+Feature-flag state: MINIO_PUBLIC_DOCUMENTS unset ⇒ legacy public (unchanged everywhere).
+Known limitations / TO CLOSE THE GATE: (1) remaining F2.7 backfill batches (PREAUTH/CASE/group/etc. classes); (2) remaining F2.8 consumer groups — needs an OPERATOR-scoped authorized download path for admin/member/HR; (3) security sign-off; (4) then set MINIO_PUBLIC_DOCUMENTS=false for new envs and have an operator remove the policy on existing buckets, re-running this report + the anonymous probe as evidence. Legacy DB fileUrl values are retained either way (stop condition).
+Next allowed package: F3.1 — Freeze PA submission and decision contracts (S)
+Stop condition observed: yes — legacy DB URLs untouched; no bucket policy changed anywhere.
+```
+
+---

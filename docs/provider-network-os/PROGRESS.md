@@ -76,7 +76,9 @@
 | F2.6 | Authorized document download | M | COMPLETE | `authorizeDownload` + `document-storage.ts` (MinIO port) + download route (proof) + test (4 pass) |
 | F2.7 | Backfill legacy document metadata (per class/batch) | S/batch | COMPLETE (CLAIM class) | `provider-document-backfill.service.ts` + test (4 pass) |
 | F2.8 | Migrate document consumers (per group) | S/grp | COMPLETE (provider claim-docs group) | `listTargetDocuments` + `safeScanLabel` + provider claim detail section + test (3 pass) |
-| F2.9 | Remove provider public-object access | M | GATED(security approval) | — |
+| F2.9 | Remove provider public-object access | M | MECHANISM BUILT · BLOCKED(gate NOT ready) | `publicDocumentsEnabled` flag (default=legacy public) + `pnos-document-privacy-readiness.ts` + test (2 pass). Report says NOT ready: 15 direct-`fileUrl` consumers remain + un-backfilled docs. Needs remaining F2.7 batches + F2.8 groups (operator download path) + security sign-off. |
+
+**Phase F2 status:** the private-document engine is COMPLETE and proven (F2.1–F2.8). F2.9's switch is deliberately NOT thrown — flipping it today would break the live admin/member/HR pages that still render public `fileUrl`. **Gate B remains OPEN** pending those consumer migrations + security approval.
 
 ## F3 — Canonical PA intake and provider workbench
 
