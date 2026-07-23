@@ -182,6 +182,45 @@ export async function buildProviderWorld(prisma: Prisma, opts: BuildOptions = {}
 
   const tenantIds = [alpha.id, beta.id];
 
+  // ── reusable claim/PA targets (F2+) ────────────────────────────────────────
+  let targetSeq = 0;
+  const createdClaimIds: string[] = [];
+  const createdPreauthIds: string[] = [];
+  const createdCaseIds: string[] = [];
+  const providerCId = providerC.id;
+
+  async function createClaim(opts: { providerId?: string; branchId?: string | null; memberId?: string; status?: string } = {}) {
+    targetSeq += 1;
+    const providerId = opts.providerId ?? providerA.id;
+    const tId = providerId === providerCId ? beta.id : alpha.id;
+    const memberId = opts.memberId ?? (tId === beta.id ? memberBeta.id : memberAlpha.id);
+    const row = await prisma.claim.create({
+      data: {
+        tenantId: tId, claimNumber: `CLM-${token}-${targetSeq}`, memberId, providerId,
+        providerBranchId: opts.branchId ?? null, serviceType: "OUTPATIENT", dateOfService: now,
+        diagnoses: [], procedures: [], billedAmount: 1000, benefitCategory: "OUTPATIENT",
+        ...(opts.status ? { status: opts.status as never } : {}),
+      },
+    });
+    createdClaimIds.push(row.id);
+    return row;
+  }
+
+  async function createPreauth(opts: { providerId?: string; memberId?: string } = {}) {
+    targetSeq += 1;
+    const providerId = opts.providerId ?? providerA.id;
+    const tId = providerId === providerCId ? beta.id : alpha.id;
+    const memberId = opts.memberId ?? (tId === beta.id ? memberBeta.id : memberAlpha.id);
+    const row = await prisma.preAuthorization.create({
+      data: {
+        tenantId: tId, preauthNumber: `PA-${token}-${targetSeq}`, memberId, providerId,
+        submittedBy: "PROVIDER", diagnoses: [], procedures: [], estimatedCost: 1000, benefitCategory: "OUTPATIENT",
+      },
+    });
+    createdPreauthIds.push(row.id);
+    return row;
+  }
+
   async function teardown() {
     // FK-safe order: branch assignments → applicability → contracts → members →
     // groups → benefit → version → package → branches → users → providers →
@@ -197,6 +236,11 @@ export async function buildProviderWorld(prisma: Prisma, opts: BuildOptions = {}
       userB.id, userC.id, userASuspended.id,
     ];
     await prisma.auditLog.deleteMany({ where: { userId: { in: worldUserIds } } });
+    // F2+ targets (+ documents referencing them or scoped to this world) — before members/providers.
+    await prisma.document.deleteMany({ where: { OR: [{ claimId: { in: createdClaimIds } }, { preauthId: { in: createdPreauthIds } }, { caseId: { in: createdCaseIds } }, { tenantId: { in: tenantIds } }] } });
+    await prisma.claim.deleteMany({ where: { id: { in: createdClaimIds } } });
+    await prisma.preAuthorization.deleteMany({ where: { id: { in: createdPreauthIds } } });
+    await prisma.clinicalCase.deleteMany({ where: { id: { in: createdCaseIds } } });
     await prisma.contractApplicability.deleteMany({ where: { contractId: { in: contractIds } } });
     await prisma.providerContract.deleteMany({ where: { id: { in: contractIds } } });
     await prisma.member.deleteMany({ where: { tenantId: { in: tenantIds } } });
@@ -225,6 +269,8 @@ export async function buildProviderWorld(prisma: Prisma, opts: BuildOptions = {}
     branches: { a1: branchA1, a2: branchA2, b1: branchB1, c1: branchC1 },
     users: { a: usersA, b: userB, c: userC, aSuspended: userASuspended },
     contracts: { aActive: contractAActive, aExpired: contractAExpired, aFuture: contractAFuture, bActive: contractBActive, cActive: contractCActive },
+    createClaim,
+    createPreauth,
     teardown,
   };
 }

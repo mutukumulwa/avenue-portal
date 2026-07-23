@@ -514,3 +514,25 @@ Stop condition observed: yes — no bucket-policy change.
 ```
 
 ---
+
+## F2.2 — Resource-level document authorization
+
+```text
+Work package: F2.2
+Status: COMPLETE
+Proof-before-build: confirmed Claim (tenant/provider/branch?/status), PreAuthorization (tenant/provider/status, NO branch), ClinicalCase (tenant/provider/branch?/status). MISSING authz.
+Files changed: src/server/services/provider-document.service.ts (authorizeTarget + TARGET_PERMISSION map), tests/factories/provider-network.ts (createClaim/createPreauth helpers + teardown clears F2+ targets/documents), tests/services/provider-document-authz.test.ts (new), PROGRESS.md + IMPLEMENTATION_LOG.md
+Schema/data changes: none
+Behavior delivered: authorizeTarget(ctx,{targetType,targetId,action}) in §9.1 order — required permission (per-target map: CLAIM read/respond, PREAUTH read/respond, CASE read/read) → resource load scoped to tenant+provider → branch check when target has a branch. Absent + cross-provider both → safe NOT_FOUND. Not-yet-built targets (PAYMENT_QUERY etc.) → TARGET_TYPE_NOT_SUPPORTED (honest — no fabricated loaders). Does NOT expose the object (F2.6).
+Authorization evidence: 6 DB tests — own claim ok; missing/wrong permission FORBIDDEN_PERMISSION (before load); other-provider + guessed id both NOT_FOUND; branch-scoped denied without branch / allowed with; PA (no branch) ok; unsupported target refused.
+Idempotency/concurrency evidence: n/a (read authz)
+Privacy/security evidence: NOT_FOUND indistinguishable for absent vs cross-provider (§9.1); permission checked before load (no existence leak on permission failure).
+Money/reconciliation evidence: n/a
+Focused tests and results: 6/6. Full suite (no DB env) 1168 passed / 157 skipped (+6 DB). tsc 0; brand PASS; currency PASS.
+Feature-flag state: none (service not wired to live upload routes yet — F2.8)
+Known limitations: loaders exist for CLAIM/PREAUTH/CASE only; INFORMATION_REQUEST/RECONSIDERATION/PAYMENT_QUERY/PROFILE_CHANGE loaders arrive with their phases (F4/F5/F6/F7). Operator/member access is a separate admin path, not this provider service. Cross-target document-reuse denial fully exercised at F2.6 (download).
+Next allowed package: F2.3 — Implement upload intent creation (S)
+Stop condition observed: yes — download not exposed.
+```
+
+---
