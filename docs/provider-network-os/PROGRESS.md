@@ -34,7 +34,7 @@
 
 | Pkg | Title | Size | Status | Evidence |
 |---|---|---|---|---|
-| F0.1 | Freeze current provider route inventory | XS | NOT_STARTED | — |
+| F0.1 | Freeze current provider route inventory | XS | COMPLETE | `PROVIDER_ROUTE_INVENTORY.md` |
 | F0.2 | Characterize provider access leakage (tests) | S | NOT_STARTED | — |
 | F0.3 | Characterize claim and PA ownership paths | S | NOT_STARTED | — |
 | F0.4 | Characterize document storage and consumers | S | NOT_STARTED | — |
