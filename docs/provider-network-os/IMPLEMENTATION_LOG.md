@@ -574,3 +574,23 @@ Stop condition observed: yes — no clean availability.
 ```
 
 ---
+
+## F2.5 — Malware scan + quarantine lifecycle
+
+```text
+Work package: F2.5
+Status: COMPLETE
+Files changed: prisma/schema.prisma (Document.scanAttempts/scanLeaseUntil/scanReason + index), src/server/services/provider-document-scan.service.ts (new), tests/services/provider-document-scan.test.ts, PROGRESS.md + IMPLEMENTATION_LOG.md
+Schema/data changes: additive scan lease/attempt fields via db push (in sync)
+Behavior delivered: DocumentScannerPort (injectable) + scanOne (verdict→terminal: CLEAN→CLEAN, INFECTED→QUARANTINED, CORRUPT→REJECTED, ERROR→retry-then-ERROR) + runScanSweep (lease-claim before scan so concurrent workers don't double-process) + isDocumentUsable (only CLEAN). Scan driven off PENDING state (§9.14). Legacy (null scanStatus) untouched (stop condition). Notify-provider (step 5) records the disposition; the durable outbox notification is F4.8 (hook noted). Admin quarantine view (step 6) is an F2/F9 ops surface — the data (scanReason, QUARANTINED status, no download) is in place.
+Authorization evidence: isDocumentUsable is the single gate F2.6 download enforces — QUARANTINED/REJECTED/ERROR/PENDING all non-usable (provider cannot access quarantine).
+Idempotency/concurrency evidence: re-scan of a terminal doc = SKIPPED (no-op); sweep lease-claim (updateMany guard) prevents double-processing; retry increments scanAttempts to the cap then ERROR.
+Privacy/security evidence: scanReason is a safe label (no raw payload); scanner reads via storageKey (private), never a public URL.
+Focused tests and results: 5/5 (usability gate pure; clean/quarantine/reject; retry→exhaust ERROR; idempotent re-scan; sweep lease). Full suite (no DB env) 1169 passed / 171 skipped (+1 pure, +4 DB). tsc 0; brand PASS; currency PASS (676).
+Feature-flag state: none
+Known limitations: real scanner engine (ClamAV etc.) wired in ops later — port + fake here. Provider notification of rejected/error rides the F4.8 outbox (not built yet); disposition + scanReason are recorded now.
+Next allowed package: F2.6 — Implement authorized document download (M)
+Stop condition observed: yes — legacy documents not switched.
+```
+
+---

@@ -72,7 +72,7 @@
 | F2.2 | Resource-level document authorization | M | COMPLETE | `ProviderDocumentService.authorizeTarget` + factory createClaim/createPreauth + test (6 pass) |
 | F2.3 | Upload intent creation | S | COMPLETE | `createUploadIntent`/`resolveOpenIntent` + `DOCUMENT_UPLOAD_POLICY` + test (5 pass) |
 | F2.4 | Upload finalize + content validation | M | COMPLETE | `finalizeUpload` + `document-mime.ts` (magic-byte) + staging port + test (5 pass) |
-| F2.5 | Malware scan + quarantine lifecycle | M | NOT_STARTED | — |
+| F2.5 | Malware scan + quarantine lifecycle | M | COMPLETE | `provider-document-scan.service.ts` (lease/retry) + `isDocumentUsable` + test (5 pass) |
 | F2.6 | Authorized document download | M | NOT_STARTED | — |
 | F2.7 | Backfill legacy document metadata (per class/batch) | S/batch | NOT_STARTED | — |
 | F2.8 | Migrate document consumers (per group) | S/grp | NOT_STARTED | — |

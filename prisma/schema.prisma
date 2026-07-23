@@ -4752,11 +4752,16 @@ model Document {
   finalizedAt            DateTime?
   supersededByDocumentId String?
   uploadIntentId         String?   @unique // one finalized document per intent (finalize-once guarantee)
+  // PNOS F2.5 — scan worker lease + retry control.
+  scanAttempts           Int       @default(0)
+  scanLeaseUntil         DateTime? // a claimed doc is leased until this time; a free/expired lease is reclaimable
+  scanReason             String? // safe reason for REJECTED/QUARANTINED/ERROR (no raw payload)
 
   @@index([tenantId, providerId])
   @@index([storageKey])
   @@index([sha256])
   @@index([scanStatus])
+  @@index([scanStatus, scanLeaseUntil])
 }
 
 // PNOS F2.1 — staged upload intent (§7.4). Binds the authorized target + actor +
