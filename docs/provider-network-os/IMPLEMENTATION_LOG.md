@@ -1177,3 +1177,21 @@ Stop condition observed: yes — provider inbox pages only.
 ```
 
 ---
+
+## F4.8 — Notification outbox schema + dispatcher
+
+```text
+Work package: F4.8
+Status: COMPLETE
+Commit: f76bf95
+ASSUMPTION + DESIGN (board-only): transactional OUTBOX chosen because the email worker is unprovisioned + no provider-notification model exists — persist intent now, deliver email later with zero schema/producer change. Flagged.
+Files changed: prisma/schema.prisma (NotificationOutbox model + NotificationOutboxStatus enum), src/server/services/notifications/outbox.ts (new), tests/services/notification-outbox.test.ts (new)
+Schema/data changes: ADDITIVE — new NotificationOutbox table + enum. Pushed to throwaway PG (54329, datasource verified); prod applies on next build. Client regenerated WITH DIRECT_URL (F3.2 landmine) — accessor present.
+Behavior delivered: NotificationOutboxService.enqueue (PENDING; idempotent on dedupeKey — @@unique(tenantId,dedupeKey), NULLs distinct so keyless enqueues aren't blocked); dispatch(opts, deps) drains PENDING via a pluggable delivery port — IN_APP→SENT immediately (row = in-app notice); EMAIL+deps.deliverEmail→SENT/SKIPPED per the port; EMAIL with NO port (today)→SKIPPED "email delivery not provisioned"; error→FAILED+attempts++; returns {processed,sent,skipped,failed}, re-runnable. listProviderNotifications (SENT in-app for a provider, unreadOnly option); markRead (provider-scoped updateMany). Relation-less. No producer enqueues yet (F4.9) and no sweeper runs dispatch (F4.10).
+Evidence: outbox test (4, REAL DB): enqueue PENDING + dedupe idempotency (1 row); dispatch IN_APP→SENT + EMAIL-no-port→SKIPPED(not provisioned); EMAIL-with-port→SENT; listProviderNotifications + provider-scoped unreadOnly + markRead (cross-provider markRead false). Full suite (no DB env) 1291 pass / 208 skip. tsc 0; brand PASS; currency PASS (704).
+Feature-flag state: none (inert until F4.9 producers + F4.10 sweeper).
+Next allowed package: F4.9 — Migrate provider events to dispatcher (per family) (XS/fam).
+Stop condition observed: yes — outbox + dispatcher only (no producers wired, no sweeper).
+```
+
+---
