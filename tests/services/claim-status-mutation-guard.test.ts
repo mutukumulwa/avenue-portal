@@ -28,6 +28,8 @@ const ALLOWLIST: Record<string, string> = {
     "Fraud hold — locks a claim to UNDER_REVIEW pending investigation (no money effect).",
   "src/app/(admin)/fraud/actions.ts":
     "Fraud escalation hold — locks a claim to UNDER_REVIEW (no money effect).",
+  "src/server/services/claim-withdrawal/service.ts":
+    "PNOS F5.5 — provider withdrawal: status-guarded CAS flips a pre-decision claim (INCURRED/RECEIVED/CAPTURED/UNDER_REVIEW) to WITHDRAWN via assertClaimTransition, no money effect.",
 };
 
 function walk(dir: string, out: string[] = []): string[] {

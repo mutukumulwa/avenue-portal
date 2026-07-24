@@ -238,6 +238,8 @@ export async function buildProviderWorld(prisma: Prisma, opts: BuildOptions = {}
     await prisma.auditLog.deleteMany({ where: { userId: { in: worldUserIds } } });
     // F2+ targets (+ documents referencing them or scoped to this world) — before members/providers.
     await prisma.document.deleteMany({ where: { OR: [{ claimId: { in: createdClaimIds } }, { preauthId: { in: createdPreauthIds } }, { caseId: { in: createdCaseIds } }, { tenantId: { in: tenantIds } }] } });
+    // F5.5: withdrawal (and any decision) writes AdjudicationLog rows FK'd to the claim — clear before the claim.
+    await prisma.adjudicationLog.deleteMany({ where: { claimId: { in: createdClaimIds } } });
     await prisma.claim.deleteMany({ where: { id: { in: createdClaimIds } } });
     // F3.2 intake evidence + F4.1 info requests (relation-less, so no FK forces this — kept tidy anyway)
     await prisma.preAuthorizationEvent.deleteMany({ where: { tenantId: { in: tenantIds } } });
