@@ -1120,3 +1120,22 @@ Stop condition observed: yes — reviewer decisions only (no reprocessing hook, 
 ```
 
 ---
+
+## F4.5 — Sanctioned-reprocessing read
+
+```text
+Work package: F4.5
+Status: COMPLETE
+Commit: f208141
+DECISION (user-ratified): "mark sanctioned, human re-decides" — acceptance (RESPONSE_ACCEPTED, F4.4) IS the sanction marker; F4.5 adds NO automatic decision-pipeline re-run (money spine untouched — PNOS never creates a second decision path).
+Files changed: src/server/services/preauth-info-request/service.ts (+listReprocessable), tests/services/preauth-info-request-service.test.ts (+1 real-DB)
+Schema/data changes: none
+Behavior delivered: PreauthInfoRequestService.listReprocessable(scope) — surfaces PAs whose info request is ACCEPTED while the PA is still UNDECIDED (SUBMITTED/UNDER_REVIEW), i.e. info in-hand + awaiting a human re-decision on the existing PA workbench. Two-step (relation-less): accepted requests in scope → filter to still-undecided PAs. Scoped like F3.7 (client confinement + optional provider). Pure read — never decides, never touches a hold.
+FLAG: the queue UI (reviewer "ready to re-decide" list) is F4.6/F4.7. The board's "claim reprocessing" is realized as PA re-decision surfacing — info requests are PA-scoped throughout F4.1–F4.4 (no claim link); the reviewer re-decides the PA via existing tools, unblocking any downstream claim.
+Evidence: service test +1 (REAL DB): includes accepted-and-still-undecided; excludes accepted-then-decided + responded-but-not-accepted; other client sees none. Full suite (no DB env) 1290 pass / 202 skip. tsc 0; brand PASS; currency PASS (699).
+Feature-flag state: none.
+Next allowed package: F4.6 — Canonical provider inbox projection (M).
+Stop condition observed: yes — read model only (no UI, no auto re-decision).
+```
+
+---
