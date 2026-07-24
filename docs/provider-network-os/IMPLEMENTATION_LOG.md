@@ -1139,3 +1139,22 @@ Stop condition observed: yes — read model only (no UI, no auto re-decision).
 ```
 
 ---
+
+## F4.6 — Canonical provider inbox projection
+
+```text
+Work package: F4.6
+Status: COMPLETE
+Commit: d962299
+ASSUMPTION (board-only): projection of the provider's actionable info requests (F4 domain). Flagged.
+Files changed: src/server/services/preauth-info-request/inbox.ts (new), tests/services/preauth-info-request-inbox.test.ts (new)
+Schema/data changes: none
+Behavior delivered: providerInboxProjection(scope) — provider's info requests AWAITING it (default OPEN/REOPENED via PROVIDER_INBOX_DEFAULT_STATUSES; callers may widen), joined with PA+member context (preauthNumber, member name/number) via a relation-less two-step, ordered by dueAt asc then openedAt, with an `overdue` flag (dueAt < now; now injectable). Provider-scoped. Pure read.
+FLAG: info-requests only for now (other actionable families unionable later without changing callers); the inbox list + detail UI is F4.7.
+Evidence: inbox test (1, REAL DB): OPEN+REOPENED projected (RESPONDED excluded by default) + PA/member context; overdue sorts before 48h + overdue=true; another facility sees none; widened statuses surface RESPONDED. Full suite (no DB env) 1290 pass / 203 skip. tsc 0; brand PASS; currency PASS (700).
+Feature-flag state: none.
+Next allowed package: F4.7 — Inbox list + info-request detail pages (M).
+Stop condition observed: yes — projection only (no pages).
+```
+
+---
