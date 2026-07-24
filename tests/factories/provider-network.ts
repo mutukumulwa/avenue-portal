@@ -243,6 +243,7 @@ export async function buildProviderWorld(prisma: Prisma, opts: BuildOptions = {}
     await prisma.preAuthorizationEvent.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.preauthIntakeReceipt.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.preauthInfoRequest.deleteMany({ where: { tenantId: { in: tenantIds } } });
+    await prisma.notificationOutbox.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.preAuthorization.deleteMany({ where: { id: { in: createdPreauthIds } } });
     await prisma.clinicalCase.deleteMany({ where: { id: { in: createdCaseIds } } });
     await prisma.contractApplicability.deleteMany({ where: { contractId: { in: contractIds } } });

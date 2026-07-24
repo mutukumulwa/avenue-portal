@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma, PrismaClient, PreauthInfoRequestStatus } from "@prisma/client";
 import { appendPreauthEvent, type PreauthEventType } from "../preauth-intake/events";
 import { normalizeRequestedItems } from "./catalog";
+import { NotificationOutboxService } from "../notifications/outbox";
 
 /**
  * PNOS F4.2 — clinical information-request open/cancel service.
@@ -65,11 +66,11 @@ export interface InfoRequestDecisionParams {
 async function applyDecision(
   db: Db,
   params: InfoRequestDecisionParams,
-  spec: { from: string[]; to: PreauthInfoRequestStatus; event: PreauthEventType; errCode: string; errMsg: string },
+  spec: { from: string[]; to: PreauthInfoRequestStatus; event: PreauthEventType; errCode: string; errMsg: string; notify: { title: string; body: string; priority?: string } },
 ) {
   const existing = await db.preauthInfoRequest.findFirst({
     where: { id: params.id, tenantId: params.tenantId },
-    select: { id: true, status: true, preAuthorizationId: true },
+    select: { id: true, status: true, preAuthorizationId: true, providerId: true },
   });
   if (!existing) throw new InfoRequestError("NOT_FOUND", "Information request not found.");
   if (!spec.from.includes(existing.status)) {
@@ -88,6 +89,21 @@ async function applyDecision(
         actorType: params.actor.type,
         actorId: params.actor.id ?? null,
         metadata: { infoRequestId: existing.id },
+      },
+      tx,
+    );
+    // F4.9: notify the provider of the reviewer's decision, in the SAME tx.
+    await NotificationOutboxService.enqueue(
+      {
+        tenantId: params.tenantId,
+        providerId: existing.providerId,
+        channel: "IN_APP",
+        eventType: spec.event,
+        priority: spec.notify.priority ?? "NORMAL",
+        title: spec.notify.title,
+        body: spec.notify.body,
+        href: `/provider/inbox/${existing.id}`,
+        metadata: { infoRequestId: existing.id, preauthId: existing.preAuthorizationId },
       },
       tx,
     );
@@ -143,6 +159,21 @@ export const PreauthInfoRequestService = {
         },
         tx,
       );
+      // F4.9: notify the provider through the outbox, in the SAME tx (exactly-once).
+      await NotificationOutboxService.enqueue(
+        {
+          tenantId: params.tenantId,
+          providerId: pa.providerId,
+          channel: "IN_APP",
+          eventType: "INFO_REQUESTED",
+          priority: "HIGH",
+          title: "Information requested",
+          body: "A pre-authorization needs additional information before it can be decided. Please respond.",
+          href: `/provider/inbox/${created.id}`,
+          metadata: { infoRequestId: created.id, preauthId: pa.id },
+        },
+        tx,
+      );
       return created;
     });
   },
@@ -150,7 +181,7 @@ export const PreauthInfoRequestService = {
   async cancel(params: CancelInfoRequestParams, db: Db = prisma) {
     const existing = await db.preauthInfoRequest.findFirst({
       where: { id: params.id, tenantId: params.tenantId },
-      select: { id: true, status: true, preAuthorizationId: true },
+      select: { id: true, status: true, preAuthorizationId: true, providerId: true },
     });
     if (!existing) throw new InfoRequestError("NOT_FOUND", "Information request not found.");
     if (!INFO_REQUEST_CANCELLABLE_STATUSES.includes(existing.status)) {
@@ -175,6 +206,20 @@ export const PreauthInfoRequestService = {
           actorType: params.actor.type,
           actorId: params.actor.id ?? null,
           metadata: { infoRequestId: existing.id },
+        },
+        tx,
+      );
+      // F4.9: inform the provider the request was withdrawn (no longer awaiting them).
+      await NotificationOutboxService.enqueue(
+        {
+          tenantId: params.tenantId,
+          providerId: existing.providerId,
+          channel: "IN_APP",
+          eventType: "INFO_REQUEST_CANCELLED",
+          title: "Information request withdrawn",
+          body: "A pre-authorization information request has been withdrawn — no response is needed.",
+          href: `/provider/inbox/${existing.id}`,
+          metadata: { infoRequestId: existing.id, preauthId: existing.preAuthorizationId },
         },
         tx,
       );
@@ -229,15 +274,24 @@ export const PreauthInfoRequestService = {
   // F4.4 — reviewer decisions on a submitted response. accept ⇒ sanctions claim
   // reprocessing (F4.5). reopen ⇒ back to the provider. close ⇒ terminal.
   async accept(params: InfoRequestDecisionParams, db: Db = prisma) {
-    return applyDecision(db, params, { from: INFO_REQUEST_ACCEPTABLE_STATUSES, to: "ACCEPTED", event: "RESPONSE_ACCEPTED", errCode: "NOT_ACCEPTABLE", errMsg: "cannot be accepted" });
+    return applyDecision(db, params, {
+      from: INFO_REQUEST_ACCEPTABLE_STATUSES, to: "ACCEPTED", event: "RESPONSE_ACCEPTED", errCode: "NOT_ACCEPTABLE", errMsg: "cannot be accepted",
+      notify: { title: "Response accepted", body: "Your information response was accepted. The pre-authorization will be re-assessed." },
+    });
   },
 
   async reopen(params: InfoRequestDecisionParams, db: Db = prisma) {
-    return applyDecision(db, params, { from: INFO_REQUEST_REOPENABLE_STATUSES, to: "REOPENED", event: "RESPONSE_REOPENED", errCode: "NOT_REOPENABLE", errMsg: "cannot be reopened" });
+    return applyDecision(db, params, {
+      from: INFO_REQUEST_REOPENABLE_STATUSES, to: "REOPENED", event: "RESPONSE_REOPENED", errCode: "NOT_REOPENABLE", errMsg: "cannot be reopened",
+      notify: { title: "More information needed", body: "Your response was reopened — please provide the additional information requested.", priority: "HIGH" },
+    });
   },
 
   async close(params: InfoRequestDecisionParams, db: Db = prisma) {
-    return applyDecision(db, params, { from: INFO_REQUEST_CLOSABLE_STATUSES, to: "CLOSED", event: "INFO_REQUEST_CLOSED", errCode: "NOT_CLOSABLE", errMsg: "cannot be closed" });
+    return applyDecision(db, params, {
+      from: INFO_REQUEST_CLOSABLE_STATUSES, to: "CLOSED", event: "INFO_REQUEST_CLOSED", errCode: "NOT_CLOSABLE", errMsg: "cannot be closed",
+      notify: { title: "Information request closed", body: "A pre-authorization information request has been closed." },
+    });
   },
 
   /**

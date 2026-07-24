@@ -200,4 +200,35 @@ describe.skipIf(!URL_SET)("F4.2 PreauthInfoRequestService (opt-in DB)", () => {
     const other = await Svc.getForProvider({ tenantId: t, providerId: world.providers.b.id }, ir.id);
     expect(other).toBeNull();
   });
+
+  it("transitions enqueue provider IN_APP notifications in the outbox, same tx (F4.9)", async () => {
+    const t = world.tenants.alpha.id;
+    const providerId = world.providers.a.id;
+    const provUser = { type: "USER", id: "prov-user" };
+    const outboxFor = async (infoRequestId: string, eventType: string) =>
+      prisma.notificationOutbox.findFirst({ where: { tenantId: t, providerId, channel: "IN_APP", eventType, metadata: { path: ["infoRequestId"], equals: infoRequestId } } });
+
+    // open → INFO_REQUESTED provider notification (PENDING, HIGH)
+    const pa = await world.createPreauth({ providerId });
+    const ir = await Svc.open({ tenantId: t, preAuthorizationId: pa.id, requestedItems: ["LAB_RESULTS"], prompt: "labs", actor: reviewer });
+    const opened = await outboxFor(ir.id, "INFO_REQUESTED");
+    expect(opened?.status).toBe("PENDING");
+    expect(opened?.href).toBe(`/provider/inbox/${ir.id}`);
+
+    // respond → reopen → RESPONSE_REOPENED notification
+    await Svc.submitResponse({ tenantId: t, id: ir.id, providerId, responseNote: "v1", actor: provUser });
+    await Svc.reopen({ tenantId: t, id: ir.id, actor: reviewer });
+    expect(await outboxFor(ir.id, "RESPONSE_REOPENED")).toBeTruthy();
+
+    // respond again → accept → RESPONSE_ACCEPTED notification
+    await Svc.submitResponse({ tenantId: t, id: ir.id, providerId, responseNote: "v2", actor: provUser });
+    await Svc.accept({ tenantId: t, id: ir.id, actor: reviewer });
+    expect(await outboxFor(ir.id, "RESPONSE_ACCEPTED")).toBeTruthy();
+
+    // a cancelled request → INFO_REQUEST_CANCELLED notification
+    const pa2 = await world.createPreauth({ providerId });
+    const ir2 = await Svc.open({ tenantId: t, preAuthorizationId: pa2.id, requestedItems: ["OTHER"], prompt: "x", actor: reviewer });
+    await Svc.cancel({ tenantId: t, id: ir2.id, actor: reviewer });
+    expect(await outboxFor(ir2.id, "INFO_REQUEST_CANCELLED")).toBeTruthy();
+  });
 });
