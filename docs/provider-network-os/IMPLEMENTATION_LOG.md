@@ -1329,3 +1329,30 @@ Stop condition observed: yes — service + focused tests only; no UI, no replace
 ```
 
 ---
+
+## F5.6 — Provider withdrawal UI
+
+```text
+Work package: F5.6
+Status: COMPLETE
+Commit: 2cf830b
+Proof-before-build classification: MISSING (no provider claim-withdrawal UI existed). The provider claim detail page (claims/[id]/page.tsx), the F1.3 ctx resolution, and the F5.5 service already existed; the closest analog is the F3.11 provider PA cancel (CancelPreauthButton + cancelProviderPreauthAction).
+Files changed: src/server/services/claim-withdrawal/policy.ts (new — pure providerCanWithdraw + CLAIM_WITHDRAWABLE_STATUSES + WITHDRAW_PERMISSION, extracted from the service), src/server/services/claim-withdrawal/service.ts (now imports the withdrawable set + permission from policy; re-exports CLAIM_WITHDRAWABLE_STATUSES for compat), src/app/provider/claims/[id]/actions.ts (new — withdrawProviderClaimAction), src/app/provider/claims/[id]/WithdrawClaimButton.tsx (new — accessible confirmation dialog), src/app/provider/claims/[id]/page.tsx (server-computes canWithdraw + renders the guarded control), tests/audit-coverage/catalogue.ts (KNOWN_AUDITING_TOKENS += ClaimWithdrawalService.withdraw(), tests/services/claim-withdrawal-policy.test.ts (new), tests/actions/provider-claim-withdrawal-action.test.ts (new), tests/components/provider-withdraw-claim-button.test.tsx (new).
+Schema/data changes: NONE.
+Behavior delivered: the claim detail page shows a guarded "Withdraw claim" control ONLY when the server computes the action is allowed — providerCanWithdraw(ctx, claim) is the SAME predicate the F5.5 service enforces (strict provider.claim.withdraw permission [a new capability requires the explicit permission — no legacy full-access fallback], pre-decision status, branch scope, no money fact), evaluated purely so the client only ever consumes an allowed action (step 1). The confirmation is an accessible alert dialog (role=alertdialog, aria-modal, aria-labelledby/aria-describedby) that states the permanent, immutable-history consequence (step 2), requires a catalog reason and an explicit confirm (step 3), and calls the F5.5 service through withdrawProviderClaimAction (step 4). Stale/replay handled: an idempotent replay reports success; a claim decided/withdrawn under the actor surfaces the server message and triggers router.refresh() + revalidatePath so the detail re-renders (steps 5-6). The confirm is disabled until a reason is chosen and while the request is in flight (double-click safe; the service is idempotent as a backstop).
+Authorization evidence: the action's real authority is the F5.5 service (requirePermission + provider-scoped load + branch), covered by the F5.5 DB tests. The action adds a friendly early providerPermits gate. Page button visibility uses the strict providerCanWithdraw. Tests: policy (permission absent/wrong-status/wrong-branch/financial ⇒ false) + action (no-permission ⇒ no service call/no revalidate; missing id ⇒ no service call).
+Idempotency/concurrency evidence: action reports alreadyWithdrawn as success; component is double-click safe (a second click while pending is a no-op — proven with a deferred action, action called once). Underlying service idempotency/CAS proven in F5.5.
+Privacy/security evidence: reason is a closed catalog; the note field is labelled "no clinical details"; the dialog never renders cross-provider data (the whole control is absent unless the claim is the provider's and withdrawable). Non-enumerating NOT_FOUND inherited from the service.
+Money/reconciliation evidence: N/A — the UI performs no money mutation; the service (F5.5) mutates zero money.
+Focused tests and results: policy 6/6 + action 6/6 + component 6/6 (18 new) + F5.5 DB suite 21/21 re-run after the policy extraction. Full suite 1310 pass / 234 skip; audit-coverage green (token added, not a redundant audit).
+Typecheck/schema result: tsc --noEmit clean. No schema change.
+Manual/visual evidence: the confirmation dialog is rendered and asserted HEADLESSLY via testing-library (role/aria/label/keyboard-Escape/disabled-states/success+error flows) — stronger evidence for the accessibility requirement than a screenshot. VISUAL check on a live page is deferred (the worktree has no .env and the throwaway DB has 0 seeded provider users/branches, so no provider session can be raised) — same convention as the F3.7-F3.14 provider UI; visual verification belongs to a run with env+seed or post-merge.
+Feature-flag state: none. The control is gated by the provider.claim.withdraw permission (persona-scoped).
+Backfill/rollout impact: none.
+Known limitations: visual/browser verification deferred (above). The residual decide()-side true-concurrent window flagged in F5.5 is unchanged (belongs to F11.2).
+Unrelated worktree changes preserved: yes — worktree contained only F5.6 changes; the main-checkout dirty UAT files are untouched.
+Next allowed package: F5.7 — Atomic claim replacement service (L; split persistence/orchestration if over two days). A correction creates ONE canonical linked claim and atomically supersedes the predecessor (SUPERSEDED) through the Claims Autopilot intake — read CLAIMS_AUTOPILOT_EXECUTION_PLAN intake sections first (D5: never a second intake engine).
+Stop condition observed: yes — withdrawal UI only; NO correction form (that is F5.7/F5.8).
+```
+
+---
