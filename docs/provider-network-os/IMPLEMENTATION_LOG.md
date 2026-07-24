@@ -944,3 +944,23 @@ Stop condition observed: yes — submission page + its list-page affordances onl
 ```
 
 ---
+
+## F3.10 — Canonical PA detail read model + provider detail page
+
+```text
+Work package: F3.10
+Status: COMPLETE
+Commit: 1b1fba7
+ASSUMPTION (board-only): "detail read model/page" = non-enumerating scoped getById consolidating getPreAuthById + provider detail page + close the tRPC getById confinement gap (flagged in F3.7).
+Files changed: src/server/services/preauth-read.service.ts (getById + PreauthDetailScope), src/server/trpc/routers/preauth.ts (getById + create read-back), src/app/(admin)/preauth/[id]/page.tsx (read swap), src/server/services/claims.service.ts (getPreAuthById removed), src/app/provider/preauth/[id]/page.tsx (new), src/app/provider/preauth/page.tsx (detail link), tests/services/preauth-read.service.test.ts (+5), tests/routers/preauth-router.test.ts (+3, create assertion updated)
+Schema/data changes: none
+Behavior delivered: PreauthReadService.getById({ tenantId, clientId?, providerId? }, id) — findFirst composing id+tenant+client-confinement(member.group.clientId)+provider scope; out-of-scope ⇒ null (NON-ENUMERATING, no existence probing); same include shape (member+group, provider, claim, documents) as the retired getPreAuthById. Provider detail page (read-only) resolves the F1.3 context, providerPermits(provider.preauth.read) gate, getById({tenantId,providerId}) → notFound() when null; renders core PA fields + diagnoses/procedures (PA JSON) + clinical notes + a canonical event timeline (listPreauthEvents, F3.2) showing PROVIDER-SAFE fields only (eventType/newStatus/safeReasonCode/date — never internalReasonRef). F3.8 list rows link to it.
+Consolidation + security fix: retired ClaimsService.getPreAuthById (0 callers left). tRPC getById now reads through getById with ctx.clientId ?? null and NOT_FOUNDs a null — CLOSES a real gap (the old PA getById was tenant-only, unlike the claims router's already-confined getById). Admin detail page confined via session.user.clientId. tRPC create read-back is unscoped ({tenantId}) so a confined operator still receives the PA it just created.
+Evidence: preauth-read.service (+5): getById where for operator/client/provider, non-enumerating null vs found row, include shape. preauth-router (+3): getById forwards ctx.clientId (confined) / null (operator), null ⇒ NOT_FOUND; create read-back asserted on getById({tenantId}). Full suite 1255 pass / 191 skip. tsc 0; brand PASS; currency PASS (688).
+FLAG: the provider detail omits a documents section — the F2.8 authorized-download pattern (built for provider claim detail) has a PA analogue but is deferred here. Verification: read model + tRPC seam unit-tested; the provider detail PAGE is NOT browser-verified (worktree env — no .env, foreign :3000 server, no seeded provider session), consistent with F3.8/F3.9.
+Feature-flag state: none (permission-gated + session-derived scope).
+Next allowed package: F3.11 — Provider PA cancellation (M).
+Stop condition observed: yes — detail read model + provider detail page + read-consumer consolidation only (no cancel/amend).
+```
+
+---
