@@ -105,7 +105,7 @@
 
 | Pkg | Title | Size | Status | Evidence |
 |---|---|---|---|---|
-| F4.1 | Information-request schema + catalogs | M | NOT_STARTED | — |
+| F4.1 | Information-request schema + catalogs | M | COMPLETE | `PreauthInfoRequest` model + `PreauthInfoRequestStatus` enum (`105a7a6`) — relation-less PA satellite (F3.2 pattern), UNIQUE(paId,sequence), inbox+SLA indexes, mutable OPEN→RESPONDED→ACCEPTED/REOPENED/CLOSED/CANCELLED. Pure catalog `preauth-info-request/catalog.ts` (8 item types + normalize/validate/label). Additive schema (pushed to throwaway PG; prod via build). Tests: catalog 5 + **real-DB schema 4**. ASSUMPTION: model shape inferred from the F4 lifecycle rows |
 | F4.2 | Request open/cancel service | M | NOT_STARTED | — |
 | F4.3 | Provider draft + explicit response submit | M | NOT_STARTED | — |
 | F4.4 | Reviewer accept/reopen/close | M | NOT_STARTED | — |

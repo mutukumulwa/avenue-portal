@@ -1046,3 +1046,21 @@ Stop condition observed: yes — GOP artifact only.
 ```
 
 ---
+
+## F4.1 — Information-request schema + catalog
+
+```text
+Work package: F4.1 (Phase F4 begins)
+Status: COMPLETE
+Commit: 105a7a6
+ASSUMPTION (board-only): "Information-request schema + catalogs" = the model + catalog for the F4 clinical-info-request lifecycle (reviewer asks a provider for more before deciding; open→respond→accept/reopen/close). Model shape inferred from the F4.2–F4.10 board rows. Flagged.
+Files changed: prisma/schema.prisma (PreauthInfoRequest model + PreauthInfoRequestStatus enum), src/server/services/preauth-info-request/catalog.ts (new), tests/services/preauth-info-request-catalog.test.ts (new), tests/services/preauth-info-request-schema.test.ts (new)
+Schema/data changes: ADDITIVE — new table PreauthInfoRequest + new enum PreauthInfoRequestStatus, no change to existing tables. Pushed to the throwaway PG (127.0.0.1:54329/pnos_uat, DIRECT_URL confirmed, datasource line verified). Applies to prod on the next build's prisma db push. Client regenerated WITH DIRECT_URL (F3.2 landmine) — preauthInfoRequest accessor present (186 type refs).
+Behavior delivered: PreauthInfoRequest — relation-less PA satellite (F3.2 pattern): scoped by tenantId + preAuthorizationId + providerId (clientId/memberId for inbox/confinement); per-PA sequence with UNIQUE(preAuthorizationId, sequence); catalog-coded requestedItems (String[]); reviewer prompt; SLA dueAt; open/respond/decide actor+timestamp fields; MUTABLE status OPEN→RESPONDED→ACCEPTED|REOPENED|CLOSED|CANCELLED. Indexes: (tenant,provider,status) provider inbox, (tenant,status,dueAt) SLA sweeper, (preAuthorizationId). Catalog (pure): INFO_REQUEST_ITEMS (8 types) + isValidInfoRequestItem / normalizeRequestedItems (upcase/trim, drop-unknown, de-dupe, order-preserving) / infoRequestItemLabel. No service/UI/lifecycle here (F4.2+).
+Evidence: catalog test (5, pure) — integrity/normalize/validate/label; schema test (4, REAL DB on throwaway PG) — default OPEN + array persist + null response fields; UNIQUE(paId,sequence) enforced; OPEN→RESPONDED→ACCEPTED mutation; inbox-scope query. Full suite (no DB env) 1281 pass / 195 skip. tsc 0; brand PASS; currency PASS (696).
+Feature-flag state: none (inert schema + pure catalog until F4.2 wires the service).
+Next allowed package: F4.2 — Request open/cancel service (M).
+Stop condition observed: yes — schema + catalog only.
+```
+
+---
