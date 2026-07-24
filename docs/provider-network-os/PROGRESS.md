@@ -87,7 +87,7 @@
 | F3.1 | Freeze PA submission/decision contracts | S | COMPLETE | `preauth-intake/contract.ts` (v1 normalize/validate/hash) + test (14 pass) |
 | F3.2 | PA intake receipt + event schema | S | COMPLETE | `PreauthIntakeReceipt` + `PreAuthorizationEvent` + `preauth-intake/events.ts` + test (7 pass) |
 | F3.3 | Implement PreauthIntakeService | M | COMPLETE | `preauth-intake/service.ts` (tx-aware, receipt PROCESSING→ACCEPTED, injectable adjudicate handoff) + test (7 pass) |
-| F3.4 | Migrate provider B2B PA submit | S | NOT_STARTED | — |
+| F3.4 | Migrate provider B2B PA submit | S | COMPLETE | `/api/v1/preauth` now adapts over `PreauthIntakeService` (no direct create) + api.preauth.write scope + receipt envelope; route test (8) + E2E-D04 test rewritten (7) |
 | F3.5 | Migrate internal PA rails (a/b/c per rail) | S/rail | NOT_STARTED | — |
 | F3.6 | Retire fragmented PA persistence | M | NOT_STARTED | — |
 | F3.7 | Canonical PA list read model | S | NOT_STARTED | — |

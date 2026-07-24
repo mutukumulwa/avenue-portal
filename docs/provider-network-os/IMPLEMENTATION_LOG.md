@@ -738,3 +738,24 @@ Stop condition observed: yes — no rail migrated.
 ```
 
 ---
+
+## F3.4 — Migrate provider B2B PA submit
+
+```text
+Work package: F3.4
+Status: COMPLETE
+Files changed: src/app/api/v1/preauth/route.ts (rewritten as an adapter over PreauthIntakeService), src/server/services/preauth-intake/service.ts (resolveMember: channel-based entitlement default — PROVIDER_API always entitled, PROVIDER_PORTAL flag-gated, admin/member tenant-only), tests/api/preauth-intake-route.test.ts (new), tests/api/provider-preauth-scope.test.ts (rewritten for the new architecture), PROGRESS.md + IMPLEMENTATION_LOG.md
+Schema/data changes: none
+Behavior delivered: /api/v1/preauth no longer creates a PA directly — it derives the PROVIDER_API context from the credential, resolves the provider (code→id) with the spoof-block preserved, maps the body to PreauthSubmissionV1, requires the api.preauth.write scope (F1.7 providerScopeError; unscoped legacy keys pass), delegates to PreauthIntakeService.submit with the production adjudicate adapter (executeAutoDecision + getSystemActorId), and returns the versioned receipt envelope while KEEPING the legacy success/reference/status fields. Rejections map to safe HTTP: member→404, provider/active/forgery→403, other→422; idempotency conflict→409; replay→200.
+Authorization evidence: scoped key without api.preauth.write → 403 FORBIDDEN_SCOPE, service never called; provider-key providerCode spoof → 403, service never called; operator resolves provider from providerCode. 15 route tests across the two files pass.
+Idempotency/concurrency evidence: Idempotency-Key header threaded to the canonical command (falls back to the content hash); conflict→409; replay→200. The exactly-once + durability guarantees are the service's (F3.3).
+CATCH (security): a naive migration would have REGRESSED the B2B rail's member scoping — the API was ALREADY deny-by-default (E2E-D02, scopeMembersByEntitlement:true) but F3.3's resolveMember was flag-gated. Fixed resolveMember to be channel-based so PROVIDER_API stays always-entitled; F3.3's 7 tests re-verified green after the change.
+Privacy/security evidence: rejection envelope carries a code + safe message + fieldErrors only — the rewritten E2E-D04 test asserts no internal tenant/client/group identifiers leak; cross-tenant is now a SAFE 404 (no-enumeration) rather than the old 403.
+Focused tests and results: preauth-intake-route 8/8 + provider-preauth-scope 7/7 + F3.3 re-run 7/7. Full suite (no DB env) 1198 passed / 190 skipped. tsc 0; brand PASS; currency PASS (682).
+Feature-flag state: none new (PROVIDER_PORTAL entitlement still behind the F1.11 flag; PROVIDER_API always entitled)
+Known limitations: only the B2B rail migrated (stop condition). The old test was REWRITTEN, not deleted — its E2E-D04 intent is preserved at the route seam and the real-entitlement proof relocated to F3.3 (real DB, stronger than the old mock).
+Next allowed package: F3.5 — Migrate one internal PA rail (S per rail) — RESOLVE the CONFLICTING dual auto-approve policy here (member 15k vs pipeline 50k). Surface to the user before picking.
+Stop condition observed: yes — one rail (B2B) migrated.
+```
+
+---

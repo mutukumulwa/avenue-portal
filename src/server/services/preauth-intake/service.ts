@@ -57,8 +57,17 @@ function isUniqueViolation(e: unknown): boolean {
 
 async function resolveMember(db: Db, ctx: PreauthCallerContext, n: NormalizedPreauthV1, providerId: string | null) {
   const at = n.expectedDateOfService ? new Date(n.expectedDateOfService) : new Date();
-  const enforced = providerId ? await ProviderAccessSettingsService.isEntitlementEnforced(ctx.tenantId, providerId, db) : false;
-  const scope = enforced && providerId ? await ProviderEntitlementService.entitledMemberWhere(providerId, at) : {};
+  // Channel decides the entitlement default (preserving each rail's shipped
+  // posture — do NOT regress the B2B API):
+  //  - PROVIDER_API is ALREADY deny-by-default (E2E-D02) → always entitlement-scoped;
+  //  - PROVIDER_PORTAL follows the D3 flag (the F1.11/F1.12 transition, default OFF);
+  //  - ADMIN_*/MEMBER_APP resolve within the tenant (they legitimately choose the member).
+  let enforce = false;
+  if (providerId) {
+    if (ctx.channel === "PROVIDER_API") enforce = true;
+    else if (ctx.channel === "PROVIDER_PORTAL") enforce = await ProviderAccessSettingsService.isEntitlementEnforced(ctx.tenantId, providerId, db);
+  }
+  const scope = enforce && providerId ? await ProviderEntitlementService.entitledMemberWhere(providerId, at) : {};
   const select = { id: true, status: true, groupId: true, group: { select: { clientId: true } } } as const;
   if (n.memberId) {
     return db.member.findFirst({ where: { id: n.memberId, tenantId: ctx.tenantId, ...scope }, select });
