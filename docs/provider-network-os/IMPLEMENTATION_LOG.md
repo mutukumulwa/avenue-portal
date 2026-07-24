@@ -1250,3 +1250,20 @@ Stop condition observed: yes — characterization only.
 ```
 
 ---
+
+## F5.2 — Claim submission-chain schema + read
+
+```text
+Work package: F5.2
+Status: COMPLETE
+Commit: fc063c2
+Files changed: prisma/schema.prisma (Claim lineage fields + ClaimSubmissionType enum + 2 indexes), src/server/services/claim-submission-chain/service.ts (new), tests/services/claim-submission-chain.test.ts (new)
+Schema/data changes: ADDITIVE — Claim gains submissionType (ClaimSubmissionType @default ORIGINAL), chainRootClaimId?, supersedesClaimId?, supersededByClaimId?, supersededAt? + indexes(chainRootClaimId, supersedesClaimId); new enum ClaimSubmissionType. Does NOT touch the mutation-guarded `status` field. Pushed to throwaway PG (54329, verified); prod on next build. Client regenerated WITH DIRECT_URL.
+Behavior delivered: the supersession model (F5.1-flagged) — a corrected/resubmitted/reconsidered claim is a NEW claim linked to a superseded original (chainRootClaimId=root, supersedesClaimId=predecessor, original.supersededByClaimId=successor), so posted GL/settlement/usage on the original is untouched. ClaimSubmissionChainService.getChain(scope, claimId): resolve root (chainRootClaimId ?? self) → all versions oldest-first with lineage+display fields; scoped (tenant + optional client/provider), out-of-scope ⇒ [] non-enumerating. Pure read. Un-backfilled claim = singleton chain. Population deferred to F5.4 (backfill/new original) + F5.7 (atomic replacement).
+Evidence: chain test (2, REAL DB): chain resolved from either end oldest-first, provider-scoped (out-of-scope ⇒ []); unlinked claim = singleton (ORIGINAL, null supersededByClaimId). Full suite (no DB env) 1291 pass / 212 skip. tsc 0; brand PASS; currency PASS (706).
+Feature-flag state: none (inert schema + read until F5.4/F5.7).
+Next allowed package: F5.3 — Lifecycle: withdrawal/supersession terminal (M). NOTE: this ADDS claim statuses → must thread claim-lifecycle.ts TRANSITIONS (compile-forced) + mutation-guard ALLOWLIST + the terminal-status assumptions from F5.1 (ACTIVE_QUEUE_STATUSES, report-exclusions, editable/decided gates).
+Stop condition observed: yes — chain schema + read only (no population, no lifecycle statuses).
+```
+
+---

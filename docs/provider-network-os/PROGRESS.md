@@ -123,7 +123,7 @@
 | Pkg | Title | Size | Status | Evidence |
 |---|---|---|---|---|
 | F5.1 | Characterize every claim-status consumer | M | COMPLETE | `CLAIM_STATUS_CONSUMERS.md` (`fef86a6`) — read-only inventory of all `Claim.status` consumers (23 files): transition authorities, queues, **terminal-status assumptions (highest-risk group)**, APPEAL* legacy (APPEAL_APPROVED/DECLINED UNREACHABLE), reports/exclusions, money coupling, exhaustiveness map. **Key constraint: `claim-lifecycle.ts:TRANSITIONS` (Record⇒compile-forced) + `claim-status-mutation-guard.test.ts` ALLOWLIST** gate every new status-writer. Includes an F5 threading checklist + flagged supersession-vs-mutate fork (confirm F5.2/F5.3) |
-| F5.2 | Claim submission-chain schema | M | NOT_STARTED | — |
+| F5.2 | Claim submission-chain schema | M | COMPLETE | Claim lineage fields (`submissionType` + `chainRootClaimId`/`supersedesClaimId`/`supersededByClaimId`/`supersededAt`) + `ClaimSubmissionType` enum (`fc063c2`) — supersession model (new linked claim, not in-place mutation). `ClaimSubmissionChainService.getChain(scope,id)` resolves the full chain from either end, scoped/non-enum. Additive schema (throwaway PG; prod via build; does NOT touch guarded `status`). Real-DB test (2). Populated by F5.4/F5.7 |
 | F5.3 | Lifecycle: withdrawal/supersession terminal | M | NOT_STARTED | — |
 | F5.4 | Create/backfill original chains (per batch) | S/batch | NOT_STARTED | — |
 | F5.5 | Simple provider withdrawal service | M | NOT_STARTED | — |
