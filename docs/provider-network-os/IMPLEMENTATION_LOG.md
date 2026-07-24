@@ -880,3 +880,24 @@ Stop condition observed: yes — persistence consolidation only; no read-model/U
 ```
 
 ---
+
+## F3.7 — Canonical PA list read model
+
+```text
+Work package: F3.7
+Status: COMPLETE
+Commit: ffd576f
+ASSUMPTION (board-only): the detailed plan is not in-repo; "Canonical PA list read model" is interpreted as a single scoped list mirroring the claims read model's confinement (G2.1). Flagged to the user.
+Files changed: src/server/services/preauth-read.service.ts (new), src/server/trpc/routers/preauth.ts (list), src/app/(admin)/preauth/page.tsx, src/server/services/claims.service.ts (getPreAuthorizations removed + PreauthStatus import dropped), tests/services/preauth-read.service.test.ts (new), tests/routers/preauth-router.test.ts (+2)
+Schema/data changes: none
+Behavior delivered: PreauthReadService.list({ tenantId, clientId?, providerId?, status? }) builds a layered where — tenant always; clientId ⇒ member.group.clientId (G2.1, null/undefined ⇒ operator); providerId ⇒ own-facility; status optional — with the same member+provider projection and createdAt-desc order the old read used. Consolidates + removes ClaimsService.getPreAuthorizations (tenant-only, 0 callers left).
+Security fix (not just a refactor): the PA list was tenant-only, so a client-confined operator saw every client's PAs (the claims list was already confined — PA was the gap). tRPC preauth.list now passes ctx.clientId ?? null; admin /preauth/page.tsx passes session.user.clientId ?? null (matches the claims admin page). Gap closed at both surfaces.
+FLAGS: (1) PreAuthorization has no branch column ⇒ provider scoping is provider-level only; F1.2 branch assignments cannot narrow a PA list. Noted for F3.8/F3.9. (2) The tRPC getById lacks the claims-router NOT_FOUND confinement check — left for F3.10 (PA detail read model), not widened here.
+Evidence: preauth-read.service.test.ts (6, mock prisma) — operator/confined/provider/status/combined where + stable include+order; preauth-router (+2) — list forwards ctx.clientId (confined) vs null (operator). Full suite 1236 pass / 191 skip. tsc 0; brand PASS; currency PASS (683).
+Verification note: the admin page change is a consumer swap preserving the exact projection (asserted by the read-model test); full browser verification needs a seeded authed session not available in this worktree — F3.8 (provider PA page) is the natural browser-verification point.
+Feature-flag state: none (client confinement is always-on, session-derived).
+Next allowed package: F3.8 — Provider PA list page (S).
+Stop condition observed: yes — list read model + its existing consumers only (no provider page).
+```
+
+---
