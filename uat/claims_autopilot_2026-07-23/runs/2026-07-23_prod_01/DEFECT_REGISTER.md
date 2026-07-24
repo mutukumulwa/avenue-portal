@@ -3,6 +3,7 @@
 | ID | Sev | Story | Status | Title |
 |---|---|---|---|---|
 | F76-GAP-01 | Medium | Day-0 P4 | OPEN (build flagged) | No UI to amend applicability on an ACTIVE provider contract |
+| F76-GAP-02 | High | Story 10 | OPEN (build flagged) | Governed policy maker/checker flow not operable through the UI |
 
 ---
 
@@ -49,3 +50,46 @@ the whole ManagePanel editable on ACTIVE — scope strictly to applicability.
 **Interim (non-campaign):** the underwriting team can add the payer through the
 Renew flow (clones into an editable DRAFT successor) if entitlement is needed
 before the fix ships — accepted as heavier than a mid-term amendment should be.
+
+
+---
+
+## F76-GAP-02 — Governed policy maker/checker flow is not UI-operable
+
+**Severity:** High (gates F8.2 shadow + F8.3 live — automation cannot be turned
+on through governed UI). Not a correctness defect: the flow logic is proven by
+the F2.5 integration test; the production WIRING is missing.
+
+**Discovered:** Day-1 Story-10a prep, tracing the `/settings/auto-adjudication`
+console draft→submit→approve path before clicking.
+
+**Root cause (code-traced):**
+- `submitPolicyForApprovalAction` → `submitPolicyChange` (`claim-autopilot/
+  policy-approval.ts:67`) creates an `ApprovalRequestService.create` request of
+  actionType `AUTO_ADJ_POLICY_CHANGE`; if no approval-matrix rule matches, the
+  request is null and submit throws *"No approval matrix is configured for
+  AUTO_ADJ_POLICY_CHANGE."* Prod has **zero** such rows.
+- The approval-matrix admin UI (`settings/approval-matrix/ApprovalMatrixManager
+  .tsx:19`) exposes only 9 action types in its dropdown — `AUTO_ADJ_POLICY_
+  CHANGE` is **not** one — so the required rule **cannot be created through the
+  UI**. (The server action writes `actionType as never` with no whitelist, so
+  the gap is purely the missing dropdown option.)
+- Compounding: the whole console is `requireRole(ROLES.ADMIN_ONLY)` and
+  `ADMIN_ONLY = ["SUPER_ADMIN"]` (`rbac.ts:22`); prod has ONE SUPER_ADMIN
+  (`admin@`). Even with a rule, maker≠checker SoD needs a second qualifying
+  approver (the matrix `requiredRole` must be a role a different user holds).
+
+**Impact on the campaign:** blocks Story 10 (policy drill) and the shadow-
+proposal evidence woven into other stories. The 12 remaining stories run in OFF
+mode (claims route to manual — intake/routing/decision/settlement/security all
+still proven).
+
+**Decision (sponsor, 2026-07-23):** build the fix; run OFF-mode stories now;
+Story 10 + F8.2 shadow gated on the fix.
+
+**Recommended fix (flagged as a build task):** add `AUTO_ADJ_POLICY_CHANGE` to
+the approval-matrix UI ACTION_TYPES; designate the checker role — recommend
+`FINANCE_OFFICER` (money-control governance; `finance@` exists and ≠ the
+`admin@` maker) — and seed/allow a default rule; confirm the approvals surface
+lets that role approve the request. Verify maker (admin@) ≠ checker (finance@)
+end-to-end through the UI.
