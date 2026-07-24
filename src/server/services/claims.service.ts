@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { ClaimStatus, PreauthStatus, ServiceType, Prisma } from "@prisma/client";
+import type { ClaimStatus, ServiceType, Prisma } from "@prisma/client";
 import { ProviderContractsService, type ResolvedClaimRates } from "./provider-contracts.service";
 
 export class ClaimsService {
@@ -383,20 +383,6 @@ export class ClaimsService {
   }
 
   // ─── PRE-AUTHORIZATIONS ─────────────────────────────────
-
-  /**
-   * List pre-authorizations
-   */
-  static async getPreAuthorizations(tenantId: string, status?: PreauthStatus) {
-    return prisma.preAuthorization.findMany({
-      where: { tenantId, ...(status ? { status } : {}) },
-      include: {
-        member: { select: { id: true, firstName: true, lastName: true, memberNumber: true } },
-        provider: { select: { id: true, name: true, type: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-  }
 
   /**
    * Get a single pre-authorization with full details

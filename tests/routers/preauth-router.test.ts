@@ -38,12 +38,15 @@ vi.mock("@/server/services/preauth-intake/service", () => ({
     }),
   },
 }));
+const readList = vi.hoisted(() => vi.fn(async () => ["pa-list"] as unknown[]));
+vi.mock("@/server/services/preauth-read.service", () => ({ PreauthReadService: { list: readList } }));
 
 import { preauthRouter } from "@/server/trpc/routers/preauth";
 import { createCallerFactory } from "@/server/trpc/trpc";
 import { PreauthIntakeService } from "@/server/services/preauth-intake/service";
 
 const caller = () => createCallerFactory(preauthRouter)({ session: { user: { id: "u1", role: "ADMIN" } }, tenantId: "t1" } as never);
+const callerAs = (clientId?: string) => createCallerFactory(preauthRouter)({ session: { user: { id: "u1", role: "ADMIN" } }, tenantId: "t1", clientId } as never);
 
 const input = {
   memberId: "member-1",
@@ -99,5 +102,18 @@ describe("F3.5c tRPC PA create → canonical pipeline", () => {
   it("the router source has no path into ClaimsService.createPreAuth (structural)", () => {
     const src = readFileSync(join(__dirname, "..", "..", "src", "server", "trpc", "routers", "preauth.ts"), "utf8");
     expect(src).not.toMatch(/createPreAuth\s*\(/);
+  });
+});
+
+describe("F3.7 tRPC PA list → canonical read model (client confinement)", () => {
+  it("passes the confined clientId to the canonical read model", async () => {
+    const res = await callerAs("cl-1").list();
+    expect(readList).toHaveBeenCalledWith({ tenantId: "t1", clientId: "cl-1" });
+    expect(res).toEqual(["pa-list"]);
+  });
+
+  it("an operator session (no clientId) passes null (all clients in tenant)", async () => {
+    await callerAs(undefined).list();
+    expect(readList).toHaveBeenCalledWith({ tenantId: "t1", clientId: null });
   });
 });

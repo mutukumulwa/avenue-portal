@@ -1,5 +1,5 @@
 import { requireRole, ROLES } from "@/lib/rbac";
-import { ClaimsService } from "@/server/services/claims.service";
+import { PreauthReadService } from "@/server/services/preauth-read.service";
 import { PlusCircle, Stethoscope, ArrowRight } from "lucide-react";
 import Link from "next/link";
 
@@ -7,7 +7,8 @@ export default async function PreAuthPage() {
   const session = await requireRole(ROLES.CLINICAL);
 
   const tenantId = session.user.tenantId;
-  const preauths = await ClaimsService.getPreAuthorizations(tenantId);
+  // F3.7: canonical scoped read + client confinement (G2.1), matching the claims page.
+  const preauths = await PreauthReadService.list({ tenantId, clientId: session.user.clientId ?? null });
 
   const statusColor = (status: string) => {
     switch (status) {

@@ -4,12 +4,15 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { ClaimsService } from "@/server/services/claims.service";
 import { preauthAdjudicationService } from "@/server/services/preauth-adjudication.service";
 import { PreauthIntakeService } from "@/server/services/preauth-intake/service";
+import { PreauthReadService } from "@/server/services/preauth-read.service";
 import { getSystemActorId } from "@/server/services/system-actor.service";
 
 export const preauthRouter = createTRPCRouter({
   list: protectedProcedure
     .query(async ({ ctx }) => {
-      return ClaimsService.getPreAuthorizations(ctx.tenantId);
+      // F3.7: canonical scoped read model + client confinement (G2.1). The PA list
+      // was previously tenant-only — a confined operator saw every client's PAs.
+      return PreauthReadService.list({ tenantId: ctx.tenantId, clientId: ctx.clientId ?? null });
     }),
 
   getById: protectedProcedure
