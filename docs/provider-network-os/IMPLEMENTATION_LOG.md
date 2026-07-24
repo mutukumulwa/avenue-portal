@@ -1383,3 +1383,30 @@ Stop condition observed: yes — the replacement SERVICE + focused tests only; n
 ```
 
 ---
+
+## F5.8 — Correction form and lineage UI
+
+```text
+Work package: F5.8
+Status: COMPLETE
+Commit: faf7aad
+Proof-before-build classification: MISSING (no provider correction UI). The claim detail page, ProviderClaimForm (F3.9), and the F5.7 service existed; the closest analogs are ProviderClaimForm/new-claim action (the form) + the F5.6 withdrawal UI (policy/action/gating pattern).
+Files changed: src/server/services/claim-replacement/policy.ts (new — pure providerCanCorrect + CLAIM_SUPERSEDABLE_STATUSES + CORRECT_PERMISSION, extracted from the service; service re-exports for compat), src/app/provider/claims/[id]/correct/{page.tsx,CorrectClaimForm.tsx,actions.ts} (new), src/app/provider/claims/[id]/ClaimLineageTable.tsx (new), src/app/provider/claims/[id]/page.tsx (lineage section + "Correct claim" link, both server-gated), tests/audit-coverage/catalogue.ts (KNOWN_AUDITING_TOKENS += ClaimReplacementService.replace(), tests/services/claim-replacement-policy.test.ts + tests/actions/provider-claim-correct-action.test.ts + tests/components/{provider-correct-claim-form,provider-claim-lineage-table}.test.tsx (new).
+Schema/data changes: NONE.
+Behavior delivered: the claim detail page shows a "Correct claim" entry ONLY when the server computes it is allowed (providerCanCorrect — the SAME predicate the F5.7 service enforces). The correct route builds a SAFE prefill DTO from the predecessor (member number/name + branch shown READ-ONLY; service type/benefit/date/attending/diagnosis/lines editable) — the form is NOT bound to a direct claim update; it prepares a FULL corrected claim and submits via correctProviderClaimAction → the F5.7 ClaimReplacementService, which supersedes the predecessor and creates a linked child. The action passes ONLY the corrected content (never member/provider/branch), so a correction can never re-identify the claim (altered member/provider/branch is structurally impossible). Submit is gated on an explicit confirmation checkbox (confirm member/branch/dates/codes/quantities/charges) and a stable draft-UUID idempotency key (double-click/refresh replays the same receipt). On success it redirects to the child (?corrected=1); a stale/decided predecessor surfaces the message and refreshes. The detail page renders the F5.2 submission chain (ClaimLineageTable) — an accessible table of every version oldest-first with the billed change and superseded-vs-current status (both immutable records and current status).
+Authorization evidence: server-derived F1.3 ctx everywhere. Page button visibility = strict providerCanCorrect; correct page redirects an un-correctable claim; the action's real authority is the F5.7 service (perm + provider ownership + branch, covered by the F5.7 DB tests) plus a friendly providerPermits early gate. Tests: policy (permission/superseded/status/branch/financial ⇒ false); action (no-permission ⇒ no service call/no redirect; identity fields NEVER passed); form (member/branch read-only+disabled).
+Idempotency/concurrency evidence: draft-UUID key (service idempotency proven in F5.7); action reports stale with a refresh signal; form double-submit safe (confirm-gated + disabled while pending).
+Privacy/security evidence: prefill exposes only this provider's own claim (scoped load); member/branch cannot be altered; the reason field is labelled "no clinical detail". Non-enumerating NOT_FOUND inherited from the service.
+Money/reconciliation evidence: N/A — the UI performs no money mutation; the F5.7 service preserves the original and touches no money.
+Focused tests and results: policy 6/6 + action 4/4 + form 3/3 + lineage 3/3 (16 new) + F5.7 DB suite 8/8 re-run after the policy extraction. Full suite 1326 pass / 242 skip; audit-coverage green (token, not a redundant audit); tsc clean; brand + currency green.
+Typecheck/schema result: tsc --noEmit clean.
+Manual/visual evidence: the form (prefill, locked identity, confirmation-gated + double-submit-safe submit, accessible error) and the lineage (accessible <table>/<caption> differences summary, aria-current) are proven HEADLESSLY via testing-library. VISUAL check on a live page is deferred (worktree has no .env / no seeded provider session) — same convention as F3.7-F3.14; visual verification belongs to a run with env+seed or post-merge.
+Feature-flag state: none. Gated by the provider.claim.correct permission (persona-scoped).
+Backfill/rollout impact: none.
+Known limitations: visual/browser verification deferred (above). The correction still carries no invoice number (F5.7 decision); the decide()-side true-concurrent window flagged in F5.5 is unchanged.
+Unrelated worktree changes preserved: yes — worktree contained only F5.8 changes; the main-checkout dirty UAT files are untouched.
+Next allowed package: F5.9 — Implement provider-correctable resubmission eligibility (S) — a read/eligibility service that decides whether a DECLINED claim may be resubmitted (distinct from correction: F5.10 LINKS a new claim post-decline without re-marking DECLINED). Read the F5.1 status-consumer characterization + F5.3 (DECLINED stays DECLINED; resubmission links).
+Stop condition observed: yes — correction form + lineage only; NO post-decline resubmission (that is F5.9/F5.10).
+```
+
+---
