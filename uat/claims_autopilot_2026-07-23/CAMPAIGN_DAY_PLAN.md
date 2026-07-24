@@ -24,8 +24,8 @@ OFF, worker in staffed-window local posture (`docs/WORKER_DEPLOYMENT.md` §F8.2)
 |---|---|---|
 | TPA claims | `claims@medvex.co.ug` (Grace) | maker for Story 10; adjudicator Day 1 |
 | Medical | `medical@medvex.co.ug` | Stories 6/8/9 review |
-| Finance | `finance@medvex.co.ug` + `finance.checker.f76@test.local` | SoD pair for settlement (Story 13) |
-| Provider operations | `provider.agakhan.f76@test.local` (+ `provider.ihk.f76@test.local` for foreign probes) | Stories 2/5/14 + Day-0 onboarding |
+| Finance | `finance@medvex.co.ug` + `finance.checker.uat@test.local` | SoD pair for settlement (Story 13) |
+| Provider operations | `provider.agakhan.uat@test.local` (+ `provider.ihk.uat@test.local` for foreign probes) | Stories 2/5/14 + Day-0 onboarding |
 | Product + sponsor | Arthur | Story 10 checker may be `admin@medvex.co.ug` |
 | Security/privacy | Arthur or delegate | Story 14 review + SECURITY_EVIDENCE walk-through |
 | Engineering/UAT | agent (evidence compilation, Stories 3/11 orchestration) | |
@@ -33,12 +33,11 @@ OFF, worker in staffed-window local posture (`docs/WORKER_DEPLOYMENT.md` §F8.2)
 
 Passwords: `@medvex.co.ug` = the standard seeded ops password (engagement
 memory; **rotate before real-client go-live** — long-standing open item).
-`@test.local`: there is NO password-reset path for existing users (Invite
-refuses existing emails; the inline control only toggles role/active — the
-padlock on portal rows is the BD-01 role-binding guard, not a lockout). The
-established pattern is a FRESH persona per engagement: Day 0 invites the
-`.f76` generation above with passwords set directly in the form. (Product gap
-flagged: admin password reset for existing users.)
+`@test.local`: recovered on Day 0 via the **admin password-reset** on
+Settings → Users (shipped `bfe9dd0`, deployed prod `f1a7eeb` during this
+campaign — incidental validation of that feature). The original `.uat`
+personas were reset directly; passwords held by the sponsor, not recorded
+here.
 
 ## Day 0 — prep (~1 h, admin + provider ops + agent)
 
@@ -46,7 +45,7 @@ flagged: admin password reset for existing users.)
 |---|---|---|---|
 | P1 | Worker up: `redis-server --port 56380 --save "" --appendonly no --daemonize yes` then `set -a; source .env.worker.local; set +a; npm run worker`; confirm `/api/health` → `workerFresh: true` | agent | ☐ |
 | P2 | Create run dir `runs/<date>_prod_01/{evidence,outputs}`; copy `ACTOR_RUN_LOG_TEMPLATE.csv` in | agent | ☐ |
-| P3 | Invite the `.f76` campaign personas (fresh accounts, passwords set in the form; Provider role → Facility selector) | admin | ☐ |
+| P3 | ✅ Reset the `.uat` personas' passwords (admin password-reset, now live in prod); facility bindings verified: agakhan→Aga Khan, ihk→IHK, finance.checker→finance | admin | ☑ |
 | P4 | ⚠️ **BLOCKED → finding F76-GAP-01:** no UI to add a payer to an ACTIVE contract (`page.tsx:493` gates applicability edits to DRAFT/PENDING_CLARIFICATION). Sponsor decision: record the gap, defer the entitlement build, proceed. Only Stories 3 & 5 are affected. | agent (recorded) | ☑ |
 | P5 | Mint an Aga Khan API key via the admin UI; record the `mvxk_` prefix ONLY in the run log; hand the plaintext to the agent for Story 3 | admin | ☐ |
 | P6 | Story 3 prod pass: `API_KEY=… bash b2b-story.sh` → **accepted leg returns 403 FORBIDDEN_SCOPE** (un-entitled, per F76-GAP-01 — the CORRECT refusal) + 401/422/404/413 all correct; happy path stays proven by integration + the local prod-mode run. Save transcript to `evidence/` | agent | ☐ |
