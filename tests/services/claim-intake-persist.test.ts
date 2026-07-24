@@ -45,6 +45,7 @@ function mockTx(over: Record<string, unknown> = {}) {
       findFirst: vi.fn(async () => null),
       findUnique: vi.fn(async () => null),
       create: vi.fn(async () => ({ id: "clm-new", claimNumber: "CLM-2026-00001" })),
+      update: vi.fn(async () => ({})), // F5.4 — self-root the new claim's chain
     },
     claimProcessingRun: { create: vi.fn(async () => ({ id: "run-new" })) },
     preAuthorization: { update: vi.fn(async () => ({})) },
