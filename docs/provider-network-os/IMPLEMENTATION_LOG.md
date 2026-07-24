@@ -1437,3 +1437,30 @@ Stop condition observed: yes — eligibility service + focused tests only; no su
 ```
 
 ---
+
+## F5.10 — Submit linked post-decline resubmission
+
+```text
+Work package: F5.10
+Status: COMPLETE
+Commit: 0425f99
+Proof-before-build classification: MISSING (the submit service + UI) atop the F5.7 replacement pattern + F5.9 eligibility. Reused the "replacement full-form contract" by extracting it from F5.7.
+Files changed: src/server/services/claim-replacement/submission.ts (new — shared ReplaceClaimCommand + buildReplacementSubmission + MAX_TX_ATTEMPTS/isRetryableWrite/sleep), src/server/services/claim-replacement/service.ts (refactored to consume submission.ts — behavior identical), src/server/services/claim-resubmission/submit.service.ts (new — ClaimResubmissionService.submit), src/app/provider/claims/[id]/correct/CorrectClaimForm.tsx (generalized: optional mode + submitAction props, correction defaults preserved), src/app/provider/claims/[id]/resubmit/{page.tsx,actions.ts} (new), src/app/provider/claims/[id]/page.tsx (gated "Resubmit" entry for eligible declined claims), tests/audit-coverage/catalogue.ts (KNOWN_AUDITING_TOKENS += ClaimResubmissionService.submit(), tests/services/claim-resubmission-submit.service.test.ts + tests/actions/provider-claim-resubmit-action.test.ts (new).
+Schema/data changes: NONE. Writes NO claim status (the original stays DECLINED; only the chain pointer advances) ⇒ NO mutation-guard entry needed.
+Behavior delivered: an ELIGIBLE (F5.9) declined claim produces a FULL new canonical claim through the Claims Autopilot intake (submitWithinTransaction — D5) as a RESUBMISSION, linked into the F5.2 chain. Unlike a correction (F5.7 supersedes a pre-decision claim to SUPERSEDED), the original is NOT superseded in STATUS — it STAYS DECLINED (its decision + money are immutable); only the chain-head pointer (supersededByClaimId) advances to the new claim. The resubmission is a fresh RECEIVED claim with a PENDING processing run — full new adjudication, NO automatic inheritance of the original's pricing/approval/decline. Flow: load original (scoped) → build+validate (shared buildReplacementSubmission; explicit replacementOfClaimRef, no invoice ⇒ null strong fingerprint ⇒ new linked claim) → resolve context → reserveReceipt (REPLAY ⇒ return child; CONFLICT ⇒ throw) → F5.9 eligibility (AFTER idempotency) → tx(retry) { in-tx recheck still-DECLINED+not-resubmitted → submitWithinTransaction → CAS advance supersededByClaimId WHERE null (NO status write) → wire chain submissionType=RESUBMISSION → AdjudicationLogs } → audit CLAIM:RESUBMIT + outbox CLAIM_RESUBMITTED. UI: the F5.8 correction form was generalized (backward-compatible mode/submitAction props) and reused by the resubmit route; the DECLINED claim detail shows a "Resubmit" entry gated by F5.9 eligibility; the F5.8 lineage already renders RESUBMISSION versions.
+Authorization evidence: the service enforces F5.9 eligibility (permission provider.claim.correct + provider ownership + branch + status + reason + deadline + not-already-resubmitted). The action adds a friendly providerPermits gate and passes ONLY content (never member/provider/branch). Tests: no-permission ⇒ no service call; identity fields never passed; non-declined ⇒ NOT_DECLINED.
+Idempotency/concurrency evidence: two concurrent resubmissions ⇒ exactly ONE current child (the loser ALREADY_RESUBMITTED — the CAS on supersededByClaimId serializes; the in-tx recheck + claim-number retry back it); same-key replay ⇒ the same child; the original stays DECLINED throughout.
+Privacy/security evidence: the ineligible/denial reason surfaced by the action is the SAFE F5.9 reason (fraud never disclosed). Non-enumerating NOT_FOUND. member/provider/branch cannot be re-identified.
+Money/reconciliation evidence: the original's DECLINED decision + money are IMMUTABLE (status/declineReasonCode/approvedAmount/paidAmount/billedAmount unchanged; only supersededByClaimId set). The resubmission inherits NO pricing/approval (approvedAmount 0, declineReasonCode null, status RECEIVED).
+Focused tests and results: submit service 5/5 (real DB: immutable original + no inheritance + chain; ineligible-denied; not-declined; replay; concurrency=one-child) + resubmit action 4/4 (delegation, no identity fields, permission gate, ineligible+refresh) + the F5.8 form/correct-action tests re-run green after the form generalization. Full suite 1340 pass / 255 skip; F5-lifecycle DB batch 47/47; audit-coverage green; tsc + brand + currency green.
+Typecheck/schema result: tsc --noEmit clean.
+Manual/visual evidence: the resubmit form (reused, mode="resubmit") + gated entry are proven headlessly (the generalized form's F5.8 test stays green). VISUAL check deferred (worktree has no .env / seeded provider session) — same convention as F3.7-F3.14.
+Feature-flag state: none. Gated by provider.claim.correct (the resubmit permission — no dedicated one in the F1.1 catalog, flagged in F5.9).
+Backfill/rollout impact: none.
+Known limitations: visual/browser verification deferred; the resubmit permission reuses provider.claim.correct (F5.9 flag). The F5.5 decide()-concurrency window is unchanged.
+Unrelated worktree changes preserved: yes — worktree contained only F5.10 changes; the main-checkout dirty UAT files are untouched.
+Next allowed package: F5.11 — Add reconsideration schema and reason policy (M) — models/enums/indexes from §7.8 (Reconsideration + line + event/message/document/SLA relations), reason eligibility by decision/line/category, deadline resolution order, requested/awarded decimal invariants. Distinct from resubmission: a reconsideration asks the payer to re-decide the SAME claim (not a new linked claim).
+Stop condition observed: yes — the resubmission submit + its UI; NO reconsideration (F5.11+).
+```
+
+---
