@@ -783,3 +783,26 @@ Stop condition observed: yes — only the member rail migrated (no sweeping chan
 ```
 
 ---
+
+## F3.5b — Migrate the ADMIN PA creation rail
+
+```text
+Work package: F3.5b (admin UI rail)
+Status: COMPLETE
+Commit: c889da7
+Files changed: src/app/(admin)/preauth/new/actions.ts (submitPreAuthAction migrated), tests/actions/admin-preauth-action.test.ts (new), PROGRESS.md + IMPLEMENTATION_LOG.md
+Schema/data changes: none
+Behavior delivered: submitPreAuthAction submits through PreauthIntakeService on channel ADMIN_PORTAL with a server-derived context {channel, tenantId, providerId(form), actorType:USER, actorId:session.user.id} and the mapped canonical command (memberId, providerId, serviceType, expectedDateOfService, diagnoses:[{description,isPrimary}], procedures:[{description||"Medical services", unitCost=total=estimatedCost}], estimatedCost, clinicalNotes, benefitCategory). Auto-decision port → preauthAdjudicationService.executeAutoDecision + getSystemActorId. No direct createPreAuth.
+Convergence/behavior change: the old admin rail created a SUBMITTED PA and surfaced createPreAuth fraud warnings INLINE (advisory; submission still succeeded). Under convergence, fraud is ENFORCED by the pipeline's FRAUD_SCREENING gate (route-to-human/decline), so the warnings-then-stay-on-form branch is REMOVED. Return type keeps `warnings?` for useActionState compat (never populated); PreAuthNewForm renders it optionally so nothing breaks.
+Preserved: requireRole(ROLES.CLINICAL) RBAC gate; PREAUTH_SUBMITTED audit (now incl. preauthId/receiptId/replayed); redirect("/preauth"). On REJECTED → return { error: firstMessage } (parity with the old try/catch), NO audit, NO redirect. redirect() stays OUTSIDE the try/catch so NEXT_REDIRECT propagates.
+Robustness: a cptCode-less free-text procedure normalizes fine (kept by description; contract line ~149-151); a NaN/absent estimate → normMoney null → "" → INVALID_ESTIMATE reject (no throw) — SAFER than the old raw Number() passed straight to createPreAuth.
+Authorization evidence (seam test): requireRole called with the CLINICAL role set before any work.
+Convergence evidence (seam test): submit called once with the exact ADMIN_PORTAL context (derived from session, providerId from form); the injected adjudicate calls executeAutoDecision(paId, tenantId, systemActor); accepted → PREAUTH_SUBMITTED audit + redirect("/preauth"); REJECTED → { error } with no audit/redirect; a thrown service error → { error } with no redirect; missing procedure defaults to "Medical services".
+Why mocks here (not real DB): same rationale as F3.5a — intake mechanics have real-DB proof in F3.3; this asserts the rail's delegation contract deterministically (server action; mirrors tests/actions/tenant-onboarding redirect-mock pattern).
+Focused tests and results: admin-preauth-action 7/7. Full suite (no DB env) 1218 passed / 190 skipped (+7 pure). tsc 0; brand PASS; currency PASS (682).
+Feature-flag state: none (admin rail is RBAC-gated, always-on for CLINICAL+).
+Next allowed package: F3.5c — Migrate the tRPC PA create rail (server/trpc/routers/preauth.ts:47).
+Stop condition observed: yes — only the admin UI rail migrated.
+```
+
+---
