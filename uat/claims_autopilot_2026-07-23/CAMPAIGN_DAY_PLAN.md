@@ -47,9 +47,9 @@ flagged: admin password reset for existing users.)
 | P1 | Worker up: `redis-server --port 56380 --save "" --appendonly no --daemonize yes` then `set -a; source .env.worker.local; set +a; npm run worker`; confirm `/api/health` → `workerFresh: true` | agent | ☐ |
 | P2 | Create run dir `runs/<date>_prod_01/{evidence,outputs}`; copy `ACTOR_RUN_LOG_TEMPLATE.csv` in | agent | ☐ |
 | P3 | Invite the `.f76` campaign personas (fresh accounts, passwords set in the form; Provider role → Facility selector) | admin | ☐ |
-| P4 | **Entitlement onboarding (the real provider-ops act):** on contract `PC-2026-128`, add NWSC applicability (INCLUDE, active, effective now) through the contract UI — never SQL | provider ops + admin | ☐ |
+| P4 | ⚠️ **BLOCKED → finding F76-GAP-01:** no UI to add a payer to an ACTIVE contract (`page.tsx:493` gates applicability edits to DRAFT/PENDING_CLARIFICATION). Sponsor decision: record the gap, defer the entitlement build, proceed. Only Stories 3 & 5 are affected. | agent (recorded) | ☑ |
 | P5 | Mint an Aga Khan API key via the admin UI; record the `mvxk_` prefix ONLY in the run log; hand the plaintext to the agent for Story 3 | admin | ☐ |
-| P6 | Story 3 dry pass: `API_KEY=… bash b2b-story.sh` → the ACCEPTED leg completes the F8.1-deferred prod smoke; save transcript to `evidence/` | agent | ☐ |
+| P6 | Story 3 prod pass: `API_KEY=… bash b2b-story.sh` → **accepted leg returns 403 FORBIDDEN_SCOPE** (un-entitled, per F76-GAP-01 — the CORRECT refusal) + 401/422/404/413 all correct; happy path stays proven by integration + the local prod-mode run. Save transcript to `evidence/` | agent | ☐ |
 
 ## Day 1 — core rails (order matters)
 
@@ -58,7 +58,7 @@ flagged: admin password reset for existing users.)
 | **10a** Policy drill FIRST | Console `/settings/auto-adjudication`: draft **SHADOW** policy scoped narrow (NWSC + OUTPATIENT [+ Aga Khan if scopeable]); maker submits; **checker approves** (SoD: maker ≠ checker); then **emergency-deactivate drill** with reason; re-draft + re-approve to leave shadow ON | claims@ (maker), admin@ (checker) | policy APPROVED/SHADOW; deactivation immediate + audited; self-approval refused (probe it); screenshots + audit rows |
 | **1** Clean admin claim | Admin direct entry for `NWSC-2026-00250`, Aga Khan, priced consult; policies now SHADOW | claims@ | banner received; claim routes to manual queue; **AutomationPanel shows the staged trace + a shadow proposal, `approvedAmount` 0** (shadow moves no money). LIVE leg: **deferred to F8.3 by design** |
 | **2** Provider-portal claim | Same shape via the provider portal | provider.agakhan.uat | identical normalization; visible in provider claim list with status |
-| **3** B2B full story | Re-run `b2b-story.sh` (accepted/replay/conflict/lookup/404/413/401) + receipt `nextAction` reads correctly | agent + engineering witness | transcript in evidence; replay returns SAME claim |
+| **3** B2B (prod: correct-refusal) | Re-run `b2b-story.sh` in prod: **accepted leg = 403 FORBIDDEN_SCOPE** (F76-GAP-01, un-entitled); 401/422/404/413 correct. Accepted/replay/conflict happy path cited from integration + local prod-mode run (not re-provable in prod until entitlement UI ships) | agent + engineering witness | prod transcript (403+negatives) + citation to the green happy-path evidence |
 | **4** CSV mixed batch | Upload `story4-import.xlsx` (3 clean + 1 in-file duplicate invoice + 1 bad row): preview first (zero writes), then commit; then **re-upload the same file** | claims@ | preview writes nothing; commit: 3 IMPORTED + 1 LINKED + 1 skipped w/ reason + conservation block ties; re-upload: all REPLAYED, zero new claims |
 | **6** Exception routes | Craft: inpatient claim w/o PA; claim with an unpriced/uncoded line; a fuzzy near-duplicate of Story 1's claim | claims@ + medical@ | each ACCEPTED then routed to the right named queue on `/claims/queues` with catalog remedy text; nothing rejected at the door (D6) |
 | **7** Reimbursement | Member reimbursement w/ proof + payout destination | claims@ (+ member view) | ALWAYS lands `REIMBURSEMENT_PROOF_REVIEW` queue; no auto path (D13); destination stored |
