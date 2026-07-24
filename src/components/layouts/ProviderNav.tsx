@@ -5,6 +5,7 @@ import { signOut } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
+  Inbox,
   UserCheck,
   FileText,
   Layers,
@@ -21,6 +22,7 @@ import type { ProviderNavIconKey, ProviderNavItemView } from "./provider-nav-mod
 // values, so the server passes a stable string key that we resolve here).
 const ICONS: Record<ProviderNavIconKey, LucideIcon> = {
   dashboard: LayoutDashboard,
+  inbox: Inbox,
   eligibility: UserCheck,
   claims: FileText,
   cases: Layers,

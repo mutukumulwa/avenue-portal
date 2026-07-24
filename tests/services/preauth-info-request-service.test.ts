@@ -189,4 +189,15 @@ describe.skipIf(!URL_SET)("F4.2 PreauthInfoRequestService (opt-in DB)", () => {
     const other = await Svc.listReprocessable({ tenantId: t, clientId: "some-other-client" });
     expect(other.map((q) => q.preAuthorizationId)).not.toContain(a.pa.id);
   });
+
+  it("getForProvider returns the request only for the owning facility (non-enumerating) (F4.7)", async () => {
+    const t = world.tenants.alpha.id;
+    const pa = await world.createPreauth({ providerId: world.providers.a.id });
+    const ir = await Svc.open({ tenantId: t, preAuthorizationId: pa.id, requestedItems: ["LAB_RESULTS"], prompt: "labs", actor: reviewer });
+
+    const own = await Svc.getForProvider({ tenantId: t, providerId: world.providers.a.id }, ir.id);
+    expect(own?.id).toBe(ir.id);
+    const other = await Svc.getForProvider({ tenantId: t, providerId: world.providers.b.id }, ir.id);
+    expect(other).toBeNull();
+  });
 });

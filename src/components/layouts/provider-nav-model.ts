@@ -16,7 +16,7 @@
 export type ProviderNavGroupKey = "Home" | "Care" | "Claims" | "Finance" | "Network" | "Administration";
 
 export type ProviderNavIconKey =
-  | "dashboard" | "eligibility" | "cases" | "preauth" | "claims" | "new-claim" | "settlements" | "api-keys";
+  | "dashboard" | "inbox" | "eligibility" | "cases" | "preauth" | "claims" | "new-claim" | "settlements" | "api-keys";
 
 export interface ProviderNavDefinition {
   key: string;
@@ -31,6 +31,7 @@ export interface ProviderNavDefinition {
 /** Existing provider routes only, in target-group order (§10.1). */
 export const PROVIDER_NAV_DEFINITIONS: ProviderNavDefinition[] = [
   { key: "dashboard", label: "Dashboard", href: "/provider/dashboard", iconKey: "dashboard", group: "Home" },
+  { key: "inbox", label: "Inbox", href: "/provider/inbox", iconKey: "inbox", group: "Home", requiredPermission: "provider.preauth.read" },
   { key: "eligibility", label: "Eligibility", href: "/provider/eligibility", iconKey: "eligibility", group: "Care", requiredPermission: "provider.eligibility.read" },
   { key: "cases", label: "Cases", href: "/provider/cases", iconKey: "cases", group: "Care", requiredPermission: "provider.case.read" },
   { key: "preauth", label: "Pre-auth", href: "/provider/preauth", iconKey: "preauth", group: "Care", requiredPermission: "provider.preauth.read" },

@@ -63,8 +63,8 @@ describe("F1.4 computeProviderNav", () => {
   });
 
   it("never emits an unfinished route", () => {
-    // NOTE: /provider/preauth is now a FINISHED route (F3.8) — removed from forbidden.
-    const forbidden = ["/provider/inbox", "/provider/payment-queries", "/provider/contracts", "/provider/performance", "/provider/profile", "/provider/users", "/provider/integrations"];
+    // NOTE: /provider/preauth (F3.8) and /provider/inbox (F4.7) are now FINISHED routes — removed from forbidden.
+    const forbidden = ["/provider/payment-queries", "/provider/contracts", "/provider/performance", "/provider/profile", "/provider/users", "/provider/integrations"];
     // even a super-broad permission set only yields existing routes
     const allPerms = PROVIDER_NAV_DEFINITIONS.map((d) => d.requiredPermission).filter(Boolean) as string[];
     const h = hrefs(allPerms);
@@ -87,6 +87,11 @@ describe("F1.4 computeProviderNav", () => {
   it("F3.8: a user with provider.preauth.read sees the Pre-auth item; one without it does not", () => {
     expect(hrefs(["provider.preauth.read"])).toContain("/provider/preauth");
     expect(hrefs(["provider.claim.read"])).not.toContain("/provider/preauth"); // migrated, lacks the perm
+  });
+
+  it("F4.7: the Inbox item follows provider.preauth.read (shown with it, hidden without)", () => {
+    expect(hrefs(["provider.preauth.read"])).toContain("/provider/inbox");
+    expect(hrefs(["provider.claim.read"])).not.toContain("/provider/inbox");
   });
 });
 

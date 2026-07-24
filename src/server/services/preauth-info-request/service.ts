@@ -277,4 +277,12 @@ export const PreauthInfoRequestService = {
       .filter((a) => undecidedSet.has(a.preAuthorizationId))
       .map((a) => ({ preAuthorizationId: a.preAuthorizationId, infoRequestId: a.id, acceptedAt: a.decidedAt }));
   },
+
+  /**
+   * F4.7 — provider-scoped single-request read for the inbox detail page.
+   * Non-enumerating: a request not belonging to this facility resolves to null.
+   */
+  async getForProvider(scope: { tenantId: string; providerId: string }, id: string, db: Db = prisma) {
+    return db.preauthInfoRequest.findFirst({ where: { id, tenantId: scope.tenantId, providerId: scope.providerId } });
+  },
 } as const;
