@@ -1491,3 +1491,30 @@ Stop condition observed: yes — schema + pure policy only; NO service.
 ```
 
 ---
+
+## F5.12 — Reconsideration eligibility and submit
+
+```text
+Work package: F5.12
+Status: COMPLETE
+Commit: 1625bdc
+Proof-before-build classification: MISSING (no reconsideration submit service; legacy same-claim appeal lives in claim-adjudication.service and is F5.17's concern — untouched here). Builds on the F5.11 schema + policy.
+Files changed: src/server/services/claim-reconsideration/submit.service.ts (new — ClaimReconsiderationService.checkEligibility + submit), tests/services/claim-reconsideration-submit.service.test.ts (new). No schema change (F5.11 added the models).
+Schema/data changes: NONE. Creates ClaimReconsideration + lines + a first event only — NO Claim write (D13), so no mutation-guard entry.
+Behavior delivered: a provider files ONE governed reconsideration on a DECIDED claim without changing the claim's state or money (D13). submit(ctx, command): authorize (provider.claim.reconsider + provider/branch scope) → idempotent replay by idempotencyKey (resolved BEFORE the duplicate check, so a same-key retry returns the existing case) → eligibility (claim status in RECONSIDERABLE_CLAIM_STATUSES; reason eligible for that decision via F5.11 isReconsiderationReasonEligible; within the filing deadline via F5.11 resolveReconsiderationDeadline from decidedAt; no ACTIVE reconsideration already on the claim) → validate (non-blank narrative; requestedAmount > 0; every selected line belongs to the claim; any supplied evidence is scanned CLEAN, never PENDING/REJECTED/QUARANTINED/ERROR) → create the case (SUBMITTED, filingDeadline, currency + originalAdjudicatorId [SoD] derived from the claim, SLA policy/version/dueAt) with EXACT frozen line snapshots (originalBilled/allowed/payable/memberShare/writeoff read from the ClaimLine; maxIncrement/awardedIncrement stay 0 until the reviewer corrects entitlement, F5.15) + a first SUBMITTED event, all in one create; a concurrent same-key submit is caught by @@unique[tenant, idempotencyKey] (P2002 → return the winner). Post-commit hash-chain audit RECONSIDERATION:SUBMIT + outbox RECONSIDERATION_SUBMITTED. checkEligibility(ctx, claimId, {reasonCode?, at?}) returns a safe gate for the F5.13 form (ELIGIBLE / NOT_FOUND / FORBIDDEN / NOT_RECONSIDERABLE / DEADLINE_PASSED / REASON_NOT_ELIGIBLE / ALREADY_ACTIVE). A claim carries at most one ACTIVE reconsideration (TERMINAL = UPHELD/WITHDRAWN/CLOSED free it).
+Authorization evidence: server-derived F1.3 ctx (requirePermission provider.claim.reconsider + provider-scoped claim load [non-enumerating NOT_FOUND] + branch). Tests: submit without the permission ⇒ ProviderAccessError FORBIDDEN_PERMISSION; checkEligibility cross-provider ⇒ NOT_FOUND, no-permission ⇒ FORBIDDEN.
+Idempotency/concurrency evidence: same-key submit ⇒ replayed (one case); a different key while one is active ⇒ ALREADY_ACTIVE (one case); the @@unique[tenant, idempotencyKey] catches a concurrent same-key race (P2002 → winner).
+Privacy/security evidence: currency + originalAdjudicatorId are derived from the claim (the command cannot set a foreign currency / spoof the adjudicator). Evidence must be scanned CLEAN. The event carries safeReasonCode; F5.11's provider projection keeps the internal fields out of the provider view.
+Money/reconciliation evidence: D13 — the original claim row/benefit/GL/fund are UNTOUCHED (no claim write anywhere; test asserts claim.status/approvedAmount/updatedAt unchanged, benefitUsage count unchanged, no fundTransaction). The line snapshot is EXACT (frozen originalBilled/allowed/payable/writeoff/alreadyApproved match the ClaimLine).
+Focused tests and results: 7/7 (real DB): file + exact snapshot + claim/benefit/fund untouched; every decided state (full/partial/declined/paid) eligible; pre-decision ⇒ NOT_RECONSIDERABLE; wrong reason ⇒ REASON_NOT_ELIGIBLE, line-not-in-claim ⇒ LINE_NOT_IN_CLAIM, expired ⇒ DEADLINE_PASSED; idempotent replay + one-active ⇒ ALREADY_ACTIVE; submit permission gate; checkEligibility gate (eligible/wrong-reason/cross-provider/no-permission). Full suite 1350 pass / 263 skip; tsc + brand + currency green.
+Typecheck/schema result: tsc --noEmit clean. No schema change.
+Manual/visual evidence: N/A — service only (F5.13 builds the provider form/detail).
+Feature-flag state: none. Gated by provider.claim.reconsider (persona-scoped).
+Backfill/rollout impact: none.
+Known limitations: evidence is an OPTIONAL clean-scan validation here; the upload → finalize → scan → attach flow + the retarget to the reconsideration is F5.13. The maxIncrement/awardedIncrement remain 0 until the reviewer corrects entitlement (F5.15). Legacy same-claim appeal (claim-adjudication.service) is untouched — F5.17 consolidates it.
+Unrelated worktree changes preserved: yes — worktree contained only F5.12 changes; the main-checkout dirty UAT files are untouched.
+Next allowed package: F5.13 — Build provider reconsideration form/detail (M). Depends on F5.12. Provider selects lines, understands the original outcome (safe amounts/reasons), submits evidence, and tracks safe status. Reuse checkEligibility to gate; will add a server action ⇒ PR-020 audit-coverage catch (add ClaimReconsiderationService.submit token).
+Stop condition observed: yes — eligibility + submit service + focused tests only; NO review/outcome (F5.14+).
+```
+
+---
