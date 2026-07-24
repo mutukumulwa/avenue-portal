@@ -983,3 +983,23 @@ Stop condition observed: yes — cancellation only (no amendment).
 ```
 
 ---
+
+## F3.12 — Provider PA amendment
+
+```text
+Work package: F3.12
+Status: COMPLETE
+Commit: 55226e4
+ASSUMPTION (board-only): "Provider PA amendment" = a provider requests ADDITIONAL cover on its own APPROVED PA, via the canonical amendment creator + the same pipeline. No dedicated provider.preauth.amend permission exists ⇒ gated on provider.preauth.create (flagged).
+Files changed: src/app/provider/preauth/[id]/actions.ts (amendProviderPreauthAction added), src/app/provider/preauth/[id]/AmendPreauthForm.tsx (new), src/app/provider/preauth/[id]/page.tsx (wire form), tests/actions/provider-preauth-amend-action.test.ts (new)
+Schema/data changes: none
+Behavior delivered: amendProviderPreauthAction — providerPermits(provider.preauth.create) gate; PARENT ownership + APPROVED via the F3.10 non-enumerating scoped read (blocks cross-provider amendment; createPaAmendment is only tenant-scoped); delegates to preauthAdjudicationService.createPaAmendment (a new PA-AMD linked via parentPreAuthId, inheriting member/provider/benefit — canonical, and UNWIRED until now: F3.12 is its first caller); then decides the amendment through the SAME executeAutoDecision pipeline as every rail (BENEFIT_CAP checks additional cost vs remaining). Handoff failure ⇒ amendment durable + SUBMITTED (deferred), request never fails. Redirects to the amendment detail. AmendPreauthForm (client: CPT + additional service + additional cost + notes) shows on the detail page only when the viewer holds provider.preauth.create AND the PA is APPROVED.
+Evidence: provider-preauth-amend-action.test.ts (7): canonical createPaAmendment with mapped additional data + provider-scoped ownership read + pipeline decide + redirect; deny without permission (no read/create); safe not-found for another facility's parent; refuse non-APPROVED parent; validate cost + service; canonical error surfaced (no redirect); pipeline deferral still redirects. Full suite 1268 pass / 191 skip. tsc 0; brand PASS; currency PASS (691).
+Verification: ACTION unit-tested; form (presentation) NOT browser-verified (worktree env, as F3.8–F3.11).
+FLAG: amendment auto-decides via executeAutoDecision (chosen, since createPaAmendment had no prior caller/behavior to mirror) — consistent with the convergence; a plan that wanted amendments to always route-to-human would omit this.
+Feature-flag state: none.
+Next allowed package: F3.13 — PA-to-claim prefill and submit (M).
+Stop condition observed: yes — amendment only (no PA→claim).
+```
+
+---
