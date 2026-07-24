@@ -238,9 +238,15 @@ export async function buildProviderWorld(prisma: Prisma, opts: BuildOptions = {}
     await prisma.auditLog.deleteMany({ where: { userId: { in: worldUserIds } } });
     // F2+ targets (+ documents referencing them or scoped to this world) — before members/providers.
     await prisma.document.deleteMany({ where: { OR: [{ claimId: { in: createdClaimIds } }, { preauthId: { in: createdPreauthIds } }, { caseId: { in: createdCaseIds } }, { tenantId: { in: tenantIds } }] } });
-    // F5.5: withdrawal (and any decision) writes AdjudicationLog rows FK'd to the claim — clear before the claim.
-    await prisma.adjudicationLog.deleteMany({ where: { claimId: { in: createdClaimIds } } });
-    await prisma.claim.deleteMany({ where: { id: { in: createdClaimIds } } });
+    // F5.7: claims may now be created through the canonical intake (a correction's child —
+    // an UNTRACKED id, with lines + a processing run + an intake receipt), so tear claims down
+    // by TENANT (these tenants are world-exclusive) and clear every claim-FK dependent first.
+    const worldClaimIds = (await prisma.claim.findMany({ where: { tenantId: { in: tenantIds } }, select: { id: true } })).map((c: { id: string }) => c.id);
+    await prisma.adjudicationLog.deleteMany({ where: { claimId: { in: worldClaimIds } } });
+    await prisma.claimLine.deleteMany({ where: { claimId: { in: worldClaimIds } } });
+    await prisma.claimProcessingRun.deleteMany({ where: { tenantId: { in: tenantIds } } });
+    await prisma.claimIntakeReceipt.deleteMany({ where: { tenantId: { in: tenantIds } } });
+    await prisma.claim.deleteMany({ where: { tenantId: { in: tenantIds } } });
     // F3.2 intake evidence + F4.1 info requests (relation-less, so no FK forces this — kept tidy anyway)
     await prisma.preAuthorizationEvent.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.preauthIntakeReceipt.deleteMany({ where: { tenantId: { in: tenantIds } } });
