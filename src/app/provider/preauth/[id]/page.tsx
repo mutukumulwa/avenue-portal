@@ -5,6 +5,8 @@ import { ProviderAccessService } from "@/server/services/provider-access.service
 import { providerPermits } from "@/components/layouts/provider-nav-model";
 import { PreauthReadService } from "@/server/services/preauth-read.service";
 import { listPreauthEvents } from "@/server/services/preauth-intake/events";
+import { CancelPreauthButton } from "./CancelPreauthButton";
+import { PROVIDER_CANCELLABLE_STATUSES } from "./actions";
 
 function money(n: number | null | undefined) {
   return `UGX ${Math.round(Number(n ?? 0)).toLocaleString("en-UG")}`;
@@ -34,6 +36,7 @@ export default async function ProviderPreauthDetail({ params }: { params: Promis
   const pa = await PreauthReadService.getById({ tenantId: ctx.tenantId, providerId: ctx.providerId }, id);
   if (!pa) notFound();
 
+  const canCancel = providerPermits(ctx.permissions, "provider.preauth.cancel") && PROVIDER_CANCELLABLE_STATUSES.includes(pa.status);
   const events = await listPreauthEvents(pa.id);
   const diagnoses = (pa.diagnoses as Array<{ icdCode?: string; code?: string; description?: string; isPrimary?: boolean }>) ?? [];
   const procedures = (pa.procedures as Array<{ cptCode?: string; description?: string; quantity?: number; unitCost?: number; total?: number }>) ?? [];
@@ -55,6 +58,12 @@ export default async function ProviderPreauthDetail({ params }: { params: Promis
         </div>
         <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${STATUS_TONE[pa.status] ?? "bg-[#E6E7E8] text-[#6C757D]"}`}>{pa.status.replace(/_/g, " ")}</span>
       </div>
+
+      {canCancel && (
+        <div className="flex justify-end">
+          <CancelPreauthButton preAuthId={pa.id} />
+        </div>
+      )}
 
       <div className="bg-white border border-[#EEEEEE] rounded-lg p-5 grid grid-cols-2 md:grid-cols-3 gap-4">
         <Field label="Service type" value={pa.serviceType} />
