@@ -123,4 +123,37 @@ describe.skipIf(!URL_SET)("F4.2 PreauthInfoRequestService (opt-in DB)", () => {
     const again = await Svc.submitResponse({ tenantId: t, id: ir.id, providerId: world.providers.a.id, responseNote: "y", actor: provUser }).catch((e) => e);
     expect(again.code).toBe("NOT_RESPONDABLE");
   });
+
+  it("reviewer accept / reopen / close transitions + guards (F4.4)", async () => {
+    const t = world.tenants.alpha.id;
+    const provUser = { type: "USER", id: "prov-user" };
+
+    // accept: RESPONDED → ACCEPTED (+ RESPONSE_ACCEPTED); accepting before a response is blocked
+    const pa1 = await world.createPreauth({ providerId: world.providers.a.id });
+    const ir1 = await Svc.open({ tenantId: t, preAuthorizationId: pa1.id, requestedItems: ["LAB_RESULTS"], prompt: "labs", actor: reviewer });
+    const early = await Svc.accept({ tenantId: t, id: ir1.id, actor: reviewer }).catch((e) => e);
+    expect(early.code).toBe("NOT_ACCEPTABLE");
+    await Svc.submitResponse({ tenantId: t, id: ir1.id, providerId: world.providers.a.id, responseNote: "done", actor: provUser });
+    const accepted = await Svc.accept({ tenantId: t, id: ir1.id, actor: reviewer, note: "sufficient" });
+    expect(accepted.status).toBe("ACCEPTED");
+    expect((await events.listPreauthEvents(pa1.id)).some((e) => e.eventType === "RESPONSE_ACCEPTED")).toBe(true);
+
+    // reopen: RESPONDED → REOPENED, then the provider can respond again (REOPENED is respondable)
+    const pa2 = await world.createPreauth({ providerId: world.providers.a.id });
+    const ir2 = await Svc.open({ tenantId: t, preAuthorizationId: pa2.id, requestedItems: ["IMAGING_REPORTS"], prompt: "imaging", actor: reviewer });
+    await Svc.submitResponse({ tenantId: t, id: ir2.id, providerId: world.providers.a.id, responseNote: "v1", actor: provUser });
+    const reopened = await Svc.reopen({ tenantId: t, id: ir2.id, actor: reviewer, note: "need more" });
+    expect(reopened.status).toBe("REOPENED");
+    const resubmitted = await Svc.submitResponse({ tenantId: t, id: ir2.id, providerId: world.providers.a.id, responseNote: "v2", actor: provUser });
+    expect(resubmitted.status).toBe("RESPONDED");
+
+    // close: from a live state → CLOSED; re-close blocked
+    const pa3 = await world.createPreauth({ providerId: world.providers.a.id });
+    const ir3 = await Svc.open({ tenantId: t, preAuthorizationId: pa3.id, requestedItems: ["OTHER"], prompt: "x", actor: reviewer });
+    const closed = await Svc.close({ tenantId: t, id: ir3.id, actor: reviewer });
+    expect(closed.status).toBe("CLOSED");
+    expect((await events.listPreauthEvents(pa3.id)).some((e) => e.eventType === "INFO_REQUEST_CLOSED")).toBe(true);
+    const reclose = await Svc.close({ tenantId: t, id: ir3.id, actor: reviewer }).catch((e) => e);
+    expect(reclose.code).toBe("NOT_CLOSABLE");
+  });
 });

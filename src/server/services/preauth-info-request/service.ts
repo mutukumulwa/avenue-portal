@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import type { Prisma, PrismaClient } from "@prisma/client";
-import { appendPreauthEvent } from "../preauth-intake/events";
+import type { Prisma, PrismaClient, PreauthInfoRequestStatus } from "@prisma/client";
+import { appendPreauthEvent, type PreauthEventType } from "../preauth-intake/events";
 import { normalizeRequestedItems } from "./catalog";
 
 /**
@@ -23,6 +23,11 @@ export const INFO_REQUEST_OPENABLE_PA_STATUSES = ["SUBMITTED", "UNDER_REVIEW"];
 export const INFO_REQUEST_CANCELLABLE_STATUSES = ["OPEN", "RESPONDED", "REOPENED"];
 /** The provider may respond only while the request is awaiting them. */
 export const INFO_REQUEST_RESPONDABLE_STATUSES = ["OPEN", "REOPENED"];
+/** The reviewer acts on a submitted response. */
+export const INFO_REQUEST_ACCEPTABLE_STATUSES = ["RESPONDED"];
+export const INFO_REQUEST_REOPENABLE_STATUSES = ["RESPONDED"];
+/** Close is allowed from any live (non-terminal) state. */
+export const INFO_REQUEST_CLOSABLE_STATUSES = ["OPEN", "RESPONDED", "REOPENED", "ACCEPTED"];
 export const DEFAULT_INFO_REQUEST_DUE_HOURS = 72;
 
 export class InfoRequestError extends Error {
@@ -46,6 +51,48 @@ export interface CancelInfoRequestParams {
   id: string;
   actor: { type: string; id?: string };
   reason?: string;
+}
+
+export interface InfoRequestDecisionParams {
+  tenantId: string;
+  id: string;
+  actor: { type: string; id?: string };
+  note?: string;
+}
+
+/** Shared reviewer transition (accept/reopen/close): guard the from-state, flip the
+ * status with decision actor/timestamp, and append the matching PA event. */
+async function applyDecision(
+  db: Db,
+  params: InfoRequestDecisionParams,
+  spec: { from: string[]; to: PreauthInfoRequestStatus; event: PreauthEventType; errCode: string; errMsg: string },
+) {
+  const existing = await db.preauthInfoRequest.findFirst({
+    where: { id: params.id, tenantId: params.tenantId },
+    select: { id: true, status: true, preAuthorizationId: true },
+  });
+  if (!existing) throw new InfoRequestError("NOT_FOUND", "Information request not found.");
+  if (!spec.from.includes(existing.status)) {
+    throw new InfoRequestError(spec.errCode, `A ${existing.status.toLowerCase()} information request ${spec.errMsg}.`);
+  }
+  return db.$transaction(async (tx) => {
+    const updated = await tx.preauthInfoRequest.update({
+      where: { id: existing.id },
+      data: { status: spec.to, decisionByActorId: params.actor.id ?? null, decidedAt: new Date(), decisionNote: (params.note ?? "").trim() || null },
+    });
+    await appendPreauthEvent(
+      {
+        tenantId: params.tenantId,
+        preAuthorizationId: existing.preAuthorizationId,
+        eventType: spec.event,
+        actorType: params.actor.type,
+        actorId: params.actor.id ?? null,
+        metadata: { infoRequestId: existing.id },
+      },
+      tx,
+    );
+    return updated;
+  });
 }
 
 export const PreauthInfoRequestService = {
@@ -177,5 +224,19 @@ export const PreauthInfoRequestService = {
       );
       return updated;
     });
+  },
+
+  // F4.4 — reviewer decisions on a submitted response. accept ⇒ sanctions claim
+  // reprocessing (F4.5). reopen ⇒ back to the provider. close ⇒ terminal.
+  async accept(params: InfoRequestDecisionParams, db: Db = prisma) {
+    return applyDecision(db, params, { from: INFO_REQUEST_ACCEPTABLE_STATUSES, to: "ACCEPTED", event: "RESPONSE_ACCEPTED", errCode: "NOT_ACCEPTABLE", errMsg: "cannot be accepted" });
+  },
+
+  async reopen(params: InfoRequestDecisionParams, db: Db = prisma) {
+    return applyDecision(db, params, { from: INFO_REQUEST_REOPENABLE_STATUSES, to: "REOPENED", event: "RESPONSE_REOPENED", errCode: "NOT_REOPENABLE", errMsg: "cannot be reopened" });
+  },
+
+  async close(params: InfoRequestDecisionParams, db: Db = prisma) {
+    return applyDecision(db, params, { from: INFO_REQUEST_CLOSABLE_STATUSES, to: "CLOSED", event: "INFO_REQUEST_CLOSED", errCode: "NOT_CLOSABLE", errMsg: "cannot be closed" });
   },
 } as const;
