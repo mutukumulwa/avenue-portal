@@ -1410,3 +1410,30 @@ Stop condition observed: yes — correction form + lineage only; NO post-decline
 ```
 
 ---
+
+## F5.9 — Provider-correctable resubmission eligibility
+
+```text
+Work package: F5.9
+Status: COMPLETE
+Commit: 72d9e72
+Proof-before-build classification: MISSING. The reason catalog (AdjudicationReasonCode.resubmissionAllowed + safe providerDescription vs internalDescription) and the contract submission window (ProviderContract.submissionWindowDays/Basis) EXIST; no resubmission eligibility service and no deadline-computation helper did. Declined lines do NOT persist reasonCodeId → the live reason source is the legacy Claim.declineReasonCode.
+Files changed: src/server/services/claim-resubmission/policy.ts (new — pure resolveResubmissionReason + resubmissionDeadline + RESUBMIT_PERMISSION + LEGACY_DECLINE_RESUBMISSION), src/server/services/claim-resubmission/eligibility.service.ts (new — ClaimResubmissionEligibilityService.check, READ-ONLY), tests/services/claim-resubmission-policy.test.ts + claim-resubmission-eligibility.test.ts (new).
+Schema/data changes: NONE. READ-ONLY service — no status write, so NO mutation-guard entry and NO audit token needed.
+Behavior delivered: ONE read-only service computes whether/why/until-when a DECLINED claim may be resubmitted, returning a code + a SAFE provider reason + the deadline. resolveResubmissionReason precedence: (1) line-level catalog reasons (every declining reason must permit it); (2) the claim-level decline code resolved against the catalog; (3) a legacy Claim.declineReasonCode map. It ONLY ever returns provider-facing text — an internal/fraud rationale is never disclosed (FRAUD_SUSPECTED ⇒ resubmissionAllowed:false + "declined after review — contact the payer"). resubmissionDeadline from the contract submission window, computed in UTC with the deadline DAY inclusive so a claim on the boundary is not mis-judged by the host timezone (SERVICE_DATE / DISCHARGE_DATE [falls back to service] / INVOICE_DATE [→ service, no field] / MONTHLY_BATCH [end of the service month]); no window ⇒ no time limit. Eligibility order: NOT_FOUND (provider-scoped, non-enumerating) → FORBIDDEN (permission then branch) → NOT_DECLINED → ALREADY_RESUBMITTED (supersededByClaimId set OR a claim with supersedesClaimId = this id — current-chain scope) → REASON_NOT_RESUBMITTABLE → DEADLINE_PASSED → ELIGIBLE. `at` is injectable for deterministic boundary testing.
+Authorization evidence: server-derived F1.3 ctx. NOT_FOUND for a foreign/absent claim (non-enumerating); FORBIDDEN for a missing permission (provider.claim.correct) or an out-of-access branch. Tests cover cross-provider, missing permission, and branch.
+Idempotency/concurrency evidence: N/A — pure read (no writes). "Already resubmitted" enforces one current chain head.
+Privacy/security evidence: the reason is ALWAYS safe (providerDescription / the legacy safe map) — internalDescription is never read into the result; the fraud path is proven not to leak (reason does not match /fraud|fwa|abuse|suspect|investigat/i).
+Money/reconciliation evidence: N/A — read-only, no money.
+Focused tests and results: policy 10/10 (reason resolver incl. fraud-never-disclosed + precedence; deadline UTC/basis/boundary) + eligibility 8/8 (real DB: reason allowed/forbidden, fraud, not-declined, already-resubmitted, cross-provider, permission+branch, boundary-timezone inclusive/expired). Full suite 1336 pass / 250 skip; tsc clean; brand + currency green.
+Typecheck/schema result: tsc --noEmit clean. No schema change.
+Manual/visual evidence: N/A — read-only service, no UI (F5.9 stop = no submit).
+Feature-flag state: none.
+Backfill/rollout impact: none.
+Known limitations: (a) the resubmit permission reuses provider.claim.correct (no dedicated resubmit permission in the F1.1 catalog) — flagged; (b) step-4 "required request/doc response accepted" is a documented no-op — no claim-side info-request model exists and a DECLINED claim carries no outstanding response (that is the PENDED / PA-side F4 flow); wire here when a claim info-request model is added; (c) deadline resolution uses the claim's contract window only — a provider/client-level default could be layered later. The F5.5 decide()-concurrency window is unchanged.
+Unrelated worktree changes preserved: yes — worktree contained only F5.9 changes; the main-checkout dirty UAT files are untouched.
+Next allowed package: F5.10 — Submit linked post-decline resubmission (M) — reuse the F5.7 replacement full-form contract; recheck F5.9 eligibility/deadline in-tx; create a canonical RESUBMISSION claim through the intake; advance the chain pointer WITHOUT changing the original DECLINED decision; preserve the sanctioned duplicate relation; no automatic inheritance of pricing/approval.
+Stop condition observed: yes — eligibility service + focused tests only; no submit (F5.10).
+```
+
+---
