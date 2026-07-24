@@ -3088,6 +3088,46 @@ enum PreauthInfoRequestStatus {
   CANCELLED // reviewer withdrew the request
 }
 
+// PNOS F4.8 — transactional notification outbox. Producers enqueue a notification
+// intent (in ONE tx with their state change, F4.9); a dispatcher drains PENDING rows
+// through a pluggable delivery port. IN_APP rows are delivered immediately (the row
+// IS the recipient's in-app notice — read via readAt); EMAIL rows are handed to the
+// email port, which is a no-op today (worker unprovisioned) so they stay recorded and
+// a future worker delivers them without any schema change. Relation-less.
+model NotificationOutbox {
+  id            String                   @id @default(cuid())
+  tenantId      String
+  providerId    String? // recipient facility (provider notifications)
+  userId        String? // specific recipient user (optional)
+  memberId      String? // member-directed (optional)
+  channel       String // IN_APP | EMAIL
+  eventType     String // e.g. INFO_REQUESTED, RESPONSE_ACCEPTED
+  priority      String                   @default("NORMAL")
+  title         String
+  body          String
+  href          String?
+  metadata      Json?
+  dedupeKey     String? // idempotent enqueue when set; NULLs are distinct in PG
+  status        NotificationOutboxStatus @default(PENDING)
+  attempts      Int                      @default(0)
+  failureReason String?
+  dispatchedAt  DateTime?
+  readAt        DateTime? // in-app read tracking
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+
+  @@unique([tenantId, dedupeKey])
+  @@index([status, createdAt]) // dispatcher drain
+  @@index([tenantId, providerId, channel, status]) // provider in-app read
+}
+
+enum NotificationOutboxStatus {
+  PENDING // enqueued, not yet dispatched
+  SENT // delivered (in-app visible, or handed to a live delivery adapter)
+  SKIPPED // consciously not delivered (e.g. email channel not provisioned)
+  FAILED // delivery attempted and errored
+}
+
 // PNOS F1.11 — audited, point-in-time provider eligibility evidence (§7.3).
 // Distinct from EligibilitySnapshot (an offline-pack balance cache). Carries
 // member/client identifiers + a SAFE result category + explanation — never a
