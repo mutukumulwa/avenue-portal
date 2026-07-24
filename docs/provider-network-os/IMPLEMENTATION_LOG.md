@@ -1195,3 +1195,21 @@ Stop condition observed: yes — outbox + dispatcher only (no producers wired, n
 ```
 
 ---
+
+## F4.9 — Migrate the info-request family to the outbox dispatcher
+
+```text
+Work package: F4.9
+Status: COMPLETE
+Commit: 18d9d6d
+ASSUMPTION (board-only): "per family" ⇒ do the info-request family now; claims/settlements families later. Flagged.
+Files changed: src/server/services/preauth-info-request/service.ts (enqueue in open/cancel/applyDecision), tests/factories/provider-network.ts (teardown clears notificationOutbox), tests/services/preauth-info-request-service.test.ts (+1 real-DB)
+Schema/data changes: none (uses the F4.8 outbox)
+Behavior delivered: the provider-directed transitions enqueue an IN_APP provider notification via NotificationOutboxService.enqueue IN THE SAME TX as the state change (transactional outbox ⇒ exactly-once). open→INFO_REQUESTED(HIGH); reopen→RESPONSE_REOPENED(HIGH); accept→RESPONSE_ACCEPTED; cancel→INFO_REQUEST_CANCELLED; close→INFO_REQUEST_CLOSED. Each has href /provider/inbox/<id> + safe metadata {infoRequestId,preauthId}. applyDecision/cancel selects gained providerId; accept/reopen/close pass notify copy via the spec. Reviewer-directed transition (submitResponse) is a separate reviewer family — deferred.
+Evidence: service +1 (REAL DB): open enqueues PENDING INFO_REQUESTED IN_APP (HIGH, correct href); reopen→RESPONSE_REOPENED; accept→RESPONSE_ACCEPTED; cancel→INFO_REQUEST_CANCELLED (matched via JSON metadata infoRequestId). Rows are PENDING until a dispatcher runs (F4.10). Full suite (no DB env) 1291 pass / 209 skip. tsc 0; brand PASS; currency PASS (704).
+Feature-flag state: none.
+Next allowed package: F4.10 — SLA sweepers + operational queues (M).
+Stop condition observed: yes — info-request family only (reviewer family + other families deferred).
+```
+
+---
