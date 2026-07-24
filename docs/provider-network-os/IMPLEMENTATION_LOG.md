@@ -1213,3 +1213,23 @@ Stop condition observed: yes — info-request family only (reviewer family + oth
 ```
 
 ---
+
+## F4.10 — Info-request SLA sweeper + operational queue (Phase F4 COMPLETE)
+
+```text
+Work package: F4.10 — completes Phase F4
+Status: COMPLETE
+Commit: e0bdccb
+ASSUMPTION (board-only): info-request SLA sweeper + overdue queue (the F4 domain). Flagged.
+Files changed: src/server/services/preauth-info-request/sweeper.ts (new), tests/services/preauth-info-request-sweeper.test.ts (new)
+Schema/data changes: none
+Behavior delivered: PreauthInfoRequestSweeper.sweepOverdueInfoRequests — idempotent batch job: awaiting-provider (OPEN/REOPENED) + dueAt<now → HIGH provider reminder via the F4.8 outbox, deduped per request per calendar day (dedupeKey INFO_OVERDUE:<id>:<day>); no PA event, no info-request mutation; returns {overdue}. overdueInfoRequests — scoped operational-queue read. Notification delivery = NotificationOutboxService.dispatch (F4.8) on the same schedule. Plain services (a future cron/worker invokes them; none provisioned here).
+Evidence: sweeper test (1, REAL DB): overdue→reminded; not-due→not; RESPONDED-but-overdue→not (not awaiting provider); re-sweep same day→deduped (1 reminder); overdueInfoRequests queue matches. Full suite (no DB env) 1291 pass / 210 skip. tsc 0; brand PASS; currency PASS (705).
+Feature-flag state: none.
+
+*** PHASE F4 COMPLETE (F4.1–F4.10). Clinical-information-request rail: lifecycle (schema/open/cancel/respond/accept/reopen/close/sanctioned-read) + provider inbox pages + transactional notification outbox/dispatcher (email deferred) + in-tx family emit + SLA sweeper. Built from the board's one-line rows with per-package assumptions flagged; services/projections REAL-DB tested on the throwaway PG; F4.7 pages not browser-verified. Flagged gaps: reviewer admin UI (F4.2/F4.4 triggers) + reviewer notification family. ***
+Next allowed package: F5.1 (first row of Phase F5 — claim withdrawal/correction/resubmission/reconsideration, 17 pkgs).
+Stop condition observed: yes — SLA sweeper + queue only.
+```
+
+---
