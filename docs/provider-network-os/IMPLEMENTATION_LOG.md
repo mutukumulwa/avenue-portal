@@ -923,3 +923,24 @@ Stop condition observed: yes — list page only (no submission form, no detail p
 ```
 
 ---
+
+## F3.9 — Provider PA submission page (PROVIDER_PORTAL rail)
+
+```text
+Work package: F3.9
+Status: COMPLETE
+Commit: c0f5e04
+ASSUMPTION (board-only): "Provider PA submission page" = a provider form submitting a PA through the canonical intake on the PROVIDER_PORTAL channel, mirroring provider claims/new. Flagged.
+Files changed: src/app/provider/preauth/new/{page.tsx, ProviderPreauthForm.tsx, actions.ts} (new), src/app/provider/preauth/page.tsx (New button + submitted banner), tests/actions/provider-preauth-action.test.ts (new)
+Schema/data changes: none
+Behavior delivered: /provider/preauth/new server-authorizes via providerPermits(provider.preauth.create), blocks a non-ACTIVE contract, and renders a form (member number, service type, benefit, expected date, ICD diagnosis w/ datalist autofill, optional CPT + requested service, estimated cost, notes; draft-UUID idempotency key). The action submits PreauthIntakeService on the PROVIDER_PORTAL (provider-bound) channel — facility identity from the session ctx, NEVER the body (D1); member resolved + entitlement-gated inside the intake per the D3 flag (default OFF ⇒ tenant-only). Post-commit auto-decision = executeAutoDecision (same 10-gate pipeline as all rails). REJECTED → friendly error (member path names the entered number); success → redirect to the list with the PA number (+ replayed marker). List page (F3.8) gains a permission-gated "New pre-auth" button + submitted/replayed banner.
+Authorization posture: legacy-compatible providerPermits (migrated needs provider.preauth.create; un-migrated allowed) — consistent with the list page + nav.
+Evidence (action, security-critical): provider-preauth-action.test.ts (7): PROVIDER_PORTAL ctx from session + no body providerId; mapped command (diagnoses/procedures/estimate/idempotencyKey); executeAutoDecision handoff w/ system actor; success + replay redirects; deny without provider.preauth.create (no submit); member/estimate validation (no submit); REJECTED → friendly error. Full suite 1247 pass / 191 skip. tsc 0; brand PASS; currency PASS (687).
+Verification: the ACTION carries the security/correctness weight and is unit-tested. The FORM (presentation) mirrors the proven provider claims form. NOT browser-verified — worktree has no .env, :3000 is held by a different (main-checkout) server lacking this branch's routes, no seeded provider session. Deferred to a run with env + seed (or post-merge deploy).
+FLAG: member picker is a free-text member-number input (like claims/new); an entitlement-scoped async picker is not built here (the intake enforces entitlement server-side regardless).
+Feature-flag state: none new (PROVIDER_PORTAL entitlement still behind the F1.11 D3 flag inside the intake).
+Next allowed package: F3.10 — Canonical PA detail read model/page (M).
+Stop condition observed: yes — submission page + its list-page affordances only.
+```
+
+---
