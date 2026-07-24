@@ -2222,6 +2222,8 @@ enum ClaimStatus {
   APPEAL_APPROVED
   APPEAL_DECLINED
   VOID
+  WITHDRAWN // F5.3 — provider withdrew the claim before decision (terminal)
+  SUPERSEDED // F5.3 — replaced by a corrected version in the submission chain (terminal)
 }
 
 enum ClaimSource {

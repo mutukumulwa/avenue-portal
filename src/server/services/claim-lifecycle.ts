@@ -14,18 +14,23 @@ import type { ClaimStatus } from "@prisma/client";
  * sanctioned owners cannot write an illegal move.
  */
 const TRANSITIONS: Record<ClaimStatus, ClaimStatus[]> = {
-  INCURRED: ["RECEIVED", "CAPTURED", "VOID"],
-  RECEIVED: ["CAPTURED", "UNDER_REVIEW", "APPROVED", "PARTIALLY_APPROVED", "DECLINED"],
-  CAPTURED: ["UNDER_REVIEW", "APPROVED", "PARTIALLY_APPROVED", "DECLINED"],
-  UNDER_REVIEW: ["APPROVED", "PARTIALLY_APPROVED", "DECLINED", "CAPTURED"],
+  // F5.3: WITHDRAWN + SUPERSEDED are reachable ONLY from pre-decision states — a
+  // decided/settled claim can never be silently withdrawn or superseded (it must go
+  // through void/appeal/reconsideration), preserving posted GL/settlement integrity.
+  INCURRED: ["RECEIVED", "CAPTURED", "VOID", "WITHDRAWN"],
+  RECEIVED: ["CAPTURED", "UNDER_REVIEW", "APPROVED", "PARTIALLY_APPROVED", "DECLINED", "WITHDRAWN", "SUPERSEDED"],
+  CAPTURED: ["UNDER_REVIEW", "APPROVED", "PARTIALLY_APPROVED", "DECLINED", "WITHDRAWN", "SUPERSEDED"],
+  UNDER_REVIEW: ["APPROVED", "PARTIALLY_APPROVED", "DECLINED", "CAPTURED", "WITHDRAWN", "SUPERSEDED"],
   APPROVED: ["PAID", "VOID", "APPEALED"],
   PARTIALLY_APPROVED: ["PAID", "VOID", "APPEALED"],
-  DECLINED: ["APPEALED"],
+  DECLINED: ["APPEALED"], // resubmission (F5.10) LINKS a new claim without re-marking DECLINED
   APPEALED: ["APPEAL_APPROVED", "APPEAL_DECLINED"],
   APPEAL_APPROVED: ["PAID", "VOID"],
   APPEAL_DECLINED: [],
   PAID: [],
   VOID: [],
+  WITHDRAWN: [], // terminal
+  SUPERSEDED: [], // terminal
 };
 
 /** Statuses from which an AUTOMATIC decision may execute (D17 eligibility). */

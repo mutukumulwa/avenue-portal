@@ -21,7 +21,7 @@ export async function reprocessClaimAction(claimId: string, trigger: "MANUAL_REP
     select: { id: true, claimRevision: true, status: true, intakeReceipts: { orderBy: { createdAt: "desc" }, take: 1, select: { id: true } } },
   });
   if (!claim) return { ok: false as const, error: "Claim not found." };
-  if (["APPROVED", "PARTIALLY_APPROVED", "DECLINED", "VOID", "SETTLED", "PAID"].includes(claim.status)) {
+  if (["APPROVED", "PARTIALLY_APPROVED", "DECLINED", "VOID", "SETTLED", "PAID", "WITHDRAWN", "SUPERSEDED"].includes(claim.status)) {
     return { ok: false as const, error: `The claim is already ${claim.status.replace(/_/g, " ")} — reprocessing applies only before a decision.` };
   }
   const receiptId = claim.intakeReceipts[0]?.id;

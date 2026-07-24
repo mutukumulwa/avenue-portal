@@ -295,7 +295,7 @@ export class ClaimsService {
     ]);
     if (!claim) throw new Error("Claim not found");
     if (!pa) throw new Error("Pre-authorization not found");
-    if (["PAID", "DECLINED", "VOID"].includes(claim.status)) {
+    if (["PAID", "DECLINED", "VOID", "WITHDRAWN", "SUPERSEDED"].includes(claim.status)) {
       throw new Error(`Cannot attach a pre-auth to a ${claim.status} claim`);
     }
     if (pa.claimId === claimId) return pa; // already attached here — idempotent

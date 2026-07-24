@@ -34,7 +34,7 @@ export async function AutomationPanel({ tenantId, claimId, claimStatus }: { tena
   const tl = await getClaimProcessingTimeline(prisma, tenantId, claimId);
   if (tl.receipts.length === 0 && tl.runs.length === 0) return null; // pre-canonical claim — nothing to explain
 
-  const decidable = !["APPROVED", "PARTIALLY_APPROVED", "DECLINED", "VOID", "SETTLED", "PAID"].includes(claimStatus);
+  const decidable = !["APPROVED", "PARTIALLY_APPROVED", "DECLINED", "VOID", "SETTLED", "PAID", "WITHDRAWN", "SUPERSEDED"].includes(claimStatus);
 
   return (
     <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-4">

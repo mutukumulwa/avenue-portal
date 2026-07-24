@@ -43,4 +43,29 @@ describe("claim lifecycle graph (F7.1)", () => {
     expect(isTerminalClaimStatus("RECEIVED")).toBe(false);
     expect(AUTO_DECIDABLE_STATUSES).toEqual(["RECEIVED", "CAPTURED", "UNDER_REVIEW"]);
   });
+
+  it("F5.3: WITHDRAWN + SUPERSEDED are terminal and reachable only from pre-decision states", () => {
+    expect(isTerminalClaimStatus("WITHDRAWN")).toBe(true);
+    expect(isTerminalClaimStatus("SUPERSEDED")).toBe(true);
+
+    // legal from pre-decision working states
+    for (const from of ["RECEIVED", "CAPTURED", "UNDER_REVIEW"] as const) {
+      expect(canTransitionClaim(from, "WITHDRAWN"), `${from}→WITHDRAWN`).toBe(true);
+      expect(canTransitionClaim(from, "SUPERSEDED"), `${from}→SUPERSEDED`).toBe(true);
+    }
+    expect(canTransitionClaim("INCURRED", "WITHDRAWN")).toBe(true); // a liability notice can be withdrawn
+
+    // ILLEGAL from decided/settled states — a decided/paid claim can never be silently
+    // withdrawn or superseded (must go through void/appeal/reconsideration); and a
+    // DECLINED claim stays DECLINED (resubmission LINKS, it does not supersede).
+    for (const [from, to] of [
+      ["APPROVED", "WITHDRAWN"], ["PARTIALLY_APPROVED", "SUPERSEDED"],
+      ["PAID", "WITHDRAWN"], ["PAID", "SUPERSEDED"],
+      ["VOID", "WITHDRAWN"], ["DECLINED", "SUPERSEDED"], ["DECLINED", "WITHDRAWN"],
+      ["WITHDRAWN", "RECEIVED"], ["SUPERSEDED", "RECEIVED"], // terminal — no exit
+    ] as const) {
+      expect(canTransitionClaim(from, to), `${from}→${to}`).toBe(false);
+      expect(() => assertClaimTransition(from, to)).toThrow(IllegalClaimTransition);
+    }
+  });
 });

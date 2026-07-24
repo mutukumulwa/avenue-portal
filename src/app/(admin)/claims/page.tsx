@@ -11,7 +11,7 @@ const PAGE_SIZE = 50;
 
 const STATUSES: ClaimStatus[] = [
   "INCURRED", "RECEIVED", "CAPTURED", "UNDER_REVIEW",
-  "APPROVED", "PARTIALLY_APPROVED", "DECLINED", "PAID", "APPEALED", "VOID",
+  "APPROVED", "PARTIALLY_APPROVED", "DECLINED", "PAID", "APPEALED", "VOID", "WITHDRAWN", "SUPERSEDED",
 ];
 const SERVICE_TYPES: ServiceType[] = ["OUTPATIENT", "INPATIENT", "DAY_CASE", "EMERGENCY"];
 
@@ -172,7 +172,7 @@ export default async function ClaimsPage({
                   serviceType: claim.serviceType,
                   contractTerms: (claim.contract as ContractSlaTerms | null) ?? null,
                 });
-                const decided = ["APPROVED", "PARTIALLY_APPROVED", "DECLINED", "PAID", "VOID"].includes(claim.status);
+                const decided = ["APPROVED", "PARTIALLY_APPROVED", "DECLINED", "PAID", "VOID", "WITHDRAWN", "SUPERSEDED"].includes(claim.status);
                 return (
                   <tr key={claim.id} className="hover:bg-[#F8F9FA] transition-colors">
                     <td className="px-6 py-4 font-mono text-brand-text-heading font-semibold">

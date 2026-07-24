@@ -144,7 +144,7 @@ async function stageDuplicate(ctx: EvalContext): Promise<StageOutcome> {
   const candidates = await ctx.db.claim.findMany({
     where: {
       tenantId: ctx.tenantId, providerId: ctx.claim.providerId, memberId: ctx.claim.memberId, benefitCategory: ctx.claim.benefitCategory as never,
-      id: { not: ctx.claimId }, strongEventFingerprint: null, status: { notIn: ["VOID", "DECLINED", "APPEAL_DECLINED"] },
+      id: { not: ctx.claimId }, strongEventFingerprint: null, status: { notIn: ["VOID", "DECLINED", "APPEAL_DECLINED", "WITHDRAWN", "SUPERSEDED"] },
       dateOfService: { gte: new Date(svc - windowMs), lte: new Date(svc + windowMs) },
     },
     select: { claimNumber: true }, take: 5,

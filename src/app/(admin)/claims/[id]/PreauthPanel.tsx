@@ -39,7 +39,7 @@ export async function PreauthPanel({
     }[];
   };
 }) {
-  const editable = !["PAID", "DECLINED", "VOID", "APPROVED", "PARTIALLY_APPROVED"].includes(claim.status);
+  const editable = !["PAID", "DECLINED", "VOID", "APPROVED", "PARTIALLY_APPROVED", "WITHDRAWN", "SUPERSEDED"].includes(claim.status);
 
   const candidates = editable
     ? await prisma.preAuthorization.findMany({
