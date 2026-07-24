@@ -122,7 +122,7 @@
 
 | Pkg | Title | Size | Status | Evidence |
 |---|---|---|---|---|
-| F5.1 | Characterize every claim-status consumer | M | NOT_STARTED | — |
+| F5.1 | Characterize every claim-status consumer | M | COMPLETE | `CLAIM_STATUS_CONSUMERS.md` (`fef86a6`) — read-only inventory of all `Claim.status` consumers (23 files): transition authorities, queues, **terminal-status assumptions (highest-risk group)**, APPEAL* legacy (APPEAL_APPROVED/DECLINED UNREACHABLE), reports/exclusions, money coupling, exhaustiveness map. **Key constraint: `claim-lifecycle.ts:TRANSITIONS` (Record⇒compile-forced) + `claim-status-mutation-guard.test.ts` ALLOWLIST** gate every new status-writer. Includes an F5 threading checklist + flagged supersession-vs-mutate fork (confirm F5.2/F5.3) |
 | F5.2 | Claim submission-chain schema | M | NOT_STARTED | — |
 | F5.3 | Lifecycle: withdrawal/supersession terminal | M | NOT_STARTED | — |
 | F5.4 | Create/backfill original chains (per batch) | S/batch | NOT_STARTED | — |

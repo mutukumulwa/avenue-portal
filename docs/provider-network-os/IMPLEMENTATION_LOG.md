@@ -1233,3 +1233,20 @@ Stop condition observed: yes — SLA sweeper + queue only.
 ```
 
 ---
+
+## F5.1 — Characterize every claim-status consumer (Phase F5 begins)
+
+```text
+Work package: F5.1
+Status: COMPLETE
+Commit: fef86a6
+Files changed: docs/provider-network-os/CLAIM_STATUS_CONSUMERS.md (new). No code/schema — read-only characterization (like F0.x).
+Method: full src/ sweep (search agent) + verified against claim-lifecycle.ts and the mutation-guard test.
+Findings (authoritative for F5.2–F5.17): ClaimStatus has 12 values. THE central authority is claim-lifecycle.ts — TRANSITIONS is a Record<ClaimStatus, ClaimStatus[]> so adding an enum value is a COMPILE ERROR there until handled (the one forced point); isTerminalClaimStatus is graph-derived. claim-status-mutation-guard.test.ts walks src/** and fails on any claim.update({status}) outside its ALLOWLIST (and on stale entries) — every F5 status-writer must be allowlisted + go through assertClaimTransition. Writers today: persist.ts (create RECEIVED), claim-decision (decide/void), claim-adjudication (appeal→APPEALED, settle→PAID), reimbursement (→PAID), pre-decision admin/fraud actions. Terminal/"open"/"decided" assumptions are scattered across ~15 gates (group 3) + report-exclusions.FULLY_DECLINED (group 5) — the silent-omission risk. APPEAL_APPROVED/APPEAL_DECLINED are UNREACHABLE (never written) — appeal-resolution unimplemented (F5.17 consolidates). Exhaustiveness: only TRANSITIONS is compiler-forced; curated arrays + includes/in gates are silent; badge renderers are cosmetic (default fallback).
+Deliverable: the doc's "Implications for F5" is an ordered threading checklist + a flagged DESIGN FORK — F5 prefers a submission-chain/supersession model (a corrected/resubmitted claim is a NEW linked claim, original superseded) over in-place status flips, to keep already-posted GL/settlement/usage intact. Confirm at F5.2/F5.3.
+Quality: docs only; brand PASS; currency PASS (705). No tsc/test run needed.
+Next allowed package: F5.2 — Claim submission-chain schema (M).
+Stop condition observed: yes — characterization only.
+```
+
+---
