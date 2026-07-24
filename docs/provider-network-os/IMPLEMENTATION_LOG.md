@@ -717,3 +717,24 @@ Stop condition observed: yes — no route migration.
 ```
 
 ---
+
+## F3.3 — Implement PreauthIntakeService
+
+```text
+Work package: F3.3
+Status: COMPLETE
+Files changed: src/server/services/preauth-intake/service.ts (new), tests/services/preauth-intake-service.test.ts, PROGRESS.md + IMPLEMENTATION_LOG.md
+Schema/data changes: none (uses F3.2 receipt/event models + existing PreAuthorization + createWithDocumentNumber)
+Behavior delivered: PreauthIntakeService.submit(ctx, submission, deps, db) — normalize+validate (F3.1) → replay/conflict on the existing receipt → entitlement-aware member resolution (reuses ProviderAccessSettings flag + entitledMemberWhere at the service date, like F1.12; default OFF ⇒ tenant-only) → member-active + provider-active gates → ONE transaction {PA via collision-safe numbering + receipt(PROCESSING) + SUBMITTED event + SLA deadline} → post-commit handoff to the injectable adjudicate port → flip receipt ACCEPTED on success. NEVER decides or touches a hold — the port is the canonical owner (D5/D6). No existing rail migrated (stop condition).
+Authorization evidence: provider-bound channel forgery (body providerId≠context) → REJECTED with PROVIDER_FORGERY; cross-tenant/entitlement-excluded member → REJECTED; provider-not-active → REJECTED. All rejects create a receipt with NO PA.
+Idempotency/concurrency evidence: same key+hash → replay (same PA, adjudicate NOT called again — spy proves exactly-once); same key+different hash → PreauthIntakeConflict, zero rows created; the receipt UNIQUE(tenant,provider,channel,key) is the concurrency guard — a racing submit that loses the receipt insert re-reads and replays the winner.
+Privacy/security evidence: money as exact Decimal strings (F3.1); event metadata safe-only (F3.2); a REJECTED submission persists ids + failureCode, no clinical body.
+Money/reconciliation evidence: no hold/decision here — those stay with preauthAdjudicationService; a handoff failure never double-decides (port must be idempotent).
+Focused tests and results: 7/7 (happy one-PA+once, replay no-re-adjudicate, conflict no-mutation, validation reject no-PA, cross-tenant+inactive member reject, forgery reject, adjudication-failure ⇒ receipt PROCESSING + PA SUBMITTED + AUTO_DECISION_DEFERRED event). Full suite 1191 passed / 190 skipped (+7 DB). tsc 0 (fixed Json casts via `as unknown as Prisma.InputJsonValue`); brand PASS; currency PASS.
+Feature-flag state: none (service is inert until a rail calls it — F3.4/F3.5)
+Known limitations: create-time fraud + benefit-in-package gates (ClaimsService.createPreAuth has them) are NOT replicated — the canonical auto-decision pipeline runs FRAUD_SCREENING + BENEFIT_CAP, so intake creates + routes (Autopilot D6 accept-and-route). The CONFLICTING dual auto-approve policy is untouched — it is F3.5's decision when the member rail migrates. Clean-document validation at submit deferred to F3.9 (the submission page attaches docs via the F2 flow). Production adjudicate adapter (wraps preauthAdjudicationService.executeAutoDecision + a system actor) is wired at the F3.4/F3.5 call sites, not here.
+Next allowed package: F3.4 — Migrate provider B2B PA submit (S)
+Stop condition observed: yes — no rail migrated.
+```
+
+---
