@@ -101,7 +101,7 @@ export default async function ProviderPreauth({
               <tbody>
                 {preauths.map((pa) => (
                   <tr key={pa.id} className="border-b border-[#F4F4F4] last:border-0 hover:bg-[#F8F9FA]">
-                    <td className="px-5 py-2.5 font-mono text-xs font-semibold text-brand-text-heading">{pa.preauthNumber}</td>
+                    <td className="px-5 py-2.5"><Link href={`/provider/preauth/${pa.id}`} className="font-mono text-xs font-semibold text-brand-indigo">{pa.preauthNumber}</Link></td>
                     <td className="px-5 py-2.5">
                       {pa.member.firstName} {pa.member.lastName}{" "}
                       <span className="text-brand-text-muted text-xs">({pa.member.memberNumber})</span>

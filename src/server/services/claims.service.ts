@@ -385,25 +385,6 @@ export class ClaimsService {
   // ─── PRE-AUTHORIZATIONS ─────────────────────────────────
 
   /**
-   * Get a single pre-authorization with full details
-   */
-  static async getPreAuthById(tenantId: string, id: string) {
-    return prisma.preAuthorization.findUnique({
-      where: { id, tenantId },
-      include: {
-        member: {
-          include: {
-            group: { select: { id: true, name: true } },
-          },
-        },
-        provider: true,
-        claim: true,
-        documents: { orderBy: { createdAt: "desc" } },
-      },
-    });
-  }
-
-  /**
    * Stage 1 of two-stage review: move a SUBMITTED inpatient pre-auth to UNDER_REVIEW.
    */
   static async markPreAuthUnderReview(tenantId: string, preauthId: string) {

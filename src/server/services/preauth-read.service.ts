@@ -26,6 +26,14 @@ export interface PreauthListScope {
   status?: PreauthStatus;
 }
 
+export interface PreauthDetailScope {
+  tenantId: string;
+  /** Client confinement (G2.1): out-of-client PAs resolve to null (non-enumerating). */
+  clientId?: string | null;
+  /** Provider scoping: a provider surface passes its own providerId; out-of-provider ⇒ null. */
+  providerId?: string;
+}
+
 export const PreauthReadService = {
   async list(scope: PreauthListScope) {
     const where: Prisma.PreAuthorizationWhereInput = {
@@ -41,6 +49,29 @@ export const PreauthReadService = {
         provider: { select: { id: true, name: true, type: true } },
       },
       orderBy: { createdAt: "desc" },
+    });
+  },
+
+  /**
+   * Canonical scoped detail read. Non-enumerating: an id outside the caller's
+   * scope (wrong tenant / client / provider) resolves to null rather than a 403,
+   * so a caller cannot probe for the existence of out-of-scope PAs. Same include
+   * shape as the retired ClaimsService.getPreAuthById so consumers are unchanged.
+   */
+  async getById(scope: PreauthDetailScope, id: string) {
+    return prisma.preAuthorization.findFirst({
+      where: {
+        id,
+        tenantId: scope.tenantId,
+        ...(scope.providerId ? { providerId: scope.providerId } : {}),
+        ...(scope.clientId ? { member: { group: { clientId: scope.clientId } } } : {}),
+      },
+      include: {
+        member: { include: { group: { select: { id: true, name: true } } } },
+        provider: true,
+        claim: true,
+        documents: { orderBy: { createdAt: "desc" } },
+      },
     });
   },
 } as const;

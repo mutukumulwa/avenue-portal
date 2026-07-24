@@ -39,7 +39,8 @@ vi.mock("@/server/services/preauth-intake/service", () => ({
   },
 }));
 const readList = vi.hoisted(() => vi.fn(async () => ["pa-list"] as unknown[]));
-vi.mock("@/server/services/preauth-read.service", () => ({ PreauthReadService: { list: readList } }));
+const readGetById = vi.hoisted(() => vi.fn(async () => ({ id: "pa-1", status: "SUBMITTED" }) as unknown));
+vi.mock("@/server/services/preauth-read.service", () => ({ PreauthReadService: { list: readList, getById: readGetById } }));
 
 import { preauthRouter } from "@/server/trpc/routers/preauth";
 import { createCallerFactory } from "@/server/trpc/trpc";
@@ -63,7 +64,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   cap.submitArgs = null;
   cap.submitResult = { receiptId: "r1", status: "ACCEPTED", replayed: false, preauthId: "pa-1" };
-  claimsServiceMock.getPreAuthById.mockResolvedValue({ id: "pa-1", status: "SUBMITTED" });
+  readGetById.mockResolvedValue({ id: "pa-1", status: "SUBMITTED" });
 });
 
 describe("F3.5c tRPC PA create → canonical pipeline", () => {
@@ -76,7 +77,8 @@ describe("F3.5c tRPC PA create → canonical pipeline", () => {
     expect((submission.diagnoses as Array<Record<string, unknown>>)[0]).toMatchObject({ icdCode: "B54", description: "Malaria" });
     expect((submission.procedures as Array<Record<string, unknown>>)[0]).toMatchObject({ cptCode: "99213", unitCost: 8000, total: 8000 });
     expect(res).toEqual({ id: "pa-1", status: "SUBMITTED" });
-    expect(claimsServiceMock.getPreAuthById).toHaveBeenCalledWith("t1", "pa-1");
+    // F3.10: read back via the canonical read model, unscoped (return what was just created)
+    expect(readGetById).toHaveBeenCalledWith({ tenantId: "t1" }, "pa-1");
   });
 
   it("no longer calls ClaimsService.createPreAuth", async () => {
@@ -96,7 +98,7 @@ describe("F3.5c tRPC PA create → canonical pipeline", () => {
     const err = (await caller().create(input).catch((e: unknown) => e)) as { code?: string; message?: string };
     expect(err.code).toBe("BAD_REQUEST");
     expect(err.message).toBe("At least one diagnosis is required");
-    expect(claimsServiceMock.getPreAuthById).not.toHaveBeenCalled();
+    expect(readGetById).not.toHaveBeenCalled();
   });
 
   it("the router source has no path into ClaimsService.createPreAuth (structural)", () => {
@@ -115,5 +117,24 @@ describe("F3.7 tRPC PA list → canonical read model (client confinement)", () =
   it("an operator session (no clientId) passes null (all clients in tenant)", async () => {
     await callerAs(undefined).list();
     expect(readList).toHaveBeenCalledWith({ tenantId: "t1", clientId: null });
+  });
+});
+
+describe("F3.10 tRPC PA getById → canonical detail read (client confinement)", () => {
+  it("passes the confined clientId to the read model and returns the PA", async () => {
+    const res = await callerAs("cl-1").getById({ id: "pa-1" });
+    expect(readGetById).toHaveBeenCalledWith({ tenantId: "t1", clientId: "cl-1" }, "pa-1");
+    expect(res).toEqual({ id: "pa-1", status: "SUBMITTED" });
+  });
+
+  it("an operator (no clientId) passes null", async () => {
+    await callerAs(undefined).getById({ id: "pa-1" });
+    expect(readGetById).toHaveBeenCalledWith({ tenantId: "t1", clientId: null }, "pa-1");
+  });
+
+  it("a non-enumerating null (out of scope) → NOT_FOUND", async () => {
+    readGetById.mockResolvedValueOnce(null);
+    const err = (await callerAs("cl-1").getById({ id: "pa-x" }).catch((e: unknown) => e)) as { code?: string };
+    expect(err.code).toBe("NOT_FOUND");
   });
 });

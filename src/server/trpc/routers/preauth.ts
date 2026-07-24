@@ -18,7 +18,12 @@ export const preauthRouter = createTRPCRouter({
   getById: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      return ClaimsService.getPreAuthById(ctx.tenantId, input.id);
+      // F3.10: canonical scoped detail read + client confinement (G2.1). A confined
+      // operator opening another client's PA gets a non-enumerating NOT_FOUND (was a
+      // gap — the old getById was tenant-only, unlike the claims router's getById).
+      const pa = await PreauthReadService.getById({ tenantId: ctx.tenantId, clientId: ctx.clientId ?? null }, input.id);
+      if (!pa) throw new TRPCError({ code: "NOT_FOUND" });
+      return pa;
     }),
 
   create: protectedProcedure
@@ -65,7 +70,8 @@ export const preauthRouter = createTRPCRouter({
       if (result.status === "REJECTED" || !result.preauthId) {
         throw new TRPCError({ code: "BAD_REQUEST", message: result.errors?.[0]?.message ?? "Pre-authorization could not be submitted." });
       }
-      return ClaimsService.getPreAuthById(ctx.tenantId, result.preauthId);
+      // Read back the freshly-created PA (unscoped by client — return exactly what was just created).
+      return PreauthReadService.getById({ tenantId: ctx.tenantId }, result.preauthId);
     }),
 
   adjudicate: protectedProcedure
