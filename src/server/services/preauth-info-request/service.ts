@@ -21,6 +21,8 @@ type Db = PrismaClient | Prisma.TransactionClient;
 export const INFO_REQUEST_OPENABLE_PA_STATUSES = ["SUBMITTED", "UNDER_REVIEW"];
 /** A request may be withdrawn until it is accepted/closed. */
 export const INFO_REQUEST_CANCELLABLE_STATUSES = ["OPEN", "RESPONDED", "REOPENED"];
+/** The provider may respond only while the request is awaiting them. */
+export const INFO_REQUEST_RESPONDABLE_STATUSES = ["OPEN", "REOPENED"];
 export const DEFAULT_INFO_REQUEST_DUE_HOURS = 72;
 
 export class InfoRequestError extends Error {
@@ -123,6 +125,50 @@ export const PreauthInfoRequestService = {
           tenantId: params.tenantId,
           preAuthorizationId: existing.preAuthorizationId,
           eventType: "INFO_REQUEST_CANCELLED",
+          actorType: params.actor.type,
+          actorId: params.actor.id ?? null,
+          metadata: { infoRequestId: existing.id },
+        },
+        tx,
+      );
+      return updated;
+    });
+  },
+
+  /**
+   * F4.3 — the provider explicitly submits a response to a request awaiting them.
+   * The draft is client-side form state (F4.7); the server persists ONLY the
+   * explicitly-submitted response. When `providerId` is passed (the provider
+   * surface), the request must belong to that facility — otherwise a non-
+   * enumerating NOT_FOUND (no cross-provider probing). Atomic with a
+   * RESPONSE_SUBMITTED PA event (safe metadata; the response text stays on the row).
+   */
+  async submitResponse(
+    params: { tenantId: string; id: string; providerId?: string; responseNote: string; actor: { type: string; id?: string } },
+    db: Db = prisma,
+  ) {
+    const note = (params.responseNote ?? "").trim();
+    if (!note) throw new InfoRequestError("NO_RESPONSE", "Enter a response before submitting.");
+
+    const existing = await db.preauthInfoRequest.findFirst({
+      where: { id: params.id, tenantId: params.tenantId, ...(params.providerId ? { providerId: params.providerId } : {}) },
+      select: { id: true, status: true, preAuthorizationId: true },
+    });
+    if (!existing) throw new InfoRequestError("NOT_FOUND", "Information request not found.");
+    if (!INFO_REQUEST_RESPONDABLE_STATUSES.includes(existing.status)) {
+      throw new InfoRequestError("NOT_RESPONDABLE", `A ${existing.status.toLowerCase()} information request is not awaiting a response.`);
+    }
+
+    return db.$transaction(async (tx) => {
+      const updated = await tx.preauthInfoRequest.update({
+        where: { id: existing.id },
+        data: { status: "RESPONDED", responseNote: note, respondedByActorId: params.actor.id ?? null, respondedAt: new Date() },
+      });
+      await appendPreauthEvent(
+        {
+          tenantId: params.tenantId,
+          preAuthorizationId: existing.preAuthorizationId,
+          eventType: "RESPONSE_SUBMITTED",
           actorType: params.actor.type,
           actorId: params.actor.id ?? null,
           metadata: { infoRequestId: existing.id },

@@ -98,4 +98,29 @@ describe.skipIf(!URL_SET)("F4.2 PreauthInfoRequestService (opt-in DB)", () => {
     const missing = await Svc.cancel({ tenantId: t, id: "nope", actor: reviewer }).catch((e) => e);
     expect(missing.code).toBe("NOT_FOUND");
   });
+
+  it("submitResponse: OPEN → RESPONDED + RESPONSE_SUBMITTED, guarding note/provider/state (F4.3)", async () => {
+    const pa = await world.createPreauth({ providerId: world.providers.a.id });
+    const t = world.tenants.alpha.id;
+    const provUser = { type: "USER", id: "prov-user" };
+    const ir = await Svc.open({ tenantId: t, preAuthorizationId: pa.id, requestedItems: ["LAB_RESULTS"], prompt: "labs", actor: reviewer });
+
+    const noNote = await Svc.submitResponse({ tenantId: t, id: ir.id, responseNote: "  ", actor: provUser }).catch((e) => e);
+    expect(noNote.code).toBe("NO_RESPONSE");
+
+    // another facility (same tenant) cannot respond → non-enumerating NOT_FOUND
+    const wrongProv = await Svc.submitResponse({ tenantId: t, id: ir.id, providerId: world.providers.b.id, responseNote: "x", actor: provUser }).catch((e) => e);
+    expect(wrongProv.code).toBe("NOT_FOUND");
+
+    const responded = await Svc.submitResponse({ tenantId: t, id: ir.id, providerId: world.providers.a.id, responseNote: "Labs attached in the portal.", actor: provUser });
+    expect(responded.status).toBe("RESPONDED");
+    expect(responded.responseNote).toBe("Labs attached in the portal.");
+    expect(responded.respondedAt).not.toBeNull();
+
+    const evs = await events.listPreauthEvents(pa.id);
+    expect(evs.some((e) => e.eventType === "RESPONSE_SUBMITTED")).toBe(true);
+
+    const again = await Svc.submitResponse({ tenantId: t, id: ir.id, providerId: world.providers.a.id, responseNote: "y", actor: provUser }).catch((e) => e);
+    expect(again.code).toBe("NOT_RESPONDABLE");
+  });
 });
