@@ -1,28 +1,38 @@
 import { prisma } from "@/lib/prisma";
 import { formatPricingRule } from "@/lib/format-pricing-rule";
 import {
-  addApplicabilityAction, attachBranchAction, detachBranchAction,
+  addApplicabilityAction, removeApplicabilityAction, attachBranchAction, detachBranchAction,
   createProviderBranchAction, addTariffLineAction, deactivateTariffAction, addExclusionAction,
   addPricingRuleAction, deactivatePricingRuleAction,
 } from "./manage-actions";
 
 const inp = "rounded border border-gray-200 px-2 py-1 text-xs";
 
-// Management widgets for a contract (spec §11.2/§11.4/§11.5). Add/remove forms
-// are shown only while the contract is editable (DRAFT / PENDING_CLARIFICATION).
+// Management widgets for a contract (spec §11.2/§11.4/§11.5). Structural
+// add/remove forms (tariffs, rules, packages, branches) are shown only while
+// the contract is editable (DRAFT / PENDING_CLARIFICATION). Applicability
+// (payers / schemes) is a routine mid-term amendment, so its add/remove
+// controls are gated on `applicabilityEditable` instead — which also covers
+// ACTIVE contracts (F76-GAP-01).
 export async function ManagePanel({
-  contractId, providerId, branchScope, editable,
+  contractId, providerId, branchScope, editable, applicabilityEditable,
 }: {
-  contractId: string; providerId: string; branchScope: string; editable: boolean;
+  contractId: string; providerId: string; branchScope: string;
+  editable: boolean; applicabilityEditable: boolean;
 }) {
-  const [clients, branches, contractBranches, tariffs, exclusions, pricingRules] = await Promise.all([
+  const [clients, branches, contractBranches, tariffs, exclusions, pricingRules, applicability] = await Promise.all([
     prisma.client.findMany({ where: { operatorTenant: { providers: { some: { id: providerId } } } }, select: { id: true, name: true }, orderBy: { name: "asc" } }).catch(() => []),
     prisma.providerBranch.findMany({ where: { providerId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
     prisma.contractBranch.findMany({ where: { contractId }, include: { branch: { select: { name: true } } } }),
     prisma.providerTariff.findMany({ where: { contractId, isActive: true }, orderBy: { serviceName: "asc" } }),
     prisma.providerContractExclusion.findMany({ where: { contractId } }),
     prisma.pricingRule.findMany({ where: { contractId, isActive: true }, orderBy: { priority: "asc" } }),
+    prisma.contractApplicability.findMany({ where: { contractId, isActive: true }, include: { client: { select: { name: true } } } }),
   ]);
+
+  // A live amendment = applicability is editable but the wider contract is not,
+  // i.e. an in-force (ACTIVE) contract. These changes require a reason.
+  const liveAmendment = applicabilityEditable && !editable;
 
   const hiddenId = <input type="hidden" name="contractId" value={contractId} />;
 
@@ -79,10 +89,40 @@ export async function ManagePanel({
         )}
       </section>
 
-      {/* Applicability */}
+      {/* Applicability — editable while DRAFT and, unlike the structural
+          widgets, while ACTIVE too (F76-GAP-01: adding/removing a payer on a
+          live contract is routine TPA work). Live changes require a reason. */}
       <section className="rounded-xl border border-gray-200 bg-white p-5">
         <h2 className="text-sm font-semibold text-[#000523] mb-3">Applicability (payers / schemes)</h2>
-        {editable && (
+
+        {liveAmendment && (
+          <p className="mb-3 rounded-lg bg-[#FFF8E1] px-3 py-2 text-xs text-[#856404]">
+            This contract is <span className="font-semibold">ACTIVE</span>. Adding or removing a payer changes who it
+            covers mid-term — a reason is required and recorded in the audit trail.
+          </p>
+        )}
+
+        {applicabilityEditable && applicability.length > 0 && (
+          <ul className="mb-3 space-y-1 text-xs">
+            {applicability.map(a => (
+              <li key={a.id} className="flex items-center justify-between gap-3">
+                <span>
+                  {a.inclusionType === "EXCLUDE" ? "Exclude " : ""}{a.client.name}
+                  {a.benefitCategory ? ` · ${a.benefitCategory}` : ""}
+                  {a.memberCategory ? ` · ${a.memberCategory}` : ""}
+                </span>
+                <form action={removeApplicabilityAction} className="flex items-center gap-2">
+                  {hiddenId}
+                  <input type="hidden" name="applicabilityId" value={a.id} />
+                  {liveAmendment && <input name="reason" required minLength={5} placeholder="Reason…" className={`${inp} w-40`} />}
+                  <button className="text-[#DC3545] shrink-0">remove</button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        {applicabilityEditable && (
           <form action={addApplicabilityAction} className="mb-3 flex flex-wrap items-end gap-2">
             {hiddenId}
             <select name="clientId" required className={inp} defaultValue="">
@@ -92,6 +132,7 @@ export async function ManagePanel({
             <input name="benefitCategory" placeholder="Benefit (opt)" className={inp} />
             <input name="memberCategory" placeholder="Member category (opt)" className={inp} />
             <select name="inclusionType" className={inp} defaultValue="INCLUDE"><option>INCLUDE</option><option>EXCLUDE</option></select>
+            {liveAmendment && <input name="reason" required minLength={5} placeholder="Reason for amending a live contract…" className={`${inp} w-56`} />}
             <button className="rounded bg-[#06B9AB] px-3 py-1 text-xs font-medium text-white">Add</button>
           </form>
         )}

@@ -57,11 +57,26 @@ async function auditManage(userId: string, contract: { id: string; contractNumbe
 }
 
 // ── Applicability (§5.4) ──
+// These actions are intentionally NOT contract-status-gated: applicability
+// (which payers/schemes a contract covers) is a routine mid-term amendment on a
+// live contract too (F76-GAP-01). Governance = the UNDERWRITING role gate above,
+// a required reason on an ACTIVE contract (the confirmation), and the audit
+// below. We deliberately do NOT route through the approval matrix: no other
+// contract mutation does — every sibling here (tariffs, rules, packages,
+// lifecycle) is role + audit — and the matrix's contract action types
+// (PROVIDER_TARIFF_CHANGE / SCHEME_ACTIVATION) are unwired, so this is the
+// lightest option consistent with how live contracts are already governed.
+const LIVE_AMENDMENT_REASON_REQUIRED =
+  "A reason is required to amend a live (ACTIVE) contract";
+
 export async function addApplicabilityAction(fd: FormData) {
   return guardedManage(fd, async () => {    const session = await requireRole(ROLES.UNDERWRITING);
     const c = await ownedContract(fd, session.user.tenantId);
     const clientId = s(fd, "clientId");
     if (!clientId) redirect(`/contracts/${c.id}?error=Select+a+payer`);
+    const live = c.status === "ACTIVE";
+    const reason = s(fd, "reason");
+    if (live && !reason) redirect(`/contracts/${c.id}?error=${encodeURIComponent(LIVE_AMENDMENT_REASON_REQUIRED)}`);
     await prisma.contractApplicability.create({
       data: {
         contractId: c.id,
@@ -71,7 +86,10 @@ export async function addApplicabilityAction(fd: FormData) {
         inclusionType: (s(fd, "inclusionType") as EligibilityRule) ?? "INCLUDE",
       },
     });
-    await auditManage(session.user.id, c, "CONTRACT_APPLICABILITY_ADDED", "applicability row added");
+    await auditManage(
+      session.user.id, c, "CONTRACT_APPLICABILITY_ADDED",
+      live ? `payer/scheme added to ACTIVE contract — ${reason}` : "applicability row added",
+    );
     back(c.id);
   });
 }
@@ -80,8 +98,14 @@ export async function removeApplicabilityAction(fd: FormData) {
   return guardedManage(fd, async () => {    const session = await requireRole(ROLES.UNDERWRITING);
     const c = await ownedContract(fd, session.user.tenantId);
     const id = s(fd, "applicabilityId");
+    const live = c.status === "ACTIVE";
+    const reason = s(fd, "reason");
+    if (live && !reason) redirect(`/contracts/${c.id}?error=${encodeURIComponent(LIVE_AMENDMENT_REASON_REQUIRED)}`);
     if (id) await prisma.contractApplicability.update({ where: { id }, data: { isActive: false } });
-    await auditManage(session.user.id, c, "CONTRACT_APPLICABILITY_REMOVED", "applicability row removed");
+    await auditManage(
+      session.user.id, c, "CONTRACT_APPLICABILITY_REMOVED",
+      live ? `payer/scheme removed from ACTIVE contract — ${reason}` : "applicability row removed",
+    );
     back(c.id);
   });
 }
