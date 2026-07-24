@@ -1464,3 +1464,30 @@ Stop condition observed: yes — the resubmission submit + its UI; NO reconsider
 ```
 
 ---
+
+## F5.11 — Reconsideration schema and reason policy
+
+```text
+Work package: F5.11
+Status: COMPLETE
+Commit: f2654ba
+Proof-before-build classification: MISSING. No ClaimReconsideration model/enum existed. RECONSIDERATION was already in DocumentTargetType + ClaimSubmissionType; DocumentUploadIntent uses a generic targetType/targetId so evidence needs no Document change; PreAuthorizationEvent is the event pattern (safeReasonCode vs internalReasonRef).
+Files changed: prisma/schema.prisma (+ReconsiderationStatus enum + ClaimReconsideration + ClaimReconsiderationLine + ClaimReconsiderationEvent — ADDITIVE), src/server/services/claim-reconsideration/policy.ts (new — pure), tests/factories/provider-network.ts (teardown clears the 3 satellites), tests/services/claim-reconsideration-policy.test.ts + claim-reconsideration-schema.test.ts (new).
+Schema/data changes: ADDITIVE. 3 new relation-less satellite models + 1 enum, pushed to the throwaway PG (54329, verified: tables + the 11-value enum). PROD applies on the next build's prisma db push (same as F4.1/F4.8). No status-writer (F5.16 executes outcomes) ⇒ NO mutation-guard entry.
+Behavior delivered: the reconsideration schema (§7.8 / D13) + the pure reason/deadline/decimal/projection policy. ClaimReconsideration is a governed case challenging a DECIDED claim (D13 — the original claim status + money are NEVER mutated by a reconsideration). It carries tenant/client/provider/branch, the disputed claimId + chain root (relation-less), a catalog reason + provider narrative, the requested amount + currency, filing deadline + filed time, the 11-state status, triage/assignment (originalAdjudicatorId for the SoD warning), a SAFE-vs-INTERNAL outcome split, an accepted-outcome supplemental claim id, SLA fields, and idempotencyKey + version (optimistic concurrency / idempotent submit). ClaimReconsiderationLine freezes the original line economics + the requested/reviewer-corrected amounts + prior approved/paid + the maxIncrement ceiling + the awardedIncrement (all Decimal(14,2)). ClaimReconsiderationEvent mirrors PreAuthorizationEvent (append-only, seq-unique per case, safeReasonCode vs internalReasonRef pointer, a safe message field for the info-request/response exchange). The pure policy owns: the filing-reason catalog + eligibility by decision/line-category; the deadline resolution ORDER (contract → client → platform-default 60 days, from the DECISION date, UTC day-inclusive/timezone-safe); the exact decimal invariants (max increment = corrected full entitlement less all prior approved/paid, never negative; awarded 0..max; supplemental ceiling = sum of awarded deltas); the structural checks (a line must belong to the case's claim; provider + currency must match the claim); and the safe-vs-internal separation (the provider projection is an explicit allow-list that drops originalAdjudicatorId / outcomeInternalNotes / assignedReviewerId / assignedTeam / internal refs).
+Authorization evidence: N/A — schema + pure policy (no service, no ctx; F5.12 adds the eligibility+submit service).
+Idempotency/concurrency evidence: schema-level — ClaimReconsideration has version Int @default(1) (optimistic) + @@unique([tenantId, idempotencyKey]) (idempotent submit; NULLs distinct ⇒ keyless drafts unaffected); ClaimReconsiderationEvent @@unique([reconsiderationId, sequence]) (proven by the round-trip P2002 test).
+Privacy/security evidence: the outcome/event models keep safeReasonCode (provider-safe) separate from internalReasonRef (a POINTER, never the detail) + outcomeInternalNotes; toProviderReconsiderationProjection is proven to exclude every internal field (no internal string leaks into the JSON).
+Money/reconciliation evidence: the line decimal invariants are exact (Decimal): maxIncrement never negative; awarded cannot be negative or exceed the maximum; zero/negative award ⇒ no supplemental (the ceiling helper). Original claim money is untouched (D13; no writer here).
+Focused tests and results: policy 10/10 (reason eligibility by decision incl. unknown/pre-decision; deadline resolution order UTC-inclusive; max-increment/awarded-bounds/sum; line-belongs-to-claim; provider/currency consistency; provider projection excludes internal) + schema round-trip 1/1 (real DB — case ← lines ← events relations, Decimal(14,2) values, per-case event sequence uniqueness = P2002, indexed claim lookup). Full suite 1350 pass / 256 skip; factory DB batch 46/46; tsc clean; brand + currency green.
+Typecheck/schema result: prisma validate OK; prisma format OK; prisma db push → in sync (throwaway 54329); prisma generate OK; tsc --noEmit clean.
+Manual/visual evidence: N/A — schema + policy (no UI, no service).
+Feature-flag state: none. Inert schema + pure policy until the F5.12+ services read/write it.
+Backfill/rollout impact: additive schema only; prod applies on next build's prisma db push. No data migration.
+Known limitations: "message" is carried on the event model (a safe message field) rather than a separate thread model — sufficient for the info-request/response exchange; a richer thread can be added if F5.14 needs it. The shared node_modules Prisma client now includes these models (harmless superset to the concurrent claims-autopilot session — regenerate defensively).
+Unrelated worktree changes preserved: yes — worktree contained only F5.11 changes; the main-checkout dirty UAT files are untouched.
+Next allowed package: F5.12 — Implement reconsideration eligibility and submit (M). Depends on F5.9 + F5.11. Provider creates ONE governed reconsideration (idempotent, versioned) WITHOUT changing claim state/money; reuse the F5.11 policy for reason/deadline/decimal/consistency; SUBMITTED + a first event; no reviewer/outcome yet.
+Stop condition observed: yes — schema + pure policy only; NO service.
+```
+
+---
