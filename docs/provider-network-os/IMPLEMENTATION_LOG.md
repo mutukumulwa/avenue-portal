@@ -1064,3 +1064,22 @@ Stop condition observed: yes — schema + catalog only.
 ```
 
 ---
+
+## F4.2 — Information-request open/cancel service
+
+```text
+Work package: F4.2
+Status: COMPLETE
+Commit: 5787af9
+ASSUMPTION (board-only): "Request open/cancel service" = reviewer-side OPEN + CANCEL on the F4.1 schema; provider response (F4.3) + reviewer accept/reopen/close (F4.4) separate. Flagged.
+Files changed: src/server/services/preauth-info-request/service.ts (new), src/server/services/preauth-intake/events.ts (+INFO_REQUEST_CANCELLED type), tests/factories/provider-network.ts (teardown clears preauthInfoRequest), tests/services/preauth-info-request-service.test.ts (new)
+Schema/data changes: none (uses the F4.1 model + F3.2 event log)
+Behavior delivered: PreauthInfoRequestService.open — normalizes requestedItems against the F4.1 catalog (empty ⇒ NO_ITEMS), requires a prompt (NO_PROMPT), loads the tenant-scoped PA (PA_NOT_FOUND), requires SUBMITTED/UNDER_REVIEW (PA_NOT_OPENABLE); in ONE tx derives the per-PA sequence, creates the OPEN request (provider/member/clientId from the PA, dueAt = now + 72h default), and appends an INFO_REQUESTED PA event with SAFE metadata { infoRequestId, sequence, itemCount } (never the prompt/clinical text). Does NOT change PA status. cancel — withdraws OPEN/RESPONDED/REOPENED → CANCELLED + INFO_REQUEST_CANCELLED event; guards terminal states (NOT_CANCELLABLE) + NOT_FOUND. Typed InfoRequestError(code,message) for all business violations. Constants exported: INFO_REQUEST_OPENABLE_PA_STATUSES, INFO_REQUEST_CANCELLABLE_STATUSES, DEFAULT_INFO_REQUEST_DUE_HOURS.
+No UI/permission here (actor-parameterized; F4.4 surface enforces the reviewer permission). Added INFO_REQUEST_CANCELLED to PREAUTH_EVENT_TYPES (the union already had INFO_REQUESTED/RESPONSE_SUBMITTED/RESPONSE_ACCEPTED). Factory teardown extended for the F4.1 satellite.
+Evidence: service test (4, REAL DB throwaway PG): open normalizes items + provider/member scope + SLA + INFO_REQUESTED event (prompt NOT in metadata); per-PA sequence 1,2; rejects empty-items/empty-prompt/unknown-PA/non-pre-decision-PA with correct codes; cancel → CANCELLED + event, guards NOT_CANCELLABLE + NOT_FOUND. Full suite (no DB env) 1281 pass / 199 skip. tsc 0; brand PASS; currency PASS (697).
+Feature-flag state: none.
+Next allowed package: F4.3 — Provider draft + explicit response submit (M).
+Stop condition observed: yes — open/cancel only (no provider response, no reviewer decision).
+```
+
+---
