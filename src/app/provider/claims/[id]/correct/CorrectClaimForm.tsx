@@ -3,8 +3,11 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, Save, AlertCircle, Lock } from "lucide-react";
-import { correctProviderClaimAction } from "./actions";
+import { correctProviderClaimAction, type CorrectClaimInput } from "./actions";
 import type { ServiceType, BenefitCategory, ClaimLineCategory } from "@prisma/client";
+
+/** The correction/resubmission action shape (both share the F5.7 replacement full-form contract). */
+export type ReplacementSubmitAction = (input: CorrectClaimInput) => Promise<{ error?: string; refresh?: boolean } | void>;
 
 interface IcdOption { code: string; description: string }
 interface CptOption { code: string; description: string; averageCost: number; category: string }
@@ -45,13 +48,21 @@ export function CorrectClaimForm({
   prefill,
   icdOptions,
   cptOptions,
+  mode = "correct",
+  submitAction = correctProviderClaimAction,
 }: {
   predecessorClaimId: string;
   predecessorNumber: string;
   prefill: CorrectionPrefill;
   icdOptions: IcdOption[];
   cptOptions: CptOption[];
+  /** "correct" (F5.8, supersedes a pre-decision claim) or "resubmit" (F5.10, links a new claim while the original stays declined). */
+  mode?: "correct" | "resubmit";
+  submitAction?: ReplacementSubmitAction;
 }) {
+  const copy = mode === "resubmit"
+    ? { verb: "resubmission", reasonLabel: "Reason for resubmission (optional)", totalLabel: "Resubmitted total", submit: "Submit resubmission", submitting: "Submitting resubmission…" }
+    : { verb: "correction", reasonLabel: "Reason for correction (optional)", totalLabel: "Corrected total", submit: "Submit correction", submitting: "Submitting correction…" };
   const today = new Date().toISOString().split("T")[0];
   const [serviceType, setServiceType] = useState<ServiceType>(prefill.serviceType);
   const [benefitCategory, setBenefitCategory] = useState<BenefitCategory>(prefill.benefitCategory);
@@ -93,7 +104,7 @@ export function CorrectClaimForm({
     setError(null);
     const diag = icdOptions.find((d) => d.code === diagCode);
     startTransition(async () => {
-      const res = await correctProviderClaimAction({
+      const res = await submitAction({
         predecessorClaimId,
         idempotencyKey: draftId,
         reason: reason.trim() || undefined,
@@ -115,8 +126,13 @@ export function CorrectClaimForm({
   return (
     <div className="bg-white border border-[#EEEEEE] rounded-lg p-6 space-y-6">
       <div className="rounded-lg bg-[#FFF8E1] border border-[#FFC107]/40 px-4 py-3 text-xs text-[#856404]">
-        You are filing a <strong>correction</strong> of claim <strong>{predecessorNumber}</strong>. Submitting creates a new claim and
-        supersedes the original — the original is kept, unchanged, in your submission history. It is not editable in place.
+        {mode === "resubmit" ? (
+          <>You are filing a <strong>resubmission</strong> of declined claim <strong>{predecessorNumber}</strong>. Submitting creates a new claim
+          for fresh adjudication — the original decline is kept, unchanged, in your submission history. It is not editable in place.</>
+        ) : (
+          <>You are filing a <strong>correction</strong> of claim <strong>{predecessorNumber}</strong>. Submitting creates a new claim and
+          supersedes the original — the original is kept, unchanged, in your submission history. It is not editable in place.</>
+        )}
       </div>
 
       {error && (
@@ -131,7 +147,7 @@ export function CorrectClaimForm({
           <div>
             <label htmlFor="cf-member" className={labelCls}>Member / card number <Lock size={10} className="inline -mt-0.5" /></label>
             <input id="cf-member" value={prefill.memberNumber} readOnly disabled aria-describedby="cf-member-note" className={roCls} />
-            <p id="cf-member-note" className="text-[11px] text-brand-text-muted mt-1">{prefill.memberName} · a correction cannot move the claim to another member.</p>
+            <p id="cf-member-note" className="text-[11px] text-brand-text-muted mt-1">{prefill.memberName} · a {copy.verb} cannot move the claim to another member.</p>
           </div>
           <div>
             <label htmlFor="cf-branch" className={labelCls}>Branch <Lock size={10} className="inline -mt-0.5" /></label>
@@ -211,7 +227,7 @@ export function CorrectClaimForm({
           ))}
         </div>
         <div className="flex justify-between items-center pt-3 mt-2 border-t border-[#EEEEEE]">
-          <span className="text-xs font-bold uppercase text-brand-text-muted">Corrected total</span>
+          <span className="text-xs font-bold uppercase text-brand-text-muted">{copy.totalLabel}</span>
           <span className="text-right">
             <span className="text-lg font-bold text-brand-indigo">{prefill.currency} {total.toLocaleString("en-UG")}</span>
             <span className="block text-[11px] text-brand-text-muted">
@@ -223,7 +239,7 @@ export function CorrectClaimForm({
       </div>
 
       <div>
-        <label htmlFor="cf-reason" className={labelCls}>Reason for correction (optional)</label>
+        <label htmlFor="cf-reason" className={labelCls}>{copy.reasonLabel}</label>
         <input id="cf-reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={280} placeholder="e.g. corrected a mis-keyed unit cost (no clinical detail)" className={inputCls} />
       </div>
 
@@ -234,7 +250,7 @@ export function CorrectClaimForm({
 
       <div className="flex justify-end">
         <button type="button" onClick={submit} disabled={pending || !confirmed} className="flex items-center gap-2 bg-brand-indigo hover:bg-brand-secondary text-white px-6 py-2.5 rounded-full font-semibold disabled:opacity-50">
-          <Save size={16} /> {pending ? "Submitting correction…" : "Submit correction"}
+          <Save size={16} /> {pending ? copy.submitting : copy.submit}
         </button>
       </div>
     </div>

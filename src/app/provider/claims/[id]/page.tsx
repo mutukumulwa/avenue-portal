@@ -6,6 +6,7 @@ import { ProviderDocumentService } from "@/server/services/provider-document.ser
 import { providerCanWithdraw } from "@/server/services/claim-withdrawal/policy";
 import { listWithdrawalReasons } from "@/server/services/claim-withdrawal/catalog";
 import { providerCanCorrect } from "@/server/services/claim-replacement/policy";
+import { ClaimResubmissionEligibilityService } from "@/server/services/claim-resubmission/eligibility.service";
 import { ClaimSubmissionChainService } from "@/server/services/claim-submission-chain/service";
 import { prisma } from "@/lib/prisma";
 import { WithdrawClaimButton } from "./WithdrawClaimButton";
@@ -51,6 +52,8 @@ export default async function ProviderClaimDetail({ params }: { params: Promise<
   // (the exact predicates the services enforce) — the client only consumes an allowed action.
   const canWithdraw = providerCanWithdraw(ctx, claim);
   const canCorrect = providerCanCorrect(ctx, claim);
+  // F5.10: a declined claim may be resubmittable (F5.9 eligibility) — only computed for DECLINED.
+  const resubmit = claim.status === "DECLINED" ? await ClaimResubmissionEligibilityService.check(ctx, claim.id) : null;
   // F5.8: the submission chain (F5.2) — both the immutable superseded records and the current one.
   const chain = await ClaimSubmissionChainService.getChain({ tenantId, providerId: provider.id }, claim.id);
 
@@ -76,6 +79,11 @@ export default async function ProviderClaimDetail({ params }: { params: Promise<
           {canCorrect && (
             <Link href={`/provider/claims/${claim.id}/correct`} className="flex items-center gap-1.5 rounded-full border border-brand-indigo/40 px-3 py-1.5 text-xs font-semibold text-brand-indigo hover:bg-brand-indigo/5">
               <Pencil size={14} /> Correct claim
+            </Link>
+          )}
+          {resubmit?.eligible && (
+            <Link href={`/provider/claims/${claim.id}/resubmit`} className="flex items-center gap-1.5 rounded-full border border-brand-indigo/40 px-3 py-1.5 text-xs font-semibold text-brand-indigo hover:bg-brand-indigo/5">
+              <Pencil size={14} /> Resubmit claim
             </Link>
           )}
           {canWithdraw && (

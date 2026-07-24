@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { ClaimStatus, Prisma, type ServiceType, type BenefitCategory } from "@prisma/client";
+import { ClaimStatus } from "@prisma/client";
 import { assertClaimTransition } from "@/server/services/claim-lifecycle";
 import {
   ProviderAccessService,
@@ -15,11 +15,12 @@ import { resolveIntakeContext, type CallerIdentity } from "@/server/services/cla
 import { computeRequestHash, computeSuspectedDuplicateFingerprint } from "@/server/services/claim-intake/fingerprint";
 import { reserveReceipt } from "@/server/services/claim-intake/receipt";
 import { IntakeError } from "@/server/services/claim-intake/errors";
-import type { IntakeLineItem, IntakeDiagnosis } from "@/server/services/claim-intake";
 import { CLAIM_SUPERSEDABLE_STATUSES, CORRECT_PERMISSION } from "./policy";
+import { type ReplaceClaimCommand, buildReplacementSubmission, MAX_TX_ATTEMPTS, isRetryableWrite, sleep } from "./submission";
 
-// Re-exported for callers that imported the supersedable set from the service (F5.7).
+// Re-exported so existing callers keep their import paths (F5.7).
 export { CLAIM_SUPERSEDABLE_STATUSES };
+export type { ReplaceClaimCommand };
 
 /**
  * PNOS F5.7 — atomic claim replacement (correction) service. The FIRST SUPERSEDED writer.
@@ -71,25 +72,6 @@ export function isClaimReplacementError(e: unknown): e is ClaimReplacementError 
   return e instanceof ClaimReplacementError;
 }
 
-export interface ReplaceClaimCommand {
-  tenantId: string;
-  /** The claim being corrected (must be this provider's and still correctable). */
-  predecessorClaimId: string;
-  /** Stable across retries (e.g. the F5.8 form draft id) — resolves replay/conflict. 8–128 chars. */
-  idempotencyKey: string;
-  /** Free-text correction reason (bounded/no-HTML by the schema; recorded in provenance/audit). */
-  reason?: string;
-  // ── the FULL corrected claim content (NOT a patch) ──────────────────────────
-  serviceType: ServiceType;
-  benefitCategory: BenefitCategory;
-  dateOfService: string;
-  admissionDate?: string;
-  dischargeDate?: string;
-  attendingDoctor?: string;
-  diagnoses: IntakeDiagnosis[];
-  lineItems: IntakeLineItem[];
-}
-
 export interface ReplaceClaimResult {
   predecessorClaimId: string;
   claimId: string;
@@ -98,55 +80,6 @@ export interface ReplaceClaimResult {
   /** true ⇒ idempotent replay returned the existing successor (no new supersession). */
   replayed: boolean;
 }
-
-const MAX_TX_ATTEMPTS = 6;
-
-/** Map the corrected content onto the canonical submission envelope. Member/provider come
- *  from the predecessor; NO invoice number (⇒ null strong fingerprint ⇒ a new linked claim). */
-function buildCorrectionSubmission(
-  predecessor: { memberId: string; providerId: string; providerBranchId: string | null; claimNumber: string },
-  command: ReplaceClaimCommand,
-) {
-  return {
-    schemaVersion: "1" as const,
-    idempotencyKey: command.idempotencyKey,
-    member: { memberId: predecessor.memberId },
-    provider: {
-      providerId: predecessor.providerId,
-      ...(predecessor.providerBranchId ? { branchId: predecessor.providerBranchId } : {}),
-    },
-    encounter: {
-      serviceType: command.serviceType,
-      benefitCategory: command.benefitCategory,
-      serviceFrom: command.dateOfService,
-      ...(command.admissionDate ? { admissionDate: command.admissionDate } : {}),
-      ...(command.dischargeDate ? { dischargeDate: command.dischargeDate } : {}),
-      ...(command.attendingDoctor?.trim() ? { attendingDoctor: command.attendingDoctor.trim() } : {}),
-    },
-    diagnoses: command.diagnoses.map((d) => ({
-      code: d.code,
-      ...(d.description?.trim() ? { description: d.description.trim() } : {}),
-      isPrimary: d.isPrimary,
-    })),
-    lines: command.lineItems.map((l) => ({
-      serviceCategory: l.serviceCategory,
-      ...(l.cptCode?.trim() ? { cptCode: l.cptCode.trim() } : {}),
-      ...(l.icdCode?.trim() ? { icdCode: l.icdCode.trim() } : {}),
-      description: l.description,
-      quantity: l.quantity,
-      unitCost: l.unitCost,
-      billedAmount: l.billedAmount,
-    })),
-    // Explicit replacement reference — the lineage identity (NOT a reused authoritative id).
-    replacementOfClaimRef: predecessor.claimNumber,
-    ...(command.reason?.trim() ? { correctionReason: command.reason.trim() } : {}),
-  };
-}
-
-function isRetryableWrite(err: unknown): boolean {
-  return err instanceof Prisma.PrismaClientKnownRequestError && (err.code === "P2002" || err.code === "P2034");
-}
-const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 export const ClaimReplacementService = {
   /**
@@ -171,7 +104,7 @@ export const ClaimReplacementService = {
     const chainRootClaimId = predecessor.chainRootClaimId ?? predecessor.id;
 
     // 2. Structural validation via the ONE canonical schema (full claim input, not a patch).
-    const raw = buildCorrectionSubmission(predecessor, command);
+    const raw = buildReplacementSubmission(predecessor, command);
     const parsed = parseClaimSubmissionV1(raw);
     if (!parsed.success) {
       const e = IntakeError.fromZod(parsed.error);
