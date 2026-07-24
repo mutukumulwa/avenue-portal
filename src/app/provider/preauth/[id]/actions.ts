@@ -7,6 +7,8 @@ import { providerPermits } from "@/components/layouts/provider-nav-model";
 import { PreauthReadService } from "@/server/services/preauth-read.service";
 import { preauthAdjudicationService } from "@/server/services/preauth-adjudication.service";
 import { getSystemActorId } from "@/server/services/system-actor.service";
+import { ClaimsService } from "@/server/services/claims.service";
+import { writeAudit } from "@/lib/audit";
 
 // A provider may cancel its own PA only BEFORE use (provider.preauth.cancel spec).
 // Once a PA is ATTACHED/UTILISED/CONVERTED (in use on a claim) or already terminal,
@@ -99,4 +101,45 @@ export async function amendProviderPreauthAction(
   }
 
   redirect(`/provider/preauth/${amendment.id}`);
+}
+
+// F3.13: start a claim from an APPROVED PA. Filing a claim ⇒ gated on
+// provider.claim.create (ASSUMPTION, flagged; the page already requires
+// provider.preauth.read to view the PA).
+export async function fileClaimFromPreauthAction(
+  input: { preAuthId: string },
+): Promise<{ error?: string } | void> {
+  const { ctx } = await ProviderAccessService.resolveUserContext();
+  if (!providerPermits(ctx.permissions, "provider.claim.create")) {
+    return { error: "You do not have permission to file claims." };
+  }
+
+  const preAuthId = (input.preAuthId ?? "").trim();
+  if (!preAuthId) return { error: "Missing pre-authorization." };
+
+  // Ownership via the F3.10 scoped read (createClaimWithPreauth is only tenant-scoped).
+  const pa = await PreauthReadService.getById({ tenantId: ctx.tenantId, providerId: ctx.providerId }, preAuthId);
+  if (!pa) return { error: "Pre-authorization not found." };
+
+  let claim: { id: string; claimNumber?: string };
+  try {
+    // Canonical PA→claim conversion: prefills member/provider/DOS/diagnoses + one
+    // aggregate pre-authorised line at the approved amount and submits through
+    // ClaimIntakeService (kind: preauthConversion). Idempotent — a converted PA
+    // returns its existing claim. Enforces APPROVED. Not a bespoke claim create.
+    claim = await ClaimsService.createClaimWithPreauth(ctx.tenantId, preAuthId);
+  } catch (e) {
+    return { error: (e as Error).message || "Could not start a claim from this pre-authorization." };
+  }
+
+  // Audit the provider-initiated attach (mirrors the admin convertToClaimAction).
+  await writeAudit({
+    userId: ctx.actorId,
+    action: "PREAUTH_ATTACHED",
+    module: "PREAUTH",
+    description: `Claim ${claim.claimNumber ?? claim.id} started from pre-auth ${preAuthId.slice(0, 8)} (provider portal)`,
+    metadata: { preauthId: preAuthId, claimId: claim.id },
+  });
+
+  redirect(`/provider/claims/${claim.id}`);
 }

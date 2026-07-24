@@ -7,6 +7,7 @@ import { PreauthReadService } from "@/server/services/preauth-read.service";
 import { listPreauthEvents } from "@/server/services/preauth-intake/events";
 import { CancelPreauthButton } from "./CancelPreauthButton";
 import { AmendPreauthForm } from "./AmendPreauthForm";
+import { FileClaimButton } from "./FileClaimButton";
 import { PROVIDER_CANCELLABLE_STATUSES } from "./actions";
 
 function money(n: number | null | undefined) {
@@ -39,6 +40,7 @@ export default async function ProviderPreauthDetail({ params }: { params: Promis
 
   const canCancel = providerPermits(ctx.permissions, "provider.preauth.cancel") && PROVIDER_CANCELLABLE_STATUSES.includes(pa.status);
   const canAmend = providerPermits(ctx.permissions, "provider.preauth.create") && pa.status === "APPROVED";
+  const canFileClaim = providerPermits(ctx.permissions, "provider.claim.create") && pa.status === "APPROVED";
   const events = await listPreauthEvents(pa.id);
   const diagnoses = (pa.diagnoses as Array<{ icdCode?: string; code?: string; description?: string; isPrimary?: boolean }>) ?? [];
   const procedures = (pa.procedures as Array<{ cptCode?: string; description?: string; quantity?: number; unitCost?: number; total?: number }>) ?? [];
@@ -61,8 +63,9 @@ export default async function ProviderPreauthDetail({ params }: { params: Promis
         <span className={`text-[11px] font-bold px-2.5 py-1 rounded-full ${STATUS_TONE[pa.status] ?? "bg-[#E6E7E8] text-[#6C757D]"}`}>{pa.status.replace(/_/g, " ")}</span>
       </div>
 
-      {(canAmend || canCancel) && (
+      {(canFileClaim || canAmend || canCancel) && (
         <div className="flex flex-wrap justify-end gap-2">
+          {canFileClaim && <FileClaimButton preAuthId={pa.id} />}
           {canAmend && <AmendPreauthForm parentPreAuthId={pa.id} />}
           {canCancel && <CancelPreauthButton preAuthId={pa.id} />}
         </div>
