@@ -2,7 +2,9 @@
 
 import { requireRole, ROLES } from "@/lib/rbac";
 import { redirect } from "next/navigation";
-import { ClaimsService } from "@/server/services/claims.service";
+import { PreauthIntakeService } from "@/server/services/preauth-intake/service";
+import { preauthAdjudicationService } from "@/server/services/preauth-adjudication.service";
+import { getSystemActorId } from "@/server/services/system-actor.service";
 import { writeAudit } from "@/lib/audit";
 import type { ServiceType, BenefitCategory } from "@prisma/client";
 
@@ -18,26 +20,44 @@ export async function submitPreAuthAction(
 
   const memberId        = formData.get("memberId")        as string;
   const benefitCategory = formData.get("benefitCategory") as BenefitCategory;
+  const providerId      = formData.get("providerId")      as string;
 
-  let warnings: string[] = [];
+  // F3.5b: converge on the canonical intake + pipeline. This rail submits through
+  // PreauthIntakeService (channel ADMIN_PORTAL) — the SAME path the B2B (F3.4) and
+  // member (F3.5a) rails use — with the post-commit auto-decision wired to
+  // preauthAdjudicationService.executeAutoDecision (10-gate pipeline is the single
+  // decision owner). No direct createPreAuth; no bespoke auto-approve. Fraud is now
+  // ENFORCED by the pipeline's FRAUD_SCREENING gate rather than shown as an
+  // advisory inline warning, so the old warnings-then-redirect branch is gone.
+  let result: Awaited<ReturnType<typeof PreauthIntakeService.submit>>;
   try {
-    const result = await ClaimsService.createPreAuth(tenantId, {
-      memberId,
-      providerId: formData.get("providerId") as string,
-      serviceType: formData.get("serviceType") as ServiceType,
-      expectedDateOfService: formData.get("expectedDateOfService")
-        ? new Date(formData.get("expectedDateOfService") as string)
-        : undefined,
-      diagnoses: [{ description: diagnosis, isPrimary: true }],
-      procedures: [{ description: formData.get("procedure") as string || "Medical services", unitCost: estimatedCost, total: estimatedCost }],
-      estimatedCost,
-      clinicalNotes: formData.get("clinicalNotes") as string || undefined,
-      benefitCategory,
-      submittedBy: "ADMIN",
-    });
-    warnings = result.warnings;
+    result = await PreauthIntakeService.submit(
+      { channel: "ADMIN_PORTAL", tenantId, providerId, actorType: "USER", actorId: session.user.id },
+      {
+        memberId,
+        providerId,
+        serviceType: formData.get("serviceType") as ServiceType,
+        expectedDateOfService: formData.get("expectedDateOfService")
+          ? new Date(formData.get("expectedDateOfService") as string)
+          : undefined,
+        diagnoses: [{ description: diagnosis, isPrimary: true }],
+        procedures: [{ description: (formData.get("procedure") as string) || "Medical services", unitCost: estimatedCost, total: estimatedCost }],
+        estimatedCost,
+        clinicalNotes: (formData.get("clinicalNotes") as string) || undefined,
+        benefitCategory,
+      },
+      {
+        adjudicate: async (preauthId, tid) => {
+          await preauthAdjudicationService.executeAutoDecision(preauthId, tid, await getSystemActorId(tid));
+        },
+      },
+    );
   } catch (err) {
     return { error: (err as Error).message };
+  }
+
+  if (result.status === "REJECTED" || !result.preauthId) {
+    return { error: result.errors?.[0]?.message ?? "The pre-authorization could not be submitted." };
   }
 
   await writeAudit({
@@ -45,12 +65,8 @@ export async function submitPreAuthAction(
     action: "PREAUTH_SUBMITTED",
     module: "PREAUTH",
     description: `Pre-auth submitted for member ${memberId.slice(0, 8)} — ${benefitCategory}, UGX ${estimatedCost.toLocaleString()}`,
-    metadata: { memberId, benefitCategory, estimatedCost },
+    metadata: { memberId, benefitCategory, estimatedCost, preauthId: result.preauthId, receiptId: result.receiptId, replayed: result.replayed },
   });
-
-  // If fraud warnings exist, return them so the form can display them
-  // before the user is redirected (they see warnings but submission succeeded)
-  if (warnings.length > 0) return { warnings };
 
   redirect("/preauth");
 }
