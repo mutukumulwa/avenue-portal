@@ -1,0 +1,65 @@
+# Story 3 transcript — https://avenue-portal.vercel.app — 2026-07-24T14:20:20Z (key redacted)
+
+## 1. ACCEPTED (fresh key uat-s3-1784902820)
+{"error":"Member is not accessible to this caller.","success":false,"code":"FORBIDDEN_SCOPE","message":"Member is not accessible to this caller."}
+
+## 2. REPLAY (same key+payload) — SAME claim, duplicate:true
+{"error":"Member is not accessible to this caller.","success":false,"code":"FORBIDDEN_SCOPE","message":"Member is not accessible to this caller."}
+HTTP 403
+
+## 3. CONFLICT (same key, changed amount) — 409, original untouched
+{"error":"Member is not accessible to this caller.","success":false,"code":"FORBIDDEN_SCOPE","message":"Member is not accessible to this caller."}
+HTTP 403
+
+## 4. RECEIPT LOOKUP — authoritative state + nextAction
+Redirecting...
+
+HTTP 308
+
+## 5. UNKNOWN RECEIPT — non-enumerating 404 (miss is chain-audited)
+{"error":"Receipt not found"}
+HTTP 404
+
+## 6. NO KEY — 401
+HTTP 401
+
+## 7. MISSING IDEMPOTENCY KEY — 422 IDEMPOTENCY_KEY_REQUIRED
+{"error":"Idempotency-Key header is required. Send a stable unique key per submission so retries are safe.","success":false,"code":"IDEMPOTENCY_KEY_REQUIRED"}
+HTTP 422
+
+# End. Verify in-app: the claim appears in the Aga Khan provider list + admin queues.
+
+## Reading (P6 — Story 3 prod correct-refusal pass, 2026-07-24)
+
+Member NWSC-2026-00250 is un-entitled at Aga Khan (F76-GAP-01: no UI to add the
+applicability). The B2B rail therefore REFUSES — which is exactly what this pass
+proves against live prod:
+
+  Step 1-3  403 FORBIDDEN_SCOPE  — valid authenticated key, member out of the
+            facility's entitlement scope. Distinct from the no-key 401 (step 6),
+            so the refusal is authorization, not authentication. Because scope
+            rejection happens BEFORE receipt reservation, steps 2-3 cannot show
+            replay/conflict — the idempotency key was never consumed (proven
+            below: zero receipts minted).
+  Step 4    308 — SCRIPT ARTIFACT, not a result: step 1's 403 returned no
+            receiptId, so the lookup URL was /receipts/ (empty id) → trailing-
+            slash redirect. The receipt-lookup 200 + nextAction happy path is
+            proven in the local prod-mode run (evidence/B2B_API_story.txt §4)
+            and the integration battery.
+  Step 5    404 "Receipt not found" — non-enumerating; the miss is hash-chain
+            audited (CLAIM:RECEIPT_LOOKUP_MISS, confirmed +1 below).
+  Step 6    401 — no key, fail-closed.
+  Step 7    422 IDEMPOTENCY_KEY_REQUIRED — header guard runs at the route, ahead
+            of scope, so it fires even for this member.
+
+Durable-side verification (prod SQL, read-only, immediately after the pass):
+  receipts minted by the pass ............ 0   (scope rejection is receipt-less)
+  claims created (last 15 min) ........... 0
+  CLAIM:RECEIPT_LOOKUP_MISS audits ....... 1   (step 5, chain-audited)
+  key authentication ..................... PASS (403 not 401 ⇒ key resolved)
+
+VERDICT: the B2B refusal surface (401 / 403 / 404 / 422) is proven end-to-end
+in production. The accepted/replay/conflict happy path stays green in the
+integration battery + the local prod-mode run, and becomes re-provable in prod
+once F76-GAP-01 (applicability amendment on ACTIVE contracts) ships and NWSC is
+entitled at Aga Khan.

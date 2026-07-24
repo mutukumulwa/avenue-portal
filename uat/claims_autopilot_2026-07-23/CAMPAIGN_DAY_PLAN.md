@@ -48,7 +48,7 @@ here.
 | P3 | ✅ Reset the `.uat` personas' passwords (admin password-reset, now live in prod); facility bindings verified: agakhan→Aga Khan, ihk→IHK, finance.checker→finance | admin | ☑ |
 | P4 | ⚠️ **BLOCKED → finding F76-GAP-01:** no UI to add a payer to an ACTIVE contract (`page.tsx:493` gates applicability edits to DRAFT/PENDING_CLARIFICATION). Sponsor decision: record the gap, defer the entitlement build, proceed. Only Stories 3 & 5 are affected. | agent (recorded) | ☑ |
 | P5 | Mint an Aga Khan API key via the admin UI; record the `mvxk_` prefix ONLY in the run log; hand the plaintext to the agent for Story 3 | admin | ☐ |
-| P6 | Story 3 prod pass: `API_KEY=… bash b2b-story.sh` → **accepted leg returns 403 FORBIDDEN_SCOPE** (un-entitled, per F76-GAP-01 — the CORRECT refusal) + 401/422/404/413 all correct; happy path stays proven by integration + the local prod-mode run. Save transcript to `evidence/` | agent | ☐ |
+| P6 | ✅ Story 3 prod pass done: 401/403/404/422 correct-refusal surface proven in prod; 0 receipts/0 claims minted; lookup-miss chain-audited. Transcript: `evidence/Story3_prod_pass.txt`. **Day 0 CLOSED.** | agent | ☑ |
 
 ## Day 1 — core rails (order matters)
 

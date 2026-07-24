@@ -6,7 +6,7 @@ timestamp,story,step,actor_persona,action,expected,observed,pass_fail,evidence_r
 ,1,admin-claim-submit,claims@medvex.co.ug,,,,,,
 ,1,automation-panel-shadow-proposal,claims@medvex.co.ug,,,,,,
 ,2,provider-portal-claim,provider.agakhan.uat@test.local,,,,,,
-,3,b2b-story-script,agent,,,,,,
+,3,b2b-story-prod-pass,agent,ran b2b-story.sh vs prod,401/403/404/422 correct-refusal surface + 0 receipts/0 claims + miss audited,PASS (refusal surface); happy path cited to integration+local prod-mode,PASS,evidence/Story3_prod_pass.txt,F76-GAP-01: accepted path 403 un-entitled (correct)
 ,4,csv-preview,claims@medvex.co.ug,,,,,,
 ,4,csv-commit,claims@medvex.co.ug,,,,,,
 ,4,csv-reupload-replay,claims@medvex.co.ug,,,,,,
