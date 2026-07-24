@@ -156,4 +156,37 @@ describe.skipIf(!URL_SET)("F4.2 PreauthInfoRequestService (opt-in DB)", () => {
     const reclose = await Svc.close({ tenantId: t, id: ir3.id, actor: reviewer }).catch((e) => e);
     expect(reclose.code).toBe("NOT_CLOSABLE");
   });
+
+  it("listReprocessable surfaces only accepted-and-still-undecided PAs, client-scoped (F4.5)", async () => {
+    const t = world.tenants.alpha.id;
+    const provUser = { type: "USER", id: "prov-user" };
+    const accept = async () => {
+      const pa = await world.createPreauth({ providerId: world.providers.a.id });
+      const ir = await Svc.open({ tenantId: t, preAuthorizationId: pa.id, requestedItems: ["LAB_RESULTS"], prompt: "labs", actor: reviewer });
+      await Svc.submitResponse({ tenantId: t, id: ir.id, providerId: world.providers.a.id, responseNote: "done", actor: provUser });
+      await Svc.accept({ tenantId: t, id: ir.id, actor: reviewer });
+      return { pa, ir };
+    };
+
+    // sanctioned + still undecided → listed
+    const a = await accept();
+    // accepted but the PA was then decided → NOT listed
+    const b = await accept();
+    await prisma.preAuthorization.update({ where: { id: b.pa.id }, data: { status: "APPROVED" } });
+    // responded but NOT accepted → NOT listed
+    const paC = await world.createPreauth({ providerId: world.providers.a.id });
+    const irC = await Svc.open({ tenantId: t, preAuthorizationId: paC.id, requestedItems: ["OTHER"], prompt: "x", actor: reviewer });
+    await Svc.submitResponse({ tenantId: t, id: irC.id, providerId: world.providers.a.id, responseNote: "v1", actor: provUser });
+
+    const queue = await Svc.listReprocessable({ tenantId: t, clientId: world.clients.alpha.id });
+    const paIds = queue.map((q) => q.preAuthorizationId);
+    expect(paIds).toContain(a.pa.id);
+    expect(paIds).not.toContain(b.pa.id); // decided
+    expect(paIds).not.toContain(paC.id); // not accepted
+    expect(queue.find((q) => q.preAuthorizationId === a.pa.id)!.infoRequestId).toBe(a.ir.id);
+
+    // a different client sees none of alpha's
+    const other = await Svc.listReprocessable({ tenantId: t, clientId: "some-other-client" });
+    expect(other.map((q) => q.preAuthorizationId)).not.toContain(a.pa.id);
+  });
 });

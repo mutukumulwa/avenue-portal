@@ -239,4 +239,42 @@ export const PreauthInfoRequestService = {
   async close(params: InfoRequestDecisionParams, db: Db = prisma) {
     return applyDecision(db, params, { from: INFO_REQUEST_CLOSABLE_STATUSES, to: "CLOSED", event: "INFO_REQUEST_CLOSED", errCode: "NOT_CLOSABLE", errMsg: "cannot be closed" });
   },
+
+  /**
+   * F4.5 — "sanctioned reprocessing" read (per the ratified decision: mark sanctioned,
+   * human re-decides — NO automatic pipeline re-run). Surfaces PAs whose information
+   * request was ACCEPTED (the acceptance is the sanction; RESPONSE_ACCEPTED is its
+   * event) while the PA itself is still UNDECIDED — i.e. it now has the requested
+   * information and is awaiting a human re-decision on the existing PA workbench.
+   * Scoped like the F3.7 read model (client confinement; provider filter optional).
+   * This never decides a PA and never touches a hold — it only lists work.
+   */
+  async listReprocessable(
+    scope: { tenantId: string; clientId?: string | null; providerId?: string },
+    db: Db = prisma,
+  ): Promise<Array<{ preAuthorizationId: string; infoRequestId: string; acceptedAt: Date | null }>> {
+    const accepted = await db.preauthInfoRequest.findMany({
+      where: {
+        tenantId: scope.tenantId,
+        status: "ACCEPTED",
+        ...(scope.clientId ? { clientId: scope.clientId } : {}),
+        ...(scope.providerId ? { providerId: scope.providerId } : {}),
+      },
+      select: { id: true, preAuthorizationId: true, decidedAt: true },
+      orderBy: { decidedAt: "desc" },
+    });
+    if (accepted.length === 0) return [];
+
+    // Which of those PAs are still awaiting a decision (SUBMITTED/UNDER_REVIEW)?
+    const paIds = [...new Set(accepted.map((a) => a.preAuthorizationId))];
+    const undecided = await db.preAuthorization.findMany({
+      where: { id: { in: paIds }, tenantId: scope.tenantId, status: { in: INFO_REQUEST_OPENABLE_PA_STATUSES as never } },
+      select: { id: true },
+    });
+    const undecidedSet = new Set(undecided.map((p) => p.id));
+
+    return accepted
+      .filter((a) => undecidedSet.has(a.preAuthorizationId))
+      .map((a) => ({ preAuthorizationId: a.preAuthorizationId, infoRequestId: a.id, acceptedAt: a.decidedAt }));
+  },
 } as const;
