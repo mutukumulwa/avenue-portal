@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { FilePlus2 } from "lucide-react";
 import { ProviderAccessService } from "@/server/services/provider-access.service";
 import { providerPermits } from "@/components/layouts/provider-nav-model";
 import { PreauthReadService } from "@/server/services/preauth-read.service";
@@ -25,15 +26,16 @@ const FILTERS = ["all", "SUBMITTED", "UNDER_REVIEW", "APPROVED", "ATTACHED", "UT
 export default async function ProviderPreauth({
   searchParams,
 }: {
-  searchParams: Promise<{ status?: string }>;
+  searchParams: Promise<{ status?: string; submitted?: string; replayed?: string }>;
 }) {
   // Direct-URL access is server-authorized here (nav visibility is convenience,
   // never the boundary — §10.1). Legacy-compatible posture: a migrated user needs
   // provider.preauth.read; an un-migrated user (no provider.* perms) is allowed.
   const { ctx, provider } = await ProviderAccessService.resolveUserContext();
   if (!providerPermits(ctx.permissions, "provider.preauth.read")) redirect("/unauthorized");
+  const canCreate = providerPermits(ctx.permissions, "provider.preauth.create");
 
-  const { status } = await searchParams;
+  const { status, submitted, replayed } = await searchParams;
   const active = status && FILTERS.includes(status) ? status : "all";
 
   // Canonical scoped read (F3.7): this provider's own PAs only.
@@ -45,9 +47,23 @@ export default async function ProviderPreauth({
 
   return (
     <div className="space-y-5">
+      {submitted && (
+        <div className="bg-brand-indigo/5 border border-brand-indigo/30 rounded-lg px-4 py-3 text-sm font-semibold text-brand-indigo" role="status">
+          {replayed
+            ? `Already received — pre-authorization ${submitted} (idempotent replay, nothing was duplicated).`
+            : `Pre-authorization ${submitted} submitted. It is now under review.`}
+        </div>
+      )}
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Pre-authorizations</h1>
-        <span className="text-xs text-brand-text-muted">{provider.name}</span>
+        <div>
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Pre-authorizations</h1>
+          <span className="text-xs text-brand-text-muted">{provider.name}</span>
+        </div>
+        {canCreate && (
+          <Link href="/provider/preauth/new" className="flex items-center gap-1.5 rounded-full bg-brand-indigo px-4 py-2 text-sm font-semibold text-white hover:bg-brand-secondary">
+            <FilePlus2 size={15} /> New pre-auth
+          </Link>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-2">
