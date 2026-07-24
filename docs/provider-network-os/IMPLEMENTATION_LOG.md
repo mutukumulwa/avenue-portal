@@ -901,3 +901,25 @@ Stop condition observed: yes — list read model + its existing consumers only (
 ```
 
 ---
+
+## F3.8 — Provider PA list page
+
+```text
+Work package: F3.8
+Status: COMPLETE
+Commit: 7406e54
+ASSUMPTION (board-only): "Provider PA list page" = a provider-facing read-only list of the provider's own PAs, mirroring the provider claims page + consuming the F3.7 read model. Flagged to the user.
+Files changed: src/app/provider/preauth/page.tsx (new), src/components/layouts/provider-nav-model.ts (Pre-auth def + preauth iconKey + providerPermits guard), src/components/layouts/ProviderNav.tsx (preauth→ShieldCheck), tests/components/provider-nav-model.test.ts (+4)
+Schema/data changes: none
+Behavior delivered: /provider/preauth resolves the F1.3 access context (resolveUserContext), server-authorizes via providerPermits(ctx.permissions, "provider.preauth.read") [nav ≠ boundary, §10.1], and lists PreauthReadService.list({ tenantId, providerId, status }) — provider-scoped (own facility only) with tenant + status filters. Read-only table (PA number, member, service, benefit, estimated, status). No create (F3.9) / no detail link (F3.10) yet.
+Nav: added the Pre-auth item (group Care, requiredPermission provider.preauth.read) that the nav model's comment reserved for the F3–F9 packages; new "preauth" iconKey → ShieldCheck. New pure providerPermits(permissions, code) = server-side page-access guard mirroring computeProviderNav's legacy posture (migrated needs the perm; un-migrated allowed) — reusable by F3.9–F3.14.
+Authorization posture: legacy-compatible — a migrated user (any provider.* perm) needs provider.preauth.read; an un-migrated user is allowed so the portal isn't broken pre-F1.9. Consistent with the nav so nav and page agree.
+Evidence: provider-nav-model.test.ts (13, +4): /provider/preauth removed from the unfinished-route forbidden list (now finished); Pre-auth emitted iff provider.preauth.read; providerPermits allows migrated-with-perm + legacy, denies migrated-without-perm. Read-model provider scoping proven in F3.7. Full suite 1240 pass / 191 skip. tsc 0; brand PASS; currency PASS (684).
+Verification: NOT browser-verified — worktree has no .env, port 3000 is held by a different (main-checkout) server lacking this branch's route, and no seeded provider session is available. The page is a read-only mirror of the proven provider claims page; its logic (scoping/gate/nav) is unit-covered. Visual confirmation deferred to a run with env + seed (or post-merge deploy).
+FLAGS: (1) PA has no branch column — provider scoping is provider-level (branch assignments don't narrow; carried from F3.7). (2) The provider claims page (mirror) does not server-authorize per-page; this NEW page does (provider.preauth.read) — deliberate hardening for the new page, not applied retroactively to claims here.
+Feature-flag state: none (permission-gated + session-derived).
+Next allowed package: F3.9 — Provider PA submission page (M).
+Stop condition observed: yes — list page only (no submission form, no detail page).
+```
+
+---
