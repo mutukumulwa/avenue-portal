@@ -3044,6 +3044,50 @@ model PreAuthorizationEvent {
   @@index([tenantId, preAuthorizationId, createdAt])
 }
 
+// PNOS F4.1 — clinical information request on a pre-authorization (the payer asks
+// the provider for more before deciding). Relation-less like the other PA
+// satellites (F3.2): scoped by tenantId + preAuthorizationId + providerId, with a
+// mutable lifecycle status (OPEN→RESPONDED→ACCEPTED/REOPENED/CLOSED, or CANCELLED)
+// and a per-PA sequence. requestedItems hold catalog codes (INFO_REQUEST_ITEMS).
+model PreauthInfoRequest {
+  id                 String                   @id @default(cuid())
+  tenantId           String
+  preAuthorizationId String
+  providerId         String // the facility that must respond
+  clientId           String? // for client-confined operator inbox
+  memberId           String? // convenience for inbox / scoping
+  sequence           Int // per-PA ordering (1,2,3…)
+  status             PreauthInfoRequestStatus @default(OPEN)
+  requestedItems     String[] // catalog codes (INFO_REQUEST_ITEMS)
+  prompt             String // the reviewer's ask to the provider
+  dueAt              DateTime? // SLA clock
+  openedByActorType  String
+  openedByActorId    String?
+  openedAt           DateTime                 @default(now())
+  responseNote       String? // the provider's response
+  respondedByActorId String?
+  respondedAt        DateTime?
+  decisionByActorId  String? // reviewer accept/reopen/close actor
+  decisionNote       String?
+  decidedAt          DateTime?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  @@unique([preAuthorizationId, sequence])
+  @@index([tenantId, providerId, status]) // provider inbox
+  @@index([tenantId, status, dueAt]) // SLA sweeper
+  @@index([preAuthorizationId])
+}
+
+enum PreauthInfoRequestStatus {
+  OPEN // reviewer requested info; awaiting the provider
+  RESPONDED // provider submitted a response; awaiting the reviewer
+  ACCEPTED // reviewer accepted the response (sanctions claim reprocessing, F4.5)
+  REOPENED // reviewer rejected the response; the provider must respond again
+  CLOSED // resolved / terminal
+  CANCELLED // reviewer withdrew the request
+}
+
 // PNOS F1.11 — audited, point-in-time provider eligibility evidence (§7.3).
 // Distinct from EligibilitySnapshot (an offline-pack balance cache). Carries
 // member/client identifiers + a SAFE result category + explanation — never a
