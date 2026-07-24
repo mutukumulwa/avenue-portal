@@ -3,7 +3,10 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, FileText, Download } from "lucide-react";
 import { ProviderAccessService } from "@/server/services/provider-access.service";
 import { ProviderDocumentService } from "@/server/services/provider-document.service";
+import { providerCanWithdraw } from "@/server/services/claim-withdrawal/policy";
+import { listWithdrawalReasons } from "@/server/services/claim-withdrawal/catalog";
 import { prisma } from "@/lib/prisma";
+import { WithdrawClaimButton } from "./WithdrawClaimButton";
 
 function money(n: number, ccy = "KES") {
   return `${ccy} ${Math.round(n).toLocaleString("en-UG")}`;
@@ -29,6 +32,8 @@ export default async function ProviderClaimDetail({ params }: { params: Promise<
       id: true, claimNumber: true, status: true, currency: true, benefitCategory: true, serviceType: true,
       billedAmount: true, approvedAmount: true, paidAmount: true, copayAmount: true,
       dateOfService: true, attendingDoctor: true, diagnoses: true,
+      // F5.6: fields the withdrawal allowed-action predicate reads (server-computed).
+      providerBranchId: true, decidedAt: true, paidAt: true, paymentVoucherId: true, settlementBatchId: true,
       member: { select: { firstName: true, lastName: true, memberNumber: true } },
       claimLines: {
         select: { id: true, lineNumber: true, description: true, cptCode: true, billedAmount: true, approvedAmount: true, disallowedAmount: true, adjudicationDecision: true, declineReason: true },
@@ -38,6 +43,10 @@ export default async function ProviderClaimDetail({ params }: { params: Promise<
   });
 
   if (!claim) notFound();
+
+  // F5.6: the server computes whether THIS actor may withdraw THIS claim (the exact
+  // predicate the service enforces) — the client only ever consumes an allowed action.
+  const canWithdraw = providerCanWithdraw(ctx, claim);
 
   const diagnoses = (claim.diagnoses as unknown as Array<{ code: string; description: string }>) ?? [];
 
@@ -56,7 +65,12 @@ export default async function ProviderClaimDetail({ params }: { params: Promise<
           <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Claim {claim.claimNumber}</h1>
           <p className="text-brand-text-muted text-sm">{claim.member.firstName} {claim.member.lastName} ({claim.member.memberNumber}) · {claim.benefitCategory.replace(/_/g, " ")} · {new Date(claim.dateOfService).toLocaleDateString("en-UG")}</p>
         </div>
-        <span className="ml-auto text-xs font-bold px-3 py-1 rounded-full bg-brand-indigo/10 text-brand-indigo">{claim.status.replace(/_/g, " ")}</span>
+        <div className="ml-auto flex items-center gap-3">
+          <span className="text-xs font-bold px-3 py-1 rounded-full bg-brand-indigo/10 text-brand-indigo">{claim.status.replace(/_/g, " ")}</span>
+          {canWithdraw && (
+            <WithdrawClaimButton claimId={claim.id} claimNumber={claim.claimNumber} reasons={listWithdrawalReasons()} />
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">

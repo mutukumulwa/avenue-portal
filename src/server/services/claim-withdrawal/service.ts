@@ -6,7 +6,7 @@ import {
   ProviderAccessError,
   type ProviderAccessContext,
 } from "../provider-access.service";
-import { assertClaimTransition, canTransitionClaim } from "../claim-lifecycle";
+import { assertClaimTransition } from "../claim-lifecycle";
 import { auditChainService } from "../audit-chain.service";
 import { NotificationOutboxService } from "../notifications/outbox";
 import {
@@ -14,6 +14,10 @@ import {
   normalizeWithdrawalReason,
   type ClaimWithdrawalReasonCode,
 } from "./catalog";
+import { CLAIM_WITHDRAWABLE_STATUSES, WITHDRAW_PERMISSION } from "./policy";
+
+// Re-exported for callers that imported the withdrawable set from the service (F5.5).
+export { CLAIM_WITHDRAWABLE_STATUSES };
 
 /**
  * PNOS F5.5 — simple provider claim-withdrawal service (the FIRST F5 status writer).
@@ -42,14 +46,6 @@ import {
  *
  * This is the service only (F5.5 stop: no UI, no replacement). F5.6 wires the provider UI.
  */
-
-/**
- * Pre-decision statuses from which WITHDRAWN is a legal move — DERIVED from the single
- * lifecycle authority (claim-lifecycle TRANSITIONS) so it can never drift from the graph.
- * Today: INCURRED, RECEIVED, CAPTURED, UNDER_REVIEW.
- */
-export const CLAIM_WITHDRAWABLE_STATUSES: ClaimStatus[] = (Object.values(ClaimStatus) as ClaimStatus[])
-  .filter((s) => s !== ClaimStatus.WITHDRAWN && canTransitionClaim(s, ClaimStatus.WITHDRAWN));
 
 export type ClaimWithdrawalErrorCode =
   | "INVALID_REASON"
@@ -85,8 +81,6 @@ export interface WithdrawClaimResult {
   /** true ⇒ idempotent replay — the claim was already withdrawn, no new effect. */
   alreadyWithdrawn: boolean;
 }
-
-const WITHDRAW_PERMISSION = "provider.claim.withdraw";
 
 export const ClaimWithdrawalService = {
   /**

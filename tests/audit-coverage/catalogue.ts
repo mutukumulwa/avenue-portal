@@ -27,6 +27,8 @@ export const KNOWN_AUDITING_TOKENS = [
   "closeBreaker(", // F4.7/F6.5 — hash-chain audits CIRCUIT_BREAKER_CLOSED internally
   "ClaimDecisionService.decide(",
   "ClaimDecisionService.voidClaim(",
+  "ClaimWithdrawalService.withdraw(", // PNOS F5.5/F5.6 — hash-chain audits CLAIM:WITHDRAW internally
+
   "preauthAdjudicationService.",
   "claimAdjudicationService.createSettlementBatch(",
   "claimAdjudicationService.approveSettlementBatch(",
