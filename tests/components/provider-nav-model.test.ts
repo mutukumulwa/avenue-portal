@@ -12,6 +12,7 @@ import { describe, it, expect } from "vitest";
 import {
   computeProviderNav,
   flattenProviderNav,
+  providerPermits,
   PROVIDER_NAV_DEFINITIONS,
 } from "@/components/layouts/provider-nav-model";
 import { PROVIDER_ROLE_PERMISSIONS } from "@/../prisma/seeds/provider-rbac";
@@ -62,7 +63,8 @@ describe("F1.4 computeProviderNav", () => {
   });
 
   it("never emits an unfinished route", () => {
-    const forbidden = ["/provider/preauth", "/provider/inbox", "/provider/payment-queries", "/provider/contracts", "/provider/performance", "/provider/profile", "/provider/users", "/provider/integrations"];
+    // NOTE: /provider/preauth is now a FINISHED route (F3.8) — removed from forbidden.
+    const forbidden = ["/provider/inbox", "/provider/payment-queries", "/provider/contracts", "/provider/performance", "/provider/profile", "/provider/users", "/provider/integrations"];
     // even a super-broad permission set only yields existing routes
     const allPerms = PROVIDER_NAV_DEFINITIONS.map((d) => d.requiredPermission).filter(Boolean) as string[];
     const h = hrefs(allPerms);
@@ -80,5 +82,25 @@ describe("F1.4 computeProviderNav", () => {
     const groups = computeProviderNav(PROVIDER_ROLE_PERMISSIONS.PROVIDER_BILLER);
     expect(groups.every((g) => g.items.length > 0)).toBe(true);
     expect(groups.map((g) => g.group)).toEqual([...new Set(groups.map((g) => g.group))]); // no dup groups
+  });
+
+  it("F3.8: a user with provider.preauth.read sees the Pre-auth item; one without it does not", () => {
+    expect(hrefs(["provider.preauth.read"])).toContain("/provider/preauth");
+    expect(hrefs(["provider.claim.read"])).not.toContain("/provider/preauth"); // migrated, lacks the perm
+  });
+});
+
+describe("F3.8 providerPermits (page-access guard)", () => {
+  it("allows a migrated user holding the exact permission", () => {
+    expect(providerPermits(["provider.preauth.read", "provider.claim.read"], "provider.preauth.read")).toBe(true);
+  });
+
+  it("denies a migrated user (has provider.* perms) lacking the exact permission", () => {
+    expect(providerPermits(["provider.claim.read"], "provider.preauth.read")).toBe(false);
+  });
+
+  it("allows an un-migrated/legacy user (no provider.* perms) — matches the nav's rollout posture", () => {
+    expect(providerPermits([], "provider.preauth.read")).toBe(true);
+    expect(providerPermits(["CLAIM:VIEW", "MEMBER:VIEW"], "provider.preauth.read")).toBe(true);
   });
 });

@@ -16,7 +16,7 @@
 export type ProviderNavGroupKey = "Home" | "Care" | "Claims" | "Finance" | "Network" | "Administration";
 
 export type ProviderNavIconKey =
-  | "dashboard" | "eligibility" | "cases" | "claims" | "new-claim" | "settlements" | "api-keys";
+  | "dashboard" | "eligibility" | "cases" | "preauth" | "claims" | "new-claim" | "settlements" | "api-keys";
 
 export interface ProviderNavDefinition {
   key: string;
@@ -33,6 +33,7 @@ export const PROVIDER_NAV_DEFINITIONS: ProviderNavDefinition[] = [
   { key: "dashboard", label: "Dashboard", href: "/provider/dashboard", iconKey: "dashboard", group: "Home" },
   { key: "eligibility", label: "Eligibility", href: "/provider/eligibility", iconKey: "eligibility", group: "Care", requiredPermission: "provider.eligibility.read" },
   { key: "cases", label: "Cases", href: "/provider/cases", iconKey: "cases", group: "Care", requiredPermission: "provider.case.read" },
+  { key: "preauth", label: "Pre-auth", href: "/provider/preauth", iconKey: "preauth", group: "Care", requiredPermission: "provider.preauth.read" },
   { key: "claims", label: "Claims", href: "/provider/claims", iconKey: "claims", group: "Claims", requiredPermission: "provider.claim.read" },
   { key: "new-claim", label: "New Claim", href: "/provider/claims/new", iconKey: "new-claim", group: "Claims", requiredPermission: "provider.claim.create" },
   { key: "settlements", label: "Settlements", href: "/provider/settlements", iconKey: "settlements", group: "Finance", requiredPermission: "provider.settlement.read" },
@@ -89,4 +90,19 @@ export function computeProviderNav(permissions: string[]): ProviderNavGroupView[
 /** Flatten the grouped nav into an ordered item list (for the horizontal bar). */
 export function flattenProviderNav(groups: ProviderNavGroupView[]): ProviderNavItemView[] {
   return groups.flatMap((g) => g.items);
+}
+
+/**
+ * Page-access guard — the server-side counterpart of the nav's legacy posture.
+ *
+ * Nav visibility is convenience; a page must independently authorize direct-URL
+ * access (§10.1). To stay consistent with computeProviderNav during the pre-F1.9
+ * rollout: a MIGRATED user (holds any provider.* permission) needs the exact
+ * `code`; an UN-MIGRATED/legacy user (no provider.* permission at all) is allowed
+ * so the portal is not broken before persona roles are assigned. Pages call this
+ * and redirect to /unauthorized on false.
+ */
+export function providerPermits(permissions: string[], code: string): boolean {
+  const hasAnyProviderPerm = permissions.some((p) => p.startsWith("provider."));
+  return !hasAnyProviderPerm || permissions.includes(code);
 }
