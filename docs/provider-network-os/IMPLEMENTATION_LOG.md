@@ -1285,3 +1285,20 @@ Stop condition observed: yes — statuses + graph + read-consumer threading only
 ```
 
 ---
+
+## F5.4 — Create/backfill original submission chains
+
+```text
+Work package: F5.4
+Status: COMPLETE
+Commit: 91517ba
+Files changed: src/server/services/claim-intake/persist.ts (self-root new claims), src/server/services/claim-submission-chain/backfill.ts (new), scripts/pnos-backfill-claim-chains.ts (new), tests/services/claim-chain-backfill.test.ts (new), tests/services/claim-intake-persist.test.ts (mock tx +claim.update)
+Schema/data changes: none (data migration only — sets chainRootClaimId on existing rows via the ops script)
+Behavior delivered: every claim is self-rooted (chainRootClaimId = own id). persist.ts self-roots new claims in the same tx after create (a chainRootClaimId update — NOT a status write, so the mutation guard is unaffected; verified green). backfillOriginalChains({tenantId?, batchSize?, dryRun?}) — batched, idempotent (only null-root rows; processed rows drop out so the loop advances cursorless and a re-run is a no-op), resumable; dryRun counts. scripts/pnos-backfill-claim-chains.ts wraps it (dry-run default, --apply, --tenant). New claims are born self-rooted, so the backfill is a one-time migration for pre-F5.4 rows.
+Evidence: backfill test (1, REAL DB): dry-run counts + no write; apply self-roots all null-root (batchSize 2 ⇒ ≥2 batches); re-run no-op. mutation-guard 3/3 (persist's chainRootClaimId update not flagged). persist unit 5/5 (mock tx gained claim.update). Full suite (no DB env) 1292 pass / 213 skip. tsc 0; brand PASS; currency PASS (707).
+Feature-flag state: none.
+Next allowed package: F5.5 — Simple provider withdrawal service (M). NOTE: F5.5 is the FIRST F5 status-WRITER (writes WITHDRAWN) → must add its file to the claim-status-mutation-guard ALLOWLIST + go through assertClaimTransition. Pre-decision withdrawal is "simple" (no posted GL/hold to reverse).
+Stop condition observed: yes — self-root create + backfill only (no withdrawal service).
+```
+
+---
