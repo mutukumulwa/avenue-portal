@@ -1023,3 +1023,26 @@ Stop condition observed: yes — PA→claim conversion only (no GOP artifact).
 ```
 
 ---
+
+## F3.14 — Authorized GOP artifact (Phase F3 COMPLETE)
+
+```text
+Work package: F3.14 — completes Phase F3
+Status: COMPLETE
+Commit: 55f860b
+ASSUMPTION (board-only): "Authorized GOP/LOU artifact" = a downloadable Guarantee of Payment for an APPROVED PA, on the already-authorized provider detail page. LOU = the existing admin/cross-border artifact; this is the provider GOP. Flagged.
+Files changed: src/app/provider/preauth/[id]/{gop-artifact.ts, GopDocument.tsx, GopButton.tsx} (new), src/app/provider/preauth/[id]/page.tsx (wire button), tests/services/gop-artifact.test.ts (new)
+Schema/data changes: none
+Behavior delivered: buildGopData(pa) (pure) → printable GOP fields, null unless APPROVED AND gopNumber issued. GopDocument (@react-pdf/renderer, mirrors DebitNote house style) renders GOP/PA refs, provider, member, authorized service + validity, guaranteed amount, and a guarantee statement (payment scoped to active cover/benefit limits/valid claim; void if cancelled/expired). GopButton (client) downloads GOP-<n>.pdf via pdf().toBlob(). Detail page shows the download whenever buildGopData(pa) is non-null.
+Authorization: generated on-the-fly from PA data the already-authorized detail page provided (provider.preauth.read + F3.10 provider-scoped non-enumerating getById) — not a stored file, so NO F2 storage/download flow and no new gate.
+Brand: "Medvex" (house PDF brand, like DebitNote); the brand guard flags only legacy "avenue" + rendered "AiCare" — both absent (guard green, 695 files).
+Evidence: gop-artifact.test.ts (4): maps APPROVED+GOP (fields + humanized benefit + amount); null for non-APPROVED + APPROVED-without-gopNumber; tolerates null amount(→0)/dates(→"—"). Full suite 1276 pass / 191 skip. tsc 0; brand PASS; currency PASS (695).
+Verification: pure mapper unit-tested; PDF document + button (presentation) NOT browser-verified (worktree env, as F3.8–F3.13).
+Feature-flag state: none.
+
+*** PHASE F3 COMPLETE (F3.1–F3.14). The canonical PA rail: single write path (intake+pipeline, all rails converged, one creator), scoped read models (list+detail, client-confined + non-enumerating), and the full provider PA surface (list/submit/detail/cancel/amend/PA→claim/GOP). F3.7–F3.14 were executed from the board's one-line descriptions (detailed plan not in-repo) with per-package assumptions flagged; all provider UI is service/action-unit-tested but NOT browser-verified. ***
+Next allowed package: F4.1 — Information-request schema + catalogs (M).
+Stop condition observed: yes — GOP artifact only.
+```
+
+---
