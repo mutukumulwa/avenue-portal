@@ -1302,3 +1302,30 @@ Stop condition observed: yes — self-root create + backfill only (no withdrawal
 ```
 
 ---
+
+## F5.5 — Simple provider withdrawal service
+
+```text
+Work package: F5.5
+Status: COMPLETE
+Commit: 21d0e68
+Proof-before-build classification: MISSING (no claim WITHDRAWN writer existed; all dependencies — F5.3 statuses, F5.4 chains, F1.1 provider.claim.withdraw perm, F1.3 ProviderAccessService, F4.8 outbox, inSerializableTx, auditChainService — already in place).
+Files changed: src/server/services/claim-withdrawal/catalog.ts (new — closed reason catalog + normalize), src/server/services/claim-withdrawal/service.ts (new — ClaimWithdrawalService.withdraw), tests/services/claim-status-mutation-guard.test.ts (ALLOWLIST +1: the new writer), tests/factories/provider-network.ts (teardown clears AdjudicationLog before claims), tests/services/claim-withdrawal.service.test.ts (new — 21 real-DB tests).
+Schema/data changes: NONE. Uses the F5.3 WITHDRAWN status + existing Claim fields only. No prisma db push needed (DB already at F5.4 schema).
+Behavior delivered: the FIRST F5 status-WRITER. An entitled provider abandons an UNDECIDED claim it owns → terminal WITHDRAWN. "Simple" = pre-decision, so there is NO posted GL/usage/hold/voucher/settlement to reverse (a hold is a PA concept, never placed on a claim at intake) — the service mutates ZERO money. Flow: authorize (requirePermission provider.claim.withdraw) → normalize catalog reason → load claim SCOPED to ctx.providerId (out-of-scope ⇒ non-enumerating NOT_FOUND) → branch guard on a branch-stamped claim → idempotent fast-path (already WITHDRAWN ⇒ alreadyWithdrawn:true) → pre-tx guards (NOT_WITHDRAWABLE for decided/terminal; HAS_FINANCIAL_EFFECT for any money fact) → inSerializableTx { in-tx fund re-check; assertClaimTransition; **status-guarded CAS** updateMany WHERE status IN {INCURRED,RECEIVED,CAPTURED,UNDER_REVIEW}; AdjudicationLog(action WITHDRAWN); F4.8 outbox CLAIM_WITHDRAWN } → post-commit hash-chain audit CLAIM:WITHDRAW. CLAIM_WITHDRAWABLE_STATUSES is DERIVED from claim-lifecycle canTransitionClaim(s,WITHDRAWN) — single source of truth, cannot drift from the graph.
+Authorization evidence: server-derived F1.3 ctx only (command never establishes scope; tenant mismatch ⇒ NOT_FOUND). Tests: missing perm ⇒ ProviderAccessError FORBIDDEN_PERMISSION; another provider's claim ⇒ NOT_FOUND (non-enumerating, row untouched); branch-stamped claim with actor lacking the branch ⇒ FORBIDDEN_BRANCH, with the branch ⇒ allowed.
+Idempotency/concurrency evidence: (a) same-key replay ⇒ second call alreadyWithdrawn:true, exactly ONE AdjudicationLog/audit/outbox; (b) two concurrent withdrawals ⇒ exactly one transition (CAS), one log; (c) decision-committed-first (simulated APPROVED) ⇒ withdrawal refuses NOT_WITHDRAWABLE; (d) withdrawal-committed-first ⇒ the REAL ClaimDecisionService.decide refuses the WITHDRAWN claim (pre-tx status guard) — claim stays WITHDRAWN, amounts 0; (e) withdrawal racing a status-guarded serializable decision ×6 iterations ⇒ exactly one of {APPROVED, WITHDRAWN} wins, never both/neither, log counts consistent.
+Privacy/security evidence: reason is a closed catalog code (no free-form clinical text); audit + outbox payloads carry ids/reasonCode/fromStatus only — PHI-free. Non-enumerating cross-provider NOT_FOUND.
+Money/reconciliation evidence: zero-money test — after withdrawing a RECEIVED claim: status WITHDRAWN, approvedAmount 0, paidAmount 0, paymentVoucherId/settlementBatchId/benefitUsageId null; no fundTransaction, no benefitHold (convertedToClaimId), member benefitUsage count unchanged.
+Focused tests and results: claim-withdrawal.service.test.ts 21/21 (opt-in DB) + claim-status-mutation-guard 3/3 (allowlist correct + new writer detected). Factory-using DB batch (7 files) 53/53 — teardown change regression-free.
+Typecheck/schema result: tsc --noEmit clean. No schema change.
+Manual/visual evidence: N/A — service only (F5.5 stop = no UI). F5.6 wires the provider UI (browser-verifiable).
+Feature-flag state: none. The writer is live behind the provider.claim.withdraw permission (persona-gated, F1.1); no separate flag.
+Backfill/rollout impact: none (no schema/data change).
+Known limitations / flagged follow-up: ClaimDecisionService.decide re-reads+re-validates claim status INSIDE its serializable tx ONLY when decision.expectedRevision is set (automatic decisions); HUMAN decisions (no expectedRevision) keep only the pre-tx status guard and do an unconditional update-by-id. F5.5 introduces the first pre-decision→terminal (WITHDRAWN) transition that can race a human decision, so a true-concurrent human decide whose pre-tx read saw a decidable status, committing AFTER a withdrawal, could overwrite WITHDRAWN→APPROVED. Impact: the withdrawal is lost and the claim is APPROVED (a GL/usage accrual, NOT a payment — settlement is a later maker/checker step; fully reversible via void). Non-exploitable, self-correcting, and NOT reproducible deterministically in the test harness (the minimal world has no chart-of-accounts, so a full decide() cannot commit). The withdrawal side is provably safe (CAS) and decide() already refuses a withdrawn claim at its pre-tx guard. Recommended fix (own package / F11.2 concurrency suite): generalize decide()'s in-tx status re-check to run for ALL decisions (extend lines ~616-621 so the status guard is unconditional; keep the revision check gated on expectedRevision). Not shipped here to avoid untested code in the canonical decision owner and scope creep beyond "simple withdrawal service".
+Unrelated worktree changes preserved: yes — worktree contained only F5.5 changes; the main-checkout dirty UAT files are untouched (separate working tree).
+Next allowed package: F5.6 — Provider withdrawal UI (S) — claim detail shows a guarded withdrawal action (server-computed allowed-action, catalog reason + confirmation, immutable-history wording, stale/replay-safe), calling ClaimWithdrawalService through a server action. Browser-verifiable (needs env+seed or post-merge).
+Stop condition observed: yes — service + focused tests only; no UI, no replacement (F5.7).
+```
+
+---
