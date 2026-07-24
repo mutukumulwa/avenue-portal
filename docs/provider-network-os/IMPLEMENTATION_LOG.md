@@ -1102,3 +1102,21 @@ Stop condition observed: yes — provider response submit only (no reviewer deci
 ```
 
 ---
+
+## F4.4 — Reviewer accept/reopen/close
+
+```text
+Work package: F4.4
+Status: COMPLETE
+Commit: a252014
+ASSUMPTION (board-only): reviewer decision on a submitted response; no dedicated reviewer permission ⇒ admin actions gated on the CLINICAL review role (like PA adjudication). Flagged.
+Files changed: src/server/services/preauth-info-request/service.ts (+accept/reopen/close + applyDecision helper + constants), src/server/services/preauth-intake/events.ts (+RESPONSE_REOPENED, +INFO_REQUEST_CLOSED), src/app/(admin)/preauth/[id]/info-request-actions.ts (new), tests/services/preauth-info-request-service.test.ts (+1 real-DB), tests/actions/admin-info-request-decision-action.test.ts (new)
+Schema/data changes: none
+Behavior delivered: service accept/reopen/close via a shared applyDecision (guard from-state → flip status + decision actor/timestamp → matching PA event). accept RESPONDED→ACCEPTED+RESPONSE_ACCEPTED (sanctions reprocessing, F4.5); reopen RESPONDED→REOPENED+RESPONSE_REOPENED (REOPENED respondable again per F4.3); close any-live(OPEN/RESPONDED/REOPENED/ACCEPTED)→CLOSED+INFO_REQUEST_CLOSED. Typed InfoRequestError (NOT_ACCEPTABLE/NOT_REOPENABLE/NOT_CLOSABLE/NOT_FOUND). Constants exported. Admin actions requireRole(ROLES.CLINICAL) → delegate → PREAUTH_INFO_ACCEPTED/REOPENED/CLOSED compliance audit → revalidate the PA detail. Object inputs (UI wired in F4.7).
+Evidence: service +1 (REAL DB): accept (early-accept blocked, RESPONDED→ACCEPTED+event), reopen (→REOPENED, provider re-responds), close (→CLOSED+event, re-close NOT_CLOSABLE). admin actions (5, mock): CLINICAL gate + delegate + audit + revalidate for accept/reopen/close, service error surfaced, missing-id validation. Audit-coverage green. Full suite (no DB env) 1290 pass / 201 skip. tsc 0; brand PASS; currency PASS (699).
+Feature-flag state: none.
+Next allowed package: F4.5 — Sanctioned claim reprocessing after acceptance (S).
+Stop condition observed: yes — reviewer decisions only (no reprocessing hook, no page).
+```
+
+---
