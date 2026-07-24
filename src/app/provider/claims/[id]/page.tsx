@@ -1,12 +1,15 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, FileText, Download } from "lucide-react";
+import { ArrowLeft, FileText, Download, Pencil } from "lucide-react";
 import { ProviderAccessService } from "@/server/services/provider-access.service";
 import { ProviderDocumentService } from "@/server/services/provider-document.service";
 import { providerCanWithdraw } from "@/server/services/claim-withdrawal/policy";
 import { listWithdrawalReasons } from "@/server/services/claim-withdrawal/catalog";
+import { providerCanCorrect } from "@/server/services/claim-replacement/policy";
+import { ClaimSubmissionChainService } from "@/server/services/claim-submission-chain/service";
 import { prisma } from "@/lib/prisma";
 import { WithdrawClaimButton } from "./WithdrawClaimButton";
+import { ClaimLineageTable } from "./ClaimLineageTable";
 
 function money(n: number, ccy = "KES") {
   return `${ccy} ${Math.round(n).toLocaleString("en-UG")}`;
@@ -32,8 +35,8 @@ export default async function ProviderClaimDetail({ params }: { params: Promise<
       id: true, claimNumber: true, status: true, currency: true, benefitCategory: true, serviceType: true,
       billedAmount: true, approvedAmount: true, paidAmount: true, copayAmount: true,
       dateOfService: true, attendingDoctor: true, diagnoses: true,
-      // F5.6: fields the withdrawal allowed-action predicate reads (server-computed).
-      providerBranchId: true, decidedAt: true, paidAt: true, paymentVoucherId: true, settlementBatchId: true,
+      // F5.6/F5.8: fields the withdrawal + correction allowed-action predicates read (server-computed).
+      providerBranchId: true, decidedAt: true, paidAt: true, paymentVoucherId: true, settlementBatchId: true, supersededByClaimId: true,
       member: { select: { firstName: true, lastName: true, memberNumber: true } },
       claimLines: {
         select: { id: true, lineNumber: true, description: true, cptCode: true, billedAmount: true, approvedAmount: true, disallowedAmount: true, adjudicationDecision: true, declineReason: true },
@@ -44,9 +47,12 @@ export default async function ProviderClaimDetail({ params }: { params: Promise<
 
   if (!claim) notFound();
 
-  // F5.6: the server computes whether THIS actor may withdraw THIS claim (the exact
-  // predicate the service enforces) — the client only ever consumes an allowed action.
+  // F5.6/F5.8: the server computes whether THIS actor may withdraw / correct THIS claim
+  // (the exact predicates the services enforce) — the client only consumes an allowed action.
   const canWithdraw = providerCanWithdraw(ctx, claim);
+  const canCorrect = providerCanCorrect(ctx, claim);
+  // F5.8: the submission chain (F5.2) — both the immutable superseded records and the current one.
+  const chain = await ClaimSubmissionChainService.getChain({ tenantId, providerId: provider.id }, claim.id);
 
   const diagnoses = (claim.diagnoses as unknown as Array<{ code: string; description: string }>) ?? [];
 
@@ -67,6 +73,11 @@ export default async function ProviderClaimDetail({ params }: { params: Promise<
         </div>
         <div className="ml-auto flex items-center gap-3">
           <span className="text-xs font-bold px-3 py-1 rounded-full bg-brand-indigo/10 text-brand-indigo">{claim.status.replace(/_/g, " ")}</span>
+          {canCorrect && (
+            <Link href={`/provider/claims/${claim.id}/correct`} className="flex items-center gap-1.5 rounded-full border border-brand-indigo/40 px-3 py-1.5 text-xs font-semibold text-brand-indigo hover:bg-brand-indigo/5">
+              <Pencil size={14} /> Correct claim
+            </Link>
+          )}
           {canWithdraw && (
             <WithdrawClaimButton claimId={claim.id} claimNumber={claim.claimNumber} reasons={listWithdrawalReasons()} />
           )}
@@ -86,6 +97,12 @@ export default async function ProviderClaimDetail({ params }: { params: Promise<
           </div>
         ))}
       </div>
+
+      <ClaimLineageTable
+        chain={chain.map((v) => ({ id: v.id, claimNumber: v.claimNumber, status: v.status, submissionType: v.submissionType, billedAmount: Number(v.billedAmount), createdAt: v.createdAt.toISOString() }))}
+        currentClaimId={claim.id}
+        currency={claim.currency}
+      />
 
       {diagnoses.length > 0 && (
         <div className="bg-white border border-[#EEEEEE] rounded-lg p-4">

@@ -28,6 +28,7 @@ export const KNOWN_AUDITING_TOKENS = [
   "ClaimDecisionService.decide(",
   "ClaimDecisionService.voidClaim(",
   "ClaimWithdrawalService.withdraw(", // PNOS F5.5/F5.6 — hash-chain audits CLAIM:WITHDRAW internally
+  "ClaimReplacementService.replace(", // PNOS F5.7/F5.8 — hash-chain audits CLAIM:REPLACE internally
 
   "preauthAdjudicationService.",
   "claimAdjudicationService.createSettlementBatch(",

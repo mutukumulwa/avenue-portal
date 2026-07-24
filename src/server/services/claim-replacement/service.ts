@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { ClaimStatus, Prisma, type ServiceType, type BenefitCategory } from "@prisma/client";
-import { assertClaimTransition, canTransitionClaim } from "@/server/services/claim-lifecycle";
+import { assertClaimTransition } from "@/server/services/claim-lifecycle";
 import {
   ProviderAccessService,
   ProviderAccessError,
@@ -16,6 +16,10 @@ import { computeRequestHash, computeSuspectedDuplicateFingerprint } from "@/serv
 import { reserveReceipt } from "@/server/services/claim-intake/receipt";
 import { IntakeError } from "@/server/services/claim-intake/errors";
 import type { IntakeLineItem, IntakeDiagnosis } from "@/server/services/claim-intake";
+import { CLAIM_SUPERSEDABLE_STATUSES, CORRECT_PERMISSION } from "./policy";
+
+// Re-exported for callers that imported the supersedable set from the service (F5.7).
+export { CLAIM_SUPERSEDABLE_STATUSES };
 
 /**
  * PNOS F5.7 — atomic claim replacement (correction) service. The FIRST SUPERSEDED writer.
@@ -48,10 +52,6 @@ import type { IntakeLineItem, IntakeDiagnosis } from "@/server/services/claim-in
  *
  * Service only (F5.7 stop: no provider correction page — that is F5.8).
  */
-
-/** Pre-decision statuses a claim can be superseded FROM — derived from the lifecycle graph. */
-export const CLAIM_SUPERSEDABLE_STATUSES: ClaimStatus[] = (Object.values(ClaimStatus) as ClaimStatus[])
-  .filter((s) => s !== ClaimStatus.SUPERSEDED && canTransitionClaim(s, ClaimStatus.SUPERSEDED));
 
 export type ClaimReplacementErrorCode =
   | "NOT_FOUND" // absent OR out-of-boundary predecessor (§9.1)
@@ -99,7 +99,6 @@ export interface ReplaceClaimResult {
   replayed: boolean;
 }
 
-const CORRECT_PERMISSION = "provider.claim.correct";
 const MAX_TX_ATTEMPTS = 6;
 
 /** Map the corrected content onto the canonical submission envelope. Member/provider come
