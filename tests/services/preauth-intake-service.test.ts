@@ -112,6 +112,17 @@ describe.skipIf(!URL_SET)("F3.3 PreauthIntakeService (opt-in DB)", () => {
     expect(res.errors?.some((e) => e.code === "PROVIDER_FORGERY")).toBe(true);
   });
 
+  it("a benefit NOT in the member's package is REJECTED (PR-024, F3.6 CATCH) — no PA", async () => {
+    // the world's members hold an OUTPATIENT benefit only; DENTAL is not in package
+    const res = await Svc.submit(ctx(), sub({ idempotencyKey: "rej-benefit", benefitCategory: "DENTAL" }), okDeps);
+    expect(res.status).toBe("REJECTED");
+    expect(res.errors?.some((e) => e.code === "BENEFIT_NOT_IN_PACKAGE")).toBe(true);
+    expect(res.preauthId).toBeUndefined();
+    const receipt = await prisma.preauthIntakeReceipt.findUniqueOrThrow({ where: { id: res.receiptId } });
+    expect(receipt.status).toBe("REJECTED");
+    expect(receipt.preAuthorizationId).toBeNull();
+  });
+
   it("post-commit adjudication failure leaves receipt PROCESSING + PA durable (recoverable)", async () => {
     const res = await Svc.submit(ctx(), sub({ idempotencyKey: "defer-1" }), failDeps);
     expect(res.status).toBe("ACCEPTED"); // the submission WAS accepted (PA exists)

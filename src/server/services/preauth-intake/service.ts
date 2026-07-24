@@ -4,6 +4,7 @@ import type { Prisma, PrismaClient } from "@prisma/client";
 import { createWithDocumentNumber } from "@/lib/document-number";
 import { ProviderEntitlementService } from "../provider-entitlement.service";
 import { ProviderAccessSettingsService } from "../provider-access-settings.service";
+import { BenefitUsageService } from "../benefit-usage.service";
 import { appendPreauthEvent } from "./events";
 import {
   normalizePreauth, validatePreauth, resolveProviderId, preauthRequestHash,
@@ -123,6 +124,17 @@ export const PreauthIntakeService = {
     if (member.status !== "ACTIVE") return rejectWith("MEMBER_NOT_ACTIVE", [{ code: "MISSING_MEMBER_IDENTIFIER", message: "Member is not active" }]);
     const provider = await db.provider.findFirst({ where: { id: providerId!, tenantId: ctx.tenantId }, select: { contractStatus: true } });
     if (!provider || provider.contractStatus !== "ACTIVE") return rejectWith("PROVIDER_NOT_ACTIVE", [{ code: "MISSING_PROVIDER", message: "Provider is not active" }]);
+
+    // ── benefit-in-package gate (PR-024) ────────────────────────────────────
+    // A PA against a benefit the member's package does not hold could never pay,
+    // and would strand a phantom hold if it auto-approved. The auto-decision
+    // pipeline's BENEFIT_CAP only bites on a cap it can RESOLVE — it silently
+    // passes when the config is absent — so this structural precondition MUST be
+    // enforced here for EVERY rail. This restores the guard the retired
+    // ClaimsService.createPreAuth threw (F3.6); F3.5a's member-side pre-check is
+    // now a friendly early duplicate of this canonical gate.
+    const benefitConfig = await BenefitUsageService.resolveConfig(db, member.id, normalized.benefitCategory!);
+    if (!benefitConfig) return rejectWith("BENEFIT_NOT_IN_PACKAGE", [{ code: "BENEFIT_NOT_IN_PACKAGE", field: "benefitCategory", message: "This benefit is not in the member's package" }]);
 
     // ── atomic: PA + receipt(PROCESSING) + SUBMITTED event ──────────────────
     let created: { paId: string; receiptId: string };

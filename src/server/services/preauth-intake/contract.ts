@@ -89,7 +89,8 @@ export type PreauthErrorCode =
   | "INVALID_ESTIMATE"
   | "INVALID_DATE"
   | "MISSING_SERVICE_TYPE"
-  | "MISSING_PARENT_PREAUTH";
+  | "MISSING_PARENT_PREAUTH"
+  | "BENEFIT_NOT_IN_PACKAGE";
 
 export interface PreauthValidationError { code: PreauthErrorCode; field?: string; message: string }
 
