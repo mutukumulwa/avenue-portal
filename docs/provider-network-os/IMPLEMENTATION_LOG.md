@@ -964,3 +964,22 @@ Stop condition observed: yes — detail read model + provider detail page + read
 ```
 
 ---
+
+## F3.11 — Provider PA cancellation
+
+```text
+Work package: F3.11
+Status: COMPLETE
+Commit: 4997b30
+ASSUMPTION (board-only): "Provider PA cancellation" = a provider cancels its OWN pre-use PA via the canonical cancel (not a bespoke transition). Flagged.
+Files changed: src/app/provider/preauth/[id]/actions.ts (new), src/app/provider/preauth/[id]/CancelPreauthButton.tsx (new), src/app/provider/preauth/[id]/page.tsx (wire button), tests/actions/provider-preauth-cancel-action.test.ts (new)
+Schema/data changes: none
+Behavior delivered: cancelProviderPreauthAction — providerPermits(provider.preauth.cancel) gate; OWNERSHIP via the F3.10 non-enumerating scoped read (getById({tenantId,providerId}) null ⇒ safe not-found, no cross-provider probe); PRE-USE state gate (SUBMITTED/UNDER_REVIEW/APPROVED only — ATTACHED/UTILISED/terminal are not provider-cancellable, matching "before use"); then delegates to preauthAdjudicationService.cancelPreAuth (releases the benefit hold PR-011#3, sets CANCELLED, hash-chained audit). Canonical errors surface as friendly messages; success revalidates the detail page. CancelPreauthButton (client: reason + confirm + error) shows only when the viewer holds provider.preauth.cancel AND the PA is pre-use.
+Evidence: provider-preauth-cancel-action.test.ts (6): canonical cancel called (id, tenant, actor, reason) + provider-scoped ownership read + revalidate on success; default reason; deny without permission (no read/cancel); safe not-found for another facility's PA (no cancel); refuse ATTACHED (no cancel); canonical error surfaced without revalidate. Full suite 1261 pass / 191 skip. tsc 0; brand PASS; currency PASS (690).
+Verification: ACTION unit-tested (permission + ownership + state + canonical delegation); button (presentation) NOT browser-verified (worktree env, as F3.8–F3.10).
+Feature-flag state: none.
+Next allowed package: F3.12 — Provider PA amendment (M).
+Stop condition observed: yes — cancellation only (no amendment).
+```
+
+---
