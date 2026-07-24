@@ -7007,3 +7007,131 @@ model ClaimAutopilotBreaker {
   @@unique([tenantId, clientId])
   @@index([tenantId, isOpen])
 }
+
+// ─── PNOS F5.11 — Reconsideration (spec §7.8 / D13) ──────────────────────────
+// A governed review case challenging a decided claim/line. Submitting a
+// reconsideration does NOT mutate the original claim's status or money (D13); the
+// case carries its own eligibility, reason, deadline, line targets, evidence,
+// reviewer, SLA, and outcome. Satellites are relation-less to Claim/ClaimLine
+// (String ids + indexes) so the schema change stays additive, exactly like the
+// F3.2 PreAuthorizationEvent / F4.1 PreauthInfoRequest satellites. Documents attach
+// via the existing DocumentUploadIntent generic target (targetType RECONSIDERATION).
+
+enum ReconsiderationStatus {
+  DRAFT
+  SUBMITTED
+  TRIAGE
+  INFORMATION_REQUIRED
+  PROVIDER_RESPONDED
+  UNDER_REVIEW
+  ACCEPTED
+  PARTIALLY_ACCEPTED
+  UPHELD
+  WITHDRAWN
+  CLOSED
+}
+
+model ClaimReconsideration {
+  id                String                @id @default(cuid())
+  tenantId          String
+  clientId          String? // payer scope, for read-model confinement (G2.1)
+  providerId        String
+  providerBranchId  String?
+  // The decided claim under dispute + its submission chain root (F5.2). Relation-less.
+  claimId           String
+  chainRootClaimId  String?
+  // Filing reason (catalog code, F5.11 policy) + the provider's narrative.
+  reasonCode        String
+  providerNarrative String
+  // Requested additional amount (the provider's ask) + currency (must match the claim).
+  requestedAmount   Decimal               @default(0) @db.Decimal(14, 2)
+  currency          String
+  // Deadline resolution (F5.11 policy) + filing time.
+  filingDeadline    DateTime?
+  filedAt           DateTime?
+  status            ReconsiderationStatus @default(DRAFT)
+  // Triage / assignment. originalAdjudicatorId drives the separation-of-duty warning.
+  assignedTeam          String?
+  assignedReviewerId    String?
+  originalAdjudicatorId String?
+  // Outcome — SAFE (provider-facing) vs INTERNAL are separated (§9); the provider
+  // projection (F5.11 policy) never exposes outcomeInternalNotes / internal refs.
+  outcomeReasonCode      String?
+  outcomeSafeExplanation String?
+  outcomeInternalNotes   String?
+  // Set only when an accepted outcome spawns a linked resubmission/supplemental claim (F5.16).
+  supplementalClaimId String?
+  // SLA policy/version + due time (event history is the ClaimReconsiderationEvent relation).
+  slaPolicy  String?
+  slaVersion String?
+  dueAt      DateTime?
+  // Optimistic concurrency + idempotent submit (F5.11 step 6).
+  idempotencyKey String?
+  version        Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  lines  ClaimReconsiderationLine[]
+  events ClaimReconsiderationEvent[]
+
+  @@unique([tenantId, idempotencyKey]) // NULLs distinct in PG ⇒ keyless drafts unaffected
+  @@index([tenantId, claimId])
+  @@index([tenantId, status])
+  @@index([tenantId, providerId])
+  @@index([tenantId, clientId])
+}
+
+model ClaimReconsiderationLine {
+  id                String               @id @default(cuid())
+  reconsiderationId String
+  reconsideration   ClaimReconsideration @relation(fields: [reconsiderationId], references: [id])
+  // The disputed original claim line (relation-less; must belong to the case's claim, F5.11 test).
+  claimLineId       String
+  disputedCategory  String?
+  narrative         String?
+  // Frozen snapshot of the original line economics (§7.8 / PNO-REC-003 recon check).
+  originalBilled      Decimal @default(0) @db.Decimal(14, 2)
+  originalAllowed     Decimal @default(0) @db.Decimal(14, 2)
+  originalPayable     Decimal @default(0) @db.Decimal(14, 2)
+  originalMemberShare Decimal @default(0) @db.Decimal(14, 2)
+  originalWriteoff    Decimal @default(0) @db.Decimal(14, 2)
+  // The provider's requested corrected amounts.
+  requestedAllowed Decimal? @db.Decimal(14, 2)
+  requestedPayable Decimal? @db.Decimal(14, 2)
+  // The reviewer's corrected FULL entitlement (through the pricing/benefit components, F5.15).
+  reviewerCorrectedEntitlement Decimal? @db.Decimal(14, 2)
+  // Prior settlement facts + the hard ceiling for the incremental award.
+  alreadyApproved  Decimal @default(0) @db.Decimal(14, 2)
+  alreadyPaid      Decimal @default(0) @db.Decimal(14, 2)
+  maxIncrement     Decimal @default(0) @db.Decimal(14, 2) // = max(0, correctedEntitlement − max(approved, paid))
+  awardedIncrement Decimal @default(0) @db.Decimal(14, 2) // 0 ≤ awarded ≤ maxIncrement (F5.11 invariant)
+  outcomeReasonCode String?
+  createdAt         DateTime @default(now())
+
+  @@index([reconsiderationId])
+  @@index([claimLineId])
+}
+
+model ClaimReconsiderationEvent {
+  id                String               @id @default(cuid())
+  tenantId          String
+  reconsiderationId String
+  reconsideration   ClaimReconsideration @relation(fields: [reconsiderationId], references: [id])
+  sequence          Int
+  eventType         String // SUBMITTED | TRIAGED | ASSIGNED | INFO_REQUESTED | PROVIDER_RESPONDED | UNDER_REVIEW | OUTCOME_RECORDED | ACCEPTED | PARTIALLY_ACCEPTED | UPHELD | WITHDRAWN | CLOSED …
+  priorStatus       String?
+  newStatus         String?
+  // Provider-safe code vs a POINTER to internal detail — never the detail itself (§9).
+  safeReasonCode    String?
+  internalReasonRef String?
+  // Safe message text for the structured info-request / provider-response exchange.
+  message           String?
+  actorType         String
+  actorId           String?
+  dataVersionRef    String?
+  metadata          Json? // SAFE metadata only (validated before write)
+  createdAt         DateTime @default(now())
+
+  @@unique([reconsiderationId, sequence])
+  @@index([tenantId, reconsiderationId, createdAt])
+}

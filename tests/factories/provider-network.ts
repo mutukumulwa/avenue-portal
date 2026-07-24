@@ -246,6 +246,11 @@ export async function buildProviderWorld(prisma: Prisma, opts: BuildOptions = {}
     await prisma.claimLine.deleteMany({ where: { claimId: { in: worldClaimIds } } });
     await prisma.claimProcessingRun.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.claimIntakeReceipt.deleteMany({ where: { tenantId: { in: tenantIds } } });
+    // F5.11: reconsideration satellites (relation-less to Claim; own cluster events → lines → case).
+    const reconIds = (await prisma.claimReconsideration.findMany({ where: { tenantId: { in: tenantIds } }, select: { id: true } })).map((r: { id: string }) => r.id);
+    await prisma.claimReconsiderationEvent.deleteMany({ where: { reconsiderationId: { in: reconIds } } });
+    await prisma.claimReconsiderationLine.deleteMany({ where: { reconsiderationId: { in: reconIds } } });
+    await prisma.claimReconsideration.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.claim.deleteMany({ where: { tenantId: { in: tenantIds } } });
     // F3.2 intake evidence + F4.1 info requests (relation-less, so no FK forces this — kept tidy anyway)
     await prisma.preAuthorizationEvent.deleteMany({ where: { tenantId: { in: tenantIds } } });
