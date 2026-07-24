@@ -1003,3 +1003,23 @@ Stop condition observed: yes — amendment only (no PA→claim).
 ```
 
 ---
+
+## F3.13 — PA-to-claim prefill and submit
+
+```text
+Work package: F3.13
+Status: COMPLETE
+Commit: 735bc6c
+ASSUMPTION (board-only): "PA-to-claim prefill and submit" = a provider starts a claim from its own APPROVED PA via the canonical conversion (prefills from the PA + submits through the claim intake). Gated on provider.claim.create (flagged).
+Files changed: src/app/provider/preauth/[id]/actions.ts (fileClaimFromPreauthAction added + writeAudit), src/app/provider/preauth/[id]/FileClaimButton.tsx (new), src/app/provider/preauth/[id]/page.tsx (wire button), tests/actions/provider-preauth-fileclaim-action.test.ts (new)
+Schema/data changes: none
+Behavior delivered: fileClaimFromPreauthAction — providerPermits(provider.claim.create) gate; ownership via the F3.10 scoped read; delegates to ClaimsService.createClaimWithPreauth (canonical PA→claim conversion: prefills member/provider/serviceType/benefit/DOS/diagnoses + ONE aggregate pre-authorised line at the approved amount, submits through ClaimIntakeService kind:preauthConversion, idempotent via preauthId:claim-create:v1, enforces APPROVED — returns the existing claim for a converted PA); writes a PREAUTH_ATTACHED audit (mirrors the admin convertToClaimAction); redirects to the new provider claim. FileClaimButton (client) shows on the detail page only when the viewer holds provider.claim.create AND the PA is APPROVED.
+Audit-coverage CATCH: the PR-020 harness flagged fileClaimFromPreauthAction because ClaimsService.createClaimWithPreauth is not in its recognized-auditing-service set (unlike PreauthIntakeService.submit / cancelPreAuth / executeAutoDecision used by the other rails, which were NOT flagged). Fixed by adding the explicit PREAUTH_ATTACHED writeAudit (also the correct behavior — mirrors admin).
+Evidence: provider-preauth-fileclaim-action.test.ts (4): canonical conversion + provider-scoped ownership read + PREAUTH_ATTACHED audit + redirect; deny without provider.claim.create (no read/convert); safe not-found for another facility's PA; canonical error surfaced without redirect. Audit-coverage harness green. Full suite 1272 pass / 191 skip. tsc 0; brand PASS; currency PASS (692).
+Verification: ACTION unit-tested; button (presentation) NOT browser-verified (worktree env, as F3.8–F3.12).
+Feature-flag state: none.
+Next allowed package: F3.14 — Authorized GOP/LOU artifact (M).
+Stop condition observed: yes — PA→claim conversion only (no GOP artifact).
+```
+
+---
