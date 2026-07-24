@@ -88,7 +88,7 @@
 | F3.2 | PA intake receipt + event schema | S | COMPLETE | `PreauthIntakeReceipt` + `PreAuthorizationEvent` + `preauth-intake/events.ts` + test (7 pass) |
 | F3.3 | Implement PreauthIntakeService | M | COMPLETE | `preauth-intake/service.ts` (tx-aware, receipt PROCESSING→ACCEPTED, injectable adjudicate handoff) + test (7 pass) |
 | F3.4 | Migrate provider B2B PA submit | S | COMPLETE | `/api/v1/preauth` now adapts over `PreauthIntakeService` (no direct create) + api.preauth.write scope + receipt envelope; route test (8) + E2E-D04 test rewritten (7) |
-| F3.5 | Migrate internal PA rails (a/b/c per rail) | S/rail | PARTIAL | **F3.5a member DONE** (`d005b3a`): `MemberPreAuthService.request` → intake (MEMBER_APP) + canonical `executeAutoDecision`; bespoke 15k/CPT auto-approve DELETED (dual-policy resolved → canonical); seam test (13). **F3.5b admin DONE** (`c889da7`): `app/(admin)/preauth/new/actions.ts` → intake (ADMIN_PORTAL) + `executeAutoDecision`; fraud now pipeline-enforced (inline warnings dropped); seam test (7). **F3.5c tRPC** (`server/trpc/routers/preauth.ts:47`) = NOT_STARTED (still on `ClaimsService.createPreAuth`) |
+| F3.5 | Migrate internal PA rails (a/b/c per rail) | S/rail | COMPLETE | **All 3 rails converged on canonical intake+pipeline.** F3.5a member (`d005b3a`, MEMBER_APP, bespoke 15k/CPT auto-approve DELETED, seam test 13). F3.5b admin UI (`c889da7`, ADMIN_PORTAL, fraud now pipeline-enforced, seam test 7). F3.5c tRPC (`8c883c5`, ADMIN_TRPC, input contract unchanged, seam test 5). `ClaimsService.createPreAuth` now called by NO rail → retire in F3.6 |
 | F3.6 | Retire fragmented PA persistence | M | NOT_STARTED | — |
 | F3.7 | Canonical PA list read model | S | NOT_STARTED | — |
 | F3.8 | Provider PA list page | S | NOT_STARTED | — |

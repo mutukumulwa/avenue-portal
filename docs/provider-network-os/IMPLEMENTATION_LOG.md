@@ -806,3 +806,24 @@ Stop condition observed: yes — only the admin UI rail migrated.
 ```
 
 ---
+
+## F3.5c — Migrate the tRPC PA create rail (F3.5 COMPLETE)
+
+```text
+Work package: F3.5c (tRPC rail) — completes F3.5
+Status: COMPLETE
+Commit: 8c883c5
+Files changed: src/server/trpc/routers/preauth.ts (create mutation migrated), tests/routers/preauth-router.test.ts (new), PROGRESS.md + IMPLEMENTATION_LOG.md
+Schema/data changes: none
+Behavior delivered: preauthRouter.create submits through PreauthIntakeService on channel ADMIN_TRPC with context {channel, tenantId: ctx.tenantId, providerId: input.providerId, actorType:USER, actorId: ctx.session.user.id} and the submission = { ...input } (the zod input is already canonical-shaped: diagnoses use icdCode, procedures carry cptCode/unitCost/total — spreads straight into PreauthSubmissionV1, no remapping). Auto-decision port → executeAutoDecision + getSystemActorId. On REJECTED → throw TRPCError BAD_REQUEST (first validation message). On success → return ClaimsService.getPreAuthById(tenantId, preauthId) so the mutation's return contract (the PA) is preserved.
+Input contract: UNCHANGED (same zod schema) — existing tRPC callers are unaffected.
+Convergence evidence (seam test, caller + mocks): ADMIN_TRPC context derived from ctx; mapped command; PA returned via getPreAuthById("t1","pa-1"); ClaimsService.createPreAuth NEVER called (behavioral) AND the router source has no createPreAuth( call (structural guard, mirrors the F5.3 claims-router removal test); adjudicate → executeAutoDecision(paId, tid, systemActor); REJECTED → TRPCError BAD_REQUEST with no PA read-back.
+Why mocks here (not real DB): same as F3.5a/b — intake mechanics proven on real DB in F3.3; this asserts the rail's delegation contract via the standard tRPC createCallerFactory pattern.
+Focused tests and results: preauth-router 5/5. Full suite (no DB env) 1223 passed / 190 skipped (+5 pure). tsc 0 (fixed a test-only type: cast the .catch() result to {code?,message?} since .catch widens to PA|error); brand PASS; currency PASS (682).
+Feature-flag state: none.
+F3.5 COMPLETE — all three internal PA rails (member/admin-UI/tRPC) + the B2B rail (F3.4) now go through PreauthIntakeService. Direct preAuthorization.create sites remaining: (1) the canonical intake itself (service.ts:131 — the target), (2) the adjudication AMENDMENT create (preauth-adjudication.service.ts:708 — lifecycle, F3.12), (3) ClaimsService.createPreAuth (claims.service.ts:495-506 — now called by NO rail; F3.6 retires it).
+Next allowed package: F3.6 — Retire fragmented PA persistence (M).
+Stop condition observed: yes — only the tRPC rail migrated in this package.
+```
+
+---
