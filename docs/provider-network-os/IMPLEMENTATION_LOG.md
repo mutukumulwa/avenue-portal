@@ -1083,3 +1083,22 @@ Stop condition observed: yes — open/cancel only (no provider response, no revi
 ```
 
 ---
+
+## F4.3 — Provider explicit response submit
+
+```text
+Work package: F4.3
+Status: COMPLETE
+Commit: f366374
+ASSUMPTION (board-only): "draft" read as CLIENT-SIDE form state (F4.7 respond form); "explicit submit" = the deliberate server-persisted submit. NO server-persisted resumable-draft field added (schema gold-plating the plan may not intend). Flagged.
+Files changed: src/server/services/preauth-info-request/service.ts (+submitResponse, +INFO_REQUEST_RESPONDABLE_STATUSES), src/app/provider/preauth/[id]/info-request-actions.ts (new), tests/services/preauth-info-request-service.test.ts (+1 real-DB), tests/actions/provider-info-response-action.test.ts (new)
+Schema/data changes: none
+Behavior delivered: PreauthInfoRequestService.submitResponse — requires a non-empty response (NO_RESPONSE); loads the request scoped by tenant + optional providerId (a request not this facility's ⇒ non-enumerating NOT_FOUND); requires RESPONDABLE (OPEN/REOPENED, else NOT_RESPONDABLE); ONE tx sets RESPONDED + responseNote + respondedBy/At + a RESPONSE_SUBMITTED PA event (safe metadata; response text stays on the row). Provider action submitInfoResponseAction: gated provider.preauth.respond; passes ctx.providerId (facility ownership); validates non-empty; on success writes a compliance PREAUTH_INFO_RESPONSE_SUBMITTED audit (PA event = domain timeline, writeAudit = tamper-evident trail; satisfies PR-020, mirrors F3.13) + revalidates the PA detail. No page (F4.7).
+Audit-coverage: harness flagged the new action (PreauthInfoRequestService.submitResponse is not a KNOWN_AUDITING_TOKEN — it appends a PA event, not a chain audit). Fixed by the explicit writeAudit in the action (honest + minimal, no catalogue change).
+Evidence: service test +1 (REAL DB): OPEN→RESPONDED + RESPONSE_SUBMITTED, guards NO_RESPONSE / cross-facility NOT_FOUND / NOT_RESPONDABLE. action test (4, mock): facility-scoped submit + audit + revalidate; deny without permission; empty-response validation; service error surfaced without revalidate. Audit-coverage green. Full suite (no DB env) 1285 pass / 200 skip. tsc 0; brand PASS; currency PASS (698).
+Feature-flag state: none.
+Next allowed package: F4.4 — Reviewer accept/reopen/close (M).
+Stop condition observed: yes — provider response submit only (no reviewer decision, no page).
+```
+
+---
