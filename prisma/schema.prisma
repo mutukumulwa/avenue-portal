@@ -2201,6 +2201,14 @@ model ProRataCalculation {
 }
 
 // ─── CLAIMS ─────────────────────────────────────────────
+// PNOS F5.2 — a claim's role in its submission chain (see Claim lineage fields).
+enum ClaimSubmissionType {
+  ORIGINAL // the first claim in the chain
+  CORRECTION // replaces an earlier version (data fix, F5.7/F5.8)
+  RESUBMISSION // re-filed after a decline (F5.10)
+  RECONSIDERATION // re-decision requested on an outcome (F5.11–F5.16)
+}
+
 enum ClaimStatus {
   INCURRED // Liability known before paper arrives (e.g. discharge notification)
   RECEIVED // Claim documents received from provider
@@ -2399,6 +2407,20 @@ model Claim {
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
 
+  // PNOS F5.2 — submission chain / supersession lineage. A corrected/resubmitted/
+  // reconsidered claim is a NEW claim linked to a superseded original (never an
+  // in-place mutation), so already-posted GL/settlement/usage on the original stays
+  // intact. Relation-less id pointers (no self-relation): chainRootClaimId = the
+  // original heading the chain (null ⇒ this IS the root); supersedesClaimId = the
+  // immediate predecessor this claim replaces; supersededByClaimId = the successor
+  // that replaced this claim (null ⇒ current head). Populated by F5.4 (backfill/
+  // new-original) + F5.7 (atomic replacement); this package only adds the shape.
+  submissionType      ClaimSubmissionType @default(ORIGINAL)
+  chainRootClaimId    String?
+  supersedesClaimId   String?
+  supersededByClaimId String?
+  supersededAt        DateTime?
+
   @@unique([tenantId, claimNumber])
   // Provider-scoped invoice uniqueness — prevents same provider submitting same invoice twice
   @@unique([providerId, invoiceNumber])
@@ -2418,6 +2440,8 @@ model Claim {
   @@index([tenantId, status, createdAt])
   @@index([memberId])
   @@index([providerId])
+  @@index([chainRootClaimId]) // F5.2 — all versions in a submission chain
+  @@index([supersedesClaimId])
 }
 
 enum ClaimLineCategory {
