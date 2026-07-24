@@ -759,3 +759,27 @@ Stop condition observed: yes — one rail (B2B) migrated.
 ```
 
 ---
+
+## F3.5a — Migrate the MEMBER PA rail (converge on the canonical pipeline)
+
+```text
+Work package: F3.5a (member rail; F3.5 is per-rail a/b/c)
+Status: COMPLETE
+Commit: d005b3a
+Files changed: src/server/services/member-preauth.service.ts (request() migrated), tests/services/member-preauth-rail.test.ts (new), PROGRESS.md + IMPLEMENTATION_LOG.md
+Schema/data changes: none (receipt/event schema landed in F3.2; no prisma db push)
+Behavior delivered: MemberPreAuthService.request no longer calls ClaimsService.createPreAuth and no longer runs its own auto-decision. It submits through PreauthIntakeService on channel MEMBER_APP with a server-derived caller context {channel, tenantId, providerId, actorType:USER, actorId:userId} and the mapped canonical command (memberId, providerId, serviceType, diagnoses:[{description,isPrimary}], procedures:[{cptCode,label,qty1,unitCost=total=estimatedCost}], estimatedCost, benefitCategory). The post-commit adjudicate port is wired to the SAME pipeline the B2B rail uses (preauthAdjudicationService.executeAutoDecision + getSystemActorId). After the handoff it reads the persisted PA status (single source of truth) and maps it to the member decision + notification: APPROVED→AUTO_APPROVED/HIGH, DECLINED→AUTO_DECLINED/HIGH, else PENDING_HUMAN_REVIEW/NORMAL. A REJECTED submission surfaces as a friendly thrown error (first error message) with no notification.
+DECISION — dual auto-approve policy RESOLVED (per user: "converge on the canonical pipeline"): DELETED the member rail's bespoke AUTO_APPROVE_CEILING (15,000) + AUTO_APPROVE_CPT_CODES allowlist and its hand-rolled approveByHuman / declineByHuman(BENEFIT_EXHAUSTED) branches. The 10-gate canonical pipeline (benefit cap, exclusions, fraud, credential, 50k ceiling) is now the single decision owner for member-originated PAs — parity with every other rail.
+Preserved (rail's own concern, unchanged): member authorization (self or an ACTIVE dependant only — allowedMemberIds), the friendly provider-active pre-check, and the friendly benefit-exists-in-package pre-check. Trimmed two now-dead member includes (group.status, benefitUsages).
+Authorization evidence (seam test): a request for a non-self/non-active-dependant member → throws "…yourself or an active dependant", submit NEVER called; a SUSPENDED dependant is likewise blocked; no linked member profile → throws, no submit; inactive provider and no-cover-in-package → friendly throw, no submit.
+Convergence evidence (seam test): submit called with the exact MEMBER_APP context (derived from session, not body); the injected adjudicate calls executeAutoDecision(paId, tenantId, systemActor); the removed approveByHuman/declineByHuman NEVER run; a 40,000 estimate (> old 15k ceiling) still routes to the pipeline (no rail-level block). status→decision→notification mapping proven for APPROVED/DECLINED/UNDER_REVIEW; REJECTED bubbles as a friendly error with no notification.
+Why mocks here (not real DB): the intake→receipt→SUBMITTED-event→adjudicate-handoff MECHANICS (incl. the deferral case where a failing adjudicate still yields ACCEPTED + durable PA) already have REAL-DB proof in tests/services/preauth-intake-service.test.ts (F3.3). The rail now calls that exact proven path, so F3.5a asserts only the rail's delegation CONTRACT deterministically — a heavy real-DB member-rail test would re-prove F3.3 and risk non-deterministic pipeline side-effects (holds/GOP) on teardown.
+Behavioral note: the server action's returned `warnings` is now always [] (createPreAuth warnings are gone; detailed reasons live on the PA + events / the PA detail page). The decision union is unchanged, so the sole caller (src/app/member/preauth/actions.ts:15) is type-compatible (tsc clean).
+Focused tests and results: member-preauth-rail 13/13. Full suite (no DB env) 1211 passed / 190 skipped (+13 pure). tsc 0; brand PASS; currency PASS (682).
+Feature-flag state: none (member rail is always-on for logged-in members; entitlement scoping does not apply to the member's own/dependant PAs).
+Remaining internal PA rails (grounded via createPreAuth callers): F3.5b = admin UI (src/app/(admin)/preauth/new/actions.ts:24), F3.5c = tRPC (src/server/trpc/routers/preauth.ts:47) — both still on ClaimsService.createPreAuth. The adjudication-amendment create (preauth-adjudication.service.ts:708) is lifecycle, NOT an intake rail (F3.12). ClaimsService.createPreAuth stays as the legacy creator until F3.6 (retire fragmented persistence) once all rails migrate.
+Next allowed package: F3.5b — Migrate the admin PA creation rail (S).
+Stop condition observed: yes — only the member rail migrated (no sweeping change).
+```
+
+---
