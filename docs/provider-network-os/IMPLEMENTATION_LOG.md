@@ -1267,3 +1267,21 @@ Stop condition observed: yes — chain schema + read only (no population, no lif
 ```
 
 ---
+
+## F5.3 — Withdrawal/supersession terminal claim statuses
+
+```text
+Work package: F5.3
+Status: COMPLETE
+Commit: 538e5f6
+Files changed: prisma/schema.prisma (ClaimStatus +=WITHDRAWN,SUPERSEDED), claim-lifecycle.ts (TRANSITIONS), report-exclusions.ts, claim-autopilot/evaluate.ts, claims.service.ts, (admin)/claims/page.tsx, (admin)/claims/[id]/{PreauthPanel,AutomationPanel}.tsx, automation-actions.ts, tests/services/claim-lifecycle.test.ts (+1)
+Schema/data changes: ADDITIVE — ClaimStatus enum += WITHDRAWN, SUPERSEDED. Pushed to throwaway PG (verified), prod on next build. Does NOT add a status-WRITER (F5.5/F5.7 do), so the claim-status-mutation-guard ALLOWLIST is unchanged.
+Behavior delivered: two terminal statuses. WITHDRAWN = provider abandoned pre-decision; SUPERSEDED = replaced by a corrected chain version. Transition graph (compile-forced authority): both terminal, reachable ONLY from pre-decision states (RECEIVED/CAPTURED/UNDER_REVIEW → {WITHDRAWN,SUPERSEDED}; INCURRED → WITHDRAWN). Decided/settled claims can never be silently withdrawn/superseded; DECLINED stays DECLINED (resubmission LINKS, F5.10). Preserves posted GL/settlement/usage.
+Threaded consumers (F5.1 checklist): report-exclusions.FULLY_DECLINED (excluded from paid/AR); dup-detection notIn (superseded/withdrawn original does NOT block resubmission — critical F5.10); claims.service PA-attach block; (admin)/claims STATUSES dropdown + decided set; PreauthPanel editable + AutomationPanel/automation-actions decidable. isTerminalClaimStatus + ACTIVE_QUEUE_STATUSES unchanged (graph-derived / open whitelist). Badge renderers auto-fallback (cosmetic).
+Evidence: lifecycle test +1: both terminal; legal from pre-decision (+INCURRED→WITHDRAWN); illegal from APPROVED/PARTIALLY_APPROVED/PAID/VOID/DECLINED + out of terminals. Full suite (no DB env) 1292 pass / 212 skip; mutation-guard GREEN (no new writer). tsc 0; brand PASS; currency PASS (706).
+Feature-flag state: none (statuses inert until F5.5/F5.7 write them).
+Next allowed package: F5.4 — Create/backfill original chains (per batch) (S/batch).
+Stop condition observed: yes — statuses + graph + read-consumer threading only (no writer service).
+```
+
+---
