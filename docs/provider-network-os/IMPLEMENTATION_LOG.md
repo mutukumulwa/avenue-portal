@@ -1158,3 +1158,22 @@ Stop condition observed: yes — projection only (no pages).
 ```
 
 ---
+
+## F4.7 — Provider inbox list + info-request detail pages
+
+```text
+Work package: F4.7
+Status: COMPLETE
+Commit: 6193427
+ASSUMPTION (board-only): the PROVIDER inbox (list + detail-to-respond) on F4.6 projection + F4.3 action. Flagged.
+Files changed: src/server/services/preauth-info-request/service.ts (+getForProvider), src/components/layouts/provider-nav-model.ts (+Inbox item, +inbox iconKey), src/components/layouts/ProviderNav.tsx (+Inbox icon), src/app/provider/inbox/page.tsx (new), src/app/provider/inbox/[id]/page.tsx (new), src/app/provider/inbox/[id]/RespondForm.tsx (new), tests/components/provider-nav-model.test.ts (+1), tests/services/preauth-info-request-service.test.ts (+1 real-DB)
+Schema/data changes: none
+Behavior delivered: /provider/inbox (providerPermits(provider.preauth.read) gate → providerInboxProjection list, SLA order + overdue + catalog labels, rows link to detail); /provider/inbox/[id] (getForProvider non-enumerating null⇒404 + F3.10 PA context; requested items + reviewer note + prior response; respond form only when provider.preauth.respond + OPEN/REOPENED); RespondForm (client → F4.3 submitInfoResponseAction → refresh). New nav Inbox item (Home group, provider.preauth.read) → Inbox icon. New service getForProvider (provider-scoped, non-enumerating).
+FLAG: the REVIEWER admin UI (triggers for F4.2 open/cancel + F4.4 accept/reopen/close on the admin PA detail) is NOT built — the actions exist + are tested, but their admin-surface wiring is a remaining gap (F4.7 is the provider inbox; reviewer panel = targeted follow-up). Pages NOT browser-verified (worktree env, as F3.8+).
+Evidence: provider-nav-model (+1): /provider/inbox now finished, Inbox follows provider.preauth.read. service (+1 real DB): getForProvider owns-only (null for another facility). Full suite (no DB env) 1291 pass / 204 skip. tsc 0; brand PASS; currency PASS (703).
+Feature-flag state: none.
+Next allowed package: F4.8 — Notification/outbox schema + dispatcher (M). DESIGN NOTE: email worker unprovisioned → plan an OUTBOX (persist rows + pluggable delivery; in-app now, email deferred to a future worker draining pending rows).
+Stop condition observed: yes — provider inbox pages only.
+```
+
+---
