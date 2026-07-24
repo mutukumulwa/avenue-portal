@@ -827,3 +827,56 @@ Stop condition observed: yes — only the tRPC rail migrated in this package.
 ```
 
 ---
+
+## F3.6 — Retire fragmented PA persistence (single canonical creator)
+
+```text
+Work package: F3.6 (+ a discovered CATCH)
+Status: COMPLETE
+Commits: eeb1d65 (CATCH — intake benefit-in-package gate), e4e752a (retire createPreAuth)
+Files changed: src/server/services/preauth-intake/contract.ts (new BENEFIT_NOT_IN_PACKAGE code), src/server/services/preauth-intake/service.ts (benefit-in-package gate), src/server/services/claims.service.ts (createPreAuth DELETED + orphaned imports removed), tests/services/preauth-intake-benefit-gate.test.ts (new), tests/services/preauth-intake-service.test.ts (+1 real-DB), tests/services/preauth-persistence-retirement.test.ts (new guard), PROGRESS.md + IMPLEMENTATION_LOG.md
+Schema/data changes: none
+
+CATCH (found in proof-before-build, fixed FIRST — commit eeb1d65):
+  Retiring createPreAuth surfaced that F3.5b/c (admin + tRPC) had dropped its PR-024
+  benefit-in-package THROW, and the auto-decision pipeline does NOT backstop it:
+  BENEFIT_CAP calls availableLimit → null for a missing config → `if (balance)` skips;
+  the approval hold-recheck calls computeAvailability → null for a missing config →
+  the route-to-human is skipped; the PA auto-approves, a BenefitHold row is written,
+  and placeHold no-ops (`if (!cfg) return`). Net: an admin/tRPC PA for a not-in-package
+  benefit could auto-approve into an unpayable GOP + a stranded phantom hold.
+  Fix: PreauthIntakeService now runs a benefit-in-package gate (BenefitUsageService
+  .resolveConfig, after the provider-active gate, before the tx) — missing config →
+  REJECTED receipt (BENEFIT_NOT_IN_PACKAGE, new PreauthErrorCode), NO PA. Enforced
+  UNIFORMLY for every rail (member/admin/tRPC/B2B) in the canonical place. B2B route
+  maps it to 422; admin → { error }; tRPC → BAD_REQUEST; member shows its friendly
+  pre-check first (now a duplicate of the canonical gate). F3.3's OUTPATIENT tests
+  still pass (benefit seeded); its rejection tests reject before the gate.
+
+Retirement (commit e4e752a):
+  With all rails on the intake and the guard living canonically, ClaimsService
+  .createPreAuth is dead → removed (method + orphaned FraudService / BenefitUsageService
+  / createWithDocumentNumber imports + the unused BenefitCategory type import). Net
+  -112 lines in claims.service.ts. The ONLY remaining `preAuthorization.create(` sites
+  are the canonical intake (all rails) and the adjudication amendment (F3.12 lifecycle).
+
+Invariant evidence: preauth-persistence-retirement.test.ts (3, repo-wide, executable):
+  ClaimsService has no createPreAuth; claims.service.ts has no PA-create path;
+  `preAuthorization.create(` appears ONLY in preauth-intake/service.ts and
+  preauth-adjudication.service.ts. Locks single-creator against silent regression.
+Benefit-gate evidence: preauth-intake-benefit-gate.test.ts (2, mock db + REAL
+  resolveConfig): phantom benefit → REJECTED/no PA/no tx/receipt failureCode; in-package
+  → reaches tx. Plus a real-DB DENTAL-not-in-package case in preauth-intake-service.test.ts.
+
+Follow-up (NOT done — out of F3.6 scope): FraudService.evaluatePreAuth is now dead code
+  (createPreAuth was its only caller) and the fraud.service.ts:342 section comment is
+  stale. Left untouched to avoid churn in the security-sensitive fraud service; the
+  canonical pipeline runs its own FRAUD_SCREENING gate.
+Focused tests and results: 2 + 3 new pure + 1 real-DB. Full suite (no DB env) 1228 passed
+  / 191 skipped. tsc 0; brand PASS; currency PASS (682).
+Feature-flag state: none.
+Next allowed package: F3.7 — Canonical PA list read model (S).
+Stop condition observed: yes — persistence consolidation only; no read-model/UI work.
+```
+
+---
