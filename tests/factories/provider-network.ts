@@ -221,6 +221,169 @@ export async function buildProviderWorld(prisma: Prisma, opts: BuildOptions = {}
     return row;
   }
 
+  // ── settlement / remittance fixtures (F6.2) ────────────────────────────────
+  // Builds a FROZEN settled batch directly (no GL-posting settlement service — the
+  // throwaway DB has no chart of accounts). Represents the stored facts F6.2 reads.
+  const createdBatchIds: string[] = [];
+  const createdVoucherIds: string[] = [];
+  const seededReasonTenants = new Set<string>();
+  let batchSeq = 0; // unique sequence within (tenant, provider, cycle) per run
+
+  async function upsertReasonCode(tenantId: string, code: string, providerDescription: string, extra?: { internalDescription?: string; category?: string; remedy?: string; resubmissionAllowed?: boolean; defaultSeverity?: "REJECT" | "SHORTFALL" | "PEND" | "INFO" }) {
+    seededReasonTenants.add(tenantId);
+    return prisma.adjudicationReasonCode.upsert({
+      where: { tenantId_code: { tenantId, code } },
+      update: {},
+      create: {
+        tenantId, code,
+        category: extra?.category ?? "Pricing",
+        internalDescription: extra?.internalDescription ?? `INTERNAL: ${code}`,
+        providerDescription,
+        memberDescription: "member text",
+        remedy: extra?.remedy ?? null,
+        resubmissionAllowed: extra?.resubmissionAllowed ?? false,
+        defaultSeverity: extra?.defaultSeverity ?? "SHORTFALL",
+      },
+    });
+  }
+
+  interface RemLineSpec {
+    description?: string;
+    cptCode?: string | null;
+    quantity?: number;
+    billed: number;
+    contractedAllowed?: number | null;
+    disallowed?: number;
+    memberShare?: number;
+    writeoff?: number;
+    approved: number; // Track A line payable
+    payerLiability?: number; // Track B engine (defaults to approved)
+    reasonCode?: { code: string; providerDescription: string; internalDescription?: string; category?: string; remedy?: string; resubmissionAllowed?: boolean; defaultSeverity?: "REJECT" | "SHORTFALL" | "PEND" | "INFO" };
+  }
+  interface RemClaimSpec {
+    memberId?: string;
+    branchId?: string | null;
+    billed: number;
+    approved: number; // claim payable (header)
+    memberShare?: number;
+    approvedBase?: number; // defaults to approved (UGX)
+    billedBase?: number | null;
+    declineReasonCode?: string | null;
+    submissionType?: "ORIGINAL" | "CORRECTION" | "RESUBMISSION" | "RECONSIDERATION";
+    chainRootClaimId?: string;
+    supersedesClaimId?: string;
+    lines: RemLineSpec[];
+  }
+  interface RemBatchSpec {
+    providerId?: string;
+    currency?: string;
+    baseCurrency?: string;
+    status?: "SETTLED" | "CHECKER_APPROVED" | "MAKER_SUBMITTED" | "PENDING";
+    withVoucher?: boolean;
+    /** Override the stored batch total (to force a header↔batch mismatch test). */
+    overrideBatchTotal?: number;
+    claims: RemClaimSpec[];
+  }
+
+  async function createSettlementBatch(spec: RemBatchSpec) {
+    targetSeq += 1;
+    const providerId = spec.providerId ?? providerA.id;
+    const tId = providerId === providerCId ? beta.id : alpha.id;
+    const currency = spec.currency ?? (tId === beta.id ? "KES" : "UGX");
+    const baseCurrency = spec.baseCurrency ?? "UGX";
+    const status = spec.status ?? "SETTLED";
+    const isSettled = status === "SETTLED";
+    const sumApproved = spec.claims.reduce((s, c) => s + c.approved, 0);
+    const sumBase = spec.claims.reduce((s, c) => s + (c.approvedBase ?? c.approved), 0);
+
+    const batch = await prisma.providerSettlementBatch.create({
+      data: {
+        tenantId: tId, providerId,
+        cycleMonth: 7, cycleYear: 2026, sequence: ++batchSeq,
+        status: status as never, currency, baseCurrency,
+        totalAmount: spec.overrideBatchTotal ?? sumApproved,
+        baseTotalAmount: isSettled ? sumBase : 0,
+        claimCount: spec.claims.length,
+        makerId: usersA.finance?.id ?? providerId,
+        checkerId: isSettled ? (usersA.admin?.id ?? providerId) : null,
+        settledAt: isSettled ? now : null,
+      },
+    });
+    createdBatchIds.push(batch.id);
+
+    let voucher: { id: string; voucherNumber: string } | null = null;
+    if (spec.withVoucher ?? isSettled) {
+      const v = await prisma.paymentVoucher.create({
+        data: {
+          voucherNumber: `PV-${token}-${targetSeq}`,
+          tenantId: tId, providerId,
+          totalAmount: sumApproved, currency, baseCurrency, baseTotalAmount: sumBase,
+          claimCount: spec.claims.length,
+          status: "PROCESSED", processedAt: now, processedBy: usersA.finance?.id ?? providerId,
+          settlementBatchId: batch.id,
+        },
+      });
+      voucher = { id: v.id, voucherNumber: v.voucherNumber };
+      createdVoucherIds.push(v.id);
+    }
+
+    const claimIds: string[] = [];
+    for (const c of spec.claims) {
+      targetSeq += 1;
+      const memberId = c.memberId ?? (tId === beta.id ? memberBeta.id : memberAlpha.id);
+      const claim = await prisma.claim.create({
+        data: {
+          tenantId: tId, claimNumber: `CLM-${token}-${String(targetSeq).padStart(4, "0")}`,
+          memberId, providerId, providerBranchId: c.branchId ?? null,
+          serviceType: "OUTPATIENT", benefitCategory: "OUTPATIENT", dateOfService: now,
+          diagnoses: [], procedures: [],
+          currency, baseCurrency,
+          billedAmount: c.billed, approvedAmount: c.approved,
+          paidAmount: isSettled ? c.approved : 0,
+          memberLiability: c.memberShare ?? 0,
+          approvedBaseAmount: c.approvedBase ?? c.approved,
+          billedBaseAmount: c.billedBase ?? null,
+          declineReasonCode: c.declineReasonCode ?? null,
+          submissionType: (c.submissionType ?? "ORIGINAL") as never,
+          chainRootClaimId: c.chainRootClaimId ?? null,
+          supersedesClaimId: c.supersedesClaimId ?? null,
+          status: (isSettled ? "PAID" : "APPROVED") as never,
+          decidedAt: past(1),
+          settlementBatchId: batch.id,
+          paymentVoucherId: voucher?.id ?? null,
+        },
+      });
+      claimIds.push(claim.id);
+      createdClaimIds.push(claim.id);
+
+      let lineNo = 0;
+      for (const l of c.lines) {
+        lineNo += 1;
+        let reasonCodeId: string | null = null;
+        if (l.reasonCode) {
+          const rc = await upsertReasonCode(tId, l.reasonCode.code, l.reasonCode.providerDescription, l.reasonCode);
+          reasonCodeId = rc.id;
+        }
+        await prisma.claimLine.create({
+          data: {
+            claimId: claim.id, lineNumber: lineNo,
+            description: l.description ?? `Service ${lineNo}`, cptCode: l.cptCode ?? null,
+            quantity: l.quantity ?? 1, unitCost: l.billed / (l.quantity ?? 1),
+            billedAmount: l.billed, approvedAmount: l.approved,
+            contractedAmount: l.contractedAllowed === undefined ? null : l.contractedAllowed,
+            disallowedAmount: l.disallowed ?? 0,
+            memberLiability: l.memberShare ?? 0,
+            providerWriteOff: l.writeoff ?? 0,
+            payerLiability: l.payerLiability ?? l.approved,
+            reasonCodeId,
+          },
+        });
+      }
+    }
+
+    return { batch, voucher, claimIds };
+  }
+
   async function teardown() {
     // FK-safe order: branch assignments → applicability → contracts → members →
     // groups → benefit → version → package → branches → users → providers →
@@ -252,6 +415,13 @@ export async function buildProviderWorld(prisma: Prisma, opts: BuildOptions = {}
     await prisma.claimReconsiderationLine.deleteMany({ where: { reconsiderationId: { in: reconIds } } });
     await prisma.claimReconsideration.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.claim.deleteMany({ where: { tenantId: { in: tenantIds } } });
+    // F6.2: settlement batches + vouchers (claims FK to both — deleted above) + any
+    // tenant-scoped reason codes seeded for line-level remittance reasons.
+    await prisma.providerSettlementBatch.deleteMany({ where: { tenantId: { in: tenantIds } } });
+    await prisma.paymentVoucher.deleteMany({ where: { tenantId: { in: tenantIds } } });
+    if (seededReasonTenants.size > 0) {
+      await prisma.adjudicationReasonCode.deleteMany({ where: { tenantId: { in: [...seededReasonTenants] } } });
+    }
     // F3.2 intake evidence + F4.1 info requests (relation-less, so no FK forces this — kept tidy anyway)
     await prisma.preAuthorizationEvent.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.preauthIntakeReceipt.deleteMany({ where: { tenantId: { in: tenantIds } } });
@@ -289,6 +459,7 @@ export async function buildProviderWorld(prisma: Prisma, opts: BuildOptions = {}
     contracts: { aActive: contractAActive, aExpired: contractAExpired, aFuture: contractAFuture, bActive: contractBActive, cActive: contractCActive },
     createClaim,
     createPreauth,
+    createSettlementBatch,
     teardown,
   };
 }
