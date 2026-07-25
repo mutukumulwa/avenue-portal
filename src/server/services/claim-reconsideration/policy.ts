@@ -190,3 +190,52 @@ export function toProviderReconsiderationProjection(r: {
     outcomeSafeExplanation: r.outcomeSafeExplanation,
   };
 }
+
+// ── Provider-visible event timeline (F5.14 — "provider sees only shared state") ─
+
+/**
+ * Event types a provider may see in the reconsideration timeline. The internal reviewer
+ * workflow (TRIAGED, ASSIGNED, UNDER_REVIEW, INTERNAL_NOTE) is NEVER shown — a provider sees
+ * only its own submission, the structured info exchange, and the final outcome.
+ */
+export const PROVIDER_VISIBLE_RECONSIDERATION_EVENTS: ReadonlySet<string> = new Set([
+  "SUBMITTED",
+  "INFO_REQUESTED",
+  "PROVIDER_RESPONDED",
+  "OUTCOME_RECORDED",
+  "ACCEPTED",
+  "PARTIALLY_ACCEPTED",
+  "UPHELD",
+  "WITHDRAWN",
+  "CLOSED",
+]);
+
+/** Only the structured info exchange carries provider-facing message text; every other event
+ *  type's message is withheld even if present (defence-in-depth against an internal note leaking
+ *  through a shared field). */
+const MESSAGE_VISIBLE_RECONSIDERATION_EVENTS: ReadonlySet<string> = new Set(["INFO_REQUESTED", "PROVIDER_RESPONDED"]);
+
+export interface ProviderReconsiderationTimelineEntry {
+  at: Date;
+  type: string;
+  /** Present only for the info-request / provider-response exchange; safe text otherwise null. */
+  message: string | null;
+}
+
+/**
+ * Project a case's events to the provider-safe timeline. Two independent allow-lists gate it:
+ * internal workflow events are dropped entirely, and message text is surfaced ONLY for the safe
+ * exchange types. The internal fields (internalReasonRef, actorId, metadata, sequence) are never
+ * carried — anything not named here cannot reach the provider by construction.
+ */
+export function toProviderReconsiderationTimeline(
+  events: Array<{ eventType: string; message: string | null; createdAt: Date }>,
+): ProviderReconsiderationTimelineEntry[] {
+  return events
+    .filter((e) => PROVIDER_VISIBLE_RECONSIDERATION_EVENTS.has(e.eventType))
+    .map((e) => ({
+      at: e.createdAt,
+      type: e.eventType,
+      message: MESSAGE_VISIBLE_RECONSIDERATION_EVENTS.has(e.eventType) ? e.message : null,
+    }));
+}
