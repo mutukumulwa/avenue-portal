@@ -49,6 +49,13 @@ export function findReconsiderationReason(code: string): ReconsiderationReason |
   return REASON_BY_CODE.get(code) ?? null;
 }
 
+/** The filing reasons eligible for a given decided claim status — for the F5.13 picker. */
+export function reconsiderationReasonsFor(claimStatus: ClaimStatus): Array<{ code: string; label: string; providerDescription: string }> {
+  return RECONSIDERATION_REASON_CATALOG
+    .filter((r) => r.eligibleDecisions.includes(claimStatus))
+    .map((r) => ({ code: r.code, label: r.label, providerDescription: r.providerDescription }));
+}
+
 /** Reason eligibility by decision (and optional line category). */
 export function isReconsiderationReasonEligible(code: string, claimStatus: ClaimStatus, lineCategory?: ClaimLineCategory): boolean {
   const reason = REASON_BY_CODE.get(code);

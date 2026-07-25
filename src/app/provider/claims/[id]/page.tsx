@@ -7,10 +7,13 @@ import { providerCanWithdraw } from "@/server/services/claim-withdrawal/policy";
 import { listWithdrawalReasons } from "@/server/services/claim-withdrawal/catalog";
 import { providerCanCorrect } from "@/server/services/claim-replacement/policy";
 import { ClaimResubmissionEligibilityService } from "@/server/services/claim-resubmission/eligibility.service";
+import { ClaimReconsiderationService } from "@/server/services/claim-reconsideration/submit.service";
+import { RECONSIDERABLE_CLAIM_STATUSES, toProviderReconsiderationProjection } from "@/server/services/claim-reconsideration/policy";
 import { ClaimSubmissionChainService } from "@/server/services/claim-submission-chain/service";
 import { prisma } from "@/lib/prisma";
 import { WithdrawClaimButton } from "./WithdrawClaimButton";
 import { ClaimLineageTable } from "./ClaimLineageTable";
+import { ReconsiderationPanel } from "./ReconsiderationPanel";
 
 function money(n: number, ccy = "KES") {
   return `${ccy} ${Math.round(n).toLocaleString("en-UG")}`;
@@ -54,6 +57,13 @@ export default async function ProviderClaimDetail({ params }: { params: Promise<
   const canCorrect = providerCanCorrect(ctx, claim);
   // F5.10: a declined claim may be resubmittable (F5.9 eligibility) — only computed for DECLINED.
   const resubmit = claim.status === "DECLINED" ? await ClaimResubmissionEligibilityService.check(ctx, claim.id) : null;
+  // F5.13: a DECIDED claim may be reconsidered (F5.12). Load the latest case for the status panel
+  // and the server-computed eligibility for the entry (only for decided claims).
+  const reconsiderable = RECONSIDERABLE_CLAIM_STATUSES.includes(claim.status);
+  const reconsideration = reconsiderable
+    ? await prisma.claimReconsideration.findFirst({ where: { tenantId, claimId: claim.id }, orderBy: { createdAt: "desc" } })
+    : null;
+  const canReconsider = reconsiderable ? (await ClaimReconsiderationService.checkEligibility(ctx, claim.id)).eligible : false;
   // F5.8: the submission chain (F5.2) — both the immutable superseded records and the current one.
   const chain = await ClaimSubmissionChainService.getChain({ tenantId, providerId: provider.id }, claim.id);
 
@@ -86,6 +96,11 @@ export default async function ProviderClaimDetail({ params }: { params: Promise<
               <Pencil size={14} /> Resubmit claim
             </Link>
           )}
+          {canReconsider && (
+            <Link href={`/provider/claims/${claim.id}/reconsider`} className="flex items-center gap-1.5 rounded-full border border-brand-indigo/40 px-3 py-1.5 text-xs font-semibold text-brand-indigo hover:bg-brand-indigo/5">
+              <Pencil size={14} /> Reconsider
+            </Link>
+          )}
           {canWithdraw && (
             <WithdrawClaimButton claimId={claim.id} claimNumber={claim.claimNumber} reasons={listWithdrawalReasons()} />
           )}
@@ -111,6 +126,10 @@ export default async function ProviderClaimDetail({ params }: { params: Promise<
         currentClaimId={claim.id}
         currency={claim.currency}
       />
+
+      {reconsideration && (
+        <ReconsiderationPanel view={toProviderReconsiderationProjection(reconsideration)} currency={claim.currency} />
+      )}
 
       {diagnoses.length > 0 && (
         <div className="bg-white border border-[#EEEEEE] rounded-lg p-4">
