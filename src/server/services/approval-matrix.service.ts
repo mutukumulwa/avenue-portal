@@ -84,30 +84,53 @@ export class ApprovalMatrixService {
   }
 
   /**
-   * A3-OBS-01: seed a sensible default CLAIM_PAYMENT approval matrix so a newly
-   * provisioned tenant launches with the dual-approval / SoD control ACTIVE. An
-   * unconfigured matrix fail-opens — `resolve()` returns null and `decide()`
-   * then approves on a single reviewer for ANY amount. Idempotent: if the tenant
-   * already has any CLAIM_PAYMENT rule (admin-configured, or a re-provision) it
-   * leaves them untouched. Mirrors the three rules the initial seed installs.
+   * A3-OBS-01 / F76-GAP-02: seed sensible default approval rules so a newly
+   * provisioned tenant launches with its SoD controls ACTIVE. An unconfigured
+   * matrix fail-opens — `resolve()` returns null and `decide()` then approves on
+   * a single reviewer for ANY amount (and a governed policy change can't even be
+   * submitted). Two independent, idempotent blocks (each keyed on its own action
+   * type) so a re-provision backfills whichever is missing:
+   *   - CLAIM_PAYMENT: the three authority bands the initial seed mirrors.
+   *   - AUTO_ADJ_POLICY_CHANGE: a FINANCE_OFFICER checker for LIVE-policy
+   *     activation (maker = the SUPER_ADMIN submitter; maker ≠ checker enforced).
+   * Returns the number of rules actually created.
    */
   static async seedForTenant(tenantId: string): Promise<number> {
-    const existing = await prisma.approvalMatrix.count({
+    const effectiveFrom = new Date("2024-01-01");
+    let seeded = 0;
+
+    // Claim-payment authority bands — left untouched if any already exist.
+    const existingClaim = await prisma.approvalMatrix.count({
       where: { tenantId, actionType: "CLAIM_PAYMENT" },
     });
-    if (existing > 0) return 0;
-    const effectiveFrom = new Date("2024-01-01");
-    await prisma.approvalMatrix.createMany({
-      data: [
-        // Inpatient claims > UGX 200k require UNDERWRITER + dual (maker ≠ checker).
-        { tenantId, actionType: "CLAIM_PAYMENT", serviceType: "INPATIENT", claimValueMin: 200000, claimValueMax: null, benefitCategory: null, requiredRole: "UNDERWRITER", requiresDual: true, effectiveFrom },
-        // Surgical UGX 150k–199,999 require MEDICAL_OFFICER.
-        { tenantId, actionType: "CLAIM_PAYMENT", serviceType: null, claimValueMin: 150000, claimValueMax: 199999, benefitCategory: "SURGICAL", requiredRole: "MEDICAL_OFFICER", requiresDual: false, effectiveFrom },
-        // All claims UGX 50k–149,999 require CLAIMS_OFFICER or above.
-        { tenantId, actionType: "CLAIM_PAYMENT", serviceType: null, claimValueMin: 50000, claimValueMax: 149999, benefitCategory: null, requiredRole: "CLAIMS_OFFICER", requiresDual: false, effectiveFrom },
-      ],
+    if (existingClaim === 0) {
+      await prisma.approvalMatrix.createMany({
+        data: [
+          // Inpatient claims > UGX 200k require UNDERWRITER + dual (maker ≠ checker).
+          { tenantId, actionType: "CLAIM_PAYMENT", serviceType: "INPATIENT", claimValueMin: 200000, claimValueMax: null, benefitCategory: null, requiredRole: "UNDERWRITER", requiresDual: true, effectiveFrom },
+          // Surgical UGX 150k–199,999 require MEDICAL_OFFICER.
+          { tenantId, actionType: "CLAIM_PAYMENT", serviceType: null, claimValueMin: 150000, claimValueMax: 199999, benefitCategory: "SURGICAL", requiredRole: "MEDICAL_OFFICER", requiresDual: false, effectiveFrom },
+          // All claims UGX 50k–149,999 require CLAIMS_OFFICER or above.
+          { tenantId, actionType: "CLAIM_PAYMENT", serviceType: null, claimValueMin: 50000, claimValueMax: 149999, benefitCategory: null, requiredRole: "CLAIMS_OFFICER", requiresDual: false, effectiveFrom },
+        ],
+      });
+      seeded += 3;
+    }
+
+    // Governed auto-adjudication policy changes — no amount bands (a policy
+    // change carries no claim value, so `resolve()` matches on action type
+    // alone). FINANCE_OFFICER signs off as the money-control checker.
+    const existingPolicy = await prisma.approvalMatrix.count({
+      where: { tenantId, actionType: "AUTO_ADJ_POLICY_CHANGE" },
     });
-    return 3;
+    if (existingPolicy === 0) {
+      await prisma.approvalMatrix.create({
+        data: { tenantId, actionType: "AUTO_ADJ_POLICY_CHANGE", serviceType: null, claimValueMin: null, claimValueMax: null, benefitCategory: null, requiredRole: "FINANCE_OFFICER", requiresDual: false, effectiveFrom },
+      });
+      seeded += 1;
+    }
+
+    return seeded;
   }
 
   /** Sequential steps for a rule — explicit ApprovalSteps, else a synthetic

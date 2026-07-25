@@ -2,7 +2,12 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { TRPCError } from "@trpc/server";
 
 const db = vi.hoisted(() => ({
-  approvalMatrix: { findMany: vi.fn(), count: vi.fn(), createMany: vi.fn(async (_a: any) => ({ count: 3 })) },
+  approvalMatrix: {
+    findMany: vi.fn(),
+    count: vi.fn(),
+    createMany: vi.fn(async (_a: any) => ({ count: 3 })),
+    create: vi.fn(async (_a: any) => ({ id: "r-auto" })),
+  },
   fxRate: { findFirst: vi.fn() },
 }));
 
@@ -161,27 +166,67 @@ describe("ApprovalMatrixService — engine (G3.1)", () => {
       expect(r?.baseAmount).toBe(86_000 * 25);
       expect(r?.matrix.id).toBe("band");
     });
+
+    // ── F76-GAP-02: governed policy changes carry no claim value ─────────────
+    it("resolves a null-amount policy change on the action type alone (AUTO_ADJ_POLICY_CHANGE)", async () => {
+      db.approvalMatrix.findMany.mockResolvedValue([
+        rule({ id: "auto", actionType: "AUTO_ADJ_POLICY_CHANGE", requiredRole: "FINANCE_OFFICER", claimValueMin: null, claimValueMax: null }),
+      ]);
+      const r = await ApprovalMatrixService.resolve(T, {
+        actionType: "AUTO_ADJ_POLICY_CHANGE",
+        currency: "UGX",
+      });
+      expect(r).not.toBeNull();
+      expect(r!.matrix.id).toBe("auto");
+      expect(r!.matrix.requiredRole).toBe("FINANCE_OFFICER");
+      expect(r!.baseAmount).toBeNull();
+      expect(r!.failSafe).toBe(false);
+    });
   });
 
-  describe("seedForTenant (A3-OBS-01 — default matrix on provisioning)", () => {
-    it("seeds the 3 default CLAIM_PAYMENT rules when none exist", async () => {
+  describe("seedForTenant (A3-OBS-01 / F76-GAP-02 — default matrix on provisioning)", () => {
+    it("seeds the 3 CLAIM_PAYMENT bands + the AUTO_ADJ_POLICY_CHANGE checker on a fresh tenant", async () => {
       db.approvalMatrix.count.mockResolvedValue(0);
       const n = await ApprovalMatrixService.seedForTenant(T);
-      expect(n).toBe(3);
+      expect(n).toBe(4);
+      // Three claim-payment bands via createMany.
       expect(db.approvalMatrix.createMany).toHaveBeenCalledOnce();
-      const seeded = (db.approvalMatrix.createMany.mock.calls[0][0] as { data: any[] }).data;
-      expect(seeded).toHaveLength(3);
+      const bands = (db.approvalMatrix.createMany.mock.calls[0][0] as { data: any[] }).data;
+      expect(bands).toHaveLength(3);
       // The inpatient >200k dual-approval rule is present (the register's A3 control).
-      expect(seeded).toContainEqual(
+      expect(bands).toContainEqual(
         expect.objectContaining({ serviceType: "INPATIENT", claimValueMin: 200000, requiredRole: "UNDERWRITER", requiresDual: true }),
+      );
+      // The governed policy-change checker via create — FINANCE_OFFICER, no bands.
+      expect(db.approvalMatrix.create).toHaveBeenCalledOnce();
+      expect(db.approvalMatrix.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            actionType: "AUTO_ADJ_POLICY_CHANGE",
+            requiredRole: "FINANCE_OFFICER",
+            requiresDual: false,
+            claimValueMin: null,
+            claimValueMax: null,
+          }),
+        }),
       );
     });
 
-    it("is idempotent — leaves an already-configured matrix untouched", async () => {
-      db.approvalMatrix.count.mockResolvedValue(3);
+    it("backfills only the policy rule when claim-payment bands already exist (re-provision)", async () => {
+      // existingClaim > 0 (skip bands), existingPolicy === 0 (seed the policy rule).
+      db.approvalMatrix.count.mockResolvedValueOnce(3).mockResolvedValueOnce(0);
+      const n = await ApprovalMatrixService.seedForTenant(T);
+      expect(n).toBe(1);
+      expect(db.approvalMatrix.createMany).not.toHaveBeenCalled();
+      expect(db.approvalMatrix.create).toHaveBeenCalledOnce();
+    });
+
+    it("is fully idempotent — leaves an already-configured matrix untouched", async () => {
+      db.approvalMatrix.count.mockResolvedValue(3); // both action types already present
       const n = await ApprovalMatrixService.seedForTenant(T);
       expect(n).toBe(0);
       expect(db.approvalMatrix.createMany).not.toHaveBeenCalled();
+      expect(db.approvalMatrix.create).not.toHaveBeenCalled();
     });
   });
 });

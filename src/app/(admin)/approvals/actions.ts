@@ -8,7 +8,7 @@ import { writeAudit } from "@/lib/audit";
 import { safeActionError } from "@/lib/safe-action-error";
 
 export async function decideApprovalAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.APPROVALS);
   const requestId = formData.get("requestId") as string;
   const decision = formData.get("decision") as "APPROVED" | "REJECTED";
   const notes = (formData.get("notes") as string) || undefined;

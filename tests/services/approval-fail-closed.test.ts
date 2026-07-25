@@ -38,6 +38,9 @@ vi.mock("@/server/services/fx.service", () => ({ FxService: fx }));
 const decisionSvc = vi.hoisted(() => ({ decide: vi.fn(async () => ({ id: "clm1" })) }));
 vi.mock("@/server/services/claim-decision.service", () => ({ ClaimDecisionService: decisionSvc }));
 
+const policyApply = vi.hoisted(() => vi.fn(async () => {}));
+vi.mock("@/server/services/claim-autopilot/policy-approval", () => ({ applyApprovedPolicyChange: policyApply }));
+
 import { ApprovalMatrixService } from "@/server/services/approval-matrix.service";
 import { ApprovalRequestService } from "@/server/services/approval-request.service";
 
@@ -136,5 +139,46 @@ describe("PR-025 — a completed chain applies the gated decision", () => {
     db.approvalRequest.findFirst.mockResolvedValue(pendingReq());
     await ApprovalRequestService.decide(T, "ar1", { id: "admin1", role: "SUPER_ADMIN" }, "REJECTED");
     expect(decisionSvc.decide).not.toHaveBeenCalled();
+  });
+});
+
+describe("F76-GAP-02 — a completed AUTO_ADJ_POLICY_CHANGE chain activates the policy", () => {
+  // Single-level rule: FINANCE_OFFICER checker, no dual. The maker is the
+  // SUPER_ADMIN who submitted the policy (held in makerId); SoD forbids
+  // self-approval, so a distinct finance officer must complete the chain.
+  const policyReq = (over: any = {}) => ({
+    id: "ar2", tenantId: T, status: "PENDING", currentLevel: 1, makerId: "admin1",
+    entityType: "AutoAdjudicationPolicy", entityId: "pol1", actionType: "AUTO_ADJ_POLICY_CHANGE",
+    matrix: { id: "auto", requiredRole: "FINANCE_OFFICER", requiresDual: false, steps: [], slaMinutes: null, escalationTargetRole: null },
+    decisions: [],
+    payload: { policyId: "pol1", version: 2, mode: "LIVE", ceiling: null, currency: "UGX", clientId: null },
+    ...over,
+  });
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it("the finance checker's final approval activates the policy and stamps appliedAt", async () => {
+    db.approvalRequest.findFirst.mockResolvedValue(policyReq());
+    await ApprovalRequestService.decide(T, "ar2", { id: "finance1", role: "FINANCE_OFFICER" }, "APPROVED");
+    expect(policyApply).toHaveBeenCalledWith(T, "pol1", "finance1");
+    expect(db.approvalRequest.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "ar2" }, data: expect.objectContaining({ appliedAt: expect.any(Date) }) }),
+    );
+  });
+
+  it("the SUPER_ADMIN maker cannot self-approve (SoD) — the policy never activates", async () => {
+    db.approvalRequest.findFirst.mockResolvedValue(policyReq());
+    await expect(
+      ApprovalRequestService.decide(T, "ar2", { id: "admin1", role: "SUPER_ADMIN" }, "APPROVED"),
+    ).rejects.toThrow();
+    expect(policyApply).not.toHaveBeenCalled();
+  });
+
+  it("a role below FINANCE_OFFICER cannot approve the policy step", async () => {
+    db.approvalRequest.findFirst.mockResolvedValue(policyReq());
+    await expect(
+      ApprovalRequestService.decide(T, "ar2", { id: "clerk1", role: "CLAIMS_OFFICER" }, "APPROVED"),
+    ).rejects.toThrow(/finance officer/i);
+    expect(policyApply).not.toHaveBeenCalled();
   });
 });
