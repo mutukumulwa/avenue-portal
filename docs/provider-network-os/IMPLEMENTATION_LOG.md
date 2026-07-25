@@ -1518,3 +1518,30 @@ Stop condition observed: yes — eligibility + submit service + focused tests on
 ```
 
 ---
+
+## F5.13 — Provider reconsideration form and detail
+
+```text
+Work package: F5.13
+Status: COMPLETE
+Commit: bea749f
+Proof-before-build classification: MISSING (no reconsideration UI). Builds on F5.12 (checkEligibility + submit) + F5.11 (reason catalog + provider projection). Reuses the FileUpload component pattern only conceptually (evidence deferred).
+Files changed: src/server/services/claim-reconsideration/policy.ts (+ reconsiderationReasonsFor helper for the picker), src/app/provider/claims/[id]/reconsider/{page.tsx, ReconsiderClaimForm.tsx, actions.ts} (new), src/app/provider/claims/[id]/ReconsiderationPanel.tsx (new), src/app/provider/claims/[id]/page.tsx (gated "Reconsider" entry + the status panel, both server-computed), tests/audit-coverage/catalogue.ts (KNOWN_AUDITING_TOKENS += ClaimReconsiderationService.submit(), tests/actions/provider-claim-reconsider-action.test.ts + tests/components/{provider-reconsider-claim-form, provider-reconsideration-panel}.test.tsx (new).
+Schema/data changes: NONE.
+Behavior delivered: the provider reconsideration flow. The reconsider route is gated by F5.12 checkEligibility (an ineligible claim redirects to the detail); it loads the claim's lines with their FROZEN original economics (billed/allowed/payable/disallowed read from the ClaimLine) and the safe per-line reason (ClaimLine.declineReason). The form is an accessible table: each line has a dispute checkbox, its frozen billed/allowed + safe reason (read-only), and a requested-corrected-allowed input; the total additional requested is computed EXACTLY (Σ over selected lines of max(0, requested − original allowed), 2dp). A reason (from the F5.11 catalog filtered to the decision via reconsiderationReasonsFor + its safe description), a narrative, and an explicit accuracy declaration are required; the filing deadline is shown. Submit calls the F5.12 service through reconsiderProviderClaimAction — the service RE-checks eligibility, so a form built against stale eligibility (window closed / a case now active) is refused and the client refreshes. The claim detail page shows a gated "Reconsider" entry (F5.12 eligible) and, when a case exists, a ReconsiderationPanel that renders ONLY the F5.11 provider projection (status, requested amount, filing deadline, review-due SLA, safe outcome, the provider's own narrative) — no internal field (original adjudicator / internal notes / assigned reviewer/team) can reach the provider by construction.
+Authorization evidence: the reconsider page hard-scopes the claim to the provider (NOT_FOUND ⇒ an inaccessible claim/line never renders); the action gates on providerPermits(provider.claim.reconsider) and delegates to the F5.12 service (which re-authorizes: permission + provider ownership + branch). Tests: action no-permission ⇒ no service call; the service-level cross-provider NOT_FOUND is covered by F5.12.
+Idempotency/concurrency evidence: the form sends a stable draft-UUID idempotency key; the F5.12 service is idempotent + one-active (proven in F5.12). A stale gate ⇒ error + refresh.
+Privacy/security evidence: the detail panel is fed EXCLUSIVELY by toProviderReconsiderationProjection (F5.11), so it structurally cannot leak the internal fields (panel test asserts no adjudicator/internal/reviewer text; the projection type has no such field). The form shows only the safe per-line reason (declineReason), never internal notes.
+Money/reconciliation evidence: the requested total delta is EXACT (2dp; test asserts 300 + 250 = 550.00). The UI performs no money mutation; the F5.12 service leaves the claim untouched (D13).
+Focused tests and results: action 4 (delegation, permission gate, stale ⇒ refresh, validation) + form 4 (frozen amounts in an accessible table with a caption, exact requested delta, all required gates before submit + correct command, stale error + refresh) + panel 2 (safe status render, no internal leak). Full suite 1360 pass / 263 skip; audit-coverage green; tsc + brand + currency green.
+Typecheck/schema result: tsc --noEmit clean.
+Manual/visual evidence: the form (accessible table, exact totals, required declaration, stale error) and the panel (safe projection) are proven HEADLESSLY via testing-library. VISUAL check on a live page deferred (worktree has no .env / seeded provider session) — same convention as F3.7-F3.14.
+Feature-flag state: none. Gated by provider.claim.reconsider.
+Backfill/rollout impact: none.
+Known limitations: EVIDENCE UPLOAD is deferred — the F2 private-document flow (DocumentUploadIntent targetType RECONSIDERATION → finalize → scan → attach) is not wired into the form; F5.12 accepts optional pre-uploaded clean evidence ids, and a follow-up can add the upload widget (a reusable FileUpload exists). Visual verification deferred.
+Unrelated worktree changes preserved: yes — worktree contained only F5.13 changes; the main-checkout dirty UAT files are untouched.
+Next allowed package: F5.14 — Implement TPA reconsideration triage and information flow (M). Depends on F5.12. Reviewer triages jurisdiction/deadline/completeness, assigns a reviewer with the SoD warning (originalAdjudicatorId), requests structured information (INFORMATION_REQUIRED ↔ PROVIDER_RESPONDED), all via ClaimReconsiderationEvent transitions — no outcome/award yet (F5.15/F5.16).
+Stop condition observed: yes — provider form + detail only; NO TPA decision (F5.14+).
+```
+
+---
