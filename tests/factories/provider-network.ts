@@ -226,6 +226,7 @@ export async function buildProviderWorld(prisma: Prisma, opts: BuildOptions = {}
   // throwaway DB has no chart of accounts). Represents the stored facts F6.2 reads.
   const createdBatchIds: string[] = [];
   const createdVoucherIds: string[] = [];
+  const createdJournalIds: string[] = [];
   const seededReasonTenants = new Set<string>();
   let batchSeq = 0; // unique sequence within (tenant, provider, cycle) per run
 
@@ -280,6 +281,9 @@ export async function buildProviderWorld(prisma: Prisma, opts: BuildOptions = {}
     baseCurrency?: string;
     status?: "SETTLED" | "CHECKER_APPROVED" | "MAKER_SUBMITTED" | "PENDING";
     withVoucher?: boolean;
+    /** Also post a (line-less) settlement journal entry and link it to the voucher. */
+    withJournal?: boolean;
+    notes?: string;
     /** Override the stored batch total (to force a header↔batch mismatch test). */
     overrideBatchTotal?: number;
     claims: RemClaimSpec[];
@@ -307,6 +311,7 @@ export async function buildProviderWorld(prisma: Prisma, opts: BuildOptions = {}
         makerId: usersA.finance?.id ?? providerId,
         checkerId: isSettled ? (usersA.admin?.id ?? providerId) : null,
         settledAt: isSettled ? now : null,
+        notes: spec.notes ?? null,
       },
     });
     createdBatchIds.push(batch.id);
@@ -325,6 +330,13 @@ export async function buildProviderWorld(prisma: Prisma, opts: BuildOptions = {}
       });
       voucher = { id: v.id, voucherNumber: v.voucherNumber };
       createdVoucherIds.push(v.id);
+      if (spec.withJournal) {
+        const je = await prisma.journalEntry.create({
+          data: { tenantId: tId, entryNumber: `JE-${token}-${targetSeq}`, entryDate: now, description: `Settlement ${batch.id}`, sourceType: "SETTLEMENT_PAID", sourceId: batch.id },
+        });
+        createdJournalIds.push(je.id);
+        await prisma.paymentVoucher.update({ where: { id: v.id }, data: { journalEntryId: je.id } });
+      }
     }
 
     const claimIds: string[] = [];
@@ -419,6 +431,10 @@ export async function buildProviderWorld(prisma: Prisma, opts: BuildOptions = {}
     // tenant-scoped reason codes seeded for line-level remittance reasons.
     await prisma.providerSettlementBatch.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.paymentVoucher.deleteMany({ where: { tenantId: { in: tenantIds } } });
+    if (createdJournalIds.length > 0) {
+      await prisma.journalLine.deleteMany({ where: { journalEntryId: { in: createdJournalIds } } });
+      await prisma.journalEntry.deleteMany({ where: { id: { in: createdJournalIds } } });
+    }
     if (seededReasonTenants.size > 0) {
       await prisma.adjudicationReasonCode.deleteMany({ where: { tenantId: { in: [...seededReasonTenants] } } });
     }

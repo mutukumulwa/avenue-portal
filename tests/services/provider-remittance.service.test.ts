@@ -38,6 +38,8 @@ describe.skipIf(!URL_SET)("F6.2 ProviderRemittanceService (opt-in DB)", () => {
   let e4: Awaited<ReturnType<import("../factories/provider-network").ProviderWorld["createSettlementBatch"]>>;
   let pageBatch: typeof e4;
   let divergeBatch: typeof e4;
+  let bBatch: typeof e4; // provider B (same tenant) — operator cross-provider visibility
+  let cBatch: typeof e4; // provider C (Beta tenant) — operator cross-tenant denial
 
   beforeAll(async () => {
     prisma = (await import("@/lib/prisma")).prisma;
@@ -53,6 +55,8 @@ describe.skipIf(!URL_SET)("F6.2 ProviderRemittanceService (opt-in DB)", () => {
     // service reads the FROZEN approvedAmount, not the engine value.
     e4 = await world.createSettlementBatch({
       providerId: world.providers.a.id,
+      withJournal: true,
+      notes: "operator batch note",
       claims: [
         {
           billed: 10000, approved: 7500, memberShare: 750,
@@ -76,6 +80,9 @@ describe.skipIf(!URL_SET)("F6.2 ProviderRemittanceService (opt-in DB)", () => {
       providerId: world.providers.a.id,
       claims: [{ billed: 1000, approved: 1000, lines: [{ billed: 1000, approved: 600 }] }],
     });
+
+    bBatch = await world.createSettlementBatch({ providerId: world.providers.b.id, claims: [{ billed: 500, approved: 500, lines: [{ billed: 500, approved: 500 }] }] });
+    cBatch = await world.createSettlementBatch({ providerId: world.providers.c.id, claims: [{ billed: 700, approved: 700, lines: [{ billed: 700, approved: 700 }] }] });
   });
   afterAll(async () => { if (world) await world.teardown(); });
 
@@ -188,5 +195,57 @@ describe.skipIf(!URL_SET)("F6.2 ProviderRemittanceService (opt-in DB)", () => {
 
     const b = await Svc.listBatches(ctxB());
     expect(b.batches.every((x) => !aIds.has(x.id))).toBe(true);
+  });
+
+  // ── F6.3: operator entry + admin extension + parity ────────────────────────
+  describe("F6.3 getBatchRemittanceForOperator (admin extension + parity)", () => {
+    const opAlpha = () => ({ tenantId: world.tenants.alpha.id });
+
+    it("returns the SAME provider-safe model + the admin extension", async () => {
+      const r = (await Svc.getBatchRemittanceForOperator(opAlpha(), e4.batch.id))!;
+      // provider-safe model is identical to the provider entry's shape
+      expect(r.batch.totalAmount).toBe("7500.00");
+      expect(r.claims).toHaveLength(1);
+      expect(r.conservation.i5Holds).toBe(true);
+      // admin extension — the Safe? = N fields
+      expect(r.admin.maker!.id).toBe(world.users.a.finance.id);
+      expect(r.admin.checker!.id).toBe(world.users.a.admin.id);
+      expect(r.admin.notes).toBe("operator batch note");
+      expect(r.admin.provider.name).toBe(world.providers.a.name);
+      expect(r.admin.journalEntry!.entryNumber).toMatch(/^JE-/);
+    });
+
+    it("parity: operator claim/voucher/total match a direct query (no lost fields)", async () => {
+      const r = (await Svc.getBatchRemittanceForOperator(opAlpha(), e4.batch.id))!;
+      const raw = await prisma.claim.findMany({ where: { settlementBatchId: e4.batch.id }, select: { claimNumber: true, billedAmount: true, approvedAmount: true }, orderBy: { claimNumber: "asc" } });
+      expect(r.claims.map((c) => c.claimNumber)).toEqual(raw.map((c) => c.claimNumber));
+      expect(r.claims[0].billed).toBe(Number(raw[0].billedAmount).toFixed(2));
+      expect(r.claims[0].approved).toBe(Number(raw[0].approvedAmount).toFixed(2));
+      const rawBatch = await prisma.providerSettlementBatch.findUnique({ where: { id: e4.batch.id }, select: { totalAmount: true } });
+      expect(r.batch.totalAmount).toBe(Number(rawBatch!.totalAmount).toFixed(2));
+      expect(r.batch.voucher!.voucherNumber).toBe(e4.voucher!.voucherNumber);
+    });
+
+    it("operator sees ANY provider's batch in the tenant (not provider-scoped)", async () => {
+      const a = await Svc.getBatchRemittanceForOperator(opAlpha(), e4.batch.id);
+      const b = await Svc.getBatchRemittanceForOperator(opAlpha(), bBatch.batch.id);
+      expect(a).not.toBeNull();
+      expect(b).not.toBeNull(); // provider B's batch, same operator tenant
+      expect(b!.admin.provider.name).toBe(world.providers.b.name);
+    });
+
+    it("operator cannot cross tenants (Alpha operator, Beta batch ⇒ null)", async () => {
+      const res = await Svc.getBatchRemittanceForOperator(opAlpha(), cBatch.batch.id);
+      expect(res).toBeNull();
+    });
+
+    it("unknown id ⇒ null (operator entry returns null, not throw)", async () => {
+      expect(await Svc.getBatchRemittanceForOperator(opAlpha(), "nope")).toBeNull();
+    });
+
+    it("the provider entry never carries the admin extension", async () => {
+      const p = await Svc.getBatchRemittance(ctxA(), e4.batch.id);
+      expect((p as unknown as Record<string, unknown>).admin).toBeUndefined();
+    });
   });
 });
