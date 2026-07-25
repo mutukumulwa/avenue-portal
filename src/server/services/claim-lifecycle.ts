@@ -21,10 +21,16 @@ const TRANSITIONS: Record<ClaimStatus, ClaimStatus[]> = {
   RECEIVED: ["CAPTURED", "UNDER_REVIEW", "APPROVED", "PARTIALLY_APPROVED", "DECLINED", "WITHDRAWN", "SUPERSEDED"],
   CAPTURED: ["UNDER_REVIEW", "APPROVED", "PARTIALLY_APPROVED", "DECLINED", "WITHDRAWN", "SUPERSEDED"],
   UNDER_REVIEW: ["APPROVED", "PARTIALLY_APPROVED", "DECLINED", "CAPTURED", "WITHDRAWN", "SUPERSEDED"],
+  // NOTE (PNOS F5.17): the `APPEALED` edges below are RETIRED — the same-claim appeal path that
+  // used them no longer exists (initiateAppeal throws; the admin form is removed) and an
+  // architecture guard bans any new APPEALED-status write. They are kept ONLY so historic
+  // APPEALED / APPEAL_APPROVED / APPEAL_DECLINED records stay valid; new disputes on a decided
+  // claim use reconsideration (F5.11–F5.16), which never mutates the original. No deletion of the
+  // legacy statuses (see docs/provider-network-os/LEGACY_APPEAL_CONSOLIDATION.md).
   APPROVED: ["PAID", "VOID", "APPEALED"],
   PARTIALLY_APPROVED: ["PAID", "VOID", "APPEALED"],
   DECLINED: ["APPEALED"], // resubmission (F5.10) LINKS a new claim without re-marking DECLINED
-  APPEALED: ["APPEAL_APPROVED", "APPEAL_DECLINED"],
+  APPEALED: ["APPEAL_APPROVED", "APPEAL_DECLINED"], // retired (F5.17) — no writer
   APPEAL_APPROVED: ["PAID", "VOID"],
   APPEAL_DECLINED: [],
   PAID: [],

@@ -78,7 +78,7 @@ export const AUDIT_EXCLUSIONS: Record<string, string> = {
   "claims/[id]/adjudication-actions.ts:adjudicateLineAction": "PRE_EXISTING_GAP — audit wiring pending",
   "claims/[id]/adjudication-actions.ts:computeOutcomeAction": "READ_ONLY preview since W1.1 — no state write",
   "claims/[id]/adjudication-actions.ts:computeVarianceAction": "READ_MODEL — stamps derived variance metrics; source data unchanged",
-  "claims/[id]/adjudication-actions.ts:initiateAppealAction": "PRE_EXISTING_GAP — audit wiring pending",
+  // initiateAppealAction removed (PNOS F5.17) — same-claim appeals retired for reconsideration.
   "claims/[id]/reimbursement-actions.ts:disburseReimbursementAction": "PRE_EXISTING_GAP — audit wiring pending",
   "claims/queues/actions.ts:getIncomingClaimCountAction": "READ_ONLY — polling count for the queues header",
   "contracts/actions.ts:createContractAction": "PRE_EXISTING_GAP — audit wiring pending",
