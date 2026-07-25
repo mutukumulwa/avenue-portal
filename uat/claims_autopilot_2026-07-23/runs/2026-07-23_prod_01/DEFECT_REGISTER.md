@@ -2,7 +2,7 @@
 
 | ID | Sev | Story | Status | Title |
 |---|---|---|---|---|
-| F76-GAP-01 | Medium | Day-0 P4 | OPEN (build flagged) | No UI to amend applicability on an ACTIVE provider contract |
+| F76-GAP-01 | Medium | Day-0 P4 | ✅ REMEDIATED 2026-07-25 (prod) | No UI to amend applicability on an ACTIVE provider contract |
 | F76-GAP-02 | High | Story 10 | OPEN (build flagged) | Governed policy maker/checker flow not operable through the UI |
 
 ---
@@ -50,6 +50,37 @@ the whole ManagePanel editable on ACTIVE — scope strictly to applicability.
 **Interim (non-campaign):** the underwriting team can add the payer through the
 Renew flow (clones into an editable DRAFT successor) if entitlement is needed
 before the fix ships — accepted as heavier than a mid-term amendment should be.
+
+**✅ REMEDIATED — 2026-07-25 (built, tested, merged to `main`, deployed to prod).**
+- **Commit** `93de4f4` *feat(contracts): F76-GAP-01 — amend applicability on
+  ACTIVE contracts*; Vercel prod deploy `dpl_HpqBf8udNfyLG4MgVMzoCc511FRP`
+  **READY** on `avenue-portal.vercel.app`. No DB migration (existing
+  `ContractApplicability` table + actions).
+- **What shipped (scoped strictly to applicability, per the recommendation):**
+  `contracts/[id]/page.tsx` now computes two gates — `editable`
+  (DRAFT/PENDING_CLARIFICATION only; tariffs/rules/packages/branches stay here)
+  and `applicabilityEditable = editable || status === "ACTIVE"`. `ManagePanel`
+  gates the applicability add/remove controls (and *only* those) on
+  `applicabilityEditable`, lists current payers with remove controls, and **wires
+  up `removeApplicabilityAction`** (previously defined but reachable from no UI).
+- **Governance (resolves the "consider an approval-matrix gate" question):** kept
+  the lightest option consistent with the codebase — `requireRole(UNDERWRITING)`
+  + a **required reason** on any ACTIVE amendment (server-enforced, folded into
+  the existing `CONTRACT_APPLICABILITY_ADDED` / `_REMOVED` audit). Deliberately
+  **not** the approval matrix: no contract mutation routes through it and its
+  contract action types (`PROVIDER_TARIFF_CHANGE` / `SCHEME_ACTIVATION`) are
+  unwired, so a matrix gate would be first-of-its-kind and inconsistent with every
+  sibling mutation. (Heavier maker/checker precedent, if ever wanted, is
+  `OverrideRecord` / `overrideService` as used for `CONTRACT_BACKDATE`.)
+- **Verification:** 7 server-action tests + 3 `ManagePanel` render tests added;
+  audit-coverage harness stays green; full suite **1143 passed / 109 skipped**;
+  typecheck (changed files), brand/currency guards, and eslint all clean.
+- **Campaign impact:** the deferred **Story 3 (B2B)** / **Story 5 (offline)**
+  ACCEPTED entitlement path is now UI-reachable — underwriting can add NWSC to
+  `PC-2026-128` (contract → Applicability → reason + Add); the Renew-flow interim
+  above is no longer needed. Prod's `403 FORBIDDEN_SCOPE` correct-refusal evidence
+  remains valid for the refusal case. **Next:** re-run the Story 3/5 ACCEPTED
+  happy path against prod to close the deferral.
 
 
 ---
