@@ -18,11 +18,23 @@ export interface ProviderAccessSettings {
   entitlementEnforcement: boolean;
   /** per-provider allow-list — enforcement is ON for these providers even if the global flag is off */
   enforcedProviderIds: string[];
+  /**
+   * F6.4 — provider-facing remittance surface (§11.1 `providerRemittanceV2`),
+   * DEFAULT OFF. The provider settlement detail page renders only when this is
+   * on for the tenant (global) or the specific provider (allow-list). Flipping it
+   * on is the F6.1 §12 finance-sign-off gate, made through an explicit settings
+   * change — this module only READS it.
+   */
+  providerRemittanceV2: boolean;
+  /** per-provider allow-list — remittance V2 is ON for these providers even if the global flag is off */
+  remittanceV2ProviderIds: string[];
 }
 
 export const PROVIDER_ACCESS_DEFAULTS: ProviderAccessSettings = {
   entitlementEnforcement: false,
   enforcedProviderIds: [],
+  providerRemittanceV2: false,
+  remittanceV2ProviderIds: [],
 };
 
 export const ProviderAccessSettingsService = {
@@ -38,6 +50,10 @@ export const ProviderAccessSettingsService = {
       enforcedProviderIds: Array.isArray(raw.enforcedProviderIds)
         ? raw.enforcedProviderIds.filter((x): x is string => typeof x === "string")
         : [],
+      providerRemittanceV2: raw.providerRemittanceV2 === true,
+      remittanceV2ProviderIds: Array.isArray(raw.remittanceV2ProviderIds)
+        ? raw.remittanceV2ProviderIds.filter((x): x is string => typeof x === "string")
+        : [],
     };
   },
 
@@ -50,5 +66,15 @@ export const ProviderAccessSettingsService = {
   async isEntitlementEnforced(tenantId: string, providerId: string, db: Db = prisma): Promise<boolean> {
     const s = await this.get(tenantId, db);
     return s.entitlementEnforcement || s.enforcedProviderIds.includes(providerId);
+  },
+
+  /**
+   * F6.4 — is the provider-facing remittance detail surface live for this
+   * provider? DEFAULT false. On only when the tenant global flag or the
+   * per-provider allow-list is set (the F6.1 §12 finance-sign-off gate).
+   */
+  async isRemittanceV2Enabled(tenantId: string, providerId: string, db: Db = prisma): Promise<boolean> {
+    const s = await this.get(tenantId, db);
+    return s.providerRemittanceV2 || s.remittanceV2ProviderIds.includes(providerId);
   },
 } as const;

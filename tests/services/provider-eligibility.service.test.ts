@@ -8,15 +8,15 @@
  * never a payment guarantee; response carries no annual-limit/usage.
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { ProviderAccessSettingsService } from "@/server/services/provider-access-settings.service";
+import { ProviderAccessSettingsService, PROVIDER_ACCESS_DEFAULTS } from "@/server/services/provider-access-settings.service";
 
 const URL_SET = !!process.env.AUTOPILOT_TEST_DB && process.env.DATABASE_URL === process.env.AUTOPILOT_TEST_DB;
 
 describe("F1.11 ProviderAccessSettings.parse (pure)", () => {
   it("defaults enforcement OFF and tolerates garbage config", () => {
-    expect(ProviderAccessSettingsService.parse(undefined)).toEqual({ entitlementEnforcement: false, enforcedProviderIds: [] });
-    expect(ProviderAccessSettingsService.parse({ providerAccess: "nonsense" })).toEqual({ entitlementEnforcement: false, enforcedProviderIds: [] });
-    expect(ProviderAccessSettingsService.parse({ providerAccess: { entitlementEnforcement: true, enforcedProviderIds: ["p1", 2, null] } })).toEqual({ entitlementEnforcement: true, enforcedProviderIds: ["p1"] });
+    expect(ProviderAccessSettingsService.parse(undefined)).toEqual(PROVIDER_ACCESS_DEFAULTS);
+    expect(ProviderAccessSettingsService.parse({ providerAccess: "nonsense" })).toEqual(PROVIDER_ACCESS_DEFAULTS);
+    expect(ProviderAccessSettingsService.parse({ providerAccess: { entitlementEnforcement: true, enforcedProviderIds: ["p1", 2, null] } })).toEqual({ entitlementEnforcement: true, enforcedProviderIds: ["p1"], providerRemittanceV2: false, remittanceV2ProviderIds: [] });
   });
 });
 
