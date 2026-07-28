@@ -2278,3 +2278,30 @@ Stop condition observed: yes — cohort benchmarks + publication + versioned rep
 ```
 
 ---
+
+## F8.5 — Build the provider performance dashboard
+
+```text
+Work package: F8.5 (phase F8 — performance scorecards; UI)
+Status: PAGE COMPLETE. The provider sees its own advisory scores, the anonymized benchmark, own-record drilldowns, and improvement-plan links.
+Commit: this feat commit (2 reads + page + nav + tests) + the paired docs commit (this note + PROGRESS row).
+Proof-before-build classification: BUILD-NEW on proven owners — the F8.2 read model (listForProvider), the F8.4 benchmark, the F7.7 improvement plans, and the F7.6 nav pattern. Confirmed the cohort dimension is Provider.type+tier and the F8.4 benchmark carries no provider id. No CONFLICTING path.
+Files changed: src/server/services/provider-performance/score.service.ts (+ getCohortBenchmarkForProvider + getSubmissionDrilldown); src/app/provider/performance/page.tsx (new); src/components/layouts/provider-nav-model.ts + ProviderNav.tsx (Performance nav item + icon); tests/components/provider-nav-model.test.ts (forbidden update + a positive test); tests/services/provider-performance-dashboard.service.test.ts (new — 3 DB); docs PROGRESS + this note.
+Schema/data changes: NONE — reads the F8.2/F8.4 rows.
+Behavior delivered (the 6 plan steps): (1) authorize performance/provider/branches — the reads gate on provider.performance.read and scope to ctx.providerId + own/authorized branches (the F8.2 read model); (2) show definitions/sample/completeness/version — each metric card shows num/den, sample size, completeness (a data-quality warning below full), and the definition version; (3) trends + anonymized benchmark — the latest period's scores + the own-cohort benchmark (median + range + peer-group size); (4) drilldown only to own source records — getSubmissionDrilldown returns the provider's own contributing claims, and its count reconciles to the metric denominator; (5) link the human improvement plans (F7.7 listForProvider); (6) a prominent advisory-not-a-sanction warning banner.
+Authorization evidence: getCohortBenchmarkForProvider + getSubmissionDrilldown + listForProvider all requirePermission(provider.performance.read) and are provider-scoped; the page redirects FORBIDDEN→/unauthorized. The drilldown never crosses the provider boundary (a provider-B claim in the same period is absent — proven). The benchmark read resolves the provider's OWN cohort only.
+Idempotency/concurrency evidence: N/A — read-only.
+Privacy/security evidence: the provider-safe benchmark read returns the distribution + peerGroupSize ONLY — never the raw cohortKey and never a provider id (proven: neither the cohortKey token nor any peer provider id appears in the payload). The drilldown is own-records-only. The scores shown are already the F8.2 published+complete+sampled set (unpublished/incomplete/under-sample never reach the provider). The advisory banner states the scores never trigger a suspension/rate/tier change.
+Money/reconciliation evidence: N/A — advisory metrics; the drilldown-to-denominator reconciliation is the integrity check (the own-record count equals the metric denominator — proven for A1).
+Focused tests and results: nav (Performance shows with provider.performance.read, hidden without; the forbidden-route test updated) + 3 DB (the own-cohort benchmark returns the distribution + peer-group size with NO cohortKey/peer-id + null when unpublished + FORBIDDEN without the permission; the drilldown count reconciles to the A1 score denominator and contains own records only). All green. tsc --noEmit clean; brand + currency + audit-coverage green; full no-DB suite 1514 pass / 413 skip; the factory-consuming DB suites pass 17/17 together.
+Typecheck/schema result: tsc clean; no schema change.
+Manual/visual evidence: N/A — the worktree has no .env / seeded provider session (the F3.7+ convention); the page is server-authorized + the reads are unit-tested. Browser verification lands against a seeded env.
+Feature-flag state: none — permission-gated (provider.performance.read). No page publishes a score before the F8.1 §7 sign-off (publication is the F8.4 operator action gated by the sign-off).
+Backfill/rollout impact: none.
+Known limitations / deferrals (flagged): (a) no in-worktree browser verification (env). (b) The drilldown is implemented for the submission-quality denominator (A1/E1 ORIGINAL-received set); other families' drilldowns add the same way. (c) The per-provider percentile band is shown as the own value beside the peer median/range (not a computed banding) to avoid over-interpreting a rate whose "good" direction differs by metric. (d) The trend view shows the latest period + the provider's history via listForProvider; a charted multi-period trend is a UI refinement.
+Unrelated worktree changes preserved: yes — worktree contained only the F8.5 files; scratchpad/ untracked and NOT staged; the main-checkout dirty UAT files untouched.
+Next allowed package: F8.6 — Build the TPA network performance workspace (M; depends F8.4, F7.7). Require an explicit network-analytics permission; add filters/trends/outliers/data-completeness over named providers; add safe drilldowns + metric-definition links; add the improvement-plan action; audit sensitive exports; and DO NOT add any rate/tier/suspension mutation. Stop: no automated network decision.
+Stop condition observed: yes — the dashboard + the two provider-safe reads + the advisory framing + tests delivered; NO automatic action, NO schema change.
+```
+
+---
