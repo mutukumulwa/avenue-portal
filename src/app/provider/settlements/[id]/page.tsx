@@ -5,6 +5,8 @@ import { ProviderAccessService, isProviderAccessError } from "@/server/services/
 import { ProviderAccessSettingsService } from "@/server/services/provider-access-settings.service";
 import { ProviderRemittanceService, isProviderRemittanceError, REMITTANCE_EXPORT_PERMISSION } from "@/server/services/provider-remittance/service";
 import type { RemittanceClaim } from "@/server/services/provider-remittance/projection";
+import { buildRemittancePdfData } from "./remittance-pdf";
+import { RemittancePdfButton } from "./RemittancePdfButton";
 
 /**
  * PNOS F6.4 — provider settlement detail (§8.9 remittance advice).
@@ -45,6 +47,9 @@ export default async function ProviderSettlementDetail({ params }: { params: Pro
   const cycle = `${MONTHS[batch.cycleMonth] ?? batch.cycleMonth} ${batch.cycleYear}${batch.sequence > 1 ? ` · Run ${batch.sequence}` : ""}`;
   const claimsCapped = claims.length < page.totalClaims;
   const canExport = ProviderAccessService.hasPermission(ctx, REMITTANCE_EXPORT_PERMISSION);
+  // F6.6: build the PDF DTO from the same read model (client renders it on click).
+  const pdfData = buildRemittancePdfData(remittance, { generatedAt: new Date() });
+  const fileBase = `remittance-${batch.cycleYear}-${String(batch.cycleMonth).padStart(2, "0")}-${batch.id.slice(0, 8)}`;
 
   return (
     <div className="space-y-5">
@@ -63,14 +68,17 @@ export default async function ProviderSettlementDetail({ params }: { params: Pro
             </p>
           </div>
         </div>
-        {canExport && (
-          <a
-            href={`/provider/settlements/${batch.id}/export`}
-            className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-indigo border border-brand-indigo/30 rounded-lg px-3 py-1.5 hover:bg-brand-indigo/5"
-          >
-            <Download size={15} /> Export CSV
-          </a>
-        )}
+        <div className="flex items-center gap-2">
+          <RemittancePdfButton data={pdfData} fileBase={fileBase} />
+          {canExport && (
+            <a
+              href={`/provider/settlements/${batch.id}/export`}
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-indigo border border-brand-indigo/30 rounded-lg px-3 py-1.5 hover:bg-brand-indigo/5"
+            >
+              <Download size={15} /> Export CSV
+            </a>
+          )}
+        </div>
       </div>
 
       {/* Summary: total / voucher / payment facts */}
