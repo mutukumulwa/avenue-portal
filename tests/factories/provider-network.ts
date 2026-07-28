@@ -558,6 +558,13 @@ export async function buildProviderWorld(prisma: Prisma, opts: BuildOptions = {}
     // F8.2/F8.4: versioned performance scores + cohort benchmarks (relation-less, tenant-scoped).
     await prisma.providerPerformanceScore.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.performanceCohortBenchmark.deleteMany({ where: { tenantId: { in: tenantIds } } });
+    // F9.2: integration control-plane rows (relation-less to Tenant; internal FKs
+    // attempt/recordResult → delivery → connection — delete children first).
+    const integrationDeliveryIds = (await prisma.providerIntegrationDelivery.findMany({ where: { tenantId: { in: tenantIds } }, select: { id: true } })).map((d: { id: string }) => d.id);
+    await prisma.providerIntegrationAttempt.deleteMany({ where: { deliveryId: { in: integrationDeliveryIds } } });
+    await prisma.providerIntegrationRecordResult.deleteMany({ where: { tenantId: { in: tenantIds } } });
+    await prisma.providerIntegrationDelivery.deleteMany({ where: { tenantId: { in: tenantIds } } });
+    await prisma.providerIntegrationConnection.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.providerSettlementBatch.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.paymentVoucher.deleteMany({ where: { tenantId: { in: tenantIds } } });
     if (createdJournalIds.length > 0) {

@@ -7642,3 +7642,235 @@ model PerformanceCohortBenchmark {
   @@index([tenantId, period, metricKey])
   @@index([tenantId, cohortKey, period])
 }
+
+// ─── PNOS F9 — HMS INTEGRATION CONTROL PLANE (§7.11 / §8.12) ──────────────────
+// Additive control-plane schema for the HMS integration rail. These models give
+// every inbound/outbound delivery a durable connection + receipt + attempt ledger
+// so integration truth never lives only in memory, a queue, or an app log (D-prohibition).
+//
+// They are ADDITIVE and do NOT replace the legacy `IntegrationConfig` (@5205),
+// which is preserved during migration (F9.2 step 5) and read-only-retired later
+// (F9.9). No live path is wired here (F9.2 stop condition): the models exist,
+// F9.3 administers connections, F9.4 writes durable receipts, F9.5 maps records,
+// F9.6 adds retry/quarantine/sweeper. Relation-less to Tenant/Provider/Branch
+// (plain String scope keys, matching the F8 performance models) — providerBranchId
+// uses `""` for provider-level so branch scope stays well-defined in unique keys.
+
+enum ProviderIntegrationMode {
+  PUSH
+  PULL
+  BIDIRECTIONAL
+}
+
+enum ProviderIntegrationStatus {
+  DRAFT
+  TESTING
+  ACTIVE
+  PAUSED
+  DISABLED
+}
+
+enum IntegrationCircuitState {
+  CLOSED // healthy — deliveries flow
+  OPEN // tripped — deliveries short-circuit until the cool-down elapses
+  HALF_OPEN // probing — a single trial delivery decides CLOSE vs re-OPEN
+}
+
+enum IntegrationDeliveryDirection {
+  INBOUND // partner → Medvex (push receipt, or a pulled batch landed durably)
+  OUTBOUND // Medvex → partner (a pull request/response envelope)
+}
+
+enum IntegrationDeliveryStatus {
+  RECEIVED // durable receipt created; not yet validated
+  VALIDATING // auth/schema/scope/control-total checks in flight
+  ACCEPTED // validated; queued for canonical mapping
+  PARTIAL // some records applied, some quarantined/rejected
+  REJECTED // whole delivery refused before any domain effect
+  RETRYING // a retryable failure is scheduled for another attempt
+  QUARANTINED // terminal/poison — parked for authorized manual remediation
+  COMPLETED // every record reached a terminal per-record outcome
+}
+
+/// A configured integration channel between one facility (provider, optional
+/// branch) and an external HMS/partner system. Carries a SECRET REFERENCE and a
+/// credential version — never the secret itself (§7.11; the plaintext-secret
+/// exposure the F9.1 inventory flagged on IntegrationConfig is closed by this
+/// indirection + the F9.3 admin service).
+model ProviderIntegrationConnection {
+  id       String @id @default(cuid())
+  tenantId String
+  // Scope keys (relation-less; validated against Provider/Branch in the F9.3 service).
+  providerId       String
+  providerBranchId String @default("") // "" = provider-level; a branch id = branch-scoped
+
+  label            String // human label, e.g. "Aga Khan HMS — production"
+  connectorType    String // connector family, e.g. "HMS_BATCH_V1" / "SLADE360_EDI"
+  connectorVersion String                       @default("1") // adapter contract version
+  mode             ProviderIntegrationMode       @default(PUSH)
+
+  // Transport safety (SSRF/allowlist enforced in F9.3/F9.7; here we hold references).
+  apiBaseUrl          String? // outbound base URL (PULL/BIDIRECTIONAL); validated HTTPS + allowlist in F9.3
+  endpointAllowlistRef String? // reference to the host/IP allowlist policy (not the list inline)
+
+  // Credentials — a REFERENCE + version only. The secret material lives in the
+  // secret store keyed by secretRef; this row never stores or returns it.
+  secretRef         String? // opaque handle into the secret store
+  credentialVersion Int     @default(1) // bumps on rotation (F9.3)
+
+  scopes         String[] @default([]) // integration scope codes this connection may exercise
+  mappingVersion String? // external→canonical mapping version (F9.5)
+
+  // Cadence + cursor (PULL). cursor advances only past a durable accepted boundary (F9.7).
+  cadence String? // e.g. cron/interval hint for the scheduler
+  cursor  String? // opaque pagination/watermark cursor
+
+  status       ProviderIntegrationStatus @default(DRAFT)
+  circuitState IntegrationCircuitState   @default(CLOSED)
+  circuitOpenedAt DateTime? // when OPEN tripped, for cool-down math (F9.6)
+
+  lastSuccessAt DateTime?
+  lastFailureAt DateTime?
+
+  owners              String? // support owners (names/emails), PHI-free
+  supportInstructions String? // runbook pointer, PHI-free
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  deliveries ProviderIntegrationDelivery[]
+
+  // One live connection per (provider, branch, connector, mode) — the consistency
+  // the F9.2 test asserts. providerBranchId's "" default keeps provider-level rows
+  // from colliding while staying unique.
+  @@unique([tenantId, providerId, providerBranchId, connectorType, mode])
+  @@index([tenantId, providerId])
+  @@index([tenantId, status])
+  @@index([tenantId, providerId, providerBranchId])
+}
+
+/// A durable receipt for one delivery envelope (a push request, or one pulled
+/// batch). Created BEFORE any domain processing (F9.4) so an accepted delivery
+/// survives a queue/app failure. Idempotency is per (connection, idempotencyKey):
+/// the same key + same hash replays; the same key + a different hash conflicts
+/// (F9.4) — nothing mutates on either.
+model ProviderIntegrationDelivery {
+  id           String                        @id @default(cuid())
+  tenantId     String
+  connectionId String
+  connection   ProviderIntegrationConnection @relation(fields: [connectionId], references: [id])
+  // Denormalized scope (matches how the codebase scopes reads); consistent with the connection.
+  providerId       String
+  providerBranchId String @default("")
+
+  direction          IntegrationDeliveryDirection @default(INBOUND)
+  businessObjectType String // CASE_SERVICE | CLAIM | PREAUTH | CASE_ACTIVITY (connector-declared)
+
+  externalBatchRef String? // the partner's batch id (e.g. "AGA-2026-07-03")
+  externalRef      String? // a finer partner reference when present
+  idempotencyKey   String // caller-stable key; unique per connection
+  normalizedPayloadHash String // hash of the normalized body — detects same-key/different-body conflict
+
+  // Control totals (asserted vs applied) — the reconciliation substrate (F9.5/F9.6).
+  recordCount     Int? // records the envelope claims
+  amountTotal     Decimal? @db.Decimal(19, 4) // asserted monetary total, where relevant
+  appliedCount     Int @default(0)
+  rejectedCount    Int @default(0)
+  quarantinedCount Int @default(0)
+  replayedCount    Int @default(0)
+
+  status IntegrationDeliveryStatus @default(RECEIVED)
+
+  // Canonical linkage — receipt/result references into the domain rails (F9.5).
+  canonicalReceiptRef String? // e.g. a ClaimIntakeReceipt id
+  canonicalResultRef  String? // e.g. an aggregate result marker
+
+  // Retry / durable lease (F9.6). Attempts are leased so a crashed worker's work
+  // is reclaimed after the lease expires without double-applying.
+  attemptCount   Int       @default(0)
+  maxAttempts    Int       @default(5)
+  nextAttemptAt  DateTime?
+  leaseOwner     String?
+  leaseExpiresAt DateTime?
+  quarantineReason String? // safe, PHI-free reason when QUARANTINED
+
+  receivedAt  DateTime  @default(now())
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  attempts      ProviderIntegrationAttempt[]
+  recordResults ProviderIntegrationRecordResult[]
+
+  // The delivery idempotency the F9.2 test asserts: one delivery per key per connection.
+  @@unique([connectionId, idempotencyKey])
+  @@index([tenantId, providerId, status])
+  @@index([connectionId, status])
+  @@index([status, nextAttemptAt]) // sweeper: retry-due / abandoned deliveries (F9.6)
+  @@index([tenantId, businessObjectType, receivedAt])
+}
+
+/// Per-record outcome inside a delivery (a batch has many). Gives each inbound
+/// record its own durable receipt + canonical reference + idempotency, so a mixed
+/// batch conserves accepted/rejected/quarantined counts (F9.5) and a same-record
+/// replay is a no-op. Never stores a raw clinical body — only a hash + a safe reason.
+model ProviderIntegrationRecordResult {
+  id         String                      @id @default(cuid())
+  tenantId   String
+  deliveryId String
+  delivery   ProviderIntegrationDelivery @relation(fields: [deliveryId], references: [id])
+
+  recordIndex        Int // position within the delivery envelope
+  recordHash         String // hash of the normalized record — the per-record idempotency key
+  businessObjectType String
+
+  // Outcome vocabulary mirrors the existing hms-batch/import dispositions:
+  // APPLIED | REPLAYED | LINKED | UNMATCHED | REJECTED | QUARANTINED.
+  outcome String
+
+  // Canonical linkage — what this record produced in the domain (no raw payload).
+  canonicalEntityType String? // e.g. "CaseServiceEntry"
+  canonicalEntityId   String?
+  canonicalReceiptRef String?
+  amount              Decimal? @db.Decimal(19, 4) // for amount conservation
+
+  safeReason String? // PHI-free reason for UNMATCHED/REJECTED/QUARANTINED
+
+  createdAt DateTime @default(now())
+
+  // A record applies at most once per delivery — the per-record idempotency guard.
+  @@unique([deliveryId, recordHash])
+  @@index([tenantId, outcome])
+  @@index([deliveryId])
+}
+
+/// One processing attempt against a delivery. The append-only attempt ledger:
+/// ordered per delivery, carries a SAFE result class + error code only — never a
+/// raw clinical body, a header, or a secret (§7.11 / D-prohibition).
+model ProviderIntegrationAttempt {
+  id         String                      @id @default(cuid())
+  deliveryId String
+  delivery   ProviderIntegrationDelivery @relation(fields: [deliveryId], references: [id])
+
+  attemptNumber Int // 1-based; ordered + unique per delivery
+
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+
+  // Result classification (safe, connector-agnostic):
+  // SUCCESS | TIMEOUT | HTTP_5XX | HTTP_4XX | SCHEMA | POISON | LEASE_EXPIRED.
+  resultClass   String?
+  httpStatus    Int? // transport status, when applicable
+  safeErrorCode String? // safe, catalogued code — NOT a raw error/body
+  retryable     Boolean @default(false)
+  nextAttemptAt DateTime?
+
+  responseReceiptRef String? // reference to a stored response receipt (no raw body inline)
+
+  createdAt DateTime @default(now())
+
+  // Attempt ordering the F9.2 test asserts: attempts are unique + ordered per delivery.
+  @@unique([deliveryId, attemptNumber])
+  @@index([deliveryId])
+}
