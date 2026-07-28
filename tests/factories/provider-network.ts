@@ -457,6 +457,9 @@ export async function buildProviderWorld(prisma: Prisma, opts: BuildOptions = {}
     // tenant-scoped reason codes seeded for line-level remittance reasons.
     // F6.7: disbursements (relation-less pointers to batch/voucher — no FK, delete freely).
     await prisma.providerDisbursement.deleteMany({ where: { tenantId: { in: tenantIds } } });
+    // F6.9: reconciliation runs + exceptions (relation-less).
+    await prisma.settlementReconciliationException.deleteMany({ where: { tenantId: { in: tenantIds } } });
+    await prisma.settlementReconciliationRun.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.providerSettlementBatch.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.paymentVoucher.deleteMany({ where: { tenantId: { in: tenantIds } } });
     if (createdJournalIds.length > 0) {

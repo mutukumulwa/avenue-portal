@@ -7197,3 +7197,58 @@ model ProviderDisbursement {
   @@index([tenantId, providerId])
   @@index([tenantId, status])
 }
+
+// PNOS F6.9 — settlement reconciliation control (§I5/I6). Stores each run + its
+// watermark + the exact mismatches it found; NEVER mutates a financial fact (the
+// job only reads and records exceptions for finance to investigate). Additive.
+enum ReconciliationExceptionType {
+  LINE_HEADER_MISMATCH // Σ line payable ≠ Σ claim payable
+  CLAIM_BATCH_MISMATCH // Σ claim payable ≠ stored batch total
+  VOUCHER_MISMATCH // batch total ≠ voucher amount
+  MISSING_VOUCHER // a SETTLED batch has no voucher
+  OVER_DISBURSED // Σ successful disbursement > batch total
+  BASE_GL_MISMATCH // Σ claim base ≠ stored batch base
+}
+
+enum ReconciliationInvestigationStatus {
+  OPEN
+  INVESTIGATING
+  RESOLVED // the underlying data was corrected out-of-band by an authorized owner
+  ACCEPTED // reviewed and accepted as a known/tolerated difference
+}
+
+model SettlementReconciliationRun {
+  id              String    @id @default(cuid())
+  tenantId        String
+  startedAt       DateTime  @default(now())
+  finishedAt      DateTime?
+  watermark       DateTime? // max settledAt scanned (for incremental repeat runs)
+  batchesChecked  Int       @default(0)
+  exceptionsFound Int       @default(0)
+  status          String    @default("RUNNING") // RUNNING | COMPLETED | FAILED
+  createdAt       DateTime  @default(now())
+
+  @@index([tenantId, startedAt])
+}
+
+model SettlementReconciliationException {
+  id                  String                            @id @default(cuid())
+  tenantId            String
+  runId               String
+  settlementBatchId   String
+  providerId          String?
+  currency            String
+  type                ReconciliationExceptionType
+  detail              String // safe references + amounts
+  expectedAmount      Decimal?                          @db.Decimal(19, 4)
+  actualAmount        Decimal?                          @db.Decimal(19, 4)
+  investigationStatus ReconciliationInvestigationStatus @default(OPEN)
+  investigationNote   String?
+  resolvedById        String?
+  resolvedAt          DateTime?
+  createdAt           DateTime                          @default(now())
+
+  @@index([tenantId, runId])
+  @@index([tenantId, settlementBatchId])
+  @@index([tenantId, investigationStatus])
+}
