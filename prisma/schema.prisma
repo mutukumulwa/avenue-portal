@@ -7135,3 +7135,65 @@ model ClaimReconsiderationEvent {
   @@unique([reconsiderationId, sequence])
   @@index([tenantId, reconsiderationId, createdAt])
 }
+
+// PNOS F6.7 — actual provider payment facts (§7.9), DISTINCT from the voucher/batch
+// (which authorize/represent payment). D16: "paid" as a bank fact lives here, not on
+// the batch. Relation-less id pointers (satellite convention, F3.2/F5.11) so no
+// ProviderSettlementBatch/PaymentVoucher model churn. NO @@unique on settlementBatchId:
+// one batch normally has ONE disbursement, but split/partial disbursements are allowed
+// (§I5); the idempotencyKey unique is what prevents a duplicate same-key record.
+enum DisbursementStatus {
+  PENDING // recorded, not yet released
+  RELEASED // authorized for payment (maker→checker)
+  PROCESSING // sent to the bank/channel
+  SUCCEEDED // channel-confirmed actual payment
+  FAILED // terminal — a retry is a NEW disbursement
+  REVERSED // terminal — a confirmed payment later recalled/bounced (compensating)
+}
+
+model ProviderDisbursement {
+  id                String             @id @default(cuid())
+  tenantId          String
+  providerId        String
+  // Relation-less pointers (satellite convention).
+  settlementBatchId String
+  voucherId         String?
+  status            DisbursementStatus @default(PENDING)
+  // Money: transaction amount + frozen base snapshot (never recomputed from live FX).
+  amount            Decimal            @db.Decimal(19, 4)
+  currency          String
+  baseAmount        Decimal            @default(0) @db.Decimal(19, 4)
+  baseCurrency      String             @default("UGX")
+  fxRateRef         String? // frozen FX fact reference (where a non-base disbursement applies)
+  // Method / destination — masked only, NEVER plaintext bank/mobile details (§9/D27).
+  method            String? // BANK_TRANSFER | MOBILE_MONEY | CHEQUE | RTGS | ...
+  channel           String?
+  maskedDestination String? // e.g. "***4321" — never the full account/MSISDN
+  externalReference String? // bank/channel payment reference (distinct from the internal voucher number)
+  valueDate         DateTime?
+  // Lifecycle actors + times (append-only in spirit; the state machine gates status).
+  initiatedById String?
+  initiatedAt   DateTime?
+  confirmedById String?
+  confirmedAt   DateTime?
+  failedById    String?
+  failedAt      DateTime?
+  reversedById  String?
+  reversedAt    DateTime?
+  // Failure reason — SAFE (provider-facing) vs INTERNAL are separated (§9/D27).
+  failureReasonSafe     String?
+  failureReasonInternal String?
+  // Compensation: a REVERSED record may point at the disbursement it reverses.
+  reversalOfDisbursementId String?
+  // Idempotency + reconciliation + optimistic concurrency.
+  idempotencyKey       String?
+  reconciliationStatus String   @default("UNRECONCILED") // UNRECONCILED | RECONCILED | EXCEPTION
+  version              Int      @default(1)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([tenantId, idempotencyKey]) // NULLs distinct in PG ⇒ keyless rows unaffected
+  @@index([tenantId, settlementBatchId])
+  @@index([tenantId, providerId])
+  @@index([tenantId, status])
+}

@@ -396,6 +396,32 @@ export async function buildProviderWorld(prisma: Prisma, opts: BuildOptions = {}
     return { batch, voucher, claimIds };
   }
 
+  // F6.7 — a disbursement fact for a batch (relation-less pointers).
+  async function createDisbursement(spec: {
+    batchId: string;
+    providerId?: string;
+    voucherId?: string | null;
+    status?: "PENDING" | "RELEASED" | "PROCESSING" | "SUCCEEDED" | "FAILED" | "REVERSED";
+    amount: number;
+    currency?: string;
+    method?: string;
+    maskedDestination?: string;
+    externalReference?: string;
+    idempotencyKey?: string;
+  }) {
+    const providerId = spec.providerId ?? providerA.id;
+    const tId = providerId === providerCId ? beta.id : alpha.id;
+    return prisma.providerDisbursement.create({
+      data: {
+        tenantId: tId, providerId, settlementBatchId: spec.batchId, voucherId: spec.voucherId ?? null,
+        status: (spec.status ?? "PENDING") as never,
+        amount: spec.amount, currency: spec.currency ?? "UGX", baseAmount: spec.amount, baseCurrency: "UGX",
+        method: spec.method ?? null, maskedDestination: spec.maskedDestination ?? null, externalReference: spec.externalReference ?? null,
+        idempotencyKey: spec.idempotencyKey ?? null,
+      },
+    });
+  }
+
   async function teardown() {
     // FK-safe order: branch assignments → applicability → contracts → members →
     // groups → benefit → version → package → branches → users → providers →
@@ -429,6 +455,8 @@ export async function buildProviderWorld(prisma: Prisma, opts: BuildOptions = {}
     await prisma.claim.deleteMany({ where: { tenantId: { in: tenantIds } } });
     // F6.2: settlement batches + vouchers (claims FK to both — deleted above) + any
     // tenant-scoped reason codes seeded for line-level remittance reasons.
+    // F6.7: disbursements (relation-less pointers to batch/voucher — no FK, delete freely).
+    await prisma.providerDisbursement.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.providerSettlementBatch.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.paymentVoucher.deleteMany({ where: { tenantId: { in: tenantIds } } });
     if (createdJournalIds.length > 0) {
@@ -476,6 +504,7 @@ export async function buildProviderWorld(prisma: Prisma, opts: BuildOptions = {}
     createClaim,
     createPreauth,
     createSettlementBatch,
+    createDisbursement,
     teardown,
   };
 }
