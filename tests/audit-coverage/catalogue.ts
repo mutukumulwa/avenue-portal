@@ -20,6 +20,8 @@ export const KNOWN_AUDITING_TOKENS = [
   "writeAudit(",
   "auditChainService.append(",
   "auditManage(",
+  "ProviderIntegrationConnectionAdmin.", // PNOS F9.3/F9.8 — every connection mutation writes INTEGRATION_CONNECTION:* audit internally
+  "DeliveryRetryService.manualRetry(", // PNOS F9.6/F9.8 — writes INTEGRATION_DELIVERY:MANUAL_RETRY audit internally
   "runClaimIntake(", // shared claim-intake path — chain-audits CLAIM:INTAKE_ACCEPTED internally
   "reimbursementService.submit(", // F5.6 — appends REIMBURSEMENT:SUBMITTED + canonical intake audit internally
   "auditPolicy(", // F6.5 — local helper wrapping auditChainService.append for the policy console

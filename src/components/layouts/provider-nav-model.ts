@@ -16,7 +16,7 @@
 export type ProviderNavGroupKey = "Home" | "Care" | "Claims" | "Finance" | "Network" | "Administration";
 
 export type ProviderNavIconKey =
-  | "dashboard" | "inbox" | "eligibility" | "cases" | "preauth" | "claims" | "new-claim" | "settlements" | "contracts" | "performance" | "profile" | "api-keys";
+  | "dashboard" | "inbox" | "eligibility" | "cases" | "preauth" | "claims" | "new-claim" | "settlements" | "contracts" | "performance" | "profile" | "api-keys" | "integrations";
 
 /** Feature flags that gate a nav item's visibility (resolved server-side, passed to computeProviderNav). */
 export type ProviderNavFlagKey = "contractView";
@@ -56,6 +56,7 @@ export const PROVIDER_NAV_DEFINITIONS: ProviderNavDefinition[] = [
   // F7.6 — read-only profile + change-request tracker (perm-gated, no flag).
   { key: "profile", label: "Profile", href: "/provider/profile", iconKey: "profile", group: "Administration", requiredPermission: "provider.profile.read" },
   { key: "api-keys", label: "API Keys", href: "/provider/api-keys", iconKey: "api-keys", group: "Administration", requiredPermission: "provider.api_keys.manage" },
+  { key: "integrations", label: "Integrations", href: "/provider/integrations", iconKey: "integrations", group: "Administration", requiredPermission: "provider.integrations.manage" },
 ];
 
 /** A browser-safe nav item — carries no permission/provider/branch authority. */

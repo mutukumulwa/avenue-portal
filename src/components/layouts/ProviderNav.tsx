@@ -16,6 +16,7 @@ import {
   BarChart3,
   IdCard,
   KeyRound,
+  Cable,
   LogOut,
   type LucideIcon,
 } from "lucide-react";
@@ -36,6 +37,7 @@ const ICONS: Record<ProviderNavIconKey, LucideIcon> = {
   performance: BarChart3,
   profile: IdCard,
   "api-keys": KeyRound,
+  integrations: Cable,
 };
 
 /**

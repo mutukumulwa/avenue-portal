@@ -231,6 +231,14 @@ export const DeliveryRetryService = {
       throw new DeliveryRetryError("UNSUPPORTED_TYPE", `No processor for ${delivery.businessObjectType}`);
     }
 
+    // Governance: a manual re-drive is an authorized operator action — audit it (PHI-free).
+    await prisma.auditLog.create({
+      data: {
+        userId: ctx.actorId, tenantId: ctx.tenantId, action: "INTEGRATION_DELIVERY:MANUAL_RETRY", module: "INTEGRATIONS",
+        description: `Manual retry of delivery ${deliveryId} by ${ctx.actorId}`, entityType: "PROVIDER_INTEGRATION_DELIVERY", entityId: deliveryId, metadata: {},
+      },
+    });
+
     // Reset to a processable state, then re-drive through the standard attempt lifecycle.
     await prisma.providerIntegrationDelivery.update({ where: { id: deliveryId }, data: { status: "ACCEPTED", quarantineReason: null, nextAttemptAt: now } });
     return this.runAttempt(
