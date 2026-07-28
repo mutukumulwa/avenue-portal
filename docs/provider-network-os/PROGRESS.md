@@ -30,7 +30,7 @@
 | C (F4) | structured request completable with independent state/SLA/audit/notification, no financial mutation | OPEN |
 | D (F5) | concurrency proves one active sibling; money proves no original mutation/double pay | OPEN |
 | E (F6) | provider/admin/export views match; batch/voucher/disbursement/GL conserve | CODE-MET (F6.1–F6.12 built+tested; provider-facing activation gated on the F6.1 §12 finance sign-off + providerRemittanceV2) |
-| F (F9) | delivery receipts survive queue/app failure; first real connector passes replay/retry/mapping/reconciliation UAT | OPEN |
+| F (F9) | delivery receipts survive queue/app failure; first real connector passes replay/retry/mapping/reconciliation UAT | CODE-MET for receipts/replay/retry/mapping/reconciliation (F9.2–F9.9 built+tested); first-real-connector UAT half OPEN pending F9.7 pilot activation (signed HMS contract + sandbox) |
 
 ## F0 — Baseline and safety characterization
 
@@ -194,7 +194,9 @@
 | F9.6 | Retry, poison quarantine, sweeper | M | COMPLETE | `DeliveryRetryService` — durable lease (CAS, crash-expiry reclaim) + `ProviderIntegrationAttempt` ledger + exponential backoff/maxAttempts → RETRYING/QUARANTINED; `sweep` (quarantine-exhausted + surface retry-due; no body → no PUSH auto-fetch); `manualRetry` (permission+ownership, idempotent re-drive). No schema change (F9.2 fields). 8 tests (1 pure + 7 DB) |
 | F9.7 | One contracted outbound pull adapter | L | BUILT · GATED(activation needs signed contract + sandbox) | `http-safe.ts` (SSRF transport + RUNTIME DNS-rebind resolution) + `receivePulled` (shared durable receipt, no caller-auth) + `CaseServicePullAdapter.pollOnce` (fetch→receipt→process, cursor advances only past accepted+processed boundary, threshold circuit + cooldown, reconciliation). Additive `consecutiveFailures`. 11 tests (6 pure transport + 5 DB). NO real endpoint polled |
 | F9.8 | Provider/admin integration ops views | M | COMPLETE | `ProviderIntegrationOpsRead` (health/delivery/detail read models — permission+provider+branch scope, bounded pagination, SAFE projection: NO payload/secret/hash/header) + `/provider/integrations` page + actions (pause/resume/disable via F9.3, manualRetry via F9.6 [now audited]) + nav item. 7 DB tests; page NOT browser-verified (env). Read-only |
-| F9.9 | Cut over legacy HMS configuration/path | M | GATED(pilot sign-off) | — |
+| F9.9 | Cut over legacy HMS configuration/path | M | BUILT · GATED(live flip needs pilot sign-off) | `LegacyHmsCutoverService` — `resolveCutoverMode` (default LEGACY, rollback-safe) + `shadowCompare` (read-only parity projection: WOULD_APPLY == legacy applied, ZERO mutation) + `mapConfigToConnection` (reviewed IntegrationConfig→DRAFT connection). Legacy `/api/v1/hms-batch` route UNTOUCHED (flip is the gated step). 4 tests (1 pure + 3 DB) |
+
+**Phase F9 — BUILDABLE SCOPE COMPLETE (F9.1→F9.9).** HMS integration control plane end to end (inventory → §7.11 schema → connection/credential admin → durable receipt → canonical CASE_SERVICE routing → retry/quarantine/sweeper → SSRF-safe pull adapter [activation GATED] → ops views → legacy cutover support [flip GATED]). Gate F CODE-MET for receipts/replay/retry/mapping/reconciliation; the first-real-connector UAT half stays OPEN pending F9.7 pilot activation (signed HMS contract + sandbox). Legacy `/api/v1/hms-batch` UNTOUCHED until the F9.9 flip. **Next: F10** (capitation) — F10.1 is a sign-off-gated governance spec.
 
 ## F10 — Capitation/PMPM extension
 
