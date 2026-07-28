@@ -2603,6 +2603,33 @@ Stop condition observed: yes — the versioned worked-rules spec delivered + sur
 
 ---
 
+## F10.2 — Add capitation arrangement/period/adjustment schema (BUILT · activation GATED)
+
+```text
+Work package: F10.2 (phase F10 — capitation/PMPM extension)
+Status: BUILT · GATED. The additive capitation ledger schema + its structural invariants exist and are tested; nothing computes accrual (F10.2 stop) and nothing activates before the F10.1 CAP-1.0 sign-off + the F10.7 pilot.
+Commit: this feat commit (schema + service + factory teardown + test) + the paired docs commit (this note + PROGRESS row).
+Proof-before-build classification: MISSING (no CapitationArrangement/Period/Adjustment/EligibleLife). Grounded in the F10.1 spec + the existing finance owners (PaymentVoucher/JournalEntry/ProviderDisbursement, referenced by id). Confirmed no name collision. No CONFLICTING path.
+Files changed: prisma/schema.prisma (+ CapitationArrangement, CapitationPeriod, CapitationAdjustment, CapitationEligibleLife + enums CapitationRateBasis/CapitationArrangementStatus/CapitationPeriodStatus — additive, pushed); src/server/services/capitation/arrangement.service.ts (new — structural service, NO calculation); tests/factories/provider-network.ts (capitation teardown, FK-safe); tests/services/capitation-arrangement.service.test.ts (new — 4 DB); docs PROGRESS + this note.
+Schema/data changes: ADDITIVE only — 4 models + 3 enums, relation-less to Tenant/Provider (plain String scope keys, F8/F9 convention); internal relations only (period→arrangement, adjustment/eligibleLife→period); the finance owners are referenced by nullable id (voucherId/disbursementId/journalEntryId) — capitation adds no new pricing/payment engine. prisma validate + db push + generate to pnos_uat.
+Behavior delivered (the 6 plan steps): (1) models/enums/indexes added; (2) the arrangement links a governing contract (governingContractId) + GL policy (glPolicyRef); (3) the eligible-life snapshot/version is CapitationEligibleLife (roster) + the period's count/controlHash/definitionVersion (F10.3 populates); (4) maker/checker/freeze/version fields on the period (frozenAt/frozenById/approvedAt/approvedById/calculationVersion/status) + the immutability guard; (5) voucher/disbursement/GL reference fields; (6) VALIDATED non-overlap (per provider/branch/client/group/package/rateBasis for live DRAFT/ACTIVE arrangements) + currency (3-letter ISO). CapitationArrangementService enforces these + opens idempotent period shells + records append-only adjustments — NO accrual math.
+Authorization evidence: every mutation requires a finance role (SUPER_ADMIN/FINANCE_OFFICER) — a PROVIDER_USER is refused FORBIDDEN (proven). (A dedicated capitation permission + full maker/checker land with F10.4/F10.6.)
+Idempotency/concurrency evidence: openPeriod is idempotent by (arrangementId, period) @@unique (same period returns the same row — proven); the eligible-life roster is @@unique([periodId, memberId]).
+Privacy/security evidence: the eligible-life roster carries memberId + inclusion + reason ONLY — no clinical detail (schema). Adjustments are append-only (no updatedAt) + audited (actorId/approvedById).
+Money/reconciliation evidence: the period holds the Decimal(19,4) conservation fields (opening/grossAccrual/adjustmentTotal/amountPayable/amountPaid/closing) the F10.4 accrual will populate under the §7.13 conservation law; nothing is computed yet.
+Focused tests and results: 4 DB — role gate + currency; effective non-overlap (overlap→OVERLAP, non-overlap OK, different-branch-scope OK); period inherits the arrangement rate + definition version + idempotent; frozen/paid immutability guard + adjustment allowed on FROZEN (correction, not rewrite) but refused on CLOSED. 4/4 pass; self-skip without AUTOPILOT_TEST_DB. Co-run with an integration + a performance suite: 15/15. tsc + brand + currency green; full no-DB suite 1541 pass / 471 skip (no regression).
+Typecheck/schema result: tsc --noEmit clean; schema additive + pushed.
+Manual/visual evidence: N/A — schema + service; the statement UI is F10.6.
+Feature-flag state: GATED — no caller creates a real arrangement; the service is invoked only by tests until the F10.1 sign-off.
+Backfill/rollout impact: none (additive; inert).
+Known limitations / deferrals (flagged): (a) NO calculation (F10.4); (b) the finance role gate is a placeholder for the dedicated capitation permission + full maker/checker (F10.4/F10.6); (c) activation is gated on the F10.1 CAP-1.0 six-owner sign-off + the F10.7 pilot.
+Unrelated worktree changes preserved: yes — worktree contained only scratchpad/ (untracked) + the F10.2 files; the main-checkout dirty UAT files untouched.
+Next allowed package: F10.3 — Implement eligible-life snapshot (M; depends F10.2 + canonical membership/coverage). One idempotent period snapshot recording exactly which covered lives qualify + why: apply the signed definition at the configured date/timezone; query canonical effective coverage (MemberCoveragePeriod) + applicability; record inclusion/exclusion reason + source version; compute member count + control hash; support DRAFT recalc before freeze; freeze only with completeness checks. Tests: joins/leaves/dependants/retroactivity; timezone boundary; replay/control hash. Stop: no accrual.
+Stop condition observed: yes — the additive schema + structural invariants delivered; NO accrual calculation, NO activation.
+```
+
+---
+
 **★ PHASE F9 — BUILDABLE SCOPE COMPLETE (F9.1→F9.9).** The HMS integration control plane end to end: inventory (F9.1) → additive §7.11 schema (F9.2) → connection/credential admin (F9.3) → durable inbound receipt (F9.4) → canonical CASE_SERVICE routing (F9.5) → retry/quarantine/sweeper (F9.6) → SSRF-safe pull adapter (F9.7, activation GATED) → ops views (F9.8) → legacy cutover support (F9.9, flip GATED). **Gate F (delivery receipts survive queue/app failure) CODE-MET; the "first real connector passes replay/retry/mapping/reconciliation UAT" half of Gate F stays OPEN pending F9.7 pilot activation (signed HMS contract + sandbox).** The legacy /api/v1/hms-batch route is UNTOUCHED and remains the live push path until the F9.9 flip. Deferred within F9 (all needing a real partner contract / pilot sign-off): F9.7 pilot activation + connection-pinned DNS-TOCTOU closure + reversible outbound-credential storage + body-HMAC signature; F9.9 live flip + legacy retirement. Other object types (PA/claim/case-activity) reuse the F9.5 pattern behind their own versioned mapper.
 
 ---
