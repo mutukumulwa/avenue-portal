@@ -2305,3 +2305,31 @@ Stop condition observed: yes — the dashboard + the two provider-safe reads + t
 ```
 
 ---
+
+## F8.6 — Build the TPA network performance workspace
+
+```text
+Work package: F8.6 (phase F8 — performance scorecards; UI) — CLOSES PHASE F8
+Status: PAGE COMPLETE. Authorized network managers compare named providers, spot outliers, export (audited), and open human improvement plans.
+Commit: this feat commit (service + page + form + export route + action + audit-coverage tokens + tests) + the paired docs commit (this note + PROGRESS row).
+Proof-before-build classification: BUILD-NEW on proven owners — the F8.2/F8.4 score+benchmark rows, the F7.6 operator page/action pattern, the F6.5 csvCell, and the F7.7 improvement-plan service. Confirmed session.user.permissions carries the explicit capability and ROLES.ADMIN_ONLY is the baseline. No CONFLICTING path.
+Files changed: src/server/services/provider-performance/network.service.ts (new); src/app/(admin)/network-performance/{page.tsx, actions.ts, NetworkImprovementPlanButton.tsx, export/route.ts} (new); tests/audit-coverage/catalogue.ts (+ ProviderImprovementPlanService. + NetworkPerformanceService.exportComparisonCsv( tokens); tests/services/provider-performance-network.service.test.ts (new — 4 DB) + tests/actions/provider-network-improvement-action.test.ts (new — 3 seam); docs PROGRESS + this note.
+Schema/data changes: NONE — reads the F8.2/F8.4 rows; the only write is a F7.7 improvement plan.
+Behavior delivered (the 6 plan steps): (1) an EXPLICIT network-analytics permission (network.analytics.read) gates every read/export/action — a SUPER_ADMIN without the cap is refused; (2) metric/period filters (listAvailable) + a named-provider comparison with a top/bottom-decile outlier flag; (3) the comparison links to the metric catalog (definitions) and drills into named providers' aggregate scores; (4) the improvement-plan action opens a F7.7 plan for a provider; (5) the CSV export is audited (NETWORK_ANALYTICS:EXPORT); (6) NO rate/tier/suspension mutation exists — the only mutation is the human improvement plan.
+Authorization evidence: assertNetworkAnalyst requires the explicit capability on every service method; the page redirects a capless operator to /unauthorized; the export route 403s without the cap; the action refuses without the cap (proven). The comparison is tenant-scoped.
+Idempotency/concurrency evidence: N/A for the reads; the improvement-plan create is the F7.7 idempotent-by-design path (unchanged).
+Privacy/security evidence: the comparison carries provider name + aggregate score numbers ONLY — no member/claim/clinical detail (proven: no member/icd/cpt/diagnosis/notes token appears in the payload). The export is audited. This is the §8.13 TPA view (named providers where the role permits) — distinct from the anonymized provider view (F8.5).
+Money/reconciliation evidence: N/A — advisory; no money, no rate/tier/status side effect (the load-bearing prohibition — the workspace has no such mutation at all).
+Focused tests and results: 4 DB (the explicit-permission gate on listComparison + exportComparisonCsv; the named comparison flags the 0.1 and 0.9 values as outliers and not the 0.5s; no clinical token in the payload; the audited CSV exports 5 rows with a BOM) + 3 action seam (delegation to F7.7 create with a parsed target date + revalidate; the cap gate refuses a capless operator; title/objective/target validation). All green. tsc --noEmit clean; brand + currency + audit-coverage green (the two new tokens cover the export + the plan action); full no-DB suite 1517 pass / 417 skip; the factory-consuming DB suites pass 16/16 together.
+Typecheck/schema result: tsc clean; no schema change.
+Manual/visual evidence: N/A — the worktree has no seeded operator session (the F3.7+ convention); the service + action + audit are unit-tested. Browser verification lands against a seeded env with the cap granted.
+Feature-flag state: none — gated on the explicit capability. The cap is an operator grant (like the F7.5 bank caps) assigned via ops; until granted the whole workspace + export + action refuse.
+Backfill/rollout impact: none. Note: grant network.analytics.read to the network-manager operator role to enable the workspace.
+Known limitations / deferrals (flagged): (a) no in-worktree browser verification (env). (b) The outlier rule is a simple top/bottom-decile flag; a configurable z-score/threshold is a refinement. (c) The metric-definition link is a placeholder anchor (the PNMC catalog is a repo doc, not a served page). (d) The capability is not seeded to an operator role (an ops grant, like the F7.5 bank caps).
+Unrelated worktree changes preserved: yes — worktree contained only the F8.6 files; scratchpad/ untracked and NOT staged; the main-checkout dirty UAT files untouched.
+★ PHASE F8 COMPLETE — all 6 packages (F8.1 metric catalog PNMC-1.0 → F8.2 versioned/published score schema → F8.3 deterministic submission-quality refresh → F8.4 anonymized cohort benchmarks + publication → F8.5 provider dashboard → F8.6 TPA network workspace). The whole rail is ADVISORY (D21) — no scorecard ever auto-suspends a provider, changes a rate, or alters tiering. Nothing publishes a provider-facing score before the F8.1 §7 six-owner sign-off. Deferred within F8: the non-submission metric families (B SLA / C PA / D payment / E reconsideration / F variance) and A2 clean-claim (needs the ClaimProcessingRun initial-run query) — each adds the same way as F8.3; the network-analytics capability + the F7.5 bank caps need operator-role grants.
+Next allowed package: F9.1 — Inventory current integration configs, secrets, and payload paths (begins phase F9, HMS integration control plane; a read-only inventory/evidence artifact like F0.x).
+Stop condition observed: yes — the workspace + comparison + audited export + improvement-plan action + tests delivered; NO automated network decision, NO rate/tier/suspension mutation, NO schema change.
+```
+
+---
