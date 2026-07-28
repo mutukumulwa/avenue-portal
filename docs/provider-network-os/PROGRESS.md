@@ -202,7 +202,7 @@
 
 | Pkg | Title | Size | Status | Evidence |
 |---|---|---|---|---|
-| F10.1 | Approve arrangement/accounting spec | M | GATED(finance/legal/network/client/provider) | — |
+| F10.1 | Approve arrangement/accounting spec | M | DRAFT · GATED(six-owner sign-off PENDING) | `CAPITATION_ARRANGEMENT_SPEC.md` (CAP-1.0) — field defs grounded in real anchors (`MemberCoveragePeriod@985`, `FundingModelType.CAPITATION@1987`, `PaymentVoucher@4667`/`JournalEntry@5165`/`ProviderDisbursement@7154`); eligible-life rule + snapshot-day/tz; freeze/reopen; conservation; 8 worked examples; six-owner sign-off surface. NO schema/code |
 | F10.2 | Capitation arrangement/period/adjustment schema | M | NOT_STARTED | — |
 | F10.3 | Eligible-life snapshot | M | NOT_STARTED | — |
 | F10.4 | Calculate/freeze capitation accrual | M | NOT_STARTED | — |

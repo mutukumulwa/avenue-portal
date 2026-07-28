@@ -2576,6 +2576,33 @@ Next allowed package: F10.1 — Approve capitation arrangement + accounting spec
 Stop condition observed: yes — the reviewed mapping + shadow parity + rollback-safe decision built and tested; NO route flip, NO legacy retirement, NO schema deletion.
 ```
 
+## F10.1 — Approve capitation arrangement & accounting specification (DRAFT · GATED)
+
+```text
+Work package: F10.1 (phase F10 — capitation/PMPM extension) — OPENS PHASE F10
+Status: DRAFT for sign-off · GATED. A versioned governance artifact (CAP-1.0) grounded in real fact fields. NO schema, NO code, NO data (F10.1 stop: no schema before sign-off). The six-owner sign-off is PENDING.
+Commit: this single docs commit (the spec + this note + PROGRESS row).
+Proof-before-build classification: CHARACTERIZE/GOVERN-ONLY (like F6.1/F7.1/F8.1). Read-only inventory to ground the rules: FundingModelType (CAPITATION tagging exists, schema:1987 — the D8 pool tag), MemberCoveragePeriod (schema:985 — canonical coverage), Member.status/relationship (schema:911/925), the PMPM pricing note (schema:418), and the F6 finance owners (PaymentVoucher@4667, JournalEntry@5165, JournalLine@5190, ProviderDisbursement@7154, ProviderSettlementBatch@6280). Confirmed: capitation TAGGING/zero-pricing exists; PMPM accrual + pool settlement + CapitationArrangement/Period/Adjustment models do NOT (plan gap §418) — those are F10.2 additive after sign-off.
+Files changed: docs/provider-network-os/CAPITATION_ARRANGEMENT_SPEC.md (new); docs PROGRESS + this note.
+Schema/data changes: NONE.
+Behavior delivered (the 6 plan steps): (1) pilot-selection surface (sponsor names one real arrangement; the existing PER_VISIT_CASE_RATE/CAPITATION contract vocabulary is cited); (2) every §7.13 field defined + grounded to a real anchor (arrangement/period/adjustment); (3) EIGHT worked examples — normal, join/leave mid-month, dependant, retroactive (BACKFILL → adjustment, not rewrite), rate change, zero encounter, carve-out; (4) timezone/snapshot-day rule (period-start tenant-midnight, persisted UTC; never server-local today, §1750; a census-day/average basis is an explicit sign-off option); (5) freeze/reopen/late-correction policy (FROZEN immutable; correction = append-only adjustment or a governed reopen, never a silent rewrite); (6) the exact conservation formula + the accounting entries mapped to the EXISTING finance owners (no new pricing/payment engine).
+Authorization evidence: N/A (governance doc). The doc DEFINES the maker/checker gates F10.2–F10.6 will enforce.
+Idempotency/concurrency evidence: N/A. The doc specifies the eligible-life snapshot control hash + no-op-on-identical-facts rule F10.3 will implement.
+Privacy/security evidence: N/A (no data).
+Money/reconciliation evidence: the conservation law (opening + accrual + adjustments − payments = closing) + the zero-pay-capitated-never-FFS invariant (D24) are the load-bearing rules; the doc maps them to Decimal money + the existing GL/voucher/disbursement owners.
+Focused tests and results: none — governance artifact (no code). tsc/guards untouched (docs-only).
+Typecheck/schema result: N/A (docs-only).
+Manual/visual evidence: N/A.
+Feature-flag state: GATED — the spec is inert until the six owners sign AND the F10.7 pilot completes ≥3 reconciled periods (PNO-CAP-008).
+Backfill/rollout impact: none.
+Known limitations / deferrals (flagged): (a) SIGN-OFF PENDING — no signatures captured; F10.2 schema does not ship until then; (b) the named pilot + real numbers are the sponsor's to supply; (c) the default eligible-life basis is a first-of-period census — a pro-rata / mid-month-census / average-daily basis is an explicit per-arrangement sign-off option, not the default.
+Unrelated worktree changes preserved: yes — worktree contained only scratchpad/ (untracked) + the F10.1 doc; the main-checkout dirty UAT files untouched.
+Next allowed package: F10.2 — Add capitation arrangement/period/adjustment schema (M; depends F10.1). GATED on the F10.1 sign-off for real activation; the additive schema (CapitationArrangement/Period/Adjustment + enums + non-overlap/immutability constraints) can be BUILT + validated behind the pending sign-off (like the F8 scoring rail built its mechanism before the F8.1 sign-off). Stop: no calculation.
+Stop condition observed: yes — the versioned worked-rules spec delivered + surfaced for sign-off; NO schema, NO calculation, NO activation.
+```
+
+---
+
 **★ PHASE F9 — BUILDABLE SCOPE COMPLETE (F9.1→F9.9).** The HMS integration control plane end to end: inventory (F9.1) → additive §7.11 schema (F9.2) → connection/credential admin (F9.3) → durable inbound receipt (F9.4) → canonical CASE_SERVICE routing (F9.5) → retry/quarantine/sweeper (F9.6) → SSRF-safe pull adapter (F9.7, activation GATED) → ops views (F9.8) → legacy cutover support (F9.9, flip GATED). **Gate F (delivery receipts survive queue/app failure) CODE-MET; the "first real connector passes replay/retry/mapping/reconciliation UAT" half of Gate F stays OPEN pending F9.7 pilot activation (signed HMS contract + sandbox).** The legacy /api/v1/hms-batch route is UNTOUCHED and remains the live push path until the F9.9 flip. Deferred within F9 (all needing a real partner contract / pilot sign-off): F9.7 pilot activation + connection-pinned DNS-TOCTOU closure + reversible outbound-credential storage + body-HMAC signature; F9.9 live flip + legacy retirement. Other object types (PA/claim/case-activity) reuse the F9.5 pattern behind their own versioned mapper.
 
 ---
