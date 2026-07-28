@@ -64,9 +64,9 @@ describe("F1.4 computeProviderNav", () => {
   });
 
   it("never emits an unfinished route", () => {
-    // NOTE: /provider/preauth (F3.8), /provider/inbox (F4.7), /provider/payment-queries (F6.11), /provider/profile (F7.6) are now FINISHED — removed from forbidden.
+    // NOTE: /provider/preauth (F3.8), /provider/inbox (F4.7), /provider/payment-queries (F6.11), /provider/profile (F7.6), /provider/performance (F8.5) are now FINISHED — removed from forbidden.
     // /provider/contracts (F7.3) is BUILT but flag-gated: with no flags passed it must stay hidden even with every permission.
-    const forbidden = ["/provider/contracts", "/provider/performance", "/provider/users", "/provider/integrations"];
+    const forbidden = ["/provider/contracts", "/provider/users", "/provider/integrations"];
     // even a super-broad permission set only yields existing (and flag-enabled) routes
     const allPerms = PROVIDER_NAV_DEFINITIONS.map((d) => d.requiredPermission).filter(Boolean) as string[];
     const h = hrefs(allPerms);
@@ -82,6 +82,11 @@ describe("F1.4 computeProviderNav", () => {
   it("F7.6: Profile shows for a user with provider.profile.read (perm-gated, no flag)", () => {
     expect(hrefs(["provider.profile.read"])).toContain("/provider/profile");
     expect(hrefs(["provider.claim.read"])).not.toContain("/provider/profile"); // migrated, lacks the perm
+  });
+
+  it("F8.5: Performance shows for a user with provider.performance.read (perm-gated, no flag)", () => {
+    expect(hrefs(["provider.performance.read"])).toContain("/provider/performance");
+    expect(hrefs(["provider.claim.read"])).not.toContain("/provider/performance");
   });
 
   it("F7.3: the flag alone does not reveal Contracts to a migrated user lacking the permission", () => {

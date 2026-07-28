@@ -16,7 +16,7 @@
 export type ProviderNavGroupKey = "Home" | "Care" | "Claims" | "Finance" | "Network" | "Administration";
 
 export type ProviderNavIconKey =
-  | "dashboard" | "inbox" | "eligibility" | "cases" | "preauth" | "claims" | "new-claim" | "settlements" | "contracts" | "profile" | "api-keys";
+  | "dashboard" | "inbox" | "eligibility" | "cases" | "preauth" | "claims" | "new-claim" | "settlements" | "contracts" | "performance" | "profile" | "api-keys";
 
 /** Feature flags that gate a nav item's visibility (resolved server-side, passed to computeProviderNav). */
 export type ProviderNavFlagKey = "contractView";
@@ -51,6 +51,8 @@ export const PROVIDER_NAV_DEFINITIONS: ProviderNavDefinition[] = [
   { key: "payment-queries", label: "Payment queries", href: "/provider/payment-queries", iconKey: "settlements", group: "Finance", requiredPermission: "provider.payment_query.manage" },
   // F7.3 — gated behind `contractView` (F7.1 §10 sign-off): hidden until the flag is on, even for a permitted user.
   { key: "contracts", label: "Contracts", href: "/provider/contracts", iconKey: "contracts", group: "Network", requiredPermission: "provider.contract.read", flagKey: "contractView" },
+  // F8.5 — advisory performance dashboard (perm-gated, no flag).
+  { key: "performance", label: "Performance", href: "/provider/performance", iconKey: "performance", group: "Network", requiredPermission: "provider.performance.read" },
   // F7.6 — read-only profile + change-request tracker (perm-gated, no flag).
   { key: "profile", label: "Profile", href: "/provider/profile", iconKey: "profile", group: "Administration", requiredPermission: "provider.profile.read" },
   { key: "api-keys", label: "API Keys", href: "/provider/api-keys", iconKey: "api-keys", group: "Administration", requiredPermission: "provider.api_keys.manage" },
