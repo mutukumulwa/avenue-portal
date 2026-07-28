@@ -7341,3 +7341,116 @@ model ProviderPaymentQueryMessage {
   @@unique([paymentQueryId, sequence])
   @@index([tenantId, paymentQueryId, createdAt])
 }
+
+// PNOS F7.4 — provider master-data change requests (spec §7.10). A provider
+// PROPOSES an allowed profile/branch/practitioner/credential/bank/integration
+// change; the active master data is NEVER mutated directly — an approved request
+// calls the canonical owning service. Sensitive changes (bank) require
+// maker ≠ checker + the F7.5 independent verification before activation, and the
+// full sensitive value NEVER lands here (snapshot/proposed store masked values
+// only). Relation-less to Provider/Tenant (plain ids) like ProviderPaymentQuery.
+enum MasterDataChangeCategory {
+  CONTACT
+  BRANCH
+  PRACTITIONER
+  CREDENTIAL
+  BANK
+  INTEGRATION
+  OTHER
+}
+
+enum MasterDataChangeStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  INFORMATION_REQUIRED
+  PROVIDER_RESPONDED
+  PENDING_CHECKER // sensitive: maker approved, awaiting a DISTINCT checker (maker ≠ checker)
+  APPROVED // decision approved; non-sensitive are activated now, sensitive await F7.5 verified activation
+  REJECTED
+  WITHDRAWN
+}
+
+enum MasterDataChangeRisk {
+  LOW
+  MEDIUM
+  HIGH // sensitive — maker ≠ checker + independent verification (bank)
+}
+
+model ProviderMasterDataChangeRequest {
+  id               String                   @id @default(cuid())
+  tenantId         String
+  providerId       String
+  providerBranchId String? // set for BRANCH-scoped changes
+  category         MasterDataChangeCategory
+  riskLevel        MasterDataChangeRisk     @default(LOW)
+
+  // Masked snapshot of the CURRENT values at submit time (sensitive fields masked),
+  // and the proposed new values (sensitive fields masked here — the full value is
+  // handled out-of-band by the canonical owner / F7.5, never stored on this row).
+  currentSnapshot     Json
+  proposedValues      Json
+  evidenceDocumentIds String[] @default([]) // relation-less pointers to Document
+  providerNarrative   String?
+
+  status              MasterDataChangeStatus @default(SUBMITTED)
+  providerRequesterId String?
+  assignedReviewerId  String?
+
+  // Maker/checker (sensitive changes) — maker ≠ checker enforced in the service.
+  makerId   String?
+  makerAt   DateTime?
+  checkerId String?
+  checkerAt DateTime?
+
+  // Independent verification facts for BANK changes — populated by F7.5, null here.
+  verificationMethod    String?
+  verificationReference String?
+  verifiedById          String?
+  verifiedAt            DateTime?
+
+  // Decision — SAFE (provider-facing) vs INTERNAL separated (§9).
+  decisionCode         String?
+  decisionExplanation  String?
+  decisionInternalNote String?
+
+  // Activation (the canonical apply): non-sensitive on approval; sensitive in F7.5.
+  effectiveAt   DateTime?
+  activatedAt   DateTime?
+  activatedById String?
+
+  // SLA
+  slaPolicy String?
+  dueAt     DateTime?
+
+  // Idempotency + optimistic concurrency.
+  idempotencyKey String?
+  version        Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  events ProviderMasterDataChangeEvent[]
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, providerId])
+  @@index([tenantId, status])
+  @@index([tenantId, category])
+}
+
+model ProviderMasterDataChangeEvent {
+  id              String                          @id @default(cuid())
+  tenantId        String
+  changeRequestId String
+  changeRequest   ProviderMasterDataChangeRequest @relation(fields: [changeRequestId], references: [id])
+  sequence        Int
+  audience        String // SHARED (provider-visible) | INTERNAL
+  eventType       String // SUBMITTED | UNDER_REVIEW | INFO_REQUESTED | PROVIDER_RESPONDED | MAKER_APPROVED | APPROVED | REJECTED | WITHDRAWN | MESSAGE
+  priorStatus     String?
+  newStatus       String?
+  body            String? // safe exchange text
+  actorType       String
+  actorId         String?
+  createdAt       DateTime @default(now())
+
+  @@unique([changeRequestId, sequence])
+  @@index([tenantId, changeRequestId, createdAt])
+}
