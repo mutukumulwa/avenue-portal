@@ -566,6 +566,12 @@ export async function buildProviderWorld(prisma: Prisma, opts: BuildOptions = {}
     await prisma.providerIntegrationDelivery.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.providerIntegrationSecret.deleteMany({ where: { tenantId: { in: tenantIds } } }); // FK → connection: before connection
     await prisma.providerIntegrationConnection.deleteMany({ where: { tenantId: { in: tenantIds } } });
+    // F10.2: capitation ledger (relation-less to Tenant; internal FKs adjustment/
+    // eligibleLife → period → arrangement — delete children first).
+    await prisma.capitationAdjustment.deleteMany({ where: { tenantId: { in: tenantIds } } });
+    await prisma.capitationEligibleLife.deleteMany({ where: { tenantId: { in: tenantIds } } });
+    await prisma.capitationPeriod.deleteMany({ where: { tenantId: { in: tenantIds } } });
+    await prisma.capitationArrangement.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.providerSettlementBatch.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.paymentVoucher.deleteMany({ where: { tenantId: { in: tenantIds } } });
     if (createdJournalIds.length > 0) {

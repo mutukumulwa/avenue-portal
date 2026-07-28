@@ -7903,3 +7903,167 @@ model ProviderIntegrationSecret {
   @@unique([connectionId, version])
   @@index([connectionId, status])
 }
+
+// ─── PNOS F10 — CAPITATION / PMPM EXTENSION (§7.13 / D24) ─────────────────────
+// A SEPARATE governed ledger (D24): frozen eligible-life + rate snapshots, a
+// dedicated reconciliation, zero-pay capitated encounters that never settle as FFS.
+// ADDITIVE + INERT — nothing computes/activates before the F10.1 CAP-1.0 six-owner
+// sign-off + the F10.7 pilot (PNO-CAP-008). Relation-less to Tenant/Provider (plain
+// String scope keys, matching the F8/F9 convention); internal relations only
+// (period → arrangement, adjustment/eligible-life → period). Reuses the existing
+// finance owners (PaymentVoucher/JournalEntry/ProviderDisbursement) by reference —
+// capitation adds NO new pricing/payment engine (§8.14).
+
+enum CapitationRateBasis {
+  PMPM // per-member-per-month × frozen lives
+  PER_VISIT // per counted valid visit
+  FIXED_PERIOD // flat per-period pool
+}
+
+enum CapitationArrangementStatus {
+  DRAFT
+  ACTIVE
+  SUSPENDED
+  EXPIRED
+}
+
+enum CapitationPeriodStatus {
+  DRAFT // snapshot may still recompute
+  CALCULATED // accrual computed, not yet frozen
+  FROZEN // immutable snapshot + accrual (maker/checker)
+  PAID // disbursement recorded
+  CLOSED // reconciled + signed off
+  REOPENED // governed reopen (supersedes with a new calculation version)
+}
+
+/// Effective-dated capitation terms for one scope. Non-overlapping ACTIVE ranges
+/// per (provider, branch, client, group, package, rateBasis).
+model CapitationArrangement {
+  id               String @id @default(cuid())
+  tenantId         String
+  providerId       String
+  providerBranchId String  @default("") // "" = all branches
+  clientId         String?
+  groupId          String?
+  packageId        String?
+
+  label     String
+  rateBasis CapitationRateBasis @default(PMPM)
+  rate      Decimal             @db.Decimal(19, 4)
+  currency  String              @default("UGX")
+  cadence   String              @default("MONTHLY")
+
+  coveredServices Json? // service scope covered by the pool
+  ffsCarveOuts    Json? // services explicitly carved out to ordinary FFS
+
+  eligibilityDefinitionVersion String // e.g. CAP-1.0 — frozen onto each period
+  governingContractId          String? // link the governing contract (§7.13 step 2)
+  glPolicyRef                  String? // GL/finance treatment reference
+
+  status        CapitationArrangementStatus @default(DRAFT)
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  approvedById  String?
+  approvedAt    DateTime?
+  createdById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  periods CapitationPeriod[]
+
+  @@index([tenantId, providerId, status])
+  @@index([tenantId, providerId, providerBranchId, effectiveFrom])
+}
+
+/// One append-only period ledger row per (arrangement, period). Carries the frozen
+/// eligible-life count + control hash, the accrual, the conservation balances, and
+/// references to the finance owners that actually pay it.
+model CapitationPeriod {
+  id            String                @id @default(cuid())
+  tenantId      String
+  arrangementId String
+  arrangement   CapitationArrangement  @relation(fields: [arrangementId], references: [id])
+
+  period      String // YYYY-MM
+  periodStart DateTime
+  periodEnd   DateTime
+
+  // eligible-life snapshot (F10.3 populates; frozen at freeze).
+  snapshotInstant         DateTime?
+  eligibleLifeCount       Int       @default(0)
+  eligibleLifeControlHash String?
+  definitionVersion       String
+
+  // accrual + conservation (F10.4 computes; Decimal only).
+  rate            Decimal @db.Decimal(19, 4)
+  grossAccrual    Decimal @default(0) @db.Decimal(19, 4)
+  adjustmentTotal Decimal @default(0) @db.Decimal(19, 4)
+  amountPayable   Decimal @default(0) @db.Decimal(19, 4)
+  amountPaid      Decimal @default(0) @db.Decimal(19, 4)
+  openingBalance  Decimal @default(0) @db.Decimal(19, 4)
+  closingBalance  Decimal @default(0) @db.Decimal(19, 4)
+  controlTotals   Json?
+
+  calculationVersion Int                    @default(0) // a reopen/recalc increments
+  status             CapitationPeriodStatus @default(DRAFT)
+  frozenAt           DateTime?
+  frozenById         String?
+  approvedAt         DateTime?
+  approvedById       String?
+
+  // finance owner references (F10.6) — capitation reuses these, never re-implements.
+  voucherId      String?
+  disbursementId String?
+  journalEntryId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  adjustments   CapitationAdjustment[]
+  eligibleLives CapitationEligibleLife[]
+
+  @@unique([arrangementId, period])
+  @@index([tenantId, status, period])
+}
+
+/// Append-only positive/negative adjustment. A correction after freeze is an
+/// adjustment (or a governed reopen) — NEVER a silent rewrite (PNO-CAP-003).
+model CapitationAdjustment {
+  id       String           @id @default(cuid())
+  tenantId String
+  periodId String
+  period   CapitationPeriod @relation(fields: [periodId], references: [id])
+
+  category    String // RETRO_ELIGIBILITY | RATE_CORRECTION | CLAWBACK | INCENTIVE | RECONCILIATION
+  amount      Decimal @db.Decimal(19, 4) // signed: + charge, − credit
+  evidenceRef String?
+  reason      String?
+  actorId     String?
+  approvedById String?
+  approvedAt   DateTime?
+
+  createdAt DateTime @default(now()) // append-only — no updatedAt
+
+  @@index([periodId])
+  @@index([tenantId, category])
+}
+
+/// The frozen eligible-life roster (F10.3). One row per (period, member) recording
+/// inclusion + the reason + the coverage source version. Carries NO clinical detail.
+model CapitationEligibleLife {
+  id       String           @id @default(cuid())
+  tenantId String
+  periodId String
+  period   CapitationPeriod @relation(fields: [periodId], references: [id])
+
+  memberId              String
+  included              Boolean
+  reasonCode            String // COVERED | NOT_ACTIVE | NO_COVERAGE_ON_SNAPSHOT_DAY | OUT_OF_SCOPE | CARVE_OUT_ONLY
+  coverageSourceVersion String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([periodId, memberId])
+  @@index([periodId, included])
+  @@index([tenantId, memberId])
+}
