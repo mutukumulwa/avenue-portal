@@ -460,6 +460,9 @@ export async function buildProviderWorld(prisma: Prisma, opts: BuildOptions = {}
     // F6.9: reconciliation runs + exceptions (relation-less).
     await prisma.settlementReconciliationException.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.settlementReconciliationRun.deleteMany({ where: { tenantId: { in: tenantIds } } });
+    // F6.10: payment-query messages (FK → query) then queries.
+    await prisma.providerPaymentQueryMessage.deleteMany({ where: { tenantId: { in: tenantIds } } });
+    await prisma.providerPaymentQuery.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.providerSettlementBatch.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.paymentVoucher.deleteMany({ where: { tenantId: { in: tenantIds } } });
     if (createdJournalIds.length > 0) {

@@ -7252,3 +7252,92 @@ model SettlementReconciliationException {
   @@index([tenantId, settlementBatchId])
   @@index([tenantId, investigationStatus])
 }
+
+// PNOS F6.10 — provider payment query (§7.9, D17). A provider raises a query about a
+// settlement/claim/line/disbursement; finance responds WITHOUT changing a claim decision
+// (a decision dispute is an explicit reconsideration, F6.12). Additive; relation-less id
+// pointers to batch/claim/line/disbursement/reconsideration (satellite convention).
+enum PaymentQueryStatus {
+  OPEN
+  ACKNOWLEDGED
+  INFORMATION_REQUIRED
+  PROVIDER_RESPONDED
+  RESOLVED
+  REJECTED
+  WITHDRAWN
+  CLOSED
+}
+
+enum PaymentQueryCategory {
+  MISSING_PAYMENT
+  SHORT_PAYMENT
+  WRONG_AMOUNT
+  WRONG_REFERENCE
+  DUPLICATE_PAYMENT
+  UNIDENTIFIED_PAYMENT
+  OTHER
+}
+
+model ProviderPaymentQuery {
+  id                String               @id @default(cuid())
+  tenantId          String
+  clientId          String? // read-model confinement (G2.1) where applicable
+  providerId        String
+  providerBranchId  String?
+  settlementBatchId String
+  // optional finer targets (relation-less pointers)
+  claimId           String?
+  claimLineId       String?
+  disbursementId    String?
+  category          PaymentQueryCategory
+  discrepancyAmount   Decimal? @db.Decimal(19, 4)
+  discrepancyCurrency String?
+  providerNarrative   String
+  status            PaymentQueryStatus   @default(OPEN)
+  // owners
+  providerRequesterId String?
+  assignedTeam        String?
+  assignedReviewerId  String?
+  // SLA
+  slaPolicy  String?
+  slaVersion String?
+  dueAt      DateTime?
+  // linked reconsideration when a dispute is explicitly converted (F6.12 sets this)
+  linkedReconsiderationId String?
+  // resolution — SAFE (provider-facing) vs INTERNAL separated (§9)
+  resolutionCode         String?
+  resolutionExplanation  String?
+  resolutionInternalNote String?
+  // idempotency + optimistic concurrency
+  idempotencyKey String?
+  version        Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  messages ProviderPaymentQueryMessage[]
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, settlementBatchId])
+  @@index([tenantId, providerId])
+  @@index([tenantId, status])
+  @@index([tenantId, clientId])
+}
+
+model ProviderPaymentQueryMessage {
+  id             String               @id @default(cuid())
+  tenantId       String
+  paymentQueryId String
+  paymentQuery   ProviderPaymentQuery @relation(fields: [paymentQueryId], references: [id])
+  sequence       Int
+  audience       String // SHARED (provider-visible) | INTERNAL
+  eventType      String // RAISED | ACKNOWLEDGED | INFO_REQUESTED | PROVIDER_RESPONDED | RESOLVED | REJECTED | WITHDRAWN | MESSAGE
+  priorStatus    String?
+  newStatus      String?
+  body           String? // safe exchange text
+  actorType      String
+  actorId        String?
+  createdAt      DateTime @default(now())
+
+  @@unique([paymentQueryId, sequence])
+  @@index([tenantId, paymentQueryId, createdAt])
+}
