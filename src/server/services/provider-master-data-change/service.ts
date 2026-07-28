@@ -31,7 +31,16 @@ export const MASTER_DATA_CHANGE_PERMISSION = "provider.profile.change_request";
 const MASTER_DATA_REVIEWER_ROLES = ["SUPER_ADMIN"];
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-export type MasterDataChangeErrorCode = "NOT_FOUND" | "FORBIDDEN" | "STALE" | "INVALID_STATE" | "INVALID" | "NOT_ACTIVATABLE";
+/**
+ * F7.5 — SEPARATE capabilities for the sensitive bank-change controls (§8.11).
+ * The independent VERIFY and the ACTIVATE steps each require their own grant,
+ * distinct from the F7.4 maker/checker approval, and the verifier must not be the
+ * maker or the requester (a requester/maker cannot self-check).
+ */
+export const BANK_CHANGE_VERIFY_CAP = "provider.bank_change.verify";
+export const BANK_CHANGE_ACTIVATE_CAP = "provider.bank_change.activate";
+
+export type MasterDataChangeErrorCode = "NOT_FOUND" | "FORBIDDEN" | "STALE" | "INVALID_STATE" | "INVALID" | "NOT_ACTIVATABLE" | "UNVERIFIED" | "FROZEN";
 export class MasterDataChangeError extends Error {
   constructor(public code: MasterDataChangeErrorCode, message: string) {
     super(message);
@@ -87,6 +96,42 @@ export const defaultMasterDataApplier: MasterDataApplyPort = async (tx, input) =
   } else {
     await tx.provider.update({ where: { id: input.providerId }, data: data as Prisma.ProviderUpdateInput });
   }
+};
+
+// ── F7.5 — sensitive bank-change verification + activation ────────────────────
+
+export interface BankChangeActor { userId: string; tenantId: string; permissions: string[] }
+
+/**
+ * The canonical provider payment-destination owner (bank details live in the
+ * settlement module behind Provider.bankDetailsRef). Activation points the
+ * destination at the VERIFIED out-of-band reference — never a full account number
+ * (there is no bank API here). Injectable so the settlement owner can supply a
+ * richer applier later.
+ */
+export type BankDestinationApplyPort = (
+  tx: Prisma.TransactionClient,
+  input: { tenantId: string; providerId: string; changeRequestId: string; verificationReference: string; effectiveAt: Date },
+) => Promise<void>;
+
+export const defaultBankDestinationApplier: BankDestinationApplyPort = async (tx, input) => {
+  // Point the canonical reference at the verified out-of-band record. No account plaintext.
+  await tx.provider.update({ where: { id: input.providerId }, data: { bankDetailsRef: input.verificationReference } });
+};
+
+/**
+ * Payment-window freeze check: is a payment to this provider imminent or in
+ * flight? If so a destination change is frozen/escalated (§8.11). Injectable; the
+ * default flags an about-to-settle batch or an in-flight disbursement.
+ */
+export type PaymentWindowPort = (args: { tenantId: string; providerId: string; db: PrismaClient | Prisma.TransactionClient }) => Promise<boolean>;
+
+export const defaultPaymentWindowCheck: PaymentWindowPort = async ({ tenantId, providerId, db }) => {
+  const [imminentBatch, inFlight] = await Promise.all([
+    db.providerSettlementBatch.findFirst({ where: { tenantId, providerId, status: { in: ["MAKER_SUBMITTED", "CHECKER_APPROVED"] } }, select: { id: true } }),
+    db.providerDisbursement.findFirst({ where: { tenantId, providerId, status: { in: ["PENDING", "RELEASED", "PROCESSING"] } }, select: { id: true } }),
+  ]);
+  return !!imminentBatch || !!inFlight;
 };
 
 const PROVIDER_SNAPSHOT_SELECT = {
@@ -297,6 +342,116 @@ export const ProviderMasterDataChangeService = {
       href: "/provider/profile", metadata: { changeRequestId: id }, dedupeKey: `mdc-approved:${id}`,
     }).catch(() => undefined);
     return { id, status: "APPROVED", version: result.version, riskLevel: row.riskLevel };
+  },
+
+  /**
+   * F7.5 — record the INDEPENDENT out-of-band verification of an APPROVED bank
+   * change (the F7.4 maker/checker already approved it). The verifier must hold the
+   * verify capability AND be distinct from the maker and the requester — a
+   * requester/maker cannot self-check. Stores the method/reference/time ONLY, never
+   * the full account (§8.11). Does not activate.
+   */
+  async verifyBankChange(
+    actor: BankChangeActor,
+    id: string,
+    expectedVersion: number,
+    input: { method: string; reference: string; verifiedAt?: Date },
+    db: PrismaClient = prisma,
+  ): Promise<MasterDataChangeResult> {
+    if (!actor.permissions.includes(BANK_CHANGE_VERIFY_CAP)) throw new MasterDataChangeError("FORBIDDEN", "The bank-change verify capability is required.");
+    if (!input.method?.trim() || !input.reference?.trim()) throw new MasterDataChangeError("INVALID", "A verification method and reference are required.");
+    const row = await db.providerMasterDataChangeRequest.findFirst({ where: { id, tenantId: actor.tenantId }, select: { id: true, category: true, status: true, version: true, makerId: true, providerRequesterId: true, verifiedAt: true } });
+    if (!row) throw new MasterDataChangeError("NOT_FOUND", "Change request not found.");
+    if (row.category !== "BANK") throw new MasterDataChangeError("INVALID", "Only a bank change is independently verified.");
+    if (row.status !== "APPROVED") throw new MasterDataChangeError("INVALID_STATE", "Only an approved bank change can be verified.");
+    if (row.verifiedAt) throw new MasterDataChangeError("INVALID_STATE", "This change is already verified.");
+    if (row.makerId && row.makerId === actor.userId) throw new MasterDataChangeError("FORBIDDEN", "The verifier must be different from the maker.");
+    if (row.providerRequesterId && row.providerRequesterId === actor.userId) throw new MasterDataChangeError("FORBIDDEN", "The requester cannot verify their own change.");
+
+    const verifiedAt = input.verifiedAt ?? new Date();
+    const result = await db.$transaction(async (tx) => {
+      const cas = await tx.providerMasterDataChangeRequest.updateMany({
+        where: { id, tenantId: actor.tenantId, version: expectedVersion, status: "APPROVED", verifiedAt: null },
+        data: { version: { increment: 1 }, verificationMethod: input.method.trim(), verificationReference: input.reference.trim(), verifiedById: actor.userId, verifiedAt },
+      });
+      if (cas.count === 0) {
+        const cur = await tx.providerMasterDataChangeRequest.findFirst({ where: { id, tenantId: actor.tenantId }, select: { version: true, verifiedAt: true } });
+        if (!cur) throw new MasterDataChangeError("NOT_FOUND", "Change request not found.");
+        if (cur.verifiedAt) throw new MasterDataChangeError("INVALID_STATE", "This change is already verified.");
+        throw new MasterDataChangeError("STALE", "This request changed since you loaded it — refresh and retry.");
+      }
+      await appendEvent(tx, { tenantId: actor.tenantId, changeRequestId: id, audience: "INTERNAL", eventType: "VERIFIED", newStatus: "APPROVED", body: `Out-of-band verification via ${input.method.trim()}.`, actorType: "TPA_USER", actorId: actor.userId });
+      return { version: expectedVersion + 1 };
+    });
+
+    await auditChainService.append({
+      actorId: actor.userId, action: "MASTER_DATA_CHANGE:VERIFY", module: "PROVIDER",
+      entityType: "ProviderMasterDataChangeRequest", entityId: id, tenantId: actor.tenantId,
+      payload: { method: input.method.trim() }, description: `Bank change ${id} independently verified.`, // no account data
+    });
+    return { id, status: "APPROVED", version: result.version, riskLevel: "HIGH" };
+  },
+
+  /**
+   * F7.5 — activate a VERIFIED bank change through the canonical payment-destination
+   * owner. Requires the activate capability, an existing verification (an unverified
+   * change is blocked), and a CLEAR payment window (an imminent/in-flight payment
+   * freezes + escalates). Sets the effective date. Version CAS ⇒ a change activates
+   * at most once. Never touches a full account number.
+   */
+  async activateBankChange(
+    actor: BankChangeActor,
+    id: string,
+    expectedVersion: number,
+    input: { effectiveAt?: Date } = {},
+    deps: { apply?: BankDestinationApplyPort; paymentWindow?: PaymentWindowPort } = {},
+    db: PrismaClient = prisma,
+  ): Promise<MasterDataChangeResult> {
+    if (!actor.permissions.includes(BANK_CHANGE_ACTIVATE_CAP)) throw new MasterDataChangeError("FORBIDDEN", "The bank-change activate capability is required.");
+    const apply = deps.apply ?? defaultBankDestinationApplier;
+    const paymentWindow = deps.paymentWindow ?? defaultPaymentWindowCheck;
+    const row = await db.providerMasterDataChangeRequest.findFirst({ where: { id, tenantId: actor.tenantId }, select: { id: true, category: true, status: true, version: true, providerId: true, verifiedAt: true, verificationReference: true, activatedAt: true } });
+    if (!row) throw new MasterDataChangeError("NOT_FOUND", "Change request not found.");
+    if (row.category !== "BANK") throw new MasterDataChangeError("INVALID", "Only a bank change is activated here.");
+    if (row.status !== "APPROVED") throw new MasterDataChangeError("INVALID_STATE", "Only an approved bank change can be activated.");
+    if (row.activatedAt) throw new MasterDataChangeError("INVALID_STATE", "This change is already activated.");
+    if (!row.verifiedAt || !row.verificationReference) throw new MasterDataChangeError("UNVERIFIED", "This change must be independently verified before activation.");
+
+    // Payment-window freeze/escalation — record the escalation, then block.
+    if (await paymentWindow({ tenantId: actor.tenantId, providerId: row.providerId, db })) {
+      await db.$transaction((tx) => appendEvent(tx, { tenantId: actor.tenantId, changeRequestId: id, audience: "INTERNAL", eventType: "ACTIVATION_FROZEN", body: "Activation blocked — a payment to this provider is imminent or in flight.", actorType: "TPA_USER", actorId: actor.userId }));
+      throw new MasterDataChangeError("FROZEN", "A payment to this provider is imminent or in flight — the change is frozen and escalated.");
+    }
+
+    const effectiveAt = input.effectiveAt ?? new Date();
+    const result = await db.$transaction(async (tx) => {
+      const cas = await tx.providerMasterDataChangeRequest.updateMany({
+        where: { id, tenantId: actor.tenantId, version: expectedVersion, status: "APPROVED", activatedAt: null, verifiedAt: { not: null } },
+        data: { version: { increment: 1 }, activatedAt: new Date(), activatedById: actor.userId, effectiveAt },
+      });
+      if (cas.count === 0) {
+        const cur = await tx.providerMasterDataChangeRequest.findFirst({ where: { id, tenantId: actor.tenantId }, select: { version: true, activatedAt: true } });
+        if (!cur) throw new MasterDataChangeError("NOT_FOUND", "Change request not found.");
+        if (cur.activatedAt) throw new MasterDataChangeError("INVALID_STATE", "This change is already activated.");
+        throw new MasterDataChangeError("STALE", "This request changed since you loaded it — refresh and retry.");
+      }
+      // Activate through the canonical destination owner (verified reference only — no account plaintext).
+      await apply(tx, { tenantId: actor.tenantId, providerId: row.providerId, changeRequestId: id, verificationReference: row.verificationReference!, effectiveAt });
+      await appendEvent(tx, { tenantId: actor.tenantId, changeRequestId: id, audience: "SHARED", eventType: "ACTIVATED", newStatus: "APPROVED", body: "Your bank destination change is now active.", actorType: "TPA_USER", actorId: actor.userId });
+      return { version: expectedVersion + 1 };
+    });
+
+    await auditChainService.append({
+      actorId: actor.userId, action: "MASTER_DATA_CHANGE:ACTIVATE", module: "PROVIDER",
+      entityType: "ProviderMasterDataChangeRequest", entityId: id, tenantId: actor.tenantId,
+      payload: { effectiveAt: effectiveAt.toISOString() }, description: `Bank change ${id} activated.`, // no account data
+    });
+    await NotificationOutboxService.enqueue({
+      tenantId: actor.tenantId, providerId: row.providerId, channel: "IN_APP", eventType: "BANK_CHANGE_ACTIVATED", priority: "HIGH",
+      title: "Bank details updated", body: "Your payment bank destination has been updated and verified.", href: "/provider/profile",
+      metadata: { changeRequestId: id }, dedupeKey: `bank-change-activated:${id}`,
+    }).catch(() => undefined);
+    return { id, status: "APPROVED", version: result.version, riskLevel: "HIGH" };
   },
 
   // ── reads ────────────────────────────────────────────────────────────────
