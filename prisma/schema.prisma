@@ -7727,7 +7727,8 @@ model ProviderIntegrationConnection {
 
   status       ProviderIntegrationStatus @default(DRAFT)
   circuitState IntegrationCircuitState   @default(CLOSED)
-  circuitOpenedAt DateTime? // when OPEN tripped, for cool-down math (F9.6)
+  circuitOpenedAt      DateTime? // when OPEN tripped, for cool-down math (F9.6)
+  consecutiveFailures  Int       @default(0) // F9.7 pull circuit threshold; reset on success
 
   lastSuccessAt DateTime?
   lastFailureAt DateTime?

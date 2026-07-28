@@ -92,6 +92,83 @@ function normalizedHash(rawBody: string): string {
   return createHash("sha256").update(rawBody, "utf8").digest("hex");
 }
 
+/** Same key + same hash → idempotent replay; same key + different hash → conflict. */
+function decideReceipt(
+  existing: { id: string; status: string; normalizedPayloadHash: string; recordCount: number | null },
+  hash: string,
+  connectionId: string,
+): DeliveryReceipt {
+  if (existing.normalizedPayloadHash !== hash) {
+    throw new InboundDeliveryError("CONFLICT", "This idempotency key was already used with a different body.");
+  }
+  return { deliveryId: existing.id, connectionId, status: existing.status, replayed: true, statusUrl: `${STATUS_URL_BASE}/${existing.id}`, recordCount: existing.recordCount };
+}
+
+/**
+ * Shared durable-receipt persist: normalize hash + control totals, then
+ * create/replay/conflict a delivery by (connection, idempotencyKey), concurrency-
+ * safe via the @@unique (P2002 → re-read → decide). Best-effort onAccepted enqueue.
+ * Used by BOTH the PUSH receive() (after caller auth) and the PULL receivePulled()
+ * (after outbound auth) so the durable-receipt semantics are identical on both rails.
+ */
+async function persistDelivery(
+  connection: { id: string; tenantId: string; providerId: string; providerBranchId: string },
+  params: { businessObjectType: string; rawBody: string; idempotencyKey: string; externalBatchRef?: string | null; externalRef?: string | null; recordCount?: number | null; amountTotal?: string | null },
+  deps: ReceiveDeps,
+  now: Date,
+): Promise<DeliveryReceipt> {
+  const hash = normalizedHash(params.rawBody);
+  const recordCount = params.recordCount ?? null;
+  const amountTotal = params.amountTotal ?? null;
+
+  const existing = await prisma.providerIntegrationDelivery.findFirst({
+    where: { connectionId: connection.id, idempotencyKey: params.idempotencyKey },
+    select: { id: true, status: true, normalizedPayloadHash: true, recordCount: true },
+  });
+  if (existing) return decideReceipt(existing, hash, connection.id);
+
+  let created;
+  try {
+    created = await prisma.providerIntegrationDelivery.create({
+      data: {
+        tenantId: connection.tenantId,
+        connectionId: connection.id,
+        providerId: connection.providerId, // server-derived from the connection
+        providerBranchId: connection.providerBranchId,
+        direction: "INBOUND",
+        businessObjectType: params.businessObjectType,
+        externalBatchRef: params.externalBatchRef ?? null,
+        externalRef: params.externalRef ?? null,
+        idempotencyKey: params.idempotencyKey,
+        normalizedPayloadHash: hash,
+        recordCount,
+        amountTotal,
+        status: "ACCEPTED", // durably accepted, ready for processing from DB state (F9.5/F9.6)
+        nextAttemptAt: now,
+        receivedAt: now,
+      },
+      select: { id: true, status: true, recordCount: true },
+    });
+  } catch (e) {
+    if (isUniqueViolation(e)) {
+      const raced = await prisma.providerIntegrationDelivery.findFirst({
+        where: { connectionId: connection.id, idempotencyKey: params.idempotencyKey },
+        select: { id: true, status: true, normalizedPayloadHash: true, recordCount: true },
+      });
+      if (raced) return decideReceipt(raced, hash, connection.id);
+    }
+    throw e;
+  }
+
+  try {
+    await deps.onAccepted?.(created.id);
+  } catch {
+    // swallow — a queue outage must not undo an accepted, durable receipt.
+  }
+
+  return { deliveryId: created.id, connectionId: connection.id, status: created.status, replayed: false, statusUrl: `${STATUS_URL_BASE}/${created.id}`, recordCount: created.recordCount };
+}
+
 export const InboundDeliveryService = {
   STATUS_URL_BASE,
 
@@ -148,89 +225,54 @@ export const InboundDeliveryService = {
       throw new InboundDeliveryError("SCHEMA", "Body is not well-formed JSON.");
     }
 
-    // ── normalize identity/hash/control totals ──────────────────────────────────
-    const hash = normalizedHash(input.rawBody);
-    const recordCount = input.recordCount ?? null;
-    const amountTotal = input.amountTotal !== undefined ? String(input.amountTotal) : null;
+    // ── normalize + create/replay/conflict + durable accept (shared with pull) ──
+    return persistDelivery(
+      connection,
+      {
+        businessObjectType: input.businessObjectType,
+        rawBody: input.rawBody,
+        idempotencyKey: input.idempotencyKey,
+        externalBatchRef: input.externalBatchRef ?? null,
+        externalRef: input.externalRef ?? null,
+        recordCount: input.recordCount ?? null,
+        amountTotal: input.amountTotal !== undefined ? String(input.amountTotal) : null,
+      },
+      deps,
+      now,
+    );
+  },
 
-    // ── create / replay / conflict (concurrency-safe via @@unique) ──────────────
-    const existing = await prisma.providerIntegrationDelivery.findFirst({
-      where: { connectionId: connection.id, idempotencyKey: input.idempotencyKey },
-      select: { id: true, status: true, normalizedPayloadHash: true, recordCount: true },
-    });
-    if (existing) return this.decide(existing, hash, connection.id);
-
-    let created;
-    try {
-      created = await prisma.providerIntegrationDelivery.create({
-        data: {
-          tenantId: connection.tenantId,
-          connectionId: connection.id,
-          providerId: connection.providerId, // server-derived from the connection
-          providerBranchId: connection.providerBranchId,
-          direction: "INBOUND",
-          businessObjectType: input.businessObjectType,
-          externalBatchRef: input.externalBatchRef ?? null,
-          externalRef: input.externalRef ?? null,
-          idempotencyKey: input.idempotencyKey,
-          normalizedPayloadHash: hash,
-          recordCount,
-          amountTotal,
-          // Durably ACCEPTED and ready for processing FROM DB STATE (F9.5/F9.6);
-          // no domain apply here (F9.4 stop).
-          status: "ACCEPTED",
-          nextAttemptAt: now,
-          receivedAt: now,
-        },
-        select: { id: true, status: true, recordCount: true },
-      });
-    } catch (e) {
-      // A concurrent request won the unique race — re-read and decide replay/conflict.
-      if (isUniqueViolation(e)) {
-        const raced = await prisma.providerIntegrationDelivery.findFirst({
-          where: { connectionId: connection.id, idempotencyKey: input.idempotencyKey },
-          select: { id: true, status: true, normalizedPayloadHash: true, recordCount: true },
-        });
-        if (raced) return this.decide(raced, hash, connection.id);
-      }
-      throw e;
+  /**
+   * PNOS F9.7 — durable receipt for a PULLED batch. The pull adapter has already
+   * authenticated OUTBOUND to the partner and fetched the page, so there is no
+   * caller secret / client timestamp to check here; the trust boundary is the
+   * safe outbound transport. Everything else (scope, size, JSON, hash, create/
+   * replay/conflict, durable accept) is identical to the push path — the delivery
+   * is the same durable object either rail produces.
+   */
+  async receivePulled(
+    connection: { id: string; tenantId: string; providerId: string; providerBranchId: string; status: string; scopes: string[]; mode: string },
+    input: { businessObjectType: string; rawBody: string; idempotencyKey: string; externalBatchRef?: string | null; externalRef?: string | null; recordCount?: number | null; amountTotal?: string | null },
+    deps: ReceiveDeps = {},
+  ): Promise<DeliveryReceipt> {
+    const now = deps.now ?? new Date();
+    const maxBodyBytes = deps.maxBodyBytes ?? DEFAULT_MAX_BODY_BYTES;
+    if (connection.status !== "ACTIVE") throw new InboundDeliveryError("INACTIVE", `Connection is ${connection.status}; only ACTIVE connections accept deliveries.`);
+    if (connection.mode === "PUSH") throw new InboundDeliveryError("FORBIDDEN_SCOPE", "A PUSH connection is not pulled.");
+    if (connection.scopes.length > 0 && !connection.scopes.includes(input.businessObjectType)) {
+      throw new InboundDeliveryError("FORBIDDEN_SCOPE", `This connection is not scoped for ${input.businessObjectType}.`);
     }
-
-    // Best-effort fast-path enqueue; the delivery is already durable if this throws.
+    if (Buffer.byteLength(input.rawBody ?? "", "utf8") > maxBodyBytes) throw new InboundDeliveryError("OVERSIZE", "Fetched body exceeds the maximum size.");
     try {
-      await deps.onAccepted?.(created.id);
+      JSON.parse(input.rawBody);
     } catch {
-      // swallow — a queue outage must not undo an accepted, durable receipt.
+      throw new InboundDeliveryError("SCHEMA", "Fetched body is not well-formed JSON.");
     }
-
-    return {
-      deliveryId: created.id,
-      connectionId: connection.id,
-      status: created.status,
-      replayed: false,
-      statusUrl: `${STATUS_URL_BASE}/${created.id}`,
-      recordCount: created.recordCount,
-    };
+    return persistDelivery(connection, input, deps, now);
   },
 
   /** Same key + same hash → idempotent replay; same key + different hash → conflict. */
-  decide(
-    existing: { id: string; status: string; normalizedPayloadHash: string; recordCount: number | null },
-    hash: string,
-    connectionId: string,
-  ): DeliveryReceipt {
-    if (existing.normalizedPayloadHash !== hash) {
-      throw new InboundDeliveryError("CONFLICT", "This idempotency key was already used with a different body.");
-    }
-    return {
-      deliveryId: existing.id,
-      connectionId,
-      status: existing.status,
-      replayed: true,
-      statusUrl: `${STATUS_URL_BASE}/${existing.id}`,
-      recordCount: existing.recordCount,
-    };
-  },
+  decide: decideReceipt,
 
   /**
    * Read a delivery's safe receipt for the status URL. Scoped to its connection
