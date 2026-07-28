@@ -2468,3 +2468,31 @@ Stop condition observed: yes — ONE object type (CASE_SERVICE) mapped through t
 ```
 
 ---
+
+## F9.6 — Implement retry, poison quarantine, and sweeper
+
+```text
+Work package: F9.6 (phase F9 — HMS integration control plane)
+Status: COMPLETE. Retryable deliveries recover with backoff + a durable lease; poison/exhausted deliveries quarantine visibly without blocking others; a sweeper + an authorized manual retry drain durable state. NO outbound pull (F9.6 stop).
+Commit: this feat commit (DeliveryRetryService + test) + the paired docs commit (this note + PROGRESS row).
+Proof-before-build classification: MISSING (no retry/lease/sweeper) but ALL fields exist — the F9.2 delivery carries attemptCount/maxAttempts/nextAttemptAt/leaseOwner/leaseExpiresAt/quarantineReason and the ProviderIntegrationAttempt ledger. Files inspected: the F9.2 delivery/attempt models, the F9.5 processor (the retry UNIT + its RETRYING classification), src/lib/safe-action-error.ts (looksLowLevel), the F9.3 access guards (manual-retry permission). Smallest change: one service over the existing fields; NO schema. No CONFLICTING path.
+Files changed: src/server/services/provider-integration/delivery-retry.service.ts (new); tests/services/provider-integration-retry.service.test.ts (new — 1 pure + 7 DB); docs PROGRESS + this note.
+Schema/data changes: NONE — uses the F9.2 lease/attempt/backoff fields.
+Behavior delivered (the 6 plan steps): (1) safe retry classification (looksLowLevel infra ⇒ retry; deterministic business failure ⇒ poison) + exponential backoff (backoffMs: 30s×2^(n-1), capped 1h) + maxAttempts (from the delivery); (2) a DURABLE lease — acquireLease is an atomic compare-and-set (conditional updateMany: claim when free/expired/mine) so one worker processes a delivery at a time and a crashed worker's lease is reclaimed after expiry; (3) retry idempotently — runAttempt wraps the F9.5 processor whose per-record results already make canonical effects once; (4) quarantine — a fatal/poison attempt or attempt-exhaustion sets status QUARANTINED with a SAFE reason (never a raw body); (5) sweep — drains ACCEPTED/RETRYING deliveries whose nextAttemptAt is due and whose lease is free/expired: exhausted ones quarantine, the rest surface as retry-due (because no raw body is retained, the sweeper does NOT re-fetch a PUSH body — that is a client re-POST / manual retry / the F9.7 PULL re-fetch); (6) manualRetry — permission-gated (provider.integrations.manage) + provider-scoped ownership (foreign delivery ⇒ safe NOT_FOUND); resets a stuck delivery to ACCEPTED and re-drives it through the standard lease/attempt lifecycle with a RE-SUPPLIED body.
+Authorization evidence: manualRetry requirePermission + ownership (a provider-B actor is refused NOT_FOUND for a provider-A delivery — proven). The sweeper is a system job (no external actor).
+Idempotency/concurrency evidence: the lease is an atomic CAS — a second live worker is refused (acquireLease false; runAttempt returns "skipped"), and a crashed worker's lease is reclaimed only after expiry (proven). Manual retry re-drives idempotently — an already-applied record REPLAYS, so a re-drive of a processed delivery adds ZERO canonical entries (proven). The attempt ledger is append-only + ordered (F9.2 @@unique).
+Idempotency/concurrency evidence (retry lifecycle): a retryable attempt records the attempt (retryable=true, resultClass) + schedules nextAttemptAt = now+backoff + RETRYING; at the ceiling it QUARANTINES (retryable=false, "exhausted"); a fatal attempt QUARANTINES immediately. All proven.
+Privacy/security evidence: attempts store a SAFE result class + error code only (no raw body/secret); quarantine reasons are safe strings. The sweeper never fetches or logs a body.
+Money/reconciliation evidence: N/A — no money; the canonical financial effects are the F9.5 processor's (idempotent).
+Focused tests and results: 1 pure (deterministic capped backoff) + 7 DB (lease + crash-expiry reclaim; skip when leased; retryable attempt + backoff + attempt-ledger row; exhaustion ⇒ QUARANTINED with 3 attempts; fatal ⇒ immediate QUARANTINED; sweep quarantines exhausted + surfaces retry-due + leaves not-due; manual retry re-drives idempotently [no duplicate entry] + foreign-provider NOT_FOUND). 8/8 pass on the throwaway PG; self-skip without AUTOPILOT_TEST_DB. Co-run of all 5 integration suites: 40/40 together. tsc clean; brand + currency green; full no-DB suite 1533 pass / 452 skip (no regression).
+Typecheck/schema result: tsc --noEmit clean; no schema change.
+Manual/visual evidence: N/A — service only; the ops view that shows attempts/retries + drives manual retry is F9.8.
+Feature-flag state: none — the sweeper is not yet scheduled (no cron entry added); it is invoked explicitly/tested. Wiring it into the daily/interval scheduler is an ops step (like the F4.10 sweeper) — deferred with F9.8/F9.9 so a half-built pull path isn't swept prematurely.
+Backfill/rollout impact: none.
+Known limitations / deferrals (flagged): (a) the sweeper does NOT re-drive PUSH deliveries (no retained body) — it manages lease/quarantine + surfaces retry-due; autonomous re-drive is the F9.7 PULL re-fetch or a client re-POST; (b) the retry UNIT is the CASE_SERVICE processor (F9.5's one object type) — other types plug in the same way; (c) no scheduler entry yet (F9.8/F9.9); (d) backoff is deterministic (no jitter) for testability — jitter is a trivial refinement.
+Unrelated worktree changes preserved: yes — worktree contained only scratchpad/ (untracked) + the F9.6 files; the main-checkout dirty UAT files untouched; no schema change.
+Next allowed package: F9.7 — Implement one contracted outbound pull adapter (L; split transport/mapping/activation). GATED on a signed sample contract + sandbox; the buildable part is the SSRF-safe transport (runtime DNS-rebind resolution — closes the F9.3/F9.4 form-only limitation), timeouts/body caps/pagination, cursor persisted only past a durable-accepted boundary, mapping via F9.5, bounded retry/circuit, source↔target reconciliation, sandbox replay/failure tests. Activation of a real pilot connection stays GATED. Stop: after one connector; no generic protocol engine.
+Stop condition observed: yes — retry/lease/backoff/quarantine/sweeper/manual-retry delivered; NO outbound pull, NO schema change.
+```
+
+---
