@@ -63,8 +63,8 @@ describe("F1.4 computeProviderNav", () => {
   });
 
   it("never emits an unfinished route", () => {
-    // NOTE: /provider/preauth (F3.8) and /provider/inbox (F4.7) are now FINISHED routes — removed from forbidden.
-    const forbidden = ["/provider/payment-queries", "/provider/contracts", "/provider/performance", "/provider/profile", "/provider/users", "/provider/integrations"];
+    // NOTE: /provider/preauth (F3.8), /provider/inbox (F4.7), /provider/payment-queries (F6.11) are now FINISHED — removed from forbidden.
+    const forbidden = ["/provider/contracts", "/provider/performance", "/provider/profile", "/provider/users", "/provider/integrations"];
     // even a super-broad permission set only yields existing routes
     const allPerms = PROVIDER_NAV_DEFINITIONS.map((d) => d.requiredPermission).filter(Boolean) as string[];
     const h = hrefs(allPerms);

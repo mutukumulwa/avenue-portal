@@ -88,4 +88,14 @@ describe.skipIf(!URL_SET)("F6.10 ProviderPaymentQueryService (opt-in DB)", () =>
     await expect(Svc.acknowledge(finance(), q2.id, q2.version + 9)).rejects.toMatchObject({ code: "STALE" });
     await expect(Svc.acknowledge({ userId: "u", tenantId: world.tenants.alpha.id, role: "PROVIDER_USER" }, q2.id, q2.version)).rejects.toBeInstanceOf(Err);
   });
+
+  it("F6.11 finance reads: listForFinance/getForFinance are role-gated and carry the full row", async () => {
+    const q = await Svc.raise(ctxA(), { settlementBatchId: batchId, category: "OTHER", narrative: "for finance queue" });
+    const list = await Svc.listForFinance(finance());
+    expect(list.some((x) => x.id === q.id)).toBe(true);
+    const full = await Svc.getForFinance(finance(), q.id);
+    expect(full!.messages.length).toBeGreaterThanOrEqual(1); // finance sees all messages incl. internal
+    expect(full!.version).toBeGreaterThanOrEqual(1);
+    await expect(Svc.listForFinance({ userId: "u", tenantId: world.tenants.alpha.id, role: "PROVIDER_USER" })).rejects.toBeInstanceOf(Err);
+  });
 });

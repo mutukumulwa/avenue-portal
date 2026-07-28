@@ -178,12 +178,27 @@ export const ProviderPaymentQueryService = {
     ProviderAccessService.requirePermission(ctx, PAYMENT_QUERY_PERMISSION);
     const row = await db.providerPaymentQuery.findFirst({ where: { id, tenantId: ctx.tenantId, providerId: ctx.providerId }, include: { messages: { orderBy: { sequence: "asc" } } } });
     if (!row) return null;
-    return { query: toProviderPaymentQueryProjection(row), timeline: toProviderPaymentQueryTimeline(row.messages) };
+    // version is a concurrency token (not sensitive) — the detail page needs it for the guarded actions.
+    return { query: toProviderPaymentQueryProjection(row), version: row.version, timeline: toProviderPaymentQueryTimeline(row.messages) };
   },
   async listForProvider(ctx: ProviderAccessContext, db: PrismaClient = prisma) {
     ProviderAccessService.requirePermission(ctx, PAYMENT_QUERY_PERMISSION);
     const rows = await db.providerPaymentQuery.findMany({ where: { tenantId: ctx.tenantId, providerId: ctx.providerId }, orderBy: { createdAt: "desc" }, take: 200 });
     return rows.map(toProviderPaymentQueryProjection);
+  },
+
+  // ── finance reads (operator; full row incl. internal — the caller gates the role) ──
+  async listForFinance(actor: FinanceActor, opts: { status?: PaymentQueryStatus } = {}, db: PrismaClient = prisma) {
+    assertFinance(actor);
+    return db.providerPaymentQuery.findMany({
+      where: { tenantId: actor.tenantId, ...(opts.status ? { status: opts.status } : {}) },
+      orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+      take: 300,
+    });
+  },
+  async getForFinance(actor: FinanceActor, id: string, db: PrismaClient = prisma) {
+    assertFinance(actor);
+    return db.providerPaymentQuery.findFirst({ where: { id, tenantId: actor.tenantId }, include: { messages: { orderBy: { sequence: "asc" } } } });
   },
 } as const;
 

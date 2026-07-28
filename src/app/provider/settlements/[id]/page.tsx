@@ -4,6 +4,7 @@ import { ArrowLeft, Banknote, FileText, CheckCircle2, AlertTriangle, Download } 
 import { ProviderAccessService, isProviderAccessError } from "@/server/services/provider-access.service";
 import { ProviderAccessSettingsService } from "@/server/services/provider-access-settings.service";
 import { ProviderRemittanceService, isProviderRemittanceError, REMITTANCE_EXPORT_PERMISSION } from "@/server/services/provider-remittance/service";
+import { PAYMENT_QUERY_PERMISSION } from "@/server/services/provider-payment-query/service";
 import type { RemittanceClaim } from "@/server/services/provider-remittance/projection";
 import { buildRemittancePdfData } from "./remittance-pdf";
 import { RemittancePdfButton } from "./RemittancePdfButton";
@@ -77,6 +78,14 @@ export default async function ProviderSettlementDetail({ params }: { params: Pro
             >
               <Download size={15} /> Export CSV
             </a>
+          )}
+          {ProviderAccessService.hasPermission(ctx, PAYMENT_QUERY_PERMISSION) && (
+            <Link
+              href={`/provider/payment-queries/new?batch=${batch.id}`}
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-text-muted border border-[#DDDDDD] rounded-lg px-3 py-1.5 hover:bg-[#F8F9FA]"
+            >
+              Query a payment
+            </Link>
           )}
         </div>
       </div>

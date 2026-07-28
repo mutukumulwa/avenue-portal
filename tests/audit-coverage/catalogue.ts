@@ -31,6 +31,14 @@ export const KNOWN_AUDITING_TOKENS = [
   "ClaimReplacementService.replace(", // PNOS F5.7/F5.8 — hash-chain audits CLAIM:REPLACE internally
   "ClaimResubmissionService.submit(", // PNOS F5.10 — hash-chain audits CLAIM:RESUBMIT internally
   "ClaimReconsiderationService.submit(", // PNOS F5.12/F5.13 — hash-chain audits RECONSIDERATION:SUBMIT internally
+  // PNOS F6.11 — payment-query actions delegate to a service that hash-chain audits PAYMENT_QUERY:* internally.
+  "ProviderPaymentQueryService.raise(",
+  "ProviderPaymentQueryService.respondToInformation(",
+  "ProviderPaymentQueryService.withdraw(",
+  "ProviderPaymentQueryService.acknowledge(",
+  "ProviderPaymentQueryService.requestInformation(",
+  "ProviderPaymentQueryService.resolve(",
+  "ProviderPaymentQueryService.reject(",
 
   "preauthAdjudicationService.",
   "claimAdjudicationService.createSettlementBatch(",

@@ -38,6 +38,7 @@ export const PROVIDER_NAV_DEFINITIONS: ProviderNavDefinition[] = [
   { key: "claims", label: "Claims", href: "/provider/claims", iconKey: "claims", group: "Claims", requiredPermission: "provider.claim.read" },
   { key: "new-claim", label: "New Claim", href: "/provider/claims/new", iconKey: "new-claim", group: "Claims", requiredPermission: "provider.claim.create" },
   { key: "settlements", label: "Settlements", href: "/provider/settlements", iconKey: "settlements", group: "Finance", requiredPermission: "provider.settlement.read" },
+  { key: "payment-queries", label: "Payment queries", href: "/provider/payment-queries", iconKey: "settlements", group: "Finance", requiredPermission: "provider.payment_query.manage" },
   { key: "api-keys", label: "API Keys", href: "/provider/api-keys", iconKey: "api-keys", group: "Administration", requiredPermission: "provider.api_keys.manage" },
 ];
 
