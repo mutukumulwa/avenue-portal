@@ -2523,3 +2523,30 @@ Stop condition observed: yes — one connector's transport + orchestration + rec
 ```
 
 ---
+
+## F9.8 — Build provider/admin integration operations views
+
+```text
+Work package: F9.8 (phase F9 — HMS integration control plane; read models + UI)
+Status: COMPLETE. Authorized providers see connection health + delivery/attempt/reconciliation detail (safe projections) and drive lifecycle actions (pause/resume/disable + manual retry) — all permission + provider + branch scoped. Read-only on domain data (F9.8 stop).
+Commit: this feat commit (read service + page + actions + nav + audit + tests) + the paired docs commit (this note + PROGRESS row).
+Proof-before-build classification: MISSING (no ops read models / views). Reuses F9.3 (pause/resume/disable), F9.6 (manualRetry), and the F8.5/F7.6 page + nav conventions. Files inspected: provider-nav-model.ts + ProviderNav.tsx (icon map), provider/performance/page.tsx (auth pattern), tests/audit-coverage (the action-audit gate). Smallest change: one read service + one page + one actions file + the nav item + the audit tokens. No CONFLICTING path.
+Files changed: src/server/services/provider-integration/ops-read.service.ts (new — the read models); src/app/provider/integrations/{page.tsx, actions.ts} (new); src/components/layouts/provider-nav-model.ts + ProviderNav.tsx (Integrations nav item + Cable icon); src/server/services/provider-integration/delivery-retry.service.ts (manualRetry now writes INTEGRATION_DELIVERY:MANUAL_RETRY audit); tests/audit-coverage/catalogue.ts (+ 2 auditing tokens); tests/components/provider-nav-model.test.ts (integrations now FINISHED + a positive test); tests/services/provider-integration-ops-read.service.test.ts (new — 7 DB); docs PROGRESS + this note.
+Schema/data changes: NONE.
+Behavior delivered (the 6 plan steps): (1) scoped health + delivery read models — listConnectionHealth (per-connection status/circuit/last-success-failure + delivery counts by status + retry-due) + listDeliveries (bounded, cursor-paginated) + getDeliveryDetail (attempts + record results + reconciliation); (2) status/counts/timestamps + attempt resultClass/safeErrorCode + a next-action hint per delivery; (3) manual-retry + pause/resume/disable exposed ONLY via permission-gated server actions (the underlying services enforce provider.integrations.manage + ownership); (4) the detail links the canonical result receipts (canonicalEntityType/Id + canonicalReceiptRef per record); (5) EXCLUDES raw payload, normalizedPayloadHash, idempotencyKey, leaseOwner, secret, and headers from every projection (proven by a negative-property test); (6) the page surfaces a safe-codes-only note (alerts/runbooks are an ops-doc follow-up).
+Authorization evidence: every read requirePermission(provider.integrations.manage); deliveries are provider-scoped and branch-filtered server-side (a branch-a1 actor does NOT see a branch-a2 delivery — proven); getDeliveryDetail is non-enumerating (another provider's delivery → null — proven); no-permission → FORBIDDEN_PERMISSION (proven). The page redirects FORBIDDEN → /unauthorized.
+Idempotency/concurrency evidence: reads are idempotent; the actions delegate to the idempotent F9.3/F9.6 services; manualRetry re-drive is idempotent (F9.6).
+Privacy/security evidence: THE leakage guard — no list item or detail carries a payload/hash/idempotencyKey/leaseOwner/secret (proven by asserting the absence of every forbidden key). Attempt rows expose only resultClass + safeErrorCode (no raw body/header). This is the §8.12 step-11 provider-facing operational status without secrets/PHI.
+Money/reconciliation evidence: the detail's reconciliation block surfaces records vs applied/rejected/quarantined/replayed from the delivery aggregate (the F9.5 conserved totals) — a read, no recompute.
+Focused tests and results: 7 DB (permission gate; provider scope + non-enumerating foreign detail; branch restriction; no-secret/no-raw-body projection; bounded pagination with a stable non-overlapping cursor; connection-health rollup incl. retry-due; detail with attempts + records + reconciliation) + the nav positive test + audit-coverage (the 2 new tokens keep the actions green). All pass; ops-read self-skips without AUTOPILOT_TEST_DB. All 7 integration suites co-run 52/52. tsc + brand + currency green; full no-DB suite 1540 pass / 464 skip.
+Typecheck/schema result: tsc --noEmit clean; no schema change.
+Manual/visual evidence: N/A — the worktree has no seeded provider session (the F3.7+ convention); the page + actions are server-authorized and the read service is unit-tested. Browser verification lands against a seeded env with the cap granted.
+Feature-flag state: none — permission-gated (provider.integrations.manage). The nav item + page appear once the cap is granted.
+Backfill/rollout impact: none.
+Known limitations / deferrals (flagged): (a) no in-worktree browser verification (env); (b) alerts/runbooks are an operations-doc follow-up (the page shows next-action hints; a paging/alerting integration is out of scope); (c) the manual-retry action needs a re-supplied body (a stored body is never retained) — the UI wiring to capture/re-POST the body is a refinement; (d) an admin (TPA) cross-provider ops view reuses this read model with an operator scope — a thin add when the TPA integration console lands.
+Unrelated worktree changes preserved: yes — worktree contained only scratchpad/ (untracked) + the F9.8 files; the main-checkout dirty UAT files untouched; no schema change.
+Next allowed package: F9.9 — Cut over legacy HMS configuration/path (M). GATED on pilot sign-off. Buildable: map existing IntegrationConfig→connection with reviewed input; a dual/shadow delivery comparison (no double domain mutation); reconcile counts/results; a switch-one-connection-behind-a-flag mechanism (default OFF); a rollback drill; retire the legacy write path only after all connections. NO real production flag flip (gated). Stop: no schema deletion.
+Stop condition observed: yes — the ops read models + views + permission-gated actions delivered; NO domain-data editing.
+```
+
+---
