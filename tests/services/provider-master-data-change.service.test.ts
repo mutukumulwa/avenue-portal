@@ -173,4 +173,15 @@ describe.skipIf(!URL_SET)("F7.4 ProviderMasterDataChangeService (opt-in DB)", ()
     const sub = await Svc.submit(ctxA(), { category: "CONTACT", proposed: { phone: "0722000000" }, idempotencyKey: "role-1" });
     await expect(Svc.startReview({ userId: world.users.a.admin.id, tenantId: world.tenants.alpha.id, role: "PROVIDER_USER" }, sub.id, sub.version)).rejects.toMatchObject({ code: "FORBIDDEN" });
   });
+
+  // ── F7.6: masked profile read ───────────────────────────────────────────────
+  it("getMaskedProfile masks the bank reference and requires provider.profile.read", async () => {
+    await prisma.provider.update({ where: { id: world.providers.a.id }, data: { bankDetailsRef: "SECRET-REF-1234" } });
+    const profile = (await Svc.getMaskedProfile(ctxA({ permissions: ["provider.profile.read"] })))!;
+    expect(profile.bank.reference).toBe("••••1234");
+    expect(JSON.stringify(profile)).not.toContain("SECRET-REF-1234");
+    expect(profile.identity.name).toContain("Provider A");
+    expect("phone" in profile.contact).toBe(true);
+    await expect(Svc.getMaskedProfile(ctxA({ permissions: [] }))).rejects.toBeInstanceOf(ProviderAccessError);
+  });
 });

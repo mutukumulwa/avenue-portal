@@ -13,6 +13,7 @@ import {
   FilePlus2,
   Banknote,
   ScrollText,
+  IdCard,
   KeyRound,
   LogOut,
   type LucideIcon,
@@ -31,6 +32,7 @@ const ICONS: Record<ProviderNavIconKey, LucideIcon> = {
   "new-claim": FilePlus2,
   settlements: Banknote,
   contracts: ScrollText,
+  profile: IdCard,
   "api-keys": KeyRound,
 };
 

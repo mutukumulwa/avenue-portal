@@ -8,6 +8,7 @@ import {
   buildCurrentSnapshot,
   canTransitionMasterData,
   isMasterDataTerminal,
+  maskSensitive,
   projectProposedValues,
   requiresMakerChecker,
   PROVIDER_WITHDRAWABLE_MASTER_DATA,
@@ -27,6 +28,7 @@ import {
  */
 
 export const MASTER_DATA_CHANGE_PERMISSION = "provider.profile.change_request";
+export const MASTER_DATA_READ_PERMISSION = "provider.profile.read";
 // Operator-only review (§ "provider master-data activation without permission" is prohibited).
 const MASTER_DATA_REVIEWER_ROLES = ["SUPER_ADMIN"];
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -466,6 +468,24 @@ export const ProviderMasterDataChangeService = {
     const rows = await db.providerMasterDataChangeRequest.findMany({ where: { tenantId: ctx.tenantId, providerId: ctx.providerId }, orderBy: { createdAt: "desc" }, take: 200 });
     return rows.map(toProviderProjection);
   },
+  /** F7.6 — the provider's own current profile, safe + masked (bank reference masked, no plaintext). */
+  async getMaskedProfile(ctx: ProviderAccessContext, db: PrismaClient = prisma) {
+    ProviderAccessService.requirePermission(ctx, MASTER_DATA_READ_PERMISSION);
+    const provider = await db.provider.findFirst({
+      where: { id: ctx.providerId, tenantId: ctx.tenantId },
+      select: { name: true, legalName: true, type: true, tier: true, ...PROVIDER_SNAPSHOT_SELECT },
+    });
+    if (!provider) return null;
+    const branches = await db.providerBranch.findMany({ where: { providerId: ctx.providerId, tenantId: ctx.tenantId }, select: { id: true, name: true, code: true, address: true, county: true, isActive: true }, orderBy: { name: "asc" } });
+    return {
+      identity: { name: provider.name, legalName: provider.legalName, type: provider.type, tier: provider.tier },
+      contact: buildCurrentSnapshot("CONTACT", provider as Record<string, unknown>),
+      credential: buildCurrentSnapshot("CREDENTIAL", provider as Record<string, unknown>),
+      bank: { reference: provider.bankDetailsRef ? maskSensitive(provider.bankDetailsRef) : null },
+      branches,
+    };
+  },
+
   // Reviewer reads carry the full row incl. INTERNAL events — the caller gates the role.
   async listForReviewer(reviewer: MasterDataReviewer, opts: { status?: MasterDataChangeStatus } = {}, db: PrismaClient = prisma) {
     assertReviewer(reviewer);
