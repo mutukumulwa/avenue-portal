@@ -248,4 +248,38 @@ describe.skipIf(!URL_SET)("F6.2 ProviderRemittanceService (opt-in DB)", () => {
       expect((p as unknown as Record<string, unknown>).admin).toBeUndefined();
     });
   });
+
+  // ── F6.5: authorized CSV export ────────────────────────────────────────────
+  describe("F6.5 exportBatchCsv", () => {
+    const ctxExport = (over: Partial<Ctx> = {}) => ctxA({ permissions: ["provider.settlement.read", "provider.settlement.export"], ...over });
+
+    it("requires provider.settlement.export (read alone ⇒ FORBIDDEN)", async () => {
+      await expect(Svc.exportBatchCsv(ctxA(), e4.batch.id)).rejects.toBeInstanceOf(ProviderAccessError);
+    });
+
+    it("exports the batch and its totals match the read model", async () => {
+      const { filename, csv, evidence } = await Svc.exportBatchCsv(ctxExport(), e4.batch.id);
+      expect(filename).toMatch(/^remittance-2026-07-.*\.csv$/);
+      expect(csv.startsWith("﻿")).toBe(true);
+      const read = await Svc.getBatchRemittance(ctxExport(), e4.batch.id);
+      expect(evidence.totals.approved).toBe(read.conservation.sumLinePayable); // page/export totals match
+      expect(evidence.rowCount).toBe(3); // E4 has 3 lines
+      expect(evidence.checksum).toMatch(/^[0-9a-f]{64}$/);
+    });
+
+    it("pagination omits no rows: a tiny pageSize still exports every claim", async () => {
+      // pageBatch has 3 claims × 1 line; page the read model 2-at-a-time.
+      const { evidence } = await Svc.exportBatchCsv(ctxExport(), pageBatch.batch.id, { pageSize: 2 });
+      expect(evidence.rowCount).toBe(3);
+    });
+
+    it("cross-provider: export of another provider's batch ⇒ NOT_FOUND", async () => {
+      await expect(Svc.exportBatchCsv(ctxExport({ actorId: world.users.b.id, providerId: world.providers.b.id }), e4.batch.id))
+        .rejects.toMatchObject({ code: "NOT_FOUND" });
+    });
+
+    it("unknown id ⇒ NOT_FOUND", async () => {
+      await expect(Svc.exportBatchCsv(ctxExport(), "missing")).rejects.toMatchObject({ code: "NOT_FOUND" });
+    });
+  });
 });

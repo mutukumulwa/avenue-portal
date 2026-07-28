@@ -10,6 +10,9 @@ import {
   type RemittanceBatchHeader,
   type RemittanceClaim,
 } from "./projection";
+import { buildRemittanceCsv, type RemittanceCsvEvidence } from "./csv";
+
+export const REMITTANCE_EXPORT_PERMISSION = "provider.settlement.export";
 
 /**
  * PNOS F6.2/F6.3 — canonical ProviderRemittanceService.
@@ -271,6 +274,39 @@ export const ProviderRemittanceService = {
     };
 
     return { ...result, admin };
+  },
+
+  /**
+   * F6.5 — authorized CSV remittance export, derived from the SAME view model.
+   * Requires provider.settlement.export (and, via the reused read, settlement.read).
+   * Fetches EVERY claim by paging the read model to exhaustion — pagination never
+   * omits a row. Returns the CSV + evidence (row count, totals, sha256 checksum);
+   * the caller (route) sets the download headers and audits the egress. Async job
+   * / stored-artifact-with-expiry is a deferred scale concern (see the log).
+   */
+  async exportBatchCsv(
+    ctx: ProviderAccessContext,
+    batchId: string,
+    opts: { pageSize?: number } = {},
+    db: Db = prisma,
+  ): Promise<{ filename: string; csv: string; evidence: RemittanceCsvEvidence }> {
+    ProviderAccessService.requirePermission(ctx, REMITTANCE_EXPORT_PERMISSION);
+    const pageSize = Math.min(MAX_PAGE_SIZE, Math.max(1, Math.trunc(opts.pageSize ?? MAX_PAGE_SIZE)));
+
+    // getBatchRemittance also enforces settlement.read + provider scope + NOT_FOUND.
+    const first = await ProviderRemittanceService.getBatchRemittance(ctx, batchId, { page: 1, pageSize }, db);
+    const claims = [...first.claims];
+    let page = 1;
+    while (claims.length < first.page.totalClaims) {
+      page += 1;
+      const next = await ProviderRemittanceService.getBatchRemittance(ctx, batchId, { page, pageSize }, db);
+      if (next.claims.length === 0) break; // safety against a shrinking batch mid-read
+      claims.push(...next.claims);
+    }
+
+    const { csv, evidence } = buildRemittanceCsv({ batch: first.batch, claims, conservation: first.conservation });
+    const filename = `remittance-${first.batch.cycleYear}-${String(first.batch.cycleMonth).padStart(2, "0")}-${batchId.slice(0, 8)}.csv`;
+    return { filename, csv, evidence };
   },
 
   /**

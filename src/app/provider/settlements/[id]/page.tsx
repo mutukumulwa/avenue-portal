@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, Banknote, FileText, CheckCircle2, AlertTriangle } from "lucide-react";
+import { ArrowLeft, Banknote, FileText, CheckCircle2, AlertTriangle, Download } from "lucide-react";
 import { ProviderAccessService, isProviderAccessError } from "@/server/services/provider-access.service";
 import { ProviderAccessSettingsService } from "@/server/services/provider-access-settings.service";
-import { ProviderRemittanceService, isProviderRemittanceError } from "@/server/services/provider-remittance/service";
+import { ProviderRemittanceService, isProviderRemittanceError, REMITTANCE_EXPORT_PERMISSION } from "@/server/services/provider-remittance/service";
 import type { RemittanceClaim } from "@/server/services/provider-remittance/projection";
 
 /**
@@ -44,22 +44,33 @@ export default async function ProviderSettlementDetail({ params }: { params: Pro
   const MONTHS = ["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const cycle = `${MONTHS[batch.cycleMonth] ?? batch.cycleMonth} ${batch.cycleYear}${batch.sequence > 1 ? ` · Run ${batch.sequence}` : ""}`;
   const claimsCapped = claims.length < page.totalClaims;
+  const canExport = ProviderAccessService.hasPermission(ctx, REMITTANCE_EXPORT_PERMISSION);
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-3">
-        <Link href="/provider/settlements" className="text-brand-text-muted hover:text-brand-indigo transition-colors" aria-label="Back to settlements">
-          <ArrowLeft size={20} />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-bold text-brand-text-heading font-heading flex items-center gap-2">
-            <Banknote size={22} /> Remittance — {cycle}
-          </h1>
-          <p className="text-sm text-brand-text-muted mt-0.5">
-            Status: <span className="font-semibold">{batch.status.replace(/_/g, " ")}</span>
-            {batch.settledAt ? ` · settled ${fmtDate(batch.settledAt)}` : ""}
-          </p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Link href="/provider/settlements" className="text-brand-text-muted hover:text-brand-indigo transition-colors" aria-label="Back to settlements">
+            <ArrowLeft size={20} />
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold text-brand-text-heading font-heading flex items-center gap-2">
+              <Banknote size={22} /> Remittance — {cycle}
+            </h1>
+            <p className="text-sm text-brand-text-muted mt-0.5">
+              Status: <span className="font-semibold">{batch.status.replace(/_/g, " ")}</span>
+              {batch.settledAt ? ` · settled ${fmtDate(batch.settledAt)}` : ""}
+            </p>
+          </div>
         </div>
+        {canExport && (
+          <a
+            href={`/provider/settlements/${batch.id}/export`}
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-indigo border border-brand-indigo/30 rounded-lg px-3 py-1.5 hover:bg-brand-indigo/5"
+          >
+            <Download size={15} /> Export CSV
+          </a>
+        )}
       </div>
 
       {/* Summary: total / voucher / payment facts */}
