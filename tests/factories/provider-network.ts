@@ -553,6 +553,8 @@ export async function buildProviderWorld(prisma: Prisma, opts: BuildOptions = {}
     // F7.4: master-data change events (FK → request) then requests (relation-less to Provider/Tenant).
     await prisma.providerMasterDataChangeEvent.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.providerMasterDataChangeRequest.deleteMany({ where: { tenantId: { in: tenantIds } } });
+    // F7.7: improvement plans (actions + updates cascade on plan delete).
+    await prisma.providerImprovementPlan.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.providerSettlementBatch.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.paymentVoucher.deleteMany({ where: { tenantId: { in: tenantIds } } });
     if (createdJournalIds.length > 0) {

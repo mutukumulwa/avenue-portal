@@ -7454,3 +7454,86 @@ model ProviderMasterDataChangeEvent {
   @@unique([changeRequestId, sequence])
   @@index([tenantId, changeRequestId, createdAt])
 }
+
+// PNOS F7.7 — provider network improvement plan (spec §12; D21 advisory). A
+// human-owned plan AGREED between a named network manager and the provider:
+// objectives, actions/milestones, evidence, and a SHARED-vs-INTERNAL update log.
+// It is ADVISORY ONLY — it NEVER mutates a rate, tier, contract, or provider
+// status (no automated sanctions; §0 prohibited). Relation-less to Provider/Tenant.
+enum ImprovementPlanStatus {
+  DRAFT
+  ACTIVE
+  ACHIEVED
+  CLOSED
+  CANCELLED
+}
+
+enum ImprovementActionStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+  BLOCKED
+}
+
+enum ImprovementOwnerRole {
+  NETWORK
+  PROVIDER
+}
+
+model ProviderImprovementPlan {
+  id                String                @id @default(cuid())
+  tenantId          String
+  providerId        String
+  title             String
+  objective         String
+  // Free-text / metric-id reference to a baseline measure. F8 metrics are stubbed
+  // here (§ "F8 metric definitions may be stubbed") — there is NO scoring engine.
+  baselineMetricRef String?
+  networkOwnerId    String? // named network manager (operator)
+  providerOwnerId   String? // named provider owner
+  status            ImprovementPlanStatus @default(DRAFT)
+  startDate         DateTime?
+  targetDate        DateTime?
+  createdById       String?
+  version           Int      @default(1)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  actions ProviderImprovementAction[]
+  updates ProviderImprovementUpdate[]
+
+  @@index([tenantId, providerId])
+  @@index([tenantId, status])
+}
+
+model ProviderImprovementAction {
+  id                  String                  @id @default(cuid())
+  tenantId            String
+  planId              String
+  plan                ProviderImprovementPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  description         String
+  ownerRole           ImprovementOwnerRole    @default(PROVIDER)
+  dueDate             DateTime?
+  status              ImprovementActionStatus @default(OPEN)
+  evidenceDocumentIds String[]                @default([])
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  @@index([tenantId, planId])
+}
+
+model ProviderImprovementUpdate {
+  id        String                  @id @default(cuid())
+  tenantId  String
+  planId    String
+  plan      ProviderImprovementPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  sequence  Int
+  audience  String // SHARED (provider-visible) | INTERNAL
+  body      String
+  actorType String
+  actorId   String?
+  createdAt DateTime @default(now())
+
+  @@unique([planId, sequence])
+  @@index([tenantId, planId, createdAt])
+}
