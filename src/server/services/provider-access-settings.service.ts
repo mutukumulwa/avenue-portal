@@ -28,6 +28,17 @@ export interface ProviderAccessSettings {
   providerRemittanceV2: boolean;
   /** per-provider allow-list — remittance V2 is ON for these providers even if the global flag is off */
   remittanceV2ProviderIds: string[];
+  /**
+   * F7.3 — provider-facing contract/rate visibility surface (§11.1
+   * `providerContractView`), DEFAULT OFF. The /provider/contracts pages + the
+   * rate CSV export render only when this is on for the tenant (global) or the
+   * specific provider (allow-list). Flipping it on is the F7.1 §10 network/legal/
+   * security-sign-off gate, made through an explicit settings change — this module
+   * only READS it.
+   */
+  providerContractView: boolean;
+  /** per-provider allow-list — contract view is ON for these providers even if the global flag is off */
+  contractViewProviderIds: string[];
 }
 
 export const PROVIDER_ACCESS_DEFAULTS: ProviderAccessSettings = {
@@ -35,6 +46,8 @@ export const PROVIDER_ACCESS_DEFAULTS: ProviderAccessSettings = {
   enforcedProviderIds: [],
   providerRemittanceV2: false,
   remittanceV2ProviderIds: [],
+  providerContractView: false,
+  contractViewProviderIds: [],
 };
 
 export const ProviderAccessSettingsService = {
@@ -53,6 +66,10 @@ export const ProviderAccessSettingsService = {
       providerRemittanceV2: raw.providerRemittanceV2 === true,
       remittanceV2ProviderIds: Array.isArray(raw.remittanceV2ProviderIds)
         ? raw.remittanceV2ProviderIds.filter((x): x is string => typeof x === "string")
+        : [],
+      providerContractView: raw.providerContractView === true,
+      contractViewProviderIds: Array.isArray(raw.contractViewProviderIds)
+        ? raw.contractViewProviderIds.filter((x): x is string => typeof x === "string")
         : [],
     };
   },
@@ -76,5 +93,15 @@ export const ProviderAccessSettingsService = {
   async isRemittanceV2Enabled(tenantId: string, providerId: string, db: Db = prisma): Promise<boolean> {
     const s = await this.get(tenantId, db);
     return s.providerRemittanceV2 || s.remittanceV2ProviderIds.includes(providerId);
+  },
+
+  /**
+   * F7.3 — is the provider-facing contract/rate surface live for this provider?
+   * DEFAULT false. On only when the tenant global flag or the per-provider
+   * allow-list is set (the F7.1 §10 network/legal/security sign-off gate).
+   */
+  async isContractViewEnabled(tenantId: string, providerId: string, db: Db = prisma): Promise<boolean> {
+    const s = await this.get(tenantId, db);
+    return s.providerContractView || s.contractViewProviderIds.includes(providerId);
   },
 } as const;

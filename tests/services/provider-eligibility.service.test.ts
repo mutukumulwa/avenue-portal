@@ -16,7 +16,7 @@ describe("F1.11 ProviderAccessSettings.parse (pure)", () => {
   it("defaults enforcement OFF and tolerates garbage config", () => {
     expect(ProviderAccessSettingsService.parse(undefined)).toEqual(PROVIDER_ACCESS_DEFAULTS);
     expect(ProviderAccessSettingsService.parse({ providerAccess: "nonsense" })).toEqual(PROVIDER_ACCESS_DEFAULTS);
-    expect(ProviderAccessSettingsService.parse({ providerAccess: { entitlementEnforcement: true, enforcedProviderIds: ["p1", 2, null] } })).toEqual({ entitlementEnforcement: true, enforcedProviderIds: ["p1"], providerRemittanceV2: false, remittanceV2ProviderIds: [] });
+    expect(ProviderAccessSettingsService.parse({ providerAccess: { entitlementEnforcement: true, enforcedProviderIds: ["p1", 2, null] } })).toEqual({ entitlementEnforcement: true, enforcedProviderIds: ["p1"], providerRemittanceV2: false, remittanceV2ProviderIds: [], providerContractView: false, contractViewProviderIds: [] });
   });
 });
 

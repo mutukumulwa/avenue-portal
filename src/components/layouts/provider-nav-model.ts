@@ -16,7 +16,10 @@
 export type ProviderNavGroupKey = "Home" | "Care" | "Claims" | "Finance" | "Network" | "Administration";
 
 export type ProviderNavIconKey =
-  | "dashboard" | "inbox" | "eligibility" | "cases" | "preauth" | "claims" | "new-claim" | "settlements" | "api-keys";
+  | "dashboard" | "inbox" | "eligibility" | "cases" | "preauth" | "claims" | "new-claim" | "settlements" | "contracts" | "api-keys";
+
+/** Feature flags that gate a nav item's visibility (resolved server-side, passed to computeProviderNav). */
+export type ProviderNavFlagKey = "contractView";
 
 export interface ProviderNavDefinition {
   key: string;
@@ -26,6 +29,13 @@ export interface ProviderNavDefinition {
   group: ProviderNavGroupKey;
   /** Undefined ⇒ always shown (e.g. Home). Otherwise the exact permission code required. */
   requiredPermission?: string;
+  /**
+   * When set, the item is emitted ONLY if this feature flag is on (in addition to
+   * the permission check). Used for a surface that is gated behind a human
+   * sign-off (F7.3 `contractView` → F7.1 §10) so the nav link never dead-ends on
+   * a route that 404s until the flag is flipped.
+   */
+  flagKey?: ProviderNavFlagKey;
 }
 
 /** Existing provider routes only, in target-group order (§10.1). */
@@ -39,6 +49,8 @@ export const PROVIDER_NAV_DEFINITIONS: ProviderNavDefinition[] = [
   { key: "new-claim", label: "New Claim", href: "/provider/claims/new", iconKey: "new-claim", group: "Claims", requiredPermission: "provider.claim.create" },
   { key: "settlements", label: "Settlements", href: "/provider/settlements", iconKey: "settlements", group: "Finance", requiredPermission: "provider.settlement.read" },
   { key: "payment-queries", label: "Payment queries", href: "/provider/payment-queries", iconKey: "settlements", group: "Finance", requiredPermission: "provider.payment_query.manage" },
+  // F7.3 — gated behind `contractView` (F7.1 §10 sign-off): hidden until the flag is on, even for a permitted user.
+  { key: "contracts", label: "Contracts", href: "/provider/contracts", iconKey: "contracts", group: "Network", requiredPermission: "provider.contract.read", flagKey: "contractView" },
   { key: "api-keys", label: "API Keys", href: "/provider/api-keys", iconKey: "api-keys", group: "Administration", requiredPermission: "provider.api_keys.manage" },
 ];
 
@@ -70,11 +82,14 @@ function toView(d: ProviderNavDefinition): ProviderNavItemView {
  * existing users before F1.9 assigns persona roles. A user who HAS any provider
  * permission is filtered precisely to what they hold (Home is always shown).
  */
-export function computeProviderNav(permissions: string[]): ProviderNavGroupView[] {
+export function computeProviderNav(permissions: string[], opts: { flags?: Partial<Record<ProviderNavFlagKey, boolean>> } = {}): ProviderNavGroupView[] {
   const permSet = new Set(permissions);
   const hasAnyProviderPerm = permissions.some((p) => p.startsWith("provider."));
 
   const visible = PROVIDER_NAV_DEFINITIONS.filter((d) => {
+    // A flag-gated item is hidden until its flag is on — regardless of permission
+    // or the legacy fallback (the underlying page is 404-gated on the same flag).
+    if (d.flagKey && !opts.flags?.[d.flagKey]) return false;
     if (!d.requiredPermission) return true; // Home
     if (!hasAnyProviderPerm) return true; // legacy/un-migrated → full set
     return permSet.has(d.requiredPermission);

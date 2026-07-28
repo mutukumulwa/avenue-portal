@@ -12,6 +12,7 @@ import {
   projectTariff,
   projectVersion,
 } from "./projection";
+import { buildContractRatesCsv, type ContractRatesCsvEvidence } from "./csv";
 
 /**
  * PNOS F7.2 — provider contract/rate read service.
@@ -119,5 +120,42 @@ export const ProviderContractViewService = {
       db.providerTariff.findMany({ where, orderBy: [{ serviceName: "asc" }, { id: "asc" }], skip: (page - 1) * pageSize, take: pageSize }),
     ]);
     return { rates: rows.map(projectTariff), page: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) } };
+  },
+
+  /**
+   * F7.3 — a provider-safe, watermarked CSV of one contract's effective rate
+   * schedule (the same allow-listed rows the page shows). Provider-scoped +
+   * non-enumerating (returns null for another provider's / a hidden contract).
+   * Pages the effective rates to exhaustion so no line is omitted. The caller
+   * (route) audits the egress with the returned evidence.
+   */
+  async exportRatesCsv(
+    ctx: ProviderAccessContext,
+    contractId: string,
+    opts: { serviceDate?: Date } = {},
+    db: Db = prisma,
+  ): Promise<{ filename: string; csv: string; evidence: ContractRatesCsvEvidence } | null> {
+    ProviderAccessService.requirePermission(ctx, CONTRACT_VIEW_PERMISSION);
+    const serviceDate = opts.serviceDate ?? new Date();
+    const detail = await ProviderContractViewService.getById(ctx, contractId, { now: serviceDate }, db);
+    if (!detail) return null; // absent / another provider's / hidden state — indistinguishable
+
+    const provider = await db.provider.findFirst({ where: { id: ctx.providerId, tenantId: ctx.tenantId }, select: { name: true } });
+
+    // Page the effective rate lines to exhaustion (no omitted rows).
+    const rates: ReturnType<typeof projectTariff>[] = [];
+    let page = 1;
+    let totalPages = 1;
+    do {
+      const res = await ProviderContractViewService.getRates(ctx, contractId, { serviceDate, page, pageSize: MAX_PAGE_SIZE }, db);
+      if (!res) return null;
+      rates.push(...res.rates);
+      totalPages = res.page.totalPages;
+      page += 1;
+    } while (page <= totalPages);
+
+    const { csv, evidence } = buildContractRatesCsv({ header: detail.header, providerName: provider?.name ?? "provider", rates });
+    const filename = `contract-rates-${detail.header.contractNumber}-${contractId.slice(0, 8)}.csv`.replace(/[^\w.-]+/g, "_");
+    return { filename, csv, evidence };
   },
 } as const;

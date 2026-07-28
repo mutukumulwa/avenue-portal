@@ -1,5 +1,6 @@
 import { ProviderNav } from "@/components/layouts/ProviderNav";
 import { ProviderAccessService } from "@/server/services/provider-access.service";
+import { ProviderAccessSettingsService } from "@/server/services/provider-access-settings.service";
 import { computeProviderNav, flattenProviderNav } from "@/components/layouts/provider-nav-model";
 
 export default async function ProviderLayout({ children }: { children: React.ReactNode }) {
@@ -10,7 +11,9 @@ export default async function ProviderLayout({ children }: { children: React.Rea
   // login/role/unauthorized redirects; each page remains independently
   // server-authorized, so hiding a nav item is convenience, not security.
   const { ctx, provider } = await ProviderAccessService.resolveUserContext();
-  const navItems = flattenProviderNav(computeProviderNav(ctx.permissions));
+  // F7.3: the Contracts item is gated on the same sign-off flag as its pages.
+  const contractView = await ProviderAccessSettingsService.isContractViewEnabled(ctx.tenantId, ctx.providerId);
+  const navItems = flattenProviderNav(computeProviderNav(ctx.permissions, { flags: { contractView } }));
 
   return (
     <div className="min-h-screen bg-[#F8F9FA]">

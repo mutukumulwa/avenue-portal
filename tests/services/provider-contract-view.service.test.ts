@@ -231,4 +231,42 @@ describe.skipIf(!URL_SET)("F7.2 ProviderContractViewService (opt-in DB)", () => 
   it("getRates: without provider.contract.read ⇒ FORBIDDEN_PERMISSION", async () => {
     await expect(Svc.getRates(ctxA({ permissions: [] }), world.contracts.aActive.id)).rejects.toBeInstanceOf(ProviderAccessError);
   });
+
+  // ── F7.3: exportRatesCsv (parity + watermark + no-leakage + scope) ──────────
+  describe("F7.3 exportRatesCsv", () => {
+    it("exports the effective rates at a service date — row count + names match getRates", async () => {
+      const res = (await Svc.exportRatesCsv(ctxA(), world.contracts.aActive.id, { serviceDate: at(0) }))!;
+      expect(res).not.toBeNull();
+      const rates = (await Svc.getRates(ctxA(), world.contracts.aActive.id, { serviceDate: at(0) }))!;
+      expect(res.evidence.rowCount).toBe(rates.page.total); // 3 effective today
+      expect(res.csv).toContain("General Consultation");
+      expect(res.csv).toContain("Complete Blood Count");
+      expect(res.csv).toContain("Malaria RDT");
+      expect(res.csv).not.toContain("Legacy Xray");
+      expect(res.csv).not.toContain("Future MRI");
+      expect(res.filename).toMatch(/^contract-rates-/);
+      expect(res.evidence.checksum).toMatch(/^[0-9a-f]{64}$/);
+    });
+
+    it("historical service date exports the then-effective line only (parity with getRates)", async () => {
+      const res = (await Svc.exportRatesCsv(ctxA(), world.contracts.aActive.id, { serviceDate: at(-600) }))!;
+      expect(res.csv).toContain("Legacy Xray");
+      expect(res.csv).not.toContain("General Consultation");
+      expect(res.evidence.rowCount).toBe(1);
+    });
+
+    it("watermarks the provider name; never leaks sourceRef/notes/the raw scan text", async () => {
+      const res = (await Svc.exportRatesCsv(ctxA(), world.contracts.aActive.id, { serviceDate: at(0) }))!;
+      expect(res.csv).toContain(world.providers.a.name);
+      expect(res.csv).toContain("CONFIDENTIAL");
+      for (const s of ["scan raw text", "INTERNAL fbc note", "sourceRef", "confidence", "poolId"]) {
+        expect(res.csv).not.toContain(s);
+      }
+    });
+
+    it("cross-provider ⇒ null; missing permission ⇒ FORBIDDEN_PERMISSION", async () => {
+      expect(await Svc.exportRatesCsv(ctxA(), world.contracts.bActive.id, { serviceDate: at(0) })).toBeNull();
+      await expect(Svc.exportRatesCsv(ctxA({ permissions: [] }), world.contracts.aActive.id)).rejects.toBeInstanceOf(ProviderAccessError);
+    });
+  });
 });

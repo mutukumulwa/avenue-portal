@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   FilePlus2,
   Banknote,
+  ScrollText,
   KeyRound,
   LogOut,
   type LucideIcon,
@@ -29,6 +30,7 @@ const ICONS: Record<ProviderNavIconKey, LucideIcon> = {
   preauth: ShieldCheck,
   "new-claim": FilePlus2,
   settlements: Banknote,
+  contracts: ScrollText,
   "api-keys": KeyRound,
 };
 

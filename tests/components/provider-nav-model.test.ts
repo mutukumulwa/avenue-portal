@@ -52,10 +52,11 @@ describe("F1.4 computeProviderNav", () => {
   });
 
   it("legacy/un-migrated user (no provider.* perms) sees the full working set (no blank portal)", () => {
-    const h = hrefs([]);
-    expect(h).toEqual(PROVIDER_NAV_DEFINITIONS.map((d) => d.href)); // all existing routes
+    // The "full working set" excludes flag-gated items (F7.3 contracts) until their flag is on.
+    const ungatedHrefs = PROVIDER_NAV_DEFINITIONS.filter((d) => !d.flagKey).map((d) => d.href);
+    expect(hrefs([])).toEqual(ungatedHrefs);
     // a user with only unrelated TPA perms is also treated as legacy here
-    expect(hrefs(["CLAIM:VIEW", "MEMBER:VIEW"])).toEqual(PROVIDER_NAV_DEFINITIONS.map((d) => d.href));
+    expect(hrefs(["CLAIM:VIEW", "MEMBER:VIEW"])).toEqual(ungatedHrefs);
   });
 
   it("Home is always present even with an unrelated single provider perm", () => {
@@ -64,11 +65,23 @@ describe("F1.4 computeProviderNav", () => {
 
   it("never emits an unfinished route", () => {
     // NOTE: /provider/preauth (F3.8), /provider/inbox (F4.7), /provider/payment-queries (F6.11) are now FINISHED — removed from forbidden.
+    // /provider/contracts (F7.3) is BUILT but flag-gated: with no flags passed it must stay hidden even with every permission.
     const forbidden = ["/provider/contracts", "/provider/performance", "/provider/profile", "/provider/users", "/provider/integrations"];
-    // even a super-broad permission set only yields existing routes
+    // even a super-broad permission set only yields existing (and flag-enabled) routes
     const allPerms = PROVIDER_NAV_DEFINITIONS.map((d) => d.requiredPermission).filter(Boolean) as string[];
     const h = hrefs(allPerms);
     for (const f of forbidden) expect(h).not.toContain(f);
+  });
+
+  it("F7.3: Contracts is flag-gated — hidden without the flag (even with the permission), shown with flag + permission", () => {
+    expect(hrefs(["provider.contract.read"])).not.toContain("/provider/contracts"); // permission but no flag
+    const withFlag = flattenProviderNav(computeProviderNav(["provider.contract.read"], { flags: { contractView: true } })).map((i) => i.href);
+    expect(withFlag).toContain("/provider/contracts");
+  });
+
+  it("F7.3: the flag alone does not reveal Contracts to a migrated user lacking the permission", () => {
+    const h = flattenProviderNav(computeProviderNav(["provider.claim.read"], { flags: { contractView: true } })).map((i) => i.href);
+    expect(h).not.toContain("/provider/contracts"); // migrated user, lacks provider.contract.read
   });
 
   it("emitted items carry no authority fields (no permission/provider/branch serialized)", () => {
