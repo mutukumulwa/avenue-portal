@@ -422,6 +422,93 @@ export async function buildProviderWorld(prisma: Prisma, opts: BuildOptions = {}
     });
   }
 
+  // ── F7.2 — contract-view detail (versions, rates, rules, branches) ─────────
+  // Attaches provider-visible detail to an existing contract so the F7.2 read
+  // service has effective rate lines + versions + PA/doc rules + exclusions + a
+  // capitation summary to project (and, via `header`, sensitive fields to prove
+  // the allow-list never leaks them). ProviderTariff does NOT cascade on contract
+  // delete (optional contract FK → SetNull) and its provider FK is required, so
+  // teardown deletes tariffs by provider; every other child cascades with the
+  // contract.
+  async function seedContractDetail(spec: {
+    contractId: string;
+    providerId?: string;
+    header?: Record<string, unknown>;
+    versions?: Array<{ versionNumber: number; status?: string; effectiveFrom: Date; effectiveTo?: Date | null; changeSummary?: string | null }>;
+    branchIds?: string[];
+    rates?: Array<Record<string, unknown> & { serviceName: string; agreedRate: number; effectiveFrom: Date }>;
+    preauthRules?: Array<Record<string, unknown>>;
+    docRules?: Array<Record<string, unknown> & { documentType: string }>;
+    exclusions?: Array<Record<string, unknown> & { serviceName: string }>;
+    pricingRules?: Array<{ ruleKind: string; params?: unknown; isActive?: boolean }>;
+  }) {
+    const providerId = spec.providerId ?? providerA.id;
+    const tId = providerId === providerCId ? beta.id : alpha.id;
+
+    if (spec.header) {
+      await prisma.providerContract.update({ where: { id: spec.contractId }, data: spec.header as any });
+    }
+    for (const v of spec.versions ?? []) {
+      await prisma.contractVersion.create({
+        data: { tenantId: tId, contractId: spec.contractId, versionNumber: v.versionNumber, status: (v.status ?? "ACTIVE") as any, effectiveFrom: v.effectiveFrom, effectiveTo: v.effectiveTo ?? null, changeSummary: v.changeSummary ?? null },
+      });
+    }
+    for (const b of spec.branchIds ?? []) {
+      await prisma.contractBranch.create({ data: { contractId: spec.contractId, branchId: b } });
+    }
+    const tariffIds: string[] = [];
+    for (const r of spec.rates ?? []) {
+      const row = await prisma.providerTariff.create({ data: {
+        providerId, contractId: spec.contractId, branchId: (r.branchId as string) ?? null, clientId: (r.clientId as string) ?? null,
+        serviceName: r.serviceName, standardDescription: (r.standardDescription as string) ?? null, providerDescription: (r.providerDescription as string) ?? null,
+        cptCode: (r.cptCode as string) ?? null, providerServiceCode: (r.providerServiceCode as string) ?? null, codingSystem: (r.codingSystem as any) ?? null,
+        agreedRate: r.agreedRate, currency: (r.currency as string) ?? "UGX", rateType: (r.rateType as any) ?? "FIXED", tariffType: (r.tariffType as any) ?? "NEGOTIATED",
+        discountPct: (r.discountPct as number) ?? null, markupPct: (r.markupPct as number) ?? null, maxPayableAmount: (r.maxPayableAmount as number) ?? null, minPayableAmount: (r.minPayableAmount as number) ?? null,
+        unitOfMeasure: (r.unitOfMeasure as any) ?? "PER_ITEM", maxQuantityPerVisit: (r.maxQuantityPerVisit as number) ?? null, quantityLimit: (r.quantityLimit as number) ?? null,
+        frequencyLimit: (r.frequencyLimit as number) ?? null, frequencyPeriod: (r.frequencyPeriod as any) ?? null,
+        genderRestriction: (r.genderRestriction as string) ?? null, ageMin: (r.ageMin as number) ?? null, ageMax: (r.ageMax as number) ?? null,
+        requiresPreauth: (r.requiresPreauth as boolean) ?? false, requiresReferral: (r.requiresReferral as boolean) ?? false,
+        externalScheme: (r.externalScheme as string) ?? null, externalRebateAmount: (r.externalRebateAmount as number) ?? null,
+        rateMissing: (r.rateMissing as boolean) ?? false, sourceRef: (r.sourceRef as any) ?? undefined, notes: (r.notes as string) ?? null,
+        effectiveFrom: r.effectiveFrom, effectiveTo: (r.effectiveTo as Date | null) ?? null,
+      } as any });
+      tariffIds.push(row.id);
+    }
+    for (const p of spec.preauthRules ?? []) {
+      await prisma.preauthRule.create({ data: {
+        tenantId: tId, contractId: spec.contractId,
+        triggerType: (p.triggerType as any) ?? "ALWAYS", thresholdAmount: (p.thresholdAmount as number) ?? null,
+        admissionRequired: (p.admissionRequired as boolean) ?? false, emergencyExempt: (p.emergencyExempt as boolean) ?? false,
+        retrospectiveAllowed: (p.retrospectiveAllowed as boolean) ?? false, retrospectiveWindowHours: (p.retrospectiveWindowHours as number) ?? null,
+        approvalSlaHours: (p.approvalSlaHours as number) ?? null, validityDays: (p.validityDays as number) ?? null,
+        requiredDocumentTypes: (p.requiredDocumentTypes as string[]) ?? [], consequenceIfMissing: (p.consequenceIfMissing as any) ?? "ROUTE_MANUAL",
+        isActive: (p.isActive as boolean) ?? true,
+      } as any });
+    }
+    for (const d of spec.docRules ?? []) {
+      await prisma.documentationRule.create({ data: {
+        tenantId: tId, contractId: spec.contractId,
+        documentType: d.documentType as any, mandatory: (d.mandatory as boolean) ?? true,
+        appliesWhen: (d.appliesWhen as any) ?? undefined, consequenceIfMissing: (d.consequenceIfMissing as any) ?? "ROUTE",
+        isActive: (d.isActive as boolean) ?? true,
+      } as any });
+    }
+    for (const e of spec.exclusions ?? []) {
+      await prisma.providerContractExclusion.create({ data: {
+        contractId: spec.contractId, cptCode: (e.cptCode as string) ?? null, serviceName: e.serviceName,
+        reason: (e.reason as string) ?? null, level: (e.level as any) ?? "TARIFF_LINE",
+        icdCodes: (e.icdCodes as string[]) ?? [], dateFrom: (e.dateFrom as Date) ?? null, dateTo: (e.dateTo as Date) ?? null,
+      } as any });
+    }
+    for (const pr of spec.pricingRules ?? []) {
+      await prisma.pricingRule.create({ data: {
+        tenantId: tId, contractId: spec.contractId, ruleKind: pr.ruleKind as any,
+        params: (pr.params as any) ?? {}, isActive: pr.isActive ?? true,
+      } as any });
+    }
+    return { tariffIds };
+  }
+
   async function teardown() {
     // FK-safe order: branch assignments → applicability → contracts → members →
     // groups → benefit → version → package → branches → users → providers →
@@ -479,6 +566,12 @@ export async function buildProviderWorld(prisma: Prisma, opts: BuildOptions = {}
     await prisma.notificationOutbox.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.preAuthorization.deleteMany({ where: { id: { in: createdPreauthIds } } });
     await prisma.clinicalCase.deleteMany({ where: { id: { in: createdCaseIds } } });
+    // F7.2: tariff lines are provider-scoped and do NOT cascade on contract delete
+    // (optional contract FK → SetNull would orphan them; the required provider FK
+    // then blocks provider deletion). Delete them explicitly, before the contracts.
+    // Every other contract child (versions, branches, PA/doc rules, exclusions,
+    // pricing rules) cascades with the contract below.
+    await prisma.providerTariff.deleteMany({ where: { providerId: { in: providerIds } } });
     await prisma.contractApplicability.deleteMany({ where: { contractId: { in: contractIds } } });
     await prisma.providerContract.deleteMany({ where: { id: { in: contractIds } } });
     await prisma.member.deleteMany({ where: { tenantId: { in: tenantIds } } });
@@ -511,6 +604,7 @@ export async function buildProviderWorld(prisma: Prisma, opts: BuildOptions = {}
     createPreauth,
     createSettlementBatch,
     createDisbursement,
+    seedContractDetail,
     teardown,
   };
 }
