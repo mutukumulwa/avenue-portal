@@ -564,6 +564,7 @@ export async function buildProviderWorld(prisma: Prisma, opts: BuildOptions = {}
     await prisma.providerIntegrationAttempt.deleteMany({ where: { deliveryId: { in: integrationDeliveryIds } } });
     await prisma.providerIntegrationRecordResult.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.providerIntegrationDelivery.deleteMany({ where: { tenantId: { in: tenantIds } } });
+    await prisma.providerIntegrationSecret.deleteMany({ where: { tenantId: { in: tenantIds } } }); // FK → connection: before connection
     await prisma.providerIntegrationConnection.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.providerSettlementBatch.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.paymentVoucher.deleteMany({ where: { tenantId: { in: tenantIds } } });

@@ -7740,6 +7740,7 @@ model ProviderIntegrationConnection {
   updatedAt   DateTime @updatedAt
 
   deliveries ProviderIntegrationDelivery[]
+  secrets    ProviderIntegrationSecret[]
 
   // One live connection per (provider, branch, connector, mode) — the consistency
   // the F9.2 test asserts. providerBranchId's "" default keeps provider-level rows
@@ -7873,4 +7874,31 @@ model ProviderIntegrationAttempt {
   // Attempt ordering the F9.2 test asserts: attempts are unique + ordered per delivery.
   @@unique([deliveryId, attemptNumber])
   @@index([deliveryId])
+}
+
+/// PNOS F9.3 — secret-reference storage for a connection's credential. The
+/// connection row holds only a pointer (secretRef → the ACTIVE row here) +
+/// credentialVersion; the secret MATERIAL never lives on the connection and is
+/// never returned by a read. Only a bcrypt hash is stored (mirrors ProviderApiKey)
+/// — the plaintext is revealed exactly once at generation/rotation. Rotation
+/// retires the prior version (overlap-safe) and mints a new one. Reversible
+/// storage for an OUTBOUND partner-supplied credential is deferred to F9.7 (when
+/// the contracted auth scheme is known); this table serves the locally-generated
+/// signing secret, verified by hash.
+model ProviderIntegrationSecret {
+  id           String                        @id @default(cuid())
+  tenantId     String
+  connectionId String
+  connection   ProviderIntegrationConnection @relation(fields: [connectionId], references: [id])
+
+  version    Int // 1-based; bumps on rotation
+  secretHash String // bcrypt hash of the plaintext — never the plaintext, never returned
+  status     String @default("ACTIVE") // ACTIVE | RETIRED
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  retiredAt   DateTime?
+
+  @@unique([connectionId, version])
+  @@index([connectionId, status])
 }
