@@ -555,6 +555,8 @@ export async function buildProviderWorld(prisma: Prisma, opts: BuildOptions = {}
     await prisma.providerMasterDataChangeRequest.deleteMany({ where: { tenantId: { in: tenantIds } } });
     // F7.7: improvement plans (actions + updates cascade on plan delete).
     await prisma.providerImprovementPlan.deleteMany({ where: { tenantId: { in: tenantIds } } });
+    // F8.2: versioned performance scores (relation-less, tenant-scoped).
+    await prisma.providerPerformanceScore.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.providerSettlementBatch.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.paymentVoucher.deleteMany({ where: { tenantId: { in: tenantIds } } });
     if (createdJournalIds.length > 0) {

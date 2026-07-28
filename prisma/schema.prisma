@@ -7537,3 +7537,68 @@ model ProviderImprovementUpdate {
   @@unique([planId, sequence])
   @@index([tenantId, planId, createdAt])
 }
+
+// PNOS F8.2 — versioned, published provider performance score (§8.13; D21 advisory).
+// A NEW model ALONGSIDE the legacy cost `ProviderScorecard` (which is left untouched,
+// so its analytics readers keep working). Every score value retains its numerator,
+// denominator, definition version, completeness, cohort, and source watermark, plus a
+// publication/freeze state — so a provider only ever sees a PUBLISHED, complete,
+// sufficiently-sampled score. This holds the F8.3 output; F8.1's PNMC-1.0 catalog is the
+// authority for what each metricKey means. Relation-less to Provider/Tenant.
+enum PerformanceScoreStatus {
+  DRAFT // computed, not yet published to the provider
+  PUBLISHED // visible to the provider when complete + meets sample + not suppressed
+  FROZEN // period frozen; only a corrected republish (new publicationVersion) supersedes
+}
+
+model ProviderPerformanceScore {
+  id                String @id @default(cuid())
+  tenantId          String
+  providerId        String
+  // "" = provider-level; a branch id = branch-level. A non-null default keeps the
+  // unique key well-defined (a nullable column would treat every provider-level row
+  // as distinct in Postgres and defeat the uniqueness the spec requires).
+  providerBranchId  String @default("")
+  period            String // YYYY-MM
+  periodStart       DateTime
+  periodEnd         DateTime
+  metricKey         String // e.g. "A2_clean_claim_rate" — a key from the PNMC catalog
+  definitionVersion String // e.g. "PNMC-1.0"
+
+  // provenance (F8.1 §1) — the numbers behind the value.
+  numerator          Decimal  @db.Decimal(18, 4)
+  denominator        Decimal  @db.Decimal(18, 4)
+  value              Decimal? @db.Decimal(18, 6) // numerator/denominator, or a p50/p90 for distribution metrics
+  unit               String   @default("RATE") // RATE | DAYS | HOURS | COUNT | PERCENTILE
+  completeness       Decimal  @default(1) @db.Decimal(5, 4) // fraction of expected facts present (0..1)
+  sampleSize         Int      @default(0) // the denominator count, for the minimum-sample rule
+  meetsMinimumSample Boolean  @default(false)
+
+  // cohort membership (the anonymized benchmark values themselves are F8.4).
+  cohortKey              String? // tenant|type|tier(|facet) — the peer set this score belongs to
+  suppressedForAnonymity Boolean @default(false)
+
+  // exclusions + control totals (F8.3 records these for reconciliation/audit).
+  excludedCount Int   @default(0)
+  controlTotals Json? // { includedFacts, excludedFacts, numeratorCheck, ... }
+
+  // source watermark — the deterministic marker of the frozen source-fact set + params
+  // that produced this score (so a re-run over identical facts is a no-op).
+  sourceWatermark String
+  computedAt      DateTime @default(now())
+
+  // publication / freeze.
+  status             PerformanceScoreStatus @default(DRAFT)
+  publishedAt        DateTime?
+  frozenAt           DateTime?
+  publicationVersion Int                    @default(1) // a corrected republish increments (F8.4)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, period, providerId, providerBranchId, metricKey, definitionVersion])
+  @@index([tenantId, providerId, period])
+  @@index([tenantId, metricKey, period])
+  @@index([tenantId, status, period])
+  @@index([tenantId, cohortKey, period, metricKey])
+}
