@@ -39,6 +39,7 @@ export const KNOWN_AUDITING_TOKENS = [
   "ProviderPaymentQueryService.requestInformation(",
   "ProviderPaymentQueryService.resolve(",
   "ProviderPaymentQueryService.reject(",
+  "ProviderPaymentQueryService.convertToReconsideration(", // PNOS F6.12 — hash-chain audits PAYMENT_QUERY:CONVERT internally
 
   "preauthAdjudicationService.",
   "claimAdjudicationService.createSettlementBatch(",

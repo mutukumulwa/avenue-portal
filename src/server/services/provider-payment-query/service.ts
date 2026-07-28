@@ -3,8 +3,10 @@ import { Prisma, type PrismaClient, type PaymentQueryCategory, type PaymentQuery
 import { ProviderAccessService, type ProviderAccessContext } from "@/server/services/provider-access.service";
 import { auditChainService } from "@/server/services/audit-chain.service";
 import { NotificationOutboxService } from "@/server/services/notifications/outbox";
+import { ClaimReconsiderationService } from "@/server/services/claim-reconsideration/submit.service";
 import {
   canTransitionPaymentQuery,
+  isPaymentQueryTerminal,
   PROVIDER_WITHDRAWABLE,
   toProviderPaymentQueryProjection,
   toProviderPaymentQueryTimeline,
@@ -24,7 +26,7 @@ import {
 export const PAYMENT_QUERY_PERMISSION = "provider.payment_query.manage";
 const PAYMENT_QUERY_FINANCE_ROLES = ["SUPER_ADMIN", "FINANCE_OFFICER"];
 
-export type PaymentQueryErrorCode = "NOT_FOUND" | "FORBIDDEN" | "STALE" | "INVALID_STATE" | "INVALID";
+export type PaymentQueryErrorCode = "NOT_FOUND" | "FORBIDDEN" | "STALE" | "INVALID_STATE" | "INVALID" | "INELIGIBLE";
 export class PaymentQueryError extends Error {
   constructor(public code: PaymentQueryErrorCode, message: string) {
     super(message);
@@ -171,6 +173,70 @@ export const ProviderPaymentQueryService = {
     assertFinance(actor);
     if (!input.explanation?.trim()) throw new PaymentQueryError("INVALID", "A rejection explanation is required.");
     return runTransition(db, { actorId: actor.userId, actorType: "TPA_USER", tenantId: actor.tenantId }, id, ["OPEN", "ACKNOWLEDGED", "INFORMATION_REQUIRED", "PROVIDER_RESPONDED"], "REJECTED", expectedVersion, { resolutionCode: input.code, resolutionExplanation: input.explanation.trim() }, { eventType: "REJECTED", audience: "SHARED", body: input.explanation.trim(), auditAction: "PAYMENT_QUERY:REJECT", notify: { title: "Payment query closed", body: input.explanation.trim() } });
+  },
+
+  /**
+   * F6.12 — explicit handoff: convert a payment query that is really a decision
+   * dispute into a governed reconsideration. Requires provider.claim.reconsider +
+   * an explicit reason (never auto-converts on category alone). Runs reconsideration
+   * eligibility/deadline FIRST, creates the F5.12 case idempotently (D13 — the claim
+   * is NOT touched), then links the query (status → RESOLVED + linkedReconsiderationId
+   * + a LINKED event) — the ONLY change to the query. No amount/status changes silently.
+   */
+  async convertToReconsideration(
+    ctx: ProviderAccessContext,
+    paymentQueryId: string,
+    input: { reasonCode: string; providerNarrative: string; requestedAmount: number; lines: Array<{ claimLineId: string; requestedAllowed?: number }>; idempotencyKey: string },
+    expectedVersion: number,
+    db: PrismaClient = prisma,
+  ): Promise<{ paymentQueryId: string; reconsiderationId: string; status: PaymentQueryStatus; replayed: boolean }> {
+    ProviderAccessService.requirePermission(ctx, "provider.claim.reconsider");
+    if (!input.reasonCode?.trim()) throw new PaymentQueryError("INVALID", "An explicit reconsideration reason is required (a query is not auto-converted).");
+
+    const q = await db.providerPaymentQuery.findFirst({ where: { id: paymentQueryId, tenantId: ctx.tenantId, providerId: ctx.providerId }, select: { id: true, claimId: true, status: true, linkedReconsiderationId: true } });
+    if (!q) throw new PaymentQueryError("NOT_FOUND", "Payment query not found.");
+    if (!q.claimId) throw new PaymentQueryError("INVALID", "This query is not about a specific claim, so it cannot become a reconsideration.");
+    if (q.linkedReconsiderationId) return { paymentQueryId: q.id, reconsiderationId: q.linkedReconsiderationId, status: q.status, replayed: true };
+    if (isPaymentQueryTerminal(q.status)) throw new PaymentQueryError("INVALID_STATE", "A closed query cannot be converted.");
+
+    // 1. eligibility/deadline FIRST (F5.12) — refuse an ineligible/expired dispute.
+    const elig = await ClaimReconsiderationService.checkEligibility(ctx, q.claimId, { reasonCode: input.reasonCode });
+    if (!elig.eligible) throw new PaymentQueryError("INELIGIBLE", elig.reason);
+
+    // 2. create the governed reconsideration (D13 — the claim is not touched).
+    const recon = await ClaimReconsiderationService.submit(ctx, {
+      tenantId: ctx.tenantId, claimId: q.claimId, idempotencyKey: input.idempotencyKey,
+      reasonCode: input.reasonCode, providerNarrative: input.providerNarrative, requestedAmount: input.requestedAmount,
+      lines: input.lines.map((l) => ({ claimLineId: l.claimLineId, requestedAllowed: l.requestedAllowed })),
+    });
+
+    // 3. link the query — its ONLY change (status → RESOLVED + linkedReconsiderationId + a LINKED event).
+    const result = await db.$transaction(async (tx) => {
+      const cas = await tx.providerPaymentQuery.updateMany({
+        where: { id: paymentQueryId, tenantId: ctx.tenantId, version: expectedVersion, linkedReconsiderationId: null, status: { in: PROVIDER_WITHDRAWABLE } },
+        data: { status: "RESOLVED", version: { increment: 1 }, linkedReconsiderationId: recon.reconsiderationId, resolutionCode: "CONVERTED_TO_RECONSIDERATION", resolutionExplanation: "This query was escalated to a formal reconsideration." },
+      });
+      if (cas.count === 0) {
+        const cur = await tx.providerPaymentQuery.findFirst({ where: { id: paymentQueryId, tenantId: ctx.tenantId }, select: { status: true, version: true, linkedReconsiderationId: true } });
+        if (!cur) throw new PaymentQueryError("NOT_FOUND", "Payment query not found.");
+        if (cur.linkedReconsiderationId) return { version: expectedVersion, alreadyLinked: cur.linkedReconsiderationId };
+        if (cur.version !== expectedVersion) throw new PaymentQueryError("STALE", "This query changed since you loaded it — refresh and retry.");
+        throw new PaymentQueryError("INVALID_STATE", `A ${cur.status.toLowerCase().replace(/_/g, " ")} query cannot be converted.`);
+      }
+      await appendMessage(tx, { tenantId: ctx.tenantId, paymentQueryId, audience: "SHARED", eventType: "CONVERTED_TO_RECONSIDERATION", newStatus: "RESOLVED", body: "Escalated to a formal reconsideration.", actorType: "PROVIDER_USER", actorId: ctx.actorId });
+      return { version: expectedVersion + 1 };
+    });
+    // A concurrent convert already linked it — return that winner idempotently.
+    if ("alreadyLinked" in result && result.alreadyLinked) {
+      return { paymentQueryId: q.id, reconsiderationId: result.alreadyLinked, status: "RESOLVED", replayed: true };
+    }
+
+    await auditChainService.append({
+      actorId: ctx.actorId, action: "PAYMENT_QUERY:CONVERT", module: "FINANCE",
+      entityType: "ProviderPaymentQuery", entityId: paymentQueryId, tenantId: ctx.tenantId,
+      payload: { claimId: q.claimId, reconsiderationId: recon.reconsiderationId }, description: `Payment query ${paymentQueryId} converted to reconsideration ${recon.reconsiderationId}.`,
+    });
+    return { paymentQueryId: q.id, reconsiderationId: recon.reconsiderationId, status: "RESOLVED", replayed: recon.replayed };
   },
 
   // ── reads ──────────────────────────────────────────────────────────────────
