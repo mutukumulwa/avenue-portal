@@ -2251,3 +2251,30 @@ Stop condition observed: yes — one family computed deterministically with wate
 ```
 
 ---
+
+## F8.4 — Publish anonymized cohort benchmarks
+
+```text
+Work package: F8.4 (phase F8 — performance scorecards)
+Status: SERVICE COMPLETE (no UI). A published period now freezes anonymity-safe cohort benchmarks and marks the provider scores PUBLISHED.
+Commit: this feat commit (schema + cohort math + publish service + tests) + the paired docs commit (this note + PROGRESS row).
+Proof-before-build classification: BUILD-NEW, additive — F8.3 produces DRAFT scores; §8.13/F8.1 §4 require a peer distribution with a minimum cohort, no named peer, a freeze watermark/version, and a corrected republish. Confirmed the cohort dimension = Provider.type + tier (already on the model), and the F8.2 score model's cohortKey/status/publicationVersion fields. No CONFLICTING path.
+Files changed: prisma/schema.prisma (+ PerformanceCohortBenchmark — additive, pushed); src/server/services/provider-performance/cohort.ts (new — pure) + publication.service.ts (new); tests/factories/provider-network.ts (teardown deletes benchmarks by tenant); tests/services/provider-performance-cohort.test.ts (new — 5 pure) + provider-performance-publication.service.test.ts (new — 5 DB); docs PROGRESS + this note.
+Schema/data changes: ADDITIVE only — one new model, relation-less to Tenant, carrying NO provider identity. prisma validate clean; db push + generate to the throwaway PG.
+Behavior delivered (the 6 plan steps): (1) cohort dimensions = tenant|type|tier + MIN_COHORT_PROVIDERS = 5 + the per-provider minimum sample (from F8.2); (2) a provider whose cohort is below the anonymity threshold is excluded — the benchmark is not written; (3) percentile/median/range via nearest-rank over the sampled providers' values, with no named peer; (4) each benchmark is frozen with a publicationVersion + a sha256 publicationWatermark; (5) publication is audited (PERFORMANCE:PUBLISH with the benchmark/suppressed/published counts); (6) a corrected republish re-runs and writes a NEW publicationVersion (the prior remains as history), and the provider score's publicationVersion advances.
+Authorization evidence: publishPeriod is role-gated to the network operator (SUPER_ADMIN for now; the explicit network-analytics permission arrives F8.6) — a PROVIDER_USER is rejected. The benchmark rows are tenant-scoped and identity-free.
+Idempotency/concurrency evidence: the benchmark unique key includes publicationVersion, so a republish never collides — it appends a new version; the watermark is a deterministic hash of the frozen distribution. Publishing an already-PUBLISHED period bumps the score's publicationVersion (a corrected republish), leaving the prior benchmark as history.
+Privacy/security evidence: THE anonymity contract in code — a cohort with < 5 distinct sampled providers is SUPPRESSED (no benchmark row is created; proven), and the benchmark row carries only the aggregate distribution + a providerCount — no providerId/name (proven: no provider id string appears in the row). An under-sample provider does not contribute a peer value and does not pull a small cohort over the threshold (proven). A provider's OWN score is still published (its own value is visible via the F8.2 read model) — only the peer comparison is withheld.
+Money/reconciliation evidence: N/A — no money. Benchmarks are advisory (D21) and never mutate a rate/tier/provider status.
+Focused tests and results: 5 pure (nearest-rank percentiles + the worked distribution [0.5,0.6,0.7,0.8,0.9] ⇒ min .5 / p25 .6 / median .7 / p75 .8 / p90 .9 / max .9; the cohort key carries no identity; the anonymity threshold) + 5 DB (a 5-provider cohort publishes a benchmark with median/min/max and NO peer id in the row + the scores become PUBLISHED with their cohortKey; a 4-provider cohort is suppressed with no benchmark row; an under-sample fifth provider is excluded so the cohort is still suppressed; a corrected republish yields publicationVersion 1 then 2 and advances the score version; publish is role-gated). All green. tsc --noEmit clean; brand + currency + audit-coverage green; full no-DB suite 1513 pass / 410 skip; the factory-consuming DB suites pass 21/21 together (the extra test providers are cleaned before teardown drops the tenant).
+Typecheck/schema result: tsc clean; schema additive + pushed.
+Manual/visual evidence: N/A — service, no UI (F8.5).
+Feature-flag state: none. Publication is an explicit operator action; nothing publishes before the F8.1 §7 sign-off (this is the mechanism the sign-off gates).
+Backfill/rollout impact: none (additive model; reads F8.2/F8.3 rows).
+Known limitations / deferrals (flagged): (a) no UI (F8.5/F8.6). (b) The per-provider percentile band is derived at read time (F8.5) from the benchmark + the provider's own value, not stored on the score (kept the F8.2 model unchanged). (c) MIN_COHORT_PROVIDERS = 5 and the sample thresholds are constants; a tenant-tunable config is a refinement. (d) Cohort facets (serviceType/region) beyond type+tier are a refinement.
+Unrelated worktree changes preserved: yes — worktree contained only the F8.4 files; scratchpad/ untracked and NOT staged; the main-checkout dirty UAT files untouched.
+Next allowed package: F8.5 — Build the provider performance dashboard (M; depends F8.4). Authorize performance/provider/branches; show definitions/sample/completeness/version; show trends + the anonymized benchmark; drilldown only to own source records; link the F7.7 improvement plans; include the advisory-not-a-sanction warning. Stop: no automatic action.
+Stop condition observed: yes — cohort benchmarks + publication + versioned republish + the anonymity suppression + tests delivered; NO UI, NO rate/tier/status side effect.
+```
+
+---
