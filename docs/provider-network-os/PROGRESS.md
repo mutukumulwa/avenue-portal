@@ -189,7 +189,7 @@
 | F9.1 | Inventory integration configs/secrets/paths | S | COMPLETE | `HMS_INTEGRATION_INVENTORY.md` (read-only trace: 11 channels I1–I11 + poll stub + 1 signed-callback precedent; 13 findings F9-*) |
 | F9.2 | Integration connection/delivery schema | M | COMPLETE | additive §7.11 models `ProviderIntegrationConnection`/`Delivery`/`RecordResult`/`Attempt` + 5 enums (mode/status/circuit/direction/deliveryStatus); `IntegrationConfig` preserved; factory teardown + `provider-integration-schema.test.ts` (6 DB pass); db push→pnos_uat |
 | F9.3 | Connection + credential administration | M | COMPLETE | `ProviderIntegrationConnectionAdmin` (create/config/test/rotate-secret/activate/pause/disable, provider.integrations.manage-gated, provider+branch server-derived, anti-widening) + `IntegrationSecretStore` (bcrypt reveal-once, +`ProviderIntegrationSecret` table) + `url-safety.ts` (SSRF); tests 16 (url-safety 11 pure + admin 5 DB). No data delivery |
-| F9.4 | Durable inbound delivery receipt | M | NOT_STARTED | — |
+| F9.4 | Durable inbound delivery receipt | M | COMPLETE | `InboundDeliveryService.receive` — authenticate (connection secret) + scope + replay-window + content-type/size/JSON guards → normalized hash + control totals → concurrency-safe create/replay/conflict → durable ACCEPTED (DB *is* the queue) + best-effort enqueue hook; `getReceipt` scoped/secret-free. 11 DB tests. No HMS apply |
 | F9.5 | Route inbound HMS records canonically (per type) | M/type | NOT_STARTED | — |
 | F9.6 | Retry, poison quarantine, sweeper | M | NOT_STARTED | — |
 | F9.7 | One contracted outbound pull adapter | L | GATED(signed contract + sandbox) | — |
