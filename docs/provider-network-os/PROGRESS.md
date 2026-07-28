@@ -186,7 +186,7 @@
 
 | Pkg | Title | Size | Status | Evidence |
 |---|---|---|---|---|
-| F9.1 | Inventory integration configs/secrets/paths | S | NOT_STARTED | — |
+| F9.1 | Inventory integration configs/secrets/paths | S | COMPLETE | `HMS_INTEGRATION_INVENTORY.md` (read-only trace: 11 channels I1–I11 + poll stub + 1 signed-callback precedent; 13 findings F9-*) |
 | F9.2 | Integration connection/delivery schema | M | NOT_STARTED | — |
 | F9.3 | Connection + credential administration | M | NOT_STARTED | — |
 | F9.4 | Durable inbound delivery receipt | M | NOT_STARTED | — |
