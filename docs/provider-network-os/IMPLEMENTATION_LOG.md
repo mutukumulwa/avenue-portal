@@ -2766,3 +2766,20 @@ Stop condition observed: yes — the buildable hardening suites + runbooks deliv
 ```
 
 ---
+
+## SHIP — merge to main + prod deploy + prod-schema-sync verification (2026-07-29)
+
+```text
+Event: MERGE + PUSH + PROD DEPLOY + SCHEMA-SYNC VERIFICATION — engagement closure for the buildable scope (not a code package).
+Merge: feat/provider-network-os (187 PNOS commits, pre-merge tip 8b447bf) merged into main via a real merge commit; content-clean (PNOS touched zero claims-autopilot/src files). During the push origin/main had advanced 7 commits (the concurrent claims-autopilot session's work) — integrated by fetch + `git merge origin/main` (merge 86e0ec7), NOT a force-push (pre-checked conflict-free with `git merge-tree`). Pushed. Then the local branch, the .claude/worktrees/pnos worktree, AND the merged remote branch were all deleted (at the user's request).
+Post-merge CI failures fixed — two independent, both of a class `tsc` + vitest cannot catch:
+  1) `next build` — "A 'use server' file can only export async functions, found object": src/app/provider/preauth/[id]/actions.ts (a "use server" module) exported the const PROVIDER_CANCELLABLE_STATUSES. "use server" files may export ONLY async functions, and this is enforced by `next build`, not by `tsc`. Fix = move the const into a plain src/app/provider/preauth/[id]/constants.ts imported by BOTH actions.ts and page.tsx (commit 2bc2545). `next build` then exits 0 (166/166 pages).
+  2) Vercel deploy `errorCode: potential_dataloss` — scripts/db-sync.mjs's `prisma db push` (no --accept-data-loss, by design) refused to add the F2.1 `Document.uploadIntentId String? @unique` because db push conservatively treats a new UNIQUE index as potentially destructive (even on an all-NULL column). Fix (out-of-band, human-safe, Supabase apply_migration add_document_upload_intent_unique): `ALTER TABLE "Document" ADD COLUMN "uploadIntentId" text` + `CREATE UNIQUE INDEX "Document_uploadIntentId_key" ON "Document"("uploadIntentId")` — AFTER verifying by SQL the column was absent and only 1 Document row existed (→ NULL, zero dup risk). Did NOT use --accept-data-loss. Re-triggered with empty commit 6ae0ee5 → the next db push had nothing destructive left → Vercel READY.
+Result: main tip 6ae0ee5; CI green — brand-guard GitHub Action success + Vercel deployment READY.
+Prod schema verification (2026-07-29): the 6ae0ee5 deploy's own db-sync step logged "🚀 Your database is now in sync with your Prisma schema" against the prod pooler aws-1-eu-central-1.pooler.supabase.com:5432 — db push checks tables/columns/enums/enum-values/indexes/constraints/defaults, and it completed with no error and no --accept-data-loss (so zero pending changes remained). Independent DB check (Supabase project otivyuroqraiijayvkze, execute_sql): 215 model tables (+2 implicit m2m join = 217 base) / 191 enums — EXACTLY matching the merged schema.prisma; all 13 spot-checked PNOS tables present (Capitation×5, ProviderIntegration×5, ProviderPerformanceScore, DocumentUploadIntent, ProviderApiKey); the Document.uploadIntentId column + the Document_uploadIntentId_key unique index both present. Nothing left to push.
+Lesson (stated to the user): verify a merge with `next build` AND a prod-parity `db push` dry-run — not just `tsc` + tests; both CI failures were exactly the class those two checks catch, and the standard tsc+vitest gate is blind to "use server" export shape and to db-push data-loss refusals.
+Activation state: NOTHING activated on merge — every activation stays flag-gated OFF or behind a human sign-off on live main.
+Remaining = HUMAN GATES ONLY (nothing code-buildable): F9.7 pull activation (signed HMS partner contract + sandbox), F9.9 hms-batch legacy cutover flip, F10.1 CAP-1.0 six-owner sign-off + F10.7 pilot (≥3 reconciled periods, finance/provider go/no-go), F11.5/F11.6 (load + a11y on a production-like seeded deployment), F11.8–F11.10 (actor UAT / pilot / GA — F11.9 is where the F9.7/F10.7 gated activations happen).
+```
+
+---

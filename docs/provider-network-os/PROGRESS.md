@@ -226,3 +226,19 @@
 | F11.8 | Actor-based end-to-end UAT | gate | GATED(human actors + sign-off) | — |
 | F11.9 | Pilot-provider activation | gate | GATED(sign-offs + runbooks) | — |
 | F11.10 | GA + legacy retirement (multiple pkgs) | multi | GATED(pilot + product sign-off) | — |
+
+---
+
+## ★ SHIP STATUS — MERGED TO MAIN + PROD-DEPLOYED (2026-07-29)
+
+**All buildable PNOS scope (F0–F11.4/F11.7) is on `main` and live on prod.** `feat/provider-network-os` (187 commits, pre-merge tip `8b447bf`) was merged into `main` via a real merge commit; the 7 concurrent claims-autopilot commits that had landed on `origin/main` were integrated by `git merge origin/main` (merge `86e0ec7`), **not a force-push** (pre-checked conflict-free via `git merge-tree`). The branch **and** the `.claude/worktrees/pnos` worktree are **deleted (local + remote)**. **Current `main` tip = `6ae0ee5`.**
+
+**Post-merge CI fixes (reusable landmines — a class `tsc` + vitest do NOT catch):**
+- **`next build`** rejects a non-async export from a `"use server"` file — moved the const `PROVIDER_CANCELLABLE_STATUSES` out of `src/app/provider/preauth/[id]/actions.ts` into a plain `constants.ts` imported by both `actions.ts` + `page.tsx` (`2bc2545`).
+- **Prod `prisma db push`** (via `scripts/db-sync.mjs`, no `--accept-data-loss`) refused the new `Document.uploadIntentId @unique` as `potential_dataloss` — applied out-of-band via Supabase (`ADD COLUMN` + `CREATE UNIQUE INDEX "Document_uploadIntentId_key"`) after verifying by SQL the column was absent and only 1 `Document` row existed (→ NULL, zero dup risk); re-triggered with empty commit `6ae0ee5`.
+
+**CI green** — brand-guard GitHub Action success + Vercel deployment **READY**. **Prod schema verified fully in sync (2026-07-29):** the `6ae0ee5` deploy's own `db-sync` step logged `🚀 Your database is now in sync with your Prisma schema`; an independent DB check (Supabase `otivyuroqraiijayvkze`) found **215 model tables / 191 enums exactly matching the merged `schema.prisma`**, all 13 spot-checked PNOS tables present, and the `Document.uploadIntentId` column + `Document_uploadIntentId_key` unique index both present.
+
+**Nothing activated on merge** — every activation stays flag-gated OFF or behind a human sign-off on live `main`. **Remaining = human gates only:** F9.7 pull activation (signed HMS contract), F9.9 hms-batch cutover, F10.1 six-owner sign-off + F10.7 pilot, F11.5/F11.6 (perf + a11y on a production-like seeded deployment), F11.8–F11.10 (actor UAT / pilot / GA — F11.9 is where the F9.7/F10.7 gated activations happen).
+
+**LESSON:** verify a merge with `next build` **and** a prod-parity `db push` dry-run — not just `tsc` + tests.
