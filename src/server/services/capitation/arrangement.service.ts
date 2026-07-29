@@ -124,9 +124,18 @@ export const CapitationArrangementService = {
     if (!arr) throw new CapitationError("NOT_FOUND", "No such arrangement.");
     const existing = await prisma.capitationPeriod.findFirst({ where: { arrangementId: arr.id, period } });
     if (existing) return existing; // idempotent
-    return prisma.capitationPeriod.create({
-      data: { tenantId: actor.tenantId, arrangementId: arr.id, period, periodStart: bounds.periodStart, periodEnd: bounds.periodEnd, definitionVersion: arr.eligibilityDefinitionVersion, rate: arr.rate, status: "DRAFT" },
-    });
+    try {
+      return await prisma.capitationPeriod.create({
+        data: { tenantId: actor.tenantId, arrangementId: arr.id, period, periodStart: bounds.periodStart, periodEnd: bounds.periodEnd, definitionVersion: arr.eligibilityDefinitionVersion, rate: arr.rate, status: "DRAFT" },
+      });
+    } catch (e) {
+      // Concurrency-safe: a parallel open won the @@unique([arrangementId, period]) race — return its row.
+      if (e && typeof e === "object" && (e as { code?: string }).code === "P2002") {
+        const raced = await prisma.capitationPeriod.findFirst({ where: { arrangementId: arr.id, period } });
+        if (raced) return raced;
+      }
+      throw e;
+    }
   },
 
   /** Guard: a FROZEN/PAID/CLOSED period is immutable (its snapshot/accrual cannot change). */
