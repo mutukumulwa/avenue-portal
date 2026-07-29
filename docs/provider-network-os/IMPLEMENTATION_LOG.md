@@ -2684,6 +2684,33 @@ Stop condition observed: yes — the Decimal accrual + conservation + maker/chec
 
 ---
 
+## F10.5 — Link encounters and protect carve-outs (BUILT · activation GATED)
+
+```text
+Work package: F10.5 (phase F10 — capitation/PMPM extension)
+Status: BUILT · GATED. An included capitated line is zero FFS payable + linked for utilization; a carve-out flows ordinary FFS; a line links at most once. The FFS-settlement guard exists + is tested. NO provider statement (F10.5 stop). Gated behind F10.1.
+Commit: this feat commit (schema + service + factory teardown + test) + the paired docs commit (this note + PROGRESS row).
+Proof-before-build classification: MISSING (no encounter linkage). Grounded in the existing FundingModelType.CAPITATION tag (schema:1987) + the F10.2 arrangement. Additive link model; no ClaimLine change. No CONFLICTING path.
+Files changed: prisma/schema.prisma (+ CapitationEncounterLink + CapitationFunding enum — additive, pushed); src/server/services/capitation/encounter-link.service.ts (new); tests/factories/provider-network.ts (encounter-link teardown); tests/services/capitation-encounter-link.service.test.ts (new — 5 DB); docs PROGRESS + this note.
+Schema/data changes: ADDITIVE only — CapitationEncounterLink (relation-less; @@unique([entityType, entityId])) + CapitationFunding(INCLUDED/CARVE_OUT). NO change to ClaimLine/CaseServiceEntry — the link is a SEPARATE row, so utilization is preserved by construction.
+Behavior delivered (the 6 plan steps): (1) resolveArrangement finds the ACTIVE arrangement effective at the service date for the provider (+ branch — a branch-specific arrangement wins over the provider-level ""); (2) linkEncounter tags an INCLUDED line + links the period; (3) assertFfsSettlementAllowed HARD-DENIES an INCLUDED (zero-pay) line from FFS settlement; (4) utilization preserved — the link never mutates/deletes the encounter (proven: the CaseServiceEntry is unchanged after linking); (5) a CARVE_OUT is classified explicitly + settles ordinary FFS (the guard allows it); (6) conflict/missing arrangement reported — NO_ARRANGEMENT for an out-of-window service, and a double-link is OVERLAP.
+Authorization evidence: linkEncounter is finance-role-gated (a PROVIDER_USER is FORBIDDEN — proven).
+Idempotency/concurrency evidence: @@unique([entityType, entityId]) makes a second link (even a different funding) a CONFLICT — the same service can never be both capitated and FFS without an explicit split (proven).
+Privacy/security evidence: the link carries member/provider/service-date + the funding decision ONLY — no clinical detail.
+Money/reconciliation evidence: THE zero-pay protection — an INCLUDED line is denied FFS settlement (proven: assertFfsSettlementAllowed throws for INCLUDED, resolves for CARVE_OUT and for an unlinked line). This is the §D24 / PNO-CAP-004 "included capitated encounter is zero FFS payable and cannot enter ordinary settlement."
+Focused tests and results: 5 DB — classify included/carve-out/no-arrangement across the effective-date boundary; the FFS-settlement hard-deny for INCLUDED vs allow for CARVE_OUT/unlinked; no double-link (OVERLAP); utilization preserved (the entry is untouched after linking); the finance-role gate. 5/5 pass; self-skip without AUTOPILOT_TEST_DB. Capitation suites co-run 18/18. tsc + brand + currency green; full no-DB suite 1541 pass / 485 skip.
+Typecheck/schema result: tsc --noEmit clean; schema additive + pushed.
+Manual/visual evidence: N/A — service only.
+Feature-flag state: GATED — invoked only by tests; the guard is NOT yet wired into the live FFS settlement path (that wiring is the gated activation, needing the F10.1 sign-off).
+Backfill/rollout impact: none.
+Known limitations / deferrals (flagged): (a) NO provider statement (F10.6); (b) assertFfsSettlementAllowed is provided + tested but NOT yet called by the live settlement/adjudication rail — wiring it is the gated activation step; (c) the CAPITATION-vs-FFS service determination is passed in by the caller (from the benefit config's FundingModelType) — F10.5 owns the arrangement resolution + the guard, not the benefit-config lookup.
+Unrelated worktree changes preserved: yes — worktree contained only scratchpad/ (untracked) + the F10.5 files; the main-checkout dirty UAT files untouched.
+Next allowed package: F10.6 — Build capitation statement, approval, and payment (L; depends F10.4, F10.5, F6 disbursement). GATED activation. Buildable: a canonical capitation statement view (lives/rate/accrual/adjustments/encounters/carve-outs/payment/balance) reconciling to the ledger, maker/checker approval, and the voucher/GL/disbursement wiring reusing the F6 owners; conservation opening+accrual+adjustments−payments=closing. Stop: no second arrangement type until pilot sign-off.
+Stop condition observed: yes — the encounter link + carve-out classification + the zero-pay FFS guard delivered; NO provider statement, NO payment, NO activation.
+```
+
+---
+
 **★ PHASE F9 — BUILDABLE SCOPE COMPLETE (F9.1→F9.9).** The HMS integration control plane end to end: inventory (F9.1) → additive §7.11 schema (F9.2) → connection/credential admin (F9.3) → durable inbound receipt (F9.4) → canonical CASE_SERVICE routing (F9.5) → retry/quarantine/sweeper (F9.6) → SSRF-safe pull adapter (F9.7, activation GATED) → ops views (F9.8) → legacy cutover support (F9.9, flip GATED). **Gate F (delivery receipts survive queue/app failure) CODE-MET; the "first real connector passes replay/retry/mapping/reconciliation UAT" half of Gate F stays OPEN pending F9.7 pilot activation (signed HMS contract + sandbox).** The legacy /api/v1/hms-batch route is UNTOUCHED and remains the live push path until the F9.9 flip. Deferred within F9 (all needing a real partner contract / pilot sign-off): F9.7 pilot activation + connection-pinned DNS-TOCTOU closure + reversible outbound-credential storage + body-HMAC signature; F9.9 live flip + legacy retirement. Other object types (PA/claim/case-activity) reuse the F9.5 pattern behind their own versioned mapper.
 
 ---
