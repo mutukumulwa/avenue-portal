@@ -2657,6 +2657,33 @@ Stop condition observed: yes — the idempotent eligible-life snapshot + freeze 
 
 ---
 
+## F10.4 — Calculate/freeze capitation accrual (BUILT · activation GATED)
+
+```text
+Work package: F10.4 (phase F10 — capitation/PMPM extension)
+Status: BUILT · GATED. Period accrual uses the frozen snapshot × the effective rate + approved adjustments with EXACT Decimal conservation + a maker/checker freeze. NO payment (F10.4 stop). Gated behind the F10.1 sign-off.
+Commit: this feat commit (accrual service + test) + the paired docs commit (this note + PROGRESS row).
+Proof-before-build classification: MISSING (no accrual) over the F10.2/F10.3 owners. Uses Prisma.Decimal (the repo money type; §0.4 no JS float). No CONFLICTING path.
+Files changed: src/server/services/capitation/accrual.service.ts (new); tests/services/capitation-accrual.service.test.ts (new — 5 DB); docs PROGRESS + this note.
+Schema/data changes: NONE — writes the F10.2 period's accrual/conservation fields + controlTotals.
+Behavior delivered (the 6 plan steps): (1) loads the frozen snapshot (eligibleLifeCount) + effective rate; (2) calculates with Prisma.Decimal, half-up at MONEY_DP=4 (PMPM = lives × rate; FIXED_PERIOD = rate; PER_VISIT = countedVisits × rate, visits from F10.5); (3) sums append-only approved adjustments (signed) into adjustmentTotal; (4) records calculationVersion (increments each recompute) + controlTotals (lives/rate/gross/adj/calculatedById); (5) enforces the maker/checker freeze (freezeAccrual requires the checker ≠ the recorded calculator); (6) a correction after freeze is refused (a FROZEN period rejects recompute — it becomes an adjustment/reopen, never a silent rewrite).
+Authorization evidence: finance-role-gated; freezeAccrual additionally enforces maker≠checker (proven: the maker who calculated is FORBIDDEN from freezing; a distinct checker freezes).
+Idempotency/concurrency evidence: recompute over the same frozen facts yields the same money (grossAccrual/closingBalance stable) while the calculationVersion bumps (proven) — a duplicate calculate is value-idempotent.
+Privacy/security evidence: N/A (money, no PHI).
+Money/reconciliation evidence: THE conservation law — opening + grossAccrual + adjustments − payments = closing, all Prisma.Decimal(19,4) half-up (proven: 2×12000 ⇒ 24000.0000 closing; opening carried from the prior period's closing ⇒ 48000.0000; adjustments +3000/−1000 ⇒ 52000.0000 payable+closing); the rounding is exact (3 × 12000.3333 ⇒ 36000.9999, no float drift).
+Focused tests and results: 5 DB — PMPM conservation; Decimal half-up rounding; append-only adjustments into payable+closing + value-idempotent duplicate calculate; opening carried from the prior period; maker/checker freeze (maker refused, checker freezes) + post-freeze immutability. 5/5 pass; self-skip without AUTOPILOT_TEST_DB. Capitation suites co-run 13/13. tsc + brand + currency green; full no-DB suite 1541 pass / 480 skip.
+Typecheck/schema result: tsc --noEmit clean; no schema change.
+Manual/visual evidence: N/A — service only; the statement UI is F10.6.
+Feature-flag state: GATED — invoked only by tests until the F10.1 sign-off.
+Backfill/rollout impact: none.
+Known limitations / deferrals (flagged): (a) NO payment (F10.6); (b) PER_VISIT accrual takes a countedVisits input pending the F10.5 encounter links; (c) the finance-role gate is the F10.2 placeholder pending a dedicated capitation permission + a full approval-matrix maker/checker (F10.6); (d) opening balance is the immediately-prior period's closing — a mid-arrangement opening (migration) would be seeded explicitly.
+Unrelated worktree changes preserved: yes — worktree contained only scratchpad/ (untracked) + the F10.4 files; the main-checkout dirty UAT files untouched. (Ops note: the throwaway pnos_uat DB was reaped during a long pause and rebuilt fresh at /tmp/pnos-pgdata, socket /tmp/pnospg, then re-pushed — see TEST_DB_HARNESS.md.)
+Next allowed package: F10.5 — Link encounters and protect carve-outs (M; depends F10.2, contract funding logic, Claims Autopilot). Resolve the arrangement at service date/provider/branch/service; tag an included capitated encounter/claim line + link the period; hard-route/deny FFS settlement of the included zero-pay line; preserve clinical utilization; identify a carve-out explicitly + process canonical FFS; report conflict/missing arrangement. Tests: included vs carve-out; rate/contract date; zero line cannot settle; same service cannot count as both without an explicit split; utilization remains. Stop: no provider statement.
+Stop condition observed: yes — the Decimal accrual + conservation + maker/checker freeze delivered; NO payment, NO activation.
+```
+
+---
+
 **★ PHASE F9 — BUILDABLE SCOPE COMPLETE (F9.1→F9.9).** The HMS integration control plane end to end: inventory (F9.1) → additive §7.11 schema (F9.2) → connection/credential admin (F9.3) → durable inbound receipt (F9.4) → canonical CASE_SERVICE routing (F9.5) → retry/quarantine/sweeper (F9.6) → SSRF-safe pull adapter (F9.7, activation GATED) → ops views (F9.8) → legacy cutover support (F9.9, flip GATED). **Gate F (delivery receipts survive queue/app failure) CODE-MET; the "first real connector passes replay/retry/mapping/reconciliation UAT" half of Gate F stays OPEN pending F9.7 pilot activation (signed HMS contract + sandbox).** The legacy /api/v1/hms-batch route is UNTOUCHED and remains the live push path until the F9.9 flip. Deferred within F9 (all needing a real partner contract / pilot sign-off): F9.7 pilot activation + connection-pinned DNS-TOCTOU closure + reversible outbound-credential storage + body-HMAC signature; F9.9 live flip + legacy retirement. Other object types (PA/claim/case-activity) reuse the F9.5 pattern behind their own versioned mapper.
 
 ---
