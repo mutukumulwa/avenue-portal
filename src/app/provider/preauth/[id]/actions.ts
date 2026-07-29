@@ -9,11 +9,7 @@ import { preauthAdjudicationService } from "@/server/services/preauth-adjudicati
 import { getSystemActorId } from "@/server/services/system-actor.service";
 import { ClaimsService } from "@/server/services/claims.service";
 import { writeAudit } from "@/lib/audit";
-
-// A provider may cancel its own PA only BEFORE use (provider.preauth.cancel spec).
-// Once a PA is ATTACHED/UTILISED/CONVERTED (in use on a claim) or already terminal,
-// it is not provider-cancellable. cancelPreAuth also backstops terminal states.
-export const PROVIDER_CANCELLABLE_STATUSES = ["SUBMITTED", "UNDER_REVIEW", "APPROVED"];
+import { PROVIDER_CANCELLABLE_STATUSES } from "./constants";
 
 export async function cancelProviderPreauthAction(
   input: { preAuthId: string; reason: string },

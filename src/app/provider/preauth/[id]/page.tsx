@@ -10,7 +10,7 @@ import { AmendPreauthForm } from "./AmendPreauthForm";
 import { FileClaimButton } from "./FileClaimButton";
 import { GopButton } from "./GopButton";
 import { buildGopData } from "./gop-artifact";
-import { PROVIDER_CANCELLABLE_STATUSES } from "./actions";
+import { PROVIDER_CANCELLABLE_STATUSES } from "./constants";
 
 function money(n: number | null | undefined) {
   return `UGX ${Math.round(Number(n ?? 0)).toLocaleString("en-UG")}`;
