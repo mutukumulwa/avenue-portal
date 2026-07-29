@@ -2630,6 +2630,33 @@ Stop condition observed: yes — the additive schema + structural invariants del
 
 ---
 
+## F10.3 — Implement eligible-life snapshot (BUILT · activation GATED)
+
+```text
+Work package: F10.3 (phase F10 — capitation/PMPM extension)
+Status: BUILT · GATED. One idempotent period snapshot records exactly which covered lives qualify + why, from canonical coverage. NO accrual (F10.3 stop). Gated behind the F10.1 sign-off.
+Commit: this feat commit (eligible-life service + test) + the paired docs commit (this note + PROGRESS row).
+Proof-before-build classification: MISSING (no snapshot) over the F10.2 schema + the CANONICAL coverage owner. Files inspected: Member (schema:895 — groupId/packageId/relationship/status), MemberStatus (ACTIVE + terminal states), MemberCoveragePeriod (schema:985 — the Fork-B canonical coverage timeline: startDate/endDate[null=open]/reason), the F10.2 CapitationEligibleLife/period. Confirmed MemberCoveragePeriod is the canonical "covered on day D" source (Fork-B WP-B2). No CONFLICTING path.
+Files changed: src/server/services/capitation/eligible-life.service.ts (new); tests/services/capitation-eligible-life.service.test.ts (new — 4 DB); docs PROGRESS + this note.
+Schema/data changes: NONE — writes the F10.2 CapitationEligibleLife roster + the period's count/hash/snapshotInstant.
+Behavior delivered (the 6 plan steps): (1) applies the signed definition at the configured snapshot instant (period.snapshotInstant or periodStart; UTC-persisted, never server-local today, §1750); (2) queries CANONICAL effective coverage — MemberCoveragePeriod (startDate ≤ D AND (endDate null OR endDate ≥ D)) + Member.status ACTIVE + the arrangement's group/package/client scope; (3) records per-candidate inclusion + a reason (COVERED / NOT_ACTIVE / NO_COVERAGE_ON_SNAPSHOT_DAY) + the coverage source version; (4) member count + a sha256 control hash over the sorted (member, included, reason) set; (5) DRAFT recalculation before freeze — an identical roster is a control-hash NO-OP (the persisted snapshot is untouched), a coverage change recomputes; (6) freezeSnapshot (DRAFT → CALCULATED) with a completeness check (a control hash must exist) and refuses recompute afterward.
+Authorization evidence: finance-role-gated (SUPER_ADMIN/FINANCE_OFFICER) — a non-finance actor is FORBIDDEN.
+Idempotency/concurrency evidence: THE replay property — computeSnapshot over identical facts returns changed=false with the same control hash and leaves the roster untouched (proven); a coverage change flips a member to COVERED and yields a new hash + count (proven). The roster write is a single transaction (delete + createMany + period update).
+Privacy/security evidence: the roster carries memberId + inclusion + a safe reason ONLY — no clinical detail. The snapshot reads coverage/status, never diagnoses.
+Money/reconciliation evidence: N/A — no money (F10.3 stop). The frozen count + hash are the inputs the F10.4 accrual multiplies by the rate.
+Focused tests and results: 4 DB — classification at the INCLUSIVE snapshot boundary (endDate == snapshot day → COVERED) across an active principal, an active dependant (counted), a next-month joiner (NO_COVERAGE), and a suspended member (NOT_ACTIVE); the period count == the service count + a 64-char hash; replay is a no-op + a coverage change recomputes (+1 covered, new hash); an out-of-scope member (different group) is absent; freeze → CALCULATED + recompute refused. 4/4 pass; self-skip without AUTOPILOT_TEST_DB. Capitation suites co-run 14/14. tsc + brand + currency green; full no-DB suite 1541 pass / 475 skip.
+Typecheck/schema result: tsc --noEmit clean; no schema change.
+Manual/visual evidence: N/A — service only.
+Feature-flag state: GATED — invoked only by tests until the F10.1 sign-off.
+Backfill/rollout impact: none.
+Known limitations / deferrals (flagged): (a) NO accrual (F10.4); (b) the default eligible-life basis is a point-in-time census at the snapshot instant — a pro-rata / average-daily basis is a per-arrangement sign-off option (F10.1 §9); (c) scope resolution is group/package direct (or the client's groups) — richer applicability (contract-applicability INCLUDE/EXCLUDE) is a refinement if the pilot needs it; (d) finance-role gate is the F10.2 placeholder pending a dedicated capitation permission.
+Unrelated worktree changes preserved: yes — worktree contained only scratchpad/ (untracked) + the F10.3 files; the main-checkout dirty UAT files untouched.
+Next allowed package: F10.4 — Calculate/freeze capitation accrual (M; depends F10.3). Load the frozen snapshot + effective rate; calculate with Decimal/approved rounding; add append-only approved adjustments; record calculation version + control totals; enforce maker/checker freeze; a correction after freeze becomes the next adjustment/reopen, never a silent rewrite. Tests: PMPM/per-visit/fixed as the pilot requires; rate boundary/rounding; duplicate calculate/freeze; maker/checker; conservation. Stop: no payment.
+Stop condition observed: yes — the idempotent eligible-life snapshot + freeze delivered; NO accrual, NO payment, NO activation.
+```
+
+---
+
 **★ PHASE F9 — BUILDABLE SCOPE COMPLETE (F9.1→F9.9).** The HMS integration control plane end to end: inventory (F9.1) → additive §7.11 schema (F9.2) → connection/credential admin (F9.3) → durable inbound receipt (F9.4) → canonical CASE_SERVICE routing (F9.5) → retry/quarantine/sweeper (F9.6) → SSRF-safe pull adapter (F9.7, activation GATED) → ops views (F9.8) → legacy cutover support (F9.9, flip GATED). **Gate F (delivery receipts survive queue/app failure) CODE-MET; the "first real connector passes replay/retry/mapping/reconciliation UAT" half of Gate F stays OPEN pending F9.7 pilot activation (signed HMS contract + sandbox).** The legacy /api/v1/hms-batch route is UNTOUCHED and remains the live push path until the F9.9 flip. Deferred within F9 (all needing a real partner contract / pilot sign-off): F9.7 pilot activation + connection-pinned DNS-TOCTOU closure + reversible outbound-credential storage + body-HMAC signature; F9.9 live flip + legacy retirement. Other object types (PA/claim/case-activity) reuse the F9.5 pattern behind their own versioned mapper.
 
 ---
