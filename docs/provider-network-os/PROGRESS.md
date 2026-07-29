@@ -216,13 +216,13 @@
 
 | Pkg | Title | Size | Status | Evidence |
 |---|---|---|---|---|
-| F11.1 | Cross-provider/branch/role security suite | M | NOT_STARTED | — |
-| F11.2 | Concurrency/idempotency suite | M | NOT_STARTED | — |
-| F11.3 | Money conservation suite | M | NOT_STARTED | — |
-| F11.4 | Privacy/log/export scan | M | NOT_STARTED | — |
-| F11.5 | Performance/load tests | M | NOT_STARTED | — |
-| F11.6 | Accessibility + responsive UAT | M | NOT_STARTED | — |
-| F11.7 | Operations + incident runbooks | M | NOT_STARTED | — |
+| F11.1 | Cross-provider/branch/role security suite | M | COMPLETE (F9/F10 surfaces) | `tests/security/pnos-cross-boundary.test.ts` (cross-provider A↛B + cross-tenant alpha↛beta + role denial, non-enumerating; 3 DB) + `SECURITY_MATRIX.md` (surface→enforcement→covering-test; F1–F8 via per-package suites) |
+| F11.2 | Concurrency/idempotency suite | M | COMPLETE (F9/F10 commands) | `tests/concurrency/repeatable-commands.test.ts` — REAL `Promise.all`: duplicate delivery→one row, lease→one winner, period opens once, accrual value-stable (4 DB). +hardened `openPeriod` P2002-catch |
+| F11.3 | Money conservation suite | M | COMPLETE (capitation) | `tests/financial/capitation-conservation.test.ts` — the conservation law holds at EVERY transition of a full accrue→adjust→pay→reverse→repay→close lifecycle + no-FFS-double-pay + overpay-reject (3 DB) |
+| F11.4 | Privacy/log/export scan | M | COMPLETE (F9/F10 read models) | `tests/privacy/pnos-marker-scan.test.ts` — seeded secret + raw-body PHI marker + finance ids never surface in any ops read model / receipt / statement (2 DB) |
+| F11.5 | Performance/load tests | M | DEFERRED(needs production-like dataset + deployment) | — |
+| F11.6 | Accessibility + responsive UAT | M | DEFERRED(needs a real browser + seeded env — worktree cannot browser-verify) | — |
+| F11.7 | Operations + incident runbooks | M | COMPLETE (F9/F10 surfaces) | `OPERATIONS_RUNBOOKS.md` — RB-1..8 (delivery stuck/poison, circuit, secret rotation, capitation mismatch/reversal, zero-pay-FFS, privacy incident); each with symptoms/safe-queries/actions/escalation/reconciliation/closure; no manual DB edits |
 | F11.8 | Actor-based end-to-end UAT | gate | GATED(human actors + sign-off) | — |
 | F11.9 | Pilot-provider activation | gate | GATED(sign-offs + runbooks) | — |
 | F11.10 | GA + legacy retirement (multiple pkgs) | multi | GATED(pilot + product sign-off) | — |
