@@ -278,39 +278,20 @@ export const claimAdjudicationService = {
 
   // ── 7. Initiate appeal ────────────────────────────────────────────────────
 
-  async initiateAppeal(claimId: string, tenantId: string, appealNotes: string, appealReviewerId: string) {
-    const claim = await prisma.claim.findUnique({
-      where: { id: claimId, tenantId },
-      select: { adjudicatorId: true, status: true, claimNumber: true },
-    });
-    if (!claim) throw new TRPCError({ code: "NOT_FOUND", message: "Claim not found" });
-    if (!["DECLINED","PARTIALLY_APPROVED"].includes(claim.status)) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "Can only appeal DECLINED or PARTIALLY_APPROVED claims" });
-    }
-    if (claim.adjudicatorId === appealReviewerId) {
-      throw new TRPCError({ code: "FORBIDDEN", message: "Appeal must be reviewed by a different person than the original adjudicator" });
-    }
-
-    assertClaimTransition(claim.status, "APPEALED", "appeal"); // F7.1
-    await prisma.claim.update({
-      where: { id: claimId },
-      data: {
-        status:          "APPEALED",
-        appealDate:      new Date(),
-        appealNotes,
-        appealReviewerId,
-      },
-    });
-
-    await auditChainService.append({
-      actorId:    appealReviewerId,
-      action:     "CLAIM:APPEAL_INITIATED",
-      module:     "CLAIM",
-      entityType: "Claim",
-      entityId:   claimId,
-      payload:    { appealNotes, appealReviewerId },
-      tenantId,
-      description: `Claim ${claim.claimNumber} appeal initiated`,
+  /**
+   * PNOS F5.17 — RETIRED. Same-claim appeals (which flipped the ORIGINAL claim to APPEALED) are
+   * replaced by the reconsideration workflow (F5.11–F5.16): a governed case that challenges a
+   * decided claim WITHOUT ever mutating it (D13). This method no longer creates an appeal — it
+   * throws — so no new code can revive the old mutation path (an architecture guard also bans any
+   * new APPEALED-status write). Historic APPEALED / APPEAL_APPROVED / APPEAL_DECLINED records
+   * are preserved read-only; the safe mapping + migration are gated on sign-off (see
+   * docs/provider-network-os/LEGACY_APPEAL_CONSOLIDATION.md).
+   */
+  async initiateAppeal(claimId: string, tenantId: string, appealNotes: string, appealReviewerId: string): Promise<never> {
+    void claimId; void tenantId; void appealNotes; void appealReviewerId;
+    throw new TRPCError({
+      code: "PRECONDITION_FAILED",
+      message: "Same-claim appeals are retired — file a reconsideration instead (it never alters the original claim).",
     });
   },
 

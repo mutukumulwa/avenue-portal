@@ -1,9 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import type { ClaimStatus, PreauthStatus, BenefitCategory, ServiceType, Prisma } from "@prisma/client";
-import { FraudService } from "./fraud.service";
+import type { ClaimStatus, ServiceType, Prisma } from "@prisma/client";
 import { ProviderContractsService, type ResolvedClaimRates } from "./provider-contracts.service";
-import { createWithDocumentNumber } from "@/lib/document-number";
-import { BenefitUsageService } from "./benefit-usage.service";
 
 export class ClaimsService {
   // ─── CLAIMS ─────────────────────────────────────────────
@@ -298,7 +295,7 @@ export class ClaimsService {
     ]);
     if (!claim) throw new Error("Claim not found");
     if (!pa) throw new Error("Pre-authorization not found");
-    if (["PAID", "DECLINED", "VOID"].includes(claim.status)) {
+    if (["PAID", "DECLINED", "VOID", "WITHDRAWN", "SUPERSEDED"].includes(claim.status)) {
       throw new Error(`Cannot attach a pre-auth to a ${claim.status} claim`);
     }
     if (pa.claimId === claimId) return pa; // already attached here — idempotent
@@ -386,148 +383,6 @@ export class ClaimsService {
   }
 
   // ─── PRE-AUTHORIZATIONS ─────────────────────────────────
-
-  /**
-   * List pre-authorizations
-   */
-  static async getPreAuthorizations(tenantId: string, status?: PreauthStatus) {
-    return prisma.preAuthorization.findMany({
-      where: { tenantId, ...(status ? { status } : {}) },
-      include: {
-        member: { select: { id: true, firstName: true, lastName: true, memberNumber: true } },
-        provider: { select: { id: true, name: true, type: true } },
-      },
-      orderBy: { createdAt: "desc" },
-    });
-  }
-
-  /**
-   * Get a single pre-authorization with full details
-   */
-  static async getPreAuthById(tenantId: string, id: string) {
-    return prisma.preAuthorization.findUnique({
-      where: { id, tenantId },
-      include: {
-        member: {
-          include: {
-            group: { select: { id: true, name: true } },
-          },
-        },
-        provider: true,
-        claim: true,
-        documents: { orderBy: { createdAt: "desc" } },
-      },
-    });
-  }
-
-  /**
-   * Submit a pre-authorization request
-   */
-  static async createPreAuth(tenantId: string, data: {
-    memberId: string;
-    providerId: string;
-    serviceType: ServiceType;
-    expectedDateOfService?: Date;
-    diagnoses: Record<string, unknown>[];
-    procedures: Record<string, unknown>[];
-    estimatedCost: number;
-    clinicalNotes?: string;
-    benefitCategory: BenefitCategory;
-    submittedBy: string;
-  }) {
-    // ── Eligibility gate ────────────────────────────────────────────────────
-    const member = await prisma.member.findUnique({
-      where: { id: data.memberId, tenantId },
-      include: { group: { select: { status: true, name: true } } },
-    });
-    if (!member) throw new Error("Member not found");
-
-    const BLOCKED = ["SUSPENDED", "LAPSED", "TERMINATED"];
-    if (BLOCKED.includes(member.status)) {
-      throw new Error(
-        `Cannot submit pre-authorisation: member ${member.firstName} ${member.lastName} is ${member.status}.`
-      );
-    }
-    if (member.group && BLOCKED.includes(member.group.status)) {
-      throw new Error(
-        `Cannot submit pre-authorisation: group "${member.group.name}" is ${member.group.status}.`
-      );
-    }
-
-    // Provider gate (PR-006): PA requests are new encounters — only ACTIVE
-    // providers accept them (server-enforced, matching the dropdown rule).
-    const paProvider = await prisma.provider.findUnique({
-      where: { id: data.providerId },
-      select: { contractStatus: true, name: true },
-    });
-    if (paProvider && !["ACTIVE"].includes(paProvider.contractStatus)) {
-      throw new Error(
-        `Provider "${paProvider.name}" is ${paProvider.contractStatus} — pre-authorisations can only be requested at ACTIVE providers.`
-      );
-    }
-    // ────────────────────────────────────────────────────────────────────────
-
-    // ── Fraud pre-auth screen (CRITICAL rules throw; others return warnings) ─
-    const fraudWarnings = await FraudService.evaluatePreAuth({
-      memberId: data.memberId,
-      providerId: data.providerId,
-      serviceType: data.serviceType,
-      expectedDateOfService: data.expectedDateOfService,
-      estimatedCost: data.estimatedCost,
-      procedures: data.procedures as Array<{ description?: string; cptCode?: string }>,
-      memberGender: member.gender,
-      tenantId,
-    });
-    // ────────────────────────────────────────────────────────────────────────
-
-    // ── Benefit-in-package gate (PR-024): validate at REQUEST time, not at
-    // claim decision. Approving a PA for a benefit the member doesn't hold
-    // creates a phantom hold and a claim that can never be approved.
-    const benefitCfg = await BenefitUsageService.resolveConfig(prisma, data.memberId, data.benefitCategory);
-    if (!benefitCfg) {
-      throw new Error(
-        `Benefit "${String(data.benefitCategory).replace(/_/g, " ")}" is not in this member's package — ` +
-        `a pre-authorization against it could never pay. Pick a benefit category from the member's package.`,
-      );
-    }
-
-    // B4: collision-safe pre-auth number (max+1 seed + reservation-retry).
-    const preauth = await createWithDocumentNumber(
-      "PA",
-      (yp) =>
-        prisma.preAuthorization
-          .findFirst({
-            where: { tenantId, preauthNumber: { startsWith: yp } },
-            orderBy: { preauthNumber: "desc" },
-            select: { preauthNumber: true },
-          })
-          .then((r) => r?.preauthNumber ?? null),
-      (preauthNumber) =>
-        prisma.preAuthorization.create({
-          data: {
-            tenantId,
-            preauthNumber,
-            memberId: data.memberId,
-            providerId: data.providerId,
-            serviceType: data.serviceType,
-            expectedDateOfService: data.expectedDateOfService,
-            diagnoses: data.diagnoses as Prisma.InputJsonValue,
-            procedures: data.procedures as Prisma.InputJsonValue,
-            estimatedCost: data.estimatedCost,
-            clinicalNotes: data.clinicalNotes,
-            benefitCategory: data.benefitCategory,
-            submittedBy: data.submittedBy,
-            status: "SUBMITTED",
-          },
-          include: {
-            member: { select: { firstName: true, lastName: true, memberNumber: true } },
-            provider: { select: { name: true } },
-          },
-        }),
-    );
-
-    return { preauth, warnings: fraudWarnings };
-  }
 
   /**
    * Stage 1 of two-stage review: move a SUBMITTED inpatient pre-auth to UNDER_REVIEW.

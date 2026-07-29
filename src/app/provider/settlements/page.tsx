@@ -1,5 +1,7 @@
+import Link from "next/link";
 import { requireProvider } from "@/lib/provider-portal";
 import { prisma } from "@/lib/prisma";
+import { ProviderAccessSettingsService } from "@/server/services/provider-access-settings.service";
 import { Banknote } from "lucide-react";
 
 function money(n: number) {
@@ -18,6 +20,11 @@ const TONE: Record<string, string> = {
 
 export default async function ProviderSettlements() {
   const { provider, tenantId } = await requireProvider();
+
+  // F6.4: the per-batch remittance detail is a provider-facing surface, live only
+  // after the F6.1 §12 finance sign-off (providerRemittanceV2). When off, the list
+  // still shows (legacy behaviour) but rows do not link to the gated detail.
+  const detailLive = await ProviderAccessSettingsService.isRemittanceV2Enabled(tenantId, provider.id);
 
   const [batches, paidAgg, vouchers] = await Promise.all([
     prisma.providerSettlementBatch.findMany({
@@ -71,7 +78,13 @@ export default async function ProviderSettlements() {
               {batches.map((b) => (
                 <tr key={b.id} className="border-b border-[#F4F4F4] last:border-0">
                   <td className="px-5 py-2.5 font-semibold">
-                    {MONTHS[b.cycleMonth] ?? b.cycleMonth} {b.cycleYear}
+                    {detailLive ? (
+                      <Link href={`/provider/settlements/${b.id}`} className="text-brand-indigo hover:underline">
+                        {MONTHS[b.cycleMonth] ?? b.cycleMonth} {b.cycleYear}
+                      </Link>
+                    ) : (
+                      <>{MONTHS[b.cycleMonth] ?? b.cycleMonth} {b.cycleYear}</>
+                    )}
                     {b.sequence > 1 && <span className="ml-1 text-[10px] font-bold text-brand-indigo">· Run {b.sequence}</span>}
                   </td>
                   <td className="px-5 py-2.5 text-right">{b._count.claims}</td>

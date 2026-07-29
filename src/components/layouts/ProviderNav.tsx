@@ -5,26 +5,48 @@ import { signOut } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
+  Inbox,
   UserCheck,
   FileText,
   Layers,
+  ShieldCheck,
   FilePlus2,
   Banknote,
+  ScrollText,
+  BarChart3,
+  IdCard,
   KeyRound,
+  Cable,
   LogOut,
+  type LucideIcon,
 } from "lucide-react";
+import type { ProviderNavIconKey, ProviderNavItemView } from "./provider-nav-model";
 
-const NAV_ITEMS = [
-  { label: "Dashboard",   href: "/provider/dashboard",   icon: LayoutDashboard },
-  { label: "Eligibility", href: "/provider/eligibility", icon: UserCheck       },
-  { label: "Claims",      href: "/provider/claims",      icon: FileText        },
-  { label: "Cases",       href: "/provider/cases",       icon: Layers          },
-  { label: "New Claim",   href: "/provider/claims/new",  icon: FilePlus2       },
-  { label: "Settlements", href: "/provider/settlements", icon: Banknote        },
-  { label: "API Keys",    href: "/provider/api-keys",    icon: KeyRound        },
-];
+// iconKey → component map (icons cannot cross the server→client boundary as
+// values, so the server passes a stable string key that we resolve here).
+const ICONS: Record<ProviderNavIconKey, LucideIcon> = {
+  dashboard: LayoutDashboard,
+  inbox: Inbox,
+  eligibility: UserCheck,
+  claims: FileText,
+  cases: Layers,
+  preauth: ShieldCheck,
+  "new-claim": FilePlus2,
+  settlements: Banknote,
+  contracts: ScrollText,
+  performance: BarChart3,
+  profile: IdCard,
+  "api-keys": KeyRound,
+  integrations: Cable,
+};
 
-export function ProviderNav({ providerName }: { providerName: string }) {
+/**
+ * F1.4: renders the already permission-filtered nav computed server-side
+ * (computeProviderNav). It receives only browser-safe {key,label,href,iconKey}
+ * items — never permissions, provider id, or branch scope. Hiding an item is
+ * convenience only; every route stays server-authorized.
+ */
+export function ProviderNav({ providerName, items }: { providerName: string; items: ProviderNavItemView[] }) {
   const pathname = usePathname();
 
   return (
@@ -36,8 +58,8 @@ export function ProviderNav({ providerName }: { providerName: string }) {
           <span className="hidden sm:inline text-brand-text-muted text-sm truncate">· {providerName}</span>
         </Link>
         <div className="hidden md:flex items-center gap-1">
-          {NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
+          {items.map((item) => {
+            const Icon = ICONS[item.iconKey];
             const active = pathname === item.href;
             return (
               <Link
@@ -66,8 +88,8 @@ export function ProviderNav({ providerName }: { providerName: string }) {
       <div className="md:hidden border-t border-[#EEEEEE] bg-white">
         <div className="overflow-x-auto px-2 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <div className="flex min-w-max items-stretch gap-2">
-            {NAV_ITEMS.map((item) => {
-              const Icon = item.icon;
+            {items.map((item) => {
+              const Icon = ICONS[item.iconKey];
               const active = pathname === item.href;
               return (
                 <Link

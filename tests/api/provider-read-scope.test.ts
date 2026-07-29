@@ -125,7 +125,7 @@ import { GET as getBenefits } from "@/app/api/v1/benefits/route";
 import { GET as getClaim } from "@/app/api/v1/claims/route";
 import { ProviderEntitlementService } from "@/server/services/provider-entitlement.service";
 
-const provider = (id: string): ApiCredential => ({ kind: "provider", tenantId: "tenant-1", providerId: id, keyId: `k-${id}` });
+const provider = (id: string): ApiCredential => ({ kind: "provider", tenantId: "tenant-1", providerId: id, keyId: `k-${id}`, scopes: [], allowedBranchIds: [] });
 const operator: ApiCredential = { kind: "operator" };
 
 const eligibilityReq = (n: string) => new Request(`https://x/api/v1/eligibility?memberNumber=${n}`);

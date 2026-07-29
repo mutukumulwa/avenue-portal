@@ -1,6 +1,6 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { notFound } from "next/navigation";
-import { ClaimsService } from "@/server/services/claims.service";
+import { PreauthReadService } from "@/server/services/preauth-read.service";
 import { prisma } from "@/lib/prisma";
 import { convertToClaimAction } from "./actions";
 import { preauthAdjudicationService } from "@/server/services/preauth-adjudication.service";
@@ -33,7 +33,9 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
 
   const { id } = await params;
   const tenantId = session.user.tenantId;
-  const pa = await ClaimsService.getPreAuthById(tenantId, id);
+  // F3.10: canonical scoped detail read + client confinement (G2.1) — a confined
+  // operator cannot open another client's PA (non-enumerating notFound).
+  const pa = await PreauthReadService.getById({ tenantId, clientId: session.user.clientId ?? null }, id);
 
   if (!pa) notFound();
 

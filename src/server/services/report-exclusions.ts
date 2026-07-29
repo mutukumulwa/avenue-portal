@@ -22,7 +22,9 @@ export interface RejectionRow {
   decidedAt: Date | null;
 }
 
-const FULLY_DECLINED = ["DECLINED", "VOID", "APPEAL_DECLINED"] as const;
+// F5.3: WITHDRAWN + SUPERSEDED never contribute value (withdrawn = abandoned; superseded
+// = its successor in the chain carries the value) — excluded from paid/AR bases like declined/void.
+const FULLY_DECLINED = ["DECLINED", "VOID", "APPEAL_DECLINED", "WITHDRAWN", "SUPERSEDED"] as const;
 
 export async function getExclusionRejectionRows(tenantId: string): Promise<RejectionRow[]> {
   const [declinedClaims, rejectedLines] = await Promise.all([

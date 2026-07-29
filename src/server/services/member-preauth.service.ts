@@ -1,14 +1,11 @@
 import { prisma } from "@/lib/prisma";
-import { ClaimsService } from "@/server/services/claims.service";
 import { MemberAppService } from "@/server/services/member-app.service";
 import { MemberNotificationService } from "@/server/services/member-notification.service";
 import { ProvidersService } from "@/server/services/providers.service";
 import { preauthAdjudicationService } from "@/server/services/preauth-adjudication.service";
+import { PreauthIntakeService } from "@/server/services/preauth-intake/service";
 import { getSystemActorId } from "@/server/services/system-actor.service";
 import type { BenefitCategory, ServiceType } from "@prisma/client";
-
-const AUTO_APPROVE_CEILING = 15000;
-const AUTO_APPROVE_CPT_CODES = new Set(["99213", "99214", "85025", "71046", "76700", "92004"]);
 
 function toMoney(value: unknown) {
   return Number(value ?? 0);
@@ -196,9 +193,7 @@ export class MemberPreAuthService {
       prisma.member.findUnique({
         where: { id: memberId, tenantId },
         include: {
-          group: { select: { status: true } },
           package: { include: { currentVersion: { include: { benefits: true } } } },
-          benefitUsages: true,
         },
       }),
       prisma.provider.findUnique({ where: { id: input.providerId, tenantId } }),
@@ -221,92 +216,70 @@ export class MemberPreAuthService {
     const benefit = member.package.currentVersion?.benefits.find((item) => item.category === benefitCategory);
     if (!benefit) throw new Error(`Your package does not currently show ${benefitCategory.replace(/_/g, " ").toLowerCase()} cover.`);
 
-    const usage = member.benefitUsages.find((item) => item.benefitConfigId === benefit.id);
-    const remaining = Math.max(0, toMoney(benefit.annualSubLimit) - toMoney(usage?.amountUsed));
     const estimatedCost = tariff ? toMoney(tariff.agreedRate) : procedure.fallbackCost;
 
-    const result = await ClaimsService.createPreAuth(tenantId, {
-      memberId,
-      providerId: input.providerId,
-      serviceType: (benefitCategory === "INPATIENT" || benefitCategory === "SURGICAL" || benefitCategory === "MATERNITY" ? "INPATIENT" : "OUTPATIENT") as ServiceType,
-      expectedDateOfService: input.expectedDateOfService,
-      diagnoses: [{ description: input.diagnosis, isPrimary: true }],
-      procedures: [{
-        cptCode: procedure.cptCode,
-        description: procedure.label,
-        quantity: 1,
-        unitCost: estimatedCost,
-        total: estimatedCost,
-      }],
-      estimatedCost,
-      clinicalNotes: input.clinicalNotes,
-      benefitCategory,
-      submittedBy: "MEMBER",
-    });
-
-    const warnings = result.warnings ?? [];
-    const canAutoApprove =
-      member.status === "ACTIVE" &&
-      member.group.status === "ACTIVE" &&
-      provider.contractStatus === "ACTIVE" &&
-      AUTO_APPROVE_CPT_CODES.has(procedure.cptCode) &&
-      estimatedCost <= AUTO_APPROVE_CEILING &&
-      warnings.length === 0;
-
-    if (canAutoApprove) {
-      // W1.1: canonical PA approval — always places the benefit hold (PR-011).
-      await preauthAdjudicationService.approveByHuman(
-        result.preauth.id,
-        tenantId,
-        await getSystemActorId(tenantId),
-        Math.min(estimatedCost, remaining),
-        undefined,
-        14,
-      );
-      await MemberNotificationService.create({
-        tenantId,
+    // F3.5: converge on the canonical pipeline. The member rail submits through
+    // PreauthIntakeService (channel MEMBER_APP) → the SAME auto-decision pipeline
+    // the B2B rail uses. It NO LONGER runs its own 15k/CPT auto-approve or its own
+    // benefit-exhaustion decline: preauthAdjudicationService's 10-gate pipeline
+    // (benefit cap, exclusions, fraud, credential, 50k ceiling) is now the single
+    // decision owner. Member authorization (self/active-dependant, above) and the
+    // friendly benefit-existence pre-check are preserved as the rail's own concern.
+    const submitResult = await PreauthIntakeService.submit(
+      { channel: "MEMBER_APP", tenantId, providerId: input.providerId, actorType: "USER", actorId: userId },
+      {
         memberId,
-        type: "PREAUTH_STATUS",
-        priority: "HIGH",
-        title: "Pre-authorization approved",
-        body: `${procedure.label} has been approved for ${provider.name}.`,
-        href: `/member/preauth/${result.preauth.id}`,
-        metadata: { preauthId: result.preauth.id, decision: "AUTO_APPROVED" },
-      });
-      return { preauthId: result.preauth.id, decision: "AUTO_APPROVED" as const, warnings };
-    }
+        providerId: input.providerId,
+        serviceType: (benefitCategory === "INPATIENT" || benefitCategory === "SURGICAL" || benefitCategory === "MATERNITY" ? "INPATIENT" : "OUTPATIENT") as ServiceType,
+        expectedDateOfService: input.expectedDateOfService,
+        diagnoses: [{ description: input.diagnosis, isPrimary: true }],
+        procedures: [{
+          cptCode: procedure.cptCode,
+          description: procedure.label,
+          quantity: 1,
+          unitCost: estimatedCost,
+          total: estimatedCost,
+        }],
+        estimatedCost,
+        clinicalNotes: input.clinicalNotes,
+        benefitCategory,
+      },
+      {
+        adjudicate: async (preauthId, tid) => {
+          await preauthAdjudicationService.executeAutoDecision(preauthId, tid, await getSystemActorId(tid));
+        },
+      },
+    );
 
-    if (estimatedCost > remaining && remaining <= 0) {
-      await preauthAdjudicationService.declineByHuman(
-        result.preauth.id,
-        tenantId,
-        await getSystemActorId(tenantId),
-        "BENEFIT_EXHAUSTED",
-        "The selected benefit does not have remaining balance for this request.",
-      );
-      await MemberNotificationService.create({
-        tenantId,
-        memberId,
-        type: "PREAUTH_STATUS",
-        priority: "HIGH",
-        title: "Pre-authorization could not be approved",
-        body: "The selected benefit does not have remaining balance for this request.",
-        href: `/member/preauth/${result.preauth.id}`,
-        metadata: { preauthId: result.preauth.id, decision: "AUTO_DECLINED" },
-      });
-      return { preauthId: result.preauth.id, decision: "AUTO_DECLINED" as const, warnings };
+    if (submitResult.status === "REJECTED" || !submitResult.preauthId) {
+      throw new Error(submitResult.errors?.[0]?.message ?? "Your pre-authorization could not be submitted.");
     }
+    const preauthId = submitResult.preauthId;
 
-    await ClaimsService.markPreAuthUnderReview(tenantId, result.preauth.id);
+    // The canonical pipeline ran during the post-commit handoff — reflect its
+    // decision to the member. Read the persisted status (single source of truth)
+    // rather than re-deriving it here.
+    const decided = await prisma.preAuthorization.findUnique({ where: { id: preauthId }, select: { status: true } });
+    const decision =
+      decided?.status === "APPROVED" ? ("AUTO_APPROVED" as const)
+      : decided?.status === "DECLINED" ? ("AUTO_DECLINED" as const)
+      : ("PENDING_HUMAN_REVIEW" as const);
+
+    const NOTICE = {
+      AUTO_APPROVED: { priority: "HIGH" as const, title: "Pre-authorization approved", body: `${procedure.label} has been approved for ${provider.name}.` },
+      AUTO_DECLINED: { priority: "HIGH" as const, title: "Pre-authorization could not be approved", body: "This request was not approved. A care reviewer can advise on next steps." },
+      PENDING_HUMAN_REVIEW: { priority: "NORMAL" as const, title: "Pre-authorization under review", body: `${procedure.label} has been sent to a care reviewer.` },
+    }[decision];
     await MemberNotificationService.create({
       tenantId,
       memberId,
       type: "PREAUTH_STATUS",
-      title: "Pre-authorization under review",
-      body: `${procedure.label} has been sent to a care reviewer.`,
-      href: `/member/preauth/${result.preauth.id}`,
-      metadata: { preauthId: result.preauth.id, decision: "PENDING_HUMAN_REVIEW" },
+      priority: NOTICE.priority,
+      title: NOTICE.title,
+      body: NOTICE.body,
+      href: `/member/preauth/${preauthId}`,
+      metadata: { preauthId, decision },
     });
-    return { preauthId: result.preauth.id, decision: "PENDING_HUMAN_REVIEW" as const, warnings };
+    return { preauthId, decision, warnings: [] as string[] };
   }
 }

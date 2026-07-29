@@ -31,6 +31,7 @@ model Tenant {
   providers                      Provider[]
   providerApiKeys                ProviderApiKey[]
   providerContracts              ProviderContract[]
+  providerUserBranchAssignments  ProviderUserBranchAssignment[]
   brokers                        Broker[]
   endorsements                   Endorsement[]
   invoices                       Invoice[]
@@ -323,6 +324,7 @@ model User {
 
   managedFundGroups           Group[]                          @relation("FundAdminGroups")
   auditLogs                   AuditLog[]
+  providerBranchAssignments   ProviderUserBranchAssignment[]
   claimReviews                Claim[]                          @relation("ClaimReviewer")
   raisedExceptions            ExceptionLog[]                   @relation("ExceptionRaisedBy")
   resolvedExceptions          ExceptionLog[]                   @relation("ExceptionResolvedBy")
@@ -2199,6 +2201,14 @@ model ProRataCalculation {
 }
 
 // ─── CLAIMS ─────────────────────────────────────────────
+// PNOS F5.2 — a claim's role in its submission chain (see Claim lineage fields).
+enum ClaimSubmissionType {
+  ORIGINAL // the first claim in the chain
+  CORRECTION // replaces an earlier version (data fix, F5.7/F5.8)
+  RESUBMISSION // re-filed after a decline (F5.10)
+  RECONSIDERATION // re-decision requested on an outcome (F5.11–F5.16)
+}
+
 enum ClaimStatus {
   INCURRED // Liability known before paper arrives (e.g. discharge notification)
   RECEIVED // Claim documents received from provider
@@ -2212,6 +2222,8 @@ enum ClaimStatus {
   APPEAL_APPROVED
   APPEAL_DECLINED
   VOID
+  WITHDRAWN // F5.3 — provider withdrew the claim before decision (terminal)
+  SUPERSEDED // F5.3 — replaced by a corrected version in the submission chain (terminal)
 }
 
 enum ClaimSource {
@@ -2397,6 +2409,20 @@ model Claim {
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
 
+  // PNOS F5.2 — submission chain / supersession lineage. A corrected/resubmitted/
+  // reconsidered claim is a NEW claim linked to a superseded original (never an
+  // in-place mutation), so already-posted GL/settlement/usage on the original stays
+  // intact. Relation-less id pointers (no self-relation): chainRootClaimId = the
+  // original heading the chain (null ⇒ this IS the root); supersedesClaimId = the
+  // immediate predecessor this claim replaces; supersededByClaimId = the successor
+  // that replaced this claim (null ⇒ current head). Populated by F5.4 (backfill/
+  // new-original) + F5.7 (atomic replacement); this package only adds the shape.
+  submissionType      ClaimSubmissionType @default(ORIGINAL)
+  chainRootClaimId    String?
+  supersedesClaimId   String?
+  supersededByClaimId String?
+  supersededAt        DateTime?
+
   @@unique([tenantId, claimNumber])
   // Provider-scoped invoice uniqueness — prevents same provider submitting same invoice twice
   @@unique([providerId, invoiceNumber])
@@ -2416,6 +2442,8 @@ model Claim {
   @@index([tenantId, status, createdAt])
   @@index([memberId])
   @@index([providerId])
+  @@index([chainRootClaimId]) // F5.2 — all versions in a submission chain
+  @@index([supersedesClaimId])
 }
 
 enum ClaimLineCategory {
@@ -2907,6 +2935,7 @@ model Provider {
   eligibilityRules   PackageProviderEligibility[]
   practitioners      ProviderPractitioner[]
   branches           ProviderBranch[]
+  userBranchAssignments ProviderUserBranchAssignment[]
   aliases            ProviderAlias[]
   offlineWorkAuths   OfflineWorkAuthorization[]
   offlineDataPacks   OfflineDataPack[]
@@ -2938,10 +2967,221 @@ model ProviderApiKey {
   createdById String?
   createdAt   DateTime  @default(now())
   revokedAt   DateTime?
+  // PNOS F1.6 — least-privilege + operationally governable credentials (§7.2).
+  scopes             String[]  @default([]) // route-scope catalog codes this key may exercise
+  allowedBranchIds   String[]  @default([]) // empty ⇒ not branch-restricted (F1.7 decides per route)
+  expiresAt          DateTime? // hard expiry — verify() rejects at/after this
+  lastSuccessAt      DateTime? // operational health, distinct from lastUsedAt (attempt)
+  lastFailureAt      DateTime?
+  rotationFamilyId   String? // groups a key with its rotated successors
+  previousKeyId      String? // the key this one rotated from
+  revokedById        String?
+  revokeReason       String?
+  allowedIpPolicyRef String? // optional network/IP allowlist reference (unused until enforced)
 
   @@index([tenantId])
   @@index([providerId])
   @@index([keyPrefix])
+  @@index([rotationFamilyId])
+  @@index([expiresAt])
+}
+
+// PNOS F1.10 — shadow-comparison telemetry for the deny-by-default entitlement
+// gate (D3). Records the divergence between today's permissive provider lookup
+// and the target entitlement result, WITHOUT changing live behavior. Relation-
+// less by design; carries only SAFE identifiers + result categories (never
+// member PII / PHI). Reviewed before F1.11 flips enforcement per client/provider.
+model ProviderEntitlementShadowSample {
+  id               String   @id @default(cuid())
+  tenantId         String
+  providerId       String
+  clientId         String? // member's client — a safe identifier, enables by-client metrics
+  providerBranchId String?
+  serviceDate      DateTime
+  classification   String // AGREE_ALLOW | AGREE_DENY | TARGET_DENY_CURRENT_ALLOW | TARGET_ALLOW_CURRENT_DENY | ERROR
+  currentAllowed   Boolean
+  targetAllowed    Boolean
+  errored          Boolean  @default(false)
+  requestId        String?
+  createdAt        DateTime @default(now())
+
+  @@index([tenantId, providerId, classification])
+  @@index([createdAt])
+}
+
+// PNOS F3.2 — canonical PA intake receipt (§7.5). One row per submission
+// attempt, keyed by the caller's idempotency key within a tenant+provider+
+// channel scope. Same key + same requestHash ⇒ replay the original; same key +
+// different hash ⇒ conflict with NO mutation (D26). Carries ids and a
+// structural failure code only — never a clinical body or document content.
+enum PreauthIntakeStatus {
+  ACCEPTED // PA created; adjudication proceeds through the canonical owner
+  REJECTED // structurally invalid — no PA exists
+  PROCESSING // accepted, post-commit processing not yet confirmed
+}
+
+model PreauthIntakeReceipt {
+  id                 String              @id @default(cuid())
+  tenantId           String
+  providerId         String?
+  clientId           String?
+  memberId           String?
+  providerBranchId   String?
+  channel            String // PreauthChannel (F3.1 contract)
+  idempotencyKey     String
+  requestHash        String // canonical normalized hash (F3.1)
+  status             PreauthIntakeStatus
+  preAuthorizationId String? // set when ACCEPTED
+  failureCode        String? // structural failure code when REJECTED
+  actorType          String
+  actorId            String
+  credentialId       String?
+  requestId          String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  // idempotency scope: tenant + submitting provider + command channel + key
+  @@unique([tenantId, providerId, channel, idempotencyKey])
+  @@index([tenantId, providerId, createdAt])
+  @@index([requestHash])
+  @@index([preAuthorizationId])
+}
+
+// PNOS F3.2 — append-only PA lifecycle events (§7.5). Ordering is explicit via
+// `sequence` (unique per PA). Metadata is SAFE only (ids/labels/codes): an
+// internal reason is referenced, never inlined.
+model PreAuthorizationEvent {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  preAuthorizationId String
+  sequence           Int
+  eventType          String // SUBMITTED | ASSIGNED | INFO_REQUESTED | APPROVED | DECLINED | CANCELLED | AMENDED | HOLD_CREATED | HOLD_RELEASED | CONVERTED_TO_CLAIM | GOP_ISSUED …
+  priorStatus        String?
+  newStatus          String?
+  safeReasonCode     String? // provider-safe code from the approved catalog
+  internalReasonRef  String? // pointer to internal detail — never the detail itself
+  actorType          String
+  actorId            String?
+  dataVersionRef     String? // contract/policy version in force
+  metadata           Json? // SAFE metadata only (validated before write)
+  createdAt          DateTime @default(now())
+
+  @@unique([preAuthorizationId, sequence])
+  @@index([tenantId, preAuthorizationId, createdAt])
+}
+
+// PNOS F4.1 — clinical information request on a pre-authorization (the payer asks
+// the provider for more before deciding). Relation-less like the other PA
+// satellites (F3.2): scoped by tenantId + preAuthorizationId + providerId, with a
+// mutable lifecycle status (OPEN→RESPONDED→ACCEPTED/REOPENED/CLOSED, or CANCELLED)
+// and a per-PA sequence. requestedItems hold catalog codes (INFO_REQUEST_ITEMS).
+model PreauthInfoRequest {
+  id                 String                   @id @default(cuid())
+  tenantId           String
+  preAuthorizationId String
+  providerId         String // the facility that must respond
+  clientId           String? // for client-confined operator inbox
+  memberId           String? // convenience for inbox / scoping
+  sequence           Int // per-PA ordering (1,2,3…)
+  status             PreauthInfoRequestStatus @default(OPEN)
+  requestedItems     String[] // catalog codes (INFO_REQUEST_ITEMS)
+  prompt             String // the reviewer's ask to the provider
+  dueAt              DateTime? // SLA clock
+  openedByActorType  String
+  openedByActorId    String?
+  openedAt           DateTime                 @default(now())
+  responseNote       String? // the provider's response
+  respondedByActorId String?
+  respondedAt        DateTime?
+  decisionByActorId  String? // reviewer accept/reopen/close actor
+  decisionNote       String?
+  decidedAt          DateTime?
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+
+  @@unique([preAuthorizationId, sequence])
+  @@index([tenantId, providerId, status]) // provider inbox
+  @@index([tenantId, status, dueAt]) // SLA sweeper
+  @@index([preAuthorizationId])
+}
+
+enum PreauthInfoRequestStatus {
+  OPEN // reviewer requested info; awaiting the provider
+  RESPONDED // provider submitted a response; awaiting the reviewer
+  ACCEPTED // reviewer accepted the response (sanctions claim reprocessing, F4.5)
+  REOPENED // reviewer rejected the response; the provider must respond again
+  CLOSED // resolved / terminal
+  CANCELLED // reviewer withdrew the request
+}
+
+// PNOS F4.8 — transactional notification outbox. Producers enqueue a notification
+// intent (in ONE tx with their state change, F4.9); a dispatcher drains PENDING rows
+// through a pluggable delivery port. IN_APP rows are delivered immediately (the row
+// IS the recipient's in-app notice — read via readAt); EMAIL rows are handed to the
+// email port, which is a no-op today (worker unprovisioned) so they stay recorded and
+// a future worker delivers them without any schema change. Relation-less.
+model NotificationOutbox {
+  id            String                   @id @default(cuid())
+  tenantId      String
+  providerId    String? // recipient facility (provider notifications)
+  userId        String? // specific recipient user (optional)
+  memberId      String? // member-directed (optional)
+  channel       String // IN_APP | EMAIL
+  eventType     String // e.g. INFO_REQUESTED, RESPONSE_ACCEPTED
+  priority      String                   @default("NORMAL")
+  title         String
+  body          String
+  href          String?
+  metadata      Json?
+  dedupeKey     String? // idempotent enqueue when set; NULLs are distinct in PG
+  status        NotificationOutboxStatus @default(PENDING)
+  attempts      Int                      @default(0)
+  failureReason String?
+  dispatchedAt  DateTime?
+  readAt        DateTime? // in-app read tracking
+  createdAt     DateTime                 @default(now())
+  updatedAt     DateTime                 @updatedAt
+
+  @@unique([tenantId, dedupeKey])
+  @@index([status, createdAt]) // dispatcher drain
+  @@index([tenantId, providerId, channel, status]) // provider in-app read
+}
+
+enum NotificationOutboxStatus {
+  PENDING // enqueued, not yet dispatched
+  SENT // delivered (in-app visible, or handed to a live delivery adapter)
+  SKIPPED // consciously not delivered (e.g. email channel not provisioned)
+  FAILED // delivery attempted and errored
+}
+
+// PNOS F1.11 — audited, point-in-time provider eligibility evidence (§7.3).
+// Distinct from EligibilitySnapshot (an offline-pack balance cache). Carries
+// member/client identifiers + a SAFE result category + explanation — never a
+// payment guarantee, never broad utilization/diagnoses. Relation-less.
+model ProviderEligibilityCheck {
+  id                   String    @id @default(cuid())
+  tenantId             String
+  providerId           String
+  providerBranchId     String?
+  actorType            String // USER | API_KEY | CONNECTOR
+  actorId              String
+  credentialId         String?
+  memberId             String? // internal id (correlation), not PHI
+  clientId             String?
+  groupId              String?
+  packageId            String?
+  requestedServiceDate DateTime
+  benefitCategory      String?
+  resultCode           String // ELIGIBLE | NOT_ELIGIBLE | NEEDS_PREAUTH | OUT_OF_NETWORK | DATA_INCOMPLETE | MANUAL_CONFIRMATION
+  safeExplanation      String?
+  contractId           String?
+  enforcementApplied   Boolean   @default(false) // was deny-by-default entitlement enforced for this check?
+  requestId            String?
+  displayValidUntil    DateTime?
+  createdAt            DateTime  @default(now())
+
+  @@index([tenantId, providerId, createdAt])
+  @@index([memberId])
 }
 
 // A physical branch/facility of a provider network (spec §5.2). Branch-level
@@ -2969,9 +3209,44 @@ model ProviderBranch {
   tariffLines      ProviderTariff[]
   offlineWorkAuths OfflineWorkAuthorization[]
   clinicalCases    ClinicalCase[]
+  userAssignments  ProviderUserBranchAssignment[]
 
   @@index([tenantId, providerId])
   @@index([providerId, isActive])
+}
+
+// PNOS F1.2 — effective, auditable assignment of a provider USER to a provider
+// BRANCH. This is the resource-scope leg of provider authorization: action
+// permissions come from the dynamic RBAC (F1.1), branch scope comes from these
+// rows. UserRole.PROVIDER_USER / User.providerId alone is NOT authorization (D4).
+// Additive; no existing behavior reads it until ProviderAccessService (F1.3).
+model ProviderUserBranchAssignment {
+  id               String    @id @default(cuid())
+  tenantId         String
+  providerId       String
+  userId           String
+  providerBranchId String
+  // Effective interval. activeTo == null ⇒ currently active (no end).
+  activeFrom       DateTime  @default(now())
+  activeTo         DateTime?
+  // Audit facts on the row itself (soft-retire; rows are never hard-deleted).
+  createdBy        String
+  createdAt        DateTime  @default(now())
+  retiredBy        String?
+  retiredAt        DateTime?
+  retireReason     String?
+
+  tenant         Tenant         @relation(fields: [tenantId], references: [id])
+  provider       Provider       @relation(fields: [providerId], references: [id])
+  user           User           @relation(fields: [userId], references: [id])
+  providerBranch ProviderBranch @relation(fields: [providerBranchId], references: [id])
+
+  // Overlap of active duplicates is enforced in service code (a partial unique
+  // on activeTo IS NULL is not expressible portably; NULLs are distinct in a
+  // plain unique index). These indexes serve the active-scope query.
+  @@index([tenantId, userId, activeTo])
+  @@index([providerId, providerBranchId, activeTo])
+  @@index([userId, activeTo])
 }
 
 // Name variants for a provider (spec §5.2, O1) — resolves the legal/trading
@@ -4564,6 +4839,46 @@ model ContributionRateTable {
 
 // ─── SUPPORTING ENTITIES ────────────────────────────────
 
+// PNOS F2 — document security regime. Scan status is NULLABLE on purpose: a null
+// value means a LEGACY (pre-F2) row that stays readable via fileUrl during
+// migration (F2.1 step 2); F2.7 backfills a disposition. New documents created
+// through the intent→finalize flow (F2.4) carry PENDING→CLEAN.
+enum DocumentScanStatus {
+  PENDING
+  CLEAN
+  REJECTED
+  QUARANTINED
+  ERROR
+}
+
+enum DocumentSourceType {
+  OPERATOR
+  PROVIDER_USER
+  PROVIDER_API
+  CONNECTOR
+  MEMBER
+}
+
+// Polymorphic upload targets. Values for not-yet-built targets (INFORMATION_
+// REQUEST F4, RECONSIDERATION F5, PAYMENT_QUERY F6, PROFILE_CHANGE F7) are
+// listed for forward-compatibility — the intent stores targetType+targetId as
+// scalars, so a value does not require the target model to exist yet.
+enum DocumentTargetType {
+  CLAIM
+  PREAUTH
+  CASE
+  INFORMATION_REQUEST
+  RECONSIDERATION
+  PAYMENT_QUERY
+  PROFILE_CHANGE
+  GROUP
+  ENDORSEMENT
+  QUOTATION
+  BROKER
+  MEMBER_HEALTH
+  OTHER
+}
+
 model Document {
   id            String            @id @default(cuid())
   fileName      String
@@ -4588,6 +4903,61 @@ model Document {
   quotationId   String?
   quotation     Quotation?        @relation(fields: [quotationId], references: [id])
   createdAt     DateTime          @default(now())
+  // PNOS F2.1 — private, scanned, resource-scoped document metadata (§7.4).
+  tenantId               String?
+  providerId             String?
+  providerBranchId       String?
+  sourceType             DocumentSourceType?
+  sourceActorId          String?
+  storageKey             String? // private object key — NOT a public URL
+  originalFileName       String?
+  declaredMimeType       String?
+  detectedMimeType       String?
+  sizeBytes              Int?
+  sha256                 String?
+  scanStatus             DocumentScanStatus? // null = legacy (readable via fileUrl until F2.7)
+  scanEngine             String?
+  scannedAt              DateTime?
+  retentionClass         String?
+  uploadedAt             DateTime?
+  finalizedAt            DateTime?
+  supersededByDocumentId String?
+  uploadIntentId         String?   @unique // one finalized document per intent (finalize-once guarantee)
+  // PNOS F2.5 — scan worker lease + retry control.
+  scanAttempts           Int       @default(0)
+  scanLeaseUntil         DateTime? // a claimed doc is leased until this time; a free/expired lease is reclaimable
+  scanReason             String? // safe reason for REJECTED/QUARANTINED/ERROR (no raw payload)
+
+  @@index([tenantId, providerId])
+  @@index([storageKey])
+  @@index([sha256])
+  @@index([scanStatus])
+  @@index([scanStatus, scanLeaseUntil])
+}
+
+// PNOS F2.1 — staged upload intent (§7.4). Binds the authorized target + actor +
+// expected type/size to a single-use token before any object is finalized;
+// finalize (F2.4) re-checks scope and consumes it exactly once.
+model DocumentUploadIntent {
+  id                       String    @id @default(cuid())
+  tenantId                 String
+  targetType               DocumentTargetType
+  targetId                 String
+  expectedProviderId       String?
+  expectedProviderBranchId String?
+  sourceType               DocumentSourceType
+  sourceActorId            String
+  expectedMimeTypes        String[]  @default([])
+  maxSizeBytes             Int
+  token                    String    @unique // single-use
+  idempotencyKey           String?
+  expiresAt                DateTime
+  finalizedAt              DateTime?
+  finalizedDocumentId      String?   @unique
+  createdAt                DateTime  @default(now())
+
+  @@index([tenantId, targetType, targetId])
+  @@index([expiresAt])
 }
 
 model Correspondence {
@@ -6636,4 +7006,1099 @@ model ClaimAutopilotBreaker {
 
   @@unique([tenantId, clientId])
   @@index([tenantId, isOpen])
+}
+
+// ─── PNOS F5.11 — Reconsideration (spec §7.8 / D13) ──────────────────────────
+// A governed review case challenging a decided claim/line. Submitting a
+// reconsideration does NOT mutate the original claim's status or money (D13); the
+// case carries its own eligibility, reason, deadline, line targets, evidence,
+// reviewer, SLA, and outcome. Satellites are relation-less to Claim/ClaimLine
+// (String ids + indexes) so the schema change stays additive, exactly like the
+// F3.2 PreAuthorizationEvent / F4.1 PreauthInfoRequest satellites. Documents attach
+// via the existing DocumentUploadIntent generic target (targetType RECONSIDERATION).
+
+enum ReconsiderationStatus {
+  DRAFT
+  SUBMITTED
+  TRIAGE
+  INFORMATION_REQUIRED
+  PROVIDER_RESPONDED
+  UNDER_REVIEW
+  ACCEPTED
+  PARTIALLY_ACCEPTED
+  UPHELD
+  WITHDRAWN
+  CLOSED
+}
+
+model ClaimReconsideration {
+  id                String                @id @default(cuid())
+  tenantId          String
+  clientId          String? // payer scope, for read-model confinement (G2.1)
+  providerId        String
+  providerBranchId  String?
+  // The decided claim under dispute + its submission chain root (F5.2). Relation-less.
+  claimId           String
+  chainRootClaimId  String?
+  // Filing reason (catalog code, F5.11 policy) + the provider's narrative.
+  reasonCode        String
+  providerNarrative String
+  // Requested additional amount (the provider's ask) + currency (must match the claim).
+  requestedAmount   Decimal               @default(0) @db.Decimal(14, 2)
+  currency          String
+  // Deadline resolution (F5.11 policy) + filing time.
+  filingDeadline    DateTime?
+  filedAt           DateTime?
+  status            ReconsiderationStatus @default(DRAFT)
+  // Triage / assignment. originalAdjudicatorId drives the separation-of-duty warning.
+  assignedTeam          String?
+  assignedReviewerId    String?
+  originalAdjudicatorId String?
+  // Outcome — SAFE (provider-facing) vs INTERNAL are separated (§9); the provider
+  // projection (F5.11 policy) never exposes outcomeInternalNotes / internal refs.
+  outcomeReasonCode      String?
+  outcomeSafeExplanation String?
+  outcomeInternalNotes   String?
+  // Set only when an accepted outcome spawns a linked resubmission/supplemental claim (F5.16).
+  supplementalClaimId String?
+  // SLA policy/version + due time (event history is the ClaimReconsiderationEvent relation).
+  slaPolicy  String?
+  slaVersion String?
+  dueAt      DateTime?
+  // Optimistic concurrency + idempotent submit (F5.11 step 6).
+  idempotencyKey String?
+  version        Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  lines  ClaimReconsiderationLine[]
+  events ClaimReconsiderationEvent[]
+
+  @@unique([tenantId, idempotencyKey]) // NULLs distinct in PG ⇒ keyless drafts unaffected
+  @@index([tenantId, claimId])
+  @@index([tenantId, status])
+  @@index([tenantId, providerId])
+  @@index([tenantId, clientId])
+}
+
+model ClaimReconsiderationLine {
+  id                String               @id @default(cuid())
+  reconsiderationId String
+  reconsideration   ClaimReconsideration @relation(fields: [reconsiderationId], references: [id])
+  // The disputed original claim line (relation-less; must belong to the case's claim, F5.11 test).
+  claimLineId       String
+  disputedCategory  String?
+  narrative         String?
+  // Frozen snapshot of the original line economics (§7.8 / PNO-REC-003 recon check).
+  originalBilled      Decimal @default(0) @db.Decimal(14, 2)
+  originalAllowed     Decimal @default(0) @db.Decimal(14, 2)
+  originalPayable     Decimal @default(0) @db.Decimal(14, 2)
+  originalMemberShare Decimal @default(0) @db.Decimal(14, 2)
+  originalWriteoff    Decimal @default(0) @db.Decimal(14, 2)
+  // The provider's requested corrected amounts.
+  requestedAllowed Decimal? @db.Decimal(14, 2)
+  requestedPayable Decimal? @db.Decimal(14, 2)
+  // The reviewer's corrected FULL entitlement (through the pricing/benefit components, F5.15).
+  reviewerCorrectedEntitlement Decimal? @db.Decimal(14, 2)
+  // Prior settlement facts + the hard ceiling for the incremental award.
+  alreadyApproved  Decimal @default(0) @db.Decimal(14, 2)
+  alreadyPaid      Decimal @default(0) @db.Decimal(14, 2)
+  maxIncrement     Decimal @default(0) @db.Decimal(14, 2) // = max(0, correctedEntitlement − max(approved, paid))
+  awardedIncrement Decimal @default(0) @db.Decimal(14, 2) // 0 ≤ awarded ≤ maxIncrement (F5.11 invariant)
+  outcomeReasonCode String?
+  createdAt         DateTime @default(now())
+
+  @@index([reconsiderationId])
+  @@index([claimLineId])
+}
+
+model ClaimReconsiderationEvent {
+  id                String               @id @default(cuid())
+  tenantId          String
+  reconsiderationId String
+  reconsideration   ClaimReconsideration @relation(fields: [reconsiderationId], references: [id])
+  sequence          Int
+  eventType         String // SUBMITTED | TRIAGED | ASSIGNED | INFO_REQUESTED | PROVIDER_RESPONDED | UNDER_REVIEW | OUTCOME_RECORDED | ACCEPTED | PARTIALLY_ACCEPTED | UPHELD | WITHDRAWN | CLOSED …
+  priorStatus       String?
+  newStatus         String?
+  // Provider-safe code vs a POINTER to internal detail — never the detail itself (§9).
+  safeReasonCode    String?
+  internalReasonRef String?
+  // Safe message text for the structured info-request / provider-response exchange.
+  message           String?
+  actorType         String
+  actorId           String?
+  dataVersionRef    String?
+  metadata          Json? // SAFE metadata only (validated before write)
+  createdAt         DateTime @default(now())
+
+  @@unique([reconsiderationId, sequence])
+  @@index([tenantId, reconsiderationId, createdAt])
+}
+
+// PNOS F6.7 — actual provider payment facts (§7.9), DISTINCT from the voucher/batch
+// (which authorize/represent payment). D16: "paid" as a bank fact lives here, not on
+// the batch. Relation-less id pointers (satellite convention, F3.2/F5.11) so no
+// ProviderSettlementBatch/PaymentVoucher model churn. NO @@unique on settlementBatchId:
+// one batch normally has ONE disbursement, but split/partial disbursements are allowed
+// (§I5); the idempotencyKey unique is what prevents a duplicate same-key record.
+enum DisbursementStatus {
+  PENDING // recorded, not yet released
+  RELEASED // authorized for payment (maker→checker)
+  PROCESSING // sent to the bank/channel
+  SUCCEEDED // channel-confirmed actual payment
+  FAILED // terminal — a retry is a NEW disbursement
+  REVERSED // terminal — a confirmed payment later recalled/bounced (compensating)
+}
+
+model ProviderDisbursement {
+  id                String             @id @default(cuid())
+  tenantId          String
+  providerId        String
+  // Relation-less pointers (satellite convention).
+  settlementBatchId String
+  voucherId         String?
+  status            DisbursementStatus @default(PENDING)
+  // Money: transaction amount + frozen base snapshot (never recomputed from live FX).
+  amount            Decimal            @db.Decimal(19, 4)
+  currency          String
+  baseAmount        Decimal            @default(0) @db.Decimal(19, 4)
+  baseCurrency      String             @default("UGX")
+  fxRateRef         String? // frozen FX fact reference (where a non-base disbursement applies)
+  // Method / destination — masked only, NEVER plaintext bank/mobile details (§9/D27).
+  method            String? // BANK_TRANSFER | MOBILE_MONEY | CHEQUE | RTGS | ...
+  channel           String?
+  maskedDestination String? // e.g. "***4321" — never the full account/MSISDN
+  externalReference String? // bank/channel payment reference (distinct from the internal voucher number)
+  valueDate         DateTime?
+  // Lifecycle actors + times (append-only in spirit; the state machine gates status).
+  initiatedById String?
+  initiatedAt   DateTime?
+  confirmedById String?
+  confirmedAt   DateTime?
+  failedById    String?
+  failedAt      DateTime?
+  reversedById  String?
+  reversedAt    DateTime?
+  // Failure reason — SAFE (provider-facing) vs INTERNAL are separated (§9/D27).
+  failureReasonSafe     String?
+  failureReasonInternal String?
+  // Compensation: a REVERSED record may point at the disbursement it reverses.
+  reversalOfDisbursementId String?
+  // Idempotency + reconciliation + optimistic concurrency.
+  idempotencyKey       String?
+  reconciliationStatus String   @default("UNRECONCILED") // UNRECONCILED | RECONCILED | EXCEPTION
+  version              Int      @default(1)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([tenantId, idempotencyKey]) // NULLs distinct in PG ⇒ keyless rows unaffected
+  @@index([tenantId, settlementBatchId])
+  @@index([tenantId, providerId])
+  @@index([tenantId, status])
+}
+
+// PNOS F6.9 — settlement reconciliation control (§I5/I6). Stores each run + its
+// watermark + the exact mismatches it found; NEVER mutates a financial fact (the
+// job only reads and records exceptions for finance to investigate). Additive.
+enum ReconciliationExceptionType {
+  LINE_HEADER_MISMATCH // Σ line payable ≠ Σ claim payable
+  CLAIM_BATCH_MISMATCH // Σ claim payable ≠ stored batch total
+  VOUCHER_MISMATCH // batch total ≠ voucher amount
+  MISSING_VOUCHER // a SETTLED batch has no voucher
+  OVER_DISBURSED // Σ successful disbursement > batch total
+  BASE_GL_MISMATCH // Σ claim base ≠ stored batch base
+}
+
+enum ReconciliationInvestigationStatus {
+  OPEN
+  INVESTIGATING
+  RESOLVED // the underlying data was corrected out-of-band by an authorized owner
+  ACCEPTED // reviewed and accepted as a known/tolerated difference
+}
+
+model SettlementReconciliationRun {
+  id              String    @id @default(cuid())
+  tenantId        String
+  startedAt       DateTime  @default(now())
+  finishedAt      DateTime?
+  watermark       DateTime? // max settledAt scanned (for incremental repeat runs)
+  batchesChecked  Int       @default(0)
+  exceptionsFound Int       @default(0)
+  status          String    @default("RUNNING") // RUNNING | COMPLETED | FAILED
+  createdAt       DateTime  @default(now())
+
+  @@index([tenantId, startedAt])
+}
+
+model SettlementReconciliationException {
+  id                  String                            @id @default(cuid())
+  tenantId            String
+  runId               String
+  settlementBatchId   String
+  providerId          String?
+  currency            String
+  type                ReconciliationExceptionType
+  detail              String // safe references + amounts
+  expectedAmount      Decimal?                          @db.Decimal(19, 4)
+  actualAmount        Decimal?                          @db.Decimal(19, 4)
+  investigationStatus ReconciliationInvestigationStatus @default(OPEN)
+  investigationNote   String?
+  resolvedById        String?
+  resolvedAt          DateTime?
+  createdAt           DateTime                          @default(now())
+
+  @@index([tenantId, runId])
+  @@index([tenantId, settlementBatchId])
+  @@index([tenantId, investigationStatus])
+}
+
+// PNOS F6.10 — provider payment query (§7.9, D17). A provider raises a query about a
+// settlement/claim/line/disbursement; finance responds WITHOUT changing a claim decision
+// (a decision dispute is an explicit reconsideration, F6.12). Additive; relation-less id
+// pointers to batch/claim/line/disbursement/reconsideration (satellite convention).
+enum PaymentQueryStatus {
+  OPEN
+  ACKNOWLEDGED
+  INFORMATION_REQUIRED
+  PROVIDER_RESPONDED
+  RESOLVED
+  REJECTED
+  WITHDRAWN
+  CLOSED
+}
+
+enum PaymentQueryCategory {
+  MISSING_PAYMENT
+  SHORT_PAYMENT
+  WRONG_AMOUNT
+  WRONG_REFERENCE
+  DUPLICATE_PAYMENT
+  UNIDENTIFIED_PAYMENT
+  OTHER
+}
+
+model ProviderPaymentQuery {
+  id                String               @id @default(cuid())
+  tenantId          String
+  clientId          String? // read-model confinement (G2.1) where applicable
+  providerId        String
+  providerBranchId  String?
+  settlementBatchId String
+  // optional finer targets (relation-less pointers)
+  claimId           String?
+  claimLineId       String?
+  disbursementId    String?
+  category          PaymentQueryCategory
+  discrepancyAmount   Decimal? @db.Decimal(19, 4)
+  discrepancyCurrency String?
+  providerNarrative   String
+  status            PaymentQueryStatus   @default(OPEN)
+  // owners
+  providerRequesterId String?
+  assignedTeam        String?
+  assignedReviewerId  String?
+  // SLA
+  slaPolicy  String?
+  slaVersion String?
+  dueAt      DateTime?
+  // linked reconsideration when a dispute is explicitly converted (F6.12 sets this)
+  linkedReconsiderationId String?
+  // resolution — SAFE (provider-facing) vs INTERNAL separated (§9)
+  resolutionCode         String?
+  resolutionExplanation  String?
+  resolutionInternalNote String?
+  // idempotency + optimistic concurrency
+  idempotencyKey String?
+  version        Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  messages ProviderPaymentQueryMessage[]
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, settlementBatchId])
+  @@index([tenantId, providerId])
+  @@index([tenantId, status])
+  @@index([tenantId, clientId])
+}
+
+model ProviderPaymentQueryMessage {
+  id             String               @id @default(cuid())
+  tenantId       String
+  paymentQueryId String
+  paymentQuery   ProviderPaymentQuery @relation(fields: [paymentQueryId], references: [id])
+  sequence       Int
+  audience       String // SHARED (provider-visible) | INTERNAL
+  eventType      String // RAISED | ACKNOWLEDGED | INFO_REQUESTED | PROVIDER_RESPONDED | RESOLVED | REJECTED | WITHDRAWN | MESSAGE
+  priorStatus    String?
+  newStatus      String?
+  body           String? // safe exchange text
+  actorType      String
+  actorId        String?
+  createdAt      DateTime @default(now())
+
+  @@unique([paymentQueryId, sequence])
+  @@index([tenantId, paymentQueryId, createdAt])
+}
+
+// PNOS F7.4 — provider master-data change requests (spec §7.10). A provider
+// PROPOSES an allowed profile/branch/practitioner/credential/bank/integration
+// change; the active master data is NEVER mutated directly — an approved request
+// calls the canonical owning service. Sensitive changes (bank) require
+// maker ≠ checker + the F7.5 independent verification before activation, and the
+// full sensitive value NEVER lands here (snapshot/proposed store masked values
+// only). Relation-less to Provider/Tenant (plain ids) like ProviderPaymentQuery.
+enum MasterDataChangeCategory {
+  CONTACT
+  BRANCH
+  PRACTITIONER
+  CREDENTIAL
+  BANK
+  INTEGRATION
+  OTHER
+}
+
+enum MasterDataChangeStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  INFORMATION_REQUIRED
+  PROVIDER_RESPONDED
+  PENDING_CHECKER // sensitive: maker approved, awaiting a DISTINCT checker (maker ≠ checker)
+  APPROVED // decision approved; non-sensitive are activated now, sensitive await F7.5 verified activation
+  REJECTED
+  WITHDRAWN
+}
+
+enum MasterDataChangeRisk {
+  LOW
+  MEDIUM
+  HIGH // sensitive — maker ≠ checker + independent verification (bank)
+}
+
+model ProviderMasterDataChangeRequest {
+  id               String                   @id @default(cuid())
+  tenantId         String
+  providerId       String
+  providerBranchId String? // set for BRANCH-scoped changes
+  category         MasterDataChangeCategory
+  riskLevel        MasterDataChangeRisk     @default(LOW)
+
+  // Masked snapshot of the CURRENT values at submit time (sensitive fields masked),
+  // and the proposed new values (sensitive fields masked here — the full value is
+  // handled out-of-band by the canonical owner / F7.5, never stored on this row).
+  currentSnapshot     Json
+  proposedValues      Json
+  evidenceDocumentIds String[] @default([]) // relation-less pointers to Document
+  providerNarrative   String?
+
+  status              MasterDataChangeStatus @default(SUBMITTED)
+  providerRequesterId String?
+  assignedReviewerId  String?
+
+  // Maker/checker (sensitive changes) — maker ≠ checker enforced in the service.
+  makerId   String?
+  makerAt   DateTime?
+  checkerId String?
+  checkerAt DateTime?
+
+  // Independent verification facts for BANK changes — populated by F7.5, null here.
+  verificationMethod    String?
+  verificationReference String?
+  verifiedById          String?
+  verifiedAt            DateTime?
+
+  // Decision — SAFE (provider-facing) vs INTERNAL separated (§9).
+  decisionCode         String?
+  decisionExplanation  String?
+  decisionInternalNote String?
+
+  // Activation (the canonical apply): non-sensitive on approval; sensitive in F7.5.
+  effectiveAt   DateTime?
+  activatedAt   DateTime?
+  activatedById String?
+
+  // SLA
+  slaPolicy String?
+  dueAt     DateTime?
+
+  // Idempotency + optimistic concurrency.
+  idempotencyKey String?
+  version        Int      @default(1)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  events ProviderMasterDataChangeEvent[]
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, providerId])
+  @@index([tenantId, status])
+  @@index([tenantId, category])
+}
+
+model ProviderMasterDataChangeEvent {
+  id              String                          @id @default(cuid())
+  tenantId        String
+  changeRequestId String
+  changeRequest   ProviderMasterDataChangeRequest @relation(fields: [changeRequestId], references: [id])
+  sequence        Int
+  audience        String // SHARED (provider-visible) | INTERNAL
+  eventType       String // SUBMITTED | UNDER_REVIEW | INFO_REQUESTED | PROVIDER_RESPONDED | MAKER_APPROVED | APPROVED | REJECTED | WITHDRAWN | MESSAGE
+  priorStatus     String?
+  newStatus       String?
+  body            String? // safe exchange text
+  actorType       String
+  actorId         String?
+  createdAt       DateTime @default(now())
+
+  @@unique([changeRequestId, sequence])
+  @@index([tenantId, changeRequestId, createdAt])
+}
+
+// PNOS F7.7 — provider network improvement plan (spec §12; D21 advisory). A
+// human-owned plan AGREED between a named network manager and the provider:
+// objectives, actions/milestones, evidence, and a SHARED-vs-INTERNAL update log.
+// It is ADVISORY ONLY — it NEVER mutates a rate, tier, contract, or provider
+// status (no automated sanctions; §0 prohibited). Relation-less to Provider/Tenant.
+enum ImprovementPlanStatus {
+  DRAFT
+  ACTIVE
+  ACHIEVED
+  CLOSED
+  CANCELLED
+}
+
+enum ImprovementActionStatus {
+  OPEN
+  IN_PROGRESS
+  DONE
+  BLOCKED
+}
+
+enum ImprovementOwnerRole {
+  NETWORK
+  PROVIDER
+}
+
+model ProviderImprovementPlan {
+  id                String                @id @default(cuid())
+  tenantId          String
+  providerId        String
+  title             String
+  objective         String
+  // Free-text / metric-id reference to a baseline measure. F8 metrics are stubbed
+  // here (§ "F8 metric definitions may be stubbed") — there is NO scoring engine.
+  baselineMetricRef String?
+  networkOwnerId    String? // named network manager (operator)
+  providerOwnerId   String? // named provider owner
+  status            ImprovementPlanStatus @default(DRAFT)
+  startDate         DateTime?
+  targetDate        DateTime?
+  createdById       String?
+  version           Int      @default(1)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  actions ProviderImprovementAction[]
+  updates ProviderImprovementUpdate[]
+
+  @@index([tenantId, providerId])
+  @@index([tenantId, status])
+}
+
+model ProviderImprovementAction {
+  id                  String                  @id @default(cuid())
+  tenantId            String
+  planId              String
+  plan                ProviderImprovementPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  description         String
+  ownerRole           ImprovementOwnerRole    @default(PROVIDER)
+  dueDate             DateTime?
+  status              ImprovementActionStatus @default(OPEN)
+  evidenceDocumentIds String[]                @default([])
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  @@index([tenantId, planId])
+}
+
+model ProviderImprovementUpdate {
+  id        String                  @id @default(cuid())
+  tenantId  String
+  planId    String
+  plan      ProviderImprovementPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  sequence  Int
+  audience  String // SHARED (provider-visible) | INTERNAL
+  body      String
+  actorType String
+  actorId   String?
+  createdAt DateTime @default(now())
+
+  @@unique([planId, sequence])
+  @@index([tenantId, planId, createdAt])
+}
+
+// PNOS F8.2 — versioned, published provider performance score (§8.13; D21 advisory).
+// A NEW model ALONGSIDE the legacy cost `ProviderScorecard` (which is left untouched,
+// so its analytics readers keep working). Every score value retains its numerator,
+// denominator, definition version, completeness, cohort, and source watermark, plus a
+// publication/freeze state — so a provider only ever sees a PUBLISHED, complete,
+// sufficiently-sampled score. This holds the F8.3 output; F8.1's PNMC-1.0 catalog is the
+// authority for what each metricKey means. Relation-less to Provider/Tenant.
+enum PerformanceScoreStatus {
+  DRAFT // computed, not yet published to the provider
+  PUBLISHED // visible to the provider when complete + meets sample + not suppressed
+  FROZEN // period frozen; only a corrected republish (new publicationVersion) supersedes
+}
+
+model ProviderPerformanceScore {
+  id                String @id @default(cuid())
+  tenantId          String
+  providerId        String
+  // "" = provider-level; a branch id = branch-level. A non-null default keeps the
+  // unique key well-defined (a nullable column would treat every provider-level row
+  // as distinct in Postgres and defeat the uniqueness the spec requires).
+  providerBranchId  String @default("")
+  period            String // YYYY-MM
+  periodStart       DateTime
+  periodEnd         DateTime
+  metricKey         String // e.g. "A2_clean_claim_rate" — a key from the PNMC catalog
+  definitionVersion String // e.g. "PNMC-1.0"
+
+  // provenance (F8.1 §1) — the numbers behind the value.
+  numerator          Decimal  @db.Decimal(18, 4)
+  denominator        Decimal  @db.Decimal(18, 4)
+  value              Decimal? @db.Decimal(18, 6) // numerator/denominator, or a p50/p90 for distribution metrics
+  unit               String   @default("RATE") // RATE | DAYS | HOURS | COUNT | PERCENTILE
+  completeness       Decimal  @default(1) @db.Decimal(5, 4) // fraction of expected facts present (0..1)
+  sampleSize         Int      @default(0) // the denominator count, for the minimum-sample rule
+  meetsMinimumSample Boolean  @default(false)
+
+  // cohort membership (the anonymized benchmark values themselves are F8.4).
+  cohortKey              String? // tenant|type|tier(|facet) — the peer set this score belongs to
+  suppressedForAnonymity Boolean @default(false)
+
+  // exclusions + control totals (F8.3 records these for reconciliation/audit).
+  excludedCount Int   @default(0)
+  controlTotals Json? // { includedFacts, excludedFacts, numeratorCheck, ... }
+
+  // source watermark — the deterministic marker of the frozen source-fact set + params
+  // that produced this score (so a re-run over identical facts is a no-op).
+  sourceWatermark String
+  computedAt      DateTime @default(now())
+
+  // publication / freeze.
+  status             PerformanceScoreStatus @default(DRAFT)
+  publishedAt        DateTime?
+  frozenAt           DateTime?
+  publicationVersion Int                    @default(1) // a corrected republish increments (F8.4)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, period, providerId, providerBranchId, metricKey, definitionVersion])
+  @@index([tenantId, providerId, period])
+  @@index([tenantId, metricKey, period])
+  @@index([tenantId, status, period])
+  @@index([tenantId, cohortKey, period, metricKey])
+}
+
+// PNOS F8.4 — a frozen, anonymized cohort benchmark for one metric+period+version.
+// It publishes the peer DISTRIBUTION (percentile/median/range) WITHOUT any named
+// peer — the row carries no providerId, only the aggregate stats and the count of
+// contributing providers (always >= the minimum-cohort threshold; a smaller cohort
+// is suppressed and no row is written). A corrected republish is a NEW publication
+// version (the prior remains as history). Relation-less to Tenant.
+model PerformanceCohortBenchmark {
+  id                String   @id @default(cuid())
+  tenantId          String
+  period            String
+  periodStart       DateTime
+  periodEnd         DateTime
+  metricKey         String
+  definitionVersion String
+  cohortKey         String // tenant|type|tier — the anonymized peer set (NO provider ids)
+
+  providerCount Int // distinct providers contributing (>= the minimum-cohort threshold)
+  sampleSize    Int // total contributing denominator across the cohort
+  unit          String @default("RATE")
+
+  // distribution — percentile/median/range only, no named peer.
+  minValue Decimal? @db.Decimal(18, 6)
+  p25      Decimal? @db.Decimal(18, 6)
+  median   Decimal? @db.Decimal(18, 6)
+  p75      Decimal? @db.Decimal(18, 6)
+  p90      Decimal? @db.Decimal(18, 6)
+  maxValue Decimal? @db.Decimal(18, 6)
+
+  // freeze + versioning.
+  publicationVersion   Int      @default(1)
+  publicationWatermark String
+  frozenAt             DateTime @default(now())
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([tenantId, period, metricKey, definitionVersion, cohortKey, publicationVersion])
+  @@index([tenantId, period, metricKey])
+  @@index([tenantId, cohortKey, period])
+}
+
+// ─── PNOS F9 — HMS INTEGRATION CONTROL PLANE (§7.11 / §8.12) ──────────────────
+// Additive control-plane schema for the HMS integration rail. These models give
+// every inbound/outbound delivery a durable connection + receipt + attempt ledger
+// so integration truth never lives only in memory, a queue, or an app log (D-prohibition).
+//
+// They are ADDITIVE and do NOT replace the legacy `IntegrationConfig` (@5205),
+// which is preserved during migration (F9.2 step 5) and read-only-retired later
+// (F9.9). No live path is wired here (F9.2 stop condition): the models exist,
+// F9.3 administers connections, F9.4 writes durable receipts, F9.5 maps records,
+// F9.6 adds retry/quarantine/sweeper. Relation-less to Tenant/Provider/Branch
+// (plain String scope keys, matching the F8 performance models) — providerBranchId
+// uses `""` for provider-level so branch scope stays well-defined in unique keys.
+
+enum ProviderIntegrationMode {
+  PUSH
+  PULL
+  BIDIRECTIONAL
+}
+
+enum ProviderIntegrationStatus {
+  DRAFT
+  TESTING
+  ACTIVE
+  PAUSED
+  DISABLED
+}
+
+enum IntegrationCircuitState {
+  CLOSED // healthy — deliveries flow
+  OPEN // tripped — deliveries short-circuit until the cool-down elapses
+  HALF_OPEN // probing — a single trial delivery decides CLOSE vs re-OPEN
+}
+
+enum IntegrationDeliveryDirection {
+  INBOUND // partner → Medvex (push receipt, or a pulled batch landed durably)
+  OUTBOUND // Medvex → partner (a pull request/response envelope)
+}
+
+enum IntegrationDeliveryStatus {
+  RECEIVED // durable receipt created; not yet validated
+  VALIDATING // auth/schema/scope/control-total checks in flight
+  ACCEPTED // validated; queued for canonical mapping
+  PARTIAL // some records applied, some quarantined/rejected
+  REJECTED // whole delivery refused before any domain effect
+  RETRYING // a retryable failure is scheduled for another attempt
+  QUARANTINED // terminal/poison — parked for authorized manual remediation
+  COMPLETED // every record reached a terminal per-record outcome
+}
+
+/// A configured integration channel between one facility (provider, optional
+/// branch) and an external HMS/partner system. Carries a SECRET REFERENCE and a
+/// credential version — never the secret itself (§7.11; the plaintext-secret
+/// exposure the F9.1 inventory flagged on IntegrationConfig is closed by this
+/// indirection + the F9.3 admin service).
+model ProviderIntegrationConnection {
+  id       String @id @default(cuid())
+  tenantId String
+  // Scope keys (relation-less; validated against Provider/Branch in the F9.3 service).
+  providerId       String
+  providerBranchId String @default("") // "" = provider-level; a branch id = branch-scoped
+
+  label            String // human label, e.g. "Aga Khan HMS — production"
+  connectorType    String // connector family, e.g. "HMS_BATCH_V1" / "SLADE360_EDI"
+  connectorVersion String                       @default("1") // adapter contract version
+  mode             ProviderIntegrationMode       @default(PUSH)
+
+  // Transport safety (SSRF/allowlist enforced in F9.3/F9.7; here we hold references).
+  apiBaseUrl          String? // outbound base URL (PULL/BIDIRECTIONAL); validated HTTPS + allowlist in F9.3
+  endpointAllowlistRef String? // reference to the host/IP allowlist policy (not the list inline)
+
+  // Credentials — a REFERENCE + version only. The secret material lives in the
+  // secret store keyed by secretRef; this row never stores or returns it.
+  secretRef         String? // opaque handle into the secret store
+  credentialVersion Int     @default(1) // bumps on rotation (F9.3)
+
+  scopes         String[] @default([]) // integration scope codes this connection may exercise
+  mappingVersion String? // external→canonical mapping version (F9.5)
+
+  // Cadence + cursor (PULL). cursor advances only past a durable accepted boundary (F9.7).
+  cadence String? // e.g. cron/interval hint for the scheduler
+  cursor  String? // opaque pagination/watermark cursor
+
+  status       ProviderIntegrationStatus @default(DRAFT)
+  circuitState IntegrationCircuitState   @default(CLOSED)
+  circuitOpenedAt      DateTime? // when OPEN tripped, for cool-down math (F9.6)
+  consecutiveFailures  Int       @default(0) // F9.7 pull circuit threshold; reset on success
+
+  lastSuccessAt DateTime?
+  lastFailureAt DateTime?
+
+  owners              String? // support owners (names/emails), PHI-free
+  supportInstructions String? // runbook pointer, PHI-free
+
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  deliveries ProviderIntegrationDelivery[]
+  secrets    ProviderIntegrationSecret[]
+
+  // One live connection per (provider, branch, connector, mode) — the consistency
+  // the F9.2 test asserts. providerBranchId's "" default keeps provider-level rows
+  // from colliding while staying unique.
+  @@unique([tenantId, providerId, providerBranchId, connectorType, mode])
+  @@index([tenantId, providerId])
+  @@index([tenantId, status])
+  @@index([tenantId, providerId, providerBranchId])
+}
+
+/// A durable receipt for one delivery envelope (a push request, or one pulled
+/// batch). Created BEFORE any domain processing (F9.4) so an accepted delivery
+/// survives a queue/app failure. Idempotency is per (connection, idempotencyKey):
+/// the same key + same hash replays; the same key + a different hash conflicts
+/// (F9.4) — nothing mutates on either.
+model ProviderIntegrationDelivery {
+  id           String                        @id @default(cuid())
+  tenantId     String
+  connectionId String
+  connection   ProviderIntegrationConnection @relation(fields: [connectionId], references: [id])
+  // Denormalized scope (matches how the codebase scopes reads); consistent with the connection.
+  providerId       String
+  providerBranchId String @default("")
+
+  direction          IntegrationDeliveryDirection @default(INBOUND)
+  businessObjectType String // CASE_SERVICE | CLAIM | PREAUTH | CASE_ACTIVITY (connector-declared)
+
+  externalBatchRef String? // the partner's batch id (e.g. "AGA-2026-07-03")
+  externalRef      String? // a finer partner reference when present
+  idempotencyKey   String // caller-stable key; unique per connection
+  normalizedPayloadHash String // hash of the normalized body — detects same-key/different-body conflict
+
+  // Control totals (asserted vs applied) — the reconciliation substrate (F9.5/F9.6).
+  recordCount     Int? // records the envelope claims
+  amountTotal     Decimal? @db.Decimal(19, 4) // asserted monetary total, where relevant
+  appliedCount     Int @default(0)
+  rejectedCount    Int @default(0)
+  quarantinedCount Int @default(0)
+  replayedCount    Int @default(0)
+
+  status IntegrationDeliveryStatus @default(RECEIVED)
+
+  // Canonical linkage — receipt/result references into the domain rails (F9.5).
+  canonicalReceiptRef String? // e.g. a ClaimIntakeReceipt id
+  canonicalResultRef  String? // e.g. an aggregate result marker
+
+  // Retry / durable lease (F9.6). Attempts are leased so a crashed worker's work
+  // is reclaimed after the lease expires without double-applying.
+  attemptCount   Int       @default(0)
+  maxAttempts    Int       @default(5)
+  nextAttemptAt  DateTime?
+  leaseOwner     String?
+  leaseExpiresAt DateTime?
+  quarantineReason String? // safe, PHI-free reason when QUARANTINED
+
+  receivedAt  DateTime  @default(now())
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  attempts      ProviderIntegrationAttempt[]
+  recordResults ProviderIntegrationRecordResult[]
+
+  // The delivery idempotency the F9.2 test asserts: one delivery per key per connection.
+  @@unique([connectionId, idempotencyKey])
+  @@index([tenantId, providerId, status])
+  @@index([connectionId, status])
+  @@index([status, nextAttemptAt]) // sweeper: retry-due / abandoned deliveries (F9.6)
+  @@index([tenantId, businessObjectType, receivedAt])
+}
+
+/// Per-record outcome inside a delivery (a batch has many). Gives each inbound
+/// record its own durable receipt + canonical reference + idempotency, so a mixed
+/// batch conserves accepted/rejected/quarantined counts (F9.5) and a same-record
+/// replay is a no-op. Never stores a raw clinical body — only a hash + a safe reason.
+model ProviderIntegrationRecordResult {
+  id         String                      @id @default(cuid())
+  tenantId   String
+  deliveryId String
+  delivery   ProviderIntegrationDelivery @relation(fields: [deliveryId], references: [id])
+
+  recordIndex        Int // position within the delivery envelope
+  recordHash         String // hash of the normalized record — the per-record idempotency key
+  businessObjectType String
+
+  // Outcome vocabulary mirrors the existing hms-batch/import dispositions:
+  // APPLIED | REPLAYED | LINKED | UNMATCHED | REJECTED | QUARANTINED.
+  outcome String
+
+  // Canonical linkage — what this record produced in the domain (no raw payload).
+  canonicalEntityType String? // e.g. "CaseServiceEntry"
+  canonicalEntityId   String?
+  canonicalReceiptRef String?
+  amount              Decimal? @db.Decimal(19, 4) // for amount conservation
+
+  safeReason String? // PHI-free reason for UNMATCHED/REJECTED/QUARANTINED
+
+  createdAt DateTime @default(now())
+
+  // A record applies at most once per delivery — the per-record idempotency guard.
+  @@unique([deliveryId, recordHash])
+  @@index([tenantId, outcome])
+  @@index([deliveryId])
+}
+
+/// One processing attempt against a delivery. The append-only attempt ledger:
+/// ordered per delivery, carries a SAFE result class + error code only — never a
+/// raw clinical body, a header, or a secret (§7.11 / D-prohibition).
+model ProviderIntegrationAttempt {
+  id         String                      @id @default(cuid())
+  deliveryId String
+  delivery   ProviderIntegrationDelivery @relation(fields: [deliveryId], references: [id])
+
+  attemptNumber Int // 1-based; ordered + unique per delivery
+
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+
+  // Result classification (safe, connector-agnostic):
+  // SUCCESS | TIMEOUT | HTTP_5XX | HTTP_4XX | SCHEMA | POISON | LEASE_EXPIRED.
+  resultClass   String?
+  httpStatus    Int? // transport status, when applicable
+  safeErrorCode String? // safe, catalogued code — NOT a raw error/body
+  retryable     Boolean @default(false)
+  nextAttemptAt DateTime?
+
+  responseReceiptRef String? // reference to a stored response receipt (no raw body inline)
+
+  createdAt DateTime @default(now())
+
+  // Attempt ordering the F9.2 test asserts: attempts are unique + ordered per delivery.
+  @@unique([deliveryId, attemptNumber])
+  @@index([deliveryId])
+}
+
+/// PNOS F9.3 — secret-reference storage for a connection's credential. The
+/// connection row holds only a pointer (secretRef → the ACTIVE row here) +
+/// credentialVersion; the secret MATERIAL never lives on the connection and is
+/// never returned by a read. Only a bcrypt hash is stored (mirrors ProviderApiKey)
+/// — the plaintext is revealed exactly once at generation/rotation. Rotation
+/// retires the prior version (overlap-safe) and mints a new one. Reversible
+/// storage for an OUTBOUND partner-supplied credential is deferred to F9.7 (when
+/// the contracted auth scheme is known); this table serves the locally-generated
+/// signing secret, verified by hash.
+model ProviderIntegrationSecret {
+  id           String                        @id @default(cuid())
+  tenantId     String
+  connectionId String
+  connection   ProviderIntegrationConnection @relation(fields: [connectionId], references: [id])
+
+  version    Int // 1-based; bumps on rotation
+  secretHash String // bcrypt hash of the plaintext — never the plaintext, never returned
+  status     String @default("ACTIVE") // ACTIVE | RETIRED
+
+  createdById String?
+  createdAt   DateTime  @default(now())
+  retiredAt   DateTime?
+
+  @@unique([connectionId, version])
+  @@index([connectionId, status])
+}
+
+// ─── PNOS F10 — CAPITATION / PMPM EXTENSION (§7.13 / D24) ─────────────────────
+// A SEPARATE governed ledger (D24): frozen eligible-life + rate snapshots, a
+// dedicated reconciliation, zero-pay capitated encounters that never settle as FFS.
+// ADDITIVE + INERT — nothing computes/activates before the F10.1 CAP-1.0 six-owner
+// sign-off + the F10.7 pilot (PNO-CAP-008). Relation-less to Tenant/Provider (plain
+// String scope keys, matching the F8/F9 convention); internal relations only
+// (period → arrangement, adjustment/eligible-life → period). Reuses the existing
+// finance owners (PaymentVoucher/JournalEntry/ProviderDisbursement) by reference —
+// capitation adds NO new pricing/payment engine (§8.14).
+
+enum CapitationRateBasis {
+  PMPM // per-member-per-month × frozen lives
+  PER_VISIT // per counted valid visit
+  FIXED_PERIOD // flat per-period pool
+}
+
+enum CapitationArrangementStatus {
+  DRAFT
+  ACTIVE
+  SUSPENDED
+  EXPIRED
+}
+
+enum CapitationPeriodStatus {
+  DRAFT // snapshot may still recompute
+  CALCULATED // accrual computed, not yet frozen
+  FROZEN // immutable snapshot + accrual (maker/checker)
+  PAID // disbursement recorded
+  CLOSED // reconciled + signed off
+  REOPENED // governed reopen (supersedes with a new calculation version)
+}
+
+/// Effective-dated capitation terms for one scope. Non-overlapping ACTIVE ranges
+/// per (provider, branch, client, group, package, rateBasis).
+model CapitationArrangement {
+  id               String @id @default(cuid())
+  tenantId         String
+  providerId       String
+  providerBranchId String  @default("") // "" = all branches
+  clientId         String?
+  groupId          String?
+  packageId        String?
+
+  label     String
+  rateBasis CapitationRateBasis @default(PMPM)
+  rate      Decimal             @db.Decimal(19, 4)
+  currency  String              @default("UGX")
+  cadence   String              @default("MONTHLY")
+
+  coveredServices Json? // service scope covered by the pool
+  ffsCarveOuts    Json? // services explicitly carved out to ordinary FFS
+
+  eligibilityDefinitionVersion String // e.g. CAP-1.0 — frozen onto each period
+  governingContractId          String? // link the governing contract (§7.13 step 2)
+  glPolicyRef                  String? // GL/finance treatment reference
+
+  status        CapitationArrangementStatus @default(DRAFT)
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  approvedById  String?
+  approvedAt    DateTime?
+  createdById   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  periods CapitationPeriod[]
+
+  @@index([tenantId, providerId, status])
+  @@index([tenantId, providerId, providerBranchId, effectiveFrom])
+}
+
+/// One append-only period ledger row per (arrangement, period). Carries the frozen
+/// eligible-life count + control hash, the accrual, the conservation balances, and
+/// references to the finance owners that actually pay it.
+model CapitationPeriod {
+  id            String                @id @default(cuid())
+  tenantId      String
+  arrangementId String
+  arrangement   CapitationArrangement  @relation(fields: [arrangementId], references: [id])
+
+  period      String // YYYY-MM
+  periodStart DateTime
+  periodEnd   DateTime
+
+  // eligible-life snapshot (F10.3 populates; frozen at freeze).
+  snapshotInstant         DateTime?
+  eligibleLifeCount       Int       @default(0)
+  eligibleLifeControlHash String?
+  definitionVersion       String
+
+  // accrual + conservation (F10.4 computes; Decimal only).
+  rate            Decimal @db.Decimal(19, 4)
+  grossAccrual    Decimal @default(0) @db.Decimal(19, 4)
+  adjustmentTotal Decimal @default(0) @db.Decimal(19, 4)
+  amountPayable   Decimal @default(0) @db.Decimal(19, 4)
+  amountPaid      Decimal @default(0) @db.Decimal(19, 4)
+  openingBalance  Decimal @default(0) @db.Decimal(19, 4)
+  closingBalance  Decimal @default(0) @db.Decimal(19, 4)
+  controlTotals   Json?
+
+  calculationVersion Int                    @default(0) // a reopen/recalc increments
+  status             CapitationPeriodStatus @default(DRAFT)
+  frozenAt           DateTime?
+  frozenById         String?
+  approvedAt         DateTime?
+  approvedById       String?
+
+  // finance owner references (F10.6) — capitation reuses these, never re-implements.
+  voucherId      String?
+  disbursementId String?
+  journalEntryId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  adjustments   CapitationAdjustment[]
+  eligibleLives CapitationEligibleLife[]
+
+  @@unique([arrangementId, period])
+  @@index([tenantId, status, period])
+}
+
+/// Append-only positive/negative adjustment. A correction after freeze is an
+/// adjustment (or a governed reopen) — NEVER a silent rewrite (PNO-CAP-003).
+model CapitationAdjustment {
+  id       String           @id @default(cuid())
+  tenantId String
+  periodId String
+  period   CapitationPeriod @relation(fields: [periodId], references: [id])
+
+  category    String // RETRO_ELIGIBILITY | RATE_CORRECTION | CLAWBACK | INCENTIVE | RECONCILIATION
+  amount      Decimal @db.Decimal(19, 4) // signed: + charge, − credit
+  evidenceRef String?
+  reason      String?
+  actorId     String?
+  approvedById String?
+  approvedAt   DateTime?
+
+  createdAt DateTime @default(now()) // append-only — no updatedAt
+
+  @@index([periodId])
+  @@index([tenantId, category])
+}
+
+/// The frozen eligible-life roster (F10.3). One row per (period, member) recording
+/// inclusion + the reason + the coverage source version. Carries NO clinical detail.
+model CapitationEligibleLife {
+  id       String           @id @default(cuid())
+  tenantId String
+  periodId String
+  period   CapitationPeriod @relation(fields: [periodId], references: [id])
+
+  memberId              String
+  included              Boolean
+  reasonCode            String // COVERED | NOT_ACTIVE | NO_COVERAGE_ON_SNAPSHOT_DAY | OUT_OF_SCOPE | CARVE_OUT_ONLY
+  coverageSourceVersion String?
+
+  createdAt DateTime @default(now())
+
+  @@unique([periodId, memberId])
+  @@index([periodId, included])
+  @@index([tenantId, memberId])
+}
+
+enum CapitationFunding {
+  INCLUDED // covered by the pool — zero FFS payable, paid via the capitation accrual
+  CARVE_OUT // explicitly FFS-carved — ordinary canonical claim + settlement
+}
+
+/// F10.5 — the funding decision for one encounter/claim line under a capitation
+/// arrangement. An INCLUDED line is zero FFS payable + linked to the period for
+/// utilization; a CARVE_OUT line flows ordinary FFS. A line links AT MOST ONCE
+/// (@@unique) — the same service can never be both without an explicit split.
+/// Relation-less to the arrangement/period (plain String ids); NO clinical detail.
+model CapitationEncounterLink {
+  id            String  @id @default(cuid())
+  tenantId      String
+  arrangementId String
+  periodId      String? // the linked period (INCLUDED); null until known
+
+  memberId         String
+  providerId       String
+  providerBranchId String   @default("")
+  serviceDate      DateTime
+
+  entityType String // CLAIM_LINE | CASE_SERVICE_ENTRY
+  entityId   String
+  funding    CapitationFunding
+  reason     String?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@unique([entityType, entityId]) // one funding decision per line — no double-count
+  @@index([tenantId, arrangementId])
+  @@index([periodId])
+  @@index([memberId, serviceDate])
 }

@@ -20,6 +20,8 @@ export const KNOWN_AUDITING_TOKENS = [
   "writeAudit(",
   "auditChainService.append(",
   "auditManage(",
+  "ProviderIntegrationConnectionAdmin.", // PNOS F9.3/F9.8 — every connection mutation writes INTEGRATION_CONNECTION:* audit internally
+  "DeliveryRetryService.manualRetry(", // PNOS F9.6/F9.8 — writes INTEGRATION_DELIVERY:MANUAL_RETRY audit internally
   "runClaimIntake(", // shared claim-intake path — chain-audits CLAIM:INTAKE_ACCEPTED internally
   "reimbursementService.submit(", // F5.6 — appends REIMBURSEMENT:SUBMITTED + canonical intake audit internally
   "auditPolicy(", // F6.5 — local helper wrapping auditChainService.append for the policy console
@@ -27,6 +29,20 @@ export const KNOWN_AUDITING_TOKENS = [
   "closeBreaker(", // F4.7/F6.5 — hash-chain audits CIRCUIT_BREAKER_CLOSED internally
   "ClaimDecisionService.decide(",
   "ClaimDecisionService.voidClaim(",
+  "ClaimWithdrawalService.withdraw(", // PNOS F5.5/F5.6 — hash-chain audits CLAIM:WITHDRAW internally
+  "ClaimReplacementService.replace(", // PNOS F5.7/F5.8 — hash-chain audits CLAIM:REPLACE internally
+  "ClaimResubmissionService.submit(", // PNOS F5.10 — hash-chain audits CLAIM:RESUBMIT internally
+  "ClaimReconsiderationService.submit(", // PNOS F5.12/F5.13 — hash-chain audits RECONSIDERATION:SUBMIT internally
+  // PNOS F6.11 — payment-query actions delegate to a service that hash-chain audits PAYMENT_QUERY:* internally.
+  "ProviderPaymentQueryService.raise(",
+  "ProviderPaymentQueryService.respondToInformation(",
+  "ProviderPaymentQueryService.withdraw(",
+  "ProviderPaymentQueryService.acknowledge(",
+  "ProviderPaymentQueryService.requestInformation(",
+  "ProviderPaymentQueryService.resolve(",
+  "ProviderPaymentQueryService.reject(",
+  "ProviderPaymentQueryService.convertToReconsideration(", // PNOS F6.12 — hash-chain audits PAYMENT_QUERY:CONVERT internally
+
   "preauthAdjudicationService.",
   "claimAdjudicationService.createSettlementBatch(",
   "claimAdjudicationService.approveSettlementBatch(",
@@ -36,6 +52,9 @@ export const KNOWN_AUDITING_TOKENS = [
   "overrideService.approve(",
   "overrideService.reject(",
   "ContractLifecycleService.", // every lifecycle transition logs to the audit chain
+  "ProviderMasterDataChangeService.", // PNOS F7.4/F7.5/F7.6 — submit/transition/approve/verify/activate all audit internally
+  "ProviderImprovementPlanService.", // PNOS F7.7/F8.6 — create/setStatus audit IMPROVEMENT_PLAN:* internally
+  "NetworkPerformanceService.exportComparisonCsv(", // PNOS F8.6 — audits NETWORK_ANALYTICS:EXPORT internally
   "auditChain", // catch-all for direct chain use
 ];
 
@@ -73,7 +92,7 @@ export const AUDIT_EXCLUSIONS: Record<string, string> = {
   "claims/[id]/adjudication-actions.ts:adjudicateLineAction": "PRE_EXISTING_GAP — audit wiring pending",
   "claims/[id]/adjudication-actions.ts:computeOutcomeAction": "READ_ONLY preview since W1.1 — no state write",
   "claims/[id]/adjudication-actions.ts:computeVarianceAction": "READ_MODEL — stamps derived variance metrics; source data unchanged",
-  "claims/[id]/adjudication-actions.ts:initiateAppealAction": "PRE_EXISTING_GAP — audit wiring pending",
+  // initiateAppealAction removed (PNOS F5.17) — same-claim appeals retired for reconsideration.
   "claims/[id]/reimbursement-actions.ts:disburseReimbursementAction": "PRE_EXISTING_GAP — audit wiring pending",
   "claims/queues/actions.ts:getIncomingClaimCountAction": "READ_ONLY — polling count for the queues header",
   "contracts/actions.ts:createContractAction": "PRE_EXISTING_GAP — audit wiring pending",

@@ -14,18 +14,29 @@ import type { ClaimStatus } from "@prisma/client";
  * sanctioned owners cannot write an illegal move.
  */
 const TRANSITIONS: Record<ClaimStatus, ClaimStatus[]> = {
-  INCURRED: ["RECEIVED", "CAPTURED", "VOID"],
-  RECEIVED: ["CAPTURED", "UNDER_REVIEW", "APPROVED", "PARTIALLY_APPROVED", "DECLINED"],
-  CAPTURED: ["UNDER_REVIEW", "APPROVED", "PARTIALLY_APPROVED", "DECLINED"],
-  UNDER_REVIEW: ["APPROVED", "PARTIALLY_APPROVED", "DECLINED", "CAPTURED"],
+  // F5.3: WITHDRAWN + SUPERSEDED are reachable ONLY from pre-decision states — a
+  // decided/settled claim can never be silently withdrawn or superseded (it must go
+  // through void/appeal/reconsideration), preserving posted GL/settlement integrity.
+  INCURRED: ["RECEIVED", "CAPTURED", "VOID", "WITHDRAWN"],
+  RECEIVED: ["CAPTURED", "UNDER_REVIEW", "APPROVED", "PARTIALLY_APPROVED", "DECLINED", "WITHDRAWN", "SUPERSEDED"],
+  CAPTURED: ["UNDER_REVIEW", "APPROVED", "PARTIALLY_APPROVED", "DECLINED", "WITHDRAWN", "SUPERSEDED"],
+  UNDER_REVIEW: ["APPROVED", "PARTIALLY_APPROVED", "DECLINED", "CAPTURED", "WITHDRAWN", "SUPERSEDED"],
+  // NOTE (PNOS F5.17): the `APPEALED` edges below are RETIRED — the same-claim appeal path that
+  // used them no longer exists (initiateAppeal throws; the admin form is removed) and an
+  // architecture guard bans any new APPEALED-status write. They are kept ONLY so historic
+  // APPEALED / APPEAL_APPROVED / APPEAL_DECLINED records stay valid; new disputes on a decided
+  // claim use reconsideration (F5.11–F5.16), which never mutates the original. No deletion of the
+  // legacy statuses (see docs/provider-network-os/LEGACY_APPEAL_CONSOLIDATION.md).
   APPROVED: ["PAID", "VOID", "APPEALED"],
   PARTIALLY_APPROVED: ["PAID", "VOID", "APPEALED"],
-  DECLINED: ["APPEALED"],
-  APPEALED: ["APPEAL_APPROVED", "APPEAL_DECLINED"],
+  DECLINED: ["APPEALED"], // resubmission (F5.10) LINKS a new claim without re-marking DECLINED
+  APPEALED: ["APPEAL_APPROVED", "APPEAL_DECLINED"], // retired (F5.17) — no writer
   APPEAL_APPROVED: ["PAID", "VOID"],
   APPEAL_DECLINED: [],
   PAID: [],
   VOID: [],
+  WITHDRAWN: [], // terminal
+  SUPERSEDED: [], // terminal
 };
 
 /** Statuses from which an AUTOMATIC decision may execute (D17 eligibility). */

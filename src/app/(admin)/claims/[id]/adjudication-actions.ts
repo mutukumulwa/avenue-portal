@@ -42,15 +42,9 @@ export async function computeOutcomeAction(formData: FormData) {
   );
 }
 
-export async function initiateAppealAction(formData: FormData) {
-  const session = await requireRole(ROLES.CLINICAL);
-  const claimId  = formData.get("claimId") as string;
-  const notes    = formData.get("appealNotes") as string;
-  await claimAdjudicationService.initiateAppeal(
-    claimId, session.user.tenantId, notes, session.user.id,
-  );
-  revalidatePath(`/claims/${claimId}`);
-}
+// PNOS F5.17 — the initiate-appeal action is REMOVED. Same-claim appeals are replaced by the
+// reconsideration workflow (F5.11–F5.16), which never mutates the original claim (D13). Historic
+// appeals stay read-only. See docs/provider-network-os/LEGACY_APPEAL_CONSOLIDATION.md.
 
 export async function computeVarianceAction(formData: FormData) {
   const session = await requireRole(ROLES.CLINICAL);

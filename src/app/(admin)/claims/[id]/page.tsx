@@ -9,7 +9,7 @@ import { adjudicateClaimAction, resolveExceptionAction, requestPriceOverrideActi
 import { disburseReimbursementAction } from "./reimbursement-actions";
 import {
   adjudicateLineAction, computeOutcomeAction,
-  initiateAppealAction, computeVarianceAction,
+  computeVarianceAction,
 } from "./adjudication-actions";
 import { ExceptionModal } from "./ExceptionModal";
 import { ArrowLeft, Clock, CheckCircle2, XCircle, AlertTriangle, Info, FlaskConical, Pill, ScanLine, Stethoscope, Scissors, HelpCircle, ShieldAlert, ShieldCheck, ShieldX, Percent, BarChart2, Scale, FileSignature } from "lucide-react";
@@ -109,7 +109,7 @@ export default async function ClaimDetailPage({
   const canComputeOutcome = allLinesDecided && canAdjudicate;
   const isOutcomeSet   = ["APPROVED","PARTIALLY_APPROVED","DECLINED"].includes(claim.status);
   const canVoid        = ["APPROVED","PARTIALLY_APPROVED"].includes(claim.status) && !p9Claim?.settlementBatchId;
-  const canAppeal      = ["DECLINED","PARTIALLY_APPROVED"].includes(claim.status);
+  // PNOS F5.17 — same-claim appeals retired; disputes on a decided claim use reconsideration.
   const diagnoses = claim.diagnoses as { code?: string; icdCode?: string; description: string; isPrimary?: boolean }[];
 
   // PR-014 #2: show billed / engine payable / delta BEFORE submission so the
@@ -960,7 +960,7 @@ export default async function ClaimDetailPage({
       )}
 
       {/* ── Decided-claim workflow: outcome, void, appeal ────── */}
-      {(isOutcomeSet || canVoid || canAppeal) && (
+      {(isOutcomeSet || canVoid) && (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-4">
           <h2 className="font-bold text-brand-text-heading text-sm font-heading border-b border-[#EEEEEE] pb-2">
             Adjudication Workflow
@@ -990,17 +990,8 @@ export default async function ClaimDetailPage({
             </form>
           )}
 
-          {canAppeal && (
-            <form action={initiateAppealAction} className="flex gap-2 items-center">
-              <input type="hidden" name="claimId" value={id} />
-              <input name="appealNotes" type="text" required placeholder="Appeal reason"
-                className="flex-1 border border-[#EEEEEE] rounded-[6px] px-3 py-2 text-sm focus:ring-1 focus:ring-brand-indigo focus:outline-none" />
-              <button type="submit"
-                className="border border-brand-indigo text-brand-indigo px-4 py-2 rounded-full text-sm font-semibold hover:bg-brand-indigo/5 transition-colors whitespace-nowrap">
-                Initiate Appeal
-              </button>
-            </form>
-          )}
+          {/* PNOS F5.17 — the Initiate-Appeal form is removed. A dispute on a decided claim is
+              filed as a reconsideration (F5.11–F5.16), which never mutates the original claim. */}
 
           {p9Claim?.settlementBatchId && (
             <p className="text-sm text-[#28A745] font-semibold flex items-center gap-2">

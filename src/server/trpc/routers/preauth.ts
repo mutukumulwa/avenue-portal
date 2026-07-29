@@ -1,18 +1,29 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { ClaimsService } from "@/server/services/claims.service";
 import { preauthAdjudicationService } from "@/server/services/preauth-adjudication.service";
+import { PreauthIntakeService } from "@/server/services/preauth-intake/service";
+import { PreauthReadService } from "@/server/services/preauth-read.service";
+import { getSystemActorId } from "@/server/services/system-actor.service";
 
 export const preauthRouter = createTRPCRouter({
   list: protectedProcedure
     .query(async ({ ctx }) => {
-      return ClaimsService.getPreAuthorizations(ctx.tenantId);
+      // F3.7: canonical scoped read model + client confinement (G2.1). The PA list
+      // was previously tenant-only — a confined operator saw every client's PAs.
+      return PreauthReadService.list({ tenantId: ctx.tenantId, clientId: ctx.clientId ?? null });
     }),
 
   getById: protectedProcedure
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => {
-      return ClaimsService.getPreAuthById(ctx.tenantId, input.id);
+      // F3.10: canonical scoped detail read + client confinement (G2.1). A confined
+      // operator opening another client's PA gets a non-enumerating NOT_FOUND (was a
+      // gap — the old getById was tenant-only, unlike the claims router's getById).
+      const pa = await PreauthReadService.getById({ tenantId: ctx.tenantId, clientId: ctx.clientId ?? null }, input.id);
+      if (!pa) throw new TRPCError({ code: "NOT_FOUND" });
+      return pa;
     }),
 
   create: protectedProcedure
@@ -44,12 +55,23 @@ export const preauthRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const { preauth } = await ClaimsService.createPreAuth(ctx.tenantId, {
-        ...input,
-        expectedDateOfService: input.expectedDateOfService ? new Date(input.expectedDateOfService) : undefined,
-        submittedBy: "ADMIN",
-      });
-      return preauth;
+      // F3.5c: converge on the canonical intake + pipeline (channel ADMIN_TRPC) —
+      // the SAME path the B2B (F3.4), member (F3.5a) and admin-UI (F3.5b) rails use.
+      // No direct createPreAuth; the 10-gate pipeline is the single decision owner.
+      const result = await PreauthIntakeService.submit(
+        { channel: "ADMIN_TRPC", tenantId: ctx.tenantId, providerId: input.providerId, actorType: "USER", actorId: ctx.session.user.id },
+        { ...input },
+        {
+          adjudicate: async (preauthId, tid) => {
+            await preauthAdjudicationService.executeAutoDecision(preauthId, tid, await getSystemActorId(tid));
+          },
+        },
+      );
+      if (result.status === "REJECTED" || !result.preauthId) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: result.errors?.[0]?.message ?? "Pre-authorization could not be submitted." });
+      }
+      // Read back the freshly-created PA (unscoped by client — return exactly what was just created).
+      return PreauthReadService.getById({ tenantId: ctx.tenantId }, result.preauthId);
     }),
 
   adjudicate: protectedProcedure

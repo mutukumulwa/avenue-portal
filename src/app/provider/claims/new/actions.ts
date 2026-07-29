@@ -28,9 +28,14 @@ export async function submitProviderClaimAction(
   const lines = (input.lineItems ?? []).filter((l) => l.description?.trim() && Number(l.unitCost) > 0);
   if (lines.length === 0) return { error: "Add at least one service line with an amount." };
 
-  const member = await prisma.member.findFirst({
-    where: { tenantId, memberNumber: { equals: memberNumber, mode: "insensitive" } },
-    select: { id: true },
+  // F1.12: resolve the member through the entitlement gate. When deny-by-default
+  // is enabled for this provider (D3 flag, default OFF), an out-of-entitlement
+  // member is not resolvable at the claim's service date ⇒ structural reject (no
+  // claim), matching the B2B API. When OFF, this is today's tenant-only lookup
+  // (the documented bypass, preserved). Receipt/idempotency stay with intake.
+  const { ProviderClaimEntitlementGate } = await import("@/server/services/provider-claim-entitlement-gate.service");
+  const { member } = await ProviderClaimEntitlementGate.resolveSubmittableMember({
+    tenantId, providerId, memberNumber, serviceDate: new Date(input.dateOfService),
   });
   if (!member) return { error: `No member found for “${memberNumber}”.` };
 

@@ -186,6 +186,11 @@ export async function persistClaimWithinTransaction(tx: Tx, input: PersistInput)
     select: { id: true, claimNumber: true },
   });
 
+  // F5.4: self-root the new claim's submission chain (chainRootClaimId = own id), so
+  // every claim is born the head of its own chain and downstream lineage (F5.7/F5.8)
+  // never special-cases a null root. NOT a status write (mutation guard unaffected).
+  await tx.claim.update({ where: { id: claim.id }, data: { chainRootClaimId: claim.id } });
+
   // 4b. Case entry-set freeze (F5.8/F5.9) — atomic, theft-proof: stamp exactly
   // the entries that are STILL unbilled. A rival slice that grabbed any of them
   // leaves count < expected → abort, so no service line can ever belong to two

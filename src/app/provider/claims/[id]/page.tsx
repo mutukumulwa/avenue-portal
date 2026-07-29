@@ -1,8 +1,19 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
-import { requireProvider } from "@/lib/provider-portal";
+import { ArrowLeft, FileText, Download, Pencil } from "lucide-react";
+import { ProviderAccessService } from "@/server/services/provider-access.service";
+import { ProviderDocumentService } from "@/server/services/provider-document.service";
+import { providerCanWithdraw } from "@/server/services/claim-withdrawal/policy";
+import { listWithdrawalReasons } from "@/server/services/claim-withdrawal/catalog";
+import { providerCanCorrect } from "@/server/services/claim-replacement/policy";
+import { ClaimResubmissionEligibilityService } from "@/server/services/claim-resubmission/eligibility.service";
+import { ClaimReconsiderationService } from "@/server/services/claim-reconsideration/submit.service";
+import { RECONSIDERABLE_CLAIM_STATUSES, toProviderReconsiderationProjection } from "@/server/services/claim-reconsideration/policy";
+import { ClaimSubmissionChainService } from "@/server/services/claim-submission-chain/service";
 import { prisma } from "@/lib/prisma";
+import { WithdrawClaimButton } from "./WithdrawClaimButton";
+import { ClaimLineageTable } from "./ClaimLineageTable";
+import { ReconsiderationPanel } from "./ReconsiderationPanel";
 
 function money(n: number, ccy = "KES") {
   return `${ccy} ${Math.round(n).toLocaleString("en-UG")}`;
@@ -15,7 +26,10 @@ const LINE_TONE: Record<string, string> = {
 };
 
 export default async function ProviderClaimDetail({ params }: { params: Promise<{ id: string }> }) {
-  const { provider, tenantId } = await requireProvider();
+  // F2.8: resolve the canonical access context so the documents section can be
+  // authorized through ProviderDocumentService (never a direct fileUrl).
+  const { ctx, provider } = await ProviderAccessService.resolveUserContext();
+  const tenantId = ctx.tenantId;
   const { id } = await params;
 
   const claim = await prisma.claim.findFirst({
@@ -25,6 +39,8 @@ export default async function ProviderClaimDetail({ params }: { params: Promise<
       id: true, claimNumber: true, status: true, currency: true, benefitCategory: true, serviceType: true,
       billedAmount: true, approvedAmount: true, paidAmount: true, copayAmount: true,
       dateOfService: true, attendingDoctor: true, diagnoses: true,
+      // F5.6/F5.8: fields the withdrawal + correction allowed-action predicates read (server-computed).
+      providerBranchId: true, decidedAt: true, paidAt: true, paymentVoucherId: true, settlementBatchId: true, supersededByClaimId: true,
       member: { select: { firstName: true, lastName: true, memberNumber: true } },
       claimLines: {
         select: { id: true, lineNumber: true, description: true, cptCode: true, billedAmount: true, approvedAmount: true, disallowedAmount: true, adjudicationDecision: true, declineReason: true },
@@ -35,7 +51,30 @@ export default async function ProviderClaimDetail({ params }: { params: Promise<
 
   if (!claim) notFound();
 
+  // F5.6/F5.8: the server computes whether THIS actor may withdraw / correct THIS claim
+  // (the exact predicates the services enforce) — the client only consumes an allowed action.
+  const canWithdraw = providerCanWithdraw(ctx, claim);
+  const canCorrect = providerCanCorrect(ctx, claim);
+  // F5.10: a declined claim may be resubmittable (F5.9 eligibility) — only computed for DECLINED.
+  const resubmit = claim.status === "DECLINED" ? await ClaimResubmissionEligibilityService.check(ctx, claim.id) : null;
+  // F5.13: a DECIDED claim may be reconsidered (F5.12). Load the latest case for the status panel
+  // and the server-computed eligibility for the entry (only for decided claims).
+  const reconsiderable = RECONSIDERABLE_CLAIM_STATUSES.includes(claim.status);
+  const reconsideration = reconsiderable
+    ? await prisma.claimReconsideration.findFirst({ where: { tenantId, claimId: claim.id }, orderBy: { createdAt: "desc" } })
+    : null;
+  const canReconsider = reconsiderable ? (await ClaimReconsiderationService.checkEligibility(ctx, claim.id)).eligible : false;
+  // F5.8: the submission chain (F5.2) — both the immutable superseded records and the current one.
+  const chain = await ClaimSubmissionChainService.getChain({ tenantId, providerId: provider.id }, claim.id);
+
   const diagnoses = (claim.diagnoses as unknown as Array<{ code: string; description: string }>) ?? [];
+
+  // F2.8 consumer: authorized document list. A caller without provider.claim.read
+  // (e.g. a legacy user not yet migrated to the provider RBAC) simply gets no
+  // documents section — exactly today's page, never a broken one.
+  const documents = await ProviderDocumentService
+    .listTargetDocuments(ctx, { targetType: "CLAIM", targetId: claim.id })
+    .catch(() => null);
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -45,7 +84,27 @@ export default async function ProviderClaimDetail({ params }: { params: Promise<
           <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Claim {claim.claimNumber}</h1>
           <p className="text-brand-text-muted text-sm">{claim.member.firstName} {claim.member.lastName} ({claim.member.memberNumber}) · {claim.benefitCategory.replace(/_/g, " ")} · {new Date(claim.dateOfService).toLocaleDateString("en-UG")}</p>
         </div>
-        <span className="ml-auto text-xs font-bold px-3 py-1 rounded-full bg-brand-indigo/10 text-brand-indigo">{claim.status.replace(/_/g, " ")}</span>
+        <div className="ml-auto flex items-center gap-3">
+          <span className="text-xs font-bold px-3 py-1 rounded-full bg-brand-indigo/10 text-brand-indigo">{claim.status.replace(/_/g, " ")}</span>
+          {canCorrect && (
+            <Link href={`/provider/claims/${claim.id}/correct`} className="flex items-center gap-1.5 rounded-full border border-brand-indigo/40 px-3 py-1.5 text-xs font-semibold text-brand-indigo hover:bg-brand-indigo/5">
+              <Pencil size={14} /> Correct claim
+            </Link>
+          )}
+          {resubmit?.eligible && (
+            <Link href={`/provider/claims/${claim.id}/resubmit`} className="flex items-center gap-1.5 rounded-full border border-brand-indigo/40 px-3 py-1.5 text-xs font-semibold text-brand-indigo hover:bg-brand-indigo/5">
+              <Pencil size={14} /> Resubmit claim
+            </Link>
+          )}
+          {canReconsider && (
+            <Link href={`/provider/claims/${claim.id}/reconsider`} className="flex items-center gap-1.5 rounded-full border border-brand-indigo/40 px-3 py-1.5 text-xs font-semibold text-brand-indigo hover:bg-brand-indigo/5">
+              <Pencil size={14} /> Reconsider
+            </Link>
+          )}
+          {canWithdraw && (
+            <WithdrawClaimButton claimId={claim.id} claimNumber={claim.claimNumber} reasons={listWithdrawalReasons()} />
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -62,12 +121,49 @@ export default async function ProviderClaimDetail({ params }: { params: Promise<
         ))}
       </div>
 
+      <ClaimLineageTable
+        chain={chain.map((v) => ({ id: v.id, claimNumber: v.claimNumber, status: v.status, submissionType: v.submissionType, billedAmount: Number(v.billedAmount), createdAt: v.createdAt.toISOString() }))}
+        currentClaimId={claim.id}
+        currency={claim.currency}
+      />
+
+      {reconsideration && (
+        <ReconsiderationPanel view={toProviderReconsiderationProjection(reconsideration)} currency={claim.currency} />
+      )}
+
       {diagnoses.length > 0 && (
         <div className="bg-white border border-[#EEEEEE] rounded-lg p-4">
           <p className="text-[11px] font-bold uppercase text-brand-text-muted mb-2">Diagnoses</p>
           <div className="flex flex-wrap gap-2">
             {diagnoses.map((d) => (
               <span key={d.code} className="text-xs bg-[#E6E7E8] text-[#495057] rounded-full px-2.5 py-0.5">{d.code} — {d.description}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {documents && documents.length > 0 && (
+        <div className="bg-white border border-[#EEEEEE] rounded-lg overflow-hidden">
+          <div className="px-5 py-3 border-b border-[#EEEEEE]">
+            <h2 className="font-bold text-brand-text-heading font-heading flex items-center gap-2"><FileText size={16} /> Documents</h2>
+          </div>
+          <div className="divide-y divide-[#F4F4F4]">
+            {documents.map((d) => (
+              <div key={d.id} className="flex items-center gap-3 px-5 py-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-brand-text-heading truncate">{d.fileName}</p>
+                  <p className="text-xs text-brand-text-muted">
+                    {d.category.replace(/_/g, " ")} · {new Date(d.createdAt).toLocaleDateString("en-UG")}
+                  </p>
+                </div>
+                {d.usable && d.downloadHref ? (
+                  <Link href={d.downloadHref} className="shrink-0 flex items-center gap-1 text-xs font-bold text-brand-indigo hover:text-brand-secondary">
+                    <Download size={13} /> Download
+                  </Link>
+                ) : (
+                  <span className="shrink-0 text-xs font-semibold text-brand-text-muted">{d.statusLabel}</span>
+                )}
+              </div>
             ))}
           </div>
         </div>

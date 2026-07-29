@@ -4,7 +4,9 @@ import { ProviderApiKeyService } from "@/server/services/provider-api-key.servic
 
 export type ApiCredential =
   | { kind: "operator"; tenantId?: string }
-  | { kind: "provider"; tenantId: string; providerId: string; keyId: string };
+  // PNOS F1.6: a verified provider key now also carries its scopes + optional
+  // branch restriction so route handlers (F1.7) can enforce least privilege.
+  | { kind: "provider"; tenantId: string; providerId: string; keyId: string; scopes: string[]; allowedBranchIds: string[] };
 
 function extractKey(req: Request): string | null {
   const raw = req.headers.get("authorization") || req.headers.get("x-api-key");
@@ -91,6 +93,26 @@ export function operatorTenantWhere(credential: ApiCredential | null): { tenantI
   return credential?.kind === "operator" && credential.tenantId
     ? { tenantId: credential.tenantId }
     : {};
+}
+
+/**
+ * PNOS F1.7 — per-route scope enforcement for provider credentials.
+ *
+ * Returns a safe 403 response when a PROVIDER key that HAS scopes does not carry
+ * the route's required scope; returns null (allowed) otherwise. Unscoped legacy
+ * keys pass (ProviderApiKeyService.hasScope is permissive for empty scopes), so
+ * enabling enforcement does not break existing integrations — it tightens
+ * automatically as keys are minted with scopes. Operator keys are not
+ * scope-restricted (they are the global integration channel).
+ */
+export function providerScopeError(credential: ApiCredential | null, requiredScope: string): NextResponse | null {
+  if (credential?.kind === "provider" && !ProviderApiKeyService.hasScope(credential, requiredScope)) {
+    return NextResponse.json(
+      { error: "Forbidden: this API key is not authorized for this operation.", code: "FORBIDDEN_SCOPE", requiredScope },
+      { status: 403 },
+    );
+  }
+  return null;
 }
 
 /**
