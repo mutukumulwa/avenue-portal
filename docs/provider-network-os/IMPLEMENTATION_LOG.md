@@ -2711,6 +2711,37 @@ Stop condition observed: yes — the encounter link + carve-out classification +
 
 ---
 
+## F10.6 — Build capitation statement, approval, and payment (BUILT · activation GATED) ★ closes phase F10's buildable scope
+
+```text
+Work package: F10.6 (phase F10 — capitation/PMPM extension)
+Status: BUILT · GATED. The canonical statement + the payable-approval + the payment/reversal/close lifecycle exist and are tested with exact conservation. The voucher/GL/disbursement OWNERS (F6) are referenced by id; wiring their creation into the live finance path + activation are GATED on the F10.1 sign-off. NO second arrangement type (F10.6 stop).
+Commit: this feat commit (statement service + test) + the paired docs commit (this note + PROGRESS row + phase note).
+Proof-before-build classification: MISSING (no statement/payment) over F10.2/F10.4/F10.5 + the F6 disbursement rail (referenced, not re-implemented). Prisma.Decimal money. No CONFLICTING path.
+Files changed: src/server/services/capitation/statement.service.ts (new); tests/services/capitation-statement.service.test.ts (new — 4 DB); docs PROGRESS + this note.
+Schema/data changes: NONE — reads/writes the F10.2 period fields (amountPaid/closingBalance/status/approvedById/voucherId/disbursementId).
+Behavior delivered (the 7 plan steps): (1) a canonical statement view reconciling lives/rate/accrual/adjustments/encounters/carve-outs/payment/balance from the frozen period; (2) provider-safe — counts + money only, NO member-clinical detail and NO internal GL/voucher/disbursement ids leaked (proven), and the numbers ARE the persisted period numbers (finance parity); (3) approvePayable is maker/checker (the approver must differ from the accrual freezer); (4) voucher/GL owner references recorded on the period (their creation in the live path is gated); (5) recordPayment records the (confirmed) provider disbursement reference + advances amountPaid; (6) EXACT conservation — opening + accrual + adjustments − payments = closing, re-verified in the statement's `conserves` flag; (7) closePeriod signs off a fully-paid period (PAID → CLOSED, immutable).
+Authorization evidence: finance-role-gated; approvePayable enforces approver ≠ freezer (proven FORBIDDEN for the maker); payment requires prior approval (proven INVALID_INPUT before approve).
+Idempotency/concurrency evidence: payment is bounded by the approved payable (overpay is INVALID_INPUT — proven); a reversal is bounded by the amount paid; status transitions gate re-entry (a PAID period rejects further payment).
+Privacy/security evidence: the statement is provider-safe — no finance ids / no clinical detail (proven by the absent-property assertions).
+Money/reconciliation evidence: THE conservation law holds across the lifecycle — 24000 payable ⇒ closing 24000 (unpaid), 0 (fully paid), restored to 24000 on reversal; every statement carries conserves=true (opening + gross + adj − paid == closing, Prisma.Decimal). A failed/reversed payment does not reduce the balance until the reversal is recorded (PNO-CAP-006/007 — proven). No FFS double settlement: the included encounters are zero-pay pool lines (the F10.5 guard) — the statement counts them as utilization, never as FFS payable.
+Focused tests and results: 4 DB — statement reconciliation + conserves + encounter counts + no finance-id leak; maker/checker payable approval + payment-blocked-before-approval; payment with conservation + overpay-rejection + close; payment reversal restores the balance. 4/4 pass; self-skip without AUTOPILOT_TEST_DB. Capitation suites co-run 22/22. tsc + brand + currency green; full no-DB suite 1541 pass / 489 skip.
+Typecheck/schema result: tsc --noEmit clean; no schema change.
+Manual/visual evidence: N/A — service only; the provider statement page + export are a UI follow-up (like the F6 remittance UI), gated with activation.
+Feature-flag state: GATED — invoked only by tests; the live voucher/GL/ProviderDisbursement creation is NOT wired (that + a provider statement page are the gated activation, needing the F10.1 sign-off).
+Backfill/rollout impact: none.
+Known limitations / deferrals (flagged): (a) the F6 voucher/GL/ProviderDisbursement CREATION is referenced by id but not created in the live path — the gated finance wiring; (b) no provider statement UI/export yet (a UI follow-up like F6's); (c) NO second arrangement type until the F10.7 pilot sign-off; (d) partial payments are supported (amountPaid accumulates) but the pilot signs off the payment cadence.
+Unrelated worktree changes preserved: yes — worktree contained only scratchpad/ (untracked) + the F10.6 files; the main-checkout dirty UAT files untouched.
+Next allowed package: F10.7 — Run capitation pilot and reconcile three periods (operational gate). GATED(pilot sign-off) — a NAMED pilot completes ≥3 representative periods with finance/provider go/no-go. This is a HUMAN pilot gate, not a code package: it consumes F10.1→F10.6 (all built) and requires the real pilot + the F10.1 CAP-1.0 six-owner sign-off. NOT buildable by code.
+Stop condition observed: yes — the statement + approval + payment + reversal + close delivered with conservation; NO second arrangement type, NO live finance-owner creation, NO activation.
+```
+
+**★ PHASE F10 — BUILDABLE SCOPE COMPLETE (F10.1→F10.6).** The capitation/PMPM ledger end to end: CAP-1.0 governance spec (F10.1, six-owner sign-off PENDING) → additive schema (F10.2) → idempotent eligible-life snapshot (F10.3) → Decimal accrual + maker/checker freeze (F10.4) → encounter link + carve-out zero-pay guard (F10.5) → statement/approval/payment/reversal/close (F10.6). A SEPARATE governed ledger (D24): a zero-pay capitated encounter never settles as FFS; the conservation law (opening + accrual + adjustments − payments = closing) holds Decimal-exact throughout. **NOTHING activates before the F10.1 CAP-1.0 six-owner sign-off + the F10.7 pilot (≥3 reconciled periods, finance/provider go/no-go). F10.7 is a human pilot gate — not buildable by code.** Deferred within F10 (gated on the sign-off): the live voucher/GL/ProviderDisbursement creation, the provider statement UI/export, the second arrangement type, and wiring the F10.5 FFS-settlement guard into the live adjudication path.
+
+---
+
+---
+
 **★ PHASE F9 — BUILDABLE SCOPE COMPLETE (F9.1→F9.9).** The HMS integration control plane end to end: inventory (F9.1) → additive §7.11 schema (F9.2) → connection/credential admin (F9.3) → durable inbound receipt (F9.4) → canonical CASE_SERVICE routing (F9.5) → retry/quarantine/sweeper (F9.6) → SSRF-safe pull adapter (F9.7, activation GATED) → ops views (F9.8) → legacy cutover support (F9.9, flip GATED). **Gate F (delivery receipts survive queue/app failure) CODE-MET; the "first real connector passes replay/retry/mapping/reconciliation UAT" half of Gate F stays OPEN pending F9.7 pilot activation (signed HMS contract + sandbox).** The legacy /api/v1/hms-batch route is UNTOUCHED and remains the live push path until the F9.9 flip. Deferred within F9 (all needing a real partner contract / pilot sign-off): F9.7 pilot activation + connection-pinned DNS-TOCTOU closure + reversible outbound-credential storage + body-HMAC signature; F9.9 live flip + legacy retirement. Other object types (PA/claim/case-activity) reuse the F9.5 pattern behind their own versioned mapper.
 
 ---
