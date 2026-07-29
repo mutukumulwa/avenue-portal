@@ -24,8 +24,8 @@ OFF, worker in staffed-window local posture (`docs/WORKER_DEPLOYMENT.md` §F8.2)
 |---|---|---|
 | TPA claims | `claims@medvex.co.ug` (Grace) | maker for Story 10; adjudicator Day 1 |
 | Medical | `medical@medvex.co.ug` | Stories 6/8/9 review |
-| Finance | `finance@medvex.co.ug` + `finance.checker.f76@test.local` | SoD pair for settlement (Story 13) |
-| Provider operations | `provider.agakhan.f76@test.local` (+ `provider.ihk.f76@test.local` for foreign probes) | Stories 2/5/14 + Day-0 onboarding |
+| Finance | `finance@medvex.co.ug` + `finance.checker.uat@test.local` | SoD pair for settlement (Story 13) |
+| Provider operations | `provider.agakhan.uat@test.local` (+ `provider.ihk.uat@test.local` for foreign probes) | Stories 2/5/14 + Day-0 onboarding |
 | Product + sponsor | Arthur | Story 10 checker may be `admin@medvex.co.ug` |
 | Security/privacy | Arthur or delegate | Story 14 review + SECURITY_EVIDENCE walk-through |
 | Engineering/UAT | agent (evidence compilation, Stories 3/11 orchestration) | |
@@ -33,12 +33,11 @@ OFF, worker in staffed-window local posture (`docs/WORKER_DEPLOYMENT.md` §F8.2)
 
 Passwords: `@medvex.co.ug` = the standard seeded ops password (engagement
 memory; **rotate before real-client go-live** — long-standing open item).
-`@test.local`: there is NO password-reset path for existing users (Invite
-refuses existing emails; the inline control only toggles role/active — the
-padlock on portal rows is the BD-01 role-binding guard, not a lockout). The
-established pattern is a FRESH persona per engagement: Day 0 invites the
-`.f76` generation above with passwords set directly in the form. (Product gap
-flagged: admin password reset for existing users.)
+`@test.local`: recovered on Day 0 via the **admin password-reset** on
+Settings → Users (shipped `bfe9dd0`, deployed prod `f1a7eeb` during this
+campaign — incidental validation of that feature). The original `.uat`
+personas were reset directly; passwords held by the sponsor, not recorded
+here.
 
 ## Day 0 — prep (~1 h, admin + provider ops + agent)
 
@@ -46,17 +45,17 @@ flagged: admin password reset for existing users.)
 |---|---|---|---|
 | P1 | Worker up: `redis-server --port 56380 --save "" --appendonly no --daemonize yes` then `set -a; source .env.worker.local; set +a; npm run worker`; confirm `/api/health` → `workerFresh: true` | agent | ☐ |
 | P2 | Create run dir `runs/<date>_prod_01/{evidence,outputs}`; copy `ACTOR_RUN_LOG_TEMPLATE.csv` in | agent | ☐ |
-| P3 | Invite the `.f76` campaign personas (fresh accounts, passwords set in the form; Provider role → Facility selector) | admin | ☐ |
+| P3 | ✅ Reset the `.uat` personas' passwords (admin password-reset, now live in prod); facility bindings verified: agakhan→Aga Khan, ihk→IHK, finance.checker→finance | admin | ☑ |
 | P4 | ⚠️ **BLOCKED → finding F76-GAP-01:** no UI to add a payer to an ACTIVE contract (`page.tsx:493` gates applicability edits to DRAFT/PENDING_CLARIFICATION). Sponsor decision: record the gap, defer the entitlement build, proceed. Only Stories 3 & 5 are affected. | agent (recorded) | ☑ |
 | P5 | Mint an Aga Khan API key via the admin UI; record the `mvxk_` prefix ONLY in the run log; hand the plaintext to the agent for Story 3 | admin | ☐ |
-| P6 | Story 3 prod pass: `API_KEY=… bash b2b-story.sh` → **accepted leg returns 403 FORBIDDEN_SCOPE** (un-entitled, per F76-GAP-01 — the CORRECT refusal) + 401/422/404/413 all correct; happy path stays proven by integration + the local prod-mode run. Save transcript to `evidence/` | agent | ☐ |
+| P6 | ✅ Story 3 prod pass done: 401/403/404/422 correct-refusal surface proven in prod; 0 receipts/0 claims minted; lookup-miss chain-audited. Transcript: `evidence/Story3_prod_pass.txt`. **Day 0 CLOSED.** | agent | ☑ |
 
 ## Day 1 — core rails (order matters)
 
 | Story | What | Actor(s) | Expected + evidence |
 |---|---|---|---|
-| **10a** Policy drill FIRST | Console `/settings/auto-adjudication`: draft **SHADOW** policy scoped narrow (NWSC + OUTPATIENT [+ Aga Khan if scopeable]); maker submits; **checker approves** (SoD: maker ≠ checker); then **emergency-deactivate drill** with reason; re-draft + re-approve to leave shadow ON | claims@ (maker), admin@ (checker) | policy APPROVED/SHADOW; deactivation immediate + audited; self-approval refused (probe it); screenshots + audit rows |
-| **1** Clean admin claim | Admin direct entry for `NWSC-2026-00250`, Aga Khan, priced consult; policies now SHADOW | claims@ | banner received; claim routes to manual queue; **AutomationPanel shows the staged trace + a shadow proposal, `approvedAmount` 0** (shadow moves no money). LIVE leg: **deferred to F8.3 by design** |
+| **10a** Policy drill | ⚠️ **DEFERRED → finding F76-GAP-02** (High): governed policy approval not UI-operable (AUTO_ADJ_POLICY_CHANGE missing from approval-matrix dropdown; console SUPER_ADMIN-only, one admin). Build flagged. Runs once the fix ships; **F8.2 shadow gated on it.** Draft-only (no submit) can still be shown as partial evidence. | admin@ (only console role) | policy DRAFT creatable; submit correctly errors 'no matrix configured' (documented) |
+| **1** Clean admin claim (OFF mode) | Admin direct entry for `NWSC-2026-00250`, Aga Khan, priced consult. Policies OFF (F76-GAP-02) ⇒ routes to manual, no shadow proposal | claims@ | banner received; claim RECEIVED→routes to manual queue; AutomationPanel shows receipt+run+staged trace, route reason, `approvedAmount` 0. Shadow-proposal + LIVE legs deferred (F76-GAP-02 / F8.3) |
 | **2** Provider-portal claim | Same shape via the provider portal | provider.agakhan.uat | identical normalization; visible in provider claim list with status |
 | **3** B2B (prod: correct-refusal) | Re-run `b2b-story.sh` in prod: **accepted leg = 403 FORBIDDEN_SCOPE** (F76-GAP-01, un-entitled); 401/422/404/413 correct. Accepted/replay/conflict happy path cited from integration + local prod-mode run (not re-provable in prod until entitlement UI ships) | agent + engineering witness | prod transcript (403+negatives) + citation to the green happy-path evidence |
 | **4** CSV mixed batch | Upload `story4-import.xlsx` (3 clean + 1 in-file duplicate invoice + 1 bad row): preview first (zero writes), then commit; then **re-upload the same file** | claims@ | preview writes nothing; commit: 3 IMPORTED + 1 LINKED + 1 skipped w/ reason + conservation block ties; re-upload: all REPLAYED, zero new claims |

@@ -230,7 +230,7 @@ export default async function AutoAdjudicationPage({
                         </form>
                       )}
                       {p.status === "PENDING_APPROVAL" && (
-                        <Link href="/settings/approval-matrix" className="text-xs font-semibold text-brand-text-muted hover:underline">
+                        <Link href="/approvals" className="text-xs font-semibold text-brand-text-muted hover:underline">
                           Awaiting checker
                         </Link>
                       )}

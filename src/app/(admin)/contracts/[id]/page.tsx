@@ -98,6 +98,14 @@ export default async function ContractDetailPage({
   const now = new Date();
   const display = c.status === "ACTIVE" && c.endDate < now ? "EXPIRED" : c.status;
 
+  // Editing gates. Tariffs / rules / packages / branches are structural and
+  // stay DRAFT-only. Applicability (which payers/schemes a contract covers) is
+  // a routine mid-term amendment, so it is also editable while the contract is
+  // ACTIVE (F76-GAP-01) — governed by the existing UNDERWRITING role, a required
+  // reason on a live change, and the CONTRACT_APPLICABILITY_ADDED/REMOVED audit.
+  const editable = c.status === "DRAFT" || c.status === "PENDING_CLARIFICATION";
+  const applicabilityEditable = editable || c.status === "ACTIVE";
+
   // Funding badge (WP-E4): FFS / CAPITATION / MIXED, derived from what the
   // contract actually carries.
   const capitationRuleCount = await prisma.pricingRule.count({
@@ -481,7 +489,7 @@ export default async function ContractDetailPage({
         <CapitationPanel
           contractId={c.id}
           contractType={c.contractType}
-          editable={c.status === "DRAFT" || c.status === "PENDING_CLARIFICATION"}
+          editable={editable}
         />
       </div>
 
@@ -490,7 +498,8 @@ export default async function ContractDetailPage({
         contractId={c.id}
         providerId={c.provider.id}
         branchScope={c.branchScope}
-        editable={c.status === "DRAFT" || c.status === "PENDING_CLARIFICATION"}
+        editable={editable}
+        applicabilityEditable={applicabilityEditable}
       />
     </div>
   );

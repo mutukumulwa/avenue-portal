@@ -28,6 +28,16 @@ export const ROLES = {
   UNDERWRITING: ["SUPER_ADMIN", "UNDERWRITER"] as UserRole[],
   /** Day-to-day ops — register members, submit claims / pre-auths */
   OPS:          ["SUPER_ADMIN", "CLAIMS_OFFICER", "MEDICAL_OFFICER", "CUSTOMER_SERVICE", "UNDERWRITER"] as UserRole[],
+  /**
+   * Maker–checker approvals queue (/approvals). Everyone in OPS PLUS
+   * FINANCE_OFFICER — the money-control checker for governed changes such as
+   * AUTO_ADJ_POLICY_CHANGE (F76-GAP-02), who is otherwise confined to FINANCE
+   * pages and cannot reach the queue. Kept SEPARATE from OPS so a finance
+   * officer gains the approvals surface only, not the ~180 member/claim/case
+   * OPS pages. Per-request role fitness is still enforced by
+   * ApprovalMatrixService.roleAuthorised at decide time.
+   */
+  APPROVALS:    ["SUPER_ADMIN", "CLAIMS_OFFICER", "MEDICAL_OFFICER", "CUSTOMER_SERVICE", "UNDERWRITER", "FINANCE_OFFICER"] as UserRole[],
   /** Anyone with a portal login (all internal staff) */
   ANY_STAFF:    ["SUPER_ADMIN", "CLAIMS_OFFICER", "FINANCE_OFFICER", "UNDERWRITER",
                  "CUSTOMER_SERVICE", "MEDICAL_OFFICER", "REPORTS_VIEWER",

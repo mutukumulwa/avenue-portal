@@ -14,6 +14,7 @@ const ACTION_LABEL: Record<string, string> = {
   PROVIDER_TARIFF_CHANGE: "Provider-tariff change",
   FUND_TOPUP: "Fund top-up",
   WRITEOFF_REFUND: "Write-off / refund",
+  AUTO_ADJ_POLICY_CHANGE: "Auto-adjudication policy change",
 };
 
 export default async function ApprovalsPage({
@@ -21,7 +22,7 @@ export default async function ApprovalsPage({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.APPROVALS);
   const { error } = await searchParams;
 
   const requests = await prisma.approvalRequest.findMany({
