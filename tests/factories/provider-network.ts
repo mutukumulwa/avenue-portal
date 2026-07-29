@@ -568,6 +568,7 @@ export async function buildProviderWorld(prisma: Prisma, opts: BuildOptions = {}
     await prisma.providerIntegrationConnection.deleteMany({ where: { tenantId: { in: tenantIds } } });
     // F10.2: capitation ledger (relation-less to Tenant; internal FKs adjustment/
     // eligibleLife → period → arrangement — delete children first).
+    await prisma.capitationEncounterLink.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.capitationAdjustment.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.capitationEligibleLife.deleteMany({ where: { tenantId: { in: tenantIds } } });
     await prisma.capitationPeriod.deleteMany({ where: { tenantId: { in: tenantIds } } });

@@ -8067,3 +8067,38 @@ model CapitationEligibleLife {
   @@index([periodId, included])
   @@index([tenantId, memberId])
 }
+
+enum CapitationFunding {
+  INCLUDED // covered by the pool — zero FFS payable, paid via the capitation accrual
+  CARVE_OUT // explicitly FFS-carved — ordinary canonical claim + settlement
+}
+
+/// F10.5 — the funding decision for one encounter/claim line under a capitation
+/// arrangement. An INCLUDED line is zero FFS payable + linked to the period for
+/// utilization; a CARVE_OUT line flows ordinary FFS. A line links AT MOST ONCE
+/// (@@unique) — the same service can never be both without an explicit split.
+/// Relation-less to the arrangement/period (plain String ids); NO clinical detail.
+model CapitationEncounterLink {
+  id            String  @id @default(cuid())
+  tenantId      String
+  arrangementId String
+  periodId      String? // the linked period (INCLUDED); null until known
+
+  memberId         String
+  providerId       String
+  providerBranchId String   @default("")
+  serviceDate      DateTime
+
+  entityType String // CLAIM_LINE | CASE_SERVICE_ENTRY
+  entityId   String
+  funding    CapitationFunding
+  reason     String?
+
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@unique([entityType, entityId]) // one funding decision per line — no double-count
+  @@index([tenantId, arrangementId])
+  @@index([periodId])
+  @@index([memberId, serviceDate])
+}
