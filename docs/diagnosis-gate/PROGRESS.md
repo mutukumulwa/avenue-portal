@@ -28,6 +28,7 @@ Detail per package: `IMPLEMENTATION_LOG.md`.
 | C3.2 | Protocol library UI + import | ✅ DONE — walkthrough found 2 real bugs |
 | C3.3 | Governance E2E (maker/checker/activate) | ✅ DONE — clicked through maker→checker→in force |
 | C3.4 | Policy flags + claim-detail surfacing | ✅ DONE — W6+W7 closed |
+| C3.5 | Capability resolution (prod authorisation fix) | ✅ DONE — feature was inoperable in prod without it |
 | C4.1 | Baseline snapshot | ⬜ must precede any provider comms (DG-D9) |
 | C4.2 | Shadow dashboard + verdicts | ⬜ |
 | C4.3 | Campaign runbook + exit memo | ⬜ **G-C4 human gate** |
