@@ -139,3 +139,63 @@ Entry template:
   `LC_ALL=C LANG=C` are exported first. Also **Prisma is 7.7.0**: `db push --skip-generate`
   no longer exists, and the datasource URL is read from `prisma.config.ts`
   (`env("DIRECT_URL")`), not from a `datasource` block env reference.
+
+## C1.3 — Converter, validator, and the v0 red report
+- **Date / commits:** 2026-08-06 · (this commit)
+- **Anchors re-verified:** `exceljs ^4.4.0` present (no dependency added); scripts run via
+  `npx tsx` with `@/` path aliases (pattern: `scripts/backfill-coverage-periods.ts`).
+- **What was built:**
+  - `src/server/services/diagnosis-gate/pack-types.ts` — the canonical pack format plus the
+    normalisation helpers (`normaliseAliasValue`, `normaliseCode`, `looseNameKey`) that the
+    converter and the C2 stage MUST share; if they ever diverge, rules silently stop
+    matching, so both sides import from one place. `canonicalisePack`/`serialisePack` sort
+    every collection so a pack is byte-deterministic and diffs cleanly in git.
+  - `src/server/services/diagnosis-gate/pack-validate.ts` — rules V0–V10 returning located,
+    machine-coded issues, plus `renderValidationMarkdown`. ERRORS block import; WARNINGS
+    mark content that is legal but **inert** (a rule with no alias can never fire) — a
+    distinction that matters because inert rules make coverage look better than it is.
+  - `scripts/diagnosis-gate/convert-workbook.ts` — xlsx → pack.json + report (+ optional
+    proposals). Reads the exact sheet names including the trailing space.
+- **What the converter deliberately REFUSES to infer (the whole point of C1.3):**
+  1. **Group codes.** No code column exists, so it assigns provisional `CIG-001…` by row
+     order *and raises a blocking error*, because those codes would shift the instant a row
+     is inserted, silently re-pointing every rule and every historical flag.
+  2. **Name spellings.** It matches names differing only in case/punctuation
+     (`OtitisExterna` ↔ `Otitis Externa`) and refuses `Tonsilitis`→`Tonsillitis` or
+     `Acne`→`Acne Vulgaris` — those are content decisions. An optional `--aliases` file
+     exists for clinical-team-confirmed variants; it is NOT populated by engineering.
+  3. **Confirmatory links.** The workbook states confirmation in prose. The converter
+     emits *proposals* by a stated token-overlap measure and leaves the pack's
+     confirmatory links empty ⇒ **R4 is provably inert on v0**, which is itself a finding.
+  4. **Catch-all flags.** No column exists; it proposes candidates by an explicit
+     breadth threshold (>40 codes) and never sets the flag.
+- **Verified — the v0 run reproduces the recorded ground truth exactly:**
+  `groups=40 · memberships=669 · labRules=22 · aliases=22 · links=10 · errors=66 ·
+  warnings=2 · verdict NOT IMPORTABLE` (expected — v0 is the pre-fix baseline).
+  Error breakdown cross-checks against `SOURCE_NOTES.md`: `UNRESOLVED_FEATURES_NAME`=**14**
+  (exactly the 14 divergent names measured), `MAPPING_CODE_EMPTY`=**2** (Vaginal
+  Candidiasis, Tinea Capitis), `GROUP_HAS_NO_CODES`=**5** (the 3 unmapped conditions + the
+  2 empty-code ones), `GROUP_CODES_NOT_AUTHORED`=1, `UNRESOLVED_SUPPORTED_DIAGNOSIS`=**29**
+  and `REQUIRES_DIAGNOSIS_NO_SUPPORT`=**10** (the F4 free-text defect, now quantified).
+  Note `CONDITION_UNMAPPED`=5 rather than 3: the two empty-code conditions legitimately end
+  up with zero memberships as well.
+  - **Determinism proven:** three runs, byte-identical `pack-v0.json` each time.
+  - Proposals report found the right confirmatory candidates (LAB003 Malaria RDT + LAB004
+    Malaria Blood Smear from *"Positive Malaria RDT or blood smear"*) and the right
+    catch-all candidates (Atopy 109, Arthritis 44, Contact Dertmatitis 42).
+  - 28 unit tests (`tests/services/diagnosis-gate-pack-validate.test.ts`): a good pack
+    passes; each V-rule broken individually and caught; normalisation asserts the
+    *negative* cases (misspellings and synonyms must NOT match); serialisation order-
+    independence; and a **ground-truth lock** on the vendored pack (40/669/22/0-confirmatory)
+    so converter drift fails the build.
+  - `npx tsc --noEmit` clean · `npx eslint` clean · full suite **1598 passed / 501 skipped
+    / 0 failed**.
+- **W-checklist:** n/a — offline tooling, no user-facing capability yet. W5/W8 for the
+  import path are owed by C3.2, which reuses `validatePack` unchanged.
+- **Deviations:** the plan sketched V1–V8; V9 (group with no codes) and V10 (rule with no
+  alias) were added because both describe content that imports cleanly yet can never fire —
+  exactly the silent-inertness the shadow campaign must not be fooled by.
+- **FINDING FOR THE CLINICAL TEAM (new, not in the 2026-08-05 fix list):** the workbook has
+  **no machine-readable confirmatory-test column**, so R4 cannot operate at all until one
+  is added. The prose `Diagnostic Confirmation Rule` is not sufficient. This is now the
+  second-highest-value workbook fix after F1 (stable group codes).
