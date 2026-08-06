@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireRole, ROLES } from "@/lib/rbac";
-import { rbacService } from "@/server/services/rbac.service";
+import { hasClinicalCapability, CLINICAL_PROTOCOL_MANAGE } from "@/server/services/diagnosis-gate/authorisation";
 import { ProtocolPackService } from "@/server/services/diagnosis-gate/protocol-pack.service";
 import { prisma } from "@/lib/prisma";
 import { SubmitButton } from "@/components/ui/SubmitButton";
@@ -43,7 +43,7 @@ export default async function ClinicalProtocolsPage({ searchParams }: { searchPa
 
   const [packs, canManage, activeGroups] = await Promise.all([
     ProtocolPackService.listPacks(tenantId),
-    rbacService.hasPermission(userId, "CLINICAL_PROTOCOL:MANAGE", tenantId).catch(() => false),
+    hasClinicalCapability(userId, session.user.role, CLINICAL_PROTOCOL_MANAGE, tenantId),
     prisma.clinicalInterventionGroup.count({ where: { pack: { tenantId, isActive: true }, enabledForLive: true } }),
   ]);
 

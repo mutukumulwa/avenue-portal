@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireRole, ROLES } from "@/lib/rbac";
-import { rbacService } from "@/server/services/rbac.service";
+import { hasClinicalCapability, CLINICAL_PROTOCOL_MANAGE, CLINICAL_PROTOCOL_APPROVE } from "@/server/services/diagnosis-gate/authorisation";
 import { ProtocolPackService } from "@/server/services/diagnosis-gate/protocol-pack.service";
 import { SubmitButton } from "@/components/ui/SubmitButton";
 import { submitPackAction, activatePackAction, deactivatePackAction, setGroupEnablementAction } from "../actions";
@@ -30,8 +30,8 @@ export default async function ProtocolPackDetailPage({
 
   const [pack, canManage, canApprove] = await Promise.all([
     ProtocolPackService.loadPackContent(tenantId, id),
-    rbacService.hasPermission(userId, "CLINICAL_PROTOCOL:MANAGE", tenantId).catch(() => false),
-    rbacService.hasPermission(userId, "CLINICAL_PROTOCOL:APPROVE", tenantId).catch(() => false),
+    hasClinicalCapability(userId, session.user.role, CLINICAL_PROTOCOL_MANAGE, tenantId),
+    hasClinicalCapability(userId, session.user.role, CLINICAL_PROTOCOL_APPROVE, tenantId),
   ]);
 
   const stats = (pack.validationStats ?? {}) as Record<string, number>;

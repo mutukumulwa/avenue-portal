@@ -561,3 +561,49 @@ existing **LIVE** autopilot policy running with `clinicalGateEnabled=false`.
 alias-coverage report (needs production-like claim data), then the C4 shadow campaign —
 which is gated on **G-C0, the clinical owner signing the spec** and filling in the pilot
 conditions (§6) and the numeric exit criteria (§7).
+
+## C3.5 — Capability resolution (production authorisation fix)
+- **Date / commits:** 2026-08-06 · (this commit)
+- **★ WHY THIS PACKAGE EXISTS — the feature shipped INOPERABLE to production.** The C3.2
+  UI gated every button on `rbacService.hasPermission`. Discovered while running the C3.1
+  wiring script against production: it reported *"role MEDICAL_OFFICER not present,
+  skipping"* for every role. Production has **0 `Role`, 0 `Permission`, 0
+  `RolePermission`, 0 `UserRoleAssignment`** rows — the granular RBAC layer was never
+  adopted there. The platform actually authorises on `User.role` + `requireRole` (214
+  admin surfaces do; only ~6 services use capabilities). And `hasPermission` requires a
+  `UserRoleAssignment` with **no SUPER_ADMIN bypass**, so it returned false for
+  *everyone*: the page rendered, the import form was hidden, and every action refused.
+  **This is the F76-GAP-02 failure reproduced through a different door** — it was invisible
+  locally because the dev database *is* seeded, which is exactly why it survived tsc,
+  eslint, 1630 tests, a clean build and a full UI walkthrough.
+- **What was built:** `src/server/services/diagnosis-gate/authorisation.ts` —
+  `hasClinicalCapability(userId, role, capability, tenantId)` with a three-step rule:
+  1. granular grant → **allow**;
+  2. user has ANY granular assignment → the granular model is in use for them, so its
+     **deny is authoritative** (a deliberate revocation must not be undone by a fallback);
+  3. otherwise → fall back to the platform's role model.
+  Both pages and all five actions now use it; no `rbacService` reference remains in the
+  gate UI.
+- **Scoped deliberately.** `rbacService.hasPermission` itself is UNCHANGED. Altering it
+  globally would silently change authorisation for blacklist, overrides, provider access
+  and claim reconsideration — a security change well outside this engagement.
+- **Not a loosening.** In an environment with no granular RBAC the capability is currently
+  held by nobody, so the feature is dead; the fallback grants exactly what
+  `prisma/seeds/rbac.ts` grants, so the two models agree. Maker ≠ checker is untouched —
+  enforced on user identity, never on capabilities. The approval matrix is unaffected:
+  `roleAuthorised` already works off the `User.role` enum.
+- **Verified:** 26 new tests (`diagnosis-gate-authorisation.test.ts`) covering all three
+  steps, including that **a granular deny beats the fallback even for SUPER_ADMIN**, that
+  a claims officer can work the queue but cannot author or approve medicine, that unknown
+  capabilities and null roles fail closed, and that a thrown assignment-count fails closed.
+  Crucially it also asserts **the fallback table and the RBAC seed grant the same
+  capabilities** — two models that disagree would authorise differently per environment,
+  which is how this class of bug returns.
+  `tsc` clean · `eslint` clean · hermetic **1656 passed / 552 skipped / 0 failed** ·
+  DG real-DB **51/51** · `next build` clean.
+- **W-checklist:** W1 revisited — the capability is now genuinely reachable by the
+  intended role in an unseeded environment, which is what W1 was always meant to
+  guarantee.
+- **LESSON (recorded for the next feature):** "permission seeded + granted" is not
+  sufficient. The question is *"does the target environment use this authorisation model
+  at all?"* — verify against production's actual RBAC state, not the seeded dev database.

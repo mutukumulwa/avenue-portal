@@ -7,15 +7,17 @@
  * services own the rules; these actions own authorisation, form parsing and audit.
  *
  * Authorisation is deliberately two-layered: `requireRole` keeps the page inside the
- * clinical roles, and `rbacService.requirePermission` enforces the specific capability —
- * so a CLAIMS_OFFICER who can reach the page to READ it still cannot import or approve
- * clinical content.
+ * clinical roles, and `hasClinicalCapability` enforces the specific capability — so a
+ * CLAIMS_OFFICER who can reach the page to READ it still cannot import or approve
+ * clinical content. The capability resolver honours granular RBAC where it is
+ * configured and falls back to the platform's role model where it is not (see
+ * `diagnosis-gate/authorisation.ts` — production has no granular RBAC at all).
  */
 import { requireRole, ROLES } from "@/lib/rbac";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { rbacService } from "@/server/services/rbac.service";
 import { auditChainService } from "@/server/services/audit-chain.service";
+import { hasClinicalCapability } from "@/server/services/diagnosis-gate/authorisation";
 import { ProtocolPackService } from "@/server/services/diagnosis-gate/protocol-pack.service";
 import { validatePack } from "@/server/services/diagnosis-gate/pack-validate";
 import type { ProtocolPack } from "@/server/services/diagnosis-gate/pack-types";
@@ -45,8 +47,8 @@ async function auditProtocol(actorId: string, tenantId: string, action: string, 
 async function authorise(permission: string) {
   const session = await requireRole(ROLES.CLINICAL);
   const { id: userId, tenantId } = session.user;
-  const ok = await rbacService.hasPermission(userId, permission, tenantId).catch(() => false);
-  if (!ok) fail(`You do not have the ${permission} permission.`);
+  const ok = await hasClinicalCapability(userId, session.user.role, permission, tenantId);
+  if (!ok) fail("You do not have permission to do that. Clinical content is managed by a medical officer.");
   return { userId, tenantId };
 }
 
