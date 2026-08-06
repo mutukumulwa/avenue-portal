@@ -15,6 +15,7 @@ const ACTION_LABEL: Record<string, string> = {
   FUND_TOPUP: "Fund top-up",
   WRITEOFF_REFUND: "Write-off / refund",
   AUTO_ADJ_POLICY_CHANGE: "Auto-adjudication policy change",
+  CLINICAL_PROTOCOL_CHANGE: "Clinical protocol change",
 };
 
 export default async function ApprovalsPage({

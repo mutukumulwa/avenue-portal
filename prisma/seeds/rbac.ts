@@ -81,6 +81,11 @@ const PERMISSIONS: Array<{
   // SETTINGS
   { code: "SETTINGS:VIEW",   module: "SETTINGS", action: "VIEW",   resource: "SETTINGS", description: "View system settings" },
   { code: "SETTINGS:UPDATE", module: "SETTINGS", action: "UPDATE", resource: "SETTINGS", description: "Update system settings" },
+  // CLINICAL PROTOCOL (Diagnosis Gate, DG C3.1)
+  { code: "CLINICAL_PROTOCOL:VIEW",    module: "CLINICAL_PROTOCOL", action: "VIEW",    resource: "PROTOCOL_PACK", description: "View clinical protocol packs and their conditions" },
+  { code: "CLINICAL_PROTOCOL:MANAGE",  module: "CLINICAL_PROTOCOL", action: "MANAGE",  resource: "PROTOCOL_PACK", description: "Import clinical content and submit it for approval (maker)" },
+  { code: "CLINICAL_PROTOCOL:APPROVE", module: "CLINICAL_PROTOCOL", action: "APPROVE", resource: "PROTOCOL_PACK", description: "Approve and activate clinical protocol packs (checker)" },
+  { code: "CLINICAL_GATE:REVIEW",      module: "CLINICAL_PROTOCOL", action: "REVIEW",  resource: "CLINICAL_FINDING", description: "Work the clinical review queue and record shadow verdicts" },
   // REPORT
   { code: "REPORT:VIEW",     module: "REPORT", action: "VIEW",     resource: "REPORT", description: "View reports" },
   { code: "REPORT:GENERATE", module: "REPORT", action: "GENERATE", resource: "REPORT", description: "Generate and download reports" },
@@ -127,6 +132,9 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "ANALYTICS:VIEW",
     "OVERRIDE:REQUEST",
     "ROLE:VIEW", "REPORT:VIEW",
+    // Diagnosis Gate: works the clinical review queue and can see the rules a
+    // finding came from, but cannot author or approve clinical content.
+    "CLINICAL_PROTOCOL:VIEW", "CLINICAL_GATE:REVIEW",
   ],
 
   SENIOR_CLAIMS_OFFICER: [
@@ -169,6 +177,11 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "MEMBER:VIEW",
     "ANALYTICS:VIEW",
     "ROLE:VIEW",
+    // Diagnosis Gate: the clinical content owner. MANAGE and APPROVE are both held
+    // by this role because clinical content should be checked by another clinician —
+    // maker ≠ checker is enforced per request on the identity, not the role.
+    "CLINICAL_PROTOCOL:VIEW", "CLINICAL_PROTOCOL:MANAGE", "CLINICAL_PROTOCOL:APPROVE",
+    "CLINICAL_GATE:REVIEW",
   ],
 
   MEDICAL_ADVISOR: [

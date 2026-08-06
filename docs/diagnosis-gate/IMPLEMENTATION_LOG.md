@@ -403,3 +403,46 @@ Entry template:
   `schemaVersion`, `suspectedDuplicateFingerprint`, `correlationId`, and `state`
   (PROCESSING|SUCCEEDED|REJECTED|FAILED — not `status`); `channel` is
   `ClaimIntakeChannel` (`ADMIN_PORTAL`, not `PORTAL`).
+
+## C3.1 — Permissions, approval-matrix action, ensure-script
+- **Date / commits:** 2026-08-06 · (this commit)
+- **Anchors re-verified:** `prisma/seeds/rbac.ts` (`PERMISSIONS` array + `ROLE_PERMISSIONS`
+  map; `ALL_PERMISSION_CODES` is computed after the array, so SUPER_ADMIN picks up new
+  entries automatically), `approval-matrix.service.ts` `seedForTenant` (~l.124),
+  `ApprovalMatrixManager.tsx` l.29, `approvals/page.tsx` l.17, `RolePermission`
+  (composite key `@@id([roleId, permissionId])`, **requires `grantedById`**).
+- **What was built:**
+  - Four staff permissions in the catalog: `CLINICAL_PROTOCOL:VIEW/MANAGE/APPROVE` and
+    `CLINICAL_GATE:REVIEW`.
+  - Role grants: **MEDICAL_OFFICER** gets all four (the clinical content owner);
+    **CLAIMS_OFFICER** gets VIEW + REVIEW only — working the clinical queue must not
+    imply authoring or approving medicine.
+  - Default matrix rule `CLINICAL_PROTOCOL_CHANGE → MEDICAL_OFFICER`, band-less.
+    **Deliberately NOT the money checker (FINANCE_OFFICER) that `AUTO_ADJ_POLICY_CHANGE`
+    uses:** what is being approved here is medicine. Maker ≠ checker is enforced per
+    request on identity, so a MEDICAL_OFFICER checker means "a second clinician".
+  - Dropdown entry + approvals-queue label.
+  - `scripts/diagnosis-gate/ensure-tenant-wiring.ts` for **existing** tenants.
+- **Verified:**
+  - Ensure-script run against the seeded DB: dry-run → run (**4 permissions, 10 role
+    grants, 1 matrix rule**) → **second run a clean no-op** ("Everything was already
+    wired"). Idempotency proven by execution, not by inspection.
+  - **Dry-run accuracy bug found and fixed during verification:** the first dry run
+    reported *0 role grants* on a fresh system, because grants are skipped when the
+    permission row does not exist yet — and on a dry run it never will. A dry run that
+    silently under-reports is worse than none, since ops would size the change from it.
+    It now reports the grants it would make.
+  - `tests/services/diagnosis-gate-wiring.test.ts` (13 hermetic tests) pins the three
+    places that must agree: catalog, role grants, and the action (enum + seed + dropdown
+    + label map + **both** dispatch branches). Also asserts CLAIMS_OFFICER does **not**
+    hold MANAGE/APPROVE, and that the ensure-script mirrors the seed.
+  - `tsc` clean · `eslint` clean · hermetic suite **1630 passed / 552 skipped / 0 failed**.
+- **Canary updated (truthfully, and strengthened):** `approval-matrix.service.test.ts`
+  asserted `seedForTenant` creates exactly 4 rules; it now creates 5. Updated to 5, the
+  `create` assertion widened to 2 calls with an explicit `CLINICAL_PROTOCOL_CHANGE →
+  MEDICAL_OFFICER` check, the re-provision case extended to a third `count` mock, and a
+  **new** case added for the real upgrade path: a tenant that predates the gate, where
+  bands and the policy rule exist and only the clinical rule is missing.
+- **W-checklist:** **W1 ✓** (catalogued, granted, and backfilled for existing tenants).
+  **W2 ✓** (enum + seed + dropdown + label map + dispatch, with a test for each).
+  W4/W5/W7/W8 remain owed by C3.2–C3.4 — no UI ships in this package.
