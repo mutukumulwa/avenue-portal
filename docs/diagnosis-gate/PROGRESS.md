@@ -6,7 +6,8 @@ Detail per package: `IMPLEMENTATION_LOG.md`.
 
 **Branch:** `feat/diagnosis-gate` (off `origin/main` @ `3ac6b2c`).
 **Baseline on branch:** tsc exit 0 · vitest 1569 passed / 501 skipped / 0 failed.
-**Current:** tsc clean · hermetic 1630 passed / 552 skipped / 0 failed · **51/51 DG real-DB tests** (opt-in).
+**Current:** tsc + eslint + next build clean · hermetic **1630 passed / 552 skipped / 0 failed** · **51/51 DG real-DB tests** (opt-in).
+**Phases C0–C3 COMPLETE.** Next: C1.4 crosswalk · C1.5 alias coverage · C4 shadow campaign (blocked on **G-C0**).
 
 | Pkg | Title | Status |
 |---|---|---|
@@ -26,7 +27,7 @@ Detail per package: `IMPLEMENTATION_LOG.md`.
 | C3.1 | Permissions + matrix + ensure-script | ✅ DONE — W1+W2 closed, idempotency proven |
 | C3.2 | Protocol library UI + import | ✅ DONE — walkthrough found 2 real bugs |
 | C3.3 | Governance E2E (maker/checker/activate) | ✅ DONE — clicked through maker→checker→in force |
-| C3.4 | Policy flags + claim-detail surfacing | ⬜ next — LAST buildable package before C4 |
+| C3.4 | Policy flags + claim-detail surfacing | ✅ DONE — W6+W7 closed |
 | C4.1 | Baseline snapshot | ⬜ must precede any provider comms (DG-D9) |
 | C4.2 | Shadow dashboard + verdicts | ⬜ |
 | C4.3 | Campaign runbook + exit memo | ⬜ **G-C4 human gate** |

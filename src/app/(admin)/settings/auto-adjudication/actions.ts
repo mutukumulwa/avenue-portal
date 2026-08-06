@@ -37,6 +37,10 @@ export async function createPolicyDraftAction(formData: FormData) {
   const currency = ((formData.get("currency") as string) || "UGX").trim().toUpperCase();
   const allowAutoPartial = formData.get("allowAutoPartial") === "on";
   const requireCleanFraud = formData.get("requireCleanFraud") !== "off";
+  // Diagnosis Gate (DG C3.4) — both default OFF, so a policy drafted without touching
+  // these keeps the clinical stage in record-only mode.
+  const clinicalGateEnabled = formData.get("clinicalGateEnabled") === "on";
+  const requireClinicalGroup = formData.get("requireClinicalGroup") === "on";
 
   if (!name) fail("Give the policy version a name.");
   if (!["OFF", "SHADOW", "LIVE"].includes(mode)) fail("Mode must be OFF, SHADOW or LIVE.");
@@ -68,6 +72,8 @@ export async function createPolicyDraftAction(formData: FormData) {
       currency,
       allowAutoPartial,
       requireCleanFraud,
+      clinicalGateEnabled,
+      requireClinicalGroup,
       enabled: false, // legacy flag: governed resolution reads mode/status, not this
       createdById: session.user.id,
       effectiveFrom: new Date(),
@@ -76,7 +82,7 @@ export async function createPolicyDraftAction(formData: FormData) {
     select: { id: true, version: true },
   });
   await auditPolicy(session.user.id, tenantId, "AUTO_ADJ:POLICY_DRAFTED", created.id,
-    { name, clientId, mode, maxAutoApproveAmount, currency, version: created.version },
+    { name, clientId, mode, maxAutoApproveAmount, currency, version: created.version, clinicalGateEnabled, requireClinicalGroup },
     `Policy draft v${created.version} "${name}" created (${mode}) — inert until checker approval`);
 
   revalidatePath(PATH);

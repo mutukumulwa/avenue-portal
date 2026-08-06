@@ -505,3 +505,59 @@ Entry template:
   pane (no file-upload tool for that surface), so the DRAFT for the walkthrough was created
   by calling the same service the action calls; the form's rendering and permission gating
   were verified visually, and the service path has 11 integration tests.
+
+## C3.4 — Policy flags and claim-detail surfacing
+- **Date / commits:** 2026-08-06 · (this commit)
+- **What was built:**
+  - `clinicalGateEnabled` + `requireClinicalGroup` as checkboxes on the **existing governed
+    policy-draft form** (`/settings/auto-adjudication`). They ride the existing
+    `AUTO_ADJ_POLICY_CHANGE` maker/checker path — they are policy fields, so switching the
+    clinical gate on is already a governed money-control change. **No new mechanism was
+    invented for them.** Both default off, so a policy drafted without touching them keeps
+    the stage in record-only mode.
+  - A **"Clinical gate" column** on the policy table ("May route" / "Records only", plus
+    "governed diagnosis required"). A flag that can only be *set* is half-wired: without
+    this the only way to know whether the gate may route is a database query.
+  - **`ClinicalFindings`** on the claim detail's automation timeline. The stage chips only
+    showed `CLINICAL — ROUTED`, which tells a reviewer nothing about *which* test was
+    questioned. Findings now render in plain language ("Test not indicated by the
+    diagnosis", "Repeated inside its clinical window", "No confirmatory test on record"),
+    with the pack's own provider-facing message, the earlier claim numbers for a repeat,
+    and an explicit "recorded only — this claim was not diverted" marker in shadow mode.
+    It closes with the standing caveat that a clinical finding never declines a claim.
+  - `getClaimProcessingTimeline` now also selects `result` and `safeMessage`. The stage
+    result is safe by construction — codes, test names and claim numbers only, never a
+    member identifier, amount, or clinical free text.
+- **Verified:** `tsc` clean · `eslint` clean · hermetic suite **1630 passed / 552 skipped /
+  0 failed** · `next build` clean with both routes emitted and 166 pages generated.
+- **Flaky-build note (not a code defect):** one `next build` run died inside webpack's
+  `WasmHash._updateWithBuffer` ("Cannot read properties of undefined"). A clean rebuild
+  (`rm -rf .next`) succeeded, as did two earlier runs. It is a webpack/Node interaction,
+  not a change here — recorded so a future run that hits it is not misread as a regression.
+- **W-checklist:** **W7 ✓** — every behaviour flag is now editable in the admin UI by the
+  intended role and readable in the policy table; none is env-var-only or DB-console-only.
+  **W6 ✓** — every clinical route code renders on the claim with its own wording.
+- **Deviations:** none.
+
+---
+
+# Phase C0–C3 complete — status summary
+
+**All buildable packages up to the shadow campaign are done.** Nine commits, every one
+green on `tsc` + `eslint` + the full suite.
+
+- Hermetic suite: **1630 passed / 552 skipped / 0 failed** (baseline was 1569 passed).
+- Diagnosis-gate real-DB suites: **51/51** across four files (opt-in via `AUTOPILOT_TEST_DB`).
+- `next build` clean; both new routes emitted.
+
+**The safety property still holds end to end:** deploying everything committed changes no
+claim's outcome. The stage is inert with no pack in force; a pack requires import →
+approval by a second clinician → deliberate activation; and even then findings are
+recorded only until `clinicalGateEnabled` **and** the specific condition are switched on.
+Proven, not asserted: the additive schema push against a populated database left an
+existing **LIVE** autopilot policy running with `clinicalGateEnabled=false`.
+
+**Next up (C1.4, C1.5, C4):** the WHO ICD-10↔11 crosswalk (may be BLOCKED-EXTERNAL), the
+alias-coverage report (needs production-like claim data), then the C4 shadow campaign —
+which is gated on **G-C0, the clinical owner signing the spec** and filling in the pilot
+conditions (§6) and the numeric exit criteria (§7).
