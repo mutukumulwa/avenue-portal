@@ -87,3 +87,55 @@ Entry template:
   is intentional and recorded so a future reader does not treat it as drift.
 - **OPEN — human gate G-C0:** §6, §7 and §9 require the clinical owner. No pack may be
   activated and no shadow campaign may start until signed.
+
+## C1.1 — Additive schema
+- **Date / commits:** 2026-08-06 · (this commit)
+- **Anchors re-verified:** `ClaimProcessingStageName` and `ApprovalActionType` enums,
+  `AutoAdjudicationPolicy` model, `ClaimProcessingStage` — all at the §4 locations.
+  Schema-file convention checked before writing: newer additive clusters (PNOS capitation)
+  keep `tenantId` as a **bare String** with no `Tenant` back-relation, while intra-cluster
+  parent/child relations DO use `@relation(..., onDelete: Cascade)` (15 existing uses,
+  e.g. `ApprovalMatrix`→item l.1596). The DG cluster follows both: bare `tenantId`
+  (so no existing model is touched at all) + cascading pack→children relations.
+- **What was built:**
+  - 6 enums: `ClinicalCodeSystem`, `ClinicalMappingProvenance`, `ClinicalLabLinkType`,
+    `ClinicalAliasMatchType`, `ClinicalProtocolPackStatus`, `ClinicalVerdict`.
+  - 7 models: `ClinicalProtocolPack`, `ClinicalInterventionGroup`,
+    `ClinicalCodeMembership`, `ClinicalLabRule`, `ClinicalLabRuleGroupLink`,
+    `ClinicalLineAlias`, `ClinicalShadowVerdict`.
+  - `CLINICAL` added to `ClaimProcessingStageName`, positioned **between DUPLICATE and
+    CONTRACT** (DG §6.2 execution order).
+  - `CLINICAL_PROTOCOL_CHANGE` appended to `ApprovalActionType`.
+  - Three fields on `AutoAdjudicationPolicy`, all `@default(false)`:
+    `clinicalGateEnabled`, `requireClinicalGroup`, `repeatWindowShortPay`.
+    (Plan §6.1 listed the first two for C1.1 and deferred the third to C5.2; the **column**
+    is added now — additive and inert — so C5.2 ships behaviour only and never needs a
+    second production schema change on the money path. The flag stays unread until C5.2.)
+- **Verified:**
+  - `npx prisma format` + `validate` → valid.
+  - **Additive proof against a POPULATED pre-change database** (the PNOS lesson — a fresh
+    push proves nothing about migration safety): built `dg_prev` from
+    `git show origin/main:prisma/schema.prisma`, inserted a Tenant + an **APPROVED/LIVE**
+    `AutoAdjudicationPolicy` row with a 75,000 ceiling, then pushed the new schema
+    **without `--accept-data-loss`**. Result: succeeded unprompted (200 ms, no data-loss
+    warning); the policy row survived with `mode=LIVE` and its ceiling intact; all three
+    new columns materialised as `false`; all 7 DG tables created.
+    ⇒ **A tenant already running LIVE automation stays record-only after deployment.**
+  - `npx prisma generate` + `npx tsc --noEmit` → exit 0.
+  - `npx vitest run` → **1570 passed / 501 skipped / 0 failed**.
+- **Test change (deliberate, not a fix-to-green):**
+  `tests/services/claim-processing-schema.test.ts` asserted the stage enum has exactly
+  **14** members — a canary guarding the autopilot's canonical stage list (§6.5). The
+  Diagnosis Gate legitimately adds a 15th, so the assertion was updated to 15 with
+  `CLINICAL` in the expected list, and a **new** assertion was added that CLINICAL sits
+  after DUPLICATE and before CONTRACT (order is semantically load-bearing, so the guard
+  is now stronger than before rather than merely relaxed).
+- **W-checklist:** n/a — no capability shipped yet. W7 (UI toggles for the three policy
+  flags) is owed by C3.4 and is tracked there; the columns are unreachable until then.
+- **Deviations:** `repeatWindowShortPay` column added one package earlier than the plan
+  scheduled it, as explained above. No behaviour attached.
+- **Environment landmine (record for future sessions):** on this macOS host
+  `pg_ctl start` fails with *"postmaster became multithreaded during startup"* unless
+  `LC_ALL=C LANG=C` are exported first. Also **Prisma is 7.7.0**: `db push --skip-generate`
+  no longer exists, and the datasource URL is read from `prisma.config.ts`
+  (`env("DIRECT_URL")`), not from a `datasource` block env reference.
