@@ -183,6 +183,27 @@ export default async function AutoAdjudicationPage({
             <input type="checkbox" name="allowAutoPartial" className="h-4 w-4" />
             Allow automatic PARTIAL approvals
           </label>
+          {/* Diagnosis Gate (DG C3.4). Both default OFF. The gate evaluates and records
+              regardless; these decide whether it may act on what it finds. */}
+          <label className="flex items-center gap-2 self-end text-sm text-brand-text-body">
+            <input type="checkbox" name="clinicalGateEnabled" className="h-4 w-4" />
+            <span>
+              Clinical gate may route claims
+              <span className="block text-xs text-brand-text-muted">
+                Off = findings are recorded only. Each condition must also be switched on in{" "}
+                <Link href="/settings/clinical-protocols" className="underline">clinical protocols</Link>.
+              </span>
+            </span>
+          </label>
+          <label className="flex items-center gap-2 self-end text-sm text-brand-text-body">
+            <input type="checkbox" name="requireClinicalGroup" className="h-4 w-4" />
+            <span>
+              Require a governed diagnosis for automation
+              <span className="block text-xs text-brand-text-muted">
+                Off = a diagnosis with no protocol passes as normal. On = it goes to a human.
+              </span>
+            </span>
+          </label>
           <div className="flex items-end justify-end">
             <SubmitButton>Create draft</SubmitButton>
           </div>
@@ -199,13 +220,14 @@ export default async function AutoAdjudicationPage({
               <th className="px-4 py-2.5">Status</th>
               <th className="px-4 py-2.5">Effective mode</th>
               <th className="px-4 py-2.5">Ceiling</th>
+              <th className="px-4 py-2.5">Clinical gate</th>
               <th className="px-4 py-2.5" />
             </tr>
           </thead>
           <tbody className="divide-y divide-brand-border">
             {policies.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-6 text-center text-brand-text-muted">
+                <td colSpan={8} className="px-4 py-6 text-center text-brand-text-muted">
                   No policy versions. Without an APPROVED LIVE policy every claim routes to a human (fail-safe).
                 </td>
               </tr>
@@ -222,6 +244,16 @@ export default async function AutoAdjudicationPage({
                     </td>
                     <td className="px-4 py-2.5 font-mono text-xs">{effective}</td>
                     <td className="px-4 py-2.5 font-mono text-xs">{p.maxAutoApproveAmount != null ? `${Number(p.maxAutoApproveAmount).toLocaleString()} ${p.currency}` : "—"}</td>
+                    {/* DG C3.4: the flag must be READABLE, not just settable — otherwise
+                        the only way to know whether the gate can route is a DB query. */}
+                    <td className="px-4 py-2.5 text-xs">
+                      {p.clinicalGateEnabled ? (
+                        <span className="font-semibold text-brand-teal">May route</span>
+                      ) : (
+                        <span className="text-brand-text-muted">Records only</span>
+                      )}
+                      {p.requireClinicalGroup && <span className="block text-[10px] text-brand-text-muted">governed diagnosis required</span>}
+                    </td>
                     <td className="px-4 py-2.5 text-right">
                       {(p.status === "DRAFT" || p.status === "REJECTED") && (
                         <form action={submitPolicyForApprovalAction} className="inline">

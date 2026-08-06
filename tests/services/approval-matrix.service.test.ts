@@ -185,10 +185,11 @@ describe("ApprovalMatrixService — engine (G3.1)", () => {
   });
 
   describe("seedForTenant (A3-OBS-01 / F76-GAP-02 — default matrix on provisioning)", () => {
-    it("seeds the 3 CLAIM_PAYMENT bands + the AUTO_ADJ_POLICY_CHANGE checker on a fresh tenant", async () => {
+    it("seeds the 3 CLAIM_PAYMENT bands + the AUTO_ADJ_POLICY_CHANGE and CLINICAL_PROTOCOL_CHANGE checkers on a fresh tenant", async () => {
       db.approvalMatrix.count.mockResolvedValue(0);
       const n = await ApprovalMatrixService.seedForTenant(T);
-      expect(n).toBe(4);
+      // 3 claim-payment bands + 2 band-less governed-change rules.
+      expect(n).toBe(5);
       // Three claim-payment bands via createMany.
       expect(db.approvalMatrix.createMany).toHaveBeenCalledOnce();
       const bands = (db.approvalMatrix.createMany.mock.calls[0][0] as { data: any[] }).data;
@@ -198,7 +199,7 @@ describe("ApprovalMatrixService — engine (G3.1)", () => {
         expect.objectContaining({ serviceType: "INPATIENT", claimValueMin: 200000, requiredRole: "UNDERWRITER", requiresDual: true }),
       );
       // The governed policy-change checker via create — FINANCE_OFFICER, no bands.
-      expect(db.approvalMatrix.create).toHaveBeenCalledOnce();
+      expect(db.approvalMatrix.create).toHaveBeenCalledTimes(2);
       expect(db.approvalMatrix.create).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -210,15 +211,42 @@ describe("ApprovalMatrixService — engine (G3.1)", () => {
           }),
         }),
       );
+      // Clinical content is checked by a MEDICAL_OFFICER, not the money checker: what is
+      // being approved is medicine. Maker != checker is enforced per request on identity,
+      // so this means "a second clinician" (Diagnosis Gate DG-D6).
+      expect(db.approvalMatrix.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            actionType: "CLINICAL_PROTOCOL_CHANGE",
+            requiredRole: "MEDICAL_OFFICER",
+            requiresDual: false,
+            claimValueMin: null,
+            claimValueMax: null,
+          }),
+        }),
+      );
     });
 
-    it("backfills only the policy rule when claim-payment bands already exist (re-provision)", async () => {
-      // existingClaim > 0 (skip bands), existingPolicy === 0 (seed the policy rule).
-      db.approvalMatrix.count.mockResolvedValueOnce(3).mockResolvedValueOnce(0);
+    it("backfills only the governed-change rules when claim-payment bands already exist (re-provision)", async () => {
+      // bands present → skip; policy rule absent → seed; protocol rule absent → seed.
+      db.approvalMatrix.count.mockResolvedValueOnce(3).mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+      const n = await ApprovalMatrixService.seedForTenant(T);
+      expect(n).toBe(2);
+      expect(db.approvalMatrix.createMany).not.toHaveBeenCalled();
+      expect(db.approvalMatrix.create).toHaveBeenCalledTimes(2);
+    });
+
+    it("backfills ONLY the clinical rule on a tenant that predates the Diagnosis Gate", async () => {
+      // The real upgrade path: bands and the policy rule already exist; only the new
+      // clinical action is missing. Getting this wrong is how an existing customer ends
+      // up seeing the feature and being unable to submit content (F76-GAP-02).
+      db.approvalMatrix.count.mockResolvedValueOnce(3).mockResolvedValueOnce(1).mockResolvedValueOnce(0);
       const n = await ApprovalMatrixService.seedForTenant(T);
       expect(n).toBe(1);
-      expect(db.approvalMatrix.createMany).not.toHaveBeenCalled();
       expect(db.approvalMatrix.create).toHaveBeenCalledOnce();
+      expect(db.approvalMatrix.create).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ actionType: "CLINICAL_PROTOCOL_CHANGE" }) }),
+      );
     });
 
     it("is fully idempotent — leaves an already-configured matrix untouched", async () => {

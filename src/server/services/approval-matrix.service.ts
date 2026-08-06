@@ -130,6 +130,20 @@ export class ApprovalMatrixService {
       seeded += 1;
     }
 
+    // Governed clinical protocol changes (Diagnosis Gate, DG-D6). Also band-less —
+    // clinical content carries no claim value. The checker is a MEDICAL_OFFICER
+    // because what is being approved is medicine, not money; maker ≠ checker is
+    // enforced per request on identity, so this means "a second clinician".
+    const existingProtocol = await prisma.approvalMatrix.count({
+      where: { tenantId, actionType: "CLINICAL_PROTOCOL_CHANGE" },
+    });
+    if (existingProtocol === 0) {
+      await prisma.approvalMatrix.create({
+        data: { tenantId, actionType: "CLINICAL_PROTOCOL_CHANGE", serviceType: null, claimValueMin: null, claimValueMax: null, benefitCategory: null, requiredRole: "MEDICAL_OFFICER", requiresDual: false, effectiveFrom },
+      });
+      seeded += 1;
+    }
+
     return seeded;
   }
 

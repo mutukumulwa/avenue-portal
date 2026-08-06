@@ -27,6 +27,7 @@ const ACTION_TYPES = [
   { value: "FUND_TOPUP",             label: "Fund top-up" },
   { value: "WRITEOFF_REFUND",        label: "Write-off / refund" },
   { value: "AUTO_ADJ_POLICY_CHANGE", label: "Auto-adjudication policy change" },
+  { value: "CLINICAL_PROTOCOL_CHANGE", label: "Clinical protocol change" },
 ];
 const actionLabel = (v: string) => ACTION_TYPES.find((a) => a.value === v)?.label ?? v;
 

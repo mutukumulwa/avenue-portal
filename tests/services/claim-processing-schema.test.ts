@@ -18,11 +18,20 @@ describe("F2.3 — processing enums", () => {
       ["AUTO_DECIDED", "FAILED", "PENDING", "RETRYABLE", "ROUTED", "RUNNING", "SHADOW_COMPLETE"].sort(),
     );
   });
-  it("ClaimProcessingStageName lists the 14 canonical stages (§6.5)", () => {
-    expect(Object.values(ClaimProcessingStageName)).toHaveLength(14);
-    for (const s of ["CONTEXT", "ELIGIBILITY", "CODING", "DOCUMENTS", "DUPLICATE", "CONTRACT", "PREAUTH", "BENEFIT", "FRAUD", "COST_SHARE", "POLICY", "DECISION", "NOTIFICATION", "AUDIT"]) {
+  // 14 autopilot stages (§6.5) + CLINICAL, added by the Diagnosis Gate (DG C1.1).
+  // CLINICAL is deliberately positioned between DUPLICATE and CONTRACT: it needs only
+  // the diagnosis, the coded lines and claim history, so an out-of-scope or
+  // protocol-flagged claim is resolved BEFORE the expensive contract evaluation.
+  it("ClaimProcessingStageName lists the 15 canonical stages (§6.5 + DG CLINICAL)", () => {
+    expect(Object.values(ClaimProcessingStageName)).toHaveLength(15);
+    for (const s of ["CONTEXT", "ELIGIBILITY", "CODING", "DOCUMENTS", "DUPLICATE", "CLINICAL", "CONTRACT", "PREAUTH", "BENEFIT", "FRAUD", "COST_SHARE", "POLICY", "DECISION", "NOTIFICATION", "AUDIT"]) {
       expect(Object.values(ClaimProcessingStageName)).toContain(s);
     }
+  });
+  it("CLINICAL is ordered after DUPLICATE and before CONTRACT (DG §6.2)", () => {
+    const order = Object.values(ClaimProcessingStageName) as string[];
+    expect(order.indexOf("CLINICAL")).toBeGreaterThan(order.indexOf("DUPLICATE"));
+    expect(order.indexOf("CLINICAL")).toBeLessThan(order.indexOf("CONTRACT"));
   });
   it("ClaimProcessingStageState and Trigger expose the required values", () => {
     expect(Object.values(ClaimProcessingStageState).sort()).toEqual(["FAILED", "PASSED", "PENDING", "ROUTED", "RETRYABLE", "RUNNING", "SKIPPED"].sort());

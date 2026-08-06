@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { getClaimProcessingTimeline } from "@/server/services/claim-intake/reconciliation";
 import { getReason, isRouteCode } from "@/server/services/claim-intake/reason-catalog";
 import { ReprocessButton } from "./ReprocessButton";
+import type { ClinicalStageResult, ClinicalRuleHit } from "@/server/services/claim-autopilot/stage-clinical";
 
 /**
  * F6.3 — the claim's automation story (§12.2): every processing run with its
@@ -21,6 +22,55 @@ const STATE_BADGE: Record<string, string> = {
   AUTO_DECIDED: "bg-[#28A745]/10 text-[#1E7E34]",
   SUPERSEDED: "bg-[#E6E7E8] text-[#6C757D]",
 };
+
+const RULE_LABEL: Record<string, string> = {
+  R2: "Test not indicated by the diagnosis",
+  R3: "Repeated inside its clinical window",
+  R4: "No confirmatory test on record",
+};
+
+/**
+ * DG C3.4 — what the clinical stage found, in words a reviewer can act on.
+ *
+ * A stage chip reading "CLINICAL ROUTED" tells a reviewer nothing about WHICH test was
+ * questioned or why, so the findings are spelled out here. Everything shown comes from
+ * the pack (its own provider-facing message) or from safe references (claim numbers) —
+ * no member identifier, no amount, no clinical free text.
+ */
+function ClinicalFindings({ result }: { result: ClinicalStageResult }) {
+  const hits: ClinicalRuleHit[] = result.ruleHits ?? [];
+  if (result.skipped) return null; // gate dormant — nothing to say
+  if (hits.length === 0) return null;
+
+  return (
+    <div className="rounded-[6px] border border-[#EEEEEE] bg-[#FAFAFA] p-3 space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[11px] font-bold text-brand-text-heading">Clinical findings</span>
+        {result.groupName && <span className="text-[10px] text-brand-text-muted">diagnosis group: {result.groupName}</span>}
+        {result.recordOnly && (
+          <span className="text-[10px] font-semibold text-brand-text-muted" title="The gate is not routing claims for this condition yet">
+            recorded only — this claim was not diverted
+          </span>
+        )}
+      </div>
+      <ul className="space-y-1.5">
+        {hits.map((h, i) => (
+          <li key={`${h.rule}-${h.claimLineId ?? i}`} className="text-[11px] text-brand-text-body">
+            <span className="font-semibold">{RULE_LABEL[h.rule] ?? h.rule}</span>
+            {h.testName && <span> — {h.testName}</span>}
+            {h.message && <span className="block text-brand-text-muted">{h.message}</span>}
+            {h.priorClaimNumbers && h.priorClaimNumbers.length > 0 && (
+              <span className="block text-brand-text-muted">Earlier claim(s): {h.priorClaimNumbers.join(", ")}</span>
+            )}
+          </li>
+        ))}
+      </ul>
+      <p className="text-[10px] text-brand-text-muted">
+        A clinical finding never declines a claim on its own — it is for a person to weigh.
+      </p>
+    </div>
+  );
+}
 
 function Badge({ label }: { label: string }) {
   return (
@@ -83,6 +133,12 @@ export async function AutomationPanel({ tenantId, claimId, claimStatus }: { tena
                 ))}
               </div>
             )}
+
+            {run.stages
+              .filter((s) => s.stage === "CLINICAL" && s.result && typeof s.result === "object")
+              .map((s) => (
+                <ClinicalFindings key={`clin-${s.stage}`} result={s.result as unknown as ClinicalStageResult} />
+              ))}
           </div>
         );
       })}

@@ -311,12 +311,12 @@ model User {
   updatedAt      DateTime  @updatedAt
 
   // Link to broker or member profile
-  brokerId String? @unique
-  broker   Broker? @relation(fields: [brokerId], references: [id])
-  memberId String? @unique
-  member   Member? @relation(fields: [memberId], references: [id])
-  groupId  String?
-  group    Group?  @relation("HRManagerGroup", fields: [groupId], references: [id])
+  brokerId   String?   @unique
+  broker     Broker?   @relation(fields: [brokerId], references: [id])
+  memberId   String?   @unique
+  member     Member?   @relation(fields: [memberId], references: [id])
+  groupId    String?
+  group      Group?    @relation("HRManagerGroup", fields: [groupId], references: [id])
   // Provider portal confinement: PROVIDER_USER accounts are bound to one facility
   // and only ever see that provider's members-eligibility, claims and settlements.
   providerId String?
@@ -1546,6 +1546,7 @@ enum ApprovalActionType {
   FUND_TOPUP
   WRITEOFF_REFUND
   AUTO_ADJ_POLICY_CHANGE // Claims Autopilot governed LIVE-policy activation (D15, F2.5)
+  CLINICAL_PROTOCOL_CHANGE // Diagnosis Gate protocol-pack activation (DG-D6, C1.2)
 }
 
 model ApprovalMatrix {
@@ -1729,6 +1730,22 @@ model AutoAdjudicationPolicy {
   approvedAt               DateTime?
   deactivatedById          String?
   deactivationReason       String?
+
+  // ── Diagnosis Gate (DG C1.1) ──────────────────────────────────────────────
+  // Both default FALSE so the CLINICAL stage is record-only on every existing and
+  // new policy row (DG-D4): it evaluates and persists rule hits but never changes a
+  // claim's disposition until a human deliberately enables routing through the
+  // governed policy-change path.
+  /// Master switch: false = record-only (shadow); true = clinical rule hits may ROUTE
+  /// (still per-group gated by ClinicalInterventionGroup.enabledForLive, DG-D5).
+  clinicalGateEnabled  Boolean @default(false)
+  /// DG-D11. false = a diagnosis outside every governed group PASSES (the gate governs
+  /// only what it knows). true = such a claim routes for standard human adjudication.
+  requireClinicalGroup Boolean @default(false)
+  /// DG-D13. The ONLY money-touching clinical behaviour: an R3 repeat-window hit
+  /// zero-pays that line instead of routing. Requires its own finance+clinical
+  /// sign-off (gate G-C5.2) and is wired in package C5.2 — not before.
+  repeatWindowShortPay Boolean @default(false)
 
   effectiveFrom DateTime  @default(now())
   effectiveTo   DateTime?
@@ -1991,25 +2008,25 @@ enum FundingModelType {
 }
 
 model BenefitConfig {
-  id                 String          @id @default(cuid())
+  id                 String           @id @default(cuid())
   packageVersionId   String
-  packageVersion     PackageVersion  @relation(fields: [packageVersionId], references: [id])
+  packageVersion     PackageVersion   @relation(fields: [packageVersionId], references: [id])
   category           BenefitCategory
   customCategoryName String? // If category == CUSTOM
   annualSubLimit     Decimal // KES
   perVisitLimit      Decimal?
-  copayPercentage    Decimal         @default(0) // e.g., 10 = 10%
+  copayPercentage    Decimal          @default(0) // e.g., 10 = 10%
   // Cost-share (G9.1) — distinct from copay: co-insurance is the member's % of
   // the cost AFTER the annual deductible is met. deductibleAmount is the annual
   // member-paid threshold before the plan pays. Both default 0 (off).
-  coInsurancePct     Decimal         @default(0) // e.g. 20 = member pays 20% post-deductible
-  deductibleAmount   Decimal         @default(0) // annual member-paid threshold
+  coInsurancePct     Decimal          @default(0) // e.g. 20 = member pays 20% post-deductible
+  deductibleAmount   Decimal          @default(0) // annual member-paid threshold
   // Funding model (WP-F1/D8): default FFS keeps existing behaviour. HYBRID
   // uses fundingOverrides: [{ tier: ServiceTier, model: FundingModelType }],
   // validated in the service layer.
   fundingModel       FundingModelType @default(FEE_FOR_SERVICE)
   fundingOverrides   Json?
-  waitingPeriodDays  Int             @default(0)
+  waitingPeriodDays  Int              @default(0)
   notes              String?
   exclusions         String[]
 
@@ -2247,28 +2264,28 @@ enum ServiceType {
 }
 
 model Claim {
-  currency         String            @default("UGX") // G3.5 multi-currency (base UGX)
-  id               String            @id @default(cuid())
+  currency         String             @default("UGX") // G3.5 multi-currency (base UGX)
+  id               String             @id @default(cuid())
   tenantId         String
-  tenant           Tenant            @relation(fields: [tenantId], references: [id])
+  tenant           Tenant             @relation(fields: [tenantId], references: [id])
   claimNumber      String // e.g., CLM-2025-00001
   invoiceNumber    String? // Provider's own invoice number — unique per provider
   memberId         String
-  member           Member            @relation(fields: [memberId], references: [id])
+  member           Member             @relation(fields: [memberId], references: [id])
   providerId       String
-  provider         Provider          @relation(fields: [providerId], references: [id])
+  provider         Provider           @relation(fields: [providerId], references: [id])
   // Branch at which the service was rendered (digital-contract spec §5.2/§8.1) —
   // required at capture for multi-branch providers so branch-scoped contracts and
   // rates can match. Null for legacy/single-branch providers.
   providerBranchId String?
-  providerBranch   ProviderBranch?   @relation(fields: [providerBranchId], references: [id])
+  providerBranch   ProviderBranch?    @relation(fields: [providerBranchId], references: [id])
   // Attached pre-authorizations (WP-C1/D4): a claim may carry several PAs
   // alongside BAU lines; the FK lives on PreAuthorization.claimId.
   preauths         PreAuthorization[]
   // Filing case (WP-D1/D5): set when this claim was assembled from a clinical
   // case at closure. Non-unique by design — one-case-many-claims stays open.
   caseId           String?
-  case             ClinicalCase?     @relation(fields: [caseId], references: [id])
+  case             ClinicalCase?      @relation(fields: [caseId], references: [id])
   // ── IPL-001 interim/periodic inpatient settlement ────────────────────────
   // A case now files MANY claims: interim "slices" cut at each Friday cut-off
   // while the admission stays open, then one final claim for the residual at
@@ -2280,7 +2297,7 @@ model Claim {
   sliceServiceFrom DateTime? // earliest entry date in the slice
   sliceServiceTo   DateTime? // latest entry date in the slice
   sliceEntries     CaseServiceEntry[] @relation("SliceEntries") // entries frozen into this claim
-  source           ClaimSource       @default(MANUAL)
+  source           ClaimSource        @default(MANUAL)
   serviceType      ServiceType
   dateOfService    DateTime
   admissionDate    DateTime? // For inpatient
@@ -2667,7 +2684,7 @@ model PreAuthorization {
   // Attachment to a claim (WP-C1/D4): a PA attaches to at most one claim; a
   // claim may carry many PAs alongside BAU service lines.
   claimId     String?
-  claim       Claim?    @relation(fields: [claimId], references: [id])
+  claim       Claim?        @relation(fields: [claimId], references: [id])
   attachedAt  DateTime?
   convertedAt DateTime? // legacy 1:1 conversion timestamp — historical rows only
   // Open-case linkage (WP-D1): PA accrues on the case until closure re-points
@@ -2766,21 +2783,21 @@ model ClinicalCase {
 }
 
 model CaseServiceEntry {
-  id          String            @id @default(cuid())
-  caseId      String
-  case        ClinicalCase      @relation(fields: [caseId], references: [id])
-  entryDate   DateTime
-  category    ClaimLineCategory
-  serviceCode String?
-  description String
-  quantity    Int               @default(1)
-  unitAmount  Decimal           @db.Decimal(14, 2)
-  totalAmount Decimal           @db.Decimal(14, 2)
-  source      String            @default("MANUAL") // MANUAL | HMS_BATCH
-  enteredById String?
-  hmsBatchRef String?
-  voided      Boolean           @default(false) // never delete — void instead
-  voidReason  String?
+  id              String            @id @default(cuid())
+  caseId          String
+  case            ClinicalCase      @relation(fields: [caseId], references: [id])
+  entryDate       DateTime
+  category        ClaimLineCategory
+  serviceCode     String?
+  description     String
+  quantity        Int               @default(1)
+  unitAmount      Decimal           @db.Decimal(14, 2)
+  totalAmount     Decimal           @db.Decimal(14, 2)
+  source          String            @default("MANUAL") // MANUAL | HMS_BATCH
+  enteredById     String?
+  hmsBatchRef     String?
+  voided          Boolean           @default(false) // never delete — void instead
+  voidReason      String?
   // IPL-001 interim settlement: when set, this entry is frozen into an interim
   // (or final) claim slice and is immutable — it can never be voided or
   // re-billed on a later slice. `null` = still unbilled, eligible for the next
@@ -2788,7 +2805,7 @@ model CaseServiceEntry {
   // "prior lines excluded by identity, not description guess").
   billedInClaimId String?
   billedInClaim   Claim?            @relation("SliceEntries", fields: [billedInClaimId], references: [id])
-  createdAt   DateTime          @default(now())
+  createdAt       DateTime          @default(now())
 
   @@index([caseId, entryDate])
   @@index([hmsBatchRef])
@@ -2923,26 +2940,26 @@ model Provider {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
-  tariffs            ProviderTariff[]
-  diagnosisTariffs   ProviderDiagnosisTariff[]
-  contracts          ProviderContract[]
-  claims             Claim[]
-  preauths           PreAuthorization[]
-  settlementBatches  ProviderSettlementBatch[]
-  checkInChallenges  CheckInChallenge[]
-  checkInEvents      CheckInEvent[]
-  visitVerifications VisitVerification[]
-  eligibilityRules   PackageProviderEligibility[]
-  practitioners      ProviderPractitioner[]
-  branches           ProviderBranch[]
+  tariffs               ProviderTariff[]
+  diagnosisTariffs      ProviderDiagnosisTariff[]
+  contracts             ProviderContract[]
+  claims                Claim[]
+  preauths              PreAuthorization[]
+  settlementBatches     ProviderSettlementBatch[]
+  checkInChallenges     CheckInChallenge[]
+  checkInEvents         CheckInEvent[]
+  visitVerifications    VisitVerification[]
+  eligibilityRules      PackageProviderEligibility[]
+  practitioners         ProviderPractitioner[]
+  branches              ProviderBranch[]
   userBranchAssignments ProviderUserBranchAssignment[]
-  aliases            ProviderAlias[]
-  offlineWorkAuths   OfflineWorkAuthorization[]
-  offlineDataPacks   OfflineDataPack[]
-  clinicalCases      ClinicalCase[]
-  lettersOfUndertaking LetterOfUndertaking[]
-  portalUsers        User[]                    @relation("ProviderPortalUser")
-  apiKeys            ProviderApiKey[]
+  aliases               ProviderAlias[]
+  offlineWorkAuths      OfflineWorkAuthorization[]
+  offlineDataPacks      OfflineDataPack[]
+  clinicalCases         ClinicalCase[]
+  lettersOfUndertaking  LetterOfUndertaking[]
+  portalUsers           User[]                         @relation("ProviderPortalUser")
+  apiKeys               ProviderApiKey[]
 
   @@index([tenantId])
   @@index([tenantId, tier])
@@ -2954,19 +2971,19 @@ model Provider {
 // every submission is attributed to that facility. Only a bcrypt hash of the
 // key is stored; the plaintext is shown once at generation.
 model ProviderApiKey {
-  id          String    @id @default(cuid())
-  tenantId    String
-  tenant      Tenant    @relation(fields: [tenantId], references: [id])
-  providerId  String
-  provider    Provider  @relation(fields: [providerId], references: [id])
-  label       String // human label, e.g. "Slade360 production"
-  keyPrefix   String // first 12 chars of the plaintext key, for display/lookup
-  keyHash     String // bcrypt hash of the full key
-  isActive    Boolean   @default(true)
-  lastUsedAt  DateTime?
-  createdById String?
-  createdAt   DateTime  @default(now())
-  revokedAt   DateTime?
+  id                 String    @id @default(cuid())
+  tenantId           String
+  tenant             Tenant    @relation(fields: [tenantId], references: [id])
+  providerId         String
+  provider           Provider  @relation(fields: [providerId], references: [id])
+  label              String // human label, e.g. "Slade360 production"
+  keyPrefix          String // first 12 chars of the plaintext key, for display/lookup
+  keyHash            String // bcrypt hash of the full key
+  isActive           Boolean   @default(true)
+  lastUsedAt         DateTime?
+  createdById        String?
+  createdAt          DateTime  @default(now())
+  revokedAt          DateTime?
   // PNOS F1.6 — least-privilege + operationally governable credentials (§7.2).
   scopes             String[]  @default([]) // route-scope catalog codes this key may exercise
   allowedBranchIds   String[]  @default([]) // empty ⇒ not branch-restricted (F1.7 decides per route)
@@ -4665,20 +4682,20 @@ model Payment {
 }
 
 model PaymentVoucher {
-  id            String    @id @default(cuid())
-  voucherNumber String
-  tenantId      String? // PR-018: tenant scope (nullable for legacy rows)
-  providerId    String
-  totalAmount   Decimal
+  id              String    @id @default(cuid())
+  voucherNumber   String
+  tenantId        String? // PR-018: tenant scope (nullable for legacy rows)
+  providerId      String
+  totalAmount     Decimal
   // OBS-2 Ticket 4/6: denomination of totalAmount + UGX base equivalent.
-  currency        String  @default("UGX")
-  baseCurrency    String  @default("UGX")
-  baseTotalAmount Decimal @default(0) @db.Decimal(19, 4)
-  claimCount    Int
-  status        String    @default("PENDING") // PENDING, APPROVED, PROCESSED
-  processedAt   DateTime?
-  processedBy   String?
-  createdAt     DateTime  @default(now())
+  currency        String    @default("UGX")
+  baseCurrency    String    @default("UGX")
+  baseTotalAmount Decimal   @default(0) @db.Decimal(19, 4)
+  claimCount      Int
+  status          String    @default("PENDING") // PENDING, APPROVED, PROCESSED
+  processedAt     DateTime?
+  processedBy     String?
+  createdAt       DateTime  @default(now())
 
   // PR-018 #2: batch ↔ voucher ↔ JE cross-links, resolvable both ways.
   // One-voucher-per-batch is enforced by the settlement status machine
@@ -4880,29 +4897,29 @@ enum DocumentTargetType {
 }
 
 model Document {
-  id            String            @id @default(cuid())
-  fileName      String
-  fileUrl       String
-  fileSize      Int?
-  mimeType      String?
-  category      String // INVOICE, LAB_RESULT, DISCHARGE_SUMMARY, AGREEMENT, MEMBER_LIST, TARIFF_SCHEDULE, CLAIM_SUPPORT, ENDORSEMENT, QUOTATION
-  uploadedBy    String?
+  id                     String              @id @default(cuid())
+  fileName               String
+  fileUrl                String
+  fileSize               Int?
+  mimeType               String?
+  category               String // INVOICE, LAB_RESULT, DISCHARGE_SUMMARY, AGREEMENT, MEMBER_LIST, TARIFF_SCHEDULE, CLAIM_SUPPORT, ENDORSEMENT, QUOTATION
+  uploadedBy             String?
   // Polymorphic relation via nullable FKs
-  groupId       String?
-  group         Group?            @relation(fields: [groupId], references: [id])
-  endorsementId String?
-  endorsement   Endorsement?      @relation(fields: [endorsementId], references: [id])
-  claimId       String?
-  claim         Claim?            @relation(fields: [claimId], references: [id])
-  preauthId     String?
-  preauth       PreAuthorization? @relation(fields: [preauthId], references: [id])
-  caseId        String?
-  case          ClinicalCase?     @relation(fields: [caseId], references: [id])
-  brokerId      String?
-  broker        Broker?           @relation(fields: [brokerId], references: [id])
-  quotationId   String?
-  quotation     Quotation?        @relation(fields: [quotationId], references: [id])
-  createdAt     DateTime          @default(now())
+  groupId                String?
+  group                  Group?              @relation(fields: [groupId], references: [id])
+  endorsementId          String?
+  endorsement            Endorsement?        @relation(fields: [endorsementId], references: [id])
+  claimId                String?
+  claim                  Claim?              @relation(fields: [claimId], references: [id])
+  preauthId              String?
+  preauth                PreAuthorization?   @relation(fields: [preauthId], references: [id])
+  caseId                 String?
+  case                   ClinicalCase?       @relation(fields: [caseId], references: [id])
+  brokerId               String?
+  broker                 Broker?             @relation(fields: [brokerId], references: [id])
+  quotationId            String?
+  quotation              Quotation?          @relation(fields: [quotationId], references: [id])
+  createdAt              DateTime            @default(now())
   // PNOS F2.1 — private, scanned, resource-scoped document metadata (§7.4).
   tenantId               String?
   providerId             String?
@@ -4922,9 +4939,9 @@ model Document {
   uploadedAt             DateTime?
   finalizedAt            DateTime?
   supersededByDocumentId String?
-  uploadIntentId         String?   @unique // one finalized document per intent (finalize-once guarantee)
+  uploadIntentId         String?             @unique // one finalized document per intent (finalize-once guarantee)
   // PNOS F2.5 — scan worker lease + retry control.
-  scanAttempts           Int       @default(0)
+  scanAttempts           Int                 @default(0)
   scanLeaseUntil         DateTime? // a claimed doc is leased until this time; a free/expired lease is reclaimable
   scanReason             String? // safe reason for REJECTED/QUARANTINED/ERROR (no raw payload)
 
@@ -4939,7 +4956,7 @@ model Document {
 // expected type/size to a single-use token before any object is finalized;
 // finalize (F2.4) re-checks scope and consumes it exactly once.
 model DocumentUploadIntent {
-  id                       String    @id @default(cuid())
+  id                       String             @id @default(cuid())
   tenantId                 String
   targetType               DocumentTargetType
   targetId                 String
@@ -4947,14 +4964,14 @@ model DocumentUploadIntent {
   expectedProviderBranchId String?
   sourceType               DocumentSourceType
   sourceActorId            String
-  expectedMimeTypes        String[]  @default([])
+  expectedMimeTypes        String[]           @default([])
   maxSizeBytes             Int
-  token                    String    @unique // single-use
+  token                    String             @unique // single-use
   idempotencyKey           String?
   expiresAt                DateTime
   finalizedAt              DateTime?
-  finalizedDocumentId      String?   @unique
-  createdAt                DateTime  @default(now())
+  finalizedDocumentId      String?            @unique
+  createdAt                DateTime           @default(now())
 
   @@index([tenantId, targetType, targetId])
   @@index([expiresAt])
@@ -6278,30 +6295,30 @@ model CustomPricingRunLog {
 // ─── CLAIM ADJUDICATION (Process 9) ──────────────────────
 
 model ProviderSettlementBatch {
-  id          String           @id @default(cuid())
-  tenantId    String
-  providerId  String
-  cycleMonth  Int
-  cycleYear   Int
+  id              String           @id @default(cuid())
+  tenantId        String
+  providerId      String
+  cycleMonth      Int
+  cycleYear       Int
   // BD-05: multiple settlement runs per provider+cycle. Run 1 is the normal
   // monthly batch; later-approved claims for the same cycle settle in a
   // supplementary run (sequence 2, 3, …). Existing rows default to 1.
-  sequence    Int              @default(1)
-  status      SettlementStatus @default(PENDING)
-  totalAmount Decimal          @default(0) @db.Decimal(19, 4)
+  sequence        Int              @default(1)
+  status          SettlementStatus @default(PENDING)
+  totalAmount     Decimal          @default(0) @db.Decimal(19, 4)
   // OBS-2 Ticket 4: every batch settles in ONE transaction currency (mixed
   // currencies are blocked at creation). `baseTotalAmount` carries the UGX
   // equivalent for base-currency GL/reporting (populated in Ticket 6).
-  currency        String  @default("UGX")
-  baseCurrency    String  @default("UGX")
-  baseTotalAmount Decimal @default(0) @db.Decimal(19, 4)
-  claimCount  Int              @default(0)
-  makerId     String
-  checkerId   String?
-  settledAt   DateTime?
-  notes       String?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  currency        String           @default("UGX")
+  baseCurrency    String           @default("UGX")
+  baseTotalAmount Decimal          @default(0) @db.Decimal(19, 4)
+  claimCount      Int              @default(0)
+  makerId         String
+  checkerId       String?
+  settledAt       DateTime?
+  notes           String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
   provider Provider @relation(fields: [providerId], references: [id])
   claims   Claim[]
@@ -6884,6 +6901,7 @@ enum ClaimProcessingStageName {
   CODING
   DOCUMENTS
   DUPLICATE
+  CLINICAL // Diagnosis Gate protocol-adherence stage (DG C2.1) — runs before CONTRACT
   CONTRACT
   PREAUTH
   BENEFIT
@@ -6906,33 +6924,33 @@ enum ClaimProcessingStageState {
 }
 
 model ClaimProcessingRun {
-  id              String                 @id @default(cuid())
+  id              String                    @id @default(cuid())
   tenantId        String
-  tenant          Tenant                 @relation(fields: [tenantId], references: [id])
+  tenant          Tenant                    @relation(fields: [tenantId], references: [id])
   claimId         String
-  claim           Claim                  @relation(fields: [claimId], references: [id])
+  claim           Claim                     @relation(fields: [claimId], references: [id])
   receiptId       String
-  receipt         ClaimIntakeReceipt     @relation(fields: [receiptId], references: [id])
-  claimRevision   Int                    @default(1)
-  workflowVersion String                 @default("v1")
-  sequence        Int                    @default(1) // 1 = initial; authorized reprocess increments
-  trigger         ClaimProcessingTrigger @default(INITIAL)
+  receipt         ClaimIntakeReceipt        @relation(fields: [receiptId], references: [id])
+  claimRevision   Int                       @default(1)
+  workflowVersion String                    @default("v1")
+  sequence        Int                       @default(1) // 1 = initial; authorized reprocess increments
+  trigger         ClaimProcessingTrigger    @default(INITIAL)
   supersedesRunId String? // terminal run this reprocess supersedes
   modeResolved    String? // resolved OFF/SHADOW/LIVE (text — decoupled from the policy enum)
   policyId        String?
-  state           ClaimProcessingState   @default(PENDING)
+  state           ClaimProcessingState      @default(PENDING)
   currentStage    ClaimProcessingStageName?
   routeCode       String?
   assignedQueue   String?
   safeMessage     String? // no raw stack/payload
-  attemptCount    Int                    @default(0)
+  attemptCount    Int                       @default(0)
   nextAttemptAt   DateTime?
   leaseOwner      String?
   leaseExpiresAt  DateTime?
   startedAt       DateTime?
   completedAt     DateTime?
-  createdAt       DateTime               @default(now())
-  updatedAt       DateTime               @updatedAt
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
 
   stages ClaimProcessingStage[]
 
@@ -7032,44 +7050,44 @@ enum ReconsiderationStatus {
 }
 
 model ClaimReconsideration {
-  id                String                @id @default(cuid())
-  tenantId          String
-  clientId          String? // payer scope, for read-model confinement (G2.1)
-  providerId        String
-  providerBranchId  String?
+  id                     String                @id @default(cuid())
+  tenantId               String
+  clientId               String? // payer scope, for read-model confinement (G2.1)
+  providerId             String
+  providerBranchId       String?
   // The decided claim under dispute + its submission chain root (F5.2). Relation-less.
-  claimId           String
-  chainRootClaimId  String?
+  claimId                String
+  chainRootClaimId       String?
   // Filing reason (catalog code, F5.11 policy) + the provider's narrative.
-  reasonCode        String
-  providerNarrative String
+  reasonCode             String
+  providerNarrative      String
   // Requested additional amount (the provider's ask) + currency (must match the claim).
-  requestedAmount   Decimal               @default(0) @db.Decimal(14, 2)
-  currency          String
+  requestedAmount        Decimal               @default(0) @db.Decimal(14, 2)
+  currency               String
   // Deadline resolution (F5.11 policy) + filing time.
-  filingDeadline    DateTime?
-  filedAt           DateTime?
-  status            ReconsiderationStatus @default(DRAFT)
+  filingDeadline         DateTime?
+  filedAt                DateTime?
+  status                 ReconsiderationStatus @default(DRAFT)
   // Triage / assignment. originalAdjudicatorId drives the separation-of-duty warning.
-  assignedTeam          String?
-  assignedReviewerId    String?
-  originalAdjudicatorId String?
+  assignedTeam           String?
+  assignedReviewerId     String?
+  originalAdjudicatorId  String?
   // Outcome — SAFE (provider-facing) vs INTERNAL are separated (§9); the provider
   // projection (F5.11 policy) never exposes outcomeInternalNotes / internal refs.
   outcomeReasonCode      String?
   outcomeSafeExplanation String?
   outcomeInternalNotes   String?
   // Set only when an accepted outcome spawns a linked resubmission/supplemental claim (F5.16).
-  supplementalClaimId String?
+  supplementalClaimId    String?
   // SLA policy/version + due time (event history is the ClaimReconsiderationEvent relation).
-  slaPolicy  String?
-  slaVersion String?
-  dueAt      DateTime?
+  slaPolicy              String?
+  slaVersion             String?
+  dueAt                  DateTime?
   // Optimistic concurrency + idempotent submit (F5.11 step 6).
-  idempotencyKey String?
-  version        Int      @default(1)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  idempotencyKey         String?
+  version                Int                   @default(1)
+  createdAt              DateTime              @default(now())
+  updatedAt              DateTime              @updatedAt
 
   lines  ClaimReconsiderationLine[]
   events ClaimReconsiderationEvent[]
@@ -7082,31 +7100,31 @@ model ClaimReconsideration {
 }
 
 model ClaimReconsiderationLine {
-  id                String               @id @default(cuid())
-  reconsiderationId String
-  reconsideration   ClaimReconsideration @relation(fields: [reconsiderationId], references: [id])
+  id                           String               @id @default(cuid())
+  reconsiderationId            String
+  reconsideration              ClaimReconsideration @relation(fields: [reconsiderationId], references: [id])
   // The disputed original claim line (relation-less; must belong to the case's claim, F5.11 test).
-  claimLineId       String
-  disputedCategory  String?
-  narrative         String?
+  claimLineId                  String
+  disputedCategory             String?
+  narrative                    String?
   // Frozen snapshot of the original line economics (§7.8 / PNO-REC-003 recon check).
-  originalBilled      Decimal @default(0) @db.Decimal(14, 2)
-  originalAllowed     Decimal @default(0) @db.Decimal(14, 2)
-  originalPayable     Decimal @default(0) @db.Decimal(14, 2)
-  originalMemberShare Decimal @default(0) @db.Decimal(14, 2)
-  originalWriteoff    Decimal @default(0) @db.Decimal(14, 2)
+  originalBilled               Decimal              @default(0) @db.Decimal(14, 2)
+  originalAllowed              Decimal              @default(0) @db.Decimal(14, 2)
+  originalPayable              Decimal              @default(0) @db.Decimal(14, 2)
+  originalMemberShare          Decimal              @default(0) @db.Decimal(14, 2)
+  originalWriteoff             Decimal              @default(0) @db.Decimal(14, 2)
   // The provider's requested corrected amounts.
-  requestedAllowed Decimal? @db.Decimal(14, 2)
-  requestedPayable Decimal? @db.Decimal(14, 2)
+  requestedAllowed             Decimal?             @db.Decimal(14, 2)
+  requestedPayable             Decimal?             @db.Decimal(14, 2)
   // The reviewer's corrected FULL entitlement (through the pricing/benefit components, F5.15).
-  reviewerCorrectedEntitlement Decimal? @db.Decimal(14, 2)
+  reviewerCorrectedEntitlement Decimal?             @db.Decimal(14, 2)
   // Prior settlement facts + the hard ceiling for the incremental award.
-  alreadyApproved  Decimal @default(0) @db.Decimal(14, 2)
-  alreadyPaid      Decimal @default(0) @db.Decimal(14, 2)
-  maxIncrement     Decimal @default(0) @db.Decimal(14, 2) // = max(0, correctedEntitlement − max(approved, paid))
-  awardedIncrement Decimal @default(0) @db.Decimal(14, 2) // 0 ≤ awarded ≤ maxIncrement (F5.11 invariant)
-  outcomeReasonCode String?
-  createdAt         DateTime @default(now())
+  alreadyApproved              Decimal              @default(0) @db.Decimal(14, 2)
+  alreadyPaid                  Decimal              @default(0) @db.Decimal(14, 2)
+  maxIncrement                 Decimal              @default(0) @db.Decimal(14, 2) // = max(0, correctedEntitlement − max(approved, paid))
+  awardedIncrement             Decimal              @default(0) @db.Decimal(14, 2) // 0 ≤ awarded ≤ maxIncrement (F5.11 invariant)
+  outcomeReasonCode            String?
+  createdAt                    DateTime             @default(now())
 
   @@index([reconsiderationId])
   @@index([claimLineId])
@@ -7130,7 +7148,7 @@ model ClaimReconsiderationEvent {
   actorId           String?
   dataVersionRef    String?
   metadata          Json? // SAFE metadata only (validated before write)
-  createdAt         DateTime @default(now())
+  createdAt         DateTime             @default(now())
 
   @@unique([reconsiderationId, sequence])
   @@index([tenantId, reconsiderationId, createdAt])
@@ -7152,45 +7170,45 @@ enum DisbursementStatus {
 }
 
 model ProviderDisbursement {
-  id                String             @id @default(cuid())
-  tenantId          String
-  providerId        String
+  id                       String             @id @default(cuid())
+  tenantId                 String
+  providerId               String
   // Relation-less pointers (satellite convention).
-  settlementBatchId String
-  voucherId         String?
-  status            DisbursementStatus @default(PENDING)
+  settlementBatchId        String
+  voucherId                String?
+  status                   DisbursementStatus @default(PENDING)
   // Money: transaction amount + frozen base snapshot (never recomputed from live FX).
-  amount            Decimal            @db.Decimal(19, 4)
-  currency          String
-  baseAmount        Decimal            @default(0) @db.Decimal(19, 4)
-  baseCurrency      String             @default("UGX")
-  fxRateRef         String? // frozen FX fact reference (where a non-base disbursement applies)
+  amount                   Decimal            @db.Decimal(19, 4)
+  currency                 String
+  baseAmount               Decimal            @default(0) @db.Decimal(19, 4)
+  baseCurrency             String             @default("UGX")
+  fxRateRef                String? // frozen FX fact reference (where a non-base disbursement applies)
   // Method / destination — masked only, NEVER plaintext bank/mobile details (§9/D27).
-  method            String? // BANK_TRANSFER | MOBILE_MONEY | CHEQUE | RTGS | ...
-  channel           String?
-  maskedDestination String? // e.g. "***4321" — never the full account/MSISDN
-  externalReference String? // bank/channel payment reference (distinct from the internal voucher number)
-  valueDate         DateTime?
+  method                   String? // BANK_TRANSFER | MOBILE_MONEY | CHEQUE | RTGS | ...
+  channel                  String?
+  maskedDestination        String? // e.g. "***4321" — never the full account/MSISDN
+  externalReference        String? // bank/channel payment reference (distinct from the internal voucher number)
+  valueDate                DateTime?
   // Lifecycle actors + times (append-only in spirit; the state machine gates status).
-  initiatedById String?
-  initiatedAt   DateTime?
-  confirmedById String?
-  confirmedAt   DateTime?
-  failedById    String?
-  failedAt      DateTime?
-  reversedById  String?
-  reversedAt    DateTime?
+  initiatedById            String?
+  initiatedAt              DateTime?
+  confirmedById            String?
+  confirmedAt              DateTime?
+  failedById               String?
+  failedAt                 DateTime?
+  reversedById             String?
+  reversedAt               DateTime?
   // Failure reason — SAFE (provider-facing) vs INTERNAL are separated (§9/D27).
-  failureReasonSafe     String?
-  failureReasonInternal String?
+  failureReasonSafe        String?
+  failureReasonInternal    String?
   // Compensation: a REVERSED record may point at the disbursement it reverses.
   reversalOfDisbursementId String?
   // Idempotency + reconciliation + optimistic concurrency.
-  idempotencyKey       String?
-  reconciliationStatus String   @default("UNRECONCILED") // UNRECONCILED | RECONCILED | EXCEPTION
-  version              Int      @default(1)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  idempotencyKey           String?
+  reconciliationStatus     String             @default("UNRECONCILED") // UNRECONCILED | RECONCILED | EXCEPTION
+  version                  Int                @default(1)
+  createdAt                DateTime           @default(now())
+  updatedAt                DateTime           @updatedAt
 
   @@unique([tenantId, idempotencyKey]) // NULLs distinct in PG ⇒ keyless rows unaffected
   @@index([tenantId, settlementBatchId])
@@ -7279,40 +7297,40 @@ enum PaymentQueryCategory {
 }
 
 model ProviderPaymentQuery {
-  id                String               @id @default(cuid())
-  tenantId          String
-  clientId          String? // read-model confinement (G2.1) where applicable
-  providerId        String
-  providerBranchId  String?
-  settlementBatchId String
+  id                      String               @id @default(cuid())
+  tenantId                String
+  clientId                String? // read-model confinement (G2.1) where applicable
+  providerId              String
+  providerBranchId        String?
+  settlementBatchId       String
   // optional finer targets (relation-less pointers)
-  claimId           String?
-  claimLineId       String?
-  disbursementId    String?
-  category          PaymentQueryCategory
-  discrepancyAmount   Decimal? @db.Decimal(19, 4)
-  discrepancyCurrency String?
-  providerNarrative   String
-  status            PaymentQueryStatus   @default(OPEN)
+  claimId                 String?
+  claimLineId             String?
+  disbursementId          String?
+  category                PaymentQueryCategory
+  discrepancyAmount       Decimal?             @db.Decimal(19, 4)
+  discrepancyCurrency     String?
+  providerNarrative       String
+  status                  PaymentQueryStatus   @default(OPEN)
   // owners
-  providerRequesterId String?
-  assignedTeam        String?
-  assignedReviewerId  String?
+  providerRequesterId     String?
+  assignedTeam            String?
+  assignedReviewerId      String?
   // SLA
-  slaPolicy  String?
-  slaVersion String?
-  dueAt      DateTime?
+  slaPolicy               String?
+  slaVersion              String?
+  dueAt                   DateTime?
   // linked reconsideration when a dispute is explicitly converted (F6.12 sets this)
   linkedReconsiderationId String?
   // resolution — SAFE (provider-facing) vs INTERNAL separated (§9)
-  resolutionCode         String?
-  resolutionExplanation  String?
-  resolutionInternalNote String?
+  resolutionCode          String?
+  resolutionExplanation   String?
+  resolutionInternalNote  String?
   // idempotency + optimistic concurrency
-  idempotencyKey String?
-  version        Int      @default(1)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  idempotencyKey          String?
+  version                 Int                  @default(1)
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
 
   messages ProviderPaymentQueryMessage[]
 
@@ -7336,7 +7354,7 @@ model ProviderPaymentQueryMessage {
   body           String? // safe exchange text
   actorType      String
   actorId        String?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime             @default(now())
 
   @@unique([paymentQueryId, sequence])
   @@index([tenantId, paymentQueryId, createdAt])
@@ -7449,7 +7467,7 @@ model ProviderMasterDataChangeEvent {
   body            String? // safe exchange text
   actorType       String
   actorId         String?
-  createdAt       DateTime @default(now())
+  createdAt       DateTime                        @default(now())
 
   @@unique([changeRequestId, sequence])
   @@index([tenantId, changeRequestId, createdAt])
@@ -7495,9 +7513,9 @@ model ProviderImprovementPlan {
   startDate         DateTime?
   targetDate        DateTime?
   createdById       String?
-  version           Int      @default(1)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  version           Int                   @default(1)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
 
   actions ProviderImprovementAction[]
   updates ProviderImprovementUpdate[]
@@ -7532,7 +7550,7 @@ model ProviderImprovementUpdate {
   body      String
   actorType String
   actorId   String?
-  createdAt DateTime @default(now())
+  createdAt DateTime                @default(now())
 
   @@unique([planId, sequence])
   @@index([tenantId, planId, createdAt])
@@ -7552,13 +7570,13 @@ enum PerformanceScoreStatus {
 }
 
 model ProviderPerformanceScore {
-  id                String @id @default(cuid())
+  id                String   @id @default(cuid())
   tenantId          String
   providerId        String
   // "" = provider-level; a branch id = branch-level. A non-null default keeps the
   // unique key well-defined (a nullable column would treat every provider-level row
   // as distinct in Postgres and defeat the uniqueness the spec requires).
-  providerBranchId  String @default("")
+  providerBranchId  String   @default("")
   period            String // YYYY-MM
   periodStart       DateTime
   periodEnd         DateTime
@@ -7698,19 +7716,19 @@ enum IntegrationDeliveryStatus {
 /// exposure the F9.1 inventory flagged on IntegrationConfig is closed by this
 /// indirection + the F9.3 admin service).
 model ProviderIntegrationConnection {
-  id       String @id @default(cuid())
-  tenantId String
+  id               String @id @default(cuid())
+  tenantId         String
   // Scope keys (relation-less; validated against Provider/Branch in the F9.3 service).
   providerId       String
   providerBranchId String @default("") // "" = provider-level; a branch id = branch-scoped
 
   label            String // human label, e.g. "Aga Khan HMS — production"
   connectorType    String // connector family, e.g. "HMS_BATCH_V1" / "SLADE360_EDI"
-  connectorVersion String                       @default("1") // adapter contract version
-  mode             ProviderIntegrationMode       @default(PUSH)
+  connectorVersion String                  @default("1") // adapter contract version
+  mode             ProviderIntegrationMode @default(PUSH)
 
   // Transport safety (SSRF/allowlist enforced in F9.3/F9.7; here we hold references).
-  apiBaseUrl          String? // outbound base URL (PULL/BIDIRECTIONAL); validated HTTPS + allowlist in F9.3
+  apiBaseUrl           String? // outbound base URL (PULL/BIDIRECTIONAL); validated HTTPS + allowlist in F9.3
   endpointAllowlistRef String? // reference to the host/IP allowlist policy (not the list inline)
 
   // Credentials — a REFERENCE + version only. The secret material lives in the
@@ -7725,10 +7743,10 @@ model ProviderIntegrationConnection {
   cadence String? // e.g. cron/interval hint for the scheduler
   cursor  String? // opaque pagination/watermark cursor
 
-  status       ProviderIntegrationStatus @default(DRAFT)
-  circuitState IntegrationCircuitState   @default(CLOSED)
-  circuitOpenedAt      DateTime? // when OPEN tripped, for cool-down math (F9.6)
-  consecutiveFailures  Int       @default(0) // F9.7 pull circuit threshold; reset on success
+  status              ProviderIntegrationStatus @default(DRAFT)
+  circuitState        IntegrationCircuitState   @default(CLOSED)
+  circuitOpenedAt     DateTime? // when OPEN tripped, for cool-down math (F9.6)
+  consecutiveFailures Int                       @default(0) // F9.7 pull circuit threshold; reset on success
 
   lastSuccessAt DateTime?
   lastFailureAt DateTime?
@@ -7758,29 +7776,29 @@ model ProviderIntegrationConnection {
 /// the same key + same hash replays; the same key + a different hash conflicts
 /// (F9.4) — nothing mutates on either.
 model ProviderIntegrationDelivery {
-  id           String                        @id @default(cuid())
-  tenantId     String
-  connectionId String
-  connection   ProviderIntegrationConnection @relation(fields: [connectionId], references: [id])
+  id               String                        @id @default(cuid())
+  tenantId         String
+  connectionId     String
+  connection       ProviderIntegrationConnection @relation(fields: [connectionId], references: [id])
   // Denormalized scope (matches how the codebase scopes reads); consistent with the connection.
   providerId       String
-  providerBranchId String @default("")
+  providerBranchId String                        @default("")
 
   direction          IntegrationDeliveryDirection @default(INBOUND)
   businessObjectType String // CASE_SERVICE | CLAIM | PREAUTH | CASE_ACTIVITY (connector-declared)
 
-  externalBatchRef String? // the partner's batch id (e.g. "AGA-2026-07-03")
-  externalRef      String? // a finer partner reference when present
-  idempotencyKey   String // caller-stable key; unique per connection
+  externalBatchRef      String? // the partner's batch id (e.g. "AGA-2026-07-03")
+  externalRef           String? // a finer partner reference when present
+  idempotencyKey        String // caller-stable key; unique per connection
   normalizedPayloadHash String // hash of the normalized body — detects same-key/different-body conflict
 
   // Control totals (asserted vs applied) — the reconciliation substrate (F9.5/F9.6).
-  recordCount     Int? // records the envelope claims
-  amountTotal     Decimal? @db.Decimal(19, 4) // asserted monetary total, where relevant
-  appliedCount     Int @default(0)
-  rejectedCount    Int @default(0)
-  quarantinedCount Int @default(0)
-  replayedCount    Int @default(0)
+  recordCount      Int? // records the envelope claims
+  amountTotal      Decimal? @db.Decimal(19, 4) // asserted monetary total, where relevant
+  appliedCount     Int      @default(0)
+  rejectedCount    Int      @default(0)
+  quarantinedCount Int      @default(0)
+  replayedCount    Int      @default(0)
 
   status IntegrationDeliveryStatus @default(RECEIVED)
 
@@ -7790,11 +7808,11 @@ model ProviderIntegrationDelivery {
 
   // Retry / durable lease (F9.6). Attempts are leased so a crashed worker's work
   // is reclaimed after the lease expires without double-applying.
-  attemptCount   Int       @default(0)
-  maxAttempts    Int       @default(5)
-  nextAttemptAt  DateTime?
-  leaseOwner     String?
-  leaseExpiresAt DateTime?
+  attemptCount     Int       @default(0)
+  maxAttempts      Int       @default(5)
+  nextAttemptAt    DateTime?
+  leaseOwner       String?
+  leaseExpiresAt   DateTime?
   quarantineReason String? // safe, PHI-free reason when QUARANTINED
 
   receivedAt  DateTime  @default(now())
@@ -7865,7 +7883,7 @@ model ProviderIntegrationAttempt {
   resultClass   String?
   httpStatus    Int? // transport status, when applicable
   safeErrorCode String? // safe, catalogued code — NOT a raw error/body
-  retryable     Boolean @default(false)
+  retryable     Boolean   @default(false)
   nextAttemptAt DateTime?
 
   responseReceiptRef String? // reference to a stored response receipt (no raw body inline)
@@ -7939,7 +7957,7 @@ enum CapitationPeriodStatus {
 /// Effective-dated capitation terms for one scope. Non-overlapping ACTIVE ranges
 /// per (provider, branch, client, group, package, rateBasis).
 model CapitationArrangement {
-  id               String @id @default(cuid())
+  id               String  @id @default(cuid())
   tenantId         String
   providerId       String
   providerBranchId String  @default("") // "" = all branches
@@ -7966,8 +7984,8 @@ model CapitationArrangement {
   approvedById  String?
   approvedAt    DateTime?
   createdById   String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt     DateTime                    @default(now())
+  updatedAt     DateTime                    @updatedAt
 
   periods CapitationPeriod[]
 
@@ -7982,7 +8000,7 @@ model CapitationPeriod {
   id            String                @id @default(cuid())
   tenantId      String
   arrangementId String
-  arrangement   CapitationArrangement  @relation(fields: [arrangementId], references: [id])
+  arrangement   CapitationArrangement @relation(fields: [arrangementId], references: [id])
 
   period      String // YYYY-MM
   periodStart DateTime
@@ -8034,11 +8052,11 @@ model CapitationAdjustment {
   periodId String
   period   CapitationPeriod @relation(fields: [periodId], references: [id])
 
-  category    String // RETRO_ELIGIBILITY | RATE_CORRECTION | CLAWBACK | INCENTIVE | RECONCILIATION
-  amount      Decimal @db.Decimal(19, 4) // signed: + charge, − credit
-  evidenceRef String?
-  reason      String?
-  actorId     String?
+  category     String // RETRO_ELIGIBILITY | RATE_CORRECTION | CLAWBACK | INCENTIVE | RECONCILIATION
+  amount       Decimal   @db.Decimal(19, 4) // signed: + charge, − credit
+  evidenceRef  String?
+  reason       String?
+  actorId      String?
   approvedById String?
   approvedAt   DateTime?
 
@@ -8101,4 +8119,243 @@ model CapitationEncounterLink {
   @@index([tenantId, arrangementId])
   @@index([periodId])
   @@index([memberId, serviceDate])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// DIAGNOSIS GATE (DG) — clinical protocol-adherence gating
+// Execution plan: /DIAGNOSIS_GATE_EXECUTION_PLAN.md · Semantics:
+// docs/diagnosis-gate/DIAGNOSIS_GATE_SPEC.md
+//
+// ALL ADDITIVE. Nothing here changes existing behaviour: the CLINICAL stage is
+// record-only until AutoAdjudicationPolicy.clinicalGateEnabled is deliberately
+// switched on (DG-D4), and clinical content exists only once a pack has been
+// imported, approved by a checker, and activated (DG-D6).
+//
+// Clinical content is NEVER authored in code or seeds — every row traces to a
+// vendored clinical-team workbook (docs/diagnosis-gate/source/). A missing or
+// ambiguous source value is an import validation error, never a default (DG-D7).
+// ═══════════════════════════════════════════════════════════════════════════
+
+enum ClinicalCodeSystem {
+  ICD10
+  ICD11
+}
+
+enum ClinicalMappingProvenance {
+  AUTHORED // stated by the clinical team in the source workbook
+  GENERATED_CROSSWALK // derived via the official WHO ICD-10↔11 crosswalk (C1.4), awaiting clinical confirmation
+}
+
+enum ClinicalLabLinkType {
+  SUPPORTED // R2: this test is clinically supported by this condition
+  CONFIRMATORY // R4: this test confirms this condition
+}
+
+enum ClinicalAliasMatchType {
+  CPT_CODE
+  SERVICE_CODE
+  NORMALIZED_NAME
+}
+
+enum ClinicalProtocolPackStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  SUPERSEDED
+  DEACTIVATED
+}
+
+enum ClinicalVerdict {
+  TRUE_POSITIVE
+  FALSE_POSITIVE
+  UNSURE
+}
+
+/// One immutable, versioned import of the ENTIRE clinical content set. Exactly one
+/// row per tenant may have isActive=true (enforced in ProtocolPackService.activatePack,
+/// which supersedes the prior active row in the same transaction).
+model ClinicalProtocolPack {
+  id       String                     @id @default(cuid())
+  tenantId String
+  version  Int
+  status   ClinicalProtocolPackStatus @default(DRAFT)
+  isActive Boolean                    @default(false)
+
+  /// Provenance back to docs/diagnosis-gate/source/
+  sourceFileName String
+  /// sha256 of the canonical pack JSON (not the xlsx) — detects re-import of identical content
+  sourceChecksum String
+  notes          String?
+
+  /// Import-time validation summary (counts, warnings) — safe machine-readable only
+  validationStats Json?
+
+  createdById        String?
+  approvalRequestId  String?
+  approvedById       String?
+  approvedAt         DateTime?
+  /// Approval and activation are SEPARATE acts: a checker approves the content, then a
+  /// human deliberately puts it in force. Both actors are recorded.
+  activatedById      String?
+  activatedAt        DateTime?
+  supersededAt       DateTime?
+  /// Safety valve — withdrawing a pack leaves NO active pack, and the CLINICAL stage
+  /// then passes every claim (NO_ACTIVE_PACK). Reason is mandatory.
+  deactivatedById    String?
+  deactivationReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  groups      ClinicalInterventionGroup[]
+  memberships ClinicalCodeMembership[]
+  labRules    ClinicalLabRule[]
+  links       ClinicalLabRuleGroupLink[]
+  aliases     ClinicalLineAlias[]
+
+  @@unique([tenantId, version])
+  @@index([tenantId, isActive])
+  @@index([tenantId, status])
+}
+
+/// The canonical unit the gate reasons about (DG-D2): a set of diagnoses that call for
+/// similar clinical intervention. ICD codes are memberships INTO a group, never keys.
+model ClinicalInterventionGroup {
+  id     String               @id @default(cuid())
+  packId String
+  pack   ClinicalProtocolPack @relation(fields: [packId], references: [id], onDelete: Cascade)
+
+  groupCode   String // "CIG-001" — the stable key; names are display only
+  name        String
+  description String?
+
+  /// DG-D8: a category rather than a diagnosis (e.g. "Atopy" spans 109 ICD codes).
+  /// Permanently barred from live routing; the UI disables the toggle.
+  isCatchAll       Boolean @default(false)
+  enabledForShadow Boolean @default(true)
+  enabledForLive   Boolean @default(false)
+
+  /// R4 lookback: how far back a confirmatory test may sit on an earlier claim.
+  /// null = the confirmatory test must be on THIS claim.
+  confirmationLookbackHours Int?
+
+  /// Row reference in the source workbook (audit trail)
+  sourceRow String?
+
+  memberships ClinicalCodeMembership[]
+  links       ClinicalLabRuleGroupLink[]
+
+  @@unique([packId, groupCode])
+  @@index([packId])
+}
+
+/// An ICD code (either system — DG-D3) belonging to an intervention group.
+model ClinicalCodeMembership {
+  id     String               @id @default(cuid())
+  packId String
+  pack   ClinicalProtocolPack @relation(fields: [packId], references: [id], onDelete: Cascade)
+
+  groupId String
+  group   ClinicalInterventionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  codeSystem ClinicalCodeSystem
+  /// Normalised at import: uppercase, trimmed. Stored exactly as looked up.
+  code       String
+  provenance ClinicalMappingProvenance @default(AUTHORED)
+  note       String?
+
+  @@unique([groupId, codeSystem, code])
+  /// The R1 resolution path: pack + system + code → group
+  @@index([packId, codeSystem, code])
+}
+
+/// A billable test with its clinical gating rules (R2/R3/R4 inputs).
+model ClinicalLabRule {
+  id     String               @id @default(cuid())
+  packId String
+  pack   ClinicalProtocolPack @relation(fields: [packId], references: [id], onDelete: Cascade)
+
+  testCode   String // "LAB003"
+  testName   String
+  department String?
+
+  /// R2 applies only when true — tests reasonably ordered without a stated diagnosis
+  /// are never flagged for incompatibility.
+  requiresDiagnosis Boolean
+
+  /// R3 window. null = no repeat control for this test.
+  repeatWindowHours Int?
+
+  /// Provider-facing text, verbatim from the workbook's Failure_Message column.
+  failureMessage String
+  auditRule      String?
+  sourceRow      String?
+
+  links   ClinicalLabRuleGroupLink[]
+  aliases ClinicalLineAlias[]
+
+  @@unique([packId, testCode])
+  @@index([packId])
+}
+
+/// test ↔ condition relationship: SUPPORTED (R2) or CONFIRMATORY (R4).
+model ClinicalLabRuleGroupLink {
+  id     String               @id @default(cuid())
+  packId String
+  pack   ClinicalProtocolPack @relation(fields: [packId], references: [id], onDelete: Cascade)
+
+  labRuleId String
+  labRule   ClinicalLabRule @relation(fields: [labRuleId], references: [id], onDelete: Cascade)
+
+  groupId String
+  group   ClinicalInterventionGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  linkType ClinicalLabLinkType
+
+  @@unique([labRuleId, groupId, linkType])
+  @@index([packId, groupId])
+  @@index([packId, linkType])
+}
+
+/// How a billed claim line is recognised as a given test. Without aliases the rules
+/// are inert on real claims — C1.5 measures coverage and feeds unmatched descriptions
+/// back to the clinical team.
+model ClinicalLineAlias {
+  id     String               @id @default(cuid())
+  packId String
+  pack   ClinicalProtocolPack @relation(fields: [packId], references: [id], onDelete: Cascade)
+
+  labRuleId String
+  labRule   ClinicalLabRule @relation(fields: [labRuleId], references: [id], onDelete: Cascade)
+
+  matchType ClinicalAliasMatchType
+  /// Normalised at import: uppercase, trimmed, whitespace collapsed.
+  value     String
+
+  /// One alias value resolves to at most one test per pack — an ambiguous alias is an
+  /// import validation error, not a runtime coin-flip.
+  @@unique([packId, matchType, value])
+  @@index([labRuleId])
+}
+
+/// A clinician's judgement on a recorded rule hit during the shadow campaign (C4.2).
+/// These verdicts produce the sampled false-positive rate that gates go-live (G-C4).
+model ClinicalShadowVerdict {
+  id       String @id @default(cuid())
+  tenantId String
+  claimId  String
+
+  ruleCode  String // "R1" | "R2" | "R3" | "R4"
+  routeCode String // the CLINICAL_* code recorded on the stage
+
+  verdict ClinicalVerdict
+  note    String?
+
+  reviewedById String
+  createdAt    DateTime @default(now())
+
+  @@unique([claimId, ruleCode, reviewedById])
+  @@index([tenantId, ruleCode, verdict])
+  @@index([tenantId, createdAt])
 }

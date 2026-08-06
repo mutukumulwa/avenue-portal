@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Users, Building2, FileText, BriefcaseMedical,
   Receipt, CreditCard, Building, PieChart,
   Settings, LogOut, Calculator, UserCheck, MessageSquareText,
-  ShieldAlert, MessageSquareWarning, Wallet, Fingerprint,
+  ShieldAlert, MessageSquareWarning, Wallet, Fingerprint, Stethoscope,
   BarChart3, TriangleAlert, Landmark, ClipboardCheck, CloudOff,
   ShieldCheck, Lock, FileSignature, Globe2, HeartPulse, KeyRound,
   UserPlus, Scale, Banknote,
@@ -26,6 +26,10 @@ const FINANCE:      UserRole[] = ["SUPER_ADMIN","FINANCE_OFFICER"];
 const FUND_PORTAL:  UserRole[] = ["SUPER_ADMIN"];
 const UNDERWRITING: UserRole[] = ["SUPER_ADMIN","UNDERWRITER"];
 const ADMIN_ONLY:   UserRole[] = ["SUPER_ADMIN"];
+// Mirrors ROLES.CLINICAL in src/lib/rbac.ts exactly. Deliberately NOT `OPS`: a nav link
+// shown to a role the page rejects is the OBS-6 bug (a link that only leads to Access
+// Denied), and CUSTOMER_SERVICE/UNDERWRITER cannot open clinical protocols.
+const CLINICAL_ROLES: UserRole[] = ["SUPER_ADMIN","CLAIMS_OFFICER","MEDICAL_OFFICER"];
 
 const NAV_GROUPS: NavGroup[] = [
   {
@@ -71,6 +75,7 @@ const NAV_GROUPS: NavGroup[] = [
       // OBS-6: /settings/exceptions is ADMIN_ONLY-guarded — showing it to OPS
       // gave claims/medical officers a nav link that only led to Access Denied.
       { label: "Exceptions",         href: "/settings/exceptions",icon: TriangleAlert,  roles: ADMIN_ONLY },
+      { label: "Clinical Protocols", href: "/settings/clinical-protocols", icon: Stethoscope, roles: CLINICAL_ROLES },
       { label: "Secure Check-Ins",   href: "/check-ins",          icon: Fingerprint,    roles: OPS        },
       { label: "Providers",          href: "/providers",          icon: Building,       roles: ADMIN_ONLY },
       { label: "Contracts",          href: "/contracts",          icon: FileSignature,  roles: UNDERWRITING },

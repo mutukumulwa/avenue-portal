@@ -34,8 +34,46 @@ describe("F3.2 — catalog is complete", () => {
     }
   });
 
-  it("covers the 23 §10.3 codes", () => {
-    expect(ALL_CODES).toHaveLength(23);
+  // 23 autopilot §10.3 codes + 4 added by the Diagnosis Gate (DG C2.1).
+  it("covers the 23 §10.3 codes plus the 4 Diagnosis Gate codes", () => {
+    expect(ALL_CODES).toHaveLength(27);
+  });
+});
+
+describe("DG C2.1 — clinical route codes", () => {
+  const CLINICAL_CODES = [
+    "CLINICAL_SCOPE_REVIEW",
+    "CLINICAL_LAB_UNSUPPORTED",
+    "CLINICAL_REPEAT_WINDOW",
+    "CLINICAL_CONFIRMATION_MISSING",
+  ] as const;
+
+  it.each(CLINICAL_CODES)("%s is catalogued and lands in a human queue", (code) => {
+    const e = getReason(code as RouteCode);
+    expect(e.queue).toBeTruthy();
+    expect(QUEUE_VALUES.has(e.queue as string)).toBe(true);
+  });
+
+  it("every clinical finding is overridable by a reviewer — the gate advises, it never binds", () => {
+    for (const code of CLINICAL_CODES) {
+      expect(getReason(code as RouteCode).overrideAllowed, code).toBe(true);
+    }
+  });
+
+  it("member wording never reveals that a clinician's test selection was questioned", () => {
+    for (const code of CLINICAL_CODES) {
+      const member = getReason(code as RouteCode).member ?? "";
+      expect(member, code).not.toMatch(/test|diagnos|indicat|confirmator|repeat/i);
+    }
+  });
+
+  it("the three protocol findings share one clinical review queue; scope goes to normal adjudication", () => {
+    expect(queueFor("CLINICAL_LAB_UNSUPPORTED")).toBe(QUEUES.CLINICAL_REVIEW);
+    expect(queueFor("CLINICAL_REPEAT_WINDOW")).toBe(QUEUES.CLINICAL_REVIEW);
+    expect(queueFor("CLINICAL_CONFIRMATION_MISSING")).toBe(QUEUES.CLINICAL_REVIEW);
+    // Out-of-scope is not a clinical finding — it just means "we have no protocol for
+    // this diagnosis", so it belongs with ordinary manual adjudication.
+    expect(queueFor("CLINICAL_SCOPE_REVIEW")).toBe(QUEUES.MANUAL_ADJUDICATION);
   });
 });
 

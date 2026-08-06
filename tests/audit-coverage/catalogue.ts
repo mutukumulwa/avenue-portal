@@ -25,6 +25,7 @@ export const KNOWN_AUDITING_TOKENS = [
   "runClaimIntake(", // shared claim-intake path — chain-audits CLAIM:INTAKE_ACCEPTED internally
   "reimbursementService.submit(", // F5.6 — appends REIMBURSEMENT:SUBMITTED + canonical intake audit internally
   "auditPolicy(", // F6.5 — local helper wrapping auditChainService.append for the policy console
+  "auditProtocol(", // DG C3.2 — local helper wrapping auditChainService.append for the clinical protocol library
   "openBreaker(", // F4.7/F6.5 — hash-chain audits CIRCUIT_BREAKER_OPENED internally
   "closeBreaker(", // F4.7/F6.5 — hash-chain audits CIRCUIT_BREAKER_CLOSED internally
   "ClaimDecisionService.decide(",

@@ -30,6 +30,8 @@ export const QUEUES = {
   REIMBURSEMENT_REVIEW: "REIMBURSEMENT_REVIEW",
   MANUAL_ADJUDICATION: "MANUAL_ADJUDICATION",
   AUTOPILOT_FAILURE: "AUTOPILOT_FAILURE",
+  /** Diagnosis Gate (DG C2.1): protocol-adherence findings for a clinical reviewer. */
+  CLINICAL_REVIEW: "CLINICAL_REVIEW",
 } as const;
 export type Queue = (typeof QUEUES)[keyof typeof QUEUES];
 
@@ -58,6 +60,14 @@ export const ROUTE_CODES = {
   INPATIENT_SHADOW_ONLY: "INPATIENT_SHADOW_ONLY",
   PIPELINE_RETRY: "PIPELINE_RETRY",
   PIPELINE_FAILED: "PIPELINE_FAILED",
+  // ── Diagnosis Gate (DG C2.1) ───────────────────────────────────────────────
+  // Clinical rules ROUTE and never decline (DG-D1): a coding or protocol error must
+  // never auto-deny care costs. These codes are only ever emitted once a protocol pack
+  // is in force AND the gate has been deliberately switched off record-only.
+  CLINICAL_SCOPE_REVIEW: "CLINICAL_SCOPE_REVIEW",
+  CLINICAL_LAB_UNSUPPORTED: "CLINICAL_LAB_UNSUPPORTED",
+  CLINICAL_REPEAT_WINDOW: "CLINICAL_REPEAT_WINDOW",
+  CLINICAL_CONFIRMATION_MISSING: "CLINICAL_CONFIRMATION_MISSING",
 } as const;
 export type RouteCode = (typeof ROUTE_CODES)[keyof typeof ROUTE_CODES];
 
@@ -111,6 +121,18 @@ export const REASON_CATALOG: Record<RouteCode, ReasonEntry> = {
   INPATIENT_SHADOW_ONLY: { queue: null, internal: "Inpatient case claim — evaluated in shadow only until the inpatient release gate (D14).", provider: "This inpatient claim is being processed through the case workflow.", member: GENERIC_MEMBER_REVIEW, remedy: "Handle via the case workflow; live automation is not enabled for inpatient in v1.", resubmissionAllowed: false, overrideAllowed: false, overrideType: "NONE" },
   PIPELINE_RETRY: { queue: null, internal: "A dependency failed transiently; the run is retryable.", provider: "This claim was received and is still being processed.", member: GENERIC_MEMBER_REVIEW, remedy: "Automatic retry in progress; no action needed.", resubmissionAllowed: false, overrideAllowed: false, overrideType: "NONE", transient: true },
   PIPELINE_FAILED: { queue: QUEUES.AUTOPILOT_FAILURE, internal: "Processing exhausted its retries — unrecoverable technical failure.", provider: "This claim was received; our team is completing processing.", member: GENERIC_MEMBER_REVIEW, remedy: "Investigate the failure and reprocess or adjudicate manually.", resubmissionAllowed: false, overrideAllowed: true, overrideType: "MANUAL_APPROVAL" },
+
+  // ── Diagnosis Gate (DG C2.1) ───────────────────────────────────────────────
+  // Provider wording here is the GENERIC fallback. Where the clinical pack supplies a
+  // specific message for the test involved (e.g. "HIV test lacks documented
+  // indication"), the stage records it on the claim's stage row and the claim detail
+  // screen shows that instead — the pack's own words reach the provider.
+  // Member wording stays generic on purpose: a member must never learn from a claim
+  // notice that their clinician's test selection was questioned.
+  CLINICAL_SCOPE_REVIEW: { queue: QUEUES.MANUAL_ADJUDICATION, internal: "Diagnosis is not in the governed intervention-group scope, and the policy requires a governed group for automation.", provider: "This claim was received and will be assessed by our team.", member: GENERIC_MEMBER_REVIEW, remedy: "Adjudicate normally, or extend the protocol pack to cover this diagnosis.", resubmissionAllowed: false, overrideAllowed: true, overrideType: "MANUAL_APPROVAL" },
+  CLINICAL_LAB_UNSUPPORTED: { queue: QUEUES.CLINICAL_REVIEW, internal: "A billed test is not supported by the claim's diagnosis group (R2).", provider: "A billed test does not appear to be indicated by the stated diagnosis and needs review.", member: GENERIC_MEMBER_REVIEW, remedy: "Confirm the test was indicated, or adjust the claim.", resubmissionAllowed: false, overrideAllowed: true, overrideType: "MANUAL_APPROVAL" },
+  CLINICAL_REPEAT_WINDOW: { queue: QUEUES.CLINICAL_REVIEW, internal: "A billed test repeats inside its clinically-set repeat window (R3).", provider: "A billed test was recently performed for this member; the repeat needs review.", member: GENERIC_MEMBER_REVIEW, remedy: "Confirm the repeat was clinically necessary, or adjust the claim.", resubmissionAllowed: false, overrideAllowed: true, overrideType: "MANUAL_APPROVAL" },
+  CLINICAL_CONFIRMATION_MISSING: { queue: QUEUES.CLINICAL_REVIEW, internal: "No confirmatory test is present for a diagnosis the pack marks as confirmable (R4). NOTE: this proves the test was not BILLED — the platform never sees results.", provider: "This diagnosis normally requires a confirmatory test on record; none was found on this claim.", member: GENERIC_MEMBER_REVIEW, remedy: "Confirm the diagnostic basis, or attach the confirmatory test.", resubmissionAllowed: true, overrideAllowed: true, overrideType: "MANUAL_APPROVAL" },
 };
 
 /** Type guard: is this string a catalogued route code? (F6.1) */

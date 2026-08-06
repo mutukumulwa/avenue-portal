@@ -21,7 +21,7 @@ export async function getClaimProcessingTimeline(db: Db, tenantId: string, claim
     db.claimProcessingRun.findMany({
       where: { tenantId, claimId },
       orderBy: [{ claimRevision: "asc" }, { sequence: "asc" }],
-      include: { stages: { orderBy: [{ startedAt: "asc" }], select: { stage: true, state: true, reasonCode: true, durationMs: true, startedAt: true, completedAt: true } } },
+      include: { stages: { orderBy: [{ startedAt: "asc" }], select: { stage: true, state: true, reasonCode: true, safeMessage: true, result: true, durationMs: true, startedAt: true, completedAt: true } } },
     }),
     db.auditLog.findMany({
       where: { tenantId, entityType: "Claim", entityId: claimId, action: { startsWith: "CLAIM:" } },
