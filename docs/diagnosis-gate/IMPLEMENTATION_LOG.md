@@ -446,3 +446,62 @@ Entry template:
 - **W-checklist:** **W1 ✓** (catalogued, granted, and backfilled for existing tenants).
   **W2 ✓** (enum + seed + dropdown + label map + dispatch, with a test for each).
   W4/W5/W7/W8 remain owed by C3.2–C3.4 — no UI ships in this package.
+
+## C3.2 / C3.3 — Protocol library UI and governance end-to-end
+- **Date / commits:** 2026-08-06 · (this commit)
+- **What was built:** `/settings/clinical-protocols` (library: in-force summary, import form,
+  version table) and `/settings/clinical-protocols/[id]` (lifecycle actions, contents,
+  per-condition switches, test table with the provider-facing messages). Five server
+  actions. Nav entry. Import accepts the **converter's pack.json**, not the workbook — the
+  reviewed artifact stays small, diffable and deterministic.
+- **★ THE WALKTHROUGH FOUND TWO REAL BUGS THAT EVERY OTHER CHECK MISSED.** `tsc`, `eslint`,
+  `next build` and 1600+ tests were all green with both defects present. This is the entire
+  justification for W8.
+  1. **`NEXT_REDIRECT` reported as an error to the user.** Next.js implements `redirect()`
+     by **throwing**. Every action had its success `done()` inside the `try`, so the redirect
+     throw was caught by the `catch` and re-reported as the failure "NEXT_REDIRECT" — a red
+     error banner on a successful submit. Fixed in all five actions by doing the work in the
+     `try` and redirecting **after** it; the hazard is documented on the helper so the next
+     action added here cannot repeat it.
+  2. **W4 violation — the intended user could not reach the page.** The page was added under
+     Setup, but `showSetup` in `AdminSidebar` is `ADMIN_ONLY`. A MEDICAL_OFFICER — the
+     clinical content owner, the one role that holds `CLINICAL_PROTOCOL:MANAGE` — had no nav
+     path to it. Moved to the **Clinical** group with a new `CLINICAL_ROLES` list that
+     mirrors `ROLES.CLINICAL` **exactly**; deliberately not the broader `OPS`, because a nav
+     link shown to a role the page rejects is the documented OBS-6 bug (a link that only
+     leads to Access Denied).
+- **Walkthrough performed (W8), against the throwaway DB on a separate port so no real data
+  was touched.** Signed in as **medical@medvex.co.ug (MEDICAL_OFFICER, not an admin)** —
+  deliberately, to prove the permission wiring works for a normal role:
+  1. `/settings/clinical-protocols` renders; dormant state reads "No clinical content is in
+     force. The diagnosis gate is dormant: every claim passes it untouched."
+  2. The **import form is visible**, proving `CLINICAL_PROTOCOL:MANAGE` resolves for this role.
+  3. "Clinical Protocols" appears in the **Clinical** nav group (after the W4 fix).
+  4. Detail page shows status/approved/in-force/checksum + "Send for approval" → clicked →
+     status became **pending approval** with "Waiting for a second clinician…".
+  5. Signed in as **admin@medvex.co.ug** (a different user): `/approvals` listed
+     **"Clinical protocol change"** — the human label, not a raw enum — with
+     **"Level 1 of 1 — needs MEDICAL OFFICER"**, proving the matrix rule resolved.
+  6. Clicked **Approve L1** → pack became **approved**, and **"Put in force" stayed `—`**,
+     proving approval and activation remain distinct acts as designed.
+  7. Clicked **Put this version in force** → **"In force"** badge, dated, with the green
+     banner *"This version is now in force. The gate still records only — no claim is routed
+     until the clinical gate is switched on."* (also confirming the NEXT_REDIRECT fix).
+- **Audit-coverage harness caught a third issue (and was right to).** `audit-coverage.test.ts`
+  requires every server action to audit or be catalogued. The actions **do** audit, but
+  through a local helper the harness cannot see through. Fixed the honest way — renamed the
+  helper `auditProtocol(` and registered that token, exactly mirroring the existing
+  `auditPolicy(` precedent — **not** by adding an exclusion.
+- **Verified:** `tsc` clean · `next build` clean with both routes emitted
+  (`/settings/clinical-protocols`, `/settings/clinical-protocols/[id]`) · hermetic suite
+  **1630 passed / 552 skipped / 0 failed**.
+- **Pre-existing issue, NOT introduced here and deliberately not fixed:** `eslint` reports
+  `react-hooks/set-state-in-effect` in `AdminSidebar.tsx` (~l.252, the auto-open
+  `useEffect`). Confirmed pre-existing by stashing this branch's changes and re-running.
+  Out of scope for this package; recorded so it is not mistaken for gate work.
+- **W-checklist:** **W4 ✓** (reachable by the intended role — after the fix). **W5 ✓** (every
+  action invoked by a shipped page). **W8 ✓** (walkthrough above). W7 owed by C3.4.
+- **Deviations:** the file-upload step of the import could not be automated in the preview
+  pane (no file-upload tool for that surface), so the DRAFT for the walkthrough was created
+  by calling the same service the action calls; the form's rendering and permission gating
+  were verified visually, and the service path has 11 integration tests.
