@@ -8191,12 +8191,19 @@ model ClinicalProtocolPack {
   /// Import-time validation summary (counts, warnings) — safe machine-readable only
   validationStats Json?
 
-  createdById       String?
-  approvalRequestId String?
-  approvedById      String?
-  approvedAt        DateTime?
-  activatedAt       DateTime?
-  supersededAt      DateTime?
+  createdById        String?
+  approvalRequestId  String?
+  approvedById       String?
+  approvedAt         DateTime?
+  /// Approval and activation are SEPARATE acts: a checker approves the content, then a
+  /// human deliberately puts it in force. Both actors are recorded.
+  activatedById      String?
+  activatedAt        DateTime?
+  supersededAt       DateTime?
+  /// Safety valve — withdrawing a pack leaves NO active pack, and the CLINICAL stage
+  /// then passes every claim (NO_ACTIVE_PACK). Reason is mandatory.
+  deactivatedById    String?
+  deactivationReason String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

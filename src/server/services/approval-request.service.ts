@@ -263,6 +263,34 @@ export class ApprovalRequestService {
       }
     }
 
+    // A rejected clinical-content change returns the pack to REJECTED so it can be
+    // corrected and resubmitted; it never becomes approved or active.
+    if (nextStatus === "REJECTED" && req.entityType === "ClinicalProtocolPack" && req.actionType === "CLINICAL_PROTOCOL_CHANGE") {
+      await prisma.clinicalProtocolPack.updateMany({
+        where: { id: req.entityId, tenantId: req.tenantId, status: "PENDING_APPROVAL" },
+        data: { status: "REJECTED" },
+      });
+    }
+
+    // ── Diagnosis Gate (C1.2, DG-D6): a completed chain APPROVES the clinical content
+    // set. Unlike a policy change this does NOT put it in force — activation is a
+    // separate, deliberate act (ProtocolPackService.activate), so approving correctness
+    // and switching the book over stay distinct decisions.
+    if (nextStatus === "APPROVED" && req.entityType === "ClinicalProtocolPack" && req.actionType === "CLINICAL_PROTOCOL_CHANGE") {
+      const { ProtocolPackService } = await import("./diagnosis-gate/protocol-pack.service");
+      try {
+        await ProtocolPackService.applyApprovedPackChange(req.tenantId, req.entityId, checker.id);
+        await prisma.approvalRequest.update({ where: { id: requestId }, data: { appliedAt: new Date() } });
+      } catch (err) {
+        await prisma.approvalRequest.update({ where: { id: requestId }, data: { status: "REJECTED" } });
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Approval chain complete, but approving the clinical content failed: ${msg} The request was closed as REJECTED.`,
+        });
+      }
+    }
+
     return prisma.approvalRequest.findUnique({ where: { id: requestId } });
   }
 }

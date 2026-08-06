@@ -13,11 +13,11 @@ Detail per package: `IMPLEMENTATION_LOG.md`.
 | C0.2 | Vendor workbook + SOURCE_NOTES | ✅ DONE |
 | C0.3 | Branch/env bootstrap | ✅ DONE — 2 anchor drifts found and plan corrected |
 | C1.1 | Additive schema | ✅ DONE — additive proof vs populated DB |
-| C1.2 | Pack service + governed lifecycle | ⬜ next |
+| C1.2 | Pack service + governed lifecycle | ✅ DONE — 11/11 real-DB lifecycle proof |
 | C1.3 | Converter + validator + v0 red report | ✅ DONE — v0 NOT IMPORTABLE, 66 errors reported |
 | C1.4 | WHO crosswalk ingestion | ⬜ may be BLOCKED-EXTERNAL |
 | C1.5 | Alias coverage report | ⬜ needs claim data |
-| C2.1 | CLINICAL stage skeleton + routes + queue | ⬜ |
+| C2.1 | CLINICAL stage skeleton + routes + queue | ⬜ next |
 | C2.2 | R2 compatibility + derived fixtures | ⬜ |
 | C2.3 | R3 repeat window (DB suite) | ⬜ |
 | C2.4 | R4 confirmation-present | ⬜ |

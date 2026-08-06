@@ -199,3 +199,57 @@ Entry template:
   **no machine-readable confirmatory-test column**, so R4 cannot operate at all until one
   is added. The prose `Diagnostic Confirmation Rule` is not sufficient. This is now the
   second-highest-value workbook fix after F1 (stable group codes).
+
+## C1.2 — Protocol pack service and governed lifecycle
+- **Date / commits:** 2026-08-06 · (this commit)
+- **Anchors re-verified:** `policy-approval.ts` (submit/apply shape, safe payload, SoD
+  defence-in-depth, replay-safety) and the approval dispatch in
+  `approval-request.service.ts` — the APPROVED/REJECTED branches for
+  `AUTO_ADJ_POLICY_CHANGE` sit at ~l.240/251 exactly as recorded. `ApprovalDecision`
+  cascades from `ApprovalRequest`, `ApprovalStep` from `ApprovalMatrix`.
+- **Schema addendum (additive, re-proved):** `activatedById`, `deactivatedById`,
+  `deactivationReason` on `ClinicalProtocolPack`. Without them the lifecycle would have
+  had unattributed activation and no withdrawal path — i.e. a hanging workflow, which
+  §7 forbids. Re-ran the populated-DB push (`dg_prev`, no `--accept-data-loss`): clean,
+  probe LIVE policy still intact.
+- **What was built:** `src/server/services/diagnosis-gate/protocol-pack.service.ts` —
+  `createDraftFromImport`, `submitForApproval`, `applyApprovedPackChange`, `activate`,
+  `deactivate`, `getActivePack`, `setGroupEnablement`, `listPacks`, `loadPackContent`,
+  `diffPacks`. Wired **both** dispatch branches (APPROVED + REJECTED) for
+  `CLINICAL_PROTOCOL_CHANGE` in `approval-request.service.ts`, so the chain is live end
+  to end rather than a service nobody calls (W5).
+- **Design decisions worth recording:**
+  - **Approval and activation are separate acts.** The autopilot's policy change
+    activates on approval; clinical content does not. Approving correctness and
+    switching the live book over have different blast radii, and the clinical owner
+    should be able to approve today and cut over on Monday. Both actors are recorded.
+  - **Packs are immutable.** There is no edit-a-rule path anywhere in the service. Fixing
+    content means a new version from a new workbook, so every flag a claim ever received
+    traces to the exact content set in force at that moment.
+  - **Ids are generated client-side** (`randomUUID`) so the whole pack — groups,
+    memberships, rules, links, aliases — lands via `createMany` inside one transaction.
+  - **`enabledForLive: false` is forced at write time**, not merely defaulted in the UI,
+    so DG-D5/DG-D8 hold of the data itself.
+  - **Re-importing content identical to the active pack is refused**, so version history
+    stays meaningful.
+  - **ICD-10 codes are existence-checked here** against the platform's `ICD10Code` table
+    — the offline converter cannot do that. ICD-11 has no platform table, so the
+    converter's check against the workbook master remains the authority (validator warns
+    rather than silently trusting).
+- **Verified:** `tests/integration/diagnosis-gate-pack-lifecycle.integration.test.ts` —
+  **11/11 green against a real database.** Proves: a pack with blocking errors cannot be
+  imported (and leaves zero rows); DRAFT import writes all content with nothing in force;
+  submit→approve→activate; the importer cannot approve their own content; approval alone
+  does not put content in force; re-approval/re-activation are replay-safe; identical
+  content is refused; v2 supersedes v1 with **exactly one pack in force**;
+  **CONCURRENT activation** (`Promise.all`) still leaves exactly one; a catch-all can
+  never be switched live while a specific condition can; an unapproved pack cannot be
+  activated; withdrawal requires a reason and leaves **no** active pack; `diffPacks`
+  surfaces a renamed condition. The approval payload was asserted **not** to contain
+  clinical content. Teardown verified hermetic (0 packs, 0 tenants left behind).
+  `tsc` clean · `eslint` clean · hermetic suite **1598 passed / 512 skipped / 0 failed**
+  (skips rose by 11 — the new DB suite self-skipping correctly without the opt-in env).
+- **W-checklist:** W2 partially — the dispatch and the `PRECONDITION_FAILED` message for
+  a missing matrix rule are in place; the matrix *seed*, the dropdown entry and the
+  label map are C3.1's. W5 closed for the approval chain. W1/W4/W7/W8 owed by C3.
+- **Deviations:** three additive audit columns added mid-package (justified above).
