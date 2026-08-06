@@ -6,7 +6,7 @@ Detail per package: `IMPLEMENTATION_LOG.md`.
 
 **Branch:** `feat/diagnosis-gate` (off `origin/main` @ `3ac6b2c`).
 **Baseline on branch:** tsc exit 0 · vitest 1569 passed / 501 skipped / 0 failed.
-**Current:** tsc clean · hermetic 1616 passed / 543 skipped / 0 failed · **42/42 DG real-DB tests** (opt-in).
+**Current:** tsc clean · hermetic 1616 passed / 552 skipped / 0 failed · **51/51 DG real-DB tests** (opt-in).
 
 | Pkg | Title | Status |
 |---|---|---|
@@ -22,8 +22,8 @@ Detail per package: `IMPLEMENTATION_LOG.md`.
 | C2.2 | R2 lab↔diagnosis compatibility | ✅ DONE |
 | C2.3 | R3 repeat window (DB suite) | ✅ DONE — total-order tie-break proven |
 | C2.4 | R4 confirmation-present | ✅ DONE |
-| C2.5 | Shadow read service | ⬜ next |
-| C3.1 | Permissions + matrix + ensure-script | ⬜ |
+| C2.5 | Shadow read service | ✅ DONE — dormant rows excluded from rates |
+| C3.1 | Permissions + matrix + ensure-script | ⬜ next |
 | C3.2 | Protocol library UI + import | ⬜ |
 | C3.3 | Governance E2E (maker/checker/activate) | ⬜ |
 | C3.4 | Policy flags + claim-detail surfacing | ⬜ |

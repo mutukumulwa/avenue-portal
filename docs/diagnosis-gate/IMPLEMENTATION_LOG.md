@@ -364,3 +364,42 @@ Entry template:
 - **W-checklist:** W3 ✓ — a routed claim now carries `assignedQueue = CLINICAL_REVIEW`, which
   `/claims/queues` renders dynamically (verified by construction; click-path walkthrough in C3).
 - **Deviations:** three plan packages merged into one commit, as noted above.
+
+## C2.5 — Shadow read model
+- **Date / commits:** 2026-08-06 · (this commit)
+- **Anchors re-verified:** `auditChainService.append` signature (`actorId/action/module/
+  entityType/entityId/payload/tenantId/description`) matched the PNOS export precedent
+  (`network.service.ts:97`, action `NETWORK_ANALYTICS:EXPORT`).
+- **What was built:** `clinical-gate-read.service.ts` — `summarize`, `listHits`,
+  `recordVerdict`, `exportCsv`.
+- **Why a read model and not a second pipeline:** the stage persists its findings whether
+  or not it acts on them, so the shadow dataset comes from the **same code path that would
+  enforce**. There is no parallel simulation that can drift from production behaviour —
+  what is measured is what will happen.
+- **The load-bearing arithmetic decision:** **dormant evaluations are excluded from every
+  rate.** A row where no pack was in force (or the condition was switched off) is not
+  evidence that the rules found nothing. Counting them as clean claims would flatter the
+  hit rate, the would-route rate and the false-positive rate simultaneously, and could
+  make a barely-exercised gate look ready to go live. `dormant` is reported separately so
+  the reviewer can see how much of the traffic the gate actually looked at.
+- **`wouldRouteRate` is computed against IN-SCOPE claims only** — it is the guard against
+  the failure the spec names in §7 (E3): a rule that fires on a third of claims is not a
+  control, it is a re-routing of the book to the same humans it was meant to free.
+- **Verified:** `tests/integration/diagnosis-gate-shadow-read.integration.test.ts` —
+  **9/9 green**; **51/51 across all four DG DB suites** together.
+  Proves: dormant exclusion (2 dormant / 1 out-of-scope / 5 in-scope from 8 rows) ·
+  would-route rate 2/5 measured against in-scope only · per-rule claims vs findings counted
+  separately (a claim with two findings for one rule counts once as a claim, twice as
+  findings) · **no false-positive rate is reported until something has actually been
+  reviewed** (null, not zero) · ambiguity and per-condition/per-test breakdowns · bounded
+  pagination with an over-large page size capped at 200 rather than dumping · **no member
+  identifier in either the list payload or the CSV** · a reviewer changing their mind
+  updates rather than double-counting · an existing verdict is shown back rather than asked
+  twice · the CSV export writes an audit-chain entry because the data leaves the platform.
+  `tsc` clean · `eslint` clean · hermetic suite **1616 passed / 552 skipped / 0 failed**.
+- **W-checklist:** W5 owed by C4.2 (the dashboard that calls this). Nothing here is
+  reachable from the UI yet — recorded as an open thread, not a completed one.
+- **Test-fixture notes for future suites:** `ClaimIntakeReceipt` requires `scopeKey`,
+  `schemaVersion`, `suspectedDuplicateFingerprint`, `correlationId`, and `state`
+  (PROCESSING|SUCCEEDED|REJECTED|FAILED — not `status`); `channel` is
+  `ClaimIntakeChannel` (`ADMIN_PORTAL`, not `PORTAL`).
