@@ -17,8 +17,8 @@ Detail per package: `IMPLEMENTATION_LOG.md`.
 | C1.3 | Converter + validator + v0 red report | ✅ DONE — v0 NOT IMPORTABLE, 66 errors reported |
 | C1.4 | WHO crosswalk ingestion | ⬜ may be BLOCKED-EXTERNAL |
 | C1.5 | Alias coverage report | ⬜ needs claim data |
-| C2.1 | CLINICAL stage skeleton + routes + queue | ⬜ next |
-| C2.2 | R2 compatibility + derived fixtures | ⬜ |
+| C2.1 | CLINICAL stage skeleton + routes + queue | ✅ DONE — inert with no pack; 13/13 real-DB |
+| C2.2 | R2 compatibility + derived fixtures | ⬜ next |
 | C2.3 | R3 repeat window (DB suite) | ⬜ |
 | C2.4 | R4 confirmation-present | ⬜ |
 | C2.5 | Shadow read service | ⬜ |

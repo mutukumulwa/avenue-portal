@@ -14,6 +14,7 @@ import type { PrismaClient, ClaimProcessingStageName, Prisma } from "@prisma/cli
 import { recordStage, safeErrorMessage } from "@/server/services/claim-intake/processing";
 import { ROUTE_CODES, type RouteCode } from "@/server/services/claim-intake/reason-catalog";
 import { effectivePolicyMode, type PolicyLike, type PolicyMode } from "./policy";
+import { stageClinical } from "./stage-clinical";
 
 type Db = PrismaClient;
 
@@ -38,7 +39,12 @@ export interface EvalContext {
   tenantId: string;
   claimId: string;
   claim: LoadedClaim;
-  policy: PolicyLike & { id: string; maxAutoApproveAmount: unknown; currency: string; allowedSources: string[]; allowedServiceTypes: string[]; allowedBenefitCategories: string[] };
+  policy: PolicyLike & {
+    id: string; maxAutoApproveAmount: unknown; currency: string; allowedSources: string[]; allowedServiceTypes: string[]; allowedBenefitCategories: string[];
+    // Diagnosis Gate (DG C2.1). Both default false, so the CLINICAL stage is
+    // record-only until deliberately switched on through the governed policy path.
+    clinicalGateEnabled?: boolean; requireClinicalGroup?: boolean;
+  };
   mode: PolicyMode;
   /** True when a prior duplicate exception was cleared (reprocess) — skips fuzzy dup review (F4.3). */
   duplicateCleared: boolean;
@@ -62,7 +68,9 @@ interface LoadedClaim {
   invoiceNumber: string | null;
   suspectedDuplicateFingerprint: string | null;
   member: { status: string; group: { status: string; clientId: string | null } | null } | null;
-  claimLines: Array<{ id: string; cptCode: string | null; drugCode: string | null; icdCode: string | null; serviceCategory: string; billedAmount: unknown }>;
+  /** Untyped JSON; carries `{code}` OR `{icdCode}` depending on the writer (DG C2.1). */
+  diagnoses: unknown;
+  claimLines: Array<{ id: string; cptCode: string | null; drugCode: string | null; icdCode: string | null; description: string; serviceCategory: string; billedAmount: unknown }>;
   documents: Array<{ category: string }>;
 }
 
@@ -257,6 +265,11 @@ const EVALUATION_STAGES: StageDef[] = [
   { name: "CODING", run: stageCoding },
   { name: "DOCUMENTS", run: stageDocuments },
   { name: "DUPLICATE", run: stageDuplicate },
+  // Diagnosis Gate (DG C2.1). Placed before CONTRACT deliberately: it needs only the
+  // diagnosis, the coded lines and claim history, so a claim that is out of clinical
+  // scope or protocol-flagged is settled before the expensive contract evaluation.
+  // Dormant until a protocol pack is activated (returns PASS with NO_ACTIVE_PACK).
+  { name: "CLINICAL", run: stageClinical },
   { name: "CONTRACT", run: stageContract },
   { name: "PREAUTH", run: stagePreauth },
   { name: "BENEFIT", run: stageBenefit },
@@ -271,8 +284,9 @@ async function loadClaim(db: Db, tenantId: string, claimId: string): Promise<Loa
     select: {
       id: true, source: true, isReimbursement: true, caseId: true, serviceType: true, benefitCategory: true, billedAmount: true, currency: true,
       memberId: true, providerId: true, dateOfService: true, invoiceNumber: true, suspectedDuplicateFingerprint: true,
+      diagnoses: true,
       member: { select: { status: true, group: { select: { status: true, clientId: true } } } },
-      claimLines: { select: { id: true, cptCode: true, drugCode: true, icdCode: true, serviceCategory: true, billedAmount: true } },
+      claimLines: { select: { id: true, cptCode: true, drugCode: true, icdCode: true, description: true, serviceCategory: true, billedAmount: true } },
       documents: { select: { category: true } },
     },
   }) as unknown as Promise<LoadedClaim | null>;

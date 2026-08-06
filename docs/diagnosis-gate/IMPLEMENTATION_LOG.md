@@ -253,3 +253,58 @@ Entry template:
   a missing matrix rule are in place; the matrix *seed*, the dropdown entry and the
   label map are C3.1's. W5 closed for the approval chain. W1/W4/W7/W8 owed by C3.
 - **Deviations:** three additive audit columns added mid-package (justified above).
+
+## C2.1 — CLINICAL stage skeleton, route codes, queue, R1 scope resolution
+- **Date / commits:** 2026-08-06 · (this commit)
+- **Anchors re-verified:** `EVALUATION_STAGES` (l.263+), `StageOutcome`/`EvalContext`
+  exports, `loadClaim` select, `REASON_CATALOG` — all as recorded in plan §4.
+- **What was built:**
+  - `QUEUES.CLINICAL_REVIEW` + 4 route codes with full catalog entries. `REASON_CATALOG`
+    is typed `Record<RouteCode, ReasonEntry>`, so **TypeScript itself enforces W6** — a
+    route code cannot exist without provider/member/remedy wording.
+  - `src/server/services/claim-autopilot/stage-clinical.ts` — `stageClinical`,
+    `extractDiagnosisCodes`, `lineMatchKeys`, plus the record-only/route plumbing.
+  - Registered `CLINICAL` between DUPLICATE and CONTRACT; extended `LoadedClaim` and the
+    `loadClaim` select with `diagnoses` and `claimLines[].description` (additive select).
+    Extended the `EvalContext` policy type with the two optional gate flags.
+- **CRITICAL FINDING — `Claim.diagnoses` carries TWO shapes in the live table.** The
+  canonical intake path (`claim-intake/persist.ts:79` `diagnosesJson`) writes
+  `{ icdCode }`, while `claims.service.ts:471`, `reimbursement.service.ts:126` and
+  `claim-intake.ts:85` write `{ code }`. The claim detail screen already hedges
+  (`claims/[id]/page.tsx:307` reads `d.code ?? d.icdCode`). Reading only one key would
+  make R1 silently resolve nothing for a whole class of claims — and **silent
+  non-resolution is indistinguishable from "no problems found"**, the exact failure mode
+  that would make the gate look healthy while doing nothing. `extractDiagnosisCodes`
+  therefore reads both, prefers a non-blank `code`, normalises, and is fuzz-tested
+  against every malformed value the JSON column can hold.
+- **Verified:**
+  - `tests/services/diagnosis-gate-stage-helpers.test.ts` (18 tests) — both shapes, mixed
+    arrays, blank-`code` fallback, normalisation, and 11 malformed inputs; plus proof that
+    `lineMatchKeys` normalises a description **identically to** `normaliseAliasValue` at
+    import time (if these ever diverge, no line is ever recognised and every rule is
+    silently inert).
+  - `tests/integration/diagnosis-gate-stage-scope.integration.test.ts` — **13/13 green
+    against a real DB.** The first test is the deployment-safety proof: **with no pack in
+    force the stage is completely inert even with both gate flags switched fully on.**
+    Also proves an **ICD-10 claim resolves against ICD-11-authored content** (DG-D3 — the
+    case that actually matters in production), primary-over-secondary preference,
+    line-level fallback, ambiguity flagged rather than silently resolved, out-of-scope
+    passing by default (DG-D11) and routing only under strict mode, strict mode being
+    inert while the gate is record-only, per-condition shadow disablement, and the pack
+    version being stamped on every evaluation so a finding is attributable to the exact
+    content in force.
+  - Reason-catalog guard extended: the 23-code canary became 27 (truthful — the gate adds
+    4) and gained DG assertions: every clinical finding is overridable; **member wording
+    never reveals that a clinician's test selection was questioned**; the three protocol
+    findings share the clinical queue while out-of-scope goes to ordinary adjudication.
+  - `tsc` clean · `eslint` clean · hermetic suite **1616 passed / 525 skipped / 0 failed**.
+- **DEPLOYMENT PREREQUISITE discovered by test:** importing any pack containing ICD-10
+  memberships requires the platform's `ICD10Code` table to be populated, because
+  `createDraftFromImport` existence-checks against it. On an empty database the import is
+  (correctly) refused. This is a hard precondition for C1.4's crosswalk output and must be
+  verified before a crosswalked pack is imported in any environment.
+- **W-checklist:** W6 ✓ (type-enforced). W3 partially — claims stamped with the new queue
+  will render in `/claims/queues` because that screen groups dynamically; asserted in
+  C2.2–C2.4 once a rule can actually fire. W1/W2/W4/W5/W7/W8 owed by C3.
+- **Deviations:** none. R2/R3/R4 are stubs here by design — the plumbing that decides
+  *whether findings are acted on* is what C2.1 proves.
