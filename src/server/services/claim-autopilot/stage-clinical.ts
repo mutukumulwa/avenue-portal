@@ -135,6 +135,129 @@ async function resolveGroup(
   };
 }
 
+interface MatchedRule {
+  claimLineId: string;
+  ruleId: string;
+  testCode: string;
+  testName: string;
+  requiresDiagnosis: boolean;
+  repeatWindowHours: number | null;
+  failureMessage: string;
+}
+
+/**
+ * Recognise billed lines as known tests, via the pack's aliases.
+ *
+ * Everything downstream depends on this: a test the pack cannot recognise on a claim is
+ * a rule that can never fire. C1.5's coverage report exists to measure exactly this, and
+ * the validator warns when a rule has no alias at all.
+ */
+async function matchLinesToRules(
+  db: PrismaClient,
+  packId: string,
+  lines: Array<{ id: string; cptCode: string | null; drugCode: string | null; description: string }>,
+): Promise<MatchedRule[]> {
+  const keyed = lines.map((l) => ({ lineId: l.id, keys: lineMatchKeys(l) }));
+  const distinct = new Map<string, { matchType: string; value: string }>();
+  for (const { keys } of keyed) for (const k of keys) distinct.set(`${k.matchType}|${k.value}`, k);
+  if (distinct.size === 0) return [];
+
+  const aliases = await db.clinicalLineAlias.findMany({
+    where: { packId, OR: [...distinct.values()].map((k) => ({ matchType: k.matchType as never, value: k.value })) },
+    select: {
+      matchType: true,
+      value: true,
+      labRule: { select: { id: true, testCode: true, testName: true, requiresDiagnosis: true, repeatWindowHours: true, failureMessage: true } },
+    },
+  });
+  if (aliases.length === 0) return [];
+
+  const byKey = new Map(aliases.map((a) => [`${a.matchType}|${a.value}`, a.labRule]));
+  const out: MatchedRule[] = [];
+  for (const { lineId, keys } of keyed) {
+    for (const k of keys) {
+      const rule = byKey.get(`${k.matchType}|${k.value}`);
+      if (!rule) continue;
+      out.push({
+        claimLineId: lineId,
+        ruleId: rule.id,
+        testCode: rule.testCode,
+        testName: rule.testName,
+        requiresDiagnosis: rule.requiresDiagnosis,
+        repeatWindowHours: rule.repeatWindowHours,
+        failureMessage: rule.failureMessage,
+      });
+      break; // one line recognises as at most one test
+    }
+  }
+  return out;
+}
+
+interface PriorLine {
+  claimNumber: string;
+  dateOfService: Date;
+  keys: Set<string>;
+}
+
+/**
+ * The member's earlier billed lines within `windowHours`, for R3 and R4.
+ *
+ * Matching happens in JS rather than SQL because aliases are stored normalised
+ * (uppercase, whitespace-collapsed) while `ClaimLine.description` is raw. Normalising in
+ * the query would need raw SQL and would risk drifting from `normaliseAliasValue`;
+ * reusing `lineMatchKeys` guarantees both sides agree by construction.
+ *
+ * "Earlier" is a total order — service date, then creation, then id — so that when two
+ * claims share a service date exactly one of them flags the other. Without the
+ * tie-break, concurrent same-day submissions would either both flag or both stay silent.
+ */
+async function fetchPriorLines(
+  db: PrismaClient,
+  tenantId: string,
+  claim: { id: string; memberId: string; dateOfService: Date; createdAt: Date },
+  windowHours: number,
+): Promise<PriorLine[]> {
+  const since = new Date(claim.dateOfService.getTime() - windowHours * 3600_000);
+  const candidates = await db.claim.findMany({
+    where: {
+      tenantId,
+      memberId: claim.memberId,
+      id: { not: claim.id },
+      status: { notIn: ["VOID", "DECLINED", "APPEAL_DECLINED"] },
+      dateOfService: { gte: since, lte: claim.dateOfService },
+    },
+    select: {
+      id: true,
+      claimNumber: true,
+      dateOfService: true,
+      createdAt: true,
+      claimLines: { select: { cptCode: true, drugCode: true, description: true } },
+    },
+    orderBy: [{ dateOfService: "desc" }, { createdAt: "desc" }],
+    take: 50,
+  });
+
+  const isEarlier = (c: { id: string; dateOfService: Date; createdAt: Date }) => {
+    const ds = c.dateOfService.getTime() - claim.dateOfService.getTime();
+    if (ds !== 0) return ds < 0;
+    const ca = c.createdAt.getTime() - claim.createdAt.getTime();
+    if (ca !== 0) return ca < 0;
+    return c.id < claim.id;
+  };
+
+  return candidates.filter(isEarlier).map((c) => ({
+    claimNumber: c.claimNumber,
+    dateOfService: c.dateOfService,
+    keys: new Set(c.claimLines.flatMap((l) => lineMatchKeys(l).map((k) => `${k.matchType}|${k.value}`))),
+  }));
+}
+
+/** Does this test appear among a set of already-keyed prior lines? */
+async function ruleAliasKeys(db: PrismaClient, ruleId: string): Promise<Set<string>> {
+  const rows = await db.clinicalLineAlias.findMany({ where: { labRuleId: ruleId }, select: { matchType: true, value: true } });
+  return new Set(rows.map((r) => `${r.matchType}|${r.value}`));
+}
+
 /**
  * The CLINICAL stage. Registered in EVALUATION_STAGES between DUPLICATE and CONTRACT.
  */
@@ -183,9 +306,86 @@ export async function stageClinical(ctx: EvalContext): Promise<StageOutcome> {
   //    can silence a noisy condition without withdrawing the whole pack.
   if (!group.enabledForShadow) return PASS({ ...base, skipped: "GROUP_DISABLED" });
 
-  // 5. Evaluate the rules. (R2/R3/R4 land in C2.2–C2.4; the plumbing below is what
-  //    decides whether their findings are acted on or merely recorded.)
+  // 5. Evaluate the rules.
   const ruleHits: ClinicalRuleHit[] = [];
+  const matched = await matchLinesToRules(db, pack.id, ctx.claim.claimLines);
+
+  const links = await db.clinicalLabRuleGroupLink.findMany({
+    where: { packId: pack.id, groupId: group.groupId },
+    select: { labRuleId: true, linkType: true },
+  });
+  const supported = new Set(links.filter((l) => l.linkType === "SUPPORTED").map((l) => l.labRuleId));
+  const confirmatory = links.filter((l) => l.linkType === "CONFIRMATORY").map((l) => l.labRuleId);
+
+  // ── R2: is this test supported by the stated diagnosis? ───────────────────
+  // Only tests the pack explicitly marks as requiring a diagnosis are checked; a test
+  // that may reasonably be ordered without one is never flagged.
+  for (const m of matched) {
+    if (!m.requiresDiagnosis) continue;
+    if (supported.has(m.ruleId)) continue;
+    ruleHits.push({
+      rule: "R2",
+      routeCode: ROUTE_CODES.CLINICAL_LAB_UNSUPPORTED,
+      claimLineId: m.claimLineId,
+      testCode: m.testCode,
+      testName: m.testName,
+      message: m.failureMessage,
+    });
+  }
+
+  // How far back any rule needs to look. One query serves both R3 and R4.
+  const repeatWindows = matched.map((m) => m.repeatWindowHours ?? 0);
+  const maxWindow = Math.max(0, ...repeatWindows, group.confirmationLookbackHours ?? 0);
+  const priorLines = maxWindow > 0
+    ? await fetchPriorLines(db, ctx.tenantId, { id: ctx.claimId, memberId: ctx.claim.memberId, dateOfService: ctx.claim.dateOfService, createdAt: ctx.claim.createdAt }, maxWindow)
+    : [];
+
+  // ── R3: was this test already done too recently to justify repeating? ─────
+  // LIMIT (stated in the spec, not hidden here): only claims that reach Medvex are
+  // visible. A repeat at a facility that never bills us cannot be seen.
+  for (const m of matched) {
+    if (m.repeatWindowHours == null || m.repeatWindowHours <= 0) continue;
+    const keys = await ruleAliasKeys(db, m.ruleId);
+    const cutoff = new Date(ctx.claim.dateOfService.getTime() - m.repeatWindowHours * 3600_000);
+    const priors = priorLines.filter((p) => p.dateOfService >= cutoff && [...keys].some((k) => p.keys.has(k)));
+    if (priors.length === 0) continue;
+    ruleHits.push({
+      rule: "R3",
+      routeCode: ROUTE_CODES.CLINICAL_REPEAT_WINDOW,
+      claimLineId: m.claimLineId,
+      testCode: m.testCode,
+      testName: m.testName,
+      message: `${m.testName} was already performed for this member within its ${m.repeatWindowHours}-hour repeat window.`,
+      priorClaimNumbers: priors.slice(0, 5).map((p) => p.claimNumber),
+    });
+  }
+
+  // ── R4: is the confirmatory test on record? ───────────────────────────────
+  // HONEST LIMIT: the platform never receives test RESULTS, so this proves only that
+  // the test was BILLED — never that it was positive. It is a completeness and
+  // deterrence control, not clinical verification.
+  if (confirmatory.length > 0) {
+    const onThisClaim = matched.some((m) => confirmatory.includes(m.ruleId));
+    let inLookback = false;
+    if (!onThisClaim && group.confirmationLookbackHours != null && group.confirmationLookbackHours > 0) {
+      const cutoff = new Date(ctx.claim.dateOfService.getTime() - group.confirmationLookbackHours * 3600_000);
+      const candidates = priorLines.filter((p) => p.dateOfService >= cutoff);
+      for (const ruleId of confirmatory) {
+        const keys = await ruleAliasKeys(db, ruleId);
+        if (candidates.some((p) => [...keys].some((k) => p.keys.has(k)))) {
+          inLookback = true;
+          break;
+        }
+      }
+    }
+    if (!onThisClaim && !inLookback) {
+      ruleHits.push({
+        rule: "R4",
+        routeCode: ROUTE_CODES.CLINICAL_CONFIRMATION_MISSING,
+        message: `No confirmatory test for ${group.groupName} was billed on this claim${group.confirmationLookbackHours ? ` or in the preceding ${group.confirmationLookbackHours} hours` : ""}.`,
+      });
+    }
+  }
 
   if (ruleHits.length === 0) return PASS(base);
 

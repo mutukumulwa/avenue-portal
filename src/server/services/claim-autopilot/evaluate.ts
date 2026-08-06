@@ -70,6 +70,8 @@ interface LoadedClaim {
   member: { status: string; group: { status: string; clientId: string | null } | null } | null;
   /** Untyped JSON; carries `{code}` OR `{icdCode}` depending on the writer (DG C2.1). */
   diagnoses: unknown;
+  /** Tie-breaker for same-service-date repeat detection (DG C2.3). */
+  createdAt: Date;
   claimLines: Array<{ id: string; cptCode: string | null; drugCode: string | null; icdCode: string | null; description: string; serviceCategory: string; billedAmount: unknown }>;
   documents: Array<{ category: string }>;
 }
@@ -285,6 +287,7 @@ async function loadClaim(db: Db, tenantId: string, claimId: string): Promise<Loa
       id: true, source: true, isReimbursement: true, caseId: true, serviceType: true, benefitCategory: true, billedAmount: true, currency: true,
       memberId: true, providerId: true, dateOfService: true, invoiceNumber: true, suspectedDuplicateFingerprint: true,
       diagnoses: true,
+      createdAt: true,
       member: { select: { status: true, group: { select: { status: true, clientId: true } } } },
       claimLines: { select: { id: true, cptCode: true, drugCode: true, icdCode: true, description: true, serviceCategory: true, billedAmount: true } },
       documents: { select: { category: true } },

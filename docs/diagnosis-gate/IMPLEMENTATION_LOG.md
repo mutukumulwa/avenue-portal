@@ -308,3 +308,59 @@ Entry template:
   C2.2–C2.4 once a rule can actually fire. W1/W2/W4/W5/W7/W8 owed by C3.
 - **Deviations:** none. R2/R3/R4 are stubs here by design — the plumbing that decides
   *whether findings are acted on* is what C2.1 proves.
+
+## C2.2 / C2.3 / C2.4 — rules R2, R3, R4
+- **Date / commits:** 2026-08-06 · (this commit)
+- **Packaging note:** the plan scheduled these as three packages; they ship as one commit
+  because all three depend on the same alias-matching and history-fetch machinery, and
+  splitting them would have meant writing that machinery twice. Tests are still organised
+  per rule.
+- **What was built** (in `stage-clinical.ts`): `matchLinesToRules` (alias → test
+  recognition), `fetchPriorLines` (bounded member history), `ruleAliasKeys`, and the R2/R3/R4
+  evaluation.
+- **Design decisions worth recording:**
+  - **History matching happens in JS, not SQL.** Aliases are stored normalised (uppercase,
+    whitespace-collapsed) while `ClaimLine.description` is raw. Normalising inside the query
+    would need raw SQL and could drift from `normaliseAliasValue`; reusing `lineMatchKeys`
+    on both sides makes the two agree **by construction**. One bounded query (≤50 claims,
+    widest window) serves both R3 and R4.
+  - **"Earlier" is a total order** — service date, then `createdAt`, then id. Without the
+    tie-break, two claims sharing a service date would either both flag (double-counting one
+    repeat) or both stay silent (missing it). This is asserted directly.
+  - **R2 checks only tests the pack marks `requiresDiagnosis`.** A test that may reasonably
+    be ordered without a stated diagnosis is never flagged.
+  - **R4 is per-claim, R2/R3 are per-line.** An unrecognised line therefore raises no R2/R3
+    finding but does not satisfy R4 either — proven explicitly.
+- **Verified:** `tests/integration/diagnosis-gate-rules.integration.test.ts` — **18/18 green
+  against a real DB**, and **42/42 across all three DG DB suites** run together.
+  - R2: supported test passes · unsupported test flags **quoting the pack's own provider
+    wording** and naming the offending line · a no-diagnosis-required test is never flagged ·
+    recognition by CPT code as well as by name · unrecognised line raises no test-level finding.
+  - R3: repeat inside the window flags and cites the earlier claim number · no flag once the
+    window elapses · **VOID/DECLINED history ignored** (an unpaid test is not a repeat) ·
+    matches history whose wording differs only in case/spacing · **flags across different
+    providers** (the control is per member, not per facility) · **same service date ⇒ exactly
+    one of the two claims flags the other**.
+  - R4: passes with the confirmatory test on the claim · flags when absent · accepts one
+    billed earlier inside the condition's lookback · stays silent for a condition with no
+    confirmatory test declared.
+  - Record-only: findings recorded but claim PASSes with the gate off; still PASSes with the
+    gate on while the condition is not live (DG-D5); ROUTES only when **both** are live, and
+    the full finding set is preserved even when routing.
+  - `tsc` clean · `eslint` clean · hermetic suite **1616 passed / 543 skipped / 0 failed**.
+- **Test-design lessons (recorded so the next DB suite avoids them):**
+  1. **The V6 validator rejected the first fixture** — a `requiresDiagnosis` test with no
+     SUPPORTED link would flag every claim billing it. The fixture was corrected so H. pylori
+     is supported *for gastritis*: "unsupported" must always mean "unsupported for THIS
+     diagnosis", never "supported for nothing". The validator caught a genuinely bad rule set.
+  2. **Cross-test history pollution.** All tests shared one member and one service date, so
+     claims created by earlier tests sat inside later tests' lookback windows and silently
+     changed their results. Each test now gets its **own service-date window, 90 days apart**
+     (the widest rule looks back 720 h).
+  3. Real-DB suites here follow the repo convention of using **seeded** fixtures; the tenant
+     is derived **from the member** rather than `tenant.findFirstOrThrow()`, so a leftover
+     fixture tenant cannot be picked. `Claim` requires `procedures`; `ClaimLine` requires
+     `lineNumber`.
+- **W-checklist:** W3 ✓ — a routed claim now carries `assignedQueue = CLINICAL_REVIEW`, which
+  `/claims/queues` renders dynamically (verified by construction; click-path walkthrough in C3).
+- **Deviations:** three plan packages merged into one commit, as noted above.

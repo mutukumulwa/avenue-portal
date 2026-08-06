@@ -6,6 +6,7 @@ Detail per package: `IMPLEMENTATION_LOG.md`.
 
 **Branch:** `feat/diagnosis-gate` (off `origin/main` @ `3ac6b2c`).
 **Baseline on branch:** tsc exit 0 · vitest 1569 passed / 501 skipped / 0 failed.
+**Current:** tsc clean · hermetic 1616 passed / 543 skipped / 0 failed · **42/42 DG real-DB tests** (opt-in).
 
 | Pkg | Title | Status |
 |---|---|---|
@@ -18,10 +19,10 @@ Detail per package: `IMPLEMENTATION_LOG.md`.
 | C1.4 | WHO crosswalk ingestion | ⬜ may be BLOCKED-EXTERNAL |
 | C1.5 | Alias coverage report | ⬜ needs claim data |
 | C2.1 | CLINICAL stage skeleton + routes + queue | ✅ DONE — inert with no pack; 13/13 real-DB |
-| C2.2 | R2 compatibility + derived fixtures | ⬜ next |
-| C2.3 | R3 repeat window (DB suite) | ⬜ |
-| C2.4 | R4 confirmation-present | ⬜ |
-| C2.5 | Shadow read service | ⬜ |
+| C2.2 | R2 lab↔diagnosis compatibility | ✅ DONE |
+| C2.3 | R3 repeat window (DB suite) | ✅ DONE — total-order tie-break proven |
+| C2.4 | R4 confirmation-present | ✅ DONE |
+| C2.5 | Shadow read service | ⬜ next |
 | C3.1 | Permissions + matrix + ensure-script | ⬜ |
 | C3.2 | Protocol library UI + import | ⬜ |
 | C3.3 | Governance E2E (maker/checker/activate) | ⬜ |
