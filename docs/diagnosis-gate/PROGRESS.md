@@ -1,0 +1,49 @@
+# Diagnosis Gate — Progress
+
+Resume point for any session. Authority: `/DIAGNOSIS_GATE_EXECUTION_PLAN.md`.
+Clinical semantics: `docs/diagnosis-gate/DIAGNOSIS_GATE_SPEC.md`.
+Detail per package: `IMPLEMENTATION_LOG.md`.
+
+**Branch:** `feat/diagnosis-gate` (off `origin/main` @ `3ac6b2c`).
+**Baseline on branch:** tsc exit 0 · vitest 1569 passed / 501 skipped / 0 failed.
+
+| Pkg | Title | Status |
+|---|---|---|
+| C0.1 | Authority spec + decision log | ✅ DONE — DG-1.0 DRAFT, awaiting G-C0 signature |
+| C0.2 | Vendor workbook + SOURCE_NOTES | ✅ DONE |
+| C0.3 | Branch/env bootstrap | ✅ DONE — 2 anchor drifts found and plan corrected |
+| C1.1 | Additive schema | ⬜ next |
+| C1.2 | Pack service + governed lifecycle | ⬜ |
+| C1.3 | Converter + validator + v0 red report | ⬜ |
+| C1.4 | WHO crosswalk ingestion | ⬜ may be BLOCKED-EXTERNAL |
+| C1.5 | Alias coverage report | ⬜ needs claim data |
+| C2.1 | CLINICAL stage skeleton + routes + queue | ⬜ |
+| C2.2 | R2 compatibility + derived fixtures | ⬜ |
+| C2.3 | R3 repeat window (DB suite) | ⬜ |
+| C2.4 | R4 confirmation-present | ⬜ |
+| C2.5 | Shadow read service | ⬜ |
+| C3.1 | Permissions + matrix + ensure-script | ⬜ |
+| C3.2 | Protocol library UI + import | ⬜ |
+| C3.3 | Governance E2E (maker/checker/activate) | ⬜ |
+| C3.4 | Policy flags + claim-detail surfacing | ⬜ |
+| C4.1 | Baseline snapshot | ⬜ must precede any provider comms (DG-D9) |
+| C4.2 | Shadow dashboard + verdicts | ⬜ |
+| C4.3 | Campaign runbook + exit memo | ⬜ **G-C4 human gate** |
+| C5.1 | Per-condition go-live verification | ⬜ blocked on G-C4 |
+| C5.2 | Repeat-window short-pay | ⬜ **G-C5.2 human gate** |
+| C5.3 | Comms pack + drift monitoring | ⬜ |
+| C6.x | Rung-2 backlog | ⬜ blocked on G-C4 |
+
+## Open human gates
+
+- **G-C0** — clinical owner signs `DIAGNOSIS_GATE_SPEC.md` §9.1, and fills §6 (pilot
+  conditions) + §7 (numeric exit criteria). Blocks pack activation and the shadow campaign.
+- **G-C4** — shadow exit memo. Blocks all of C5 and C6.
+- **G-C5.2** — finance + clinical sign-off for repeat-window short-pay.
+
+## Safety property
+
+Nothing in this engagement changes platform behaviour until (a) a protocol pack is
+imported *and* approved *and* activated, and (b) `clinicalGateEnabled` is deliberately
+switched on. Deploying every completed package with default settings leaves adjudication
+behaviourally identical.
