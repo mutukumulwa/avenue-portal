@@ -160,9 +160,44 @@ describe.skipIf(!URL_SET)("DG C2.1 integration — CLINICAL stage scope resoluti
     expect(out.result).toMatchObject({ groupCode: "CIG-001" });
   });
 
-  it("flags an ambiguous resolution instead of silently picking one", async () => {
-    const out = await stageClinical(ctxFor({ diagnoses: [{ code: "1F40", isPrimary: true }, { code: "GC08", isPrimary: true }] }));
-    expect((out.result as Record<string, unknown>).ambiguous).toBe(true);
+  it("EVALUATES NOTHING when the diagnosis matches several conditions (DG-D15)", async () => {
+    // Picking the first match would let database row order decide which clinical rules
+    // run — and that ordering is not even stable across queries.
+    const out = await stageClinical(
+      ctxFor({
+        diagnoses: [{ code: "1F40", isPrimary: true }, { code: "GC08", isPrimary: true }],
+        lines: [{ description: "Malaria RDT" }],
+      }),
+    );
+    const r = out.result as Record<string, unknown>;
+    expect(out.disposition).toBe("PASS");
+    expect(r.ambiguous).toBe(true);
+    expect(r.ruleHits ?? []).toHaveLength(0);
+    // No single condition is claimed...
+    expect(r.groupCode).toBeUndefined();
+    // ...but every candidate is named, so the pack can be disambiguated.
+    expect(r.candidateGroups).toEqual([
+      { groupCode: "CIG-001", groupName: "Malaria" },
+      { groupCode: "CIG-002", groupName: "Urinary Tract Infection" },
+    ]);
+  });
+
+  it("candidate ordering is stable, so the record does not churn between runs", async () => {
+    const a = await stageClinical(ctxFor({ diagnoses: [{ code: "1F40", isPrimary: true }, { code: "GC08", isPrimary: true }] }));
+    const b = await stageClinical(ctxFor({ diagnoses: [{ code: "GC08", isPrimary: true }, { code: "1F40", isPrimary: true }] }));
+    expect((a.result as Record<string, unknown>).candidateGroups).toEqual((b.result as Record<string, unknown>).candidateGroups);
+  });
+
+  it("strict mode treats an ambiguous diagnosis as unresolved, not as a governed one", async () => {
+    const out = await stageClinical(
+      ctxFor({
+        diagnoses: [{ code: "1F40", isPrimary: true }, { code: "GC08", isPrimary: true }],
+        clinicalGateEnabled: true,
+        requireClinicalGroup: true,
+      }),
+    );
+    expect(out.disposition).toBe("ROUTE");
+    expect(out.disposition === "ROUTE" && out.code).toBe("CLINICAL_SCOPE_REVIEW");
   });
 
   it("passes an out-of-scope diagnosis by default — the gate governs only what it knows (DG-D11)", async () => {

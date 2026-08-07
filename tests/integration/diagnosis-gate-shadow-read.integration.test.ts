@@ -79,6 +79,11 @@ describe.skipIf(!URL_SET)("DG C2.5 integration — shadow read model", () => {
     await recordEvaluation({ packId: "p1", packVersion: 1, groupCode: "CIG-001", groupName: "Malaria" });
     // 1 in scope, ambiguous, clean
     await recordEvaluation({ packId: "p1", packVersion: 1, groupCode: "CIG-001", groupName: "Malaria", ambiguous: true });
+    // 1 in scope, clean, but with a rule that COULD NOT be checked (DG-D14)
+    await recordEvaluation({
+      packId: "p1", packVersion: 1, groupCode: "CIG-001", groupName: "Malaria",
+      inertRules: [{ rule: "R3", testCode: "LAB003", testName: "Malaria RDT", windowHours: 12, reason: "SUBDAY_WINDOW_DATE_ONLY_DATA" }],
+    });
     // 2 in scope with findings
     await recordEvaluation({
       packId: "p1", packVersion: 1, groupCode: "CIG-001", groupName: "Malaria", recordOnly: true,
@@ -107,15 +112,15 @@ describe.skipIf(!URL_SET)("DG C2.5 integration — shadow read model", () => {
   it("EXCLUDES dormant evaluations — they are not evidence that the rules found nothing", async () => {
     const s = await ClinicalGateReadService.summarize(tenantId, window);
     expect(s.dormant).toBe(2);
-    // 8 recorded, 2 dormant, 1 out of scope ⇒ 5 in scope.
-    expect(s.inScope).toBe(5);
+    // 9 recorded, 2 dormant, 1 out of scope ⇒ 6 in scope.
+    expect(s.inScope).toBe(6);
     expect(s.outOfScope).toBe(1);
   });
 
   it("computes the would-route rate against IN-SCOPE claims only", async () => {
     const s = await ClinicalGateReadService.summarize(tenantId, window);
     expect(s.wouldRoute).toBe(2);
-    expect(s.wouldRouteRate).toBeCloseTo(2 / 5, 6); // the guard against re-routing the book
+    expect(s.wouldRouteRate).toBeCloseTo(2 / 6, 6); // the guard against re-routing the book
   });
 
   it("counts claims and findings per rule separately", async () => {
@@ -135,8 +140,17 @@ describe.skipIf(!URL_SET)("DG C2.5 integration — shadow read model", () => {
     const s = await ClinicalGateReadService.summarize(tenantId, window);
     expect(s.ambiguous).toBe(1);
     const malaria = s.byGroup.find((g) => g.groupCode === "CIG-001")!;
-    expect(malaria).toMatchObject({ groupName: "Malaria", evaluated: 5, flagged: 2 });
+    expect(malaria).toMatchObject({ groupName: "Malaria", evaluated: 6, flagged: 2 });
     expect(s.topTests[0]).toMatchObject({ testCode: "LAB010", findings: 2 });
+  });
+
+  it("reports rules it COULD NOT check, so a low hit count is not read as clean (DG-D14)", async () => {
+    const s = await ClinicalGateReadService.summarize(tenantId, window);
+    expect(s.inertRules).toHaveLength(1);
+    expect(s.inertRules[0]).toMatchObject({ rule: "R3", testCode: "LAB003", windowHours: 12, evaluations: 1 });
+    // and it is attributed to the rule, beside that rule's hit counts
+    expect(s.rules.find((r) => r.rule === "R3")!.inertEvaluations).toBe(1);
+    expect(s.rules.find((r) => r.rule === "R2")!.inertEvaluations).toBe(0);
   });
 
   it("lists findings with bounded pagination and no member identifiers", async () => {

@@ -22,7 +22,7 @@
  */
 import type { PrismaClient } from "@prisma/client";
 import { ROUTE_CODES, type RouteCode } from "@/server/services/claim-intake/reason-catalog";
-import { normaliseAliasValue, normaliseCode } from "@/server/services/diagnosis-gate/pack-types";
+import { normaliseAliasValue, normaliseCode, isSubDayWindow, windowDays, dayDifference } from "@/server/services/diagnosis-gate/pack-types";
 import type { EvalContext, StageOutcome } from "./evaluate";
 
 /** One thing the clinical rules found wrong. Persisted on the stage row verbatim. */
@@ -39,6 +39,21 @@ export interface ClinicalRuleHit {
   priorClaimNumbers?: string[];
 }
 
+/**
+ * A rule the pack defines but this evaluation could NOT check (DG-D14).
+ *
+ * Recorded rather than dropped: a shadow report that silently omits unevaluated rules
+ * overstates coverage, and "we checked and found nothing" must never be confused with
+ * "we could not check".
+ */
+export interface ClinicalInertRule {
+  rule: "R3" | "R4";
+  testCode?: string;
+  testName?: string;
+  windowHours: number;
+  reason: "SUBDAY_WINDOW_DATE_ONLY_DATA";
+}
+
 export interface ClinicalStageResult extends Record<string, unknown> {
   packId?: string;
   packVersion?: number;
@@ -48,11 +63,15 @@ export interface ClinicalStageResult extends Record<string, unknown> {
   skipped?: string;
   /** The claim's diagnosis matched no governed condition. */
   outOfScope?: boolean;
-  /** More than one condition matched — recorded so the pack can be disambiguated. */
+  /** More than one condition matched — NO rules were evaluated (DG-D15). */
   ambiguous?: boolean;
+  /** Every condition the diagnosis matched, when ambiguous. */
+  candidateGroups?: Array<{ groupCode: string; groupName: string }>;
   /** True when findings were recorded but deliberately not acted on. */
   recordOnly?: boolean;
   ruleHits?: ClinicalRuleHit[];
+  /** Rules the pack defines but this evaluation could not check (DG-D14). */
+  inertRules?: ClinicalInertRule[];
 }
 
 const PASS = (result?: ClinicalStageResult): StageOutcome => ({ disposition: "PASS", result });
@@ -92,16 +111,40 @@ export function lineMatchKeys(line: { cptCode?: string | null; drugCode?: string
   return keys;
 }
 
+/** A single, unambiguous governed condition the claim resolved to. */
+export interface ResolvedGroup {
+  groupId: string;
+  groupCode: string;
+  groupName: string;
+  isCatchAll: boolean;
+  enabledForShadow: boolean;
+  enabledForLive: boolean;
+  confirmationLookbackHours: number | null;
+}
+
+/**
+ * The claim's diagnosis matched MORE THAN ONE governed condition (DG-D15).
+ *
+ * This is common in real content — 12.7% of the v0 mappings put one ICD code in several
+ * conditions (`CA09` is in Allergic Rhinitis, Nasopharyngitis and Pharyngitis), which is
+ * clinically defensible because ICD hierarchies overlap. What is NOT defensible is
+ * letting database row order decide which condition's rules run, so no winner is picked.
+ */
+export interface AmbiguousGroups {
+  ambiguous: true;
+  candidates: Array<{ groupCode: string; groupName: string }>;
+}
+
 /**
  * Resolve the claim's diagnosis to a governed condition in the active pack.
  * Primary diagnoses win; a line-level code is the fallback. Returns null when nothing
- * in the pack matches.
+ * in the pack matches, or an `AmbiguousGroups` marker when several match (DG-D15).
  */
 async function resolveGroup(
   db: PrismaClient,
   packId: string,
   codes: { primary: string[]; all: string[] },
-): Promise<{ groupId: string; groupCode: string; groupName: string; isCatchAll: boolean; enabledForShadow: boolean; enabledForLive: boolean; confirmationLookbackHours: number | null; ambiguous: boolean } | null> {
+): Promise<ResolvedGroup | AmbiguousGroups | null> {
   const lookup = async (candidates: string[]) => {
     if (candidates.length === 0) return [];
     return db.clinicalCodeMembership.findMany({
@@ -122,17 +165,35 @@ async function resolveGroup(
   if (rows.length === 0) return null;
 
   const distinct = new Map(rows.map((r) => [r.group.id, r.group]));
-  const first = [...distinct.values()][0];
+
+  // DG-D15: no tie-break exists. Picking `[...distinct.values()][0]` would let database
+  // row order decide which clinical rules run — and the ordering is not even stable
+  // across queries. The claim is reported as ambiguous with every candidate named, and
+  // the pack gets fixed (validator V11 blocks the import that produced it).
+  if (distinct.size > 1) {
+    return {
+      ambiguous: true,
+      candidates: [...distinct.values()]
+        .map((g) => ({ groupCode: g.groupCode, groupName: g.name }))
+        .sort((a, b) => a.groupCode.localeCompare(b.groupCode)), // stable for review/tests
+    };
+  }
+
+  const only = [...distinct.values()][0];
   return {
-    groupId: first.id,
-    groupCode: first.groupCode,
-    groupName: first.name,
-    isCatchAll: first.isCatchAll,
-    enabledForShadow: first.enabledForShadow,
-    enabledForLive: first.enabledForLive,
-    confirmationLookbackHours: first.confirmationLookbackHours,
-    ambiguous: distinct.size > 1,
+    groupId: only.id,
+    groupCode: only.groupCode,
+    groupName: only.name,
+    isCatchAll: only.isCatchAll,
+    enabledForShadow: only.enabledForShadow,
+    enabledForLive: only.enabledForLive,
+    confirmationLookbackHours: only.confirmationLookbackHours,
   };
+}
+
+/** Type guard: did resolution end in ambiguity rather than a single condition? */
+function isAmbiguous(r: ResolvedGroup | AmbiguousGroups | null): r is AmbiguousGroups {
+  return r !== null && "ambiguous" in r;
 }
 
 interface MatchedRule {
@@ -294,12 +355,36 @@ export async function stageClinical(ctx: EvalContext): Promise<StageOutcome> {
     return PASS(result);
   }
 
+  // 3b. Ambiguous resolution (DG-D15): the diagnosis matched several governed
+  //     conditions, so NO rules are evaluated — running one condition's rules because
+  //     it happened to come back first would make the outcome depend on row order.
+  //     Every candidate is recorded so the pack can be disambiguated by the clinical
+  //     team (validator V11 blocks the import that allowed it).
+  //
+  //     In strict mode an ambiguous diagnosis counts as unresolved: it is not a
+  //     governed resolution, so it does not satisfy "requires a governed diagnosis".
+  if (isAmbiguous(group)) {
+    const result: ClinicalStageResult = {
+      packId: pack.id,
+      packVersion: pack.version,
+      ambiguous: true,
+      candidateGroups: group.candidates,
+    };
+    if (gateEnabled && requireGroup) {
+      return ROUTE(
+        ROUTE_CODES.CLINICAL_SCOPE_REVIEW,
+        `diagnosis matches ${group.candidates.length} governed conditions — not evaluated`,
+        result,
+      );
+    }
+    return PASS(result);
+  }
+
   const base: ClinicalStageResult = {
     packId: pack.id,
     packVersion: pack.version,
     groupCode: group.groupCode,
     groupName: group.groupName,
-    ...(group.ambiguous ? { ambiguous: true } : {}),
   };
 
   // 4. A condition switched off for shadow is not evaluated at all — the clinical team
@@ -308,6 +393,7 @@ export async function stageClinical(ctx: EvalContext): Promise<StageOutcome> {
 
   // 5. Evaluate the rules.
   const ruleHits: ClinicalRuleHit[] = [];
+  const inertRules: ClinicalInertRule[] = [];
   const matched = await matchLinesToRules(db, pack.id, ctx.claim.claimLines);
 
   const links = await db.clinicalLabRuleGroupLink.findMany({
@@ -343,11 +429,32 @@ export async function stageClinical(ctx: EvalContext): Promise<StageOutcome> {
   // ── R3: was this test already done too recently to justify repeating? ─────
   // LIMIT (stated in the spec, not hidden here): only claims that reach Medvex are
   // visible. A repeat at a facility that never bills us cannot be seen.
+  //
+  // DG-D14: compared in whole calendar days, because that is the resolution the claim
+  // data actually has. A window under a day cannot be evaluated at all and is recorded
+  // as inert — see below.
   for (const m of matched) {
     if (m.repeatWindowHours == null || m.repeatWindowHours <= 0) continue;
+
+    if (isSubDayWindow(m.repeatWindowHours)) {
+      // Recorded, not silently dropped: the shadow report must be able to say which
+      // rules it is NOT checking, or coverage looks better than it is.
+      inertRules.push({
+        rule: "R3",
+        testCode: m.testCode,
+        testName: m.testName,
+        windowHours: m.repeatWindowHours,
+        reason: "SUBDAY_WINDOW_DATE_ONLY_DATA",
+      });
+      continue;
+    }
+
     const keys = await ruleAliasKeys(db, m.ruleId);
-    const cutoff = new Date(ctx.claim.dateOfService.getTime() - m.repeatWindowHours * 3600_000);
-    const priors = priorLines.filter((p) => p.dateOfService >= cutoff && [...keys].some((k) => p.keys.has(k)));
+    const allowedDays = windowDays(m.repeatWindowHours);
+    const priors = priorLines.filter((p) => {
+      const gap = dayDifference(ctx.claim.dateOfService, p.dateOfService);
+      return gap >= 0 && gap <= allowedDays && [...keys].some((k) => p.keys.has(k));
+    });
     if (priors.length === 0) continue;
     ruleHits.push({
       rule: "R3",
@@ -355,7 +462,7 @@ export async function stageClinical(ctx: EvalContext): Promise<StageOutcome> {
       claimLineId: m.claimLineId,
       testCode: m.testCode,
       testName: m.testName,
-      message: `${m.testName} was already performed for this member within its ${m.repeatWindowHours}-hour repeat window.`,
+      message: `${m.testName} was already performed for this member within its ${allowedDays}-day repeat window.`,
       priorClaimNumbers: priors.slice(0, 5).map((p) => p.claimNumber),
     });
   }
@@ -367,9 +474,26 @@ export async function stageClinical(ctx: EvalContext): Promise<StageOutcome> {
   if (confirmatory.length > 0) {
     const onThisClaim = matched.some((m) => confirmatory.includes(m.ruleId));
     let inLookback = false;
-    if (!onThisClaim && group.confirmationLookbackHours != null && group.confirmationLookbackHours > 0) {
-      const cutoff = new Date(ctx.claim.dateOfService.getTime() - group.confirmationLookbackHours * 3600_000);
-      const candidates = priorLines.filter((p) => p.dateOfService >= cutoff);
+    /** True when a lookback was declared but could not be evaluated (DG-D14). */
+    let lookbackUnverifiable = false;
+    const lookbackHours = group.confirmationLookbackHours;
+
+    // DG-D14 again: a sub-day lookback cannot be evaluated. Recorded as inert, and the
+    // finding below is suppressed — asserting "no confirmatory test on record" after
+    // failing to check the record would be stating something we do not know.
+    if (!onThisClaim && isSubDayWindow(lookbackHours)) {
+      lookbackUnverifiable = true;
+      inertRules.push({
+        rule: "R4",
+        windowHours: lookbackHours!,
+        reason: "SUBDAY_WINDOW_DATE_ONLY_DATA",
+      });
+    } else if (!onThisClaim && lookbackHours != null && lookbackHours > 0) {
+      const allowedDays = windowDays(lookbackHours);
+      const candidates = priorLines.filter((p) => {
+        const gap = dayDifference(ctx.claim.dateOfService, p.dateOfService);
+        return gap >= 0 && gap <= allowedDays;
+      });
       for (const ruleId of confirmatory) {
         const keys = await ruleAliasKeys(db, ruleId);
         if (candidates.some((p) => [...keys].some((k) => p.keys.has(k)))) {
@@ -378,23 +502,28 @@ export async function stageClinical(ctx: EvalContext): Promise<StageOutcome> {
         }
       }
     }
-    if (!onThisClaim && !inLookback) {
+    if (!onThisClaim && !inLookback && !lookbackUnverifiable) {
+      const lookbackPhrase = lookbackHours && lookbackHours >= 24 ? ` or in the preceding ${windowDays(lookbackHours)} day(s)` : "";
       ruleHits.push({
         rule: "R4",
         routeCode: ROUTE_CODES.CLINICAL_CONFIRMATION_MISSING,
-        message: `No confirmatory test for ${group.groupName} was billed on this claim${group.confirmationLookbackHours ? ` or in the preceding ${group.confirmationLookbackHours} hours` : ""}.`,
+        message: `No confirmatory test for ${group.groupName} was billed on this claim${lookbackPhrase}.`,
       });
     }
   }
 
-  if (ruleHits.length === 0) return PASS(base);
+  // Inert rules ride along whether or not anything was found, so a clean evaluation
+  // still reports what it was unable to check (DG-D14).
+  const withInert: ClinicalStageResult = inertRules.length > 0 ? { ...base, inertRules } : base;
+
+  if (ruleHits.length === 0) return PASS(withInert);
 
   // 6. Act, or merely record. Routing requires BOTH the policy master switch and this
   //    specific condition being live (DG-D5) — and a catch-all can never route at all
   //    (DG-D8), enforced here as well as at write time so neither layer alone is
   //    load-bearing.
   const mayRoute = gateEnabled && group.enabledForLive && !group.isCatchAll;
-  const withHits: ClinicalStageResult = { ...base, ruleHits };
+  const withHits: ClinicalStageResult = { ...withInert, ruleHits };
 
   if (!mayRoute) return PASS({ ...withHits, recordOnly: true });
 

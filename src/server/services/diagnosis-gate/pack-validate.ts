@@ -16,7 +16,7 @@
  * but inert or incomplete (e.g. a rule with no alias can never fire).
  */
 import type { ProtocolPack, CodeSystem } from "./pack-types";
-import { PACK_FORMAT_VERSION, normaliseCode } from "./pack-types";
+import { PACK_FORMAT_VERSION, normaliseCode, isSubDayWindow, MIN_ENFORCEABLE_WINDOW_HOURS } from "./pack-types";
 
 export type IssueSeverity = "ERROR" | "WARNING";
 
@@ -130,6 +130,36 @@ export function validatePack(pack: ProtocolPack, ctx: ValidationContext = {}): V
     }
   }
 
+  // ── V11 (DG-D15): one code must belong to exactly one condition ───────────
+  // A code in several conditions is clinically defensible (ICD hierarchies overlap) but
+  // leaves the engine no principled way to choose which condition's rules apply — and
+  // the stage refuses to guess, so every such claim goes unevaluated. Blocking at import
+  // puts the decision where it belongs: with the clinical team, once, in the content.
+  // Reported per CODE rather than per membership, so 85 conflicts read as 85 decisions.
+  const groupsPerCode = new Map<string, Set<string>>();
+  for (const m of pack.memberships) {
+    if (!m.code?.trim() || !groupByCode.has(m.groupCode)) continue;
+    const key = `${m.codeSystem}|${normaliseCode(m.code)}`;
+    const set = groupsPerCode.get(key) ?? new Set<string>();
+    set.add(m.groupCode);
+    groupsPerCode.set(key, set);
+  }
+  let crossGroupCodes = 0;
+  for (const [key, groups] of groupsPerCode) {
+    if (groups.size < 2) continue;
+    crossGroupCodes += 1;
+    const [system, code] = key.split("|");
+    const names = [...groups].sort().map((gc) => `${gc} (${groupByCode.get(gc)?.name ?? "?"})`).join(", ");
+    issues.push(
+      err(
+        "V11",
+        "CODE_IN_MULTIPLE_GROUPS",
+        `${system} code "${code}" belongs to ${groups.size} conditions — ${names}. A claim carrying it cannot be resolved to one condition, so no clinical rule would be evaluated. Assign the code to exactly one condition.`,
+        key,
+      ),
+    );
+  }
+
   // ── V4 / V6: lab rules and links ──────────────────────────────────────────
   const seenRule = new Set<string>();
   for (const r of pack.labRules) {
@@ -144,6 +174,20 @@ export function validatePack(pack: ProtocolPack, ctx: ValidationContext = {}): V
     }
     if (r.repeatWindowHours != null && (!Number.isFinite(r.repeatWindowHours) || r.repeatWindowHours <= 0)) {
       issues.push(err("V4", "REPEAT_WINDOW_INVALID", `Test "${r.testCode}" has a non-positive repeat window (${String(r.repeatWindowHours)}).`, r.sourceRow));
+    }
+    // V12 (DG-D14): claims carry a service DATE, not a time. A window shorter than a day
+    // cannot be evaluated — enforcing it either way would produce false positives on
+    // same-day repeats and false negatives across midnight. Legal content, inert rule,
+    // so this warns rather than blocks (the V10 philosophy).
+    if (isSubDayWindow(r.repeatWindowHours)) {
+      issues.push(
+        warn(
+          "V12",
+          "REPEAT_WINDOW_SUBDAY_UNENFORCEABLE",
+          `Test "${r.testCode}" (${r.testName}) has a ${r.repeatWindowHours}-hour repeat window, which cannot be checked against date-only claim data — the rule will be recorded as inert rather than evaluated. Use a window of ${MIN_ENFORCEABLE_WINDOW_HOURS} hours or more, or capture a performed-at timestamp.`,
+          r.sourceRow,
+        ),
+      );
     }
   }
 
@@ -229,6 +273,8 @@ export function validatePack(pack: ProtocolPack, ctx: ValidationContext = {}): V
       labRules: pack.labRules.length,
       rulesRequiringDiagnosis: pack.labRules.filter((r) => r.requiresDiagnosis).length,
       rulesWithRepeatWindow: pack.labRules.filter((r) => r.repeatWindowHours != null).length,
+      subdayWindowRules: pack.labRules.filter((r) => isSubDayWindow(r.repeatWindowHours)).length,
+      crossGroupCodes,
       links: pack.links.length,
       supportedLinks: pack.links.filter((l) => l.linkType === "SUPPORTED").length,
       confirmatoryLinks: pack.links.filter((l) => l.linkType === "CONFIRMATORY").length,
@@ -254,7 +300,17 @@ function summarise(issues: ValidationIssue[]): Array<{ rule: string; code: strin
 /** Human-readable report — this is the artifact that goes back to the clinical team. */
 export function renderValidationMarkdown(
   result: ValidationResult,
-  meta: { sourceFileName: string; generatedAt: string; packVersionNote?: string },
+  meta: {
+    sourceFileName: string;
+    generatedAt: string;
+    packVersionNote?: string;
+    /**
+     * Extra markdown placed directly under the header, for framing a specific workbook
+     * version. It lives here rather than being hand-added to the generated file, so it
+     * survives the next regeneration — an edited report would silently lose it.
+     */
+    preamble?: string[];
+  },
 ): string {
   const L: string[] = [];
   L.push(`# Protocol pack validation report`);
@@ -266,6 +322,11 @@ export function renderValidationMarkdown(
   L.push(`| Verdict | ${result.importable ? "**IMPORTABLE** — no blocking errors" : `**NOT IMPORTABLE** — ${result.errors.length} blocking error(s)`} |`);
   if (meta.packVersionNote) L.push(`| Note | ${meta.packVersionNote} |`);
   L.push("");
+
+  if (meta.preamble?.length) {
+    L.push(...meta.preamble);
+    L.push("");
+  }
 
   L.push(`## What this report is`);
   L.push("");

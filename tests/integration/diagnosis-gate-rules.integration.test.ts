@@ -130,6 +130,8 @@ describe.skipIf(!URL_SET)("DG C2.2–C2.4 integration — clinical rules R2/R3/R
   }
 
   const hits = (out: { result?: Record<string, unknown> }): ClinicalRuleHit[] => ((out.result as ClinicalStageResult)?.ruleHits ?? []);
+  const inert = (out: { result?: Record<string, unknown> }) => ((out.result as ClinicalStageResult)?.inertRules ?? []);
+  const daysBefore = (d: number) => new Date(dos().getTime() - d * 24 * 3600_000);
 
   beforeEach(() => {
     epoch += 1;
@@ -224,34 +226,51 @@ describe.skipIf(!URL_SET)("DG C2.2–C2.4 integration — clinical rules R2/R3/R
 
   // ── R3 ────────────────────────────────────────────────────────────────────
   describe("R3 — repeat inside the clinical window", () => {
+    // NOTE (DG-D14): the enforceable-window cases use LAB010 (720 h = 30 days). The
+    // malaria and glucose rules carry the REAL v0 windows (12 h and 4 h), which are
+    // shorter than a day and therefore unenforceable against date-only claim data —
+    // they are covered by the inertness block below.
     it("flags a repeat inside the window and cites the earlier claim", async () => {
-      const prior = await makeClaim({ dateOfService: hoursBefore(6), lines: [{ description: "Malaria RDT" }] });
-      const c = await makeClaim({ dateOfService: dos(), lines: [{ description: "Malaria RDT" }] });
-      const out = await stageClinical(ctxFor(c, { lines: [{ description: "Malaria RDT" }] }));
+      const prior = await makeClaim({ dateOfService: daysBefore(10), lines: [{ description: "Stool H Pylori" }] });
+      const c = await makeClaim({ dateOfService: dos(), lines: [{ description: "Stool H Pylori" }] });
+      const out = await stageClinical(ctxFor(c, { lines: [{ description: "Stool H Pylori" }] }));
       const r3 = hits(out).filter((h) => h.rule === "R3");
       expect(r3).toHaveLength(1);
       expect(r3[0].priorClaimNumbers).toContain(prior.claimNumber);
+      expect(r3[0].message).toContain("30-day");
     });
 
     it("does NOT flag once the window has elapsed", async () => {
-      await makeClaim({ dateOfService: hoursBefore(48), lines: [{ description: "Random Blood Sugar" }] });
-      const c = await makeClaim({ dateOfService: dos(), lines: [{ description: "Random Blood Sugar" }] });
-      const out = await stageClinical(ctxFor(c, { lines: [{ description: "Random Blood Sugar" }] }));
+      await makeClaim({ dateOfService: daysBefore(40), lines: [{ description: "Stool H Pylori" }] });
+      const c = await makeClaim({ dateOfService: dos(), lines: [{ description: "Stool H Pylori" }] });
+      const out = await stageClinical(ctxFor(c, { lines: [{ description: "Stool H Pylori" }] }));
       expect(hits(out).filter((h) => h.rule === "R3")).toHaveLength(0);
     });
 
+    it("is inclusive at the window edge and excludes the day after (30-day boundary)", async () => {
+      // The boundary is where an off-by-one silently changes a clinical rule.
+      await makeClaim({ dateOfService: daysBefore(30), lines: [{ description: "Stool H Pylori" }] });
+      const onEdge = await makeClaim({ dateOfService: dos(), lines: [{ description: "Stool H Pylori" }] });
+      expect(hits(await stageClinical(ctxFor(onEdge, { lines: [{ description: "Stool H Pylori" }] }))).filter((h) => h.rule === "R3")).toHaveLength(1);
+
+      epoch += 1; currentDos = new Date(EPOCH_START.getTime() + epoch * EPOCH_STRIDE_MS);
+      await makeClaim({ dateOfService: daysBefore(31), lines: [{ description: "Stool H Pylori" }] });
+      const justOutside = await makeClaim({ dateOfService: dos(), lines: [{ description: "Stool H Pylori" }] });
+      expect(hits(await stageClinical(ctxFor(justOutside, { lines: [{ description: "Stool H Pylori" }] }))).filter((h) => h.rule === "R3")).toHaveLength(0);
+    });
+
     it("ignores VOID and DECLINED history — an unpaid test is not a repeat", async () => {
-      await makeClaim({ dateOfService: hoursBefore(2), lines: [{ description: "Random Blood Sugar" }], status: "VOID" });
-      await makeClaim({ dateOfService: hoursBefore(2), lines: [{ description: "Random Blood Sugar" }], status: "DECLINED" });
-      const c = await makeClaim({ dateOfService: dos(), lines: [{ description: "Random Blood Sugar" }] });
-      const out = await stageClinical(ctxFor(c, { lines: [{ description: "Random Blood Sugar" }] }));
+      await makeClaim({ dateOfService: daysBefore(2), lines: [{ description: "Stool H Pylori" }], status: "VOID" });
+      await makeClaim({ dateOfService: daysBefore(2), lines: [{ description: "Stool H Pylori" }], status: "DECLINED" });
+      const c = await makeClaim({ dateOfService: dos(), lines: [{ description: "Stool H Pylori" }] });
+      const out = await stageClinical(ctxFor(c, { lines: [{ description: "Stool H Pylori" }] }));
       expect(hits(out).filter((h) => h.rule === "R3")).toHaveLength(0);
     });
 
     it("matches history whose wording differs only in case and spacing", async () => {
-      const prior = await makeClaim({ dateOfService: hoursBefore(3), lines: [{ description: "  malaria   RDT  " }] });
-      const c = await makeClaim({ dateOfService: dos(), lines: [{ description: "Malaria RDT" }] });
-      const out = await stageClinical(ctxFor(c, { lines: [{ description: "Malaria RDT" }] }));
+      const prior = await makeClaim({ dateOfService: daysBefore(5), lines: [{ description: "  stool   H PYLORI  " }] });
+      const c = await makeClaim({ dateOfService: dos(), lines: [{ description: "Stool H Pylori" }] });
+      const out = await stageClinical(ctxFor(c, { lines: [{ description: "Stool H Pylori" }] }));
       expect(hits(out).filter((h) => h.rule === "R3")[0]?.priorClaimNumbers).toContain(prior.claimNumber);
     });
 
@@ -260,16 +279,47 @@ describe.skipIf(!URL_SET)("DG C2.2–C2.4 integration — clinical rules R2/R3/R
       const prior = await prisma.claim.create({
         data: {
           tenantId, memberId, providerId: secondProviderId, claimNumber: `DGR-${slug}-other`,
-          serviceType: "OUTPATIENT", benefitCategory: "OUTPATIENT", dateOfService: hoursBefore(5),
+          serviceType: "OUTPATIENT", benefitCategory: "OUTPATIENT", dateOfService: daysBefore(4),
           diagnoses: [{ icdCode: "1F40", isPrimary: true }], procedures: [], billedAmount: 1000, status: "APPROVED", currency: "UGX",
-          claimLines: { create: [{ lineNumber: 1, description: "Malaria RDT", serviceCategory: "LABORATORY", quantity: 1, unitCost: 1000, billedAmount: 1000 }] },
+          claimLines: { create: [{ lineNumber: 1, description: "Stool H Pylori", serviceCategory: "LABORATORY", quantity: 1, unitCost: 1000, billedAmount: 1000 }] },
         },
         select: { id: true, claimNumber: true },
       });
       madeClaims.push(prior.id);
+      const c = await makeClaim({ dateOfService: dos(), lines: [{ description: "Stool H Pylori" }] });
+      const out = await stageClinical(ctxFor(c, { lines: [{ description: "Stool H Pylori" }] }));
+      expect(hits(out).filter((h) => h.rule === "R3")[0]?.priorClaimNumbers).toContain(prior.claimNumber);
+    });
+
+    it("does NOT evaluate a sub-day window, and records it as inert (DG-D14)", async () => {
+      // The bug this fixes: Malaria RDT's real v0 window is 12 h, but a claim carries a
+      // service DATE with no time. The old millisecond arithmetic therefore flagged ANY
+      // two same-day claims — including ones 8 hours apart, which the 12 h rule allows —
+      // and missed ones 2 hours apart either side of midnight.
+      await makeClaim({ dateOfService: dos(), lines: [{ description: "Malaria RDT" }] });
       const c = await makeClaim({ dateOfService: dos(), lines: [{ description: "Malaria RDT" }] });
       const out = await stageClinical(ctxFor(c, { lines: [{ description: "Malaria RDT" }] }));
-      expect(hits(out).filter((h) => h.rule === "R3")[0]?.priorClaimNumbers).toContain(prior.claimNumber);
+
+      expect(hits(out).filter((h) => h.rule === "R3")).toHaveLength(0);
+      const r3Inert = inert(out).filter((i) => i.rule === "R3");
+      expect(r3Inert).toHaveLength(1);
+      expect(r3Inert[0]).toMatchObject({ testCode: "LAB003", windowHours: 12, reason: "SUBDAY_WINDOW_DATE_ONLY_DATA" });
+    });
+
+    it("does not silently drop the sub-day rule — the same claim still reports it", async () => {
+      // A rule we cannot check must never be indistinguishable from a rule that found
+      // nothing; that is what makes shadow coverage numbers honest.
+      const c = await makeClaim({ dateOfService: dos(), lines: [{ description: "Random Blood Sugar" }] });
+      const out = await stageClinical(ctxFor(c, { lines: [{ description: "Random Blood Sugar" }] }));
+      expect(inert(out).some((i) => i.testCode === "LAB012" && i.windowHours === 4)).toBe(true);
+    });
+
+    it("a cross-midnight repeat under a sub-day window is inert, not a false negative", async () => {
+      await makeClaim({ dateOfService: daysBefore(1), lines: [{ description: "Malaria RDT" }] });
+      const c = await makeClaim({ dateOfService: dos(), lines: [{ description: "Malaria RDT" }] });
+      const out = await stageClinical(ctxFor(c, { lines: [{ description: "Malaria RDT" }] }));
+      expect(hits(out).filter((h) => h.rule === "R3")).toHaveLength(0);
+      expect(inert(out).some((i) => i.rule === "R3")).toBe(true);
     });
 
     it("same service date: EXACTLY ONE of the two claims flags the other", async () => {

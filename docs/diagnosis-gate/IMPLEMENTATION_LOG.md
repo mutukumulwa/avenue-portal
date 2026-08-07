@@ -607,3 +607,268 @@ conditions (§6) and the numeric exit criteria (§7).
 - **LESSON (recorded for the next feature):** "permission seeded + granted" is not
   sufficient. The question is *"does the target environment use this authorisation model
   at all?"* — verify against production's actual RBAC state, not the seeded dev database.
+
+---
+
+# Phase C7 — v0.1 intake & rule-correctness hardening
+
+## C7.1 — R3/R4 day-level arithmetic + sub-day inertness (DG-D14)
+- **Date / commits:** 2026-08-07 · (this commit)
+- **Anchors re-verified:** R3 ms-arithmetic at `stage-clinical.ts:347–349`, R4 lookback
+  `:371`, validator V4 window check, shadow `summarize` accumulators — all as recorded in
+  `PLAN_C7_V01_INTAKE.md` §3.
+- **★ THE BUG.** `Claim.dateOfService` is date-only, but R3/R4 did millisecond arithmetic
+  on it. With v0's REAL windows (Malaria RDT 12 h, smear 12 h, electrolytes 12 h, RBS
+  4 h) that meant **false positives** — any two same-day claims flagged, including ones
+  8 h apart that a 12 h rule permits — **and false negatives**: two claims 2 h apart
+  either side of midnight never flagged. Both directions wrong, on 4 of 22 tests.
+- **What was built:**
+  - `pack-types.ts`: `MIN_ENFORCEABLE_WINDOW_HOURS`, `windowDays`, `isSubDayWindow`,
+    `floorToUtcDay`, `dayDifference` — one shared definition, imported by both the stage
+    and the validator (the same divergence-by-construction rule as `normaliseAliasValue`).
+  - R3/R4 compare **whole UTC calendar days**, the resolution the data actually has.
+    Windows < 24 h are **not evaluated** and are recorded as `inertRules` on the stage
+    result — a rule we could not check must never look like a rule that found nothing.
+  - **Correctness detail beyond the plan:** an unverifiable R4 *lookback* now also
+    suppresses the missing-confirmation finding (`lookbackUnverifiable`). Asserting "no
+    confirmatory test on record" after failing to check the record would state something
+    we do not know. Inert rules ride the result whether or not any hit was found.
+  - Validator **V12** `REPEAT_WINDOW_SUBDAY_UNENFORCEABLE` (WARNING — legal but inert
+    content, the V10 philosophy) + `subdayWindowRules` stat.
+  - Shadow read model: `inertRules` breakdown on `ShadowSummary` and `inertEvaluations`
+    per `RuleSummary`, so coverage numbers cannot silently exclude unchecked rules.
+- **Test rewrite — deliberate, and the honest option.** Five existing R3 tests used
+  Malaria RDT (12 h) and RBS (4 h): they were **asserting behaviour that was wrong**.
+  Rather than mutate the fixture's windows to keep old assertions green — which would
+  have hidden the defect — the enforceable-path tests moved to LAB010 (720 h = 30 days,
+  day-level) and the sub-day cases became explicit inertness tests. The fixture keeps
+  v0's real values, so the suite now demonstrates the bug it fixes.
+- **Verified:** DG DB suites **56/56** (was 51; rules file 22, was 18) incl. a **30/31-day
+  boundary test** (inclusive at the edge, excluded the day after — where an off-by-one
+  silently changes a clinical rule), three inertness cases, and the same-service-date
+  single-flag determinism test still green. Validator unit **35** (was 28) incl. a
+  parametrised 4/12/23 h warn vs 24/72/720 h no-warn boundary. `tsc` + `eslint` clean;
+  hermetic **1663 passed / 557 skipped / 0 failed**. **`pack-v0.json` re-run
+  byte-identical** (converter untouched) and the v0 report now carries
+  `V12 × 4` — exactly the four sub-day tests predicted from the source.
+- **Housekeeping:** removed two byte-identical iCloud duplicate files
+  (`authorisation 2.ts`, `diagnosis-gate-authorisation.test 2.ts`) verified identical
+  before deletion.
+- **W-checklist:** n/a (no new user-facing capability; the shadow dashboard renders the
+  new counts through existing C4.2 surfaces — no UI shipped in this package).
+
+## C7.2 — R1 no-winner ambiguity + validator V11 (DG-D15)
+- **Date / commits:** 2026-08-07 · (this commit)
+- **Anchors re-verified:** `resolveGroup` first-match pick at `stage-clinical.ts:125`,
+  `ambiguous` flag at `:134`, base-result assembly, validator V9 seam.
+- **★ THE BUG.** `resolveGroup` returned `[...distinct.values()][0]` — the FIRST group the
+  database happened to return — then set `ambiguous: true` as a note. So which condition's
+  clinical rules ran was decided by row order, which is not even stable across queries.
+  This is not a rare edge: **85 ICD codes (12.7% of v0's mappings, 172 memberships)** sit
+  in more than one condition. `CA09` is in Allergic Rhinitis, Nasopharyngitis AND
+  Pharyngitis — clinically defensible, since ICD hierarchies overlap, but it leaves the
+  engine no principled way to choose. Verified by recomputing from v0 directly.
+- **What was built:**
+  - `resolveGroup` returns `ResolvedGroup | AmbiguousGroups | null`. On ambiguity it
+    returns every candidate (sorted by group code, so the record is stable across runs)
+    and **the stage evaluates no rules at all** — it PASSes with `ambiguous: true` and
+    `candidateGroups`. No tie-break exists anywhere in the code.
+  - **Strict mode counts ambiguity as unresolved:** `requireClinicalGroup` routes
+    `CLINICAL_SCOPE_REVIEW`, because matching several conditions is not a governed
+    resolution.
+  - Validator **V11** `CODE_IN_MULTIPLE_GROUPS` (**ERROR** — DG-D15), reported **per code,
+    not per membership**, so 85 conflicts read as 85 decisions rather than 172 rows.
+    Names every owning condition in the message. Stat: `crossGroupCodes`.
+  - Shadow `listHits` carries `candidateGroups`; the claim-detail panel renders a plain
+    explanation ("Clinical checks not run — the diagnosis matches more than one governed
+    condition… This is a gap in the protocol content, not a finding about the claim"),
+    plus a "Not checked" line for C7.1's inert rules. A reviewer seeing an empty clinical
+    section would otherwise reasonably assume the claim had been examined and found clean.
+- **Verified:** DG DB **58/58** (scope file 15, was 12). The old "flags an ambiguous
+  resolution" test was **rewritten**, not patched: it now asserts PASS with zero ruleHits,
+  **no `groupCode` claimed**, and both candidates named — plus a new test that candidate
+  ordering is stable regardless of diagnosis order, and one for strict-mode routing.
+  Validator unit **38** (was 35) incl. per-code-not-per-membership and a guard that the
+  same code under ICD-10 and ICD-11 is normal dual-accept content, not a conflict.
+  `tsc` + `eslint` clean; hermetic **1666 passed / 559 skipped / 0 failed**.
+- **v0 report regenerated:** now carries **V11 × 85** (exactly the number independently
+  recomputed from the workbook) and V12 × 4. Total blocking errors 66 → **151**. That rise
+  is the point: V11 surfaces a defect that was previously invisible *and* silently
+  degrading every affected claim to "no rules evaluated". `pack-v0.json` byte-identical —
+  this is a validator change, not a conversion change.
+- **W-checklist:** W6 ✓ (the ambiguous state renders on the claim with its own wording).
+
+## C7.3 — Converter reader hardening
+- **Date / commits:** 2026-08-07 · (this commit)
+- **Diagnosis (timeboxed, root cause found — not guessed):** `exceljs` failed on the v0.1
+  annex with `Cannot read properties of undefined (reading 'sheets')` at
+  `xlsx.js:323`. Cause: **openpyxl emits namespace-PREFIXED elements** (`<x:workbook>`,
+  `<x:sheets>`) while exceljs's SAX parsers match only the unprefixed form, so
+  `parseWorkbook` returned `undefined` and `model.sheets` was never set. Confirmed by
+  experiment rather than inspection: de-prefixing **workbook.xml alone** moved the error
+  on to `Cannot set properties of undefined (setting 'sheetNo')`, and de-prefixing **all
+  30 XML parts** moved it again to `reading 'name'`. The incompatibility is therefore
+  deeper than namespaces, so plan option (a) — patch/wrap exceljs — was **rejected on
+  evidence**: further hand-rolled OOXML rewriting would have been guesswork.
+- **Decision (plan option b), with the reasoning recorded:** the converter now reads via
+  **SheetJS (`@e965/xlsx@0.20.3`)**, added as a **devDependency**. Candidates were tested
+  against the real files, not chosen from documentation: `read-excel-file`'s node API did
+  not cooperate; SheetJS opened **both** workbooks with full fidelity — 18,727 rows,
+  correct values, and crucially **v0's trailing-space sheet name preserved**, which the
+  converter depends on.
+  - **Replaced rather than fell back.** A try-exceljs-then-SheetJS fallback would mean two
+    readers, two behaviours and eventual silent divergence between environments.
+  - **Provenance stated, not buried:** `@e965/xlsx` is a community republish, because
+    SheetJS distributes from its own CDN and the `xlsx` npm name is frozen at a stale
+    0.18.5 with known advisories. Pinned; the swap to the vendor tarball is one line and
+    documented in the converter header.
+  - **Runtime posture unchanged:** SheetJS is dev-only and imported by the CLI and its
+    test alone (`grep` over `src/` returns nothing); the server never parses xlsx — the
+    admin screen imports the pack.json this tool emits. `exceljs` remains a dependency
+    for the five production files that use it; none were touched.
+- **Second defect found while testing:** `XLSX.readFile` resolves `fs` through an internal
+  shim that is absent under vitest, so the guard tests could not open files the CLI could.
+  Both now read bytes with `node:fs` and use `XLSX.read(buffer)` — a reader that works in
+  the CLI but not in tests is a reader whose guards cannot run.
+- **Verified — the acceptance gates:**
+  - **`pack-v0.json` BYTE-IDENTICAL** to the committed artifact under the new reader, and
+    identical across two consecutive runs. This is the meaningful regression proof: the
+    adapter presents the same 1-based accessor surface the parsing code already used, so
+    **no parsing logic changed** — only the bytes-to-cells layer.
+  - **v0.1 now opens** (previously impossible).
+  - Notable evidence: converting v0.1 yields **identical numbers to v0** (40 groups, 669
+    memberships, 22 rules, 151 errors) — independent confirmation that the annex genuinely
+    **preserved the original six sheets** rather than editing them, as its change log claims.
+  - 4 new reader-guard tests pinning both flavours, the trailing-space name, cross-file
+    cell equality, and that repeat windows arrive as **numbers** (not strings).
+  - `tsc` + `eslint` clean; hermetic **1670 passed / 559 skipped / 0 failed**; DG DB **58/58**.
+- **W-checklist:** n/a (offline tooling).
+- **Deviation from plan:** none in outcome; the plan's option (a) was attempted first and
+  rejected with evidence, exactly as it required.
+
+---
+
+## C7.4 — v0.1 annex intake + red report
+
+**Goal:** read the four annex sheets the clinical remediation added, and produce the
+second red report — without letting the annex's own confidence stand in for clinical
+sign-off.
+
+- **What the annex actually gave us**, verified cell by cell before writing any converter
+  code (measurements in `source/SOURCE_NOTES.md` §v0.1):
+  - `Conditions v0.1` — **authored `CIG-001`…`CIG-040`**. This is the F1 ask answered: the
+    join key is no longer a display name that three sheets spell three ways.
+  - `Name Aliases v0.1` — 80 rows, self-classified: 78 normalisation/preserved, **2
+    `SCOPE_REVIEW_REQUIRED`**.
+  - `Lab Rules v0.1` — `Supported_Group_Codes_Auto` resolved on 10 of 22 rows (the empty
+    cells are a genuine "none", not a gap); a provider-facing rewrite of all 22 messages;
+    2 confirmatory proposals, both `AUTHORITATIVE_CANDIDATE_PENDING_CLINICAL_SIGNOFF`; and
+    `Clinical_Approval_Status = PENDING_CLINICAL_SIGNOFF` on **all 22**.
+  - `Source Register` — the WHO release string.
+- **Status gating is the whole design (DG-D16).** The annex marks its own confidence, and
+  the converter treats an unapproved marker as a refusal, not a hint. `isApprovedStatus`
+  rejects anything containing PENDING / CANDIDATE / PROPOSED, and a confirmatory link
+  needs **both** its status columns to read as approved. Consequences, deliberately:
+  - **0 confirmatory links import → R4 still fires for nothing.** The one thing that would
+    have made the gate look more capable is exactly the thing that needed a signature.
+  - The 2 scope-review aliases are refused, which is why `UNRESOLVED_FEATURES_NAME` lands
+    at **2** rather than 0. Deciding that "Eczema" and "Eczema (Atopic Dermatitis)" are one
+    condition is a clinical judgement; the converter will not make it to clear an error.
+  - Everything refused is listed in `reports/v0.1-proposals.md`, so the clinical team sees
+    what is waiting on a decision rather than on more data work.
+  - Catch-alls import in the **safe direction only**: a true flag bars a condition from
+    live routing forever (DG-D8), so accepting the annex's proposal can only restrict.
+- **Provider wording (DG-D17):** `Provider_Message_v0_1` is preferred over v0's clinician
+  shorthand for all 22 rules — "HIV test lacks documented indication" → "Clinical
+  indication is not sufficiently documented in the available claim data for HIV." A
+  message a provider cannot act on is a rule that generates a call, not a correction.
+- **Two bugs found while wiring, both mine:**
+  - the annex name index (name → **group code**) was being merged into the legacy alias
+    map (name → **name**). Same TypeScript type, different meaning; it would have produced
+    a nonsense error message on the first miss. Removed — annex names go straight into the
+    group index, which is the map that resolution actually consults.
+  - unresolved-name errors still pointed at `Commonest` as the naming authority when the
+    annex had taken that role over. Now parameterised, so the report tells a reader which
+    sheet to actually go and edit.
+- **Verified — the acceptance gates:**
+  - **`pack-v0.json` and `reports/v0-validation.md` byte-identical** to the committed
+    artifacts. The annex path returns null on a plain workbook, so the legacy path is
+    untouched — asserted, not assumed.
+  - **Determinism:** two consecutive runs produce byte-identical pack, report and
+    proposals.
+  - **Every predicted invariant met**, and the one prediction that was wrong was wrong in
+    the right direction: `UNRESOLVED_FEATURES_NAME` is 2, not the 0 I expected, precisely
+    because the 2 scope-review aliases were refused.
+  - **151 → 109 blocking errors.** Cleared: `UNRESOLVED_SUPPORTED_DIAGNOSIS` 29→0,
+    `UNRESOLVED_FEATURES_NAME` 14→2, `GROUP_CODES_NOT_AUTHORED` 1→0. **Unchanged:** V11 85,
+    V6 10, `CONDITION_UNMAPPED` 5, `GROUP_HAS_NO_CODES` 5, `MAPPING_CODE_EMPTY` 2.
+  - **Verdict remains NOT IMPORTABLE**, and the headline for the clinical team is that
+    v0.1 did not move a single ICD code between conditions: the 85 overlaps are still the
+    largest blocker, and they are a clinical assignment decision, not data cleaning.
+  - 9 new lock tests. **Mutation-checked**: making `isApprovedStatus` return `true` imports
+    2 confirmatory links and the suite fails — the guard is load-bearing, not decorative.
+  - `tsc` + `eslint` clean; hermetic **1679 passed / 559 skipped / 0 failed**.
+- **W-checklist:** n/a (offline tooling; no new UI surface).
+- **Deviation from plan:** none.
+
+---
+
+## C7.5 — Spec amendments DG-D14–D19, docs, comms framing
+
+**Goal:** close phase C7 on paper, so the documents say what the code now does.
+
+- **Spec (`DIAGNOSIS_GATE_SPEC.md`)** — amended in place. It is still DRAFT and unsigned,
+  so no re-signing is owed; the change log records the amendment explicitly rather than
+  letting it look like the original draft.
+  - **DG-D14…D19** appended to §2. Three of the six correct **our own implementation**,
+    not the workbook — worth stating plainly, because a decision log that only ever
+    records other people's defects is not a decision log.
+  - §3 R1 rewritten: more than one matching group means **no rules run**, no tie-break
+    exists, and import blocks the cause. The old wording ("if two groups match, the claim
+    is treated as unresolved") described the intent while the code picked a winner.
+  - §3 R3 now carries **two** known limits, not one. The existing one (a repeat at a
+    facility that never bills us is invisible) is joined by sub-day windows, with the four
+    affected tests named and the fix stated (a performed-at timestamp, or a window in days).
+  - §4 gains **"not evaluated is not a clinical pass"**: a claim passes this stage for
+    three different reasons — nothing wrong, nothing resolved, or nothing running — and
+    only the first is evidence. Any coverage figure that merges them overstates the gate.
+  - §8 gains **emergency bypass** (DG-D19), parked with its reason: it needs a structured
+    emergency indicator, and inferring one from free text would create a phrase anyone
+    could type to skip the gate. Paired with the reassurance that Rung 1 never denies, so
+    an emergency is at worst delayed by a human, never refused by a rule.
+- **Root plan** — the two build specs that still described superseded behaviour were
+  corrected at source: §6.3 R1 ("first group … wins") and §6.3 R3/R4 (millisecond window
+  arithmetic). A stale plan is worse than no plan when the whole point is that another
+  model can execute it without inventing anything. §19 also gained the **C3.5** row, which
+  had been built but never indexed.
+- **Comms framing is generated, not hand-written.** A paragraph typed onto
+  `v0.1-validation.md` would vanish the next time the converter ran, and could silently
+  contradict the numbers below it. `renderValidationMarkdown` gained an optional
+  `preamble`, and the converter builds it **from the same counts the report uses** —
+  refused confirmatory tests, refused aliases, cross-group codes. What it tells the
+  clinical team:
+  - nothing in the workbook is in force, and nothing will be until they sign;
+  - what v0.1 genuinely settled (stable codes — the biggest error source last time);
+  - what we refused and why, ending on the uncomfortable part: **R4 still applies to
+    nothing at all**;
+  - that the 85 overlapping codes are the highest-value change they can make, are a
+    clinical decision rather than data cleaning, and are exactly why this version did not
+    move that number.
+- **Verified:**
+  - `pack-v0.json` **and** `v0-validation.md` still byte-identical — the preamble is empty
+    for a plain workbook, so the v0 artifact is untouched.
+  - v0.1 pack/report/proposals still byte-identical across two consecutive runs **with**
+    the preamble in place.
+  - Consistency greps clean: no "first group"/order-dependent language survives in the
+    spec, plan or source notes; sub-day semantics stated in both the spec and SOURCE_NOTES
+    (with the four tests named — and cross-checked against the pack, which caught a
+    LAB012/LAB019 swap in my first draft).
+  - 1 new test pinning the framing, so the honest sentences cannot quietly disappear.
+  - `tsc` + `eslint` clean; hermetic **1680 passed / 559 skipped / 0 failed**; **DG real-DB
+    58/58** on a fresh throwaway Postgres.
+- **Note on the DB run:** the local `aicare_uat` dev DB predates this schema, and pushing
+  to it would have required `--accept-data-loss` for three unique constraints from
+  unrelated main work, against 779 real claims. Built a throwaway instead — the point was
+  to verify the suites, not to modify the user's database.
+- **W-checklist:** n/a (documentation + an optional report parameter; no new UI surface).
+- **Deviation from plan:** none.

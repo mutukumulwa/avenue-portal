@@ -57,6 +57,7 @@ is misreading the workbook, not that the workbook changed.
 - **Commonest Labs Rationale**: 22 tests, `LAB001`–`LAB022`.
   - `Requires_Diagnosis = Yes` on 16 of 22.
   - `Repeat_Window_Hours` present on all 22; range 4 h (Random Blood Sugar) → 2,160 h / 90 d (HbA1c, Lipid Profile, Hepatitis B).
+    - **4 of the 22 are shorter than 24 h and therefore unenforceable (DG-D14):** `LAB003` Malaria RDT (12 h), `LAB004` Malaria Blood Smear (12 h), `LAB019` Electrolytes (12 h), `LAB012` Random Blood Sugar (4 h). A claim carries a date of service, not a time, so an hours-scale window would flag every same-day repeat regardless of gap and miss every cross-midnight one. These import with warning `REPEAT_WINDOW_SUBDAY_UNENFORCEABLE`, are recorded as inert, and are never evaluated. Windows of a day or more are compared in whole calendar days. Making these live needs a performed-at timestamp on the claim line, or a window restated in days.
   - `Supported_ICD11_Diagnoses` is **free text**, semicolon-separated, and includes non-diagnoses (`STI assessment`, `Occupational exposure`, `Pregnancy`).
 
 ### Join-key integrity (the F1 defect, quantified)
@@ -108,6 +109,73 @@ Cross-referenced to the fix list sent to the clinical team on 2026-08-05:
 | F7 | Catch-alls: `Atopy` (109 codes), `Viraemia/Bacteraemia of unknown origin` | V7 → `isCatchAll`, permanently excluded from live (DG-D12) |
 | F8 | `Claims filter` sheet empty | resolved in the spec, not the workbook |
 | F9 | References are global (WHO, Hutchison's, Davidson's); no local STG anchor; no named owner/version | governance section of the spec |
+
+---
+
+## v0.1 — `ICD11_Codes_Mapped_with_Clinical_Features_v0.1_research_remediated.xlsx`
+
+| | |
+|---|---|
+| Received | 2026-08-07, produced for the Medvex team by cross-referencing v0 against public sources |
+| SHA-256 | `1d19d25e41a165f935100bbb4952de45454cf30944b27c6aceeda614777845e2` |
+| Status | **Annex, not a replacement.** Still **NOT IMPORTABLE** — 109 blocking errors (down from v0's 151). Report: `../reports/v0.1-validation.md`. |
+
+### What it did and did not change
+
+v0.1 **preserves all six v0 sheets byte-for-byte** and adds eleven annex sheets alongside
+them. It is therefore additive: converting v0 still produces the identical pack
+(`pack-v0.json`), which is asserted by a test rather than assumed.
+
+The four annex sheets the converter reads:
+
+| Sheet | What the converter takes from it |
+|---|---|
+| `Conditions v0.1` | `Group_Code` (authored, stable — the F1 ask), `Canonical_Name`, `Original_v0_Name`, `Proposed_Is_Catch_All` |
+| `Name Aliases v0.1` | alias → group code, **only** where `Resolution_Status` is a normalisation, never a scope decision |
+| `Lab Rules v0.1` | `Supported_Group_Codes_Auto` (resolved links), `Provider_Message_v0_1`, and the confirmatory proposal + its two status columns |
+| `Source Register` | the WHO ICD release string, recorded as a stated target (DG-D18) |
+
+The remaining annex sheets (`Claims Gate v0.1`, red-flag and symptom vocabularies, the
+change log) are **not** read. They describe chart data the claim rails do not carry, or
+restate decisions that live in the spec.
+
+### Status gating — what the annex proposed but the converter refused (DG-D16)
+
+The annex marks its own confidence. Content that is not signed off is **reported, never
+imported**, because accepting it would let a spreadsheet column stand in for a clinician's
+signature:
+
+| Annex content | Rows | Imported? |
+|---|---:|---|
+| Aliases marked `DETERMINISTIC_NORMALIZATION` / `PRESERVED` | 78 | ✅ yes — spelling and punctuation only |
+| Aliases marked `SCOPE_REVIEW_REQUIRED` | 2 | ❌ no — deciding two labels mean one condition is clinical |
+| Confirmatory tests marked `AUTHORITATIVE_CANDIDATE_PENDING_CLINICAL_SIGNOFF` | 2 | ❌ no — **R4 still fires for nothing** |
+| Every row's `Clinical_Approval_Status` | 22 | all `PENDING_CLINICAL_SIGNOFF` |
+
+### Measured effect on the validation report
+
+| Issue | v0 | v0.1 | Why |
+|---|---:|---:|---|
+| `GROUP_CODES_NOT_AUTHORED` | 1 | **0** | conditions now carry authored `CIG-001`…`CIG-040` |
+| `UNRESOLVED_SUPPORTED_DIAGNOSIS` | 29 | **0** | supported diagnoses resolved to group codes, no free text left to guess at |
+| `UNRESOLVED_FEATURES_NAME` | 14 | **2** | 12 were spelling; the 2 that remain are the `SCOPE_REVIEW_REQUIRED` pair |
+| `CODE_IN_MULTIPLE_GROUPS` (V11) | 85 | **85** | unchanged — v0.1 did not remap a single ICD code |
+| `REQUIRES_DIAGNOSIS_NO_SUPPORT` (V6) | 10 | **10** | unchanged |
+| `CONDITION_UNMAPPED` / `GROUP_HAS_NO_CODES` | 5 / 5 | **5 / 5** | unchanged — same five conditions |
+| `MAPPING_CODE_EMPTY` | 2 | **2** | unchanged |
+| `CATCH_ALL_GROUP` (warning) | 0 | **3** | `Atopy`, `Viraemia of Unknown Origin`, `Bacteraemia of Unknown Origin` now flagged, and so permanently barred from live routing |
+| `REPEAT_WINDOW_SUBDAY_UNENFORCEABLE` (warning) | 4 | **4** | unchanged |
+| **Total blocking errors** | **151** | **109** | |
+
+All 22 failure messages were rewritten into provider-facing wording and are taken in
+preference to v0's clinician shorthand (DG-D17) — e.g. `"HIV test lacks documented
+indication"` became `"Clinical indication is not sufficiently documented in the available
+claim data for HIV."`
+
+**What v0.1 does not fix:** the 85 overlapping ICD codes are the single largest blocker
+and are untouched. Until each code belongs to exactly one condition, a claim carrying one
+resolves to nothing and no clinical rule is evaluated for it. That is a clinical
+assignment decision, not a data-cleaning one.
 
 ### Symptom/sign columns are deliberately not imported in Rung 1
 

@@ -1,0 +1,4652 @@
+{
+  "meta": {
+    "formatVersion": 1,
+    "sourceFileName": "ICD11_Codes_Mapped_with_Clinical_Features_v0.1_research_remediated.xlsx",
+    "sourceFileChecksum": "1d19d25e41a165f935100bbb4952de45454cf30944b27c6aceeda614777845e2",
+    "icdRelease": "ICD-11 MMS 2026-01 available"
+  },
+  "groups": [
+    {
+      "groupCode": "CIG-001",
+      "name": "Malaria",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A2"
+    },
+    {
+      "groupCode": "CIG-002",
+      "name": "Atopy",
+      "isCatchAll": true,
+      "sourceRow": "Conditions v0.1!A3"
+    },
+    {
+      "groupCode": "CIG-003",
+      "name": "Allergic Rhinitis",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A4"
+    },
+    {
+      "groupCode": "CIG-004",
+      "name": "Acute Rhinosinusitis (Sinusitis)",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A5"
+    },
+    {
+      "groupCode": "CIG-005",
+      "name": "Urticaria",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A6"
+    },
+    {
+      "groupCode": "CIG-006",
+      "name": "Common Cold",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A7"
+    },
+    {
+      "groupCode": "CIG-007",
+      "name": "Upper Respiratory Tract Infection (URTI)",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A8"
+    },
+    {
+      "groupCode": "CIG-008",
+      "name": "Nasopharyngitis",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A9"
+    },
+    {
+      "groupCode": "CIG-009",
+      "name": "Pharyngitis",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A10"
+    },
+    {
+      "groupCode": "CIG-010",
+      "name": "Tonsillitis",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A11"
+    },
+    {
+      "groupCode": "CIG-011",
+      "name": "Asthma",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A12"
+    },
+    {
+      "groupCode": "CIG-012",
+      "name": "Chronic Obstructive Pulmonary Disease (COPD)",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A13"
+    },
+    {
+      "groupCode": "CIG-013",
+      "name": "Bronchiolitis",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A14"
+    },
+    {
+      "groupCode": "CIG-014",
+      "name": "Pneumonia",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A15"
+    },
+    {
+      "groupCode": "CIG-015",
+      "name": "Adenotonsillitis",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A16"
+    },
+    {
+      "groupCode": "CIG-016",
+      "name": "Laryngitis",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A17"
+    },
+    {
+      "groupCode": "CIG-017",
+      "name": "Otitis Media",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A18"
+    },
+    {
+      "groupCode": "CIG-018",
+      "name": "Otitis Externa",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A19"
+    },
+    {
+      "groupCode": "CIG-019",
+      "name": "Urinary Tract Infection (UTI)",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A20"
+    },
+    {
+      "groupCode": "CIG-020",
+      "name": "Vaginal Candidiasis",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A21"
+    },
+    {
+      "groupCode": "CIG-021",
+      "name": "Pelvic Inflammatory Disease (PID)",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A22"
+    },
+    {
+      "groupCode": "CIG-022",
+      "name": "Vaginitis",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A23"
+    },
+    {
+      "groupCode": "CIG-023",
+      "name": "Peptic Ulcer Disease (PUD)",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A24"
+    },
+    {
+      "groupCode": "CIG-024",
+      "name": "Gastritis",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A25"
+    },
+    {
+      "groupCode": "CIG-025",
+      "name": "Gastro-oesophageal Reflux Disease (GERD)",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A26"
+    },
+    {
+      "groupCode": "CIG-026",
+      "name": "Duodenitis",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A27"
+    },
+    {
+      "groupCode": "CIG-027",
+      "name": "Gastroduodenitis",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A28"
+    },
+    {
+      "groupCode": "CIG-028",
+      "name": "Gastroenteritis",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A29"
+    },
+    {
+      "groupCode": "CIG-029",
+      "name": "Hypertension",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A30"
+    },
+    {
+      "groupCode": "CIG-030",
+      "name": "Diabetes Mellitus",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A31"
+    },
+    {
+      "groupCode": "CIG-031",
+      "name": "Viraemia of Unknown Origin",
+      "isCatchAll": true,
+      "sourceRow": "Conditions v0.1!A32"
+    },
+    {
+      "groupCode": "CIG-032",
+      "name": "Bacteraemia of Unknown Origin",
+      "isCatchAll": true,
+      "sourceRow": "Conditions v0.1!A33"
+    },
+    {
+      "groupCode": "CIG-033",
+      "name": "Arthritis",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A34"
+    },
+    {
+      "groupCode": "CIG-034",
+      "name": "Contact Dermatitis",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A35"
+    },
+    {
+      "groupCode": "CIG-035",
+      "name": "Eczema",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A36"
+    },
+    {
+      "groupCode": "CIG-036",
+      "name": "Acne",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A37"
+    },
+    {
+      "groupCode": "CIG-037",
+      "name": "Tinea Capitis",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A38"
+    },
+    {
+      "groupCode": "CIG-038",
+      "name": "Psoriasis",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A39"
+    },
+    {
+      "groupCode": "CIG-039",
+      "name": "Atopic Conjunctivitis",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A40"
+    },
+    {
+      "groupCode": "CIG-040",
+      "name": "Conjunctivitis",
+      "isCatchAll": false,
+      "sourceRow": "Conditions v0.1!A41"
+    }
+  ],
+  "memberships": [
+    {
+      "groupCode": "CIG-001",
+      "codeSystem": "ICD11",
+      "code": "1F40",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-001",
+      "codeSystem": "ICD11",
+      "code": "1F40.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-001",
+      "codeSystem": "ICD11",
+      "code": "1F40.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-001",
+      "codeSystem": "ICD11",
+      "code": "1F40.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-001",
+      "codeSystem": "ICD11",
+      "code": "1F41",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-001",
+      "codeSystem": "ICD11",
+      "code": "1F41.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-001",
+      "codeSystem": "ICD11",
+      "code": "1F41.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-001",
+      "codeSystem": "ICD11",
+      "code": "1F41.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-001",
+      "codeSystem": "ICD11",
+      "code": "1F42",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-001",
+      "codeSystem": "ICD11",
+      "code": "1F42.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-001",
+      "codeSystem": "ICD11",
+      "code": "1F42.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-001",
+      "codeSystem": "ICD11",
+      "code": "1F42.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-001",
+      "codeSystem": "ICD11",
+      "code": "1F43",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-001",
+      "codeSystem": "ICD11",
+      "code": "1F44",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-001",
+      "codeSystem": "ICD11",
+      "code": "1F45",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-001",
+      "codeSystem": "ICD11",
+      "code": "1F4Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-001",
+      "codeSystem": "ICD11",
+      "code": "JB63.60",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-001",
+      "codeSystem": "ICD11",
+      "code": "MG55.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "1F86.4",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "4A85.22",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "5C64.20",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "9A06.7",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "9A06.70",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "9A06.71",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "9A06.7Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "9A06.7Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "9A60.01",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "AA12",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA12",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA80",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA80.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA80.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA80.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA80.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA80.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA81",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA81.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA81.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA81.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA82",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA84",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA85",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA85.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA85.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA85.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA85.20",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA85.2Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA85.2Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA85.3",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA86",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA86.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA87",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA87.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA87.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA87.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA87.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA88",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA88.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA88.00",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA88.0Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA88.0Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA88.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA88.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA88.3",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA89",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA8Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EA8Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EB44",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EC91.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "ED90.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EE13.5",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EF70",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EG40",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EG40.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EH40.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EH40.01",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EH40.02",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EH40.0Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EH40.10",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EJ30.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK00",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK00.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK00.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK00.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK00.3",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK00.4",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK00.5",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK00.6",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK00.7",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK00.8",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK00.9",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK00.A",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK00.B",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK00.C",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK00.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK00.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK01",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK02",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK02.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK02.00",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK02.01",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK02.02",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK02.03",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK02.04",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK02.05",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK02.06",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK02.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK02.10",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK02.12",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK02.13",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK02.1Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK02.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK02.20",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK02.21",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK02.22",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK02.23",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK02.24",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK02.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK02.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK11",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EK2Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EL60",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "EL61",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "KC21.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "SE39",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "SN40",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-002",
+      "codeSystem": "ICD11",
+      "code": "SN43",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-003",
+      "codeSystem": "ICD11",
+      "code": "CA08",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-003",
+      "codeSystem": "ICD11",
+      "code": "CA08.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-003",
+      "codeSystem": "ICD11",
+      "code": "CA08.00",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-003",
+      "codeSystem": "ICD11",
+      "code": "CA08.01",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-003",
+      "codeSystem": "ICD11",
+      "code": "CA08.02",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-003",
+      "codeSystem": "ICD11",
+      "code": "CA08.03",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-003",
+      "codeSystem": "ICD11",
+      "code": "CA08.0Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-003",
+      "codeSystem": "ICD11",
+      "code": "CA08.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-003",
+      "codeSystem": "ICD11",
+      "code": "CA08.10",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-003",
+      "codeSystem": "ICD11",
+      "code": "CA08.1Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-003",
+      "codeSystem": "ICD11",
+      "code": "CA08.1Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-003",
+      "codeSystem": "ICD11",
+      "code": "CA08.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-003",
+      "codeSystem": "ICD11",
+      "code": "CA08.3",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-003",
+      "codeSystem": "ICD11",
+      "code": "CA08.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-003",
+      "codeSystem": "ICD11",
+      "code": "CA08.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-003",
+      "codeSystem": "ICD11",
+      "code": "CA09",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-003",
+      "codeSystem": "ICD11",
+      "code": "CA09.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-003",
+      "codeSystem": "ICD11",
+      "code": "SC90",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-003",
+      "codeSystem": "ICD11",
+      "code": "SK93",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-003",
+      "codeSystem": "ICD11",
+      "code": "SK95",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "2A21.10",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "4A00.14",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "4A00.15",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "4A44.91",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "4A85.21",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "EB00",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "EB00.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "EB00.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "EB00.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "EB01",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "EB01.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "EB01.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "EB01.3",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "EB01.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "EB01.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "EB02",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "EB02.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "EB03",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "EB04",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "EB05",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "EB0Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "EF40.10",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "EH61",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "EH61.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "EH61.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "EK10",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "EK10.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "EK10.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "EK10.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "EK50.00",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "ME62.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "ME63.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-005",
+      "codeSystem": "ICD11",
+      "code": "SN4K",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-006",
+      "codeSystem": "ICD11",
+      "code": "SA60",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-007",
+      "codeSystem": "ICD11",
+      "code": "CA07",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-007",
+      "codeSystem": "ICD11",
+      "code": "CA07.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-007",
+      "codeSystem": "ICD11",
+      "code": "CA07.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-008",
+      "codeSystem": "ICD11",
+      "code": "CA00",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-008",
+      "codeSystem": "ICD11",
+      "code": "CA09",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-008",
+      "codeSystem": "ICD11",
+      "code": "CA09.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-009",
+      "codeSystem": "ICD11",
+      "code": "1B51",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-009",
+      "codeSystem": "ICD11",
+      "code": "1F05.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-009",
+      "codeSystem": "ICD11",
+      "code": "CA00",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-009",
+      "codeSystem": "ICD11",
+      "code": "CA02",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-009",
+      "codeSystem": "ICD11",
+      "code": "CA02.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-009",
+      "codeSystem": "ICD11",
+      "code": "CA02.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-009",
+      "codeSystem": "ICD11",
+      "code": "CA02.10",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-009",
+      "codeSystem": "ICD11",
+      "code": "CA02.1Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-009",
+      "codeSystem": "ICD11",
+      "code": "CA02.1Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-009",
+      "codeSystem": "ICD11",
+      "code": "CA02.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-009",
+      "codeSystem": "ICD11",
+      "code": "CA02.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-009",
+      "codeSystem": "ICD11",
+      "code": "CA04",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-009",
+      "codeSystem": "ICD11",
+      "code": "CA09",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-009",
+      "codeSystem": "ICD11",
+      "code": "CA09.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-009",
+      "codeSystem": "ICD11",
+      "code": "CA09.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-009",
+      "codeSystem": "ICD11",
+      "code": "SL05",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-010",
+      "codeSystem": "ICD11",
+      "code": "1C17.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-010",
+      "codeSystem": "ICD11",
+      "code": "1C17.0Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-010",
+      "codeSystem": "ICD11",
+      "code": "1C17.0Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-010",
+      "codeSystem": "ICD11",
+      "code": "CA03",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-010",
+      "codeSystem": "ICD11",
+      "code": "CA03.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-010",
+      "codeSystem": "ICD11",
+      "code": "CA03.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-010",
+      "codeSystem": "ICD11",
+      "code": "CA03.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-010",
+      "codeSystem": "ICD11",
+      "code": "CA0F",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-010",
+      "codeSystem": "ICD11",
+      "code": "CA0F.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-010",
+      "codeSystem": "ICD11",
+      "code": "CA0F.3",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-010",
+      "codeSystem": "ICD11",
+      "code": "CA0F.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-010",
+      "codeSystem": "ICD11",
+      "code": "CA0F.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-010",
+      "codeSystem": "ICD11",
+      "code": "CA0K.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-010",
+      "codeSystem": "ICD11",
+      "code": "SC93",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-010",
+      "codeSystem": "ICD11",
+      "code": "SL06",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-011",
+      "codeSystem": "ICD11",
+      "code": "CA23",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-011",
+      "codeSystem": "ICD11",
+      "code": "CA23.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-011",
+      "codeSystem": "ICD11",
+      "code": "CA23.00",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-011",
+      "codeSystem": "ICD11",
+      "code": "CA23.01",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-011",
+      "codeSystem": "ICD11",
+      "code": "CA23.02",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-011",
+      "codeSystem": "ICD11",
+      "code": "CA23.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-011",
+      "codeSystem": "ICD11",
+      "code": "CA23.10",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-011",
+      "codeSystem": "ICD11",
+      "code": "CA23.11",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-011",
+      "codeSystem": "ICD11",
+      "code": "CA23.12",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-011",
+      "codeSystem": "ICD11",
+      "code": "CA23.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-011",
+      "codeSystem": "ICD11",
+      "code": "CA23.22",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-011",
+      "codeSystem": "ICD11",
+      "code": "CA23.3",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-011",
+      "codeSystem": "ICD11",
+      "code": "CA23.30",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-011",
+      "codeSystem": "ICD11",
+      "code": "CA23.31",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-011",
+      "codeSystem": "ICD11",
+      "code": "CA23.32",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-011",
+      "codeSystem": "ICD11",
+      "code": "CB02.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-011",
+      "codeSystem": "ICD11",
+      "code": "SL40",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-013",
+      "codeSystem": "ICD11",
+      "code": "CA26",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-013",
+      "codeSystem": "ICD11",
+      "code": "CA26.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-013",
+      "codeSystem": "ICD11",
+      "code": "CA26.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-013",
+      "codeSystem": "ICD11",
+      "code": "CA26.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-013",
+      "codeSystem": "ICD11",
+      "code": "CA26.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-013",
+      "codeSystem": "ICD11",
+      "code": "CA41",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-013",
+      "codeSystem": "ICD11",
+      "code": "CA41.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-013",
+      "codeSystem": "ICD11",
+      "code": "CA41.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-013",
+      "codeSystem": "ICD11",
+      "code": "CA41.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-013",
+      "codeSystem": "ICD11",
+      "code": "CB03.6",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-014",
+      "codeSystem": "ICD11",
+      "code": "CA40",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-014",
+      "codeSystem": "ICD11",
+      "code": "CA40.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-014",
+      "codeSystem": "ICD11",
+      "code": "CA40.06",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-014",
+      "codeSystem": "ICD11",
+      "code": "CA40.07",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-014",
+      "codeSystem": "ICD11",
+      "code": "CA40.08",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-014",
+      "codeSystem": "ICD11",
+      "code": "CA40.0Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-014",
+      "codeSystem": "ICD11",
+      "code": "CA40.0Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-014",
+      "codeSystem": "ICD11",
+      "code": "CA40.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-014",
+      "codeSystem": "ICD11",
+      "code": "CA40.10",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-014",
+      "codeSystem": "ICD11",
+      "code": "CA40.11",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-014",
+      "codeSystem": "ICD11",
+      "code": "CA40.12",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-014",
+      "codeSystem": "ICD11",
+      "code": "CA40.13",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-014",
+      "codeSystem": "ICD11",
+      "code": "CA40.1Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-014",
+      "codeSystem": "ICD11",
+      "code": "CA40.1Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-014",
+      "codeSystem": "ICD11",
+      "code": "CA40.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-014",
+      "codeSystem": "ICD11",
+      "code": "CA40.20",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-014",
+      "codeSystem": "ICD11",
+      "code": "CA40.2Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-014",
+      "codeSystem": "ICD11",
+      "code": "CA40.2Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-014",
+      "codeSystem": "ICD11",
+      "code": "CA40.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-014",
+      "codeSystem": "ICD11",
+      "code": "CA40.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-015",
+      "codeSystem": "ICD11",
+      "code": "CA02.10",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-015",
+      "codeSystem": "ICD11",
+      "code": "CA03",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-015",
+      "codeSystem": "ICD11",
+      "code": "CA03.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-015",
+      "codeSystem": "ICD11",
+      "code": "CA03.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-015",
+      "codeSystem": "ICD11",
+      "code": "CA03.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-015",
+      "codeSystem": "ICD11",
+      "code": "CA0F",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-015",
+      "codeSystem": "ICD11",
+      "code": "CA0F.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-015",
+      "codeSystem": "ICD11",
+      "code": "CA0F.3",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-015",
+      "codeSystem": "ICD11",
+      "code": "CA0F.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-015",
+      "codeSystem": "ICD11",
+      "code": "CA0F.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-016",
+      "codeSystem": "ICD11",
+      "code": "CA05",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-016",
+      "codeSystem": "ICD11",
+      "code": "CA05.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-016",
+      "codeSystem": "ICD11",
+      "code": "CA06",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-016",
+      "codeSystem": "ICD11",
+      "code": "CA06.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-016",
+      "codeSystem": "ICD11",
+      "code": "CA06.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-016",
+      "codeSystem": "ICD11",
+      "code": "CA0G",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-016",
+      "codeSystem": "ICD11",
+      "code": "SL09",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-017",
+      "codeSystem": "ICD11",
+      "code": "AA80",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-017",
+      "codeSystem": "ICD11",
+      "code": "AA81",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-017",
+      "codeSystem": "ICD11",
+      "code": "AA82",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-017",
+      "codeSystem": "ICD11",
+      "code": "AA83",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-017",
+      "codeSystem": "ICD11",
+      "code": "AA8Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-017",
+      "codeSystem": "ICD11",
+      "code": "AA90",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-017",
+      "codeSystem": "ICD11",
+      "code": "AA91",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-017",
+      "codeSystem": "ICD11",
+      "code": "AA91.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-017",
+      "codeSystem": "ICD11",
+      "code": "AA91.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-017",
+      "codeSystem": "ICD11",
+      "code": "AA91.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-017",
+      "codeSystem": "ICD11",
+      "code": "AA91.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-017",
+      "codeSystem": "ICD11",
+      "code": "AA9Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-017",
+      "codeSystem": "ICD11",
+      "code": "AB00",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-017",
+      "codeSystem": "ICD11",
+      "code": "AB01",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-017",
+      "codeSystem": "ICD11",
+      "code": "AB0Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-017",
+      "codeSystem": "ICD11",
+      "code": "AB0Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-018",
+      "codeSystem": "ICD11",
+      "code": "AA02",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-018",
+      "codeSystem": "ICD11",
+      "code": "AA10",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-018",
+      "codeSystem": "ICD11",
+      "code": "AA11",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-018",
+      "codeSystem": "ICD11",
+      "code": "AA13",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-018",
+      "codeSystem": "ICD11",
+      "code": "AA3Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-018",
+      "codeSystem": "ICD11",
+      "code": "AA3Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-019",
+      "codeSystem": "ICD11",
+      "code": "GB51",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-019",
+      "codeSystem": "ICD11",
+      "code": "GC00",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-019",
+      "codeSystem": "ICD11",
+      "code": "GC00.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-019",
+      "codeSystem": "ICD11",
+      "code": "GC00.3",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-019",
+      "codeSystem": "ICD11",
+      "code": "GC00.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-019",
+      "codeSystem": "ICD11",
+      "code": "GC00.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-019",
+      "codeSystem": "ICD11",
+      "code": "GC08",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-019",
+      "codeSystem": "ICD11",
+      "code": "GC08.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-019",
+      "codeSystem": "ICD11",
+      "code": "GC08.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-019",
+      "codeSystem": "ICD11",
+      "code": "GC08.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-019",
+      "codeSystem": "ICD11",
+      "code": "GC08.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-019",
+      "codeSystem": "ICD11",
+      "code": "GC08.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-021",
+      "codeSystem": "ICD11",
+      "code": "GA05",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-021",
+      "codeSystem": "ICD11",
+      "code": "GA05.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-021",
+      "codeSystem": "ICD11",
+      "code": "GA05.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-021",
+      "codeSystem": "ICD11",
+      "code": "GA05.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-021",
+      "codeSystem": "ICD11",
+      "code": "GA05.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-021",
+      "codeSystem": "ICD11",
+      "code": "GC78",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-022",
+      "codeSystem": "ICD11",
+      "code": "GA02",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-022",
+      "codeSystem": "ICD11",
+      "code": "GA02.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-022",
+      "codeSystem": "ICD11",
+      "code": "GA02.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-022",
+      "codeSystem": "ICD11",
+      "code": "GA02.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-022",
+      "codeSystem": "ICD11",
+      "code": "GA02.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-022",
+      "codeSystem": "ICD11",
+      "code": "GA30.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-022",
+      "codeSystem": "ICD11",
+      "code": "SM95",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "DA60",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "DA60.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "DA60.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "DA60.6",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "DA60.60",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "DA60.61",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "DA60.62",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "DA60.63",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "DA60.6Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "DA60.6Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "DA60.7",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "DA60.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "DA60.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "DA61",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "DA63",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "DA63.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "DA63.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "DA63.4",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "DA63.5",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "DA63.50",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "DA63.51",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "DA63.52",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "DA63.5Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "DA63.5Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "DA63.6",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "DA63.60",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "DA63.61",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "DA63.6Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "DA63.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "DA63.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "SM3D",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-023",
+      "codeSystem": "ICD11",
+      "code": "SM3E",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-024",
+      "codeSystem": "ICD11",
+      "code": "DA42",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-024",
+      "codeSystem": "ICD11",
+      "code": "DA42.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-024",
+      "codeSystem": "ICD11",
+      "code": "DA42.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-024",
+      "codeSystem": "ICD11",
+      "code": "DA42.4Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-024",
+      "codeSystem": "ICD11",
+      "code": "DA42.5",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-024",
+      "codeSystem": "ICD11",
+      "code": "DA42.7",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-024",
+      "codeSystem": "ICD11",
+      "code": "DA42.70",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-024",
+      "codeSystem": "ICD11",
+      "code": "DA42.71",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-024",
+      "codeSystem": "ICD11",
+      "code": "DA42.8",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-024",
+      "codeSystem": "ICD11",
+      "code": "DA42.83",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-024",
+      "codeSystem": "ICD11",
+      "code": "DA42.8Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-024",
+      "codeSystem": "ICD11",
+      "code": "DA42.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-024",
+      "codeSystem": "ICD11",
+      "code": "DA42.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-024",
+      "codeSystem": "ICD11",
+      "code": "SM3F",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-025",
+      "codeSystem": "ICD11",
+      "code": "DA22",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-025",
+      "codeSystem": "ICD11",
+      "code": "DA22.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-025",
+      "codeSystem": "ICD11",
+      "code": "DA22.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-025",
+      "codeSystem": "ICD11",
+      "code": "DA22.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-026",
+      "codeSystem": "ICD11",
+      "code": "DA51",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-026",
+      "codeSystem": "ICD11",
+      "code": "DA51.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-026",
+      "codeSystem": "ICD11",
+      "code": "DA51.51",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-026",
+      "codeSystem": "ICD11",
+      "code": "DA51.5Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-026",
+      "codeSystem": "ICD11",
+      "code": "DA51.5Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-026",
+      "codeSystem": "ICD11",
+      "code": "DA51.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-028",
+      "codeSystem": "ICD11",
+      "code": "1A06",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-028",
+      "codeSystem": "ICD11",
+      "code": "1A09.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-028",
+      "codeSystem": "ICD11",
+      "code": "1A20",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-028",
+      "codeSystem": "ICD11",
+      "code": "1A21",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-028",
+      "codeSystem": "ICD11",
+      "code": "1A22",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-028",
+      "codeSystem": "ICD11",
+      "code": "1A23",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-028",
+      "codeSystem": "ICD11",
+      "code": "1A40",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-028",
+      "codeSystem": "ICD11",
+      "code": "1A40.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-028",
+      "codeSystem": "ICD11",
+      "code": "1A40.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-028",
+      "codeSystem": "ICD11",
+      "code": "DA90.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-028",
+      "codeSystem": "ICD11",
+      "code": "DA94",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-028",
+      "codeSystem": "ICD11",
+      "code": "DD91.01",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-028",
+      "codeSystem": "ICD11",
+      "code": "DD91.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-028",
+      "codeSystem": "ICD11",
+      "code": "KB8C",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-028",
+      "codeSystem": "ICD11",
+      "code": "ME05.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-028",
+      "codeSystem": "ICD11",
+      "code": "ME06",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-028",
+      "codeSystem": "ICD11",
+      "code": "SA55",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-028",
+      "codeSystem": "ICD11",
+      "code": "SD92",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-028",
+      "codeSystem": "ICD11",
+      "code": "SM37",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-028",
+      "codeSystem": "ICD11",
+      "code": "SM76",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "8B22.8",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "9B71.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "BA00",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "BA00.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "BA00.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "BA00.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "BA00.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "BA00.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "BA01",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "BA02",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "BA03",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "BA04",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "BA04.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "BA04.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "BA04.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "BA04.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "BA04.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "JA20",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "JA20.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "JA20.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "JA20.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "JA20.3",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "JA20.4",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "JA20.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "JA20.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "JA21",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "MC80.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "MC80.00",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "MC80.01",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "MC80.02",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "MC80.03",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "MC80.0Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "MC80.0Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-029",
+      "codeSystem": "ICD11",
+      "code": "MG24.6",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-030",
+      "codeSystem": "ICD11",
+      "code": "5A10",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-030",
+      "codeSystem": "ICD11",
+      "code": "5A11",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-030",
+      "codeSystem": "ICD11",
+      "code": "5A13",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-030",
+      "codeSystem": "ICD11",
+      "code": "5A13.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-030",
+      "codeSystem": "ICD11",
+      "code": "5A13.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-030",
+      "codeSystem": "ICD11",
+      "code": "5A13.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-030",
+      "codeSystem": "ICD11",
+      "code": "5A13.3",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-030",
+      "codeSystem": "ICD11",
+      "code": "5A13.4",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-030",
+      "codeSystem": "ICD11",
+      "code": "5A13.5",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-030",
+      "codeSystem": "ICD11",
+      "code": "5A13.6",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-030",
+      "codeSystem": "ICD11",
+      "code": "5A13.7",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-030",
+      "codeSystem": "ICD11",
+      "code": "5A13.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-030",
+      "codeSystem": "ICD11",
+      "code": "5A14",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-030",
+      "codeSystem": "ICD11",
+      "code": "5A21",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-030",
+      "codeSystem": "ICD11",
+      "code": "5A21.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-030",
+      "codeSystem": "ICD11",
+      "code": "5A21.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-030",
+      "codeSystem": "ICD11",
+      "code": "5A21.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-030",
+      "codeSystem": "ICD11",
+      "code": "5A24",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-030",
+      "codeSystem": "ICD11",
+      "code": "5A2Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-030",
+      "codeSystem": "ICD11",
+      "code": "8D88.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-030",
+      "codeSystem": "ICD11",
+      "code": "JA63",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-030",
+      "codeSystem": "ICD11",
+      "code": "JA63.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-030",
+      "codeSystem": "ICD11",
+      "code": "JA63.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-030",
+      "codeSystem": "ICD11",
+      "code": "JA63.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-030",
+      "codeSystem": "ICD11",
+      "code": "JA63.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-030",
+      "codeSystem": "ICD11",
+      "code": "JA63.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-030",
+      "codeSystem": "ICD11",
+      "code": "QA0A.10",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-030",
+      "codeSystem": "ICD11",
+      "code": "QC64.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-030",
+      "codeSystem": "ICD11",
+      "code": "SP60",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-031",
+      "codeSystem": "ICD11",
+      "code": "1D9Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-031",
+      "codeSystem": "ICD11",
+      "code": "1D9Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-031",
+      "codeSystem": "ICD11",
+      "code": "KA62",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-031",
+      "codeSystem": "ICD11",
+      "code": "KA62.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-031",
+      "codeSystem": "ICD11",
+      "code": "KA62.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-032",
+      "codeSystem": "ICD11",
+      "code": "1G40",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-032",
+      "codeSystem": "ICD11",
+      "code": "1G41",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-032",
+      "codeSystem": "ICD11",
+      "code": "JB40.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-032",
+      "codeSystem": "ICD11",
+      "code": "MA15.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-032",
+      "codeSystem": "ICD11",
+      "code": "XS5E",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-032",
+      "codeSystem": "ICD11",
+      "code": "XS65",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "1B40.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA00",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA00.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA00.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA00.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA00.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA01",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA01.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA01.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA01.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA01.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA02",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA02.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA02.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA02.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA02.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA03",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA03.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA03.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA03.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA03.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA0Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA13",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA20",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA20.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA20.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA20.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA21",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA21.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA21.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA21.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA24",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA24.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA24.00",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA24.01",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA24.0Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA24.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA24.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA24.3",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA24.4",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA24.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "FA24.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "SP10",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-033",
+      "codeSystem": "ICD11",
+      "code": "SP12",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "4A85.22",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EG40",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EG40.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK00",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK00.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK00.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK00.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK00.3",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK00.4",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK00.5",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK00.6",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK00.7",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK00.8",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK00.9",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK00.A",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK00.B",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK00.C",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK00.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK00.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK01",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK02",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK02.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK02.00",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK02.01",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK02.02",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK02.03",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK02.04",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK02.05",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK02.06",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK02.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK02.10",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK02.12",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK02.13",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK02.1Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK02.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK02.21",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK02.22",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK02.23",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK02.24",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK02.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK02.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-034",
+      "codeSystem": "ICD11",
+      "code": "EK11",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-035",
+      "codeSystem": "ICD11",
+      "code": "9A06.7",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-035",
+      "codeSystem": "ICD11",
+      "code": "9A06.70",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-035",
+      "codeSystem": "ICD11",
+      "code": "9A06.7Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-035",
+      "codeSystem": "ICD11",
+      "code": "9A06.7Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-035",
+      "codeSystem": "ICD11",
+      "code": "EA80",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-035",
+      "codeSystem": "ICD11",
+      "code": "EA80.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-035",
+      "codeSystem": "ICD11",
+      "code": "EA80.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-035",
+      "codeSystem": "ICD11",
+      "code": "EA80.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-035",
+      "codeSystem": "ICD11",
+      "code": "EA80.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-035",
+      "codeSystem": "ICD11",
+      "code": "EA80.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-035",
+      "codeSystem": "ICD11",
+      "code": "EA84",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-035",
+      "codeSystem": "ICD11",
+      "code": "EA85",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-035",
+      "codeSystem": "ICD11",
+      "code": "EA85.20",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-035",
+      "codeSystem": "ICD11",
+      "code": "EA86",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-035",
+      "codeSystem": "ICD11",
+      "code": "EA87",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-035",
+      "codeSystem": "ICD11",
+      "code": "EA87.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-035",
+      "codeSystem": "ICD11",
+      "code": "EA87.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-035",
+      "codeSystem": "ICD11",
+      "code": "EA87.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-035",
+      "codeSystem": "ICD11",
+      "code": "EA87.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-035",
+      "codeSystem": "ICD11",
+      "code": "EA88",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-035",
+      "codeSystem": "ICD11",
+      "code": "EA88.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-035",
+      "codeSystem": "ICD11",
+      "code": "EA88.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-035",
+      "codeSystem": "ICD11",
+      "code": "EA88.3",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-035",
+      "codeSystem": "ICD11",
+      "code": "EA89",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-035",
+      "codeSystem": "ICD11",
+      "code": "EA8Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-035",
+      "codeSystem": "ICD11",
+      "code": "EA8Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-035",
+      "codeSystem": "ICD11",
+      "code": "EE13.5",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-035",
+      "codeSystem": "ICD11",
+      "code": "EF70",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-035",
+      "codeSystem": "ICD11",
+      "code": "SN43",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-036",
+      "codeSystem": "ICD11",
+      "code": "ED80",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-036",
+      "codeSystem": "ICD11",
+      "code": "ED80.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-036",
+      "codeSystem": "ICD11",
+      "code": "ED80.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-036",
+      "codeSystem": "ICD11",
+      "code": "ED80.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-036",
+      "codeSystem": "ICD11",
+      "code": "ED80.3",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-036",
+      "codeSystem": "ICD11",
+      "code": "ED80.4",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-036",
+      "codeSystem": "ICD11",
+      "code": "ED80.40",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-036",
+      "codeSystem": "ICD11",
+      "code": "ED80.41",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-036",
+      "codeSystem": "ICD11",
+      "code": "ED80.4Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-036",
+      "codeSystem": "ICD11",
+      "code": "ED80.4Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-036",
+      "codeSystem": "ICD11",
+      "code": "ED80.5",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-036",
+      "codeSystem": "ICD11",
+      "code": "ED80.6",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-036",
+      "codeSystem": "ICD11",
+      "code": "ED80.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-036",
+      "codeSystem": "ICD11",
+      "code": "ED80.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-036",
+      "codeSystem": "ICD11",
+      "code": "ED81",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-036",
+      "codeSystem": "ICD11",
+      "code": "ED81.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-036",
+      "codeSystem": "ICD11",
+      "code": "ED81.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-036",
+      "codeSystem": "ICD11",
+      "code": "EH67",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-036",
+      "codeSystem": "ICD11",
+      "code": "EH67.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-036",
+      "codeSystem": "ICD11",
+      "code": "EH67.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-036",
+      "codeSystem": "ICD11",
+      "code": "KC21.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-036",
+      "codeSystem": "ICD11",
+      "code": "SN4V",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-038",
+      "codeSystem": "ICD11",
+      "code": "EA90",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-038",
+      "codeSystem": "ICD11",
+      "code": "EA90.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-038",
+      "codeSystem": "ICD11",
+      "code": "EA90.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-038",
+      "codeSystem": "ICD11",
+      "code": "EA90.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-038",
+      "codeSystem": "ICD11",
+      "code": "EA90.3",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-038",
+      "codeSystem": "ICD11",
+      "code": "EA90.4",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-038",
+      "codeSystem": "ICD11",
+      "code": "EA90.40",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-038",
+      "codeSystem": "ICD11",
+      "code": "EA90.4Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-038",
+      "codeSystem": "ICD11",
+      "code": "EA90.4Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-038",
+      "codeSystem": "ICD11",
+      "code": "EA90.5",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-038",
+      "codeSystem": "ICD11",
+      "code": "EA90.50",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-038",
+      "codeSystem": "ICD11",
+      "code": "EA90.51",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-038",
+      "codeSystem": "ICD11",
+      "code": "EA90.52",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-038",
+      "codeSystem": "ICD11",
+      "code": "EA90.53",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-038",
+      "codeSystem": "ICD11",
+      "code": "EA90.5Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-038",
+      "codeSystem": "ICD11",
+      "code": "EA90.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-038",
+      "codeSystem": "ICD11",
+      "code": "EA90.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-038",
+      "codeSystem": "ICD11",
+      "code": "EA95",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-038",
+      "codeSystem": "ICD11",
+      "code": "EK91.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-038",
+      "codeSystem": "ICD11",
+      "code": "SN4A",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-039",
+      "codeSystem": "ICD11",
+      "code": "9A60.01",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-039",
+      "codeSystem": "ICD11",
+      "code": "9A60.02",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-040",
+      "codeSystem": "ICD11",
+      "code": "1C20",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-040",
+      "codeSystem": "ICD11",
+      "code": "1D84",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-040",
+      "codeSystem": "ICD11",
+      "code": "1D84.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-040",
+      "codeSystem": "ICD11",
+      "code": "1D84.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-040",
+      "codeSystem": "ICD11",
+      "code": "1D84.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-040",
+      "codeSystem": "ICD11",
+      "code": "1D84.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-040",
+      "codeSystem": "ICD11",
+      "code": "9A02.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-040",
+      "codeSystem": "ICD11",
+      "code": "9A06.72",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-040",
+      "codeSystem": "ICD11",
+      "code": "9A60",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-040",
+      "codeSystem": "ICD11",
+      "code": "9A60.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-040",
+      "codeSystem": "ICD11",
+      "code": "9A60.00",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-040",
+      "codeSystem": "ICD11",
+      "code": "9A60.01",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-040",
+      "codeSystem": "ICD11",
+      "code": "9A60.02",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-040",
+      "codeSystem": "ICD11",
+      "code": "9A60.0Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-040",
+      "codeSystem": "ICD11",
+      "code": "9A60.0Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-040",
+      "codeSystem": "ICD11",
+      "code": "9A60.1",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-040",
+      "codeSystem": "ICD11",
+      "code": "9A60.2",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-040",
+      "codeSystem": "ICD11",
+      "code": "9A60.3",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-040",
+      "codeSystem": "ICD11",
+      "code": "9A60.32",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-040",
+      "codeSystem": "ICD11",
+      "code": "9A60.33",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-040",
+      "codeSystem": "ICD11",
+      "code": "9A60.3Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-040",
+      "codeSystem": "ICD11",
+      "code": "9A60.3Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-040",
+      "codeSystem": "ICD11",
+      "code": "9A60.4",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-040",
+      "codeSystem": "ICD11",
+      "code": "9A60.5",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-040",
+      "codeSystem": "ICD11",
+      "code": "9A60.6",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-040",
+      "codeSystem": "ICD11",
+      "code": "9A60.Y",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-040",
+      "codeSystem": "ICD11",
+      "code": "9A60.Z",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-040",
+      "codeSystem": "ICD11",
+      "code": "9A79",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-040",
+      "codeSystem": "ICD11",
+      "code": "EK02.11",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-040",
+      "codeSystem": "ICD11",
+      "code": "KA65.0",
+      "provenance": "AUTHORED"
+    },
+    {
+      "groupCode": "CIG-040",
+      "codeSystem": "ICD11",
+      "code": "SK66",
+      "provenance": "AUTHORED"
+    }
+  ],
+  "labRules": [
+    {
+      "testCode": "LAB001",
+      "testName": "HIV",
+      "department": "Serology",
+      "requiresDiagnosis": true,
+      "repeatWindowHours": 720,
+      "failureMessage": "Clinical indication is not sufficiently documented in the available claim data for HIV.",
+      "auditRule": "Diagnosis or risk factor required",
+      "sourceRow": "Commonest Labs Rationale!A2"
+    },
+    {
+      "testCode": "LAB002",
+      "testName": "Beta hCG (Pregnancy Test)",
+      "department": "Serology",
+      "requiresDiagnosis": false,
+      "repeatWindowHours": 24,
+      "failureMessage": "Clinical indication is not sufficiently documented in the available claim data for Beta hCG (Pregnancy Test).",
+      "auditRule": "Amenorrhea OR pregnancy suspicion",
+      "sourceRow": "Commonest Labs Rationale!A3"
+    },
+    {
+      "testCode": "LAB003",
+      "testName": "Malaria RDT",
+      "department": "Microbiology",
+      "requiresDiagnosis": false,
+      "repeatWindowHours": 12,
+      "failureMessage": "Clinical indication is not sufficiently documented in the available claim data for Malaria RDT.",
+      "auditRule": "≥1 symptom AND ≥1 sign",
+      "sourceRow": "Commonest Labs Rationale!A4"
+    },
+    {
+      "testCode": "LAB004",
+      "testName": "Malaria Blood Smear",
+      "department": "Microbiology",
+      "requiresDiagnosis": false,
+      "repeatWindowHours": 12,
+      "failureMessage": "Clinical indication is not sufficiently documented in the available claim data for Malaria Blood Smear.",
+      "auditRule": "≥1 symptom AND ≥1 sign",
+      "sourceRow": "Commonest Labs Rationale!A5"
+    },
+    {
+      "testCode": "LAB005",
+      "testName": "CBC/Full Haemogram",
+      "department": "Hematology",
+      "requiresDiagnosis": true,
+      "repeatWindowHours": 24,
+      "failureMessage": "Clinical indication is not sufficiently documented in the available claim data for CBC/Full Haemogram.",
+      "auditRule": "Diagnosis OR symptom+sign",
+      "sourceRow": "Commonest Labs Rationale!A6"
+    },
+    {
+      "testCode": "LAB006",
+      "testName": "C-Reactive Protein",
+      "department": "Chemistry",
+      "requiresDiagnosis": true,
+      "repeatWindowHours": 24,
+      "failureMessage": "Clinical indication is not sufficiently documented in the available claim data for C-Reactive Protein.",
+      "auditRule": "Inflammatory indication",
+      "sourceRow": "Commonest Labs Rationale!A7"
+    },
+    {
+      "testCode": "LAB007",
+      "testName": "Urinalysis (Microscopy & Culture)",
+      "department": "Microbiology",
+      "requiresDiagnosis": false,
+      "repeatWindowHours": 24,
+      "failureMessage": "Clinical indication is not sufficiently documented in the available claim data for Urinalysis (Microscopy & Culture).",
+      "auditRule": "Urinary symptom required",
+      "sourceRow": "Commonest Labs Rationale!A8"
+    },
+    {
+      "testCode": "LAB008",
+      "testName": "Stool Analysis (Microscopy & Culture)",
+      "department": "Microbiology",
+      "requiresDiagnosis": false,
+      "repeatWindowHours": 72,
+      "failureMessage": "Clinical indication is not sufficiently documented in the available claim data for Stool Analysis (Microscopy & Culture).",
+      "auditRule": "GI symptom required",
+      "sourceRow": "Commonest Labs Rationale!A9"
+    },
+    {
+      "testCode": "LAB009",
+      "testName": "Blood Culture",
+      "department": "Microbiology",
+      "requiresDiagnosis": true,
+      "repeatWindowHours": 24,
+      "failureMessage": "Clinical indication is not sufficiently documented in the available claim data for Blood Culture.",
+      "auditRule": "Fever + sepsis features",
+      "sourceRow": "Commonest Labs Rationale!A10"
+    },
+    {
+      "testCode": "LAB010",
+      "testName": "Stool H. pylori",
+      "department": "Microbiology",
+      "requiresDiagnosis": true,
+      "repeatWindowHours": 720,
+      "failureMessage": "Clinical indication is not sufficiently documented in the available claim data for Stool H. pylori.",
+      "auditRule": "Dyspepsia/PUD",
+      "sourceRow": "Commonest Labs Rationale!A11"
+    },
+    {
+      "testCode": "LAB011",
+      "testName": "Blood H. pylori",
+      "department": "Serology",
+      "requiresDiagnosis": true,
+      "repeatWindowHours": 720,
+      "failureMessage": "Clinical indication is not sufficiently documented in the available claim data for Blood H. pylori.",
+      "auditRule": "Dyspepsia/PUD",
+      "sourceRow": "Commonest Labs Rationale!A12"
+    },
+    {
+      "testCode": "LAB012",
+      "testName": "Random Blood Sugar",
+      "department": "Chemistry",
+      "requiresDiagnosis": false,
+      "repeatWindowHours": 4,
+      "failureMessage": "Clinical indication is not sufficiently documented in the available claim data for Random Blood Sugar.",
+      "auditRule": "Diabetes symptoms",
+      "sourceRow": "Commonest Labs Rationale!A13"
+    },
+    {
+      "testCode": "LAB013",
+      "testName": "Fasting Blood Sugar",
+      "department": "Chemistry",
+      "requiresDiagnosis": true,
+      "repeatWindowHours": 168,
+      "failureMessage": "Clinical indication is not sufficiently documented in the available claim data for Fasting Blood Sugar.",
+      "auditRule": "Diabetes screening/risk",
+      "sourceRow": "Commonest Labs Rationale!A14"
+    },
+    {
+      "testCode": "LAB014",
+      "testName": "HbA1c",
+      "department": "Chemistry",
+      "requiresDiagnosis": true,
+      "repeatWindowHours": 2160,
+      "failureMessage": "Clinical indication is not sufficiently documented in the available claim data for HbA1c.",
+      "auditRule": "Diagnosis or screening risk",
+      "sourceRow": "Commonest Labs Rationale!A15"
+    },
+    {
+      "testCode": "LAB015",
+      "testName": "Lipid Profile",
+      "department": "Chemistry",
+      "requiresDiagnosis": true,
+      "repeatWindowHours": 2160,
+      "failureMessage": "Clinical indication is not sufficiently documented in the available claim data for Lipid Profile.",
+      "auditRule": "Risk factor required",
+      "sourceRow": "Commonest Labs Rationale!A16"
+    },
+    {
+      "testCode": "LAB016",
+      "testName": "Renal Function Tests",
+      "department": "Chemistry",
+      "requiresDiagnosis": true,
+      "repeatWindowHours": 24,
+      "failureMessage": "Clinical indication is not sufficiently documented in the available claim data for Renal Function Tests.",
+      "auditRule": "Renal indication",
+      "sourceRow": "Commonest Labs Rationale!A17"
+    },
+    {
+      "testCode": "LAB017",
+      "testName": "Urea (BUN)",
+      "department": "Chemistry",
+      "requiresDiagnosis": true,
+      "repeatWindowHours": 24,
+      "failureMessage": "Clinical indication is not sufficiently documented in the available claim data for Urea (BUN).",
+      "auditRule": "Renal indication",
+      "sourceRow": "Commonest Labs Rationale!A18"
+    },
+    {
+      "testCode": "LAB018",
+      "testName": "Creatinine",
+      "department": "Chemistry",
+      "requiresDiagnosis": true,
+      "repeatWindowHours": 24,
+      "failureMessage": "Clinical indication is not sufficiently documented in the available claim data for Creatinine.",
+      "auditRule": "Renal indication",
+      "sourceRow": "Commonest Labs Rationale!A19"
+    },
+    {
+      "testCode": "LAB019",
+      "testName": "Electrolytes",
+      "department": "Chemistry",
+      "requiresDiagnosis": true,
+      "repeatWindowHours": 12,
+      "failureMessage": "Clinical indication is not sufficiently documented in the available claim data for Electrolytes.",
+      "auditRule": "Fluid/electrolyte indication",
+      "sourceRow": "Commonest Labs Rationale!A20"
+    },
+    {
+      "testCode": "LAB020",
+      "testName": "Liver Function Tests",
+      "department": "Chemistry",
+      "requiresDiagnosis": true,
+      "repeatWindowHours": 72,
+      "failureMessage": "Clinical indication is not sufficiently documented in the available claim data for Liver Function Tests.",
+      "auditRule": "Hepatic indication",
+      "sourceRow": "Commonest Labs Rationale!A21"
+    },
+    {
+      "testCode": "LAB021",
+      "testName": "Bilirubin",
+      "department": "Chemistry",
+      "requiresDiagnosis": true,
+      "repeatWindowHours": 72,
+      "failureMessage": "Clinical indication is not sufficiently documented in the available claim data for Bilirubin.",
+      "auditRule": "Jaundice required",
+      "sourceRow": "Commonest Labs Rationale!A22"
+    },
+    {
+      "testCode": "LAB022",
+      "testName": "Hepatitis B",
+      "department": "Serology",
+      "requiresDiagnosis": true,
+      "repeatWindowHours": 2160,
+      "failureMessage": "Clinical indication is not sufficiently documented in the available claim data for Hepatitis B.",
+      "auditRule": "Risk factor or liver disease",
+      "sourceRow": "Commonest Labs Rationale!A23"
+    }
+  ],
+  "links": [
+    {
+      "testCode": "LAB003",
+      "groupCode": "CIG-001",
+      "linkType": "SUPPORTED"
+    },
+    {
+      "testCode": "LAB004",
+      "groupCode": "CIG-001",
+      "linkType": "SUPPORTED"
+    },
+    {
+      "testCode": "LAB005",
+      "groupCode": "CIG-001",
+      "linkType": "SUPPORTED"
+    },
+    {
+      "testCode": "LAB008",
+      "groupCode": "CIG-028",
+      "linkType": "SUPPORTED"
+    },
+    {
+      "testCode": "LAB010",
+      "groupCode": "CIG-024",
+      "linkType": "SUPPORTED"
+    },
+    {
+      "testCode": "LAB011",
+      "groupCode": "CIG-024",
+      "linkType": "SUPPORTED"
+    },
+    {
+      "testCode": "LAB012",
+      "groupCode": "CIG-030",
+      "linkType": "SUPPORTED"
+    },
+    {
+      "testCode": "LAB013",
+      "groupCode": "CIG-030",
+      "linkType": "SUPPORTED"
+    },
+    {
+      "testCode": "LAB014",
+      "groupCode": "CIG-030",
+      "linkType": "SUPPORTED"
+    },
+    {
+      "testCode": "LAB015",
+      "groupCode": "CIG-029",
+      "linkType": "SUPPORTED"
+    }
+  ],
+  "aliases": [
+    {
+      "testCode": "LAB002",
+      "matchType": "NORMALIZED_NAME",
+      "value": "BETA HCG (PREGNANCY TEST)"
+    },
+    {
+      "testCode": "LAB021",
+      "matchType": "NORMALIZED_NAME",
+      "value": "BILIRUBIN"
+    },
+    {
+      "testCode": "LAB009",
+      "matchType": "NORMALIZED_NAME",
+      "value": "BLOOD CULTURE"
+    },
+    {
+      "testCode": "LAB011",
+      "matchType": "NORMALIZED_NAME",
+      "value": "BLOOD H. PYLORI"
+    },
+    {
+      "testCode": "LAB006",
+      "matchType": "NORMALIZED_NAME",
+      "value": "C-REACTIVE PROTEIN"
+    },
+    {
+      "testCode": "LAB005",
+      "matchType": "NORMALIZED_NAME",
+      "value": "CBC/FULL HAEMOGRAM"
+    },
+    {
+      "testCode": "LAB018",
+      "matchType": "NORMALIZED_NAME",
+      "value": "CREATININE"
+    },
+    {
+      "testCode": "LAB019",
+      "matchType": "NORMALIZED_NAME",
+      "value": "ELECTROLYTES"
+    },
+    {
+      "testCode": "LAB013",
+      "matchType": "NORMALIZED_NAME",
+      "value": "FASTING BLOOD SUGAR"
+    },
+    {
+      "testCode": "LAB014",
+      "matchType": "NORMALIZED_NAME",
+      "value": "HBA1C"
+    },
+    {
+      "testCode": "LAB022",
+      "matchType": "NORMALIZED_NAME",
+      "value": "HEPATITIS B"
+    },
+    {
+      "testCode": "LAB001",
+      "matchType": "NORMALIZED_NAME",
+      "value": "HIV"
+    },
+    {
+      "testCode": "LAB015",
+      "matchType": "NORMALIZED_NAME",
+      "value": "LIPID PROFILE"
+    },
+    {
+      "testCode": "LAB020",
+      "matchType": "NORMALIZED_NAME",
+      "value": "LIVER FUNCTION TESTS"
+    },
+    {
+      "testCode": "LAB004",
+      "matchType": "NORMALIZED_NAME",
+      "value": "MALARIA BLOOD SMEAR"
+    },
+    {
+      "testCode": "LAB003",
+      "matchType": "NORMALIZED_NAME",
+      "value": "MALARIA RDT"
+    },
+    {
+      "testCode": "LAB012",
+      "matchType": "NORMALIZED_NAME",
+      "value": "RANDOM BLOOD SUGAR"
+    },
+    {
+      "testCode": "LAB016",
+      "matchType": "NORMALIZED_NAME",
+      "value": "RENAL FUNCTION TESTS"
+    },
+    {
+      "testCode": "LAB008",
+      "matchType": "NORMALIZED_NAME",
+      "value": "STOOL ANALYSIS (MICROSCOPY & CULTURE)"
+    },
+    {
+      "testCode": "LAB010",
+      "matchType": "NORMALIZED_NAME",
+      "value": "STOOL H. PYLORI"
+    },
+    {
+      "testCode": "LAB017",
+      "matchType": "NORMALIZED_NAME",
+      "value": "UREA (BUN)"
+    },
+    {
+      "testCode": "LAB007",
+      "matchType": "NORMALIZED_NAME",
+      "value": "URINALYSIS (MICROSCOPY & CULTURE)"
+    }
+  ]
+}

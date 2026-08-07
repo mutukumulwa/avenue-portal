@@ -300,9 +300,13 @@ Stage control flow (exact):
 2. Resolve the claim's group: collect candidate codes = claim primary diagnosis code(s)
    from `Claim.diagnoses` JSON + distinct `claimLines[].icdCode`. Look each up in
    `ClinicalCodeMembership` under the ACTIVE pack for BOTH code systems (DG-D3).
-   First group whose membership matches a primary diagnosis wins; else first line-code
-   match. Ambiguity (two groups matched) → treat as unresolved + record
-   `ambiguous:true` in the result (shadow report surfaces it).
+   Primary-diagnosis matches are preferred over line-code matches. **Exactly one group
+   must remain, or nothing is evaluated** — if two or more groups match at the winning
+   precedence level the claim is unresolved, `ambiguous:true` and every candidate group
+   code are recorded, and R2/R3/R4 do not run at all (**DG-D15**, amended by C7.2). There
+   is no tie-break: the original wording here picked the first group the database returned,
+   which let row order decide which condition's clinical rules applied. Import now blocks
+   a code that belongs to two groups (validator V11), so the fix is a clinical assignment.
 3. Unresolved group: if `policy.requireClinicalGroup && policy.clinicalGateEnabled` →
    `ROUTE(CLINICAL_SCOPE_REVIEW)`; else `PASS` with `result:{outOfScope:true}` (DG-D11).
 4. Resolved group with `enabledForShadow=false` → `PASS` `result:{groupDisabled:true}`.
@@ -324,18 +328,23 @@ Stage control flow (exact):
   labRule, failureMessage}`.
 - **R3 repeat window** — for each matched lab rule with `repeatWindowHours != null`:
   query the member's prior claim lines (any provider, same tenant) whose lines match the
-  same lab rule's aliases, on claims with `status notIn [VOID, DECLINED, APPEAL_DECLINED]`
-  and `dateOfService ∈ [claim.dateOfService − windowHours, claim.dateOfService)`.
+  same lab rule's aliases, on claims with `status notIn [VOID, DECLINED, APPEAL_DECLINED]`.
   Mirror the `stageDuplicate` query shape (anchor §4). Found → hit
   `{rule:"R3", routeCode: CLINICAL_REPEAT_WINDOW, priorClaimNumbers (≤5, safe)}`.
   Determinism under concurrency: the later-received claim (by `createdAt`) is the one
   that flags; document in tests (C2.3).
+  **Window arithmetic is day-level, not millisecond (DG-D14, amended by C7.1):** a prior
+  line is inside the window when `0 ≤ dayDiff ≤ floor(windowHours / 24)`, both dates
+  floored to UTC day. `dateOfService` is date-only in practice, so anything finer would be
+  false precision. A rule with `0 < repeatWindowHours < 24` is **not evaluated at all** —
+  it is recorded in `inertRules` and counted separately in the shadow summary, so coverage
+  figures never silently include a rule that is not running.
 - **R4 confirmation-present** — if the group has ≥1 `CONFIRMATORY` link: the claim must
   contain a line matching a confirmatory rule's aliases, OR (when
   `confirmationLookbackHours != null`) the member must have such a line in the lookback
-  window (same query machinery as R3, direction: before service date, window =
-  `confirmationLookbackHours`). Absent → hit `{rule:"R4", routeCode:
-  CLINICAL_CONFIRMATION_MISSING}`.
+  window (same query machinery and the same day-level arithmetic as R3, direction: before
+  service date, window = `confirmationLookbackHours`). Absent → hit `{rule:"R4",
+  routeCode: CLINICAL_CONFIRMATION_MISSING}`.
 
 ### 6.4 New route codes and queue (exact strings)
 
@@ -786,6 +795,7 @@ DPPA privacy design for free-text ingestion (minimize, extract-at-edge, retentio
 | C3.2 | Protocol library UI + import | C1.2, C1.3, C3.1 | |
 | C3.3 | Governance E2E (maker/checker/activate) | C3.2 | |
 | C3.4 | Policy flags + claim-detail surfacing | C2.5, C3.3 | |
+| C3.5 | Capability resolution (production authorisation) | C3.1–C3.4 | added in build: production carries **zero** RBAC rows, so gating any button on `rbacService.hasPermission` alone made the whole feature inoperable there |
 | C4.1 | Baseline snapshot | C2.5 | precedes ANY comms (DG-D9) |
 | C4.2 | Shadow dashboard + verdicts | C2.5, C3.4 | |
 | C4.3 | Campaign runbook + exit memo | C4.1, C4.2 | **G-C4 (human)** |
@@ -793,6 +803,14 @@ DPPA privacy design for free-text ingestion (minimize, extract-at-edge, retentio
 | C5.2 | Repeat-window short-pay | G-C4 | **G-C5.2 (human)** |
 | C5.3 | Comms pack + drift monitoring | C4.1, C5.1 | |
 | C6.x | Rung-2 backlog | — | **G-C6 = G-C4 memo** |
+| C7.1 | R3/R4 day-level arithmetic + sub-day inertness | — | correctness; see addendum |
+| C7.2 | R1 no-winner ambiguity + validator V11 | — | correctness; see addendum |
+| C7.3 | Converter reader hardening | — | see addendum |
+| C7.4 | v0.1 annex intake + red report | C7.1–C7.3 | see addendum |
+| C7.5 | Spec amendments DG-D14–D19 + docs | C7.1–C7.4 | see addendum |
+
+Phase C7 (added 2026-08-07, triggered by the v0.1 research-remediated annex) is specified
+in `docs/diagnosis-gate/PLAN_C7_V01_INTAKE.md` — same execution rules, same W-invariants.
 
 ---
 
