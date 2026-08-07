@@ -174,6 +174,24 @@ describe("DG C1.3 — pack validator: each rule catches its own defect", () => {
     expect(codesOf(validatePack(p, { knownCodes }).errors)).toContain("REPEAT_WINDOW_INVALID");
   });
 
+  it.each([
+    [4, true], [12, true], [23, true],   // sub-day: unenforceable on date-only data
+    [24, false], [72, false], [720, false], // a day or more: evaluable
+  ])("V12 warns for a %i-hour window: %s (DG-D14)", (hours, shouldWarn) => {
+    const p = goodPack();
+    p.labRules[0].repeatWindowHours = hours;
+    const r = validatePack(p, { knownCodes });
+    expect(codesOf(r.warnings).includes("REPEAT_WINDOW_SUBDAY_UNENFORCEABLE")).toBe(shouldWarn);
+    // Inert content is legal content — it must never block the import.
+    expect(r.importable).toBe(true);
+  });
+
+  it("V12 counts sub-day rules in the stats so a reviewer sees how much is inert", () => {
+    const p = goodPack();
+    p.labRules[0].repeatWindowHours = 12;
+    expect(validatePack(p, { knownCodes }).stats.subdayWindowRules).toBe(1);
+  });
+
   it("V6 rejects a diagnosis-requiring test with no supported condition — it would flag every claim", () => {
     const p = goodPack();
     p.links = p.links.filter((l) => !(l.testCode === "LAB003" && l.linkType === "SUPPORTED"));

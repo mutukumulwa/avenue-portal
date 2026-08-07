@@ -23,7 +23,7 @@
 import type { PrismaClient, Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { auditChainService } from "../audit-chain.service";
-import type { ClinicalStageResult, ClinicalRuleHit } from "../claim-autopilot/stage-clinical";
+import type { ClinicalStageResult, ClinicalRuleHit, ClinicalInertRule } from "../claim-autopilot/stage-clinical";
 
 export type ClinicalRuleCode = "R2" | "R3" | "R4";
 export const CLINICAL_RULES: ClinicalRuleCode[] = ["R2", "R3", "R4"];
@@ -42,6 +42,12 @@ export interface RuleSummary {
   verdicts: { truePositive: number; falsePositive: number; unsure: number; total: number };
   /** Sampled false-positive rate, or null when nothing has been reviewed yet. */
   sampledFalsePositiveRate: number | null;
+  /**
+   * Evaluations where this rule was defined but COULD NOT be checked (DG-D14) — e.g. a
+   * sub-day repeat window against date-only claim data. Reported so a low hit count is
+   * never mistaken for a clean result.
+   */
+  inertEvaluations: number;
 }
 
 export interface ShadowSummary {
@@ -58,6 +64,8 @@ export interface ShadowSummary {
   rules: RuleSummary[];
   byGroup: Array<{ groupCode: string; groupName: string; evaluated: number; flagged: number }>;
   topTests: Array<{ testCode: string; testName: string; findings: number }>;
+  /** Rules the pack defines that no evaluation could check, by test (DG-D14). */
+  inertRules: Array<{ rule: string; testCode: string; testName: string; windowHours: number; reason: string; evaluations: number }>;
 }
 
 /** A stage row projected into something the dashboard can render. */
@@ -115,6 +123,8 @@ export const ClinicalGateReadService = {
     const perRuleFindings = new Map<ClinicalRuleCode, number>(CLINICAL_RULES.map((r) => [r, 0]));
     const groups = new Map<string, { groupCode: string; groupName: string; evaluated: number; flagged: number }>();
     const tests = new Map<string, { testCode: string; testName: string; findings: number }>();
+    const inert = new Map<string, { rule: string; testCode: string; testName: string; windowHours: number; reason: string; evaluations: number }>();
+    const perRuleInert = new Map<ClinicalRuleCode, number>(CLINICAL_RULES.map((r) => [r, 0]));
 
     for (const row of rows) {
       const res = row.result;
@@ -134,6 +144,16 @@ export const ClinicalGateReadService = {
       const key = res.groupCode ?? "—";
       const g = groups.get(key) ?? { groupCode: key, groupName: res.groupName ?? key, evaluated: 0, flagged: 0 };
       g.evaluated += 1;
+
+      // DG-D14: what this evaluation could NOT check. Counted separately from findings
+      // so "few hits" is never silently the same as "we did not look".
+      for (const ir of (res.inertRules ?? []) as ClinicalInertRule[]) {
+        const key = `${ir.rule}|${ir.testCode ?? "-"}|${ir.windowHours}`;
+        const e = inert.get(key) ?? { rule: ir.rule, testCode: ir.testCode ?? "—", testName: ir.testName ?? "—", windowHours: ir.windowHours, reason: ir.reason, evaluations: 0 };
+        e.evaluations += 1;
+        inert.set(key, e);
+        perRuleInert.set(ir.rule, (perRuleInert.get(ir.rule) ?? 0) + 1);
+      }
 
       const hits = res.ruleHits ?? [];
       if (hits.length > 0) {
@@ -186,10 +206,12 @@ export const ClinicalGateReadService = {
           findings: perRuleFindings.get(rule) ?? 0,
           verdicts,
           sampledFalsePositiveRate: judged > 0 ? verdicts.falsePositive / judged : null,
+          inertEvaluations: perRuleInert.get(rule) ?? 0,
         };
       }),
       byGroup: [...groups.values()].sort((a, b) => b.flagged - a.flagged || b.evaluated - a.evaluated),
       topTests: [...tests.values()].sort((a, b) => b.findings - a.findings).slice(0, 20),
+      inertRules: [...inert.values()].sort((a, b) => b.evaluations - a.evaluations),
     };
   },
 

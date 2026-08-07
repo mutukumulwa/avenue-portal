@@ -607,3 +607,52 @@ conditions (§6) and the numeric exit criteria (§7).
 - **LESSON (recorded for the next feature):** "permission seeded + granted" is not
   sufficient. The question is *"does the target environment use this authorisation model
   at all?"* — verify against production's actual RBAC state, not the seeded dev database.
+
+---
+
+# Phase C7 — v0.1 intake & rule-correctness hardening
+
+## C7.1 — R3/R4 day-level arithmetic + sub-day inertness (DG-D14)
+- **Date / commits:** 2026-08-07 · (this commit)
+- **Anchors re-verified:** R3 ms-arithmetic at `stage-clinical.ts:347–349`, R4 lookback
+  `:371`, validator V4 window check, shadow `summarize` accumulators — all as recorded in
+  `PLAN_C7_V01_INTAKE.md` §3.
+- **★ THE BUG.** `Claim.dateOfService` is date-only, but R3/R4 did millisecond arithmetic
+  on it. With v0's REAL windows (Malaria RDT 12 h, smear 12 h, electrolytes 12 h, RBS
+  4 h) that meant **false positives** — any two same-day claims flagged, including ones
+  8 h apart that a 12 h rule permits — **and false negatives**: two claims 2 h apart
+  either side of midnight never flagged. Both directions wrong, on 4 of 22 tests.
+- **What was built:**
+  - `pack-types.ts`: `MIN_ENFORCEABLE_WINDOW_HOURS`, `windowDays`, `isSubDayWindow`,
+    `floorToUtcDay`, `dayDifference` — one shared definition, imported by both the stage
+    and the validator (the same divergence-by-construction rule as `normaliseAliasValue`).
+  - R3/R4 compare **whole UTC calendar days**, the resolution the data actually has.
+    Windows < 24 h are **not evaluated** and are recorded as `inertRules` on the stage
+    result — a rule we could not check must never look like a rule that found nothing.
+  - **Correctness detail beyond the plan:** an unverifiable R4 *lookback* now also
+    suppresses the missing-confirmation finding (`lookbackUnverifiable`). Asserting "no
+    confirmatory test on record" after failing to check the record would state something
+    we do not know. Inert rules ride the result whether or not any hit was found.
+  - Validator **V12** `REPEAT_WINDOW_SUBDAY_UNENFORCEABLE` (WARNING — legal but inert
+    content, the V10 philosophy) + `subdayWindowRules` stat.
+  - Shadow read model: `inertRules` breakdown on `ShadowSummary` and `inertEvaluations`
+    per `RuleSummary`, so coverage numbers cannot silently exclude unchecked rules.
+- **Test rewrite — deliberate, and the honest option.** Five existing R3 tests used
+  Malaria RDT (12 h) and RBS (4 h): they were **asserting behaviour that was wrong**.
+  Rather than mutate the fixture's windows to keep old assertions green — which would
+  have hidden the defect — the enforceable-path tests moved to LAB010 (720 h = 30 days,
+  day-level) and the sub-day cases became explicit inertness tests. The fixture keeps
+  v0's real values, so the suite now demonstrates the bug it fixes.
+- **Verified:** DG DB suites **56/56** (was 51; rules file 22, was 18) incl. a **30/31-day
+  boundary test** (inclusive at the edge, excluded the day after — where an off-by-one
+  silently changes a clinical rule), three inertness cases, and the same-service-date
+  single-flag determinism test still green. Validator unit **35** (was 28) incl. a
+  parametrised 4/12/23 h warn vs 24/72/720 h no-warn boundary. `tsc` + `eslint` clean;
+  hermetic **1663 passed / 557 skipped / 0 failed**. **`pack-v0.json` re-run
+  byte-identical** (converter untouched) and the v0 report now carries
+  `V12 × 4` — exactly the four sub-day tests predicted from the source.
+- **Housekeeping:** removed two byte-identical iCloud duplicate files
+  (`authorisation 2.ts`, `diagnosis-gate-authorisation.test 2.ts`) verified identical
+  before deletion.
+- **W-checklist:** n/a (no new user-facing capability; the shadow dashboard renders the
+  new counts through existing C4.2 surfaces — no UI shipped in this package).

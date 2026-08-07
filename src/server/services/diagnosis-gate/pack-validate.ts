@@ -16,7 +16,7 @@
  * but inert or incomplete (e.g. a rule with no alias can never fire).
  */
 import type { ProtocolPack, CodeSystem } from "./pack-types";
-import { PACK_FORMAT_VERSION, normaliseCode } from "./pack-types";
+import { PACK_FORMAT_VERSION, normaliseCode, isSubDayWindow, MIN_ENFORCEABLE_WINDOW_HOURS } from "./pack-types";
 
 export type IssueSeverity = "ERROR" | "WARNING";
 
@@ -145,6 +145,20 @@ export function validatePack(pack: ProtocolPack, ctx: ValidationContext = {}): V
     if (r.repeatWindowHours != null && (!Number.isFinite(r.repeatWindowHours) || r.repeatWindowHours <= 0)) {
       issues.push(err("V4", "REPEAT_WINDOW_INVALID", `Test "${r.testCode}" has a non-positive repeat window (${String(r.repeatWindowHours)}).`, r.sourceRow));
     }
+    // V12 (DG-D14): claims carry a service DATE, not a time. A window shorter than a day
+    // cannot be evaluated — enforcing it either way would produce false positives on
+    // same-day repeats and false negatives across midnight. Legal content, inert rule,
+    // so this warns rather than blocks (the V10 philosophy).
+    if (isSubDayWindow(r.repeatWindowHours)) {
+      issues.push(
+        warn(
+          "V12",
+          "REPEAT_WINDOW_SUBDAY_UNENFORCEABLE",
+          `Test "${r.testCode}" (${r.testName}) has a ${r.repeatWindowHours}-hour repeat window, which cannot be checked against date-only claim data — the rule will be recorded as inert rather than evaluated. Use a window of ${MIN_ENFORCEABLE_WINDOW_HOURS} hours or more, or capture a performed-at timestamp.`,
+          r.sourceRow,
+        ),
+      );
+    }
   }
 
   const supportedByRule = new Map<string, number>();
@@ -229,6 +243,7 @@ export function validatePack(pack: ProtocolPack, ctx: ValidationContext = {}): V
       labRules: pack.labRules.length,
       rulesRequiringDiagnosis: pack.labRules.filter((r) => r.requiresDiagnosis).length,
       rulesWithRepeatWindow: pack.labRules.filter((r) => r.repeatWindowHours != null).length,
+      subdayWindowRules: pack.labRules.filter((r) => isSubDayWindow(r.repeatWindowHours)).length,
       links: pack.links.length,
       supportedLinks: pack.links.filter((l) => l.linkType === "SUPPORTED").length,
       confirmatoryLinks: pack.links.filter((l) => l.linkType === "CONFIRMATORY").length,

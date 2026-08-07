@@ -118,6 +118,39 @@ export function looseNameKey(raw: string): string {
   return raw.toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+// ── Repeat/lookback window arithmetic (DG-D14) ───────────────────────────────
+// A claim carries `dateOfService` at DATE resolution — there is no time of day. So a
+// window shorter than a day cannot be evaluated: under a 4-hour window two same-day
+// claims would ALWAYS flag (even 8 hours apart) and two claims 2 hours apart either
+// side of midnight would NEVER flag. Both directions are wrong, so sub-day windows are
+// treated as unenforceable and recorded as inert rather than guessed at.
+//
+// Windows of a day or more are compared in whole calendar days, which is exactly the
+// resolution the data actually has.
+
+/** Below this, a window cannot be evaluated on date-only claim data (DG-D14). */
+export const MIN_ENFORCEABLE_WINDOW_HOURS = 24;
+
+/** Whole days a window covers. 24h→1, 72h→3, 720h→30. */
+export function windowDays(hours: number): number {
+  return Math.floor(hours / 24);
+}
+
+/** True when the window is too short to evaluate against date-only data (DG-D14). */
+export function isSubDayWindow(hours: number | null | undefined): boolean {
+  return hours != null && hours > 0 && hours < MIN_ENFORCEABLE_WINDOW_HOURS;
+}
+
+/** Midnight-UTC floor, so day differences are not skewed by any time component. */
+export function floorToUtcDay(d: Date): number {
+  return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+}
+
+/** Whole days between two service dates (positive when `later` is after `earlier`). */
+export function dayDifference(later: Date, earlier: Date): number {
+  return Math.round((floorToUtcDay(later) - floorToUtcDay(earlier)) / 86_400_000);
+}
+
 /** Deterministic ordering so two conversions of one workbook are byte-identical. */
 export function canonicalisePack(pack: ProtocolPack): ProtocolPack {
   const by =

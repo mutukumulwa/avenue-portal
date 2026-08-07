@@ -793,6 +793,14 @@ DPPA privacy design for free-text ingestion (minimize, extract-at-edge, retentio
 | C5.2 | Repeat-window short-pay | G-C4 | **G-C5.2 (human)** |
 | C5.3 | Comms pack + drift monitoring | C4.1, C5.1 | |
 | C6.x | Rung-2 backlog | — | **G-C6 = G-C4 memo** |
+| C7.1 | R3/R4 day-level arithmetic + sub-day inertness | — | correctness; see addendum |
+| C7.2 | R1 no-winner ambiguity + validator V11 | — | correctness; see addendum |
+| C7.3 | Converter reader hardening | — | see addendum |
+| C7.4 | v0.1 annex intake + red report | C7.1–C7.3 | see addendum |
+| C7.5 | Spec amendments DG-D14–D19 + docs | C7.1–C7.4 | see addendum |
+
+Phase C7 (added 2026-08-07, triggered by the v0.1 research-remediated annex) is specified
+in `docs/diagnosis-gate/PLAN_C7_V01_INTAKE.md` — same execution rules, same W-invariants.
 
 ---
 
