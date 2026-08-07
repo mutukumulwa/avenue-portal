@@ -6,7 +6,7 @@ Detail per package: `IMPLEMENTATION_LOG.md`.
 
 **Branch:** `feat/diagnosis-gate` (off `origin/main` @ `3ac6b2c`).
 **Baseline on branch:** tsc exit 0 · vitest 1569 passed / 501 skipped / 0 failed.
-**Current:** tsc + eslint + next build clean · hermetic **1630 passed / 552 skipped / 0 failed** · **51/51 DG real-DB tests** (opt-in).
+**Current:** tsc + eslint clean · hermetic **1666 passed / 559 skipped / 0 failed** · **58/58 DG real-DB tests** (opt-in).
 **Phases C0–C3 COMPLETE.** Next: **C7 (v0.1 annex intake + rule hardening — `PLAN_C7_V01_INTAKE.md`)** · then C1.4 crosswalk · C1.5 alias coverage · C4 shadow campaign (blocked on **G-C0**).
 
 | Pkg | Title | Status |
@@ -36,9 +36,9 @@ Detail per package: `IMPLEMENTATION_LOG.md`.
 | C5.2 | Repeat-window short-pay | ⬜ **G-C5.2 human gate** |
 | C5.3 | Comms pack + drift monitoring | ⬜ |
 | C6.x | Rung-2 backlog | ⬜ blocked on G-C4 |
-| C7.1 | R3/R4 day-level + sub-day inertness | ⬜ next — correctness fix, no gate |
-| C7.2 | R1 no-winner ambiguity + V11 | ⬜ correctness fix, no gate |
-| C7.3 | Converter reader hardening | ⬜ |
+| C7.1 | R3/R4 day-level + sub-day inertness | ✅ DONE — real correctness bug fixed |
+| C7.2 | R1 no-winner ambiguity + V11 | ✅ DONE — row-order tie-break removed |
+| C7.3 | Converter reader hardening | ⬜ next |
 | C7.4 | v0.1 annex intake + red report | ⬜ after C7.1–C7.3 |
 | C7.5 | Spec DG-D14–D19 + docs | ⬜ |
 
