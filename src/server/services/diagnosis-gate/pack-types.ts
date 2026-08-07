@@ -81,6 +81,12 @@ export interface PackMeta {
   sourceFileChecksum?: string;
   /** Free-text note from whoever ran the conversion. */
   notes?: string;
+  /**
+   * The ICD release this content is intended to validate against (DG-D18), e.g.
+   * "ICD-11 MMS 2026-01". Recorded as a stated TARGET — it does not assert that every
+   * code was checked against that release.
+   */
+  icdRelease?: string;
 }
 
 export interface ProtocolPack {

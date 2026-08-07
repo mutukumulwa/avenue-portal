@@ -745,3 +745,68 @@ conditions (§6) and the numeric exit criteria (§7).
 - **W-checklist:** n/a (offline tooling).
 - **Deviation from plan:** none in outcome; the plan's option (a) was attempted first and
   rejected with evidence, exactly as it required.
+
+---
+
+## C7.4 — v0.1 annex intake + red report
+
+**Goal:** read the four annex sheets the clinical remediation added, and produce the
+second red report — without letting the annex's own confidence stand in for clinical
+sign-off.
+
+- **What the annex actually gave us**, verified cell by cell before writing any converter
+  code (measurements in `source/SOURCE_NOTES.md` §v0.1):
+  - `Conditions v0.1` — **authored `CIG-001`…`CIG-040`**. This is the F1 ask answered: the
+    join key is no longer a display name that three sheets spell three ways.
+  - `Name Aliases v0.1` — 80 rows, self-classified: 78 normalisation/preserved, **2
+    `SCOPE_REVIEW_REQUIRED`**.
+  - `Lab Rules v0.1` — `Supported_Group_Codes_Auto` resolved on 10 of 22 rows (the empty
+    cells are a genuine "none", not a gap); a provider-facing rewrite of all 22 messages;
+    2 confirmatory proposals, both `AUTHORITATIVE_CANDIDATE_PENDING_CLINICAL_SIGNOFF`; and
+    `Clinical_Approval_Status = PENDING_CLINICAL_SIGNOFF` on **all 22**.
+  - `Source Register` — the WHO release string.
+- **Status gating is the whole design (DG-D16).** The annex marks its own confidence, and
+  the converter treats an unapproved marker as a refusal, not a hint. `isApprovedStatus`
+  rejects anything containing PENDING / CANDIDATE / PROPOSED, and a confirmatory link
+  needs **both** its status columns to read as approved. Consequences, deliberately:
+  - **0 confirmatory links import → R4 still fires for nothing.** The one thing that would
+    have made the gate look more capable is exactly the thing that needed a signature.
+  - The 2 scope-review aliases are refused, which is why `UNRESOLVED_FEATURES_NAME` lands
+    at **2** rather than 0. Deciding that "Eczema" and "Eczema (Atopic Dermatitis)" are one
+    condition is a clinical judgement; the converter will not make it to clear an error.
+  - Everything refused is listed in `reports/v0.1-proposals.md`, so the clinical team sees
+    what is waiting on a decision rather than on more data work.
+  - Catch-alls import in the **safe direction only**: a true flag bars a condition from
+    live routing forever (DG-D8), so accepting the annex's proposal can only restrict.
+- **Provider wording (DG-D17):** `Provider_Message_v0_1` is preferred over v0's clinician
+  shorthand for all 22 rules — "HIV test lacks documented indication" → "Clinical
+  indication is not sufficiently documented in the available claim data for HIV." A
+  message a provider cannot act on is a rule that generates a call, not a correction.
+- **Two bugs found while wiring, both mine:**
+  - the annex name index (name → **group code**) was being merged into the legacy alias
+    map (name → **name**). Same TypeScript type, different meaning; it would have produced
+    a nonsense error message on the first miss. Removed — annex names go straight into the
+    group index, which is the map that resolution actually consults.
+  - unresolved-name errors still pointed at `Commonest` as the naming authority when the
+    annex had taken that role over. Now parameterised, so the report tells a reader which
+    sheet to actually go and edit.
+- **Verified — the acceptance gates:**
+  - **`pack-v0.json` and `reports/v0-validation.md` byte-identical** to the committed
+    artifacts. The annex path returns null on a plain workbook, so the legacy path is
+    untouched — asserted, not assumed.
+  - **Determinism:** two consecutive runs produce byte-identical pack, report and
+    proposals.
+  - **Every predicted invariant met**, and the one prediction that was wrong was wrong in
+    the right direction: `UNRESOLVED_FEATURES_NAME` is 2, not the 0 I expected, precisely
+    because the 2 scope-review aliases were refused.
+  - **151 → 109 blocking errors.** Cleared: `UNRESOLVED_SUPPORTED_DIAGNOSIS` 29→0,
+    `UNRESOLVED_FEATURES_NAME` 14→2, `GROUP_CODES_NOT_AUTHORED` 1→0. **Unchanged:** V11 85,
+    V6 10, `CONDITION_UNMAPPED` 5, `GROUP_HAS_NO_CODES` 5, `MAPPING_CODE_EMPTY` 2.
+  - **Verdict remains NOT IMPORTABLE**, and the headline for the clinical team is that
+    v0.1 did not move a single ICD code between conditions: the 85 overlaps are still the
+    largest blocker, and they are a clinical assignment decision, not data cleaning.
+  - 9 new lock tests. **Mutation-checked**: making `isApprovedStatus` return `true` imports
+    2 confirmatory links and the suite fails — the guard is load-bearing, not decorative.
+  - `tsc` + `eslint` clean; hermetic **1679 passed / 559 skipped / 0 failed**.
+- **W-checklist:** n/a (offline tooling; no new UI surface).
+- **Deviation from plan:** none.

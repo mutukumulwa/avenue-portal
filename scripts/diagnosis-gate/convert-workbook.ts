@@ -60,6 +60,49 @@ const SHEET = {
  */
 const CATCH_ALL_PROPOSAL_THRESHOLD = 40;
 
+// ── v0.1 "research remediation" annex (C7.4) ─────────────────────────────────
+// A remediated workbook keeps the original sheets untouched and adds parallel annex
+// sheets carrying stable codes, an alias table, and resolved lab links. When they are
+// present the converter reads them INSTEAD of guessing — but only the rows whose status
+// says a human has settled them (DG-D16). Everything still pending is reported, never
+// imported, however confidently it is written.
+const ANNEX = {
+  conditions: "Conditions v0.1",
+  aliases: "Name Aliases v0.1",
+  labRules: "Lab Rules v0.1",
+  sources: "Source Register",
+} as const;
+
+/**
+ * Alias statuses safe to import: a deterministic spelling/spacing normalisation, or a
+ * name preserved unchanged. `SCOPE_REVIEW_REQUIRED` — e.g. "Acne" vs "Acne Vulgaris" —
+ * is a CLINICAL judgement about whether two labels mean the same condition, and is
+ * excluded until a clinician says otherwise.
+ */
+const ACCEPTED_ALIAS_STATUSES = new Set(["DETERMINISTIC_NORMALIZATION", "PRESERVED"]);
+
+/** A confirmatory link imports only once a human has signed it off. */
+const APPROVED_STATUS_MARKERS = ["APPROVED", "SIGNED_OFF", "CONFIRMED"];
+function isApprovedStatus(v: string): boolean {
+  const s = v.trim().toUpperCase();
+  if (!s) return false;
+  // "PENDING…" / "…PENDING_CLINICAL_SIGNOFF" must never read as approved.
+  if (s.includes("PENDING") || s.includes("CANDIDATE") || s.includes("PROPOSED")) return false;
+  return APPROVED_STATUS_MARKERS.some((m) => s.includes(m));
+}
+
+interface AnnexGroup { groupCode: string; canonicalName: string; originalName: string; isCatchAll: boolean; sourceRow: string }
+interface AnnexLabRule { testCode: string; supportedGroupCodes: string[]; confirmatoryGroup: string | null; confirmatoryApproved: boolean; confirmatoryStatus: string; providerMessage: string }
+interface Annex {
+  groups: AnnexGroup[];
+  /** looseName → groupCode, from canonical + original names + accepted aliases. */
+  nameIndex: Map<string, string>;
+  labRules: Map<string, AnnexLabRule>;
+  icdRelease?: string;
+  pendingAliases: Array<{ alias: string; groupCode: string; status: string }>;
+  confirmatoryProposals: Array<{ testCode: string; groupCode: string; status: string }>;
+}
+
 /**
  * READER NOTE (C7.3). This tool originally used `exceljs`, which cannot open workbooks
  * written by openpyxl — the v0.1 annex failed with "Cannot read properties of undefined
@@ -175,6 +218,139 @@ function col(idx: Map<string, number>, ...candidates: string[]): number | undefi
   return undefined;
 }
 
+/**
+ * Read the v0.1 annex sheets, if this workbook has them.
+ *
+ * Returns null for a plain (non-remediated) workbook, so the legacy path is untouched —
+ * which is what keeps `pack-v0.json` byte-identical.
+ */
+function readAnnex(wb: Workbook, issue: (code: string, message: string, where?: string) => void): Annex | null {
+  if (!wb.sheetNames.includes(ANNEX.conditions)) return null;
+
+  const groups: AnnexGroup[] = [];
+  const nameIndex = new Map<string, string>();
+  const pendingAliases: Annex["pendingAliases"] = [];
+  const labRules = new Map<string, AnnexLabRule>();
+  const confirmatoryProposals: Annex["confirmatoryProposals"] = [];
+
+  // ── Conditions: stable codes at last (the F1 ask) ──────────────────────────
+  {
+    const ws = getSheet(wb, ANNEX.conditions);
+    const idx = headerIndex(ws, 1);
+    const c = {
+      code: col(idx, "group_code", "group code"),
+      canonical: col(idx, "canonical_name", "canonical name"),
+      original: col(idx, "original_v0_name", "original v0 name"),
+      catchAll: col(idx, "proposed_is_catch_all", "is_catch_all"),
+    };
+    if (!c.code || !c.canonical) {
+      issue("ANNEX_CONDITIONS_COLUMNS_MISSING", `"${ANNEX.conditions}" is missing Group_Code or Canonical_Name — the annex cannot be used.`, ANNEX.conditions);
+      return null;
+    }
+    const seen = new Set<string>();
+    for (let r = 2; r <= ws.rowCount; r += 1) {
+      const row = ws.getRow(r);
+      const groupCode = cellText(row.getCell(c.code).value);
+      const canonicalName = cellText(row.getCell(c.canonical).value);
+      if (!groupCode || !canonicalName) continue;
+      if (seen.has(groupCode)) {
+        issue("ANNEX_DUPLICATE_GROUP_CODE", `Group code "${groupCode}" appears more than once on ${ANNEX.conditions}.`, `${ANNEX.conditions}!A${r}`);
+        continue;
+      }
+      seen.add(groupCode);
+      const originalName = c.original ? cellText(row.getCell(c.original).value) : "";
+      // A catch-all imports in the SAFE direction: flagged true bars it from live routing
+      // forever (DG-D8), so accepting the proposal can only ever restrict, never widen.
+      const isCatchAll = c.catchAll ? /^(true|yes|y|1)$/i.test(cellText(row.getCell(c.catchAll).value)) : false;
+      groups.push({ groupCode, canonicalName, originalName, isCatchAll, sourceRow: `${ANNEX.conditions}!A${r}` });
+      nameIndex.set(looseNameKey(canonicalName), groupCode);
+      if (originalName) nameIndex.set(looseNameKey(originalName), groupCode);
+    }
+  }
+
+  // ── Name aliases: status-gated (DG-D16) ───────────────────────────────────
+  if (wb.sheetNames.includes(ANNEX.aliases)) {
+    const ws = getSheet(wb, ANNEX.aliases);
+    const idx = headerIndex(ws, 1);
+    const c = { alias: col(idx, "alias"), code: col(idx, "group_code", "group code"), status: col(idx, "resolution_status", "resolution status") };
+    if (c.alias && c.code) {
+      for (let r = 2; r <= ws.rowCount; r += 1) {
+        const row = ws.getRow(r);
+        const alias = cellText(row.getCell(c.alias).value);
+        const groupCode = cellText(row.getCell(c.code).value);
+        const status = c.status ? cellText(row.getCell(c.status).value).toUpperCase() : "";
+        if (!alias || !groupCode) continue;
+        if (!ACCEPTED_ALIAS_STATUSES.has(status)) {
+          // Reported, never imported: deciding two labels mean one condition is clinical.
+          pendingAliases.push({ alias, groupCode, status: status || "(no status)" });
+          continue;
+        }
+        nameIndex.set(looseNameKey(alias), groupCode);
+      }
+    }
+  }
+
+  // ── Lab rules: resolved links + provider-safe wording ──────────────────────
+  if (wb.sheetNames.includes(ANNEX.labRules)) {
+    const ws = getSheet(wb, ANNEX.labRules);
+    const idx = headerIndex(ws, 1);
+    const c = {
+      id: col(idx, "test_id", "test id"),
+      supported: col(idx, "supported_group_codes_auto"),
+      confirmatory: col(idx, "proposed_confirmatory_group"),
+      confirmatoryStatus: col(idx, "confirmatory_status"),
+      approval: col(idx, "clinical_approval_status"),
+      message: col(idx, "provider_message_v0_1", "provider_message"),
+    };
+    if (c.id) {
+      for (let r = 2; r <= ws.rowCount; r += 1) {
+        const row = ws.getRow(r);
+        const testCode = cellText(row.getCell(c.id).value);
+        if (!testCode) continue;
+        const supported = c.supported
+          ? cellText(row.getCell(c.supported).value).split(/[;,]/).map((x) => x.trim()).filter(Boolean)
+          : [];
+        const confirmatoryGroup = c.confirmatory ? cellText(row.getCell(c.confirmatory).value) || null : null;
+        const confirmatoryStatus = c.confirmatoryStatus ? cellText(row.getCell(c.confirmatoryStatus).value) : "";
+        const approval = c.approval ? cellText(row.getCell(c.approval).value) : "";
+        // BOTH statuses must read as approved — a confirmatory candidate is clinical
+        // content, and "AUTHORITATIVE_CANDIDATE_PENDING_CLINICAL_SIGNOFF" is not a signature.
+        const confirmatoryApproved = !!confirmatoryGroup && isApprovedStatus(confirmatoryStatus) && isApprovedStatus(approval);
+        if (confirmatoryGroup && !confirmatoryApproved) {
+          confirmatoryProposals.push({ testCode, groupCode: confirmatoryGroup, status: confirmatoryStatus || approval || "(no status)" });
+        }
+        labRules.set(testCode, {
+          testCode,
+          supportedGroupCodes: supported,
+          confirmatoryGroup,
+          confirmatoryApproved,
+          confirmatoryStatus,
+          providerMessage: c.message ? cellText(row.getCell(c.message).value) : "",
+        });
+      }
+    }
+  }
+
+  // ── ICD release target (DG-D18): recorded as a target, not a validation claim ──
+  let icdRelease: string | undefined;
+  if (wb.sheetNames.includes(ANNEX.sources)) {
+    const ws = getSheet(wb, ANNEX.sources);
+    const idx = headerIndex(ws, 1);
+    const c = { id: col(idx, "source_id"), version: col(idx, "version_or_date") };
+    if (c.id && c.version) {
+      for (let r = 2; r <= ws.rowCount; r += 1) {
+        const row = ws.getRow(r);
+        if (/ICD11|ICD-11/i.test(cellText(row.getCell(c.id).value))) {
+          const v = cellText(row.getCell(c.version).value);
+          if (v) { icdRelease = v.startsWith("ICD") ? v : `ICD-11 ${v}`; break; }
+        }
+      }
+    }
+  }
+
+  return { groups, nameIndex, labRules, icdRelease, pendingAliases, confirmatoryProposals };
+}
+
 function parseArgs(argv: string[]): Record<string, string> {
   const out: Record<string, string> = {};
   for (let i = 0; i < argv.length; i += 1) {
@@ -219,6 +395,16 @@ async function main() {
     console.log(`  name aliases loaded: ${nameAliases.size} (from ${args.aliases})`);
   }
 
+  // ── 0. v0.1 annex, when present (C7.4 / DG-D16) ───────────────────────────
+  const annex = readAnnex(wb, cErr);
+  if (annex) {
+    console.log(`  annex detected: ${annex.groups.length} conditions, ${annex.nameIndex.size} name keys, ${annex.labRules.size} lab rows`);
+    if (args.aliases) {
+      cWarn("ANNEX_OVERRIDES_ALIAS_FILE", `The workbook carries its own "${ANNEX.aliases}" sheet, which is authoritative — the --aliases file was ignored so that names have one source of truth.`);
+      nameAliases = new Map();
+    }
+  }
+
   // ── 1. ICD-11 master (reference set for existence checks) ─────────────────
   const icd11 = new Set<string>();
   {
@@ -236,7 +422,16 @@ async function main() {
   // fixed workbook that ADDS a proper code column is picked up automatically.
   const groups: PackGroup[] = [];
   const groupByLooseName = new Map<string, string>(); // looseName → groupCode
-  {
+  if (annex) {
+    // The annex supplies AUTHORED, stable codes — the F1 ask. No provisional numbering,
+    // so GROUP_CODES_NOT_AUTHORED no longer fires.
+    for (const g of annex.groups) {
+      groups.push({ groupCode: g.groupCode, name: g.canonicalName, isCatchAll: g.isCatchAll, sourceRow: g.sourceRow });
+      groupByLooseName.set(looseNameKey(g.canonicalName), g.groupCode);
+      if (g.originalName) groupByLooseName.set(looseNameKey(g.originalName), g.groupCode);
+    }
+    for (const [k, v] of annex.nameIndex) if (!groupByLooseName.has(k)) groupByLooseName.set(k, v);
+  } else {
     const ws = getSheet(wb, SHEET.commonest);
     const firstCell = cellText(ws.getRow(1).getCell(1).value).toLowerCase();
     const HEADER_WORDS = ["diagnosis", "condition", "name", "group code", "groupcode", "cig"];
@@ -284,6 +479,9 @@ async function main() {
     }
   }
 
+  /** Sheet that defines the condition list — the annex takes over that role when present. */
+  const nameAuthority = annex ? ANNEX.conditions : SHEET.commonest;
+
   /** Resolve a name written on any sheet to a group code, or record why it failed. */
   const resolveGroup = (rawName: string, where: string, issueCode: string): string | null => {
     const name = rawName.trim();
@@ -295,12 +493,12 @@ async function main() {
     if (viaAlias) {
       const resolved = groupByLooseName.get(looseNameKey(viaAlias));
       if (resolved) return resolved;
-      cErr(issueCode, `Name alias "${name}" → "${viaAlias}" does not match any condition on ${SHEET.commonest}.`, where);
+      cErr(issueCode, `Name alias "${name}" → "${viaAlias}" does not match any condition on ${nameAuthority}.`, where);
       return null;
     }
     cErr(
       issueCode,
-      `"${name}" does not match any condition on ${SHEET.commonest}. Spellings differ between sheets; the converter matches case and punctuation only and will not guess a correction.`,
+      `"${name}" does not match any condition on ${nameAuthority}. Spellings differ between sheets; the converter matches case and punctuation only and will not guess a correction.`,
       where,
     );
     return null;
@@ -377,8 +575,13 @@ async function main() {
         }
       }
 
-      const failureMessage = c.failure ? cellText(row.getCell(c.failure).value) : "";
-      if (!failureMessage) cErr("FAILURE_MESSAGE_EMPTY", `Test "${testCode}" has no Failure_Message — a flag on this test could not be explained to the provider.`, where);
+      // DG-D17: v0's Failure_Message is sometimes clinician shorthand ("No fever/history
+      // of fever") that should never be shown to a provider. When the annex supplies a
+      // provider-facing rewrite, prefer it.
+      const annexRule = annex?.labRules.get(testCode);
+      const v0Message = c.failure ? cellText(row.getCell(c.failure).value) : "";
+      const failureMessage = annexRule?.providerMessage || v0Message;
+      if (!failureMessage) cErr("FAILURE_MESSAGE_EMPTY", `Test "${testCode}" has no provider-facing message — a flag on this test could not be explained to the provider.`, where);
 
       labRules.push({
         testCode,
@@ -396,8 +599,24 @@ async function main() {
       // RULE_HAS_NO_ALIAS warnings and the C1.5 coverage report.
       if (testName) aliases.push({ testCode, matchType: "NORMALIZED_NAME", value: normaliseAliasValue(testName) });
 
-      // SUPPORTED links from the free-text supported-diagnoses column.
-      if (c.supported) {
+      if (annexRule) {
+        // The annex already resolved these to group codes, so there is no free text left
+        // to guess at. A code that does not exist is an error, never a silent drop.
+        for (const groupCode of annexRule.supportedGroupCodes) {
+          if (groups.some((g) => g.groupCode === groupCode)) links.push({ testCode, groupCode, linkType: "SUPPORTED" });
+          else cErr("ANNEX_UNKNOWN_SUPPORTED_GROUP", `Test "${testCode}" lists supported group "${groupCode}", which is not defined on ${ANNEX.conditions}.`, where);
+        }
+        // Confirmatory links import ONLY when signed off (DG-D16). v0.1 has none, so R4
+        // stays inert — correctly, and visibly, rather than by accident.
+        if (annexRule.confirmatoryApproved && annexRule.confirmatoryGroup) {
+          if (groups.some((g) => g.groupCode === annexRule.confirmatoryGroup)) {
+            links.push({ testCode, groupCode: annexRule.confirmatoryGroup, linkType: "CONFIRMATORY" });
+          } else {
+            cErr("ANNEX_UNKNOWN_CONFIRMATORY_GROUP", `Test "${testCode}" names confirmatory group "${annexRule.confirmatoryGroup}", which is not defined on ${ANNEX.conditions}.`, where);
+          }
+        }
+      } else if (c.supported) {
+        // Legacy path: free-text supported-diagnoses column.
         const raw = cellText(row.getCell(c.supported).value);
         for (const token of raw.split(/[;,]/).map((t) => t.trim()).filter(Boolean)) {
           const groupCode = resolveGroup(token, `${where} (Supported_ICD11_Diagnoses)`, "UNRESOLVED_SUPPORTED_DIAGNOSIS");
@@ -454,7 +673,7 @@ async function main() {
         if (!groupByLooseName.has(key) && !nameAliases.has(key)) {
           cErr(
             "UNRESOLVED_FEATURES_NAME",
-            `"${name}" on ${SHEET.features.trim()} does not match any condition on ${SHEET.commonest}. Its clinical detail cannot be attached to a group.`,
+            `"${name}" on ${SHEET.features.trim()} does not match any condition on ${nameAuthority}. Its clinical detail cannot be attached to a group.`,
             `${SHEET.features.trim()}!C${r}`,
           );
         }
@@ -469,6 +688,7 @@ async function main() {
       sourceFileName: basename(inPath),
       sourceFileChecksum,
       notes: args.notes,
+      ...(annex?.icdRelease ? { icdRelease: annex.icdRelease } : {}),
     },
     groups,
     memberships,
@@ -542,6 +762,47 @@ async function main() {
       for (const x of wide) P.push(`| ${x.g.name} | \`${x.g.groupCode}\` | ${x.n} |`);
     }
     P.push("");
+
+    if (annex) {
+      // Everything the annex PROPOSED but did not sign off. These are held out of the
+      // pack deliberately, and listing them is how the clinical team sees what is waiting
+      // on a decision rather than on more work.
+      P.push("## Held out of the pack, awaiting clinical sign-off (v0.1 annex)");
+      P.push("");
+      P.push("### Confirmatory tests (rule R4)");
+      P.push("");
+      if (annex.confirmatoryProposals.length === 0) {
+        P.push("_None proposed._");
+      } else {
+        P.push(
+          "Each row proposes a test that would confirm a condition. None is imported, so " +
+            "**R4 fires for nothing** — the rule is present and inert. Signing these off is " +
+            "what switches it on.",
+        );
+        P.push("");
+        P.push("| Test | Proposed confirmatory condition | Status in workbook |");
+        P.push("|---|---|---|");
+        for (const c of annex.confirmatoryProposals) P.push(`| ${c.testCode} | \`${c.groupCode}\` | ${c.status} |`);
+      }
+      P.push("");
+      P.push("### Name aliases needing a scope decision");
+      P.push("");
+      if (annex.pendingAliases.length === 0) {
+        P.push("_None._");
+      } else {
+        P.push(
+          "The annex marks these as needing review rather than as safe spelling fixes, so " +
+            "the converter did not accept them. Deciding that two labels mean one condition " +
+            "is a clinical judgement, not a text-matching one.",
+        );
+        P.push("");
+        P.push("| Name in the workbook | Proposed condition | Status |");
+        P.push("|---|---|---|");
+        for (const a of annex.pendingAliases) P.push(`| ${a.alias} | \`${a.groupCode}\` | ${a.status} |`);
+      }
+      P.push("");
+    }
+
     mkdirSync(dirname(proposalsPath), { recursive: true });
     writeFileSync(proposalsPath, P.join("\n"));
   }
