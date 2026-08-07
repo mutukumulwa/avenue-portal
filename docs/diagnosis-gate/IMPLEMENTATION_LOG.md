@@ -697,3 +697,51 @@ conditions (§6) and the numeric exit criteria (§7).
   degrading every affected claim to "no rules evaluated". `pack-v0.json` byte-identical —
   this is a validator change, not a conversion change.
 - **W-checklist:** W6 ✓ (the ambiguous state renders on the claim with its own wording).
+
+## C7.3 — Converter reader hardening
+- **Date / commits:** 2026-08-07 · (this commit)
+- **Diagnosis (timeboxed, root cause found — not guessed):** `exceljs` failed on the v0.1
+  annex with `Cannot read properties of undefined (reading 'sheets')` at
+  `xlsx.js:323`. Cause: **openpyxl emits namespace-PREFIXED elements** (`<x:workbook>`,
+  `<x:sheets>`) while exceljs's SAX parsers match only the unprefixed form, so
+  `parseWorkbook` returned `undefined` and `model.sheets` was never set. Confirmed by
+  experiment rather than inspection: de-prefixing **workbook.xml alone** moved the error
+  on to `Cannot set properties of undefined (setting 'sheetNo')`, and de-prefixing **all
+  30 XML parts** moved it again to `reading 'name'`. The incompatibility is therefore
+  deeper than namespaces, so plan option (a) — patch/wrap exceljs — was **rejected on
+  evidence**: further hand-rolled OOXML rewriting would have been guesswork.
+- **Decision (plan option b), with the reasoning recorded:** the converter now reads via
+  **SheetJS (`@e965/xlsx@0.20.3`)**, added as a **devDependency**. Candidates were tested
+  against the real files, not chosen from documentation: `read-excel-file`'s node API did
+  not cooperate; SheetJS opened **both** workbooks with full fidelity — 18,727 rows,
+  correct values, and crucially **v0's trailing-space sheet name preserved**, which the
+  converter depends on.
+  - **Replaced rather than fell back.** A try-exceljs-then-SheetJS fallback would mean two
+    readers, two behaviours and eventual silent divergence between environments.
+  - **Provenance stated, not buried:** `@e965/xlsx` is a community republish, because
+    SheetJS distributes from its own CDN and the `xlsx` npm name is frozen at a stale
+    0.18.5 with known advisories. Pinned; the swap to the vendor tarball is one line and
+    documented in the converter header.
+  - **Runtime posture unchanged:** SheetJS is dev-only and imported by the CLI and its
+    test alone (`grep` over `src/` returns nothing); the server never parses xlsx — the
+    admin screen imports the pack.json this tool emits. `exceljs` remains a dependency
+    for the five production files that use it; none were touched.
+- **Second defect found while testing:** `XLSX.readFile` resolves `fs` through an internal
+  shim that is absent under vitest, so the guard tests could not open files the CLI could.
+  Both now read bytes with `node:fs` and use `XLSX.read(buffer)` — a reader that works in
+  the CLI but not in tests is a reader whose guards cannot run.
+- **Verified — the acceptance gates:**
+  - **`pack-v0.json` BYTE-IDENTICAL** to the committed artifact under the new reader, and
+    identical across two consecutive runs. This is the meaningful regression proof: the
+    adapter presents the same 1-based accessor surface the parsing code already used, so
+    **no parsing logic changed** — only the bytes-to-cells layer.
+  - **v0.1 now opens** (previously impossible).
+  - Notable evidence: converting v0.1 yields **identical numbers to v0** (40 groups, 669
+    memberships, 22 rules, 151 errors) — independent confirmation that the annex genuinely
+    **preserved the original six sheets** rather than editing them, as its change log claims.
+  - 4 new reader-guard tests pinning both flavours, the trailing-space name, cross-file
+    cell equality, and that repeat windows arrive as **numbers** (not strings).
+  - `tsc` + `eslint` clean; hermetic **1670 passed / 559 skipped / 0 failed**; DG DB **58/58**.
+- **W-checklist:** n/a (offline tooling).
+- **Deviation from plan:** none in outcome; the plan's option (a) was attempted first and
+  rejected with evidence, exactly as it required.

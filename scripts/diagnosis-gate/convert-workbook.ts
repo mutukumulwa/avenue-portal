@@ -29,7 +29,7 @@
 import { createHash } from "node:crypto";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, basename } from "node:path";
-import ExcelJS from "exceljs";
+import * as XLSX from "@e965/xlsx";
 import {
   type ProtocolPack,
   type PackGroup,
@@ -60,9 +60,30 @@ const SHEET = {
  */
 const CATCH_ALL_PROPOSAL_THRESHOLD = 40;
 
-type Cell = ExcelJS.CellValue;
+/**
+ * READER NOTE (C7.3). This tool originally used `exceljs`, which cannot open workbooks
+ * written by openpyxl — the v0.1 annex failed with "Cannot read properties of undefined
+ * (reading 'sheets')". Root cause: openpyxl emits namespace-PREFIXED elements
+ * (`<x:workbook>`) where exceljs's SAX parsers only match the unprefixed form. Stripping
+ * the prefix across all 30 XML parts got past that error and straight into the next one,
+ * so the incompatibility is deeper than namespaces and not worth hand-patching.
+ *
+ * SheetJS reads both files with full fidelity — including v0's trailing-space sheet name,
+ * which this converter depends on. It is a **devDependency used only by this offline CLI**:
+ * the server never parses xlsx (the admin screen imports the pack.json this tool emits),
+ * so the runtime dependency posture is unchanged. `exceljs` remains a dependency for the
+ * five production files that use it; nothing about them changed.
+ *
+ * Provenance caveat, stated rather than buried: `@e965/xlsx` is a community republish of
+ * SheetJS on npm, because SheetJS itself distributes from its own CDN and the `xlsx` name
+ * on npm is frozen at a stale 0.18.5 with known advisories. Version is pinned. If you
+ * prefer the vendor artifact, swap to
+ * `npm i -D https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz` — the import site is this
+ * one file.
+ */
+type Cell = string | number | boolean | Date | null | undefined;
 
-/** exceljs cells can be rich text, hyperlinks or formula results — flatten to text. */
+/** Flatten a cell to text. Kept defensive so any reader shape degrades gracefully. */
 function cellText(v: Cell): string {
   if (v == null) return "";
   if (typeof v === "string") return v.trim();
@@ -73,27 +94,76 @@ function cellText(v: Cell): string {
     if (Array.isArray(o.richText)) return (o.richText as Array<{ text: string }>).map((r) => r.text).join("").trim();
     if (typeof o.text === "string") return o.text.trim();
     if ("result" in o) return cellText(o.result as Cell);
+    if ("v" in o) return cellText(o.v as Cell);
     if ("hyperlink" in o && typeof o.hyperlink === "string") return o.hyperlink.trim();
   }
   return String(v).trim();
 }
 
-function getSheet(wb: ExcelJS.Workbook, name: string): ExcelJS.Worksheet {
-  const exact = wb.getWorksheet(name);
-  if (exact) return exact;
-  const loose = wb.worksheets.find((w) => w.name.trim() === name.trim());
-  if (loose) return loose;
-  throw new Error(`Worksheet "${name}" not found. Available: ${wb.worksheets.map((w) => `"${w.name}"`).join(", ")}`);
+/**
+ * A sheet presented with the tiny 1-based accessor surface the parsing code below already
+ * used, so swapping the reader changed no parsing logic — which is what makes the
+ * byte-identical v0 output a meaningful regression gate.
+ */
+interface Sheet {
+  name: string;
+  rowCount: number;
+  colCount: number;
+  getRow(row: number): { getCell(col: number): { value: Cell } };
 }
 
-/** Map header text → column index for a sheet whose row `headerRow` holds headers. */
-function headerIndex(ws: ExcelJS.Worksheet, headerRow: number): Map<string, number> {
+interface Workbook {
+  sheetNames: string[];
+  sheet(name: string): Sheet | undefined;
+}
+
+function loadWorkbook(path: string): Workbook {
+  // Read the bytes ourselves rather than using XLSX.readFile: SheetJS resolves `fs`
+  // through an internal shim that is not present in every module environment (it is
+  // absent under vitest), and a reader that works in the CLI but not in tests is a
+  // reader whose guard tests cannot run.
+  const wb = XLSX.read(readFileSync(path), { type: "buffer", cellDates: true });
+  const cache = new Map<string, Sheet>();
+  const build = (name: string): Sheet => {
+    const raw = XLSX.utils.sheet_to_json<Cell[]>(wb.Sheets[name], { header: 1, raw: true, defval: null, blankrows: true });
+    const colCount = raw.reduce((m, r) => Math.max(m, r?.length ?? 0), 0);
+    return {
+      name,
+      rowCount: raw.length,
+      colCount,
+      getRow: (row) => ({ getCell: (col) => ({ value: raw[row - 1]?.[col - 1] ?? null }) }),
+    };
+  };
+  return {
+    sheetNames: wb.SheetNames,
+    sheet: (name) => {
+      if (!wb.Sheets[name]) return undefined;
+      let s = cache.get(name);
+      if (!s) { s = build(name); cache.set(name, s); }
+      return s;
+    },
+  };
+}
+
+function getSheet(wb: Workbook, name: string): Sheet {
+  const exact = wb.sheet(name);
+  if (exact) return exact;
+  // The v0 workbook has a sheet whose name carries a TRAILING SPACE; tolerate that in
+  // both directions rather than making callers guess.
+  const looseName = wb.sheetNames.find((n) => n.trim() === name.trim());
+  const loose = looseName ? wb.sheet(looseName) : undefined;
+  if (loose) return loose;
+  throw new Error(`Worksheet "${name}" not found. Available: ${wb.sheetNames.map((n) => `"${n}"`).join(", ")}`);
+}
+
+/** Map header text → 1-based column index for a sheet whose `headerRow` holds headers. */
+function headerIndex(ws: Sheet, headerRow: number): Map<string, number> {
   const idx = new Map<string, number>();
   const row = ws.getRow(headerRow);
-  row.eachCell({ includeEmpty: false }, (cell, col) => {
-    const t = cellText(cell.value);
-    if (t) idx.set(t.trim().toLowerCase(), col);
-  });
+  for (let c = 1; c <= ws.colCount; c += 1) {
+    const t = cellText(row.getCell(c).value);
+    if (t) idx.set(t.trim().toLowerCase(), c);
+  }
   return idx;
 }
 
@@ -132,8 +202,7 @@ async function main() {
   const bytes = readFileSync(inPath);
   const sourceFileChecksum = createHash("sha256").update(bytes).digest("hex");
 
-  const wb = new ExcelJS.Workbook();
-  await wb.xlsx.readFile(inPath);
+  const wb = loadWorkbook(inPath);
 
   const conversionIssues: ValidationIssue[] = [];
   const cErr = (code: string, message: string, where?: string) => conversionIssues.push({ rule: "C", code, severity: "ERROR", message, where });
