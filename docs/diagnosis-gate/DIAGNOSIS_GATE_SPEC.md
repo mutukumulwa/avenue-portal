@@ -70,6 +70,7 @@ These are binding. Changing any of them requires re-signing this specification.
 | **DG-D17** | **Provider-facing text is the workbook's provider-facing text**, preferred over clinician shorthand where both exist. | *"No fever/history of fever"* tells a provider nothing they can act on. A message that cannot be acted on produces a phone call, not a corrected claim. |
 | **DG-D18** | The pack records the **ICD release it targets** (e.g. "ICD-11 MMS 2026-01"), as a stated target only — not a claim that every code was checked against that release. | Codes move between releases. Recording the intended release makes a later mismatch findable; claiming verification we did not perform would not. |
 | **DG-D19** | **Emergency bypass is a Rung-2 concept, not a Rung-1 rule.** It requires structured emergency evidence and must never be inferred from free text alone. | Genuine emergencies must not be routed for review — but a bypass triggered by keyword matching is an open door. It waits for structured evidence, per the clinical team's own wording. |
+| **DG-D20** | **A catch-all diagnosis routes the claim to a human once the gate is live** — before any rule runs, and regardless of what the rules would find. DG-D8 bars a catch-all's *rules* from ever going live; this adds that the *claim itself* leaves the automated path. While the gate is record-only, the fact is recorded and counted, so the review volume this creates is measured before anyone switches it on. | Clinical directive of 2026-08-07 (Q7), and it is stronger than DG-D8 alone in the right way: under D8 a catch-all claim still sailed on and could auto-adjudicate through the other filters — exactly the "dumping ground" the directive names. A broad label is not a diagnosis; a person decides what it is worth. |
 
 ---
 
@@ -145,6 +146,7 @@ This section replaces the workbook's empty `Claims filter` sheet.
 | Rule | Record-only mode (launch) | Routing mode (per condition) | Ever denies? |
 |---|---|---|---|
 | R1 unresolved (no group, or **more than one**) | pass; recorded | pass (default) / route to standard adjudication (strict mode) | No |
+| R1 resolves to a **catch-all category** (DG-D20) | pass; recorded | route → **Clinical review** queue, before any rule runs | No |
 | R2 unsupported test | pass; recorded | route → **Clinical review** queue | No |
 | R3 repeat in window | pass; recorded | route → **Clinical review** queue | No — unless DG-D13 short-pay is separately enabled |
 | R4 confirmation absent | pass; recorded | route → **Clinical review** queue | No |
@@ -281,3 +283,4 @@ any claim line is reduced automatically (DG-D13).
 |---|---|---|
 | DG-1.0 | 2026-08-06 | Initial draft for sign-off. Decisions DG-D1…D13; rules R1–R4; failure semantics replacing the empty `Claims filter` sheet. |
 | DG-1.0 | 2026-08-07 | Amended before signature, so no re-signing is owed. Adds DG-D14…D19 from the v0.1 annex review: sub-day windows unenforceable and day-level arithmetic (R3/R4); ambiguity evaluates nothing (R1); annex acceptance status-gated; provider-facing wording preferred; ICD release target recorded; emergency bypass parked in §8. §4 gains the "not evaluated is not a clinical pass" statement. Three of these correct our own implementation, not the workbook. |
+| DG-1.0 | 2026-08-07 | **DG-D20** added from the clinical leads' written directive (Claims Clinical Review, Q7): a catch-all diagnosis routes the claim to a human once the gate is live, not merely "its rules never fire". §4 gains the corresponding row. Built same day; inert until `clinicalGateEnabled`, like everything else. |

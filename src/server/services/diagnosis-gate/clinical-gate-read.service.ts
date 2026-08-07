@@ -57,6 +57,12 @@ export interface ShadowSummary {
   outOfScope: number;
   ambiguous: number;
   dormant: number;
+  /**
+   * Claims whose diagnosis resolved to a catch-all category (DG-D20). Once the gate is
+   * live these route to a human on that fact alone, so the shadow report must show how
+   * much review volume that switch will create BEFORE anyone flips it.
+   */
+  catchAll: number;
   /** Claims that would have been routed had the gate been live for their condition. */
   wouldRoute: number;
   /** wouldRoute ÷ inScope — the guard against re-routing the whole book. */
@@ -117,6 +123,7 @@ export const ClinicalGateReadService = {
     let outOfScope = 0;
     let ambiguous = 0;
     let dormant = 0;
+    let catchAll = 0;
     let wouldRoute = 0;
 
     const perRuleClaims = new Map<ClinicalRuleCode, Set<string>>(CLINICAL_RULES.map((r) => [r, new Set<string>()]));
@@ -140,6 +147,12 @@ export const ClinicalGateReadService = {
       }
       inScope += 1;
       if (res.ambiguous) ambiguous += 1;
+      // DG-D20: a catch-all resolution routes by itself once live, so it counts toward
+      // would-route even when no rule found anything.
+      if (res.catchAll) {
+        catchAll += 1;
+        wouldRoute += 1;
+      }
 
       const key = res.groupCode ?? "—";
       const g = groups.get(key) ?? { groupCode: key, groupName: res.groupName ?? key, evaluated: 0, flagged: 0 };
@@ -158,7 +171,7 @@ export const ClinicalGateReadService = {
       const hits = res.ruleHits ?? [];
       if (hits.length > 0) {
         g.flagged += 1;
-        wouldRoute += 1;
+        if (!res.catchAll) wouldRoute += 1; // already counted above — never double-count a claim
         for (const h of hits) {
           perRuleClaims.get(h.rule)?.add(row.claimId);
           perRuleFindings.set(h.rule, (perRuleFindings.get(h.rule) ?? 0) + 1);
@@ -195,6 +208,7 @@ export const ClinicalGateReadService = {
       outOfScope,
       ambiguous,
       dormant,
+      catchAll,
       wouldRoute,
       wouldRouteRate: inScope > 0 ? wouldRoute / inScope : null,
       rules: CLINICAL_RULES.map((rule) => {

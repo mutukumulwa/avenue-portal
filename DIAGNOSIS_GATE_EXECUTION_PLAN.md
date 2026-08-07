@@ -309,9 +309,15 @@ Stage control flow (exact):
    a code that belongs to two groups (validator V11), so the fix is a clinical assignment.
 3. Unresolved group: if `policy.requireClinicalGroup && policy.clinicalGateEnabled` →
    `ROUTE(CLINICAL_SCOPE_REVIEW)`; else `PASS` with `result:{outOfScope:true}` (DG-D11).
-4. Resolved group with `enabledForShadow=false` → `PASS` `result:{groupDisabled:true}`.
-5. Evaluate R2, R3, R4 (§6.3). Collect `ruleHits[]`.
-6. If hits and `policy.clinicalGateEnabled && group.enabledForLive && !group.isCatchAll`
+4. Resolved group that `isCatchAll` (DG-D20, added by C7.6 on the clinical leads' Q7
+   directive): if `policy.clinicalGateEnabled` → `ROUTE(CLINICAL_CATCH_ALL_REVIEW)`
+   BEFORE any rule runs — the breadth of the label is itself the reason for review, and
+   the claim must not be able to auto-adjudicate through the later filters. Gate off →
+   continue with `catchAll:true` recorded, so the shadow report prices the review volume
+   this switch will create.
+5. Resolved group with `enabledForShadow=false` → `PASS` `result:{groupDisabled:true}`.
+6. Evaluate R2, R3, R4 (§6.3). Collect `ruleHits[]`.
+7. If hits and `policy.clinicalGateEnabled && group.enabledForLive && !group.isCatchAll`
    → `ROUTE(<first hit's route code>)` with the full `ruleHits` in `result`.
    Otherwise → `PASS` with `result:{recordOnly:true, ruleHits, groupCode, packVersion}`.
    **Either way the hits are persisted** in the stage row (`ClaimProcessingStage.result`)
@@ -808,6 +814,7 @@ DPPA privacy design for free-text ingestion (minimize, extract-at-edge, retentio
 | C7.3 | Converter reader hardening | — | see addendum |
 | C7.4 | v0.1 annex intake + red report | C7.1–C7.3 | see addendum |
 | C7.5 | Spec amendments DG-D14–D19 + docs | C7.1–C7.4 | see addendum |
+| C7.6 | DG-D20 catch-all → human review (clinical Q7 directive, 2026-08-07) | C7.5 | new scope from the clinical leads' written response |
 
 Phase C7 (added 2026-08-07, triggered by the v0.1 research-remediated annex) is specified
 in `docs/diagnosis-gate/PLAN_C7_V01_INTAKE.md` — same execution rules, same W-invariants.

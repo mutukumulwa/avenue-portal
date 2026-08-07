@@ -68,6 +68,7 @@ export const ROUTE_CODES = {
   CLINICAL_LAB_UNSUPPORTED: "CLINICAL_LAB_UNSUPPORTED",
   CLINICAL_REPEAT_WINDOW: "CLINICAL_REPEAT_WINDOW",
   CLINICAL_CONFIRMATION_MISSING: "CLINICAL_CONFIRMATION_MISSING",
+  CLINICAL_CATCH_ALL_REVIEW: "CLINICAL_CATCH_ALL_REVIEW",
 } as const;
 export type RouteCode = (typeof ROUTE_CODES)[keyof typeof ROUTE_CODES];
 
@@ -133,6 +134,7 @@ export const REASON_CATALOG: Record<RouteCode, ReasonEntry> = {
   CLINICAL_LAB_UNSUPPORTED: { queue: QUEUES.CLINICAL_REVIEW, internal: "A billed test is not supported by the claim's diagnosis group (R2).", provider: "A billed test does not appear to be indicated by the stated diagnosis and needs review.", member: GENERIC_MEMBER_REVIEW, remedy: "Confirm the test was indicated, or adjust the claim.", resubmissionAllowed: false, overrideAllowed: true, overrideType: "MANUAL_APPROVAL" },
   CLINICAL_REPEAT_WINDOW: { queue: QUEUES.CLINICAL_REVIEW, internal: "A billed test repeats inside its clinically-set repeat window (R3).", provider: "A billed test was recently performed for this member; the repeat needs review.", member: GENERIC_MEMBER_REVIEW, remedy: "Confirm the repeat was clinically necessary, or adjust the claim.", resubmissionAllowed: false, overrideAllowed: true, overrideType: "MANUAL_APPROVAL" },
   CLINICAL_CONFIRMATION_MISSING: { queue: QUEUES.CLINICAL_REVIEW, internal: "No confirmatory test is present for a diagnosis the pack marks as confirmable (R4). NOTE: this proves the test was not BILLED — the platform never sees results.", provider: "This diagnosis normally requires a confirmatory test on record; none was found on this claim.", member: GENERIC_MEMBER_REVIEW, remedy: "Confirm the diagnostic basis, or attach the confirmatory test.", resubmissionAllowed: true, overrideAllowed: true, overrideType: "MANUAL_APPROVAL" },
+  CLINICAL_CATCH_ALL_REVIEW: { queue: QUEUES.CLINICAL_REVIEW, internal: "The diagnosis resolves to a catch-all category (DG-D20): a broad label, not a specific diagnosis, so it must not travel the automated path. Routed regardless of rule findings.", provider: "The stated diagnosis is a broad category; a more specific diagnosis is needed for automated processing, so this claim will be reviewed by our team.", member: GENERIC_MEMBER_REVIEW, remedy: "Adjudicate on clinical merit; encourage the provider to code the specific condition.", resubmissionAllowed: false, overrideAllowed: true, overrideType: "MANUAL_APPROVAL" },
 };
 
 /** Type guard: is this string a catalogued route code? (F6.1) */

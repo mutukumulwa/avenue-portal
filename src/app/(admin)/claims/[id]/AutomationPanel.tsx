@@ -59,6 +59,22 @@ function ClinicalFindings({ result }: { result: ClinicalStageResult }) {
     );
   }
 
+  // DG-D20: the diagnosis is a catch-all category. When the gate is live this alone
+  // routed the claim — before any rule ran — so the reviewer must be told the reason is
+  // the breadth of the label, not a rule finding.
+  if (result.catchAll && hits.length === 0 && inert.length === 0) {
+    return (
+      <div className="rounded-[6px] border border-[#EEEEEE] bg-[#FAFAFA] p-3">
+        <span className="text-[11px] font-bold text-brand-text-heading">Catch-all diagnosis</span>
+        <p className="text-[11px] text-brand-text-body mt-1">
+          {result.groupName ?? "This diagnosis"} is a broad category rather than a specific
+          diagnosis, so it never travels the automated path. Adjudicate on clinical merit;
+          a more specific diagnosis code would let future claims be processed automatically.
+        </p>
+      </div>
+    );
+  }
+
   if (hits.length === 0 && inert.length === 0) return null;
 
   return (
@@ -66,6 +82,11 @@ function ClinicalFindings({ result }: { result: ClinicalStageResult }) {
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-[11px] font-bold text-brand-text-heading">Clinical findings</span>
         {result.groupName && <span className="text-[10px] text-brand-text-muted">diagnosis group: {result.groupName}</span>}
+        {result.catchAll && (
+          <span className="text-[10px] font-semibold text-brand-text-muted" title="Catch-all diagnoses never travel the automated path (DG-D20)">
+            catch-all category
+          </span>
+        )}
         {result.recordOnly && (
           <span className="text-[10px] font-semibold text-brand-text-muted" title="The gate is not routing claims for this condition yet">
             recorded only — this claim was not diverted

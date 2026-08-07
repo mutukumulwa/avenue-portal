@@ -69,6 +69,13 @@ export interface ClinicalStageResult extends Record<string, unknown> {
   candidateGroups?: Array<{ groupCode: string; groupName: string }>;
   /** True when findings were recorded but deliberately not acted on. */
   recordOnly?: boolean;
+  /**
+   * DG-D20: the diagnosis resolved to a catch-all category. When the gate is live the
+   * claim is routed to a human on this fact alone — a broad label must not travel the
+   * automated path (Q7 clinical directive, 2026-08-07). When the gate is off this is
+   * recorded so the shadow report can count how often it WOULD have routed.
+   */
+  catchAll?: boolean;
   ruleHits?: ClinicalRuleHit[];
   /** Rules the pack defines but this evaluation could not check (DG-D14). */
   inertRules?: ClinicalInertRule[];
@@ -385,7 +392,24 @@ export async function stageClinical(ctx: EvalContext): Promise<StageOutcome> {
     packVersion: pack.version,
     groupCode: group.groupCode,
     groupName: group.groupName,
+    ...(group.isCatchAll ? { catchAll: true } : {}),
   };
+
+  // 3c. Catch-all category (DG-D20). A catch-all is a broad label, not a diagnosis —
+  //     under DG-D8 it could never unlock the automated path, but the claim itself would
+  //     have sailed on and could still auto-adjudicate through the other filters. The
+  //     clinical directive (Q7, 2026-08-07) closes that: once the gate is live, a claim
+  //     under a catch-all code goes to a human, full stop — regardless of what the rules
+  //     find, which is why this sits BEFORE rule evaluation. With the gate off, the fact
+  //     is recorded (`catchAll: true` on `base`) and the claim passes, so shipping this
+  //     changes nothing until the deliberate switch (DG-D4).
+  if (group.isCatchAll && gateEnabled) {
+    return ROUTE(
+      ROUTE_CODES.CLINICAL_CATCH_ALL_REVIEW,
+      `diagnosis resolves to catch-all category ${group.groupCode} (${group.groupName}) — manual review required`,
+      base,
+    );
+  }
 
   // 4. A condition switched off for shadow is not evaluated at all — the clinical team
   //    can silence a noisy condition without withdrawing the whole pack.
@@ -518,10 +542,11 @@ export async function stageClinical(ctx: EvalContext): Promise<StageOutcome> {
 
   if (ruleHits.length === 0) return PASS(withInert);
 
-  // 6. Act, or merely record. Routing requires BOTH the policy master switch and this
-  //    specific condition being live (DG-D5) — and a catch-all can never route at all
-  //    (DG-D8), enforced here as well as at write time so neither layer alone is
-  //    load-bearing.
+  // 6. Act, or merely record. Routing on rule findings requires BOTH the policy master
+  //    switch and this specific condition being live (DG-D5). A catch-all never gets
+  //    here with the gate on — step 3c already routed it (DG-D20) — but the exclusion
+  //    stays as defence-in-depth: a catch-all's RULES must never be what routes a claim
+  //    (DG-D8), whatever path reached this point.
   const mayRoute = gateEnabled && group.enabledForLive && !group.isCatchAll;
   const withHits: ClinicalStageResult = { ...withInert, ruleHits };
 

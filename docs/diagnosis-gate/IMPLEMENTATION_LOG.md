@@ -872,3 +872,42 @@ sign-off.
   to verify the suites, not to modify the user's database.
 - **W-checklist:** n/a (documentation + an optional report parameter; no new UI surface).
 - **Deviation from plan:** none.
+
+---
+
+## C7.6 — DG-D20: a catch-all diagnosis routes to a human (clinical directive Q7)
+
+**Goal:** implement the one directly-buildable directive from the clinical leads' written
+response (Claims Clinical Review, Dr. Paul Makau, 2026-08-07): catch-all and unspecified
+categories "must be locked out of automated approval paths … routing to a human medical
+reviewer, prohibiting auto-adjudication."
+
+- **Why this was a real gap, not a restatement of DG-D8.** DG-D8 bars a catch-all's
+  RULES from going live — but the claim itself passed the stage and could still
+  auto-adjudicate through eligibility/contract/benefit/fraud. That is precisely the
+  "dumping ground" the directive names: a broad label as the key to the automated path.
+  The directive quarantines the CLAIM, which is the stronger and correct protection.
+- **Build:** new route code `CLINICAL_CATCH_ALL_REVIEW` (reason catalog → CLINICAL_REVIEW
+  queue, overridable, member text generic); stage step 3c routes a catch-all resolution
+  when `clinicalGateEnabled`, BEFORE rule evaluation — the breadth of the label is the
+  reason, not any finding. Gate off → `catchAll: true` recorded on the result; the shadow
+  summary counts it into `catchAll` and `wouldRoute` (no double-count with rule hits), so
+  the review volume the switch will create is priced before anyone flips it. Claim-detail
+  panel renders both faces (routed: "Catch-all diagnosis" explainer; record-only: a
+  chip), because a reviewer facing a bare ROUTED chip with no findings would reasonably
+  conclude the system glitched (the W6 lesson).
+- **Deliberately NOT gated on `enabledForLive`:** a catch-all can never BE live (write-
+  time guard), so per-condition go-live cannot be the switch. The master gate flag alone
+  governs it — asserted by a test.
+- **Step-6 exclusion kept as defence-in-depth:** with the gate on, a catch-all never
+  reaches step 6; the `!isCatchAll` term stays so a catch-all's rules can never be what
+  routes a claim, whatever path reached that point.
+- **Verified:** tsc + eslint clean; route-code canary consciously 27→28; hermetic
+  **1681 passed / 0 failed**; DG real-DB **62/62** (4 new: record-when-off /
+  route-when-on-with-zero-findings / independent-of-enabledForLive / specific-diagnosis-
+  untouched). Deploy-inert as always: no schema change, gate default off.
+- **W-checklist:** route code catalogued with queue+texts (W3), claim-detail renders the
+  outcome (W6), no new permission or nav surface.
+- **Deviation from plan:** none — this package is NEW scope from the clinical directive,
+  recorded as C7.6 in the addendum's spirit; spec DG-D20 + §4 row + change log written
+  the same day the directive arrived.

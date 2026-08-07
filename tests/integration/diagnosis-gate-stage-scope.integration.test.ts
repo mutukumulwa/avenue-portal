@@ -217,6 +217,42 @@ describe.skipIf(!URL_SET)("DG C2.1 integration — CLINICAL stage scope resoluti
     expect(out.disposition).toBe("PASS");
   });
 
+  // ── DG-D20 (C7.6): catch-all categories route to a human once the gate is live ──
+  // Clinical directive Q7 (2026-08-07): a broad label like Atopy must not travel the
+  // automated path AT ALL — not merely "its rules never fire" (DG-D8), but the claim
+  // itself goes to a reviewer. Before this, a catch-all claim sailed on and could still
+  // auto-adjudicate through the other filters.
+
+  it("records a catch-all resolution while the gate is off — deploy changes nothing (DG-D20)", async () => {
+    const out = await stageClinical(ctxFor({ diagnoses: [{ code: "EK00", isPrimary: true }] }));
+    expect(out.disposition).toBe("PASS");
+    expect(out.result).toMatchObject({ groupCode: "CIG-009", groupName: "Atopy", catchAll: true });
+  });
+
+  it("ROUTES a catch-all claim to clinical review once the gate is live — even with zero rule findings", async () => {
+    // No billed lines at all, so no rule could possibly fire. The breadth of the label
+    // is itself the reason for review.
+    const out = await stageClinical(ctxFor({ diagnoses: [{ code: "EK00", isPrimary: true }], clinicalGateEnabled: true }));
+    expect(out.disposition).toBe("ROUTE");
+    expect(out.disposition === "ROUTE" && out.code).toBe("CLINICAL_CATCH_ALL_REVIEW");
+    expect(out.result).toMatchObject({ groupCode: "CIG-009", catchAll: true });
+  });
+
+  it("catch-all routing does not depend on per-condition go-live — a catch-all can never BE live", async () => {
+    // enabledForLive stays false on CIG-009 (write-time guard bars enabling a
+    // catch-all); the route must fire from the master switch alone.
+    const group = await prisma.clinicalInterventionGroup.findFirstOrThrow({ where: { packId, groupCode: "CIG-009" } });
+    expect(group.enabledForLive).toBe(false);
+    const out = await stageClinical(ctxFor({ diagnoses: [{ code: "EK00", isPrimary: true }], clinicalGateEnabled: true }));
+    expect(out.disposition).toBe("ROUTE");
+  });
+
+  it("a specific (non-catch-all) diagnosis is untouched by DG-D20", async () => {
+    const out = await stageClinical(ctxFor({ diagnoses: [{ code: "1F40", isPrimary: true }], clinicalGateEnabled: true }));
+    expect(out.disposition).toBe("PASS");
+    expect((out.result as Record<string, unknown>).catchAll).toBeUndefined();
+  });
+
   it("skips a condition switched off for shadow, without withdrawing the pack", async () => {
     const group = await prisma.clinicalInterventionGroup.findFirstOrThrow({ where: { packId, groupCode: "CIG-002" } });
     await ProtocolPackService.setGroupEnablement(tenantId, group.id, { enabledForShadow: false });

@@ -34,9 +34,11 @@ describe("F3.2 — catalog is complete", () => {
     }
   });
 
-  // 23 autopilot §10.3 codes + 4 added by the Diagnosis Gate (DG C2.1).
-  it("covers the 23 §10.3 codes plus the 4 Diagnosis Gate codes", () => {
-    expect(ALL_CODES).toHaveLength(27);
+  // 23 autopilot §10.3 codes + 4 added by the Diagnosis Gate (DG C2.1) + the DG-D20
+  // catch-all route (C7.6). This count is a canary: a new route code must be a
+  // deliberate act, recorded here, never a drive-by.
+  it("covers the 23 §10.3 codes plus the 5 Diagnosis Gate codes", () => {
+    expect(ALL_CODES).toHaveLength(28);
   });
 });
 
@@ -46,6 +48,7 @@ describe("DG C2.1 — clinical route codes", () => {
     "CLINICAL_LAB_UNSUPPORTED",
     "CLINICAL_REPEAT_WINDOW",
     "CLINICAL_CONFIRMATION_MISSING",
+    "CLINICAL_CATCH_ALL_REVIEW",
   ] as const;
 
   it.each(CLINICAL_CODES)("%s is catalogued and lands in a human queue", (code) => {
@@ -67,10 +70,13 @@ describe("DG C2.1 — clinical route codes", () => {
     }
   });
 
-  it("the three protocol findings share one clinical review queue; scope goes to normal adjudication", () => {
+  it("the clinical findings share one clinical review queue; scope goes to normal adjudication", () => {
     expect(queueFor("CLINICAL_LAB_UNSUPPORTED")).toBe(QUEUES.CLINICAL_REVIEW);
     expect(queueFor("CLINICAL_REPEAT_WINDOW")).toBe(QUEUES.CLINICAL_REVIEW);
     expect(queueFor("CLINICAL_CONFIRMATION_MISSING")).toBe(QUEUES.CLINICAL_REVIEW);
+    // DG-D20: a catch-all diagnosis is a clinical-review matter — the reviewer needs
+    // clinical judgement to adjudicate a broad label, not just standard processing.
+    expect(queueFor("CLINICAL_CATCH_ALL_REVIEW")).toBe(QUEUES.CLINICAL_REVIEW);
     // Out-of-scope is not a clinical finding — it just means "we have no protocol for
     // this diagnosis", so it belongs with ordinary manual adjudication.
     expect(queueFor("CLINICAL_SCOPE_REVIEW")).toBe(QUEUES.MANUAL_ADJUDICATION);
