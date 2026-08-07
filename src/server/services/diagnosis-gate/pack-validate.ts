@@ -130,6 +130,36 @@ export function validatePack(pack: ProtocolPack, ctx: ValidationContext = {}): V
     }
   }
 
+  // ── V11 (DG-D15): one code must belong to exactly one condition ───────────
+  // A code in several conditions is clinically defensible (ICD hierarchies overlap) but
+  // leaves the engine no principled way to choose which condition's rules apply — and
+  // the stage refuses to guess, so every such claim goes unevaluated. Blocking at import
+  // puts the decision where it belongs: with the clinical team, once, in the content.
+  // Reported per CODE rather than per membership, so 85 conflicts read as 85 decisions.
+  const groupsPerCode = new Map<string, Set<string>>();
+  for (const m of pack.memberships) {
+    if (!m.code?.trim() || !groupByCode.has(m.groupCode)) continue;
+    const key = `${m.codeSystem}|${normaliseCode(m.code)}`;
+    const set = groupsPerCode.get(key) ?? new Set<string>();
+    set.add(m.groupCode);
+    groupsPerCode.set(key, set);
+  }
+  let crossGroupCodes = 0;
+  for (const [key, groups] of groupsPerCode) {
+    if (groups.size < 2) continue;
+    crossGroupCodes += 1;
+    const [system, code] = key.split("|");
+    const names = [...groups].sort().map((gc) => `${gc} (${groupByCode.get(gc)?.name ?? "?"})`).join(", ");
+    issues.push(
+      err(
+        "V11",
+        "CODE_IN_MULTIPLE_GROUPS",
+        `${system} code "${code}" belongs to ${groups.size} conditions — ${names}. A claim carrying it cannot be resolved to one condition, so no clinical rule would be evaluated. Assign the code to exactly one condition.`,
+        key,
+      ),
+    );
+  }
+
   // ── V4 / V6: lab rules and links ──────────────────────────────────────────
   const seenRule = new Set<string>();
   for (const r of pack.labRules) {
@@ -244,6 +274,7 @@ export function validatePack(pack: ProtocolPack, ctx: ValidationContext = {}): V
       rulesRequiringDiagnosis: pack.labRules.filter((r) => r.requiresDiagnosis).length,
       rulesWithRepeatWindow: pack.labRules.filter((r) => r.repeatWindowHours != null).length,
       subdayWindowRules: pack.labRules.filter((r) => isSubDayWindow(r.repeatWindowHours)).length,
+      crossGroupCodes,
       links: pack.links.length,
       supportedLinks: pack.links.filter((l) => l.linkType === "SUPPORTED").length,
       confirmatoryLinks: pack.links.filter((l) => l.linkType === "CONFIRMATORY").length,

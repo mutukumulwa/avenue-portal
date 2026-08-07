@@ -63,8 +63,10 @@ export interface ClinicalStageResult extends Record<string, unknown> {
   skipped?: string;
   /** The claim's diagnosis matched no governed condition. */
   outOfScope?: boolean;
-  /** More than one condition matched — recorded so the pack can be disambiguated. */
+  /** More than one condition matched — NO rules were evaluated (DG-D15). */
   ambiguous?: boolean;
+  /** Every condition the diagnosis matched, when ambiguous. */
+  candidateGroups?: Array<{ groupCode: string; groupName: string }>;
   /** True when findings were recorded but deliberately not acted on. */
   recordOnly?: boolean;
   ruleHits?: ClinicalRuleHit[];
@@ -109,16 +111,40 @@ export function lineMatchKeys(line: { cptCode?: string | null; drugCode?: string
   return keys;
 }
 
+/** A single, unambiguous governed condition the claim resolved to. */
+export interface ResolvedGroup {
+  groupId: string;
+  groupCode: string;
+  groupName: string;
+  isCatchAll: boolean;
+  enabledForShadow: boolean;
+  enabledForLive: boolean;
+  confirmationLookbackHours: number | null;
+}
+
+/**
+ * The claim's diagnosis matched MORE THAN ONE governed condition (DG-D15).
+ *
+ * This is common in real content — 12.7% of the v0 mappings put one ICD code in several
+ * conditions (`CA09` is in Allergic Rhinitis, Nasopharyngitis and Pharyngitis), which is
+ * clinically defensible because ICD hierarchies overlap. What is NOT defensible is
+ * letting database row order decide which condition's rules run, so no winner is picked.
+ */
+export interface AmbiguousGroups {
+  ambiguous: true;
+  candidates: Array<{ groupCode: string; groupName: string }>;
+}
+
 /**
  * Resolve the claim's diagnosis to a governed condition in the active pack.
  * Primary diagnoses win; a line-level code is the fallback. Returns null when nothing
- * in the pack matches.
+ * in the pack matches, or an `AmbiguousGroups` marker when several match (DG-D15).
  */
 async function resolveGroup(
   db: PrismaClient,
   packId: string,
   codes: { primary: string[]; all: string[] },
-): Promise<{ groupId: string; groupCode: string; groupName: string; isCatchAll: boolean; enabledForShadow: boolean; enabledForLive: boolean; confirmationLookbackHours: number | null; ambiguous: boolean } | null> {
+): Promise<ResolvedGroup | AmbiguousGroups | null> {
   const lookup = async (candidates: string[]) => {
     if (candidates.length === 0) return [];
     return db.clinicalCodeMembership.findMany({
@@ -139,17 +165,35 @@ async function resolveGroup(
   if (rows.length === 0) return null;
 
   const distinct = new Map(rows.map((r) => [r.group.id, r.group]));
-  const first = [...distinct.values()][0];
+
+  // DG-D15: no tie-break exists. Picking `[...distinct.values()][0]` would let database
+  // row order decide which clinical rules run — and the ordering is not even stable
+  // across queries. The claim is reported as ambiguous with every candidate named, and
+  // the pack gets fixed (validator V11 blocks the import that produced it).
+  if (distinct.size > 1) {
+    return {
+      ambiguous: true,
+      candidates: [...distinct.values()]
+        .map((g) => ({ groupCode: g.groupCode, groupName: g.name }))
+        .sort((a, b) => a.groupCode.localeCompare(b.groupCode)), // stable for review/tests
+    };
+  }
+
+  const only = [...distinct.values()][0];
   return {
-    groupId: first.id,
-    groupCode: first.groupCode,
-    groupName: first.name,
-    isCatchAll: first.isCatchAll,
-    enabledForShadow: first.enabledForShadow,
-    enabledForLive: first.enabledForLive,
-    confirmationLookbackHours: first.confirmationLookbackHours,
-    ambiguous: distinct.size > 1,
+    groupId: only.id,
+    groupCode: only.groupCode,
+    groupName: only.name,
+    isCatchAll: only.isCatchAll,
+    enabledForShadow: only.enabledForShadow,
+    enabledForLive: only.enabledForLive,
+    confirmationLookbackHours: only.confirmationLookbackHours,
   };
+}
+
+/** Type guard: did resolution end in ambiguity rather than a single condition? */
+function isAmbiguous(r: ResolvedGroup | AmbiguousGroups | null): r is AmbiguousGroups {
+  return r !== null && "ambiguous" in r;
 }
 
 interface MatchedRule {
@@ -311,12 +355,36 @@ export async function stageClinical(ctx: EvalContext): Promise<StageOutcome> {
     return PASS(result);
   }
 
+  // 3b. Ambiguous resolution (DG-D15): the diagnosis matched several governed
+  //     conditions, so NO rules are evaluated — running one condition's rules because
+  //     it happened to come back first would make the outcome depend on row order.
+  //     Every candidate is recorded so the pack can be disambiguated by the clinical
+  //     team (validator V11 blocks the import that allowed it).
+  //
+  //     In strict mode an ambiguous diagnosis counts as unresolved: it is not a
+  //     governed resolution, so it does not satisfy "requires a governed diagnosis".
+  if (isAmbiguous(group)) {
+    const result: ClinicalStageResult = {
+      packId: pack.id,
+      packVersion: pack.version,
+      ambiguous: true,
+      candidateGroups: group.candidates,
+    };
+    if (gateEnabled && requireGroup) {
+      return ROUTE(
+        ROUTE_CODES.CLINICAL_SCOPE_REVIEW,
+        `diagnosis matches ${group.candidates.length} governed conditions — not evaluated`,
+        result,
+      );
+    }
+    return PASS(result);
+  }
+
   const base: ClinicalStageResult = {
     packId: pack.id,
     packVersion: pack.version,
     groupCode: group.groupCode,
     groupName: group.groupName,
-    ...(group.ambiguous ? { ambiguous: true } : {}),
   };
 
   // 4. A condition switched off for shadow is not evaluated at all — the clinical team

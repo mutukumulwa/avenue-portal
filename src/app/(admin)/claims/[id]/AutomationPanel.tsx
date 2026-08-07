@@ -39,8 +39,27 @@ const RULE_LABEL: Record<string, string> = {
  */
 function ClinicalFindings({ result }: { result: ClinicalStageResult }) {
   const hits: ClinicalRuleHit[] = result.ruleHits ?? [];
+  const inert = result.inertRules ?? [];
   if (result.skipped) return null; // gate dormant — nothing to say
-  if (hits.length === 0) return null;
+
+  // DG-D15: the diagnosis matched several governed conditions, so nothing was checked.
+  // Say so plainly — a reviewer seeing an empty clinical section would reasonably
+  // assume the claim was examined and found clean.
+  if (result.ambiguous) {
+    const names = (result.candidateGroups ?? []).map((c) => c.groupName).join(", ");
+    return (
+      <div className="rounded-[6px] border border-[#EEEEEE] bg-[#FAFAFA] p-3">
+        <span className="text-[11px] font-bold text-brand-text-heading">Clinical checks not run</span>
+        <p className="text-[11px] text-brand-text-body mt-1">
+          The diagnosis on this claim matches more than one governed condition
+          {names ? ` (${names})` : ""}, so no clinical rule was applied. This is a gap in the
+          protocol content, not a finding about the claim.
+        </p>
+      </div>
+    );
+  }
+
+  if (hits.length === 0 && inert.length === 0) return null;
 
   return (
     <div className="rounded-[6px] border border-[#EEEEEE] bg-[#FAFAFA] p-3 space-y-2">
@@ -65,6 +84,11 @@ function ClinicalFindings({ result }: { result: ClinicalStageResult }) {
           </li>
         ))}
       </ul>
+      {inert.length > 0 && (
+        <p className="text-[10px] text-brand-text-muted">
+          Not checked: {inert.map((i) => `${i.testName ?? i.rule} (${i.windowHours}h window — needs a time of day)`).join("; ")}.
+        </p>
+      )}
       <p className="text-[10px] text-brand-text-muted">
         A clinical finding never declines a claim on its own — it is for a person to weigh.
       </p>

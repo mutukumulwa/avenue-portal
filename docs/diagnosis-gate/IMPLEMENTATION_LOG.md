@@ -656,3 +656,44 @@ conditions (§6) and the numeric exit criteria (§7).
   before deletion.
 - **W-checklist:** n/a (no new user-facing capability; the shadow dashboard renders the
   new counts through existing C4.2 surfaces — no UI shipped in this package).
+
+## C7.2 — R1 no-winner ambiguity + validator V11 (DG-D15)
+- **Date / commits:** 2026-08-07 · (this commit)
+- **Anchors re-verified:** `resolveGroup` first-match pick at `stage-clinical.ts:125`,
+  `ambiguous` flag at `:134`, base-result assembly, validator V9 seam.
+- **★ THE BUG.** `resolveGroup` returned `[...distinct.values()][0]` — the FIRST group the
+  database happened to return — then set `ambiguous: true` as a note. So which condition's
+  clinical rules ran was decided by row order, which is not even stable across queries.
+  This is not a rare edge: **85 ICD codes (12.7% of v0's mappings, 172 memberships)** sit
+  in more than one condition. `CA09` is in Allergic Rhinitis, Nasopharyngitis AND
+  Pharyngitis — clinically defensible, since ICD hierarchies overlap, but it leaves the
+  engine no principled way to choose. Verified by recomputing from v0 directly.
+- **What was built:**
+  - `resolveGroup` returns `ResolvedGroup | AmbiguousGroups | null`. On ambiguity it
+    returns every candidate (sorted by group code, so the record is stable across runs)
+    and **the stage evaluates no rules at all** — it PASSes with `ambiguous: true` and
+    `candidateGroups`. No tie-break exists anywhere in the code.
+  - **Strict mode counts ambiguity as unresolved:** `requireClinicalGroup` routes
+    `CLINICAL_SCOPE_REVIEW`, because matching several conditions is not a governed
+    resolution.
+  - Validator **V11** `CODE_IN_MULTIPLE_GROUPS` (**ERROR** — DG-D15), reported **per code,
+    not per membership**, so 85 conflicts read as 85 decisions rather than 172 rows.
+    Names every owning condition in the message. Stat: `crossGroupCodes`.
+  - Shadow `listHits` carries `candidateGroups`; the claim-detail panel renders a plain
+    explanation ("Clinical checks not run — the diagnosis matches more than one governed
+    condition… This is a gap in the protocol content, not a finding about the claim"),
+    plus a "Not checked" line for C7.1's inert rules. A reviewer seeing an empty clinical
+    section would otherwise reasonably assume the claim had been examined and found clean.
+- **Verified:** DG DB **58/58** (scope file 15, was 12). The old "flags an ambiguous
+  resolution" test was **rewritten**, not patched: it now asserts PASS with zero ruleHits,
+  **no `groupCode` claimed**, and both candidates named — plus a new test that candidate
+  ordering is stable regardless of diagnosis order, and one for strict-mode routing.
+  Validator unit **38** (was 35) incl. per-code-not-per-membership and a guard that the
+  same code under ICD-10 and ICD-11 is normal dual-accept content, not a conflict.
+  `tsc` + `eslint` clean; hermetic **1666 passed / 559 skipped / 0 failed**.
+- **v0 report regenerated:** now carries **V11 × 85** (exactly the number independently
+  recomputed from the workbook) and V12 × 4. Total blocking errors 66 → **151**. That rise
+  is the point: V11 surfaces a defect that was previously invisible *and* silently
+  degrading every affected claim to "no rules evaluated". `pack-v0.json` byte-identical —
+  this is a validator change, not a conversion change.
+- **W-checklist:** W6 ✓ (the ambiguous state renders on the claim with its own wording).

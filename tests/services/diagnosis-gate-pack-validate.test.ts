@@ -198,6 +198,37 @@ describe("DG C1.3 — pack validator: each rule catches its own defect", () => {
     expect(codesOf(validatePack(p, { knownCodes }).errors)).toContain("REQUIRES_DIAGNOSIS_NO_SUPPORT");
   });
 
+  it("V11 rejects a code that belongs to more than one condition (DG-D15)", () => {
+    const p = goodPack();
+    // CA09-style overlap: the same code in two conditions leaves the engine no
+    // principled way to choose, so the stage refuses to evaluate at all.
+    p.memberships.push({ groupCode: "CIG-002", codeSystem: "ICD11", code: "1F40", provenance: "AUTHORED" });
+    const r = validatePack(p, { knownCodes });
+    const v11 = r.errors.filter((e) => e.code === "CODE_IN_MULTIPLE_GROUPS");
+    expect(v11).toHaveLength(1);
+    expect(v11[0].message).toContain("CIG-001");
+    expect(v11[0].message).toContain("CIG-002");
+    expect(r.importable).toBe(false);
+  });
+
+  it("V11 reports once per CODE, not once per membership — 1 conflict is 1 decision", () => {
+    const p = goodPack();
+    p.groups.push({ groupCode: "CIG-003", name: "Pharyngitis", isCatchAll: false });
+    p.memberships.push({ groupCode: "CIG-002", codeSystem: "ICD11", code: "1F40", provenance: "AUTHORED" });
+    p.memberships.push({ groupCode: "CIG-003", codeSystem: "ICD11", code: "1F40", provenance: "AUTHORED" });
+    const r = validatePack(p, { knownCodes });
+    // three memberships of one code ⇒ ONE error naming all three conditions
+    expect(r.errors.filter((e) => e.code === "CODE_IN_MULTIPLE_GROUPS")).toHaveLength(1);
+    expect(r.stats.crossGroupCodes).toBe(1);
+  });
+
+  it("V11 does not fire when the same code appears under different systems", () => {
+    // ICD-10 B50.9 and ICD-11 1F40 both meaning malaria is normal dual-accept content.
+    const r = validatePack(goodPack(), { knownCodes });
+    expect(r.errors.filter((e) => e.code === "CODE_IN_MULTIPLE_GROUPS")).toHaveLength(0);
+    expect(r.stats.crossGroupCodes).toBe(0);
+  });
+
   it("V9 rejects a group with no codes — nothing could ever resolve to it", () => {
     const p = goodPack();
     p.groups.push({ groupCode: "CIG-003", name: "COPD", isCatchAll: false });

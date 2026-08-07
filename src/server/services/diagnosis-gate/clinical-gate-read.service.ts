@@ -231,6 +231,8 @@ export const ClinicalGateReadService = {
     const flat: Array<{
       claimId: string; claimNumber: string; providerName: string | null; dateOfService: Date; recordedAt: Date;
       groupCode: string | null; groupName: string | null; hit: ClinicalRuleHit;
+      /** Populated when the claim resolved to several conditions (DG-D15). */
+      candidateGroups?: Array<{ groupCode: string; groupName: string }>;
     }> = [];
     for (const row of rows) {
       for (const hit of row.result.ruleHits ?? []) {
@@ -240,6 +242,7 @@ export const ClinicalGateReadService = {
           claimId: row.claimId, claimNumber: row.claimNumber, providerName: row.providerName,
           dateOfService: row.dateOfService, recordedAt: row.recordedAt,
           groupCode: row.result.groupCode ?? null, groupName: row.result.groupName ?? null, hit,
+          ...(row.result.candidateGroups ? { candidateGroups: row.result.candidateGroups } : {}),
         });
       }
     }
