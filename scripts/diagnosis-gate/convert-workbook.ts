@@ -704,10 +704,62 @@ async function main() {
   writeFileSync(outPath, serialised);
 
   const packChecksum = createHash("sha256").update(serialised).digest("hex");
+
+  // Framing for the clinical team. It is generated rather than hand-written onto the
+  // report, so it cannot drift from the numbers underneath it or vanish on the next run.
+  const preamble: string[] = [];
+  if (annex) {
+    const refusedConfirmatory = annex.confirmatoryProposals.length;
+    const refusedAliases = annex.pendingAliases.length;
+    const crossGroup = result.stats.crossGroupCodes ?? 0;
+    preamble.push("## Reading this report");
+    preamble.push("");
+    preamble.push(
+      "**Nothing in this workbook is in force.** No rule from it affects a single claim " +
+        "today, and none will until your team signs the specification and approves a pack " +
+        "through the normal maker/checker route.",
+    );
+    preamble.push("");
+    preamble.push(
+      "**What this version settled.** Conditions now carry stable codes (`CIG-001`–" +
+        "`CIG-040`), so the sheets no longer join on a spelt-out condition name — that was " +
+        "the single largest source of errors last time, and it is gone. Supported tests are " +
+        "stated as codes rather than free text, the provider-facing messages have been " +
+        "rewritten, and three broad categories are correctly flagged as categories.",
+    );
+    preamble.push("");
+    preamble.push(
+      `**What we did NOT accept.** Where the workbook marks its own rows as pending or ` +
+        `needing review, we report them and stop — a status column is not a signature. So ` +
+        `${refusedConfirmatory} proposed confirmatory test(s) and ${refusedAliases} proposed ` +
+        `condition merge(s) were left out, and are listed in the companion proposals file. ` +
+        `A consequence worth stating plainly: **rule R4 (confirmatory test present) still ` +
+        `applies to nothing at all**, because no condition yet has a confirmed test against ` +
+        `a clinician's name.`,
+    );
+    preamble.push("");
+    preamble.push(
+      `**What still blocks the import.** ${crossGroup} ICD codes belong to more than one ` +
+        `condition — \`CA09\`, for instance, sits in Allergic Rhinitis, Nasopharyngitis and ` +
+        `Pharyngitis at once. This is clinically reasonable (the ICD hierarchy overlaps), but ` +
+        `it leaves the system no principled way to choose which condition's rules apply, and ` +
+        `we will not let it guess. Every such claim is therefore covered by no rule. Assigning ` +
+        `each code to exactly one condition is the single highest-value change your team can ` +
+        `make, and it is a clinical decision rather than a data-cleaning one — which is why ` +
+        `this version, which did not change any code assignment, did not move that number.`,
+    );
+    preamble.push("");
+    preamble.push(
+      "The rest of this report is the full list, grouped so a repeated defect reads as one " +
+        "line. Every entry names the sheet and row to edit.",
+    );
+  }
+
   const report = renderValidationMarkdown(result, {
     sourceFileName: basename(inPath),
     generatedAt: args.now ?? new Date().toISOString().slice(0, 10),
     packVersionNote: `pack sha256 \`${packChecksum.slice(0, 16)}…\` · source sha256 \`${sourceFileChecksum.slice(0, 16)}…\``,
+    preamble,
   });
   mkdirSync(dirname(reportPath), { recursive: true });
   writeFileSync(reportPath, report);

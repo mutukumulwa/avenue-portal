@@ -57,6 +57,7 @@ is misreading the workbook, not that the workbook changed.
 - **Commonest Labs Rationale**: 22 tests, `LAB001`–`LAB022`.
   - `Requires_Diagnosis = Yes` on 16 of 22.
   - `Repeat_Window_Hours` present on all 22; range 4 h (Random Blood Sugar) → 2,160 h / 90 d (HbA1c, Lipid Profile, Hepatitis B).
+    - **4 of the 22 are shorter than 24 h and therefore unenforceable (DG-D14):** `LAB003` Malaria RDT (12 h), `LAB004` Malaria Blood Smear (12 h), `LAB019` Electrolytes (12 h), `LAB012` Random Blood Sugar (4 h). A claim carries a date of service, not a time, so an hours-scale window would flag every same-day repeat regardless of gap and miss every cross-midnight one. These import with warning `REPEAT_WINDOW_SUBDAY_UNENFORCEABLE`, are recorded as inert, and are never evaluated. Windows of a day or more are compared in whole calendar days. Making these live needs a performed-at timestamp on the claim line, or a window restated in days.
   - `Supported_ICD11_Diagnoses` is **free text**, semicolon-separated, and includes non-diagnoses (`STI assessment`, `Occupational exposure`, `Pregnancy`).
 
 ### Join-key integrity (the F1 defect, quantified)

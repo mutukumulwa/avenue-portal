@@ -6,8 +6,8 @@ Detail per package: `IMPLEMENTATION_LOG.md`.
 
 **Branch:** `feat/diagnosis-gate` (off `origin/main` @ `3ac6b2c`).
 **Baseline on branch:** tsc exit 0 · vitest 1569 passed / 501 skipped / 0 failed.
-**Current:** tsc + eslint clean · hermetic **1679 passed / 559 skipped / 0 failed** · **58/58 DG real-DB tests** (opt-in).
-**Phases C0–C3 COMPLETE · C7.1–C7.4 COMPLETE.** Next: **C7.5 (spec DG-D14–D19 + docs)** · then C1.4 crosswalk · C1.5 alias coverage · C4 shadow campaign (blocked on **G-C0**).
+**Current:** tsc + eslint clean · hermetic **1680 passed / 559 skipped / 0 failed** · **58/58 DG real-DB tests** (opt-in).
+**Phases C0–C3 COMPLETE · PHASE C7 COMPLETE (C7.1–C7.5).** Next: C1.4 crosswalk · C1.5 alias coverage · C4 shadow campaign (all blocked on **G-C0**).
 
 | Pkg | Title | Status |
 |---|---|---|
@@ -40,7 +40,7 @@ Detail per package: `IMPLEMENTATION_LOG.md`.
 | C7.2 | R1 no-winner ambiguity + V11 | ✅ DONE — row-order tie-break removed |
 | C7.3 | Converter reader hardening | ✅ DONE — SheetJS (dev-only); v0 pack byte-identical |
 | C7.4 | v0.1 annex intake + red report | ✅ DONE — 151→109 errors; still NOT IMPORTABLE |
-| C7.5 | Spec DG-D14–D19 + docs | ⬜ next |
+| C7.5 | Spec DG-D14–D19 + docs + comms framing | ✅ DONE — spec amended pre-signature; framing generated, not typed |
 
 ## Open human gates
 

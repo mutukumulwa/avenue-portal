@@ -810,3 +810,65 @@ sign-off.
   - `tsc` + `eslint` clean; hermetic **1679 passed / 559 skipped / 0 failed**.
 - **W-checklist:** n/a (offline tooling; no new UI surface).
 - **Deviation from plan:** none.
+
+---
+
+## C7.5 — Spec amendments DG-D14–D19, docs, comms framing
+
+**Goal:** close phase C7 on paper, so the documents say what the code now does.
+
+- **Spec (`DIAGNOSIS_GATE_SPEC.md`)** — amended in place. It is still DRAFT and unsigned,
+  so no re-signing is owed; the change log records the amendment explicitly rather than
+  letting it look like the original draft.
+  - **DG-D14…D19** appended to §2. Three of the six correct **our own implementation**,
+    not the workbook — worth stating plainly, because a decision log that only ever
+    records other people's defects is not a decision log.
+  - §3 R1 rewritten: more than one matching group means **no rules run**, no tie-break
+    exists, and import blocks the cause. The old wording ("if two groups match, the claim
+    is treated as unresolved") described the intent while the code picked a winner.
+  - §3 R3 now carries **two** known limits, not one. The existing one (a repeat at a
+    facility that never bills us is invisible) is joined by sub-day windows, with the four
+    affected tests named and the fix stated (a performed-at timestamp, or a window in days).
+  - §4 gains **"not evaluated is not a clinical pass"**: a claim passes this stage for
+    three different reasons — nothing wrong, nothing resolved, or nothing running — and
+    only the first is evidence. Any coverage figure that merges them overstates the gate.
+  - §8 gains **emergency bypass** (DG-D19), parked with its reason: it needs a structured
+    emergency indicator, and inferring one from free text would create a phrase anyone
+    could type to skip the gate. Paired with the reassurance that Rung 1 never denies, so
+    an emergency is at worst delayed by a human, never refused by a rule.
+- **Root plan** — the two build specs that still described superseded behaviour were
+  corrected at source: §6.3 R1 ("first group … wins") and §6.3 R3/R4 (millisecond window
+  arithmetic). A stale plan is worse than no plan when the whole point is that another
+  model can execute it without inventing anything. §19 also gained the **C3.5** row, which
+  had been built but never indexed.
+- **Comms framing is generated, not hand-written.** A paragraph typed onto
+  `v0.1-validation.md` would vanish the next time the converter ran, and could silently
+  contradict the numbers below it. `renderValidationMarkdown` gained an optional
+  `preamble`, and the converter builds it **from the same counts the report uses** —
+  refused confirmatory tests, refused aliases, cross-group codes. What it tells the
+  clinical team:
+  - nothing in the workbook is in force, and nothing will be until they sign;
+  - what v0.1 genuinely settled (stable codes — the biggest error source last time);
+  - what we refused and why, ending on the uncomfortable part: **R4 still applies to
+    nothing at all**;
+  - that the 85 overlapping codes are the highest-value change they can make, are a
+    clinical decision rather than data cleaning, and are exactly why this version did not
+    move that number.
+- **Verified:**
+  - `pack-v0.json` **and** `v0-validation.md` still byte-identical — the preamble is empty
+    for a plain workbook, so the v0 artifact is untouched.
+  - v0.1 pack/report/proposals still byte-identical across two consecutive runs **with**
+    the preamble in place.
+  - Consistency greps clean: no "first group"/order-dependent language survives in the
+    spec, plan or source notes; sub-day semantics stated in both the spec and SOURCE_NOTES
+    (with the four tests named — and cross-checked against the pack, which caught a
+    LAB012/LAB019 swap in my first draft).
+  - 1 new test pinning the framing, so the honest sentences cannot quietly disappear.
+  - `tsc` + `eslint` clean; hermetic **1680 passed / 559 skipped / 0 failed**; **DG real-DB
+    58/58** on a fresh throwaway Postgres.
+- **Note on the DB run:** the local `aicare_uat` dev DB predates this schema, and pushing
+  to it would have required `--accept-data-loss` for three unique constraints from
+  unrelated main work, against 779 real claims. Built a throwaway instead — the point was
+  to verify the suites, not to modify the user's database.
+- **W-checklist:** n/a (documentation + an optional report parameter; no new UI surface).
+- **Deviation from plan:** none.

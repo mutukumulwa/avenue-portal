@@ -2,7 +2,7 @@
 
 | | |
 |---|---|
-| **Spec version** | DG-1.0 |
+| **Spec version** | DG-1.0 (amended 2026-08-07 — see §10) |
 | **Status** | **DRAFT — awaiting sign-off (gate G-C0).** No protocol pack may be activated, and no shadow campaign may start, until §9 is signed. |
 | **Owner (engineering)** | Claims platform |
 | **Owner (clinical)** | *(to be named — §9)* |
@@ -64,6 +64,12 @@ These are binding. Changing any of them requires re-signing this specification.
 | **DG-D11** | A diagnosis outside the governed groups **passes** by default. Narrowing the automated path to *only* governed conditions is a separate, explicit business switch. | The gate governs the conditions it knows; it does not silently seize the rest of the book. |
 | **DG-D12** | Rules are evaluated **per claim line**, and a flag names the specific line and test. | Consistent with the platform's line-level adjudication; a reviewer must see *which* test is questioned. |
 | **DG-D13** | **Repeat-window short-pay is the one money-touching rule**, is default-off, and requires its own finance + clinical sign-off (§9.2) beyond this specification. | Objective duplicate testing is the one clinically defensible auto-adjustment — but it moves money, so it is quarantined. |
+| **DG-D14** | **A repeat window shorter than 24 hours cannot be enforced**, because a claim records a date of service, not a time. Such rules import with a warning, are recorded as **inert**, and are never evaluated. Windows of a day or more are measured in **whole calendar days**. | A 4-hour window on date-only data is wrong in both directions: two same-day tests 8 hours apart would always flag, and two tests 2 hours apart across midnight would never flag. Neither is the rule the clinician wrote, so the honest answer is to not run it and say so. Affects 4 of v0's 22 tests. |
+| **DG-D15** | **Ambiguity never picks a winner.** If a claim's diagnosis codes resolve to more than one intervention group, **no rules are evaluated**; the claim passes and every candidate group is recorded. Import treats a code belonging to more than one group as a **blocking error**. | 85 of v0's ICD codes (12.7%) sit in several conditions — `CA09` is in Allergic Rhinitis, Nasopharyngitis *and* Pharyngitis. Which condition's rules run must be a clinical decision, not an accident of database row order. |
+| **DG-D16** | **Content is accepted only where its status says a clinician settled it.** A remediated workbook that marks its own rows as pending, candidate or needing review has those rows **reported and refused**, never imported. | A status column is not a signature. The v0.1 annex proposed two confirmatory tests and two condition-merge decisions; accepting them would have switched a clinical rule on with nobody's name against it. |
+| **DG-D17** | **Provider-facing text is the workbook's provider-facing text**, preferred over clinician shorthand where both exist. | *"No fever/history of fever"* tells a provider nothing they can act on. A message that cannot be acted on produces a phone call, not a corrected claim. |
+| **DG-D18** | The pack records the **ICD release it targets** (e.g. "ICD-11 MMS 2026-01"), as a stated target only — not a claim that every code was checked against that release. | Codes move between releases. Recording the intended release makes a later mismatch findable; claiming verification we did not perform would not. |
+| **DG-D19** | **Emergency bypass is a Rung-2 concept, not a Rung-1 rule.** It requires structured emergency evidence and must never be inferred from free text alone. | Genuine emergencies must not be routed for review — but a bypass triggered by keyword matching is an open door. It waits for structured evidence, per the clinical team's own wording. |
 
 ---
 
@@ -81,15 +87,21 @@ intervention group, the group's rules apply. If they do not:
 - **default (DG-D11):** the claim passes untouched;
 - **optional strict mode:** the claim routes for standard human adjudication.
 
-If two groups match, the claim is treated as unresolved and the ambiguity is recorded
-for the clinical team to disambiguate in the next pack.
+If **more than one** group matches, the claim is treated as unresolved: **no rules are
+evaluated at all**, and every candidate group is recorded for the clinical team to
+disambiguate in the next pack (DG-D15). There is no tie-break — running the first
+group's rules would mean the engine had chosen a diagnosis, which is not its job.
+
+This is why import blocks a code that belongs to two groups: the fix is a clinical
+assignment, and until it is made those claims are simply not covered by the gate.
 
 ### R2 — Test supported by the diagnosis
 > *Is this test one that this condition would call for?*
 
 For each billed test that the pack marks as requiring a diagnosis, the claim's group
 must be listed among that test's supported conditions. Otherwise: flag, using the
-workbook's own failure message (e.g. *"HIV test lacks documented indication"*).
+workbook's own provider-facing message (DG-D17) — e.g. *"Clinical indication is not
+sufficiently documented in the available claim data for HIV."*
 
 **Only tests explicitly marked `Requires_Diagnosis` are checked.** Tests that may
 reasonably be ordered without a stated diagnosis are never flagged by R2.
@@ -101,9 +113,16 @@ Each test carries a clinically-set repeat window (v0: 4 hours for random blood s
 90 days for HbA1c and lipids). If the member has the same test on an earlier claim
 within that window, the repeat is flagged with the earlier claim's reference.
 
-**Known limit:** only claims that reach Medvex are visible. A repeat at a facility that
-never bills us cannot be seen. This is a real ceiling on the control, stated here so it
-is never over-claimed.
+**Two known limits, both real ceilings on the control:**
+
+1. **Only claims that reach Medvex are visible.** A repeat at a facility that never bills
+   us cannot be seen.
+2. **Windows under 24 hours do not run at all** (DG-D14). A claim carries a date, not a
+   time, so an hours-scale window cannot be judged. Four of v0's 22 tests are affected —
+   random blood sugar (4 h), malaria RDT, blood smear and electrolytes (12 h). They are
+   recorded as inert and counted separately, so coverage figures never include a rule
+   that is not running. Making them enforceable needs a performed-at timestamp on the
+   claim line, or a window restated in days.
 
 ### R4 — Confirmatory test present
 > *For a condition we expect to be confirmed by a test, is that test on record?*
@@ -125,10 +144,17 @@ This section replaces the workbook's empty `Claims filter` sheet.
 
 | Rule | Record-only mode (launch) | Routing mode (per condition) | Ever denies? |
 |---|---|---|---|
-| R1 unresolved | pass; recorded | pass (default) / route to standard adjudication (strict mode) | No |
+| R1 unresolved (no group, or **more than one**) | pass; recorded | pass (default) / route to standard adjudication (strict mode) | No |
 | R2 unsupported test | pass; recorded | route → **Clinical review** queue | No |
 | R3 repeat in window | pass; recorded | route → **Clinical review** queue | No — unless DG-D13 short-pay is separately enabled |
 | R4 confirmation absent | pass; recorded | route → **Clinical review** queue | No |
+
+**"Not evaluated" is not a clinical pass.** A claim can go through this stage untouched
+for three quite different reasons: no rule found anything wrong; its diagnosis resolved to
+no governed condition or to several (DG-D15); or the rule that would have applied is inert
+(DG-D14, or a rule with no supported conditions or confirmatory test recorded). Only the
+first is evidence of anything. The shadow report separates them, and any coverage figure
+that treats them alike overstates what the gate is doing.
 
 **Every flag carries:** the rule, the specific claim line and test, an internal
 explanation, a provider-facing message (from the workbook), and a member-facing message
@@ -214,6 +240,13 @@ Not built, not implied, not to be represented as present:
 - Imaging appropriateness rules.
 - Test-result ingestion from provider systems.
 - Any migration of the platform to ICD-11.
+- **Emergency bypass** (DG-D19). The concept is accepted: a genuine emergency should not
+  be routed for review. It is parked here because it needs a structured emergency
+  indicator on the claim, and inferring one from free text would create a phrase anybody
+  could type to skip the gate. Until then, note that Rung 1 never denies a claim, so an
+  emergency is at worst delayed by a human review, never refused by a rule.
+- **Sub-day repeat windows** (DG-D14) — not out of scope by choice but by data: they need
+  a performed-at timestamp the claim rails do not carry.
 
 ---
 
@@ -247,3 +280,4 @@ any claim line is reduced automatically (DG-D13).
 | Version | Date | Change |
 |---|---|---|
 | DG-1.0 | 2026-08-06 | Initial draft for sign-off. Decisions DG-D1…D13; rules R1–R4; failure semantics replacing the empty `Claims filter` sheet. |
+| DG-1.0 | 2026-08-07 | Amended before signature, so no re-signing is owed. Adds DG-D14…D19 from the v0.1 annex review: sub-day windows unenforceable and day-level arithmetic (R3/R4); ambiguity evaluates nothing (R1); annex acceptance status-gated; provider-facing wording preferred; ICD release target recorded; emergency bypass parked in §8. §4 gains the "not evaluated is not a clinical pass" statement. Three of these correct our own implementation, not the workbook. |

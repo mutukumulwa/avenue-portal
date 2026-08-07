@@ -300,7 +300,17 @@ function summarise(issues: ValidationIssue[]): Array<{ rule: string; code: strin
 /** Human-readable report — this is the artifact that goes back to the clinical team. */
 export function renderValidationMarkdown(
   result: ValidationResult,
-  meta: { sourceFileName: string; generatedAt: string; packVersionNote?: string },
+  meta: {
+    sourceFileName: string;
+    generatedAt: string;
+    packVersionNote?: string;
+    /**
+     * Extra markdown placed directly under the header, for framing a specific workbook
+     * version. It lives here rather than being hand-added to the generated file, so it
+     * survives the next regeneration — an edited report would silently lose it.
+     */
+    preamble?: string[];
+  },
 ): string {
   const L: string[] = [];
   L.push(`# Protocol pack validation report`);
@@ -312,6 +322,11 @@ export function renderValidationMarkdown(
   L.push(`| Verdict | ${result.importable ? "**IMPORTABLE** — no blocking errors" : `**NOT IMPORTABLE** — ${result.errors.length} blocking error(s)`} |`);
   if (meta.packVersionNote) L.push(`| Note | ${meta.packVersionNote} |`);
   L.push("");
+
+  if (meta.preamble?.length) {
+    L.push(...meta.preamble);
+    L.push("");
+  }
 
   L.push(`## What this report is`);
   L.push("");

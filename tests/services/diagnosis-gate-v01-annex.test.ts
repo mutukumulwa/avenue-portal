@@ -52,6 +52,15 @@ describe.skipIf(!have)("DG C7.4 — v0.1 annex intake", () => {
     expect(readFileSync(REPORT_V01, "utf8")).toContain("NO_CONFIRMATORY_LINKS");
   });
 
+  it("tells the clinical team, in the report itself, that R4 applies to nothing", () => {
+    // The framing is generated, not hand-added, so it cannot drift from the numbers below
+    // it or be lost on the next run. It has to keep saying the uncomfortable part.
+    const report = readFileSync(REPORT_V01, "utf8");
+    expect(report).toContain("Nothing in this workbook is in force");
+    expect(report).toContain("still applies to nothing at all");
+    expect(report).toContain("85 ICD codes belong to more than one condition");
+  });
+
   it("holds the pending proposals in the proposals report instead of the pack", () => {
     const proposals = readFileSync(PROPOSALS_V01, "utf8");
     expect(proposals).toContain("awaiting clinical sign-off");
