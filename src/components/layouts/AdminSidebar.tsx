@@ -283,7 +283,29 @@ function NavGroupSection({ group, bestMatch }: { group: NavGroup; bestMatch: str
   );
 }
 
-export function AdminSidebar({ userRole }: { userRole: UserRole | null }) {
+/** Human-readable persona label for an enum role (DEF-001). */
+const ROLE_LABELS: Record<string, string> = {
+  SUPER_ADMIN: "Super Administrator",
+  CLAIMS_OFFICER: "Claims Officer",
+  FINANCE_OFFICER: "Finance Officer",
+  UNDERWRITER: "Underwriter",
+  CUSTOMER_SERVICE: "Membership Officer",
+  MEDICAL_OFFICER: "Medical Officer",
+  REPORTS_VIEWER: "Reports Viewer",
+  HR_MANAGER: "HR Manager",
+  FUND_ADMINISTRATOR: "Fund Administrator",
+  BROKER_USER: "Broker",
+  MEMBER_USER: "Member",
+  PROVIDER_USER: "Provider User",
+};
+
+export function AdminSidebar({
+  userRole,
+  userName,
+}: {
+  userRole: UserRole | null;
+  userName?: string | null;
+}) {
   const pathname = usePathname();
   const bestMatch = resolveBestMatch(pathname);
   // Setup lights up only when the best match is one of ITS sub-routes — so
@@ -343,9 +365,30 @@ export function AdminSidebar({ userRole }: { userRole: UserRole | null }) {
               )}
             </>
           )}
+          {/* DEF-001: the signed-in actor and their effective role must be
+              evidenceable from the screen without opening a protected record —
+              a reviewer could not previously tell WHO performed an action. */}
+          {(userName || userRole) && (
+            <div
+              aria-label="Signed-in user"
+              className="mb-2 rounded-[8px] border border-[#EEEEEE] bg-brand-bg-alt/40 px-2.5 py-2"
+            >
+              {userName && (
+                <p className="truncate text-sm font-semibold text-brand-text-heading" title={userName}>
+                  {userName}
+                </p>
+              )}
+              {userRole && (
+                <p className="truncate text-[11px] text-brand-text-muted">
+                  {ROLE_LABELS[userRole] ?? userRole}
+                </p>
+              )}
+            </div>
+          )}
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
-            className="w-full group flex items-center rounded-[8px] px-2 py-2 text-brand-error hover:bg-red-50 transition-colors"
+            aria-label={userName ? `Sign out of ${userName}'s session` : "Sign out"}
+            className="w-full group flex items-center rounded-[8px] px-2 py-2 text-brand-error hover:bg-red-50 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-indigo"
           >
             <LogOut className="h-4 w-4 shrink-0" />
             <span className="ml-2.5 text-sm font-semibold">Log out</span>

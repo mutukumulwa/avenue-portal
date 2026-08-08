@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Lock, Mail, AlertCircle } from "lucide-react";
-import { Suspense, useState } from "react";
+import { Suspense, useRef, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 
@@ -26,9 +26,37 @@ function LoginForm() {
   const [loading, setLoading] = useState(false);
   const searchParams = useSearchParams();
 
+  // DEF-004: the form relied on browser-native "Please fill in this field"
+  // bubbles, which are transient, unstyled, not announced by screen readers and
+  // vanish on blur. Validation state is now owned by the component so each
+  // invalid field carries a persistent, associated, announced message.
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
+  const emailRef = useRef<HTMLInputElement>(null);
+  const passwordRef = useRef<HTMLInputElement>(null);
+
+  /** Field-level validation. Deliberately says nothing about account existence. */
+  const validate = () => {
+    const next: { email?: string; password?: string } = {};
+    if (!email.trim()) next.email = "Enter your email address.";
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
+      next.email = "Enter a valid email address, for example name@medvex.co.ug.";
+    if (!password) next.password = "Enter your password.";
+    return next;
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    const invalid = validate();
+    setFieldErrors(invalid);
+    if (Object.keys(invalid).length > 0) {
+      // Focus moves to the first invalid field so keyboard and screen-reader
+      // users are placed on the problem rather than left at the submit button.
+      (invalid.email ? emailRef : passwordRef).current?.focus();
+      return;
+    }
+
     setLoading(true);
     const startedAt = performance.now();
 
@@ -96,68 +124,111 @@ function LoginForm() {
               monitored and logged; unauthorized use is prohibited and may be
               prosecuted.
             </p>
-            <form onSubmit={handleLogin} className="space-y-5">
+            {/* noValidate: validation is owned by the component so errors are
+                persistent, associated and announced (DEF-004). */}
+            <form onSubmit={handleLogin} className="space-y-5" noValidate>
               {error && (
-                <div className="flex items-center gap-2 bg-[#DC3545]/10 text-[#DC3545] border border-[#DC3545]/20 rounded-lg px-4 py-3 text-sm">
+                <div
+                  role="alert"
+                  aria-live="assertive"
+                  className="flex items-center gap-2 bg-[#DC3545]/10 text-[#DC3545] border border-[#DC3545]/20 rounded-lg px-4 py-3 text-sm"
+                >
                   <AlertCircle size={16} className="shrink-0" />
                   {error}
                 </div>
               )}
 
               <div className="space-y-1.5">
-                <label className="text-sm font-bold text-brand-text-heading">Email Address</label>
+                <label htmlFor="login-email" className="block text-sm font-bold text-brand-text-heading">
+                  Email Address
+                </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-brand-text-muted">
                     <Mail className="h-5 w-5" />
                   </div>
                   <input
+                    id="login-email"
+                    name="email"
+                    ref={emailRef}
                     type="email"
+                    autoComplete="username"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="bg-white border border-[#EEEEEE] text-brand-text-heading text-sm rounded-[8px] focus:ring-2 focus:ring-brand-indigo focus:border-brand-indigo block w-full pl-10 p-2.5 outline-none transition-all"
+                    aria-invalid={fieldErrors.email ? true : undefined}
+                    aria-describedby={fieldErrors.email ? "login-email-error" : undefined}
+                    className={`bg-white border text-brand-text-heading text-sm rounded-[8px] focus:ring-2 focus:ring-brand-indigo focus:border-brand-indigo block w-full pl-10 p-2.5 outline-none transition-all ${
+                      fieldErrors.email ? "border-[#DC3545]" : "border-[#EEEEEE]"
+                    }`}
                     placeholder="name@medvex.co.ug"
-                    required
                   />
                 </div>
+                {fieldErrors.email && (
+                  <p id="login-email-error" role="alert" className="text-xs text-[#DC3545]">
+                    {fieldErrors.email}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-sm font-bold text-brand-text-heading">Password</label>
+                <label htmlFor="login-password" className="block text-sm font-bold text-brand-text-heading">
+                  Password
+                </label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-brand-text-muted">
                     <Lock className="h-5 w-5" />
                   </div>
                   <input
+                    id="login-password"
+                    name="password"
+                    ref={passwordRef}
                     type="password"
+                    autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="bg-white border border-[#EEEEEE] text-brand-text-heading text-sm rounded-[8px] focus:ring-2 focus:ring-brand-indigo focus:border-brand-indigo block w-full pl-10 p-2.5 outline-none transition-all"
+                    aria-invalid={fieldErrors.password ? true : undefined}
+                    aria-describedby={fieldErrors.password ? "login-password-error" : undefined}
+                    className={`bg-white border text-brand-text-heading text-sm rounded-[8px] focus:ring-2 focus:ring-brand-indigo focus:border-brand-indigo block w-full pl-10 p-2.5 outline-none transition-all ${
+                      fieldErrors.password ? "border-[#DC3545]" : "border-[#EEEEEE]"
+                    }`}
                     placeholder="••••••••"
-                    required
                   />
                 </div>
+                {fieldErrors.password && (
+                  <p id="login-password-error" role="alert" className="text-xs text-[#DC3545]">
+                    {fieldErrors.password}
+                  </p>
+                )}
               </div>
 
               <div className="space-y-1.5">
-                <label className="text-sm font-bold text-brand-text-heading">
-                  Authenticator code <span className="font-normal text-brand-text-muted">(if 2FA enabled)</span>
+                <label htmlFor="login-totp" className="block text-sm font-bold text-brand-text-heading">
+                  Authenticator code{" "}
+                  <span className="font-normal text-brand-text-muted">(if 2FA enabled)</span>
                 </label>
+                {/* Correctly optional: users without 2FA must not be blocked. */}
                 <input
+                  id="login-totp"
+                  name="totp"
                   type="text"
                   inputMode="numeric"
                   maxLength={6}
                   value={totp}
                   onChange={(e) => setTotp(e.target.value)}
+                  aria-describedby="login-totp-hint"
                   className="bg-white border border-[#EEEEEE] text-brand-text-heading text-sm rounded-[8px] focus:ring-2 focus:ring-brand-indigo focus:border-brand-indigo block w-full p-2.5 outline-none transition-all"
                   placeholder="6-digit code"
                   autoComplete="one-time-code"
                 />
+                <p id="login-totp-hint" className="text-xs text-brand-text-muted">
+                  Leave blank if you have not set up an authenticator app.
+                </p>
               </div>
 
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-brand-indigo hover:bg-brand-secondary text-white font-bold py-3 rounded-full transition-colors disabled:opacity-60 disabled:cursor-not-allowed mt-2"
+                aria-busy={loading}
+                className="w-full bg-brand-indigo hover:bg-brand-secondary text-white font-bold py-3 rounded-full transition-colors disabled:opacity-60 disabled:cursor-not-allowed mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-indigo focus-visible:ring-offset-2"
               >
                 {loading ? "Signing in…" : "Sign In"}
               </button>

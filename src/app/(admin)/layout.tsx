@@ -49,7 +49,7 @@ export default async function AdminLayout({
           <TenantThemeInjector tenantId={session.user.tenantId} />
         )}
         <div className="flex min-h-screen bg-brand-bg-alt/30">
-          <AdminSidebar userRole={userRole} />
+          <AdminSidebar userRole={userRole} userName={session?.user?.name ?? null} />
           <div className="flex-1 ml-60 p-8">
             <Breadcrumbs />
             {children}
