@@ -19,6 +19,12 @@ describe("resolvePostLoginPath (BD-03)", () => {
     expect(resolvePostLoginPath("FINANCE_OFFICER")).toBe("/dashboard");
   });
 
+  // DEF-003: a reports viewer holds READ_REPORTS only; the staff dashboard put
+  // claimant/provider/amount rows on their landing screen.
+  it("routes a reports viewer to the reports surface, not the dashboard", () => {
+    expect(resolvePostLoginPath("REPORTS_VIEWER")).toBe("/reports");
+  });
+
   it("falls back to the staff dashboard for a missing/unknown role", () => {
     expect(resolvePostLoginPath(undefined)).toBe("/dashboard");
     expect(resolvePostLoginPath(null)).toBe("/dashboard");

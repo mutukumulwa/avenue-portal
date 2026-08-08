@@ -26,8 +26,44 @@ export const ROLES = {
   FINANCE:      ["SUPER_ADMIN", "FINANCE_OFFICER"] as UserRole[],
   /** Underwriting — groups, packages, providers */
   UNDERWRITING: ["SUPER_ADMIN", "UNDERWRITER"] as UserRole[],
-  /** Day-to-day ops — register members, submit claims / pre-auths */
+  /**
+   * Day-to-day ops — register members, submit claims / pre-auths.
+   *
+   * DEPRECATED (WP-3): this set conflates membership work with claims work,
+   * which is what let CUSTOMER_SERVICE reach the claims surface (DEF-003).
+   * Prefer MEMBER_OPS or CLAIMS_OPS. Retained until every call site migrates;
+   * the authz parity suite asserts OPS === MEMBER_OPS ∪ CLAIMS_OPS.
+   */
   OPS:          ["SUPER_ADMIN", "CLAIMS_OFFICER", "MEDICAL_OFFICER", "CUSTOMER_SERVICE", "UNDERWRITER"] as UserRole[],
+
+  /**
+   * Membership work — members, groups, endorsements, enrolment, roster support.
+   * CUSTOMER_SERVICE (the Membership Officer) belongs here and ONLY here
+   * (decision D1, Branch A: membership-only).
+   */
+  MEMBER_OPS:   ["SUPER_ADMIN", "CLAIMS_OFFICER", "MEDICAL_OFFICER", "CUSTOMER_SERVICE", "UNDERWRITER"] as UserRole[],
+
+  /**
+   * Claims/pre-auth/case work — creating and adjudicating claims.
+   * Deliberately EXCLUDES CUSTOMER_SERVICE (D1 Branch A) and UNDERWRITER.
+   */
+  CLAIMS_OPS:   ["SUPER_ADMIN", "CLAIMS_OFFICER", "MEDICAL_OFFICER"] as UserRole[],
+
+  /**
+   * Authority to read individual claims and claim volumes — claimant identity,
+   * provider, claim reference, amount, status. The DEF-003 oracle.
+   */
+  CLAIMS_READ:  ["SUPER_ADMIN", "CLAIMS_OFFICER", "MEDICAL_OFFICER"] as UserRole[],
+
+  /**
+   * Authority to read portfolio money aggregates — loss ratio, billed/approved
+   * sums, premium-vs-claims. Decision D3: membership of an ops set is never
+   * sufficient for money aggregates.
+   *
+   * PROVISIONAL: pending the WP-0 persona × permission matrix sign-off. The
+   * authz parity suite pins this set so any change is a deliberate, reviewed one.
+   */
+  MONEY_READ:   ["SUPER_ADMIN", "FINANCE_OFFICER", "UNDERWRITER"] as UserRole[],
   /**
    * Maker–checker approvals queue (/approvals). Everyone in OPS PLUS
    * FINANCE_OFFICER — the money-control checker for governed changes such as
@@ -38,10 +74,17 @@ export const ROLES = {
    * ApprovalMatrixService.roleAuthorised at decide time.
    */
   APPROVALS:    ["SUPER_ADMIN", "CLAIMS_OFFICER", "MEDICAL_OFFICER", "CUSTOMER_SERVICE", "UNDERWRITER", "FINANCE_OFFICER"] as UserRole[],
-  /** Anyone with a portal login (all internal staff) */
+  /**
+   * Anyone with an internal TPA staff login.
+   *
+   * DEF-003: FUND_ADMINISTRATOR was removed. A fund administrator is an
+   * EMPLOYER-side finance user with their own group-scoped portal
+   * (/fund/dashboard, scoped via analytics-access.ts `allowedGroupIds`).
+   * Admitting them to the admin shell gave them tenant-wide — i.e.
+   * cross-employer — reach on surfaces that scope by tenant only.
+   */
   ANY_STAFF:    ["SUPER_ADMIN", "CLAIMS_OFFICER", "FINANCE_OFFICER", "UNDERWRITER",
-                 "CUSTOMER_SERVICE", "MEDICAL_OFFICER", "REPORTS_VIEWER",
-                 "FUND_ADMINISTRATOR"] as UserRole[],
+                 "CUSTOMER_SERVICE", "MEDICAL_OFFICER", "REPORTS_VIEWER"] as UserRole[],
   /** Member self-service portal */
   MEMBER:       ["MEMBER_USER"] as UserRole[],
   /** Corporate group HR administrator */

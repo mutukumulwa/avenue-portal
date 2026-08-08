@@ -16,8 +16,23 @@ export default async function AdminLayout({
     const session = await getCachedSession();
     const userRole = (session?.user?.role ?? null) as UserRole | null;
 
-    // Global Route Guard for Admin paths
-    if (!session || userRole === "HR_MANAGER" || userRole === "BROKER_USER" || userRole === "MEMBER_USER") {
+    // Global Route Guard for Admin paths.
+    //
+    // DEF-003: roles that own a non-admin portal are sent to their own portal
+    // rather than /unauthorized — the admin shell scopes by tenant, which for
+    // an employer-side user (FUND_ADMINISTRATOR) would mean cross-employer
+    // reach. resolvePostLoginPath is the single source for "where does this
+    // role live", so this guard cannot drift from the login redirect.
+    if (session && userRole && userRole !== "SUPER_ADMIN") {
+      const { resolvePostLoginPath } = await import("@/lib/post-login");
+      const home = resolvePostLoginPath(userRole);
+      if (home !== "/dashboard" && home !== "/reports") {
+        const { redirect } = await import("next/navigation");
+        redirect(home);
+      }
+    }
+
+    if (!session) {
       const { requireRole, ROLES } = await import("@/lib/rbac");
       await requireRole(ROLES.ANY_STAFF); // will automatically redirect to auth or forbidden
     }

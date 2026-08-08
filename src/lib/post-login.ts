@@ -16,6 +16,10 @@ export function resolvePostLoginPath(role: string | null | undefined): string {
     case "HR_MANAGER":         return "/hr/dashboard";
     case "FUND_ADMINISTRATOR": return "/fund/dashboard";
     case "PROVIDER_USER":      return "/provider/dashboard";
+    // DEF-003: a reports viewer holds READ_REPORTS only. Landing them on the
+    // staff dashboard put claims rows (claimant, provider, amount) on their
+    // first screen. Their home is the reports surface.
+    case "REPORTS_VIEWER":     return "/reports";
     default:                   return "/dashboard";
   }
 }
