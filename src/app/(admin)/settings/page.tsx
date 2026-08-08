@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireRole, ROLES } from "@/lib/rbac";
 import { InviteUserModal } from "./InviteUserModal";
@@ -68,7 +69,17 @@ export default async function SettingsPage() {
             <tbody className="divide-y divide-[#EEEEEE] text-brand-text-body">
               {users.map((u) => (
                 <tr key={u.id} className="hover:bg-[#F8F9FA]">
-                  <td className="px-5 py-3 font-semibold text-brand-text-heading">{u.firstName} {u.lastName}</td>
+                  {/* DEF-002: every user must be reopenable — the flat table
+                      alone made dynamic roles, permissions and scope unauditable. */}
+                  <td className="px-5 py-3 font-semibold text-brand-text-heading">
+                    <Link
+                      href={`/settings/users/${u.id}`}
+                      className="hover:text-brand-indigo hover:underline"
+                      title="View effective access, roles and scope"
+                    >
+                      {u.firstName} {u.lastName}
+                    </Link>
+                  </td>
                   <td className="px-5 py-3">{u.email}</td>
                   <td className="px-5 py-3">
                     <span className={`px-3 py-1 text-[10px] font-bold uppercase rounded-full ${roleColor(u.role)}`}>

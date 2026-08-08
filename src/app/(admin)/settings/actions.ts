@@ -137,7 +137,7 @@ export async function updateUserAccessAction(formData: FormData) {
   // portal rows, but a hand-crafted POST must not escalate a facility user).
   const target = await prisma.user.findFirst({
     where: { id: userId, tenantId: session.user.tenantId },
-    select: { role: true, providerId: true, memberId: true, brokerId: true, groupId: true },
+    select: { role: true, isActive: true, providerId: true, memberId: true, brokerId: true, groupId: true },
   });
   if (!target) return;
 
@@ -161,11 +161,18 @@ export async function updateUserAccessAction(formData: FormData) {
     );
   }
 
+  // DEF-002 test 8: a role or status change must land on any LIVE session, not
+  // wait for the user to log out. The sessionVersion bump rides the existing
+  // single-session rail (R25), so the old session is invalidated within the
+  // enforcement cache TTL. Only bump when something actually changed — a
+  // no-op save should not sign the user out.
+  const changed = !roleUnchanged || isActive !== target.isActive;
+
   await prisma.user.update({
     where: { id: userId, tenantId: session.user.tenantId },
     // Never rewrite role to something the checks above didn't clear: when the
     // row is a locked portal user, `role` equals the preserved current role.
-    data: { role, isActive },
+    data: { role, isActive, ...(changed ? { sessionVersion: { increment: 1 } } : {}) },
   });
 
   await writeAudit({
@@ -173,7 +180,7 @@ export async function updateUserAccessAction(formData: FormData) {
     action: "USER_ACCESS_UPDATED",
     module: "SETTINGS",
     description: `Updated user access for ${userId}`,
-    metadata: { targetUserId: userId, role, isActive },
+    metadata: { targetUserId: userId, role, isActive, roleChanged: !roleUnchanged },
   });
 
   revalidatePath("/settings");

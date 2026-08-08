@@ -44,7 +44,7 @@ describe("updateUserAccessAction (BD-01)", () => {
 
   it("allows toggling a portal user active/inactive while preserving its role", async () => {
     mockPrisma.user.findFirst.mockResolvedValue({
-      role: "PROVIDER_USER", providerId: "p1", memberId: null, brokerId: null, groupId: null,
+      role: "PROVIDER_USER", isActive: true, providerId: "p1", memberId: null, brokerId: null, groupId: null,
     });
     mockPrisma.user.update.mockResolvedValue({});
 
@@ -52,7 +52,38 @@ describe("updateUserAccessAction (BD-01)", () => {
 
     expect(mockPrisma.user.update).toHaveBeenCalledOnce();
     const arg = mockPrisma.user.update.mock.calls[0][0];
-    expect(arg.data).toEqual({ role: "PROVIDER_USER", isActive: false });
+    // DEF-002 test 8: deactivating must also invalidate the live session — a
+    // disabled user keeping their tab alive would defeat the control.
+    expect(arg.data).toEqual({
+      role: "PROVIDER_USER",
+      isActive: false,
+      sessionVersion: { increment: 1 },
+    });
+  });
+
+  it("does not invalidate the session when nothing actually changed", async () => {
+    mockPrisma.user.findFirst.mockResolvedValue({
+      role: "CLAIMS_OFFICER", isActive: true, providerId: null, memberId: null, brokerId: null, groupId: null,
+    });
+    mockPrisma.user.update.mockResolvedValue({});
+
+    await updateUserAccessAction(fd({ userId: "u1", role: "CLAIMS_OFFICER", isActive: "true" }));
+
+    const arg = mockPrisma.user.update.mock.calls[0][0];
+    expect(arg.data).toEqual({ role: "CLAIMS_OFFICER", isActive: true });
+    expect(arg.data.sessionVersion).toBeUndefined();
+  });
+
+  it("invalidates the session when a staff role changes", async () => {
+    mockPrisma.user.findFirst.mockResolvedValue({
+      role: "CLAIMS_OFFICER", isActive: true, providerId: null, memberId: null, brokerId: null, groupId: null,
+    });
+    mockPrisma.user.update.mockResolvedValue({});
+
+    await updateUserAccessAction(fd({ userId: "u1", role: "CUSTOMER_SERVICE", isActive: "true" }));
+
+    const arg = mockPrisma.user.update.mock.calls[0][0];
+    expect(arg.data.sessionVersion).toEqual({ increment: 1 });
   });
 
   it("rejects converting a staff user INTO a portal role inline", async () => {
