@@ -10,7 +10,7 @@ export default async function RegisterMemberPage({
 }: {
   searchParams: Promise<{ principalId?: string }>;
 }) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const { principalId } = await searchParams;
 
   const groups = await GroupsService.getGroups(session.user.tenantId, session.user.clientId);

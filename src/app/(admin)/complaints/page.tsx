@@ -13,7 +13,7 @@ const STATUS_STYLES: Record<string, string> = {
 export default async function ComplaintsPage(props: {
   searchParams: Promise<{ status?: string; type?: string }>;
 }) {
-  await requireRole(ROLES.OPS);
+  await requireRole(ROLES.MEMBER_OPS);
 
   const { status, type } = await props.searchParams;
 

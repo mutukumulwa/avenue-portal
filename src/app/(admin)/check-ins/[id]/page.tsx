@@ -27,7 +27,7 @@ async function getAppOrigin() {
 }
 
 export default async function CheckInDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const { id } = await params;
   const challenge = await SecureCheckInService.getChallengeForStaff(session.user.tenantId, id);
 

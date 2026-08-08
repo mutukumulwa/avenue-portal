@@ -6,7 +6,7 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { SecureCheckInService } from "@/server/services/secure-checkin/secure-checkin.service";
 
 export async function initiateCheckInAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const memberId = String(formData.get("memberId") ?? "");
   const providerId = String(formData.get("providerId") ?? "");
   const workstationId = String(formData.get("workstationId") ?? "");
@@ -25,7 +25,7 @@ export async function initiateCheckInAction(formData: FormData) {
 }
 
 export async function confirmVisitCodeAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const challengeId = String(formData.get("challengeId") ?? "");
   const code = String(formData.get("code") ?? "");
 
@@ -42,7 +42,7 @@ export async function confirmVisitCodeAction(formData: FormData) {
 }
 
 export async function emergencyOverrideAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const memberId = String(formData.get("memberId") ?? "");
   const providerId = String(formData.get("providerId") ?? "");
   const reason = String(formData.get("reason") ?? "");
@@ -61,7 +61,7 @@ export async function emergencyOverrideAction(formData: FormData) {
 }
 
 export async function knowledgeFallbackAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const challengeId = String(formData.get("challengeId") ?? "");
   const photoEvidenceUrl = String(formData.get("photoEvidenceUrl") ?? "");
 
@@ -86,7 +86,7 @@ export async function knowledgeFallbackAction(formData: FormData) {
 }
 
 export async function restartCheckInAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const challengeId = String(formData.get("challengeId") ?? "");
   if (!challengeId) throw new Error("Challenge is required.");
 
@@ -100,7 +100,7 @@ export async function restartCheckInAction(formData: FormData) {
 }
 
 export async function cancelCheckInAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const challengeId = String(formData.get("challengeId") ?? "");
   const reason = String(formData.get("reason") ?? "");
   if (!challengeId) throw new Error("Challenge is required.");

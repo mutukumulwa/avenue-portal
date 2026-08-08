@@ -11,7 +11,7 @@ export default async function ReimbursementClaimPage({
 }: {
   searchParams: Promise<{ memberId?: string }>;
 }) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
   const { memberId } = await searchParams;
   const tenantId = session.user.tenantId;
 

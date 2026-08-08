@@ -75,7 +75,7 @@ export async function parseImportAction(
   _prev: ParseResult | null,
   formData: FormData
 ): Promise<ParseResult> {
-  await requireRole(ROLES.OPS);
+  await requireRole(ROLES.MEMBER_OPS);
 
   const file = formData.get("file") as File | null;
   if (!file || file.size === 0) {
@@ -124,7 +124,7 @@ export async function confirmImportAction(
   _prev: ImportResult | null,
   formData: FormData
 ): Promise<ImportResult> {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
 
   const groupId  = formData.get("groupId")  as string;
   const rowsJson = formData.get("rows")     as string;

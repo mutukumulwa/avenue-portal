@@ -7,7 +7,7 @@ import { emergencyOverrideAction, initiateCheckInAction } from "./actions";
 import { MemberLookup } from "./MemberLookup";
 
 export default async function CheckInsPage() {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
 
   const [members, providers, recentChallenges, overrides] = await Promise.all([
     prisma.member.findMany({

@@ -6,7 +6,7 @@ import { MembersService } from "@/server/services/members.service";
 import { MemberEditForm } from "./MemberEditForm";
 
 export default async function MemberEditPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
 
   const { id } = await params;
   const member = await MembersService.getMemberById(session.user.tenantId, id);

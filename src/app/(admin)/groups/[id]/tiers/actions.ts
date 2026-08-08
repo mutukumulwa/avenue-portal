@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 
 export async function createTierAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
 
   const groupId   = formData.get("groupId") as string;
   const name      = formData.get("name") as string;
@@ -36,7 +36,7 @@ export async function createTierAction(formData: FormData) {
 }
 
 export async function updateTierAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
 
   const tierId    = formData.get("tierId") as string;
   const groupId   = formData.get("groupId") as string;
@@ -69,7 +69,7 @@ export async function updateTierAction(formData: FormData) {
 }
 
 export async function deleteTierAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
 
   const tierId  = formData.get("tierId") as string;
   const groupId = formData.get("groupId") as string;

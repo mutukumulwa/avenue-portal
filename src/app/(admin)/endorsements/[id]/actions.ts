@@ -6,7 +6,7 @@ import { EndorsementsService } from "@/server/services/endorsement.service";
 import { prisma } from "@/lib/prisma";
 
 export async function approveEndorsementAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
 
   const endorsementId = formData.get("endorsementId") as string;
   try {
@@ -22,7 +22,7 @@ export async function approveEndorsementAction(formData: FormData) {
 }
 
 export async function rejectEndorsementAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
 
   const endorsementId = formData.get("endorsementId") as string;
   await prisma.endorsement.update({

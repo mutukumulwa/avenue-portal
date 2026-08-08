@@ -7,7 +7,7 @@ import { ShieldAlert, ShieldCheck, AlertTriangle, ArrowRight } from "lucide-reac
 export default async function FraudDashboardPage(props: {
   searchParams: Promise<{ resolved?: string; severity?: string }>;
 }) {
-  await requireRole(ROLES.OPS);
+  await requireRole(ROLES.CLAIMS_READ);
 
   const { resolved, severity } = await props.searchParams;
   const showResolved = resolved === "true";

@@ -20,7 +20,7 @@ export default async function ClaimsPage({
 }: {
   searchParams: Promise<{ page?: string; providerId?: string; status?: string; serviceType?: string }>;
 }) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_READ);
   const tenantId = session.user.tenantId;
 
   const params = await searchParams;

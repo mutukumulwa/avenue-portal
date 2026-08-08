@@ -6,7 +6,7 @@ import { GroupsService } from "@/server/services/groups.service";
 import { GroupEditForm } from "./GroupEditForm";
 
 export default async function GroupEditPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
 
   const { id } = await params;
   const group = await GroupsService.getGroupById(session.user.tenantId, id, session.user.clientId);

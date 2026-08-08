@@ -145,11 +145,14 @@ export const ROLE_GRANTS: Record<UserRole, readonly string[]> = {
 };
 
 /**
- * Roles whose grants are amended relative to prisma/seeds/rbac.ts by an explicit
- * decision. The parity suite exempts exactly these and no others, so an
- * unreviewed divergence anywhere else fails the build.
+ * Roles permitted to diverge from prisma/seeds/rbac.ts.
+ *
+ * Deliberately EMPTY: decision D1 Branch A was applied to the seed as well, so
+ * the catalog and the seed state the same grants. Adding a role here means
+ * accepting two disagreeing sources of truth — the exact condition that caused
+ * DEF-003 — so it requires a recorded decision.
  */
-export const SEED_DIVERGENCE_EXEMPT: ReadonlyArray<UserRole> = ["CUSTOMER_SERVICE"];
+export const SEED_DIVERGENCE_EXEMPT: ReadonlyArray<UserRole> = [];
 
 /**
  * Effective permissions for a session (decision D2-b): enum baseline ∪ dynamic

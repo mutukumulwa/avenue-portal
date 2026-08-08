@@ -17,7 +17,7 @@ export default async function FraudCasePage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireRole(ROLES.OPS);
+  await requireRole(ROLES.CLAIMS_READ);
   const { id } = await params;
 
   const alert = await prisma.claimFraudAlert.findUnique({

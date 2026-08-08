@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 
 export default async function ReinstatementQueuePage() {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const requests = await ReinstatementService.getPendingRequests(session.user.tenantId);
 
   return (

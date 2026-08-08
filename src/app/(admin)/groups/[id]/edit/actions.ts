@@ -10,7 +10,7 @@ export async function updateGroupAction(
   _prev: { error?: string } | null,
   formData: FormData
 ): Promise<{ error: string }> {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
 
   try {
     await GroupsService.updateGroup(session.user.tenantId, groupId, {

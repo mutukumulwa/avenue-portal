@@ -9,7 +9,7 @@ export default async function FraudInvestigationsPage({
 }: {
   searchParams: Promise<{ error?: string; closed?: string }>;
 }) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_READ);
   const { error, closed } = await searchParams;
   const tenantId = session.user.tenantId;
   const showClosed = closed === "true";

@@ -24,7 +24,7 @@ function pct(value: number, total: number) {
 export default async function CheckInAuditPage(props: {
   searchParams: Promise<{ flow?: string; outcome?: string; review?: string; date?: string }>;
 }) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_READ);
   const { flow, outcome, review, date } = await props.searchParams;
 
   const selectedDate = date ? new Date(`${date}T00:00:00`) : new Date();

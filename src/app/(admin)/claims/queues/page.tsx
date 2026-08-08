@@ -70,7 +70,7 @@ export default async function ClaimQueuesPage({
   searchParams: Promise<{ queue?: string; route?: string }>;
 }) {
   const { queue, route } = await searchParams;
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_READ);
   const [claims, facilities] = await Promise.all([
     ClaimsService.getActiveQueues(session.user.tenantId, session.user.clientId, { take: 500 }),
     ClaimsService.getQueueFacilitySummary(session.user.tenantId, session.user.clientId),

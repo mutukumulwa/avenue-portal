@@ -5,7 +5,7 @@ import { ArrowLeft, Download, Info } from "lucide-react";
 import { MemberImportClient } from "./MemberImportClient";
 
 export default async function MemberImportPage() {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
 
   const groups = await prisma.group.findMany({
     where: { tenantId: session.user.tenantId, status: "ACTIVE" },

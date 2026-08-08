@@ -9,7 +9,7 @@ export async function createBranchEnrollmentApprovalAction(
   _prev: { error?: string; link?: string } | null,
   formData: FormData
 ): Promise<{ error?: string; link?: string }> {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const reason = String(formData.get("reason") ?? "");
 
   try {

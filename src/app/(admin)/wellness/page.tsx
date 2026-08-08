@@ -26,7 +26,7 @@ const ACTIVITY_TYPES = ["SCREENING_COMPLETED", "HEALTH_CHECK", "VITALS_LOGGED", 
 const fmtDate = (d: Date | null) => (d ? new Date(d).toISOString().slice(0, 10) : "—");
 
 export default async function WellnessPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const { error } = await searchParams;
   const tenantId = session.user.tenantId;
 

@@ -13,7 +13,7 @@ export async function issueCardAction(
   _prev: { error?: string; success?: boolean } | null,
   formData: FormData
 ): Promise<{ error?: string; success?: boolean }> {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
 
   const cardNumber = (formData.get("cardNumber") as string | null)?.trim();
   if (!cardNumber) return { error: "Card number is required." };
@@ -67,7 +67,7 @@ export async function issueCardAction(
 export async function requestCardReplacementAction(
   formData: FormData,
 ): Promise<{ error?: string; invoiceId?: string }> {
-  const session   = await requireRole(ROLES.OPS);
+  const session   = await requireRole(ROLES.MEMBER_OPS);
   const tenantId  = session.user.tenantId;
   const memberId  = formData.get("memberId") as string;
   const reason    = (formData.get("reason") as string) || "Lost card";

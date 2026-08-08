@@ -17,7 +17,7 @@ import { BranchEnrollmentPanel } from "./webauthn/BranchEnrollmentPanel";
 import QRCode from "react-qr-code";
 
 export default async function MemberDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
 
   const { id } = await params;
 

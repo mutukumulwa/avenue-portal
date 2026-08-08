@@ -31,7 +31,7 @@ export default async function OverrideQueuePage({
 }: {
   searchParams: Promise<{ status?: string }>;
 }) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_READ);
   const { status } = await searchParams;
   const tenantId = session.user.tenantId;
 

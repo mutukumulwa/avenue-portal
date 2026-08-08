@@ -25,7 +25,7 @@ export default async function CaseDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ error?: string; closed?: string }>;
 }) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_READ);
   const { id } = await params;
   const { error, closed } = await searchParams;
   const tenantId = session.user.tenantId;

@@ -20,7 +20,7 @@ export async function ingestOfflineOpsAction(
   /** PR-036: per-op TERMINAL state — the client shows the truth, never "synced" for a conflicted op. */
   outcomes: Array<{ opKey: string; state: string; reason?: string }>;
 }> {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
   if (!Array.isArray(ops) || ops.length === 0) return { accepted: 0, syncedOpKeys: [], conflicts: 0, outcomes: [] };
 
   // WP-B4: the work code travels with the batch; invalid/missing ⇒ ops buffer
@@ -62,7 +62,7 @@ export async function unlockOfflineWorkAction(code: string): Promise<
   | { ok: true; pack: { packId: string; generatedAt: string; validUntil: string; memberCount: number; keyVersion: number; ciphertext: string; iv: string; authTag: string } }
   | { ok: false; reason: string }
 > {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
   try {
     const { OfflinePackService } = await import("@/server/services/offline-pack.service");
     const pack = await OfflinePackService.getEncryptedPack(session.user.tenantId, code);

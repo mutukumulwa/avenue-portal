@@ -6,7 +6,7 @@ import { ArrowLeft, Clock, Send, ShieldCheck } from "lucide-react";
 import { resolveServiceRequestAction } from "@/app/(admin)/service-requests/[id]/actions";
 
 export default async function ResolveServiceRequestPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await requireRole(ROLES.OPS); // Need OPS to resolve
+  const session = await requireRole(ROLES.MEMBER_OPS); // Need OPS to resolve
 
   const { id } = await params;
 

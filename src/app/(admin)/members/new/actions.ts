@@ -9,7 +9,7 @@ export async function addMemberAction(
   _prev: { error?: string; warnings?: string[] } | null,
   formData: FormData
 ): Promise<{ error?: string; warnings?: string[] }> {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
 
   const tenantId = session.user.tenantId;
 

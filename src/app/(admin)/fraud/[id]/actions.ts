@@ -12,7 +12,7 @@ export async function dismissCaseAction(
   _prev: { error?: string } | null,
   formData: FormData
 ): Promise<{ error: string }> {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
   const reason = (formData.get("reason") as string | null)?.trim();
   if (!reason) return { error: "A dismissal reason is required." };
 
@@ -44,7 +44,7 @@ export async function escalateCaseAction(
   _prev: { error?: string } | null,
   formData: FormData
 ): Promise<{ error: string }> {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
   const notes = (formData.get("notes") as string | null)?.trim();
   if (!notes) return { error: "Investigation notes are required before escalating." };
 

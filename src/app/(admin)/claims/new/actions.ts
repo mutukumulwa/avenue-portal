@@ -37,7 +37,7 @@ export async function submitClaimAction(data: {
   diagnoses: DiagnosisInput[];
   lineItems: LineItemInput[];
 }) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
 
   // Canonical intake (F5.1): the operator selects the provider; the same schema,
   // scope, staged evaluation and durable receipt as every other rail apply.
@@ -71,7 +71,7 @@ export async function submitReimbursementClaimAction(data: {
   proofType?: string;
   mpesaConfirmationCode?: string;
 }) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
 
   if (!data.reimbursementBankName && !data.reimbursementMpesaPhone) {
     return { ok: false as const, error: "Provide either bank account details or a mobile-money phone number for the reimbursement payment." };

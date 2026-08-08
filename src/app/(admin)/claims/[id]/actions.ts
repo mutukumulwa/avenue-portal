@@ -19,7 +19,7 @@ import { writeAudit } from "@/lib/audit";
  * control to ClaimDecisionService.decide, surface its message verbatim.
  */
 export async function adjudicateClaimAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
   const tenantId = session.user.tenantId;
   const claimId = formData.get("claimId") as string;
   const action = formData.get("action") as "CAPTURED" | "APPROVED" | "PARTIALLY_APPROVED" | "DECLINED";
@@ -88,7 +88,7 @@ export async function adjudicateClaimAction(formData: FormData) {
  * contract ceiling.
  */
 export async function requestPriceOverrideAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
   const tenantId = session.user.tenantId;
   const claimId = formData.get("claimId") as string;
   const justification = ((formData.get("justification") as string) || "").trim();
@@ -123,7 +123,7 @@ export async function requestPriceOverrideAction(formData: FormData) {
  * usage + GL reversals.
  */
 export async function voidClaimAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
   const claimId = formData.get("claimId") as string;
   const reason = ((formData.get("reason") as string) || "").trim();
 
@@ -152,7 +152,7 @@ export async function voidClaimAction(formData: FormData) {
 // ── Exception logging ──────────────────────────────────────────────────────
 
 export async function raiseExceptionAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
 
   const claimId     = formData.get("claimId")       as string;
   const entityRef   = formData.get("entityRef")     as string;
@@ -199,7 +199,7 @@ export async function raiseExceptionAction(formData: FormData) {
 }
 
 export async function resolveExceptionAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
 
   const exceptionId    = formData.get("exceptionId")    as string;
   const claimId        = formData.get("claimId")        as string;
@@ -247,7 +247,7 @@ export async function resolveExceptionAction(formData: FormData) {
 export async function collectCoContributionAction(
   formData: FormData,
 ): Promise<{ error?: string }> {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
 
   const transactionId    = formData.get("transactionId") as string;
   const amountCollected  = Number(formData.get("amountCollected"));
@@ -290,7 +290,7 @@ export async function collectCoContributionAction(
 export async function waiveCoContributionAction(
   formData: FormData,
 ): Promise<{ error?: string }> {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
 
   const transactionId = formData.get("transactionId") as string;
   const reason        = (formData.get("reason") as string)?.trim();
@@ -326,7 +326,7 @@ export async function waiveCoContributionAction(
 // ─── PRE-AUTH ATTACHMENT (WP-C3) ─────────────────────────────────────────────
 
 export async function attachPreauthAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
   const claimId = formData.get("claimId") as string;
   const preauthId = formData.get("preauthId") as string;
 
@@ -342,7 +342,7 @@ export async function attachPreauthAction(formData: FormData) {
 }
 
 export async function detachPreauthAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
   const claimId = formData.get("claimId") as string;
   const preauthId = formData.get("preauthId") as string;
 

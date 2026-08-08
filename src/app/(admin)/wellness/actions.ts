@@ -16,7 +16,7 @@ function fail(err: unknown): never {
 }
 
 export async function upsertProgramAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   try {
     const conditions = (formData.get("targetConditions") as string || "")
       .split(",").map((s) => s.trim()).filter(Boolean);
@@ -40,13 +40,13 @@ export async function upsertProgramAction(formData: FormData) {
 }
 
 export async function retireProgramAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   await WellnessService.retireProgram(session.user.tenantId, formData.get("id") as string);
   revalidatePath(PATH);
 }
 
 export async function enrollAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   try {
     const enrollment = await WellnessService.enroll(
       session.user.tenantId,
@@ -67,7 +67,7 @@ export async function enrollAction(formData: FormData) {
 }
 
 export async function logActivityAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   try {
     await WellnessService.logActivity(session.user.tenantId, formData.get("enrollmentId") as string, {
       type: formData.get("type") as WellnessActivityType,
@@ -80,7 +80,7 @@ export async function logActivityAction(formData: FormData) {
 }
 
 export async function withdrawAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   await WellnessService.withdraw(session.user.tenantId, formData.get("enrollmentId") as string);
   revalidatePath(PATH);
 }

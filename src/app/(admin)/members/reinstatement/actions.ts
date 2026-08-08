@@ -5,7 +5,7 @@ import { ReinstatementService } from "@/server/services/reinstatement.service";
 import { revalidatePath } from "next/cache";
 
 export async function approveReinstatementAction(_prev: unknown, formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const requestId = formData.get("requestId") as string;
   const resetWaitingPeriod = formData.get("resetWaitingPeriod") === "on";
 
@@ -21,7 +21,7 @@ export async function approveReinstatementAction(_prev: unknown, formData: FormD
 }
 
 export async function declineReinstatementAction(_prev: unknown, formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const requestId = formData.get("requestId") as string;
   const declineReason = (formData.get("declineReason") as string)?.trim();
 

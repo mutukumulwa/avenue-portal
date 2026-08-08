@@ -38,7 +38,7 @@ export default async function ClaimDetailPage({
   searchParams: Promise<{ error?: string; notice?: string; submitted?: string; replayed?: string }>;
 }) {
   const { error, notice, submitted, replayed } = await searchParams;
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_READ);
 
   const { id } = await params;
   const tenantId = session.user.tenantId;

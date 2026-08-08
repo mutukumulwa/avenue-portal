@@ -23,7 +23,7 @@ const QUEUE_META: Record<string, { label: string; owner: string; slaHours: numbe
 };
 
 export default async function ContractQueuesPage() {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const tenantId = session.user.tenantId;
 
   const grouped = await prisma.claim.groupBy({

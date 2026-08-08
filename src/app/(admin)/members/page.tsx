@@ -29,7 +29,7 @@ export default async function MembersPage({
 }: {
   searchParams: Promise<{ q?: string; status?: string; relationship?: string; page?: string }>;
 }) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
 
   const { q, status, relationship, page: pageParam } = await searchParams;
   const tenantId = session.user.tenantId;

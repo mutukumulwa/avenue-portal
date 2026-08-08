@@ -8,7 +8,7 @@ import { resolveSchemeClientId } from "@/server/services/clientResolve";
 import { nextMemberNumber } from "@/server/services/member-numbering.service";
 
 export async function enrollIndividualClientAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const tenantId = session.user.tenantId;
 
   const packageId   = formData.get("packageId") as string;

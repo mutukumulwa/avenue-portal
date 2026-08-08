@@ -3,7 +3,7 @@ import { CaptureClient } from "./CaptureClient";
 import { CloudOff } from "lucide-react";
 
 export default async function OfflineCapturePage() {
-  await requireRole(ROLES.OPS);
+  await requireRole(ROLES.CLAIMS_READ);
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">

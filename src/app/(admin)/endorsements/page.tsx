@@ -43,7 +43,7 @@ export default async function EndorsementsPage({
 }: {
   searchParams: Promise<{ q?: string; status?: string; type?: string }>;
 }) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
 
   const { q, status, type } = await searchParams;
   const tenantId = session.user.tenantId;

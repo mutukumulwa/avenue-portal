@@ -8,7 +8,7 @@ export default async function NewEndorsementPage({
 }: {
   searchParams: Promise<{ groupId?: string }>;
 }) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
 
   const { groupId: preselectedGroupId } = await searchParams;
   const tenantId = session.user.tenantId;

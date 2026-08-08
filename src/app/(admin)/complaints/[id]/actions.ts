@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 export async function moveToInvestigatingAction(complaintId: string) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
 
   await prisma.complaint.update({
     where: { id: complaintId },
@@ -29,7 +29,7 @@ export async function resolveComplaintAction(
   _prev: { error?: string } | null,
   formData: FormData
 ): Promise<{ error: string }> {
-  const session  = await requireRole(ROLES.OPS);
+  const session  = await requireRole(ROLES.MEMBER_OPS);
   const resolution = (formData.get("resolution") as string | null)?.trim();
   if (!resolution) return { error: "A resolution note is required." };
 
@@ -53,7 +53,7 @@ export async function dismissComplaintAction(
   _prev: { error?: string } | null,
   formData: FormData
 ): Promise<{ error: string }> {
-  const session  = await requireRole(ROLES.OPS);
+  const session  = await requireRole(ROLES.MEMBER_OPS);
   const resolution = (formData.get("resolution") as string | null)?.trim();
   if (!resolution) return { error: "A reason is required when dismissing." };
 

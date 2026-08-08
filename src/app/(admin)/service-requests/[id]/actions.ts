@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { writeAudit } from "@/lib/audit";
 
 export async function resolveServiceRequestAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
 
   const requestId = formData.get("requestId") as string;
   const response = formData.get("response") as string;

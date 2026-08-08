@@ -26,7 +26,7 @@ const TYPE_LABEL: Record<string, string> = {
 async function approveOverrideAction(formData: FormData) {
   "use server";
   const { requireRole, ROLES } = await import("@/lib/rbac");
-  const session    = await requireRole(ROLES.OPS);
+  const session    = await requireRole(ROLES.CLAIMS_READ);
   const overrideId = formData.get("overrideId") as string;
   const notes      = (formData.get("notes") as string) || undefined;
   await overrideService.approve({
@@ -39,7 +39,7 @@ async function approveOverrideAction(formData: FormData) {
 async function rejectOverrideAction(formData: FormData) {
   "use server";
   const { requireRole, ROLES } = await import("@/lib/rbac");
-  const session    = await requireRole(ROLES.OPS);
+  const session    = await requireRole(ROLES.CLAIMS_READ);
   const overrideId = formData.get("overrideId") as string;
   const reason     = formData.get("reason") as string;
   await overrideService.reject({
@@ -49,7 +49,7 @@ async function rejectOverrideAction(formData: FormData) {
 }
 
 export default async function OverrideDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_READ);
   const { id } = await params;
   const tenantId = session.user.tenantId;
 

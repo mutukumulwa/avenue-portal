@@ -14,7 +14,7 @@ import { redirect } from "next/navigation";
  * the code once for read-out.
  */
 export async function issueOfflineCodeAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
   const tenantId = session.user.tenantId;
 
   const providerId = formData.get("providerId") as string;
@@ -56,7 +56,7 @@ export async function issueOfflineCodeAction(formData: FormData) {
 }
 
 export async function revokeOfflineCodeAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
   const id = formData.get("id") as string;
   const auth = await OfflineAuthService.revokeCode(session.user.tenantId, id, session.user.id);
 

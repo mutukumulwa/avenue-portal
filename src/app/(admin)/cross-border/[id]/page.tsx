@@ -22,7 +22,7 @@ export default async function CrossBorderCasePage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ error?: string }>;
 }) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const { id } = await params;
   const { error } = await searchParams;
 

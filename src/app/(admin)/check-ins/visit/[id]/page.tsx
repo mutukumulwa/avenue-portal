@@ -11,7 +11,7 @@ function labelFromKey(value: string) {
 }
 
 export default async function VisitVerificationPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const { id } = await params;
   const visit = await prisma.visitVerification.findUnique({
     where: { id, tenantId: session.user.tenantId },

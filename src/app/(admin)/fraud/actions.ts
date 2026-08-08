@@ -7,7 +7,7 @@ import { writeAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
 
 export async function dismissAlertAction(alertId: string) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
 
   await prisma.claimFraudAlert.update({
     where: { id: alertId },
@@ -31,7 +31,7 @@ export async function dismissAlertAction(alertId: string) {
 
 /** Open a formal fraud investigation (G5.11) over an alert + its claim. */
 export async function openInvestigationFromAlertAction(alertId: string, claimId: string) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
   const { FraudInvestigationService } = await import("@/server/services/fraud-engine.service");
 
   const inv = await FraudInvestigationService.open(session.user.tenantId, {
@@ -52,7 +52,7 @@ export async function openInvestigationFromAlertAction(alertId: string, claimId:
 }
 
 export async function escalateClaimAction(claimId: string): Promise<{ error: string } | void> {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
 
   // Lock claim to HELD status so it cannot be paid until resolved
   const current = await prisma.claim.findFirst({

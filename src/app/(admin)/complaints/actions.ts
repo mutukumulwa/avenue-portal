@@ -10,7 +10,7 @@ export async function updateComplaintStatusAction(
   status: "INVESTIGATING" | "RESOLVED" | "DISMISSED",
   resolution?: string
 ) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
 
   await prisma.complaint.update({
     where: { id: complaintId },

@@ -9,7 +9,7 @@ import { prisma } from "@/lib/prisma";
  * surfaces "N new" without new infra. Client-scoped.
  */
 export async function getIncomingClaimCountAction(): Promise<number> {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
   return prisma.claim.count({
     where: {
       tenantId: session.user.tenantId,

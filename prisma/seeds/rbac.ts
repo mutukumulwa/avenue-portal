@@ -7,7 +7,7 @@ import {
 
 // ─── PERMISSION DEFINITIONS ──────────────────────────────────────────────────
 
-const PERMISSIONS: Array<{
+export const PERMISSIONS: Array<{
   code: string;
   module: string;
   action: string;
@@ -109,7 +109,7 @@ const UNDERWRITER_PERMS = [
   "ROLE:VIEW", "SETTINGS:VIEW", "REPORT:VIEW",
 ];
 
-const ROLE_PERMISSIONS: Record<string, string[]> = {
+export const ROLE_PERMISSIONS: Record<string, string[]> = {
   UNDERWRITER: UNDERWRITER_PERMS,
 
   SENIOR_UNDERWRITER: [
@@ -163,11 +163,17 @@ const ROLE_PERMISSIONS: Record<string, string[]> = {
     "ROLE:VIEW", "REPORT:VIEW", "REPORT:GENERATE",
   ],
 
+  // DECISION D1 — BRANCH A (2026-08-08): the Membership Officer is
+  // MEMBERSHIP-ONLY. CLAIM:VIEW, PREAUTH:VIEW, BILLING:VIEW and ANALYTICS:VIEW
+  // were removed: they contradicted src/lib/constants.ts, the UAT role charter
+  // and the signed-off eligibility oracle, and carried no review trail — drift
+  // rather than decision. They are the grants behind DEF-003 (S1).
+  //
+  // Keep in lockstep with ROLE_GRANTS in src/lib/authz/catalog.ts; the parity
+  // suite (tests/security/authz-parity.test.ts) fails the build if they differ.
   CUSTOMER_SERVICE: [
     "MEMBER:VIEW", "MEMBER:CREATE", "MEMBER:AMEND", "MEMBER:REINSTATE",
-    "CLAIM:VIEW", "PREAUTH:VIEW",
-    "GROUP:VIEW", "BILLING:VIEW",
-    "ANALYTICS:VIEW",
+    "GROUP:VIEW",
     "OVERRIDE:REQUEST",
     "ROLE:VIEW", "REPORT:VIEW",
   ],
@@ -252,7 +258,7 @@ ROLE_PERMISSIONS["SUPER_ADMIN"] = ALL_PERMISSION_CODES;
 
 // ─── ROLE CODE LIST ──────────────────────────────────────────────────────────
 
-const ROLE_CODES = [
+export const ROLE_CODES = [
   // Existing roles (mapped from UserRole enum)
   "SUPER_ADMIN", "CLAIMS_OFFICER", "FINANCE_OFFICER", "UNDERWRITER",
   "CUSTOMER_SERVICE", "MEDICAL_OFFICER", "REPORTS_VIEWER",

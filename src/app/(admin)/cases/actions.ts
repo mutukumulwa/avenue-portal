@@ -9,7 +9,7 @@ import { redirect } from "next/navigation";
 import type { BenefitCategory, CaseType } from "@prisma/client";
 
 export async function openCaseAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
   const tenantId = session.user.tenantId;
 
   const memberNumber = (formData.get("memberNumber") as string)?.trim();
@@ -50,7 +50,7 @@ export async function openCaseAction(formData: FormData) {
  * the ops officer pastes/uploads it here. Same pipeline as the push API.
  */
 export async function uploadHmsBatchAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
   const raw = formData.get("batchJson") as string;
 
   let parsed: unknown;

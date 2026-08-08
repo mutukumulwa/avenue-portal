@@ -12,7 +12,7 @@ export async function createMemberPortalUserAction(
   _prev: { error?: string } | null,
   formData: FormData
 ): Promise<{ error?: string }> {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const email = ((formData.get("email") as string | null) || "").trim().toLowerCase();
   const password = formData.get("password") as string;
 
@@ -60,7 +60,7 @@ export async function resetMemberPortalPasswordAction(
   _prev: { error?: string } | null,
   formData: FormData
 ): Promise<{ error?: string }> {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const password = formData.get("password") as string;
   const resetPwErr = validatePassword(password);
   if (resetPwErr) return { error: resetPwErr };

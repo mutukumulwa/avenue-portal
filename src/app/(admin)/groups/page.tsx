@@ -29,7 +29,7 @@ export default async function GroupsPage({
 }: {
   searchParams: Promise<{ q?: string; status?: string }>;
 }) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
 
   const { q, status } = await searchParams;
   const tenantId = session.user.tenantId;

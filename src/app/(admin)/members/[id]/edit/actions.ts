@@ -11,7 +11,7 @@ export async function updateMemberAction(
   _prev: { error?: string } | null,
   formData: FormData
 ): Promise<{ error: string }> {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
 
   const firstName = formData.get("firstName") as string;
   const lastName  = formData.get("lastName")  as string;

@@ -22,7 +22,7 @@ export default async function OpenCasesPage({
 }: {
   searchParams: Promise<{ batch?: string }>;
 }) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_READ);
   const { batch } = await searchParams;
   const cases = await CaseService.listOpenCases(session.user.tenantId, session.user.clientId);
 

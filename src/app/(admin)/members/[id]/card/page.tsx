@@ -17,7 +17,7 @@ const CARD_STATUS_STYLE: Record<string, string> = {
 };
 
 export default async function MemberCardPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const { id }  = await params;
   const tenantId = session.user.tenantId;
 

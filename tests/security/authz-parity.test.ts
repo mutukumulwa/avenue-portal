@@ -30,30 +30,33 @@ const sorted = (xs: readonly string[]) => [...new Set(xs)].sort();
 describe("catalog ↔ seed parity", () => {
   const enumRoles = Object.keys(ROLE_GRANTS) as UserRole[];
 
-  it.each(enumRoles.filter((r) => !SEED_DIVERGENCE_EXEMPT.includes(r) && r !== "SUPER_ADMIN" && r !== "PROVIDER_USER"))(
-    "%s grants match prisma/seeds/rbac.ts exactly",
-    (role) => {
-      const seed = SEED_ROLE_PERMISSIONS[role];
-      // Only assert for roles the seed actually defines; provider personas and
-      // the extended roles live in their own catalogs.
-      if (!seed) return;
-      expect(sorted(ROLE_GRANTS[role])).toEqual(sorted(seed));
-    },
+  const comparable = enumRoles.filter(
+    (r) => !SEED_DIVERGENCE_EXEMPT.includes(r) && r !== "SUPER_ADMIN" && r !== "PROVIDER_USER",
   );
 
-  it("exempts only roles with a recorded decision behind the divergence", () => {
-    // Growing this list must be a deliberate, reviewed act.
-    expect(SEED_DIVERGENCE_EXEMPT).toEqual(["CUSTOMER_SERVICE"]);
+  it("actually has roles to compare (guards against a vacuous suite)", () => {
+    expect(comparable.length).toBeGreaterThanOrEqual(9);
+    for (const role of comparable) {
+      expect(SEED_ROLE_PERMISSIONS[role], `seed is missing ${role}`).toBeDefined();
+    }
   });
 
-  it("CUSTOMER_SERVICE diverges from the seed in exactly the D1 Branch A way", () => {
-    const seed = sorted(SEED_ROLE_PERMISSIONS.CUSTOMER_SERVICE ?? []);
-    const catalog = sorted(ROLE_GRANTS.CUSTOMER_SERVICE);
-    const removed = seed.filter((p) => !catalog.includes(p));
-    const added = catalog.filter((p) => !seed.includes(p));
+  it.each(comparable)("%s grants match prisma/seeds/rbac.ts exactly", (role) => {
+    expect(sorted(ROLE_GRANTS[role])).toEqual(sorted(SEED_ROLE_PERMISSIONS[role]));
+  });
 
-    expect(removed).toEqual(["ANALYTICS:VIEW", "BILLING:VIEW", "CLAIM:VIEW", "PREAUTH:VIEW"]);
-    expect(added).toEqual([]);
+  it("permits no unreviewed divergence between catalog and seed", () => {
+    // D1 Branch A was applied to BOTH, so nothing is exempt. Adding a role here
+    // means accepting two disagreeing sources of truth.
+    expect(SEED_DIVERGENCE_EXEMPT).toEqual([]);
+  });
+
+  it("the seed no longer grants CUSTOMER_SERVICE claims, billing or analytics", () => {
+    const seed = SEED_ROLE_PERMISSIONS.CUSTOMER_SERVICE ?? [];
+    for (const code of ["CLAIM:VIEW", "PREAUTH:VIEW", "BILLING:VIEW", "ANALYTICS:VIEW"]) {
+      expect(seed, `seed still grants ${code}`).not.toContain(code);
+    }
+    expect(seed).toContain("MEMBER:VIEW");
   });
 });
 

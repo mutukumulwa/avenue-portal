@@ -11,7 +11,7 @@ export default async function GroupEnrollmentHero({
 }: {
   searchParams: Promise<{ error?: string }>;
 }) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const { error } = await searchParams;
   
   const tenantId = session.user.tenantId;

@@ -7,7 +7,7 @@ import { writeAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
 
 export async function issueLouAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
   const tenantId = session.user.tenantId;
 
   const memberNumber = (formData.get("memberNumber") as string)?.trim();
@@ -38,7 +38,7 @@ export async function issueLouAction(formData: FormData) {
 }
 
 export async function cancelLouAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
   const louId = formData.get("louId") as string;
   await LouService.cancel(session.user.tenantId, louId);
   await writeAudit({

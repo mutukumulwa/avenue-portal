@@ -25,7 +25,7 @@ export default async function ComplaintDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireRole(ROLES.OPS);
+  await requireRole(ROLES.MEMBER_OPS);
   const { id } = await params;
 
   const complaint = await prisma.complaint.findUnique({

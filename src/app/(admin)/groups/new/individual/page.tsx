@@ -5,7 +5,7 @@ import Link from "next/link";
 import { enrollIndividualClientAction } from "./actions";
 
 export default async function IndividualClientEnrollPage() {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const packages = await prisma.package.findMany({
     where: { tenantId: session.user.tenantId, status: "ACTIVE" },
     select: { id: true, name: true, annualLimit: true, contributionAmount: true, type: true },

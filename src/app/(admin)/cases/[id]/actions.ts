@@ -8,7 +8,7 @@ import { redirect } from "next/navigation";
 import type { ClaimLineCategory } from "@prisma/client";
 
 export async function addServiceEntryAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
   const caseId = formData.get("caseId") as string;
 
   await CaseService.addServiceEntry({
@@ -27,7 +27,7 @@ export async function addServiceEntryAction(formData: FormData) {
 }
 
 export async function voidServiceEntryAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
   const caseId = formData.get("caseId") as string;
   await CaseService.voidServiceEntry(
     session.user.tenantId,
@@ -39,14 +39,14 @@ export async function voidServiceEntryAction(formData: FormData) {
 }
 
 export async function attachCasePreauthAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
   const caseId = formData.get("caseId") as string;
   await CaseService.attachPreauth(session.user.tenantId, caseId, formData.get("preauthId") as string);
   revalidatePath(`/cases/${caseId}`);
 }
 
 export async function issueCaseLouAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
   const caseId = formData.get("caseId") as string;
   const lou = await LouService.issue({
     tenantId: session.user.tenantId,
@@ -69,7 +69,7 @@ export async function issueCaseLouAction(formData: FormData) {
 }
 
 export async function cutInterimSliceAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
   const caseId = formData.get("caseId") as string;
 
   // IPL-001: cut a Friday interim bill slice from an OPEN case. Guard violations
@@ -100,7 +100,7 @@ export async function cutInterimSliceAction(formData: FormData) {
 }
 
 export async function closeAndFileAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
   const caseId = formData.get("caseId") as string;
 
   // PR-032: guard violations (empty case, already filed) surface as a banner
@@ -128,7 +128,7 @@ export async function closeAndFileAction(formData: FormData) {
 }
 
 export async function cancelCaseAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
   const caseId = formData.get("caseId") as string;
   await CaseService.cancelCase(
     session.user.tenantId,

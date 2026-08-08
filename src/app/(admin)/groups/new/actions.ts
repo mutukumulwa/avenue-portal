@@ -6,7 +6,7 @@ import { GroupsService } from "@/server/services/groups.service";
 import { writeAudit } from "@/lib/audit";
 
 export async function enrollGroupAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
 
   const tenantId = session.user.tenantId;
 

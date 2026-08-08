@@ -9,7 +9,7 @@ const CASE_TYPES = ["INPATIENT_ADMISSION", "OUTPATIENT_EPISODE", "MATERNITY", "D
 const BENEFITS = ["INPATIENT", "OUTPATIENT", "MATERNITY", "SURGICAL", "DENTAL", "OPTICAL", "CHRONIC_DISEASE"];
 
 export default async function NewCasePage() {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
   const tenantId = session.user.tenantId;
 
   const [providers, members] = await Promise.all([

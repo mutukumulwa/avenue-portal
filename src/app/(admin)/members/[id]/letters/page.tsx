@@ -19,7 +19,7 @@ const LETTER_TYPES: Array<{ value: LetterType; label: string; description: strin
 async function generateLetterAction(formData: FormData) {
   "use server";
   const { requireRole, ROLES } = await import("@/lib/rbac");
-  const session    = await requireRole(ROLES.OPS);
+  const session    = await requireRole(ROLES.MEMBER_OPS);
   const memberId   = formData.get("memberId") as string;
   const letterType = formData.get("letterType") as LetterType;
   const context: Record<string, string> = {};
@@ -43,7 +43,7 @@ async function generateLetterAction(formData: FormData) {
 }
 
 export default async function MemberLettersPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const { id } = await params;
   const tenantId = session.user.tenantId;
 

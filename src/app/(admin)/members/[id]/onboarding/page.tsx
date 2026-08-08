@@ -31,7 +31,7 @@ const CARD_STATUS_LABEL: Record<string, string> = {
 };
 
 export default async function MemberOnboardingPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const { id } = await params;
   const tenantId = session.user.tenantId;
 

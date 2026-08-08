@@ -14,7 +14,7 @@ const BADGE: Record<string, string> = {
 };
 
 export default async function LouRegisterPage() {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_READ);
   const tenantId = session.user.tenantId;
 
   const [lous, providers, members] = await Promise.all([

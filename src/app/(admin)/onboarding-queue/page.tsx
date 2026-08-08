@@ -18,7 +18,7 @@ export default async function OnboardingQueuePage({
 }: {
   searchParams: Promise<{ gap?: string }>;
 }) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const tenantId = session.user.tenantId;
   const { gap } = await searchParams;
 

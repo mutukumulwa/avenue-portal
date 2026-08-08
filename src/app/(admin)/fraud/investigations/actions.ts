@@ -10,7 +10,7 @@ import { writeAudit } from "@/lib/audit";
 const PATH = "/fraud/investigations";
 
 export async function openInvestigationAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
   const tenantId = session.user.tenantId;
   const claimId = ((formData.get("claimId") as string) || "").trim() || undefined;
   const fraudAlertId = ((formData.get("fraudAlertId") as string) || "").trim() || undefined;
@@ -40,7 +40,7 @@ export async function openInvestigationAction(formData: FormData) {
 }
 
 export async function assignInvestigationAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
   const id = formData.get("id") as string;
   await FraudInvestigationService.assign(session.user.tenantId, id, session.user.id);
   await writeAudit({
@@ -54,7 +54,7 @@ export async function assignInvestigationAction(formData: FormData) {
 }
 
 export async function resolveInvestigationAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_OPS);
   const id = formData.get("id") as string;
   const status = formData.get("status") as "SUBSTANTIATED" | "DISMISSED";
   const findings = ((formData.get("findings") as string) || "").trim() || undefined;

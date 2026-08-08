@@ -18,7 +18,7 @@ function fail(path: string, err: unknown): never {
 
 // ── Facilities ──────────────────────────────────────────────────────────
 export async function upsertFacilityAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   try {
     const specialties = (formData.get("specialties") as string || "")
       .split(",").map((s) => s.trim()).filter(Boolean);
@@ -40,14 +40,14 @@ export async function upsertFacilityAction(formData: FormData) {
 }
 
 export async function retireFacilityAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   await CrossBorderService.retireFacility(session.user.tenantId, formData.get("id") as string);
   revalidatePath(LIST);
 }
 
 // ── Cases ───────────────────────────────────────────────────────────────
 export async function openCaseAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   let newId = "";
   try {
     const memberId = formData.get("memberId") as string;
@@ -80,7 +80,7 @@ export async function openCaseAction(formData: FormData) {
 }
 
 export async function assignFacilityAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const caseId = formData.get("caseId") as string;
   try {
     await CrossBorderService.assignFacility(session.user.tenantId, caseId, formData.get("facilityId") as string);
@@ -92,7 +92,7 @@ export async function assignFacilityAction(formData: FormData) {
 }
 
 export async function captureEstimateAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const caseId = formData.get("caseId") as string;
   try {
     const descs = formData.getAll("lineDescription") as string[];
@@ -111,7 +111,7 @@ export async function captureEstimateAction(formData: FormData) {
 }
 
 export async function issueGopAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const caseId = formData.get("caseId") as string;
   try {
     await CrossBorderService.issueGop(session.user.tenantId, caseId, {
@@ -134,7 +134,7 @@ export async function issueGopAction(formData: FormData) {
 }
 
 export async function startTreatmentAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const caseId = formData.get("caseId") as string;
   try {
     await CrossBorderService.startTreatment(session.user.tenantId, caseId);
@@ -146,7 +146,7 @@ export async function startTreatmentAction(formData: FormData) {
 }
 
 export async function addInvoiceLineAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const caseId = formData.get("caseId") as string;
   try {
     await CrossBorderService.addInvoiceLine(session.user.tenantId, caseId, {
@@ -162,7 +162,7 @@ export async function addInvoiceLineAction(formData: FormData) {
 }
 
 export async function consolidateInvoiceAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const caseId = formData.get("caseId") as string;
   try {
     const c = await CrossBorderService.consolidateInvoice(session.user.tenantId, caseId);
@@ -181,7 +181,7 @@ export async function consolidateInvoiceAction(formData: FormData) {
 }
 
 export async function settleAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const caseId = formData.get("caseId") as string;
   try {
     await CrossBorderService.settle(session.user.tenantId, caseId);
@@ -200,7 +200,7 @@ export async function settleAction(formData: FormData) {
 }
 
 export async function cancelCaseAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
   const caseId = formData.get("caseId") as string;
   try {
     await CrossBorderService.cancelCase(session.user.tenantId, caseId);

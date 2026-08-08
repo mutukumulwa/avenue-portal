@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { peekNextDocumentNumber } from "@/lib/document-number";
 
 export async function submitEndorsementAction(formData: FormData) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
 
   const tenantId = session.user.tenantId;
   const groupId       = formData.get("groupId") as string;

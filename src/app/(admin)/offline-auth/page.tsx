@@ -17,7 +17,7 @@ export default async function OfflineAuthPage({
 }: {
   searchParams: Promise<{ issued?: string }>;
 }) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.CLAIMS_READ);
   const tenantId = session.user.tenantId;
   const { issued } = await searchParams;
 

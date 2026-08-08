@@ -8,7 +8,7 @@ import { SelfFundedPanel } from "./self-funded/SelfFundedPanel";
 import { SelfFundedSetupPanel } from "./self-funded/SelfFundedSetupPanel";
 
 export default async function GroupDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await requireRole(ROLES.OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
 
   const { id } = await params;
 
