@@ -6,9 +6,25 @@ import bcrypt from "bcryptjs";
 import { cache } from "react";
 import { measureAsync } from "@/lib/perf";
 import { verifyTotp, totpEnrolmentRequiredNow } from "@/lib/totp";
+import { effectivePermissions } from "@/lib/authz/catalog";
 
-/** Loads all active permission codes for a user from UserRoleAssignment. */
-async function loadUserPermissions(userId: string, tenantId: string): Promise<string[]> {
+/**
+ * Effective permission codes for a user (WP-2, decision D2-b).
+ *
+ * Enum-role baseline from the canonical catalog UNION the dynamic
+ * UserRoleAssignment overlay. The overlay is strictly additive.
+ *
+ * The union matters operationally: production has zero Role/Permission/
+ * UserRoleAssignment rows, so a dynamic-only read returns [] for every user and
+ * every permission-gated surface fails closed. Deriving the baseline from the
+ * role keeps enforcement correct before the RBAC data seed lands, and keeps it
+ * correct afterwards without a second source of truth.
+ */
+async function loadUserPermissions(
+  userId: string,
+  tenantId: string,
+  role: string,
+): Promise<string[]> {
   const assignments = await prisma.userRoleAssignment.findMany({
     where: { userId, tenantId, isActive: true, status: "ACTIVE" },
     include: {
@@ -17,11 +33,11 @@ async function loadUserPermissions(userId: string, tenantId: string): Promise<st
       },
     },
   });
-  const codes = new Set<string>();
+  const dynamic = new Set<string>();
   for (const a of assignments) {
-    for (const rp of a.role.permissions) codes.add(rp.permission.code);
+    for (const rp of a.role.permissions) dynamic.add(rp.permission.code);
   }
-  return [...codes];
+  return effectivePermissions(role, [...dynamic]);
 }
 
 /**
@@ -115,7 +131,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             }
           }
 
-          const permissions = await loadUserPermissions(user.id, user.tenantId);
+          const permissions = await loadUserPermissions(user.id, user.tenantId, user.role);
 
           // Single-session control (R25): bump the version so this login
           // supersedes any prior session; the new version rides in the JWT.

@@ -15,21 +15,30 @@ import {
 import { PortalSwitcher } from "./PortalSwitcher";
 import { useEffect, useState } from "react";
 import type { UserRole } from "@prisma/client";
+import { ROLES } from "@/lib/authz/roles";
 
 type SubItem = { label: string; href: string };
 type NavItem  = { label: string; href: string; icon: React.ElementType; roles: UserRole[]; children?: SubItem[] };
 type NavGroup = { label: string; items: NavItem[] };
 
-const ANY_STAFF:    UserRole[] = ["SUPER_ADMIN","CLAIMS_OFFICER","FINANCE_OFFICER","UNDERWRITER","CUSTOMER_SERVICE","MEDICAL_OFFICER","REPORTS_VIEWER"];
-const OPS:          UserRole[] = ["SUPER_ADMIN","CLAIMS_OFFICER","MEDICAL_OFFICER","CUSTOMER_SERVICE","UNDERWRITER"];
-const FINANCE:      UserRole[] = ["SUPER_ADMIN","FINANCE_OFFICER"];
-const FUND_PORTAL:  UserRole[] = ["SUPER_ADMIN"];
-const UNDERWRITING: UserRole[] = ["SUPER_ADMIN","UNDERWRITER"];
-const ADMIN_ONLY:   UserRole[] = ["SUPER_ADMIN"];
-// Mirrors ROLES.CLINICAL in src/lib/rbac.ts exactly. Deliberately NOT `OPS`: a nav link
-// shown to a role the page rejects is the OBS-6 bug (a link that only leads to Access
-// Denied), and CUSTOMER_SERVICE/UNDERWRITER cannot open clinical protocols.
-const CLINICAL_ROLES: UserRole[] = ["SUPER_ADMIN","CLAIMS_OFFICER","MEDICAL_OFFICER"];
+// WP-2 (DEF-003): these sets used to be re-declared here as local copies, and
+// had already drifted from src/lib/rbac.ts — the local ANY_STAFF omitted
+// FUND_ADMINISTRATOR while rbac.ts still included it, so a fund administrator
+// on /dashboard got NO navigation but FULL claims data. That is the precise
+// reason navigation state is not an authorization control. The nav now imports
+// the same sets the page guards use; the parity suite fails the build if a
+// local role literal reappears in this file.
+//
+// CLINICAL is deliberately NOT OPS: a nav link shown to a role the page rejects
+// is the OBS-6 bug (a link that only leads to Access Denied).
+const ANY_STAFF     = ROLES.ANY_STAFF;
+const OPS           = ROLES.MEMBER_OPS;
+const FINANCE       = ROLES.FINANCE;
+const FUND_PORTAL   = ROLES.ADMIN_ONLY;
+const UNDERWRITING  = ROLES.UNDERWRITING;
+const ADMIN_ONLY    = ROLES.ADMIN_ONLY;
+const CLINICAL_ROLES = ROLES.CLINICAL;
+const CLAIMS_OPS    = ROLES.CLAIMS_OPS;
 
 const NAV_GROUPS: NavGroup[] = [
   {
@@ -56,7 +65,7 @@ const NAV_GROUPS: NavGroup[] = [
       // open case accrues services/PAs/LOUs and can bill in interim slices
       // while open, with the final bill at closure (IPL-001).
       {
-        label: "Case Management", href: "/cases", icon: Receipt, roles: OPS,
+        label: "Case Management", href: "/cases", icon: Receipt, roles: CLAIMS_OPS,
         children: [
           { label: "Open Cases",              href: "/cases"          },
           { label: "All Claims",              href: "/claims"         },

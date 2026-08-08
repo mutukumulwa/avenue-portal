@@ -2,6 +2,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { type Context } from "./context";
 import { ZodError } from "zod";
+import { INTERNAL_STAFF_ROLES } from "@/lib/authz/catalog";
 
 const t = initTRPC.context<Context>().create({
   transformer: superjson,
@@ -43,7 +44,9 @@ export const protectedProcedure = t.procedure.use(enforceUserIsAuthed);
 // New code should use requirePermission() from rbac.service inside procedure handlers.
 export const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   const role = ctx.session.user.role;
-  if (!role || !["SUPER_ADMIN", "CLAIMS_OFFICER", "FINANCE_OFFICER", "UNDERWRITER", "CUSTOMER_SERVICE"].includes(role)) {
+  // WP-2: derived from the canonical catalog rather than restated here — this
+  // list was a seventh, independently-drifting source of authorization truth.
+  if (!role || !(INTERNAL_STAFF_ROLES as readonly string[]).includes(role)) {
     throw new TRPCError({ code: "FORBIDDEN" });
   }
   return next({ ctx });
