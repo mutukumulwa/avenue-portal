@@ -24,6 +24,7 @@ import {
 } from "@/lib/authz/catalog";
 import { ROLES, type UserRole } from "@/lib/authz/roles";
 import { ROLE_PERMISSIONS as SEED_ROLE_PERMISSIONS } from "../../prisma/seeds/rbac";
+import { ALL_ROLES, CLAIM_READ_ROLES, MONEY_READ_ROLES } from "./persona-authority-matrix";
 
 const sorted = (xs: readonly string[]) => [...new Set(xs)].sort();
 
@@ -197,6 +198,31 @@ describe("hasPerm", () => {
   it("denies with no session", () => {
     expect(hasPerm(null, "MEMBER:VIEW")).toBe(false);
     expect(hasPerm({ user: null }, "MEMBER:VIEW")).toBe(false);
+  });
+});
+
+describe("DEF-004 — enum sets are pinned to the approved persona matrix", () => {
+  // Round 1 proved the catalog was internally CONSISTENT; it did not prove the
+  // catalog AGREED with the workbook's approved persona authority. That gap let
+  // UNDERWRITER keep claim/claim-money read (DEF-004). These pins close it: the
+  // enum sets must equal persona-authority-matrix.ts, the single oracle.
+  it("ROLES.CLAIMS_READ equals the approved persona matrix (not just internally consistent)", () => {
+    expect([...ROLES.CLAIMS_READ].sort()).toEqual([...CLAIM_READ_ROLES].sort());
+  });
+
+  it("ROLES.MONEY_READ equals the approved persona matrix", () => {
+    expect([...ROLES.MONEY_READ].sort()).toEqual([...MONEY_READ_ROLES].sort());
+  });
+
+  it("the matrix covers every UserRole (no persona uncategorised)", () => {
+    // The DEF-004 tripwire: a role added to the enum but not to the matrix fails
+    // here, so the next round cannot ship a silently-uncategorised persona.
+    expect([...ALL_ROLES].sort()).toEqual([...Object.keys(ROLE_GRANTS)].sort());
+  });
+
+  it("UNDERWRITER holds neither CLAIM:VIEW nor PREAUTH:VIEW (DEF-004)", () => {
+    expect(permitted(ROLE_GRANTS.UNDERWRITER, "CLAIM:VIEW")).toBe(false);
+    expect(permitted(ROLE_GRANTS.UNDERWRITER, "PREAUTH:VIEW")).toBe(false);
   });
 });
 
