@@ -97,10 +97,12 @@ PERMISSIONS.push(...PROVIDER_PERMISSIONS);
 
 // ─── ROLE PERMISSION MAPPINGS ────────────────────────────────────────────────
 
+// DEF-004: UNDERWRITER holds no claim/pre-auth grants (matches catalog.ts; the
+// parity suite asserts catalog ≡ seed). SENIOR_UNDERWRITER spreads this list and
+// correctly loses the same two grants.
 const UNDERWRITER_PERMS = [
   "QUOTATION:VIEW", "QUOTATION:CREATE", "QUOTATION:ISSUE", "QUOTATION:DECLINE", "QUOTATION:WITHDRAW",
   "UNDERWRITING:VIEW", "UNDERWRITING:ASSESS", "UNDERWRITING:RECORD_DECISION", "UNDERWRITING:DECLINE",
-  "CLAIM:VIEW", "PREAUTH:VIEW",
   "MEMBER:VIEW", "MEMBER:CREATE", "MEMBER:AMEND", "MEMBER:REINSTATE",
   "BILLING:VIEW", "BROKER:VIEW",
   "ANALYTICS:VIEW",

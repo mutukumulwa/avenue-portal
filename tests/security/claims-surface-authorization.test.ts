@@ -15,14 +15,33 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, resolve, sep } from "node:path";
 import { ROLES, type UserRole } from "@/lib/authz/roles";
+import { ALL_ROLES, CLAIM_READ_ROLES, CLAIM_DENIED_ROLES } from "./persona-authority-matrix";
 
 const ADMIN_ROOT = resolve(__dirname, "../../src/app/(admin)");
 
 /** Route segments whose contents are claims work, not membership work. */
 const CLAIMS_DOMAIN = ["claims", "cases", "fraud", "lou", "overrides", "offline-capture", "offline-auth"];
 
-/** Roles that must never reach a claims surface (decision D1 Branch A + DEF-003). */
-const MUST_BE_DENIED: UserRole[] = ["CUSTOMER_SERVICE", "REPORTS_VIEWER", "FUND_ADMINISTRATOR", "HR_MANAGER", "BROKER_USER", "MEMBER_USER"];
+/**
+ * FINANCE_OFFICER is denied individual-claim READ authority by the persona
+ * matrix (it is not in CLAIM_READ_ROLES), yet finance legitimately reaches ONE
+ * narrow claims-domain surface — the claim REIMBURSEMENT action — gated by
+ * ROLES.FINANCE (SUPER_ADMIN + FINANCE_OFFICER); see
+ * src/app/(admin)/claims/[id]/reimbursement-actions.ts and the "narrower
+ * role-specific sets" note below. This is a documented, pre-existing route-axis
+ * carve-out. Every OTHER non-claim-read role must never reach ANY claims surface.
+ */
+const FINANCE_CLAIM_REIMBURSEMENT_CARVE_OUT: UserRole[] = ["FINANCE_OFFICER"];
+
+/**
+ * Roles that must never reach a claims surface (decision D1 Branch A + DEF-003
+ * + DEF-004). Derived from the approved persona matrix (CLAIM_DENIED_ROLES) so
+ * adding a role back into claim access, or adding a new uncategorised role,
+ * fails here too — minus only the documented finance-reimbursement carve-out.
+ */
+const MUST_BE_DENIED: UserRole[] = CLAIM_DENIED_ROLES.filter(
+  (r) => !FINANCE_CLAIM_REIMBURSEMENT_CARVE_OUT.includes(r),
+);
 
 function walk(dir: string): string[] {
   const out: string[] = [];
@@ -64,6 +83,17 @@ describe("WP-3 — claims surfaces fail closed", () => {
       .filter((f) => f.sets.some((set) => (ROLES[set as keyof typeof ROLES] as UserRole[] | undefined)?.includes(role)))
       .map((f) => f.rel);
     expect(offenders).toEqual([]);
+  });
+
+  it("every non-claim-read role is denied, save the documented finance carve-out (DEF-004 tripwire)", () => {
+    // The union of the denied set and the single finance-reimbursement carve-out
+    // must be EXACTLY every role outside CLAIM_READ_ROLES. A new UserRole added
+    // to the enum but not categorised would break this equality.
+    expect([...MUST_BE_DENIED, ...FINANCE_CLAIM_REIMBURSEMENT_CARVE_OUT].sort()).toEqual(
+      [...ALL_ROLES.filter((r) => !CLAIM_READ_ROLES.includes(r))].sort(),
+    );
+    // UNDERWRITER specifically must now be denied (DEF-004).
+    expect(MUST_BE_DENIED).toContain("UNDERWRITER");
   });
 
   it("every claims-domain guard names a set that exists", () => {

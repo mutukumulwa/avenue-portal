@@ -60,10 +60,12 @@ export const ROLE_GRANTS: Record<UserRole, readonly string[]> = {
     "ROLE:VIEW", "REPORT:VIEW", "REPORT:GENERATE",
   ],
 
+  // DEF-004: UNDERWRITER holds no claim/pre-auth grants (D1-A persona matrix).
+  // Aggregate analytics (ANALYTICS:VIEW) and view-only billing are retained —
+  // both are enum-guarded surfaces, not claim data.
   UNDERWRITER: [
     "QUOTATION:VIEW", "QUOTATION:CREATE", "QUOTATION:ISSUE", "QUOTATION:DECLINE", "QUOTATION:WITHDRAW",
     "UNDERWRITING:VIEW", "UNDERWRITING:ASSESS", "UNDERWRITING:RECORD_DECISION", "UNDERWRITING:DECLINE",
-    "CLAIM:VIEW", "PREAUTH:VIEW",
     "MEMBER:VIEW", "MEMBER:CREATE", "MEMBER:AMEND", "MEMBER:REINSTATE",
     "BILLING:VIEW", "BROKER:VIEW",
     "ANALYTICS:VIEW",

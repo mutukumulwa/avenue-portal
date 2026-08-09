@@ -61,27 +61,28 @@ export const ROLES = {
 
   /**
    * Authority to READ individual claims and claim volumes — claimant identity,
-   * provider, claim reference, amount, status. The DEF-003 oracle.
+   * provider, claim reference, amount, status. The DEF-003/DEF-004 oracle.
    *
-   * Mirrors the CLAIM:VIEW grant, so UNDERWRITER is included: they hold
-   * CLAIM:VIEW in both the catalog and the seed, and removing their claim
-   * visibility would be a regression the defect does not call for. The roles
-   * this set exists to EXCLUDE are CUSTOMER_SERVICE (decision D1 Branch A),
+   * Approved claim-read roles per the UAT persona matrix (02 Roles & Accounts).
+   * UNDERWRITER is EXCLUDED (DEF-004): the underwriter's authorised work is
+   * packages/schemes/tiers/endorsements, not claims. The roles this set exists
+   * to EXCLUDE are UNDERWRITER (DEF-004), CUSTOMER_SERVICE (decision D1 Branch A),
    * REPORTS_VIEWER and FUND_ADMINISTRATOR.
    *
    * Reading a claim is not adjudicating one — see CLAIMS_OPS.
    */
-  CLAIMS_READ:  ["SUPER_ADMIN", "CLAIMS_OFFICER", "MEDICAL_OFFICER", "UNDERWRITER"] as UserRole[],
+  CLAIMS_READ:  ["SUPER_ADMIN", "CLAIMS_OFFICER", "MEDICAL_OFFICER"] as UserRole[],
 
   /**
    * Authority to read portfolio money aggregates — loss ratio, billed/approved
    * sums, premium-vs-claims. Decision D3: membership of an ops set is never
    * sufficient for money aggregates.
    *
-   * PROVISIONAL: pending the WP-0 persona × permission matrix sign-off. The
-   * authz parity suite pins this set so any change is a deliberate, reviewed one.
+   * UNDERWRITER is EXCLUDED (DEF-004): the underwriter holds no claim-money
+   * authority. The authz parity suite pins this set to the approved persona
+   * matrix so any change is a deliberate, reviewed one.
    */
-  MONEY_READ:   ["SUPER_ADMIN", "FINANCE_OFFICER", "UNDERWRITER"] as UserRole[],
+  MONEY_READ:   ["SUPER_ADMIN", "FINANCE_OFFICER"] as UserRole[],
   /**
    * Maker–checker approvals queue (/approvals). Everyone in OPS PLUS
    * FINANCE_OFFICER — the money-control checker for governed changes such as
