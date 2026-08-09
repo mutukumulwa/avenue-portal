@@ -304,6 +304,11 @@ model User {
   // Single-session control (R25/H-03): bumped on each login; a JWT carrying an
   // older version is invalidated, so only the most recent login stays valid.
   sessionVersion Int       @default(0)
+  // DEF-002: brute-force lockout. failedLoginCount rolls within a 15-min window
+  // (see auth.ts); lockedUntil is a temporary, self-expiring lock.
+  failedLoginCount  Int       @default(0)
+  lastFailedLoginAt DateTime?
+  lockedUntil       DateTime?
   // Two-factor auth (R81/H-01): base32 TOTP secret + enabled flag.
   totpSecret     String?
   totpEnabled    Boolean   @default(false)

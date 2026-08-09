@@ -2,43 +2,10 @@ import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "@/lib/prisma";
-import bcrypt from "bcryptjs";
 import { cache } from "react";
 import { measureAsync } from "@/lib/perf";
-import { verifyTotp, totpEnrolmentRequiredNow } from "@/lib/totp";
-import { effectivePermissions } from "@/lib/authz/catalog";
-
-/**
- * Effective permission codes for a user (WP-2, decision D2-b).
- *
- * Enum-role baseline from the canonical catalog UNION the dynamic
- * UserRoleAssignment overlay. The overlay is strictly additive.
- *
- * The union matters operationally: production has zero Role/Permission/
- * UserRoleAssignment rows, so a dynamic-only read returns [] for every user and
- * every permission-gated surface fails closed. Deriving the baseline from the
- * role keeps enforcement correct before the RBAC data seed lands, and keeps it
- * correct afterwards without a second source of truth.
- */
-async function loadUserPermissions(
-  userId: string,
-  tenantId: string,
-  role: string,
-): Promise<string[]> {
-  const assignments = await prisma.userRoleAssignment.findMany({
-    where: { userId, tenantId, isActive: true, status: "ACTIVE" },
-    include: {
-      role: {
-        include: { permissions: { include: { permission: { select: { code: true } } } } },
-      },
-    },
-  });
-  const dynamic = new Set<string>();
-  for (const a of assignments) {
-    for (const rp of a.role.permissions) dynamic.add(rp.permission.code);
-  }
-  return effectivePermissions(role, [...dynamic]);
-}
+import { totpEnrolmentRequiredNow } from "@/lib/totp";
+import { authorizeCredentials } from "@/lib/auth-credentials";
 
 /**
  * Current sessionVersion for a user, cached briefly to bound the per-request DB
@@ -79,87 +46,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         password: { label: "Password", type: "password" },
         totp: { label: "Authenticator code", type: "text" }
       },
-      async authorize(credentials) {
-        return measureAsync("auth.credentials.authorize", async () => {
-          if (!credentials?.email || !credentials?.password) {
-            return null;
-          }
-
-          const user = await measureAsync("auth.credentials.user_lookup", () =>
-            prisma.user.findFirst({
-              where: {
-                email: credentials.email as string,
-                isActive: true,
-              },
-              select: {
-                id: true,
-                email: true,
-                passwordHash: true,
-                firstName: true,
-                lastName: true,
-                role: true,
-                tenantId: true,
-                clientId: true,
-                groupId: true,
-                memberId: true,
-                providerId: true,
-                totpSecret: true,
-                totpEnabled: true,
-              },
-            })
-          );
-
-          if (!user) {
-            return null;
-          }
-
-          const isPasswordValid = await measureAsync("auth.credentials.password_compare", () =>
-            bcrypt.compare(credentials.password as string, user.passwordHash)
-          );
-
-          if (!isPasswordValid) {
-            return null;
-          }
-
-          // Two-factor (R81): when enabled, a valid TOTP is mandatory. A
-          // missing/incorrect code fails the login (the form surfaces the code
-          // field so the user can retry).
-          if (user.totpEnabled && user.totpSecret) {
-            const code = (credentials.totp as string | undefined)?.trim();
-            if (!code || !verifyTotp(user.totpSecret, code)) {
-              return null;
-            }
-          }
-
-          const permissions = await loadUserPermissions(user.id, user.tenantId, user.role);
-
-          // Single-session control (R25): bump the version so this login
-          // supersedes any prior session; the new version rides in the JWT.
-          const bumped = await prisma.user.update({
-            where: { id: user.id },
-            data: { sessionVersion: { increment: 1 }, lastLoginAt: new Date() },
-            select: { sessionVersion: true },
-          });
-
-          return {
-            id: user.id,
-            email: user.email,
-            name: `${user.firstName} ${user.lastName}`,
-            role: user.role,
-            tenantId: user.tenantId,
-            clientId: user.clientId ?? undefined,
-            groupId: user.groupId ?? undefined,
-            memberId: user.memberId ?? undefined,
-            providerId: user.providerId ?? undefined,
-            permissions,
-            sessionVersion: bumped.sessionVersion,
-            // WP-8 (DEC-09): privileged roles must enrol an authenticator —
-            // login is allowed (grace) but requireRole confines the session to
-            // Settings → Security until enrolment completes.
-            mustEnrollTotp: totpEnrolmentRequiredNow(user.role, user.totpEnabled),
-          };
-        });
-      }
+      // DEF-002: credential authorization (incl. brute-force lockout) lives in
+      // src/lib/auth-credentials.ts so it can be unit-tested without importing
+      // the whole next-auth machinery.
+      authorize: authorizeCredentials,
     })
   ],
   callbacks: {
