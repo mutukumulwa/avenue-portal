@@ -11,22 +11,28 @@ const db = vi.hoisted(() => ({
   },
   $transaction: vi.fn(async (ops: any[]) => Promise.all(ops)),
 }));
-const enqueueEmail = vi.hoisted(() => vi.fn(async () => {}));
+// DEF-003 (R4.2 / D-15): delivery moved from the BullMQ/Redis queue
+// (enqueueEmail) to the bounded direct send (sendEmailNowBounded).
+const sendEmailNowBounded = vi.hoisted(() => vi.fn(async () => ({ delivered: true })));
 
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
-vi.mock("@/lib/queue", () => ({ enqueueEmail }));
+vi.mock("@/lib/queue", () => ({ sendEmailNowBounded }));
 
 import { PasswordResetService } from "@/server/services/password-reset.service";
+import { resetRateLimiter } from "@/lib/rate-limit";
 
 describe("PasswordResetService (R24 / H-02)", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetRateLimiter();
+  });
 
   describe("request", () => {
     it("issues + emails a code for an active user", async () => {
       db.user.findFirst.mockResolvedValue({ id: "u1", firstName: "Grace" });
       await PasswordResetService.request("grace@medvex.co.ug");
       expect(db.passwordResetToken.create).toHaveBeenCalled();
-      expect(enqueueEmail).toHaveBeenCalledWith(
+      expect(sendEmailNowBounded).toHaveBeenCalledWith(
         expect.objectContaining({ to: "grace@medvex.co.ug", subject: expect.stringMatching(/reset code/i) }),
       );
     });
@@ -35,7 +41,7 @@ describe("PasswordResetService (R24 / H-02)", () => {
       db.user.findFirst.mockResolvedValue(null);
       await PasswordResetService.request("nobody@example.com");
       expect(db.passwordResetToken.create).not.toHaveBeenCalled();
-      expect(enqueueEmail).not.toHaveBeenCalled();
+      expect(sendEmailNowBounded).not.toHaveBeenCalled();
     });
   });
 

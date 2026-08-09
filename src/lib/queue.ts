@@ -268,6 +268,28 @@ export async function enqueueEmail(payload: { to: string; subject: string; body:
 }
 
 /**
+ * DEF-003: send a transactional email inline, bypassing BullMQ/Redis (which is
+ * not provisioned and does not fit Vercel serverless). Bounded so a slow or
+ * unreachable SMTP host can never hang the request. Never throws.
+ */
+export async function sendEmailNowBounded(
+  payload: { to: string; subject: string; body: string; html?: string },
+  timeoutMs = 8000, // D-16
+): Promise<{ delivered: boolean }> {
+  const { NotificationService } = await import("@/server/services/notification.service");
+  try {
+    await Promise.race([
+      NotificationService.executeEmailDispatch(payload),
+      new Promise((_, rej) => setTimeout(() => rej(new Error("email-timeout")), timeoutMs)),
+    ]);
+    return { delivered: true };
+  } catch (err) {
+    console.error("[reset] bounded email send failed:", (err as Error).message);
+    return { delivered: false };
+  }
+}
+
+/**
  * Trigger background billing computations (e.g. Endorsement sweeps)
  */
 export async function enqueueBillingRun(groupId: string) {

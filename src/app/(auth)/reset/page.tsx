@@ -1,12 +1,26 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import Link from "next/link";
 import { requestResetAction, confirmResetAction } from "./actions";
 
 export default function ResetPasswordPage() {
   const [reqState, requestAction, reqPending] = useActionState(requestResetAction, null);
   const [confState, confirmAction, confPending] = useActionState(confirmResetAction, null);
+
+  // DEF-003 defence in depth: the server action is already bounded (≤8s), but if
+  // a network stall keeps the form pending past 12s, re-enable the button and
+  // show the generic acknowledgment so it can never appear stuck "Sending…".
+  const [reqSlow, setReqSlow] = useState(false);
+  useEffect(() => {
+    if (!reqPending) {
+      setReqSlow(false);
+      return;
+    }
+    const t = setTimeout(() => setReqSlow(true), 12000);
+    return () => clearTimeout(t);
+  }, [reqPending]);
+  const reqBusy = reqPending && !reqSlow;
 
   const inputCls =
     "mt-1 w-full rounded-md border border-brand-border bg-brand-bg px-3 py-2 text-sm text-brand-text-body focus:border-brand-teal focus:outline-none focus:ring-1 focus:ring-brand-teal";
@@ -32,10 +46,10 @@ export default function ResetPasswordPage() {
               <label className={labelCls} htmlFor="email">Email</label>
               <input id="email" name="email" type="email" required className={inputCls} placeholder="name@medvex.co.ug" />
             </div>
-            <button disabled={reqPending} className="rounded-full bg-brand-indigo px-5 py-2 text-sm font-semibold text-white hover:bg-brand-indigo-hover disabled:opacity-50">
-              {reqPending ? "Sending…" : "Send code"}
+            <button disabled={reqBusy} className="rounded-full bg-brand-indigo px-5 py-2 text-sm font-semibold text-white hover:bg-brand-indigo-hover disabled:opacity-50">
+              {reqBusy ? "Sending…" : "Send code"}
             </button>
-            {reqState?.sent && (
+            {(reqState?.sent || reqSlow) && (
               <p className="text-xs text-brand-success">If that email exists, a code is on its way.</p>
             )}
             {reqState?.error && <p className="text-xs text-brand-error">{reqState.error}</p>}
