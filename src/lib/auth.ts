@@ -6,6 +6,7 @@ import { cache } from "react";
 import { measureAsync } from "@/lib/perf";
 import { totpEnrolmentRequiredNow } from "@/lib/totp";
 import { authorizeCredentials } from "@/lib/auth-credentials";
+import { SESSION_IDLE_MAX_AGE_S, SESSION_UPDATE_AGE_S } from "@/lib/session-policy";
 
 /**
  * Current sessionVersion for a user, cached briefly to bound the per-request DB
@@ -37,7 +38,8 @@ async function currentSessionState(
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
-  session: { strategy: "jwt" },
+  // D-19: 30-min rolling idle expiry, refreshed on activity at most every 5 min.
+  session: { strategy: "jwt", maxAge: SESSION_IDLE_MAX_AGE_S, updateAge: SESSION_UPDATE_AGE_S },
   providers: [
     CredentialsProvider({
       name: "Credentials",
