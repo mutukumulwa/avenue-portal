@@ -10,14 +10,14 @@ export default async function ProviderLayout({ children }: { children: React.Rea
   // requireProvider (inside resolveUserContext) still performs the standard
   // login/role/unauthorized redirects; each page remains independently
   // server-authorized, so hiding a nav item is convenience, not security.
-  const { ctx, provider } = await ProviderAccessService.resolveUserContext();
+  const { ctx, provider, session } = await ProviderAccessService.resolveUserContext();
   // F7.3: the Contracts item is gated on the same sign-off flag as its pages.
   const contractView = await ProviderAccessSettingsService.isContractViewEnabled(ctx.tenantId, ctx.providerId);
   const navItems = flattenProviderNav(computeProviderNav(ctx.permissions, { flags: { contractView } }));
 
   return (
     <div className="min-h-screen bg-[#F8F9FA]">
-      <ProviderNav providerName={provider.name} items={navItems} />
+      <ProviderNav providerName={provider.name} items={navItems} actorName={session.user.name ?? null} />
       <main className="max-w-6xl mx-auto px-4 py-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
         {children}
       </main>

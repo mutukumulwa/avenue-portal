@@ -21,6 +21,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import type { ProviderNavIconKey, ProviderNavItemView } from "./provider-nav-model";
+import { SignedInIdentity } from "./SignedInIdentity";
 
 // iconKey → component map (icons cannot cross the server→client boundary as
 // values, so the server passes a stable string key that we resolve here).
@@ -46,7 +47,7 @@ const ICONS: Record<ProviderNavIconKey, LucideIcon> = {
  * items — never permissions, provider id, or branch scope. Hiding an item is
  * convenience only; every route stays server-authorized.
  */
-export function ProviderNav({ providerName, items }: { providerName: string; items: ProviderNavItemView[] }) {
+export function ProviderNav({ providerName, items, actorName }: { providerName: string; items: ProviderNavItemView[]; actorName?: string | null }) {
   const pathname = usePathname();
 
   return (
@@ -76,6 +77,8 @@ export function ProviderNav({ providerName, items }: { providerName: string; ite
               </Link>
             );
           })}
+          {/* DEF-001: signed-in actor + generic Provider persona + facility (D-20). */}
+          <SignedInIdentity variant="bar" name={actorName} role="PROVIDER_USER" subtitle={providerName} />
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold text-brand-error hover:bg-red-50 transition-colors"
@@ -85,6 +88,11 @@ export function ProviderNav({ providerName, items }: { providerName: string; ite
           </button>
         </div>
       </div>
+      {(actorName) && (
+        <div className="md:hidden border-t border-[#EEEEEE] bg-white px-4 py-1.5 flex justify-end">
+          <SignedInIdentity variant="bar" name={actorName} role="PROVIDER_USER" subtitle={providerName} />
+        </div>
+      )}
       <div className="md:hidden border-t border-[#EEEEEE] bg-white">
         <div className="overflow-x-auto px-2 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <div className="flex min-w-max items-stretch gap-2">

@@ -20,6 +20,7 @@ import {
   Bell,
   HeartPulse,
 } from "lucide-react";
+import { SignedInIdentity } from "./SignedInIdentity";
 
 const NAV_ITEMS = [
   { label: "Dashboard",   href: "/member/dashboard",   icon: LayoutDashboard },
@@ -38,7 +39,7 @@ const NAV_ITEMS = [
   { label: "Profile",     href: "/member/profile",     icon: UserCircle      },
 ];
 
-export function MemberNav() {
+export function MemberNav({ actorName }: { actorName?: string | null } = {}) {
   const pathname = usePathname();
 
   return (
@@ -67,6 +68,8 @@ export function MemberNav() {
               </Link>
             );
           })}
+          {/* DEF-001: signed-in actor + generic Member persona (D-20). */}
+          <SignedInIdentity variant="bar" name={actorName} role="MEMBER_USER" />
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold text-brand-error hover:bg-red-50 transition-colors"
@@ -79,7 +82,7 @@ export function MemberNav() {
       <div className="md:hidden border-t border-[#EEEEEE] bg-white">
         <div className="flex items-center justify-between px-4 pb-1 pt-2 text-[11px] font-semibold text-brand-text-muted">
           <span>Member tools</span>
-          <span>Swipe for more</span>
+          {actorName ? <SignedInIdentity variant="bar" name={actorName} role="MEMBER_USER" /> : <span>Swipe for more</span>}
         </div>
         <div className="relative max-w-5xl mx-auto overflow-hidden">
           <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-white to-transparent" />

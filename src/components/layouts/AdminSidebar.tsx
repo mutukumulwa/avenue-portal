@@ -13,6 +13,7 @@ import {
   UserPlus, Scale, Banknote,
 } from "lucide-react";
 import { PortalSwitcher } from "./PortalSwitcher";
+import { SignedInIdentity } from "./SignedInIdentity";
 import { useEffect, useState } from "react";
 import type { UserRole } from "@prisma/client";
 import { ROLES } from "@/lib/authz/roles";
@@ -283,22 +284,6 @@ function NavGroupSection({ group, bestMatch }: { group: NavGroup; bestMatch: str
   );
 }
 
-/** Human-readable persona label for an enum role (DEF-001). */
-const ROLE_LABELS: Record<string, string> = {
-  SUPER_ADMIN: "Super Administrator",
-  CLAIMS_OFFICER: "Claims Officer",
-  FINANCE_OFFICER: "Finance Officer",
-  UNDERWRITER: "Underwriter",
-  CUSTOMER_SERVICE: "Membership Officer",
-  MEDICAL_OFFICER: "Medical Officer",
-  REPORTS_VIEWER: "Reports Viewer",
-  HR_MANAGER: "HR Manager",
-  FUND_ADMINISTRATOR: "Fund Administrator",
-  BROKER_USER: "Broker",
-  MEMBER_USER: "Member",
-  PROVIDER_USER: "Provider User",
-};
-
 export function AdminSidebar({
   userRole,
   userName,
@@ -367,24 +352,12 @@ export function AdminSidebar({
           )}
           {/* DEF-001: the signed-in actor and their effective role must be
               evidenceable from the screen without opening a protected record —
-              a reviewer could not previously tell WHO performed an action. */}
-          {(userName || userRole) && (
-            <div
-              aria-label="Signed-in user"
-              className="mb-2 rounded-[8px] border border-[#EEEEEE] bg-brand-bg-alt/40 px-2.5 py-2"
-            >
-              {userName && (
-                <p className="truncate text-sm font-semibold text-brand-text-heading" title={userName}>
-                  {userName}
-                </p>
-              )}
-              {userRole && (
-                <p className="truncate text-[11px] text-brand-text-muted">
-                  {ROLE_LABELS[userRole] ?? userRole}
-                </p>
-              )}
-            </div>
-          )}
+              a reviewer could not previously tell WHO performed an action. The
+              shared SignedInIdentity block is the single implementation used by
+              every portal shell. */}
+          <div className="mb-2">
+            <SignedInIdentity name={userName} role={userRole} />
+          </div>
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
             aria-label={userName ? `Sign out of ${userName}'s session` : "Sign out"}

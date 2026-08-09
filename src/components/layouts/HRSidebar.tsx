@@ -10,6 +10,7 @@ import {
   Headset
 } from "lucide-react";
 import { PortalSwitcher } from "./PortalSwitcher";
+import { SignedInIdentity } from "./SignedInIdentity";
 
 type NavItem  = { label: string; href: string; icon: React.ElementType };
 type NavGroup = { label: string; items: NavItem[] };
@@ -86,7 +87,7 @@ function NavGroupSection({ group, pathname }: { group: NavGroup; pathname: strin
   );
 }
 
-export function HRSidebar({ groupName, userRole }: { groupName: string; userRole: string }) {
+export function HRSidebar({ groupName, userRole, userName }: { groupName: string; userRole: string; userName?: string | null }) {
   const pathname = usePathname();
 
   return (
@@ -113,6 +114,10 @@ export function HRSidebar({ groupName, userRole }: { groupName: string; userRole
 
         {/* Bottom */}
         <div className="pt-3 border-t border-[#EEEEEE] space-y-0.5">
+          {/* DEF-001: signed-in actor + effective role, evidenceable on-screen. */}
+          <div className="mb-2">
+            <SignedInIdentity name={userName} role={userRole} subtitle={groupName} />
+          </div>
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
             className="w-full group flex items-center rounded-[8px] px-2 py-2 text-brand-error hover:bg-red-50 transition-colors"

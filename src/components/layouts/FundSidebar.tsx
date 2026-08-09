@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { LayoutDashboard, Wallet, FileText, BarChart2, LogOut } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { PortalSwitcher } from "./PortalSwitcher";
+import { SignedInIdentity } from "./SignedInIdentity";
 
 const STATIC_ITEMS = [
   { label: "Dashboard", href: "/fund/dashboard", icon: LayoutDashboard },
@@ -17,9 +18,9 @@ interface FundScheme {
   isLow: boolean;
 }
 
-interface Props { schemes: FundScheme[]; userRole: string }
+interface Props { schemes: FundScheme[]; userRole: string; userName?: string | null }
 
-export function FundSidebar({ schemes, userRole }: Props) {
+export function FundSidebar({ schemes, userRole, userName }: Props) {
   const pathname = usePathname();
 
   return (
@@ -102,6 +103,10 @@ export function FundSidebar({ schemes, userRole }: Props) {
         )}
 
         <div className="mt-auto pt-4 border-t border-[#EEEEEE]">
+          {/* DEF-001: signed-in actor + effective role, evidenceable on-screen. */}
+          <div className="mb-2">
+            <SignedInIdentity name={userName} role={userRole} />
+          </div>
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
             className="w-full group flex items-center rounded-[8px] p-2 text-brand-error hover:bg-red-50 transition-colors"
