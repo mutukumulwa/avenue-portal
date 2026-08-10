@@ -1,11 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma, PrismaClient, UnlistedServiceRule } from "@prisma/client";
+import { compareTariffPrecedence } from "./tariff-precedence";
 
 type Tx = Prisma.TransactionClient | PrismaClient;
-
-// Priority when several tariff rows cover the same code: a negotiated rate
-// beats a gazetted one, which beats a published price list.
-const TARIFF_PRIORITY: Record<string, number> = { NEGOTIATED: 0, GAZETTED: 1, PUBLISHED: 2 };
 
 export type LineRateRule =
   | "CONTRACT_TARIFF" // priced from the active contract's schedule
@@ -104,19 +101,9 @@ export class ProviderContractsService {
       : [];
 
     // Best rate per code: client-specific beats master, then contract-scoped beats
-    // standalone, then tariff-type priority, then latest.
-    tariffs.sort((a, b) => {
-      const aClient = a.clientId ? 0 : 1;
-      const bClient = b.clientId ? 0 : 1;
-      if (aClient !== bClient) return aClient - bClient;
-      const aContract = a.contractId ? 0 : 1;
-      const bContract = b.contractId ? 0 : 1;
-      if (aContract !== bContract) return aContract - bContract;
-      const pa = TARIFF_PRIORITY[a.tariffType] ?? 9;
-      const pb = TARIFF_PRIORITY[b.tariffType] ?? 9;
-      if (pa !== pb) return pa - pb;
-      return b.effectiveFrom.getTime() - a.effectiveFrom.getTime();
-    });
+    // standalone, then tariff-type priority, then latest (WP-N2: the SAME shared
+    // comparator the contract engine uses, so both resolvers agree on overlap).
+    tariffs.sort(compareTariffPrecedence);
     const tariffMap = new Map<string, (typeof tariffs)[number]>();
     for (const t of tariffs) {
       if (t.cptCode && !tariffMap.has(t.cptCode)) tariffMap.set(t.cptCode, t);
@@ -154,18 +141,7 @@ export class ProviderContractsService {
           },
         })
       : [];
-    descTariffs.sort((a, b) => {
-      const aClient = a.clientId ? 0 : 1;
-      const bClient = b.clientId ? 0 : 1;
-      if (aClient !== bClient) return aClient - bClient;
-      const aContract = a.contractId ? 0 : 1;
-      const bContract = b.contractId ? 0 : 1;
-      if (aContract !== bContract) return aContract - bContract;
-      const pa = TARIFF_PRIORITY[a.tariffType] ?? 9;
-      const pb = TARIFF_PRIORITY[b.tariffType] ?? 9;
-      if (pa !== pb) return pa - pb;
-      return b.effectiveFrom.getTime() - a.effectiveFrom.getTime();
-    });
+    descTariffs.sort(compareTariffPrecedence);
     const descTariffMap = new Map<string, (typeof descTariffs)[number]>();
     for (const t of descTariffs) {
       for (const key of [norm(t.serviceName), norm(t.standardDescription), norm(t.providerDescription)]) {
@@ -327,6 +303,18 @@ export class ProviderContractsService {
   /** Keep the flat Provider.contract* fields (used by list pages) in line with the contract register. */
   static async syncProviderSummary(tx: Tx, providerId: string) {
     const now = new Date();
+    // GAP-A1.2 (WP-N4): a manual SUSPENDED is STICKY — a contract lifecycle
+    // transition must never silently revert it to ACTIVE. This sync only ever
+    // computes ACTIVE / EXPIRED / TERMINATED / PENDING, so a `contractStatus` of
+    // SUSPENDED here can only have come from the manual admin action
+    // (setProviderStatus) — it IS the manual-suspension marker. Preserve it while
+    // still refreshing the summary dates/terms; only a manual reactivation clears it.
+    const current = await tx.provider.findUnique({
+      where: { id: providerId },
+      select: { contractStatus: true },
+    });
+    const manuallySuspended = current?.contractStatus === "SUSPENDED";
+
     const active = await tx.providerContract.findFirst({
       where: { providerId, status: "ACTIVE", startDate: { lte: now }, endDate: { gte: now } },
       orderBy: { endDate: "desc" },
@@ -335,7 +323,7 @@ export class ProviderContractsService {
       await tx.provider.update({
         where: { id: providerId },
         data: {
-          contractStatus: "ACTIVE",
+          contractStatus: manuallySuspended ? "SUSPENDED" : "ACTIVE",
           contractStartDate: active.startDate,
           contractEndDate: active.endDate,
           paymentTermDays: active.paymentTermDays,
@@ -345,10 +333,13 @@ export class ProviderContractsService {
       return;
     }
     const any = await tx.providerContract.findFirst({ where: { providerId }, orderBy: { endDate: "desc" } });
+    const computed = any
+      ? (any.endDate < now || any.status === "EXPIRED" ? "EXPIRED" : any.status === "TERMINATED" ? "TERMINATED" : "PENDING")
+      : "PENDING";
     await tx.provider.update({
       where: { id: providerId },
       data: {
-        contractStatus: any ? (any.endDate < now || any.status === "EXPIRED" ? "EXPIRED" : any.status === "TERMINATED" ? "TERMINATED" : "PENDING") : "PENDING",
+        contractStatus: manuallySuspended ? "SUSPENDED" : computed,
         contractStartDate: any?.startDate ?? null,
         contractEndDate: any?.endDate ?? null,
       },

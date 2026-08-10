@@ -226,9 +226,13 @@ export const contractsRouter = createTRPCRouter({
     .input(z.object({ id: z.string(), reason: z.string().optional() }))
     .mutation(async ({ ctx, input }) => ContractLifecycleService.returnToDraft(ctx.tenantId, input.id, ctx.session.user.id, input.reason)),
 
+  // WP-N5: `backdateOverrideId` is accepted for API compatibility but NO LONGER
+  // trusted — the service resolves the APPROVED CONTRACT_BACKDATE / activation
+  // overrides itself from the DB, so neither a forged id nor a bare
+  // `allowUnsigned` flag can bypass governance through this parallel door.
   activate: underwritingProcedure
     .input(z.object({ id: z.string(), allowUnsigned: z.boolean().optional(), backdateOverrideId: z.string().optional() }))
-    .mutation(async ({ ctx, input }) => ContractLifecycleService.activate(ctx.tenantId, input.id, ctx.session.user.id, { allowUnsigned: input.allowUnsigned, backdateOverrideId: input.backdateOverrideId })),
+    .mutation(async ({ ctx, input }) => ContractLifecycleService.activate(ctx.tenantId, input.id, ctx.session.user.id, { allowUnsigned: input.allowUnsigned })),
 
   suspend: underwritingProcedure
     .input(z.object({ id: z.string(), reason: z.string().optional() }))

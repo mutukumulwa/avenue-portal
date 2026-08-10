@@ -8,6 +8,7 @@ import { PendingButton } from "@/components/ui/PendingButton";
 import { ManagePanel } from "./ManagePanel";
 import { FeeSchedule } from "./FeeSchedule";
 import { CapitationPanel } from "./CapitationPanel";
+import { ContractExclusionsManager } from "./ContractExclusionsManager";
 import {
   submitForReviewAction,
   approveContractAction,
@@ -21,6 +22,7 @@ import {
   editContractHeaderAction,
   voidContractAction,
   requestBackdateOverrideAction,
+  requestUnsignedActivationOverrideAction,
 } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -95,6 +97,28 @@ export default async function ContractDetailPage({
   if (!c) notFound();
 
   const validation = await ContractLifecycleService.validate(tenantId, id);
+
+  // WP-N6 (N-012): contract-owned structured treatment exclusions. Loaded here
+  // and configured via ContractExclusionsManager, which reuses the same
+  // owner-agnostic action + evaluation path as package-version exclusions.
+  const contractExclusionRows = await prisma.treatmentExclusionRule.findMany({
+    where: { providerContractId: id, isActive: true },
+    orderBy: { createdAt: "desc" },
+  });
+  const contractExclusions = contractExclusionRows.map((r) => ({
+    id: r.id,
+    ruleCategory: r.ruleCategory,
+    exclusionType: r.exclusionType,
+    benefitCategories: r.benefitCategories,
+    serviceCodes: r.serviceCodes,
+    diagnosisCodes: r.diagnosisCodes,
+    procedureCodes: r.procedureCodes,
+    exceptionType: ((r.exceptionLogic as { type?: string } | null)?.type) ?? null,
+    effectiveFrom: r.effectiveFrom.toISOString(),
+    effectiveTo: r.effectiveTo ? r.effectiveTo.toISOString() : null,
+    memberSafeExplanation: r.memberSafeExplanation,
+  }));
+
   const now = new Date();
   const display = c.status === "ACTIVE" && c.endDate < now ? "EXPIRED" : c.status;
 
@@ -150,6 +174,23 @@ export default async function ContractDetailPage({
               />
               <PendingButton className="rounded-lg bg-[#856404] px-3 py-1.5 text-sm font-medium text-white hover:opacity-90">
                 Raise CONTRACT_BACKDATE override
+              </PendingButton>
+            </form>
+          )}
+          {/* WP-N5: an unsigned-activation waiver now needs an APPROVED override
+              (not a bare checkbox) — name the remedy inline, like the backdate flow. */}
+          {error.toLowerCase().includes("unsigned") && (
+            <form action={requestUnsignedActivationOverrideAction} className="mt-3 flex flex-wrap items-center gap-2">
+              <input type="hidden" name="id" value={id} />
+              <input
+                name="justification"
+                required
+                minLength={20}
+                placeholder="Justification for activating unsigned (min 20 chars)"
+                className="flex-1 min-w-64 rounded-lg border border-[#DC3545]/30 bg-white px-3 py-1.5 text-sm text-[#000523]"
+              />
+              <PendingButton className="rounded-lg bg-[#856404] px-3 py-1.5 text-sm font-medium text-white hover:opacity-90">
+                Raise unsigned-activation override
               </PendingButton>
             </form>
           )}
@@ -501,6 +542,9 @@ export default async function ContractDetailPage({
         editable={editable}
         applicabilityEditable={applicabilityEditable}
       />
+
+      {/* WP-N6 (N-012): contract-owned structured treatment exclusions */}
+      <ContractExclusionsManager contractId={c.id} editable={editable} initialRules={contractExclusions} />
     </div>
   );
 }

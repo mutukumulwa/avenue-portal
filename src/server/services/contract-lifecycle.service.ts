@@ -1,7 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { auditChainService } from "./audit-chain.service";
 import { ProviderContractsService } from "./provider-contracts.service";
-import type { Prisma, ProviderContractStatus } from "@prisma/client";
+import type { Prisma, ProviderContractStatus, OverrideType } from "@prisma/client";
 
 // ─── DIGITAL CONTRACT LIFECYCLE SERVICE ──────────────────────────────────────
 // Implements the contract status machine (spec §4.2), activation rules (§4.3),
@@ -154,6 +154,26 @@ export class ContractLifecycleService {
     if (!TRANSITIONS[from]?.includes(to)) {
       throw new Error(`Illegal contract status transition ${from} → ${to}.`);
     }
+  }
+
+  /**
+   * WP-N5 — the AUTHORITATIVE lookup of an APPROVED governance override on a
+   * specific contract. `activate` calls this itself rather than trusting a
+   * client-supplied flag/id, so the tRPC door (which takes `allowUnsigned` +
+   * `backdateOverrideId` from input) cannot bypass governance with a forged
+   * value: the authority is the DB record, scoped to (tenant, this contract,
+   * type, APPROVED). Returns the override id, or null when none is approved.
+   */
+  private static async approvedContractOverride(
+    tenantId: string,
+    contractId: string,
+    overrideType: OverrideType,
+  ): Promise<string | null> {
+    const ov = await prisma.overrideRecord.findFirst({
+      where: { tenantId, entityType: "ProviderContract", entityId: contractId, overrideType, status: "APPROVED" },
+      select: { id: true },
+    });
+    return ov?.id ?? null;
   }
 
   private static async logEvent(
@@ -326,17 +346,39 @@ export class ContractLifecycleService {
 
     const validation = await this.validate(tenantId, contractId);
     const blocking = validation.issues.filter(i => i.severity === "ERROR");
-    // V2 (unsigned) may be waived by override flag; all other ERRORs are hard.
-    const hardBlocks = blocking.filter(i => !(i.rule === "V2" && opts?.allowUnsigned));
+
+    // WP-N5 (N-005): V2 (unsigned execution) may be waived ONLY by an APPROVED
+    // activation override on THIS contract — never by a bare client flag. The
+    // authority is the DB record, looked up here, so a forged `allowUnsigned`
+    // through the tRPC door cannot self-grant the waiver.
+    let unsignedWaived = false;
+    if (opts?.allowUnsigned) {
+      const ov = await this.approvedContractOverride(tenantId, contractId, "CUSTOM");
+      if (!ov) {
+        throw new Error(
+          "Activating an unsigned contract requires an APPROVED activation override on this contract " +
+          "(or set the contract FULLY_EXECUTED). An unsigned waiver cannot be self-granted.",
+        );
+      }
+      unsignedWaived = true;
+    }
+    const hardBlocks = blocking.filter(i => !(i.rule === "V2" && unsignedWaived));
     if (hardBlocks.length > 0) {
       throw new Error(`Contract fails activation validation: ${hardBlocks.map(i => i.message).join("; ")}`);
     }
 
-    // Backdating horizon check (default 90 days) — beyond it requires an override.
+    // WP-N5 (N-006): backdating past the horizon requires an APPROVED
+    // CONTRACT_BACKDATE override on THIS contract. The authoritative id is
+    // resolved here — a client-supplied `backdateOverrideId` is never trusted
+    // (a forged id resolves to nothing and the activation is blocked).
     const horizon = opts?.backdateHorizonDays ?? 90;
     const backdatedDays = Math.floor((Date.now() - c.startDate.getTime()) / 86_400_000);
-    if (backdatedDays > horizon && !opts?.backdateOverrideId) {
-      throw new Error(`Contract start date is ${backdatedDays} days in the past (horizon ${horizon}). Backdating requires override CONTRACT_BACKDATE.`);
+    let backdateOverrideId: string | null = null;
+    if (backdatedDays > horizon) {
+      backdateOverrideId = await this.approvedContractOverride(tenantId, contractId, "CONTRACT_BACKDATE");
+      if (!backdateOverrideId) {
+        throw new Error(`Contract start date is ${backdatedDays} days in the past (horizon ${horizon}). Backdating requires an APPROVED CONTRACT_BACKDATE override on this contract.`);
+      }
     }
 
     const activated = await prisma.$transaction(async tx => {
@@ -383,7 +425,7 @@ export class ContractLifecycleService {
       return updated;
     });
 
-    await this.logEvent(prisma as never, tenantId, userId, "CONTRACT:ACTIVATED", contractId, { backdatedDays, backdateOverrideId: opts?.backdateOverrideId ?? null, allowUnsigned: !!opts?.allowUnsigned }, `Contract ${c.contractNumber} activated`);
+    await this.logEvent(prisma as never, tenantId, userId, "CONTRACT:ACTIVATED", contractId, { backdatedDays, backdateOverrideId, allowUnsigned: unsignedWaived }, `Contract ${c.contractNumber} activated`);
     return activated;
   }
 

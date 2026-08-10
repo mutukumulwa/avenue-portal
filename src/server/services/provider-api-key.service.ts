@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { randomBytes, randomUUID } from "crypto";
+import { ProvidersService } from "./providers.service";
 
 /**
  * Per-facility API credentials for HMS / hospital-system integration.
@@ -107,12 +108,22 @@ export class ProviderApiKeyService {
     const keyPrefix = plaintext.slice(0, 12);
     const candidates = await prisma.providerApiKey.findMany({
       where: { keyPrefix, isActive: true },
-      select: { id: true, tenantId: true, providerId: true, keyHash: true, scopes: true, allowedBranchIds: true, expiresAt: true },
+      select: {
+        id: true, tenantId: true, providerId: true, keyHash: true, scopes: true, allowedBranchIds: true, expiresAt: true,
+        // WP-N4 (N-014): the owning facility's status gates authentication.
+        provider: { select: { contractStatus: true } },
+      },
     });
     for (const c of candidates) {
       if (await bcrypt.compare(plaintext, c.keyHash)) {
         // Expiry is a hard gate — an expired key never authenticates.
         if (c.expiresAt && c.expiresAt.getTime() <= now.getTime()) {
+          await prisma.providerApiKey.update({ where: { id: c.id }, data: { lastUsedAt: now, lastFailureAt: now } }).catch(() => {});
+          return null;
+        }
+        // WP-N4 (N-014): a suspended/non-operational facility's key stops working —
+        // a suspended facility must not keep transacting on the B2B API.
+        if (!c.provider || !ProvidersService.isOperational(c.provider.contractStatus)) {
           await prisma.providerApiKey.update({ where: { id: c.id }, data: { lastUsedAt: now, lastFailureAt: now } }).catch(() => {});
           return null;
         }

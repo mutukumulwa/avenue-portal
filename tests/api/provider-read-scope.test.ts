@@ -108,6 +108,9 @@ const db = vi.hoisted(() => ({
   // SP-6: the eligibility route projects the evaluator core, which reads coverage
   // periods (empty here — scope is what this suite proves, not the verdict).
   memberCoveragePeriod: { findMany: vi.fn(async () => []) },
+  // WP-N4: eligibility/benefits check the facility's status (ACTIVE here — this
+  // suite proves client-entitlement scope, not the suspension gate).
+  provider: { findFirst: vi.fn(async () => ({ contractStatus: "ACTIVE" })) },
 }));
 
 const cred = vi.hoisted(() => ({ current: null as ApiCredential | null }));

@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure, memberOpsProcedure } from "../trpc";
 import { GroupsService } from "../../services/groups.service";
+import { groupCreateSchema } from "@/lib/validation/group";
 
 export const groupsRouter = createTRPCRouter({
   getAll: protectedProcedure.query(async ({ ctx }) => {
@@ -13,19 +14,13 @@ export const groupsRouter = createTRPCRouter({
       return GroupsService.getGroupById(ctx.tenantId, input.id, ctx.clientId);
     }),
 
+  // WP-S1 — the tRPC door shares the SAME canonical schema as the server action,
+  // so a raw `POST /api/trpc/groups.create` gets the trimmed name, the date
+  // horizon guard and the registration/paymentFrequency rules for free (the old
+  // `effectiveDate: z.string()` accepted anything). Client-scoped duplicate
+  // enforcement + version pinning live in `GroupsService.createGroup`.
   create: memberOpsProcedure
-    .input(
-      z.object({
-        name: z.string().min(1),
-        industry: z.string().optional(),
-        registrationNumber: z.string().optional(),
-        contactPersonName: z.string().min(1),
-        contactPersonPhone: z.string().min(1),
-        contactPersonEmail: z.string().email(),
-        packageId: z.string().min(1),
-        effectiveDate: z.string(),
-      })
-    )
+    .input(groupCreateSchema)
     .mutation(async ({ ctx, input }) => {
       return GroupsService.createGroup(ctx.tenantId, input, ctx.clientId);
     }),

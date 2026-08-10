@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { upsertCptTariffAction, deleteCptTariffAction } from "./actions";
+import type { ActionResult } from "@/lib/action-result";
 import { Pencil, Trash2, Plus } from "lucide-react";
 
 export interface SerializedTariff {
@@ -35,21 +36,34 @@ function TariffForm({
   tariff?: SerializedTariff;
   onDone: () => void;
 }) {
+  const [result, setResult] = useState<ActionResult | null>(null);
+  const err = (f: string) => (result && !result.ok ? result.fieldErrors?.[f]?.[0] : undefined);
+  const formError = result && !result.ok ? result.formError : undefined;
+
   return (
     <form
-      action={async (fd) => { await upsertCptTariffAction(fd); onDone(); }}
+      action={async (fd) => {
+        const r = await upsertCptTariffAction(fd);
+        setResult(r);
+        if (r.ok) onDone();
+      }}
       className="grid gap-3 px-5 py-4 bg-brand-indigo/5 border-b border-[#EEEEEE] sm:grid-cols-2 lg:grid-cols-3"
     >
       <input type="hidden" name="providerId" value={providerId} />
       {tariff && <input type="hidden" name="tariffId" value={tariff.id} />}
 
+      {formError && <p role="alert" className="sm:col-span-2 lg:col-span-3 text-xs text-[#DC3545] font-semibold">{formError}</p>}
+
       <div>
         <label className={lbl}>Service Name *</label>
-        <input name="serviceName" required defaultValue={tariff?.serviceName} className={inp} placeholder="e.g. Consultation" />
+        <input name="serviceName" required defaultValue={tariff?.serviceName} className={inp} placeholder="e.g. Consultation"
+          aria-invalid={err("serviceName") ? true : undefined} />
+        {err("serviceName") && <p role="alert" className="text-[11px] text-[#DC3545] mt-1">{err("serviceName")}</p>}
       </div>
       <div>
         <label className={lbl}>CPT Code</label>
         <input name="cptCode" defaultValue={tariff?.cptCode ?? ""} className={inp} placeholder="99213" />
+        {err("cptCode") && <p role="alert" className="text-[11px] text-[#DC3545] mt-1">{err("cptCode")}</p>}
       </div>
       <div>
         <label className={lbl}>Client</label>
@@ -57,11 +71,14 @@ function TariffForm({
           <option value="">Network master</option>
           {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
+        {err("clientId") && <p role="alert" className="text-[11px] text-[#DC3545] mt-1">{err("clientId")}</p>}
       </div>
       <div className="flex gap-2">
         <div className="flex-1">
           <label className={lbl}>Agreed Rate *</label>
-          <input name="agreedRate" type="number" step="0.01" required defaultValue={tariff?.agreedRate} className={inp} />
+          <input name="agreedRate" type="number" step="0.01" min="0.01" required defaultValue={tariff?.agreedRate} className={inp}
+            aria-invalid={err("agreedRate") ? true : undefined} />
+          {err("agreedRate") && <p role="alert" className="text-[11px] text-[#DC3545] mt-1">{err("agreedRate")}</p>}
         </div>
         <div className="w-24">
           <label className={lbl}>Currency</label>
@@ -74,7 +91,15 @@ function TariffForm({
       </div>
       <div>
         <label className={lbl}>Effective From *</label>
-        <input name="effectiveFrom" type="date" required defaultValue={tariff?.effectiveFrom?.slice(0, 10)} className={inp} />
+        <input name="effectiveFrom" type="date" required defaultValue={tariff?.effectiveFrom?.slice(0, 10)} className={inp}
+          aria-invalid={err("effectiveFrom") ? true : undefined} />
+        {err("effectiveFrom") && <p role="alert" className="text-[11px] text-[#DC3545] mt-1">{err("effectiveFrom")}</p>}
+      </div>
+      <div>
+        <label className={lbl}>Effective To</label>
+        <input name="effectiveTo" type="date" defaultValue={tariff?.effectiveTo?.slice(0, 10) ?? ""} className={inp}
+          aria-invalid={err("effectiveTo") ? true : undefined} />
+        {err("effectiveTo") && <p role="alert" className="text-[11px] text-[#DC3545] mt-1">{err("effectiveTo")}</p>}
       </div>
       <div className="flex items-end gap-2">
         <button type="submit" className="bg-brand-indigo text-white px-4 py-2 rounded-full text-xs font-bold hover:bg-brand-secondary flex-1 transition-colors">
@@ -165,13 +190,13 @@ export function ProviderTariffsCard({
                     >
                       <Pencil size={13} />
                     </button>
-                    <form action={deleteCptTariffAction}>
+                    <form action={async (fd) => { await deleteCptTariffAction(fd); }}>
                       <input type="hidden" name="tariffId"   value={t.id} />
                       <input type="hidden" name="providerId" value={providerId} />
                       <button
                         type="submit"
                         className="text-brand-text-muted hover:text-[#DC3545] transition-colors"
-                        title="Delete"
+                        title="Deactivate (kept for history)"
                       >
                         <Trash2 size={13} />
                       </button>

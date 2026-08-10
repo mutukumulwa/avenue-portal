@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { withApiKey, getApiCredential, operatorTenantWhere, providerScopeError } from "@/lib/apiAuth";
 import { ROUTE_SCOPE_CATALOG } from "@/lib/provider-api-scopes";
 import { ProviderEntitlementService } from "@/server/services/provider-entitlement.service";
+import { ProvidersService } from "@/server/services/providers.service";
 import { decideEligibility } from "@/server/services/eligibility/evaluator-core";
 
 async function getEligibility(req: Request) {
@@ -22,6 +23,20 @@ async function getEligibility(req: Request) {
     // keys pass; a scoped key must carry api.eligibility.read (operator exempt).
     const scopeErr = providerScopeError(credential, ROUTE_SCOPE_CATALOG.eligibility);
     if (scopeErr) return scopeErr;
+
+    // WP-N4 (N-014): a suspended/non-operational facility's key returns neither
+    // eligibility nor member PII (before any member lookup). Operator keys carry
+    // no single provider, so this gate applies only to per-facility credentials.
+    if (credential?.kind === "provider") {
+      const facility = await prisma.provider.findFirst({
+        where: { id: credential.providerId, tenantId: credential.tenantId },
+        select: { contractStatus: true },
+      });
+      if (!facility || !ProvidersService.isOperational(facility.contractStatus)) {
+        return NextResponse.json({ error: "Facility is not currently active" }, { status: 403 });
+      }
+    }
+
     const scope =
       credential?.kind === "provider"
         ? await ProviderEntitlementService.entitledMemberWhere(credential.providerId)

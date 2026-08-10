@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { ContractLifecycleService } from "../contract-lifecycle.service";
+import { compareTariffPrecedenceWithBranch } from "../tariff-precedence";
 import type {
   EngineClaimContext,
   EngineClaimResult,
@@ -168,6 +169,9 @@ export class ContractEngine {
           { OR: [{ clientId: ctx.clientId ?? null }, { clientId: null }] },
         ],
       },
+      // WP-N2: a deterministic DB order so overlap can never let row order decide
+      // the price (the per-line selection re-sorts with the shared comparator).
+      orderBy: [{ effectiveFrom: "desc" }, { id: "asc" }],
     });
     const memories = await prisma.serviceMappingMemory.findMany({
       where: { tenantId: ctx.tenantId, OR: [{ contractId: contract.id }, { contractId: null }], tariffId: { in: tariffs.map(t => t.id) } },
@@ -351,10 +355,12 @@ export class ContractEngine {
     let tariff: ProviderTariff | undefined;
     let method: string | null = null;
 
-    // 1. Code match (branch-specific beats network — sort branch rows first).
+    // 1. Code match. WP-N2: branch-specific beats network, then the SAME shared
+    //    precedence the legacy resolver uses (client → contract → type → latest →
+    //    id) — deterministic even when two rows overlap for the same code.
     const byCode = tariffs
       .filter(t => (line.cptCode && t.cptCode === line.cptCode) || (line.providerServiceCode && t.providerServiceCode === line.providerServiceCode))
-      .sort((a, b) => (a.branchId ? 0 : 1) - (b.branchId ? 0 : 1));
+      .sort(compareTariffPrecedenceWithBranch);
     if (byCode.length > 0) {
       tariff = byCode[0];
       method = "CODE";

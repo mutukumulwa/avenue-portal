@@ -116,6 +116,16 @@ export async function attachBranchAction(fd: FormData) {
     const c = await ownedContract(fd, session.user.tenantId);
     const branchId = s(fd, "branchId");
     if (branchId) {
+      // WP-N5 (CON-008): a LISTED contract may only scope to its OWN provider's
+      // branches. Without this a foreign branch could satisfy the branch-scope
+      // validation (V1) — attaching a branch that belongs to another provider.
+      const branch = await prisma.providerBranch.findUnique({
+        where: { id: branchId },
+        select: { tenantId: true, providerId: true },
+      });
+      if (!branch || branch.tenantId !== session.user.tenantId || branch.providerId !== c.providerId) {
+        redirect(`/contracts/${c.id}?error=${encodeURIComponent("That branch does not belong to this contract's provider.")}`);
+      }
       await prisma.contractBranch.upsert({
         where: { contractId_branchId: { contractId: c.id, branchId } },
         create: { contractId: c.id, branchId },

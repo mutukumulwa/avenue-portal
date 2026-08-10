@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { upsertDiagnosisTariffAction, deleteDiagnosisTariffAction } from "./actions";
+import type { ActionResult } from "@/lib/action-result";
 import { DiagnosisSearch, type SelectedDiagnosis } from "@/components/clinical/DiagnosisSearch";
 import { Pencil, Trash2, Plus } from "lucide-react";
 
@@ -35,10 +36,17 @@ function DiagTariffForm({
   );
 
   const selected = diagnoses[0] ?? null;
+  const [result, setResult] = useState<ActionResult | null>(null);
+  const err = (f: string) => (result && !result.ok ? result.fieldErrors?.[f]?.[0] : undefined);
+  const formError = result && !result.ok ? result.formError : undefined;
 
   return (
     <form
-      action={async (fd) => { await upsertDiagnosisTariffAction(fd); onDone(); }}
+      action={async (fd) => {
+        const r = await upsertDiagnosisTariffAction(fd);
+        setResult(r);
+        if (r.ok) onDone();
+      }}
       className="px-5 py-5 bg-brand-indigo/5 border-b border-[#EEEEEE] space-y-4"
     >
       <input type="hidden" name="providerId"     value={providerId} />
@@ -46,9 +54,12 @@ function DiagTariffForm({
       {selected && <input type="hidden" name="icdCode"        value={selected.code} />}
       {selected && <input type="hidden" name="diagnosisLabel" value={selected.description} />}
 
+      {formError && <p role="alert" className="text-xs text-[#DC3545] font-semibold">{formError}</p>}
+
       <div>
         <label className={lbl}>Diagnosis (ICD-10) *</label>
         <DiagnosisSearch value={diagnoses} onChange={setDiagnoses} max={1} />
+        {err("icdCode") && <p role="alert" className="text-[11px] text-[#DC3545] mt-1">{err("icdCode")}</p>}
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -58,10 +69,13 @@ function DiagTariffForm({
             name="bundledRate"
             type="number"
             step="0.01"
+            min="0.01"
             defaultValue={tariff?.bundledRate ?? ""}
             className={inp}
             placeholder="Full episode"
+            aria-invalid={err("bundledRate") ? true : undefined}
           />
+          {err("bundledRate") && <p role="alert" className="text-[11px] text-[#DC3545] mt-1">{err("bundledRate")}</p>}
         </div>
         <div>
           <label className={lbl}>Per-Day Rate (UGX)</label>
@@ -69,10 +83,13 @@ function DiagTariffForm({
             name="perDayRate"
             type="number"
             step="0.01"
+            min="0.01"
             defaultValue={tariff?.perDayRate ?? ""}
             className={inp}
             placeholder="Inpatient"
+            aria-invalid={err("perDayRate") ? true : undefined}
           />
+          {err("perDayRate") && <p role="alert" className="text-[11px] text-[#DC3545] mt-1">{err("perDayRate")}</p>}
         </div>
         <div>
           <label className={lbl}>Effective From *</label>
@@ -82,7 +99,9 @@ function DiagTariffForm({
             required
             defaultValue={tariff?.effectiveFrom?.slice(0, 10)}
             className={inp}
+            aria-invalid={err("effectiveFrom") ? true : undefined}
           />
+          {err("effectiveFrom") && <p role="alert" className="text-[11px] text-[#DC3545] mt-1">{err("effectiveFrom")}</p>}
         </div>
         <div>
           <label className={lbl}>Effective To</label>
@@ -91,7 +110,9 @@ function DiagTariffForm({
             type="date"
             defaultValue={tariff?.effectiveTo?.slice(0, 10) ?? ""}
             className={inp}
+            aria-invalid={err("effectiveTo") ? true : undefined}
           />
+          {err("effectiveTo") && <p role="alert" className="text-[11px] text-[#DC3545] mt-1">{err("effectiveTo")}</p>}
         </div>
       </div>
 
@@ -198,13 +219,13 @@ export function ProviderDiagnosisTariffsCard({
                     >
                       <Pencil size={13} />
                     </button>
-                    <form action={deleteDiagnosisTariffAction}>
+                    <form action={async (fd) => { await deleteDiagnosisTariffAction(fd); }}>
                       <input type="hidden" name="tariffId"   value={t.id} />
                       <input type="hidden" name="providerId" value={providerId} />
                       <button
                         type="submit"
                         className="text-brand-text-muted hover:text-[#DC3545] transition-colors"
-                        title="Delete"
+                        title="Deactivate (kept for history)"
                       >
                         <Trash2 size={13} />
                       </button>

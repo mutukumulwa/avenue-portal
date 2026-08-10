@@ -8,6 +8,8 @@ import { resolveSchemeClientId } from "@/server/services/clientResolve";
 import { nextMemberNumber } from "@/server/services/member-numbering.service";
 import { coverageService } from "@/server/services/coverage.service";
 import { assertEnrolmentAge } from "@/server/services/eligibility/enrolment-age";
+import { groupCreateSchema } from "@/lib/validation/group";
+import { normalizeLegalName } from "@/lib/normalize";
 
 export async function enrollIndividualClientAction(formData: FormData) {
   const session = await requireRole(ROLES.MEMBER_OPS);
@@ -30,7 +32,18 @@ export async function enrollIndividualClientAction(formData: FormData) {
   });
   if (!pkg) throw new Error("Package not found.");
 
-  const effectiveDateObj = new Date(effectiveDate);
+  // WP-S1: route the synthetic scheme's identity + effective date through the
+  // canonical schema (trim/collapse name, real-date + horizon guard) so an
+  // Invalid Date can't reach Prisma. `.pick` keeps just the two scheme fields the
+  // individual form supplies (the person's own name + start date).
+  const schemeCheck = groupCreateSchema
+    .pick({ name: true, effectiveDate: true })
+    .safeParse({ name: `${firstName} ${lastName}`, effectiveDate });
+  if (!schemeCheck.success) {
+    throw new Error(schemeCheck.error.issues[0]?.message ?? "Invalid enrolment details.");
+  }
+  const schemeName = schemeCheck.data.name;
+  const effectiveDateObj = schemeCheck.data.effectiveDate;
   const renewalDate = new Date(effectiveDateObj);
   renewalDate.setFullYear(renewalDate.getFullYear() + 1);
 
@@ -59,7 +72,8 @@ export async function enrollIndividualClientAction(formData: FormData) {
     data: {
       tenantId,
       clientId:           await resolveSchemeClientId(tenantId, session.user.clientId),
-      name:               `${firstName} ${lastName}`,
+      name:               schemeName,
+      nameNormalized:     normalizeLegalName(schemeName),
       clientType:         "INDIVIDUAL",
       fundingMode:        fundingMode as never,
       contactPersonName:  `${firstName} ${lastName}`,

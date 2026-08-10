@@ -104,7 +104,10 @@ async function stageEligibility(ctx: EvalContext): Promise<StageOutcome> {
   const member = ctx.claim.member;
   if (!member) return routeOut(ROUTE_CODES.ELIGIBILITY_REVIEW, "member not found");
   if (["SUSPENDED", "LAPSED", "TERMINATED"].includes(member.status)) return routeOut(ROUTE_CODES.ELIGIBILITY_REVIEW, `member ${member.status}`);
-  if (member.group && ["SUSPENDED", "LAPSED", "TERMINATED"].includes(member.group.status)) return routeOut(ROUTE_CODES.ELIGIBILITY_REVIEW, `group ${member.group.status}`);
+  // WP-S2: a scheme that is not yet live (PROSPECT/PENDING) is as ineligible for
+  // auto-approval as one that has left cover — align the deny-list so autopilot no
+  // longer silently passes claims for members of a not-yet-active scheme.
+  if (member.group && ["PROSPECT", "PENDING", "SUSPENDED", "LAPSED", "TERMINATED"].includes(member.group.status)) return routeOut(ROUTE_CODES.ELIGIBILITY_REVIEW, `group ${member.group.status}`);
   const cov = await coverageService.evaluate(ctx.db, ctx.claim.memberId, ctx.claim.dateOfService, { ignoreOpenPeriods: isCoverageEnded(member.status) });
   if (cov.hasPeriods && !cov.covered) return routeOut(ROUTE_CODES.ELIGIBILITY_REVIEW, "outside coverage window for service date");
   return PASS;

@@ -117,12 +117,12 @@ export const AUDIT_EXCLUSIONS: Record<string, string> = {
   "fund/[groupId]/actions.ts:generateAdminFeeInvoiceAction": "PRE_EXISTING_GAP — audit wiring pending",
   "fund/[groupId]/actions.ts:recordDepositAction": "PRE_EXISTING_GAP — audit wiring pending",
   "fund/[groupId]/actions.ts:toggleCategoryHoldAction": "PRE_EXISTING_GAP — audit wiring pending",
-  "groups/[id]/edit/actions.ts:updateGroupAction": "PRE_EXISTING_GAP — audit wiring pending",
+  // WP-S1/S2/S3: updateGroupAction (GROUP_UPDATED), changeGroupStatusAction
+  // (GROUP_SUSPENDED/REACTIVATED/TERMINATED/…) and the three tier actions
+  // (GROUP_TIER_*) all call writeAudit with before/after now — removed from the
+  // exclusion list so the harness polices them positively.
   "groups/[id]/self-funded/actions.ts:configureSelfFundedSchemeAction": "PRE_EXISTING_GAP — audit wiring pending",
   "groups/[id]/self-funded/actions.ts:recordFundDepositAction": "PRE_EXISTING_GAP — audit wiring pending",
-  "groups/[id]/tiers/actions.ts:createTierAction": "PRE_EXISTING_GAP — audit wiring pending",
-  "groups/[id]/tiers/actions.ts:deleteTierAction": "PRE_EXISTING_GAP — audit wiring pending",
-  "groups/[id]/tiers/actions.ts:updateTierAction": "PRE_EXISTING_GAP — audit wiring pending",
   "member/check-in/actions.ts:acknowledgeMemberCheckInAction": "PRE_EXISTING_GAP — audit wiring pending",
   "member/facilities/actions.ts:getNearbyProvidersAction": "READ_ONLY — geo search",
   "member/facilities/actions.ts:getProcedureCatalogAction": "READ_ONLY — catalogue read",
@@ -158,12 +158,11 @@ export const AUDIT_EXCLUSIONS: Record<string, string> = {
   // the exclusion list so the harness polices them positively.
   "providers/[id]/actions.ts:addCredentialAction": "PRE_EXISTING_GAP — audit wiring pending",
   "providers/[id]/actions.ts:createPractitionerAndLinkAction": "PRE_EXISTING_GAP — audit wiring pending",
-  "providers/[id]/actions.ts:deleteCptTariffAction": "PRE_EXISTING_GAP — audit wiring pending",
-  "providers/[id]/actions.ts:deleteDiagnosisTariffAction": "PRE_EXISTING_GAP — audit wiring pending",
+  // WP-N3: deleteCptTariffAction / deleteDiagnosisTariffAction / upsertDiagnosisTariffAction
+  // now soft-deactivate + writeAudit — no longer gaps, removed from this list.
   "providers/[id]/actions.ts:linkExistingPractitionerAction": "PRE_EXISTING_GAP — audit wiring pending",
   "providers/[id]/actions.ts:unlinkPractitionerAction": "PRE_EXISTING_GAP — audit wiring pending",
   "providers/[id]/actions.ts:updateContractAction": "PRE_EXISTING_GAP — audit wiring pending",
-  "providers/[id]/actions.ts:upsertDiagnosisTariffAction": "PRE_EXISTING_GAP — audit wiring pending",
   "quotations/[id]/actions.ts:acceptQuotationAction": "PRE_EXISTING_GAP — audit wiring pending",
   "quotations/[id]/actions.ts:declineQuotationAction": "PRE_EXISTING_GAP — audit wiring pending",
   "quotations/[id]/actions.ts:expireQuotationAction": "PRE_EXISTING_GAP — audit wiring pending",

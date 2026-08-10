@@ -5,6 +5,7 @@ import type { ProviderAccessContext } from "./provider-access.service";
 import { ProviderEntitlementService } from "./provider-entitlement.service";
 import { ProviderEntitlementShadowService } from "./provider-entitlement-shadow.service";
 import { ProviderAccessSettingsService } from "./provider-access-settings.service";
+import { ProvidersService } from "./providers.service";
 import { decideEligibility } from "./eligibility/evaluator-core";
 
 /**
@@ -93,6 +94,19 @@ export const ProviderEligibilityService = {
         ...(member ? { memberId: member.id, member: { firstName: member.firstName, lastName: member.lastName, memberNumber: member.memberNumber }, schemeName: member.schemeName ?? null, packageName: member.packageName ?? null, requiresPreauth: member.requiresPreauth ?? false } : {}),
       };
     };
+
+    // WP-N4 (N-014): a SUSPENDED (or otherwise non-operational) facility is
+    // blocked for new encounters — it must return neither eligibility nor member
+    // PII. This runs BEFORE any member lookup, so a suspended facility can never
+    // confirm a member exists (mirrors the claim/preauth intake status check and
+    // the ProvidersService.ENCOUNTER_STATUSES rule). Evidence is still recorded.
+    const facility = await db.provider.findFirst({
+      where: { id: ctx.providerId, tenantId: ctx.tenantId },
+      select: { contractStatus: true },
+    });
+    if (!facility || !ProvidersService.isOperational(facility.contractStatus)) {
+      return finish("NOT_ELIGIBLE", "This facility is not currently active for eligibility checks.");
+    }
 
     // ENFORCED path: branch must be in the caller's context; member must be entitled.
     if (enforced) {

@@ -15,6 +15,8 @@ const db = vi.hoisted(() => ({
   contractApplicability: { findMany: vi.fn(async () => [{ clientId: "c1", groupId: null, inclusionType: "INCLUDE" }]) },
   // SP-6: eligibility route projects the evaluator core (reads coverage periods).
   memberCoveragePeriod: { findMany: vi.fn(async () => []) },
+  // WP-N4: the route checks the facility's status before any member lookup.
+  provider: { findFirst: vi.fn(async () => ({ contractStatus: "ACTIVE" })) },
 }));
 
 vi.mock("@/lib/prisma", () => ({ prisma: db }));

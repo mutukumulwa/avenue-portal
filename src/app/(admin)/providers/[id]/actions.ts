@@ -6,6 +6,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { writeAudit } from "@/lib/audit";
 import { ProvidersService } from "@/server/services/providers.service";
+import { ok, fail, type ActionResult } from "@/lib/action-result";
+import { cptTariffSchema, diagnosisTariffSchema, detectTariffOverlap } from "@/lib/validation/tariff";
 
 // ── Provider master data + status lifecycle (PR-006) ───────────────────────
 
@@ -238,57 +240,104 @@ export async function updateContractAction(formData: FormData) {
 
 // ── CPT Tariffs ────────────────────────────────────────────────────────────
 
-export async function upsertCptTariffAction(formData: FormData) {
+/**
+ * WP-N1 (N-009): the agreed rate + effective window are validated server-side
+ * (positive, finite, ≤2dp, effectiveTo > effectiveFrom) — zero/negative/NaN no
+ * longer persist. WP-N2 (N-010): an overlapping active rate for the same
+ * code+scope is blocked at write. Returns an ActionResult (SP-2); no partial row.
+ */
+export async function upsertCptTariffAction(formData: FormData): Promise<ActionResult> {
   const session = await requireRole(ROLES.ADMIN_ONLY);
 
-  const providerId  = formData.get("providerId")  as string;
-  const tariffId    = formData.get("tariffId")    as string | null;
-  const cptCode     = (formData.get("cptCode")    as string) || null;
-  const serviceName = formData.get("serviceName") as string;
-  const agreedRate  = Number(formData.get("agreedRate"));
-  const currency    = ((formData.get("currency") as string) || "UGX").trim().toUpperCase();
-  // Per-client override (G5.4): empty = network master rate; set = this client's
-  // negotiated rate, which wins at claim-line resolution.
-  const clientId    = ((formData.get("clientId") as string) || "").trim() || null;
-  const effectiveFrom = new Date(formData.get("effectiveFrom") as string);
-  const effectiveTo   = formData.get("effectiveTo") ? new Date(formData.get("effectiveTo") as string) : null;
+  const providerId = formData.get("providerId") as string;
+  const tariffId   = ((formData.get("tariffId") as string) || "").trim() || null;
 
-  // Verify provider belongs to tenant
-  const provider = await prisma.provider.findUnique({ where: { id: providerId, tenantId: session.user.tenantId } });
-  if (!provider) throw new Error("Provider not found");
+  const parsed = cptTariffSchema.safeParse({
+    serviceName: formData.get("serviceName"),
+    cptCode: (formData.get("cptCode") as string) || null,
+    agreedRate: formData.get("agreedRate"),
+    currency: ((formData.get("currency") as string) || "UGX").trim().toUpperCase(),
+    // Per-client override (G5.4): empty = network master rate; set = this
+    // client's negotiated rate, which wins at claim-line resolution.
+    clientId: ((formData.get("clientId") as string) || "").trim() || null,
+    effectiveFrom: (formData.get("effectiveFrom") as string) || undefined,
+    effectiveTo: (formData.get("effectiveTo") as string) || null,
+  });
+  if (!parsed.success) return fail(parsed.error.flatten().fieldErrors);
+  const data = parsed.data;
 
-  // Verify the client (if any) belongs to this operator
-  if (clientId) {
+  const provider = await prisma.provider.findUnique({
+    where: { id: providerId, tenantId: session.user.tenantId },
+    select: { id: true },
+  });
+  if (!provider) return fail(undefined, "Provider not found");
+
+  if (data.clientId) {
     const client = await prisma.client.findFirst({
-      where: { id: clientId, operatorTenantId: session.user.tenantId },
+      where: { id: data.clientId, operatorTenantId: session.user.tenantId },
       select: { id: true },
     });
-    if (!client) throw new Error("Client not found");
+    if (!client) return fail({ clientId: ["Client not found"] });
   }
 
+  // WP-N2: block an overlapping active rate for the same code+scope so pricing
+  // is never ambiguous. Standalone (provider-level) rates carry no contractId.
+  const existing = await prisma.providerTariff.findMany({
+    where: { providerId, contractId: null, isActive: true, clientId: data.clientId ?? null },
+    select: { id: true, cptCode: true, serviceName: true, clientId: true, contractId: true, effectiveFrom: true, effectiveTo: true, isActive: true },
+  });
+  const conflict = detectTariffOverlap(existing, {
+    id: tariffId ?? undefined,
+    cptCode: data.cptCode ?? null,
+    serviceName: data.serviceName,
+    clientId: data.clientId ?? null,
+    contractId: null,
+    effectiveFrom: data.effectiveFrom,
+    effectiveTo: data.effectiveTo ?? null,
+  });
+  if (conflict) {
+    return fail({
+      effectiveFrom: [
+        "Another active rate for this code and scope already covers an overlapping period. Deactivate it or change the effective dates.",
+      ],
+    });
+  }
+
+  const values = {
+    cptCode: data.cptCode ?? null,
+    serviceName: data.serviceName,
+    agreedRate: data.agreedRate,
+    currency: data.currency,
+    clientId: data.clientId ?? null,
+    effectiveFrom: data.effectiveFrom,
+    effectiveTo: data.effectiveTo ?? null,
+  };
   if (tariffId) {
-    await prisma.providerTariff.update({
-      where: { id: tariffId },
-      data: { cptCode, serviceName, agreedRate, currency, clientId, effectiveFrom, effectiveTo },
-    });
+    await prisma.providerTariff.update({ where: { id: tariffId }, data: values });
   } else {
-    await prisma.providerTariff.create({
-      data: { providerId, cptCode, serviceName, agreedRate, currency, clientId, effectiveFrom, effectiveTo },
-    });
+    await prisma.providerTariff.create({ data: { providerId, ...values } });
   }
 
   await writeAudit({
     userId: session.user.id,
     action: tariffId ? "PROVIDER_TARIFF_UPDATED" : "PROVIDER_TARIFF_CREATED",
     module: "PROVIDERS",
-    description: `Provider tariff ${serviceName} @ ${agreedRate} ${currency}${clientId ? " (client override)" : " (network master)"}`,
-    metadata: { providerId, tariffId, clientId, cptCode, agreedRate, currency },
+    description: `Provider tariff ${data.serviceName} @ ${data.agreedRate} ${data.currency}${data.clientId ? " (client override)" : " (network master)"}`,
+    metadata: { providerId, tariffId, clientId: data.clientId ?? null, cptCode: data.cptCode ?? null, agreedRate: data.agreedRate, currency: data.currency },
   });
 
   revalidatePath(`/providers/${providerId}`);
+  return ok();
 }
 
-export async function deleteCptTariffAction(formData: FormData) {
+/**
+ * WP-N3 (N-011): a tariff is NEVER hard-deleted (schema: "Never delete —
+ * deactivate"). It may be referenced by mapping memories, pricing rules, or
+ * historical claim lines; soft-deactivating keeps the row so past pricing stays
+ * reconstructable and no non-cascading FK (ServiceMappingMemory.tariffId) throws
+ * a raw P2003 at the user. Prospective: the row stops applying to new claims.
+ */
+export async function deleteCptTariffAction(formData: FormData): Promise<ActionResult> {
   const session = await requireRole(ROLES.ADMIN_ONLY);
 
   const tariffId   = formData.get("tariffId")   as string;
@@ -298,45 +347,86 @@ export async function deleteCptTariffAction(formData: FormData) {
     where: { id: tariffId },
     include: { provider: { select: { tenantId: true } } },
   });
-  if (!tariff || tariff.provider.tenantId !== session.user.tenantId) throw new Error("Not found");
+  if (!tariff || tariff.provider.tenantId !== session.user.tenantId) return fail(undefined, "Not found");
+  if (!tariff.isActive) {
+    revalidatePath(`/providers/${providerId}`);
+    return ok();
+  }
 
-  await prisma.providerTariff.delete({ where: { id: tariffId } });
+  const [memoryRefs, pricingRuleRefs, claimLineRefs] = await Promise.all([
+    prisma.serviceMappingMemory.count({ where: { tariffId } }),
+    prisma.pricingRule.count({ where: { tariffLineId: tariffId } }),
+    prisma.claimLine.count({ where: { matchedRuleId: tariffId } }),
+  ]);
+
+  await prisma.providerTariff.update({ where: { id: tariffId }, data: { isActive: false } });
+
+  await writeAudit({
+    userId: session.user.id,
+    action: "PROVIDER_TARIFF_DEACTIVATED",
+    module: "PROVIDERS",
+    description: `Provider tariff "${tariff.serviceName}" deactivated (prospective); ${memoryRefs} mapping-memory / ${pricingRuleRefs} pricing-rule / ${claimLineRefs} claim-line reference(s) retained`,
+    metadata: { providerId, tariffId, memoryRefs, pricingRuleRefs, claimLineRefs },
+  });
+
   revalidatePath(`/providers/${providerId}`);
+  return ok();
 }
 
 // ── Diagnosis Tariffs ──────────────────────────────────────────────────────
 
-export async function upsertDiagnosisTariffAction(formData: FormData) {
+export async function upsertDiagnosisTariffAction(formData: FormData): Promise<ActionResult> {
   const session = await requireRole(ROLES.ADMIN_ONLY);
 
-  const providerId     = formData.get("providerId")     as string;
-  const tariffId       = formData.get("diagTariffId")   as string | null;
-  const icdCode        = formData.get("icdCode")        as string;
-  const diagnosisLabel = formData.get("diagnosisLabel") as string;
-  const bundledRate    = formData.get("bundledRate") ? Number(formData.get("bundledRate")) : null;
-  const perDayRate     = formData.get("perDayRate")  ? Number(formData.get("perDayRate"))  : null;
-  const notes          = (formData.get("notes") as string) || null;
-  const effectiveFrom  = new Date(formData.get("effectiveFrom") as string);
-  const effectiveTo    = formData.get("effectiveTo") ? new Date(formData.get("effectiveTo") as string) : null;
+  const providerId = formData.get("providerId")   as string;
+  const tariffId   = ((formData.get("diagTariffId") as string) || "").trim() || null;
 
-  const provider = await prisma.provider.findUnique({ where: { id: providerId, tenantId: session.user.tenantId } });
-  if (!provider) throw new Error("Provider not found");
+  const parsed = diagnosisTariffSchema.safeParse({
+    icdCode: formData.get("icdCode"),
+    diagnosisLabel: formData.get("diagnosisLabel"),
+    bundledRate: (formData.get("bundledRate") as string) || null,
+    perDayRate: (formData.get("perDayRate") as string) || null,
+    notes: (formData.get("notes") as string) || null,
+    effectiveFrom: (formData.get("effectiveFrom") as string) || undefined,
+    effectiveTo: (formData.get("effectiveTo") as string) || null,
+  });
+  if (!parsed.success) return fail(parsed.error.flatten().fieldErrors);
+  const data = parsed.data;
 
+  const provider = await prisma.provider.findUnique({
+    where: { id: providerId, tenantId: session.user.tenantId },
+    select: { id: true },
+  });
+  if (!provider) return fail(undefined, "Provider not found");
+
+  const values = {
+    icdCode: data.icdCode,
+    diagnosisLabel: data.diagnosisLabel,
+    bundledRate: data.bundledRate ?? null,
+    perDayRate: data.perDayRate ?? null,
+    notes: data.notes ?? null,
+    effectiveFrom: data.effectiveFrom,
+    effectiveTo: data.effectiveTo ?? null,
+  };
   if (tariffId) {
-    await prisma.providerDiagnosisTariff.update({
-      where: { id: tariffId },
-      data: { icdCode, diagnosisLabel, bundledRate, perDayRate, notes, effectiveFrom, effectiveTo },
-    });
+    await prisma.providerDiagnosisTariff.update({ where: { id: tariffId }, data: values });
   } else {
-    await prisma.providerDiagnosisTariff.create({
-      data: { providerId, icdCode, diagnosisLabel, bundledRate, perDayRate, notes, effectiveFrom, effectiveTo },
-    });
+    await prisma.providerDiagnosisTariff.create({ data: { providerId, ...values } });
   }
 
+  await writeAudit({
+    userId: session.user.id,
+    action: tariffId ? "PROVIDER_DIAGNOSIS_TARIFF_UPDATED" : "PROVIDER_DIAGNOSIS_TARIFF_CREATED",
+    module: "PROVIDERS",
+    description: `Diagnosis tariff ${data.icdCode} (${data.diagnosisLabel})${data.bundledRate != null ? ` bundled ${data.bundledRate}` : ""}${data.perDayRate != null ? ` per-day ${data.perDayRate}` : ""}`,
+    metadata: { providerId, tariffId, icdCode: data.icdCode, bundledRate: data.bundledRate ?? null, perDayRate: data.perDayRate ?? null },
+  });
+
   revalidatePath(`/providers/${providerId}`);
+  return ok();
 }
 
-export async function deleteDiagnosisTariffAction(formData: FormData) {
+export async function deleteDiagnosisTariffAction(formData: FormData): Promise<ActionResult> {
   const session = await requireRole(ROLES.ADMIN_ONLY);
 
   const tariffId   = formData.get("tariffId")   as string;
@@ -346,10 +436,26 @@ export async function deleteDiagnosisTariffAction(formData: FormData) {
     where: { id: tariffId },
     include: { provider: { select: { tenantId: true } } },
   });
-  if (!tariff || tariff.provider.tenantId !== session.user.tenantId) throw new Error("Not found");
+  if (!tariff || tariff.provider.tenantId !== session.user.tenantId) return fail(undefined, "Not found");
+  if (!tariff.isActive) {
+    revalidatePath(`/providers/${providerId}`);
+    return ok();
+  }
 
-  await prisma.providerDiagnosisTariff.delete({ where: { id: tariffId } });
+  // WP-N3: soft-deactivate (schema: "Never delete — deactivate") — keeps the row
+  // so historical episode pricing stays reconstructable.
+  await prisma.providerDiagnosisTariff.update({ where: { id: tariffId }, data: { isActive: false } });
+
+  await writeAudit({
+    userId: session.user.id,
+    action: "PROVIDER_DIAGNOSIS_TARIFF_DEACTIVATED",
+    module: "PROVIDERS",
+    description: `Diagnosis tariff ${tariff.icdCode} (${tariff.diagnosisLabel}) deactivated (prospective)`,
+    metadata: { providerId, tariffId, icdCode: tariff.icdCode },
+  });
+
   revalidatePath(`/providers/${providerId}`);
+  return ok();
 }
 
 // ── Practitioners ──────────────────────────────────────────────────────────

@@ -107,15 +107,14 @@ export async function returnToDraftAction(fd: FormData) {
 export async function activateContractAction(fd: FormData) {
   const { tenantId, userId, id } = await withContract(fd);
   const allowUnsigned = str(fd, "allowUnsigned") === "on";
-  // PR-009 #2: an APPROVED CONTRACT_BACKDATE override on this contract unblocks
-  // activation past the backdating horizon.
-  const backdateOverride = await prisma.overrideRecord.findFirst({
-    where: { tenantId, entityType: "ProviderContract", entityId: id, overrideType: "CONTRACT_BACKDATE", status: "APPROVED" },
-    select: { id: true },
-  });
+  // WP-N5: the service resolves BOTH governance overrides authoritatively from
+  // the DB (an APPROVED CONTRACT_BACKDATE for backdating past the horizon, and an
+  // APPROVED activation override to waive V2/unsigned) — the action no longer
+  // passes an override id, so a forged flag/id (here or via the tRPC twin door)
+  // cannot bypass governance.
   await guarded(
     id,
-    () => ContractLifecycleService.activate(tenantId, id, userId, { allowUnsigned, backdateOverrideId: backdateOverride?.id }),
+    () => ContractLifecycleService.activate(tenantId, id, userId, { allowUnsigned }),
     "Contract activated.",
   );
 }
@@ -192,6 +191,30 @@ export async function requestBackdateOverrideAction(fd: FormData) {
   }
   revalidatePath(`/contracts/${id}`);
   redirect(`/contracts/${id}?notice=${encodeURIComponent("CONTRACT_BACKDATE override requested — once approved on the Overrides console, Activate will succeed.")}`);
+}
+
+// ── WP-N5: raise the activation (unsigned-waiver) override from the contract ──
+export async function requestUnsignedActivationOverrideAction(fd: FormData) {
+  const { session, tenantId, userId, id } = await withContract(fd);
+  void session;
+  const justification = (str(fd, "justification") ?? "").trim();
+  const { overrideService } = await import("@/server/services/override.service");
+  try {
+    await overrideService.request({
+      tenantId,
+      makerId: userId,
+      overrideType: "CUSTOM",
+      entityType: "ProviderContract",
+      entityId: id,
+      reasonCode: "EXCEPTIONAL_BUSINESS_CASE",
+      justification,
+    });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Override request failed";
+    redirect(`/contracts/${id}?error=${encodeURIComponent(msg)}`);
+  }
+  revalidatePath(`/contracts/${id}`);
+  redirect(`/contracts/${id}?notice=${encodeURIComponent("Unsigned-activation override requested — once approved on the Overrides console, Activate (allow unsigned) will succeed.")}`);
 }
 
 export async function renewContractAction(fd: FormData) {

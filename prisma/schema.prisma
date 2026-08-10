@@ -762,6 +762,15 @@ model Group {
   clientId                  String
   client                    Client              @relation(fields: [clientId], references: [id])
   name                      String
+  // Normalized legal-name key for CLIENT-scoped case/space/Unicode-insensitive
+  // duplicate detection (SP-3 / WP-S1). Computed via normalizeLegalName() on every
+  // scheme create + rename. `@default("")` lets `db push` add the column to
+  // existing rows; the `@@unique([clientId, nameNormalized])` below is a DEPLOY
+  // step gated on a CLEAN collision report + backfill first
+  // (scripts/uat/report-group-name-collisions.ts then
+  // scripts/uat/backfill-group-name-normalized.ts) — plan §7.1 (a constraint
+  // ships only after its report is clean).
+  nameNormalized            String              @default("")
   industry                  String?
   registrationNumber        String?
   contactPersonName         String
@@ -819,6 +828,16 @@ model Group {
   @@index([tenantId, fundingMode])
   @@index([brokerId])
   @@index([clientId])
+  // WP-S1 — CLIENT-scoped scheme-name uniqueness (S-002: two clients may each run
+  // a "Staff Medical Scheme"; one client may not). DEPLOY-GATED: apply only after
+  // scripts/uat/report-group-name-collisions.ts is clean AND
+  // scripts/uat/backfill-group-name-normalized.ts has run (plan §7.1).
+  @@unique([clientId, nameNormalized])
+  // WP-S1 — registration number unique per tenant where present. NULLs don't
+  // collide (schemes without one are unaffected); tenant scoping keeps two
+  // tenants' individual IND-NNNNN refs from cross-colliding. DEPLOY-GATED behind
+  // scripts/uat/report-group-registration-collisions.ts.
+  @@unique([tenantId, registrationNumber])
 }
 
 // ─── SERVICE REQUESTS (HR MODULE) ───────────────────────

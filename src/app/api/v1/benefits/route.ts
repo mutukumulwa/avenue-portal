@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withApiKey, getApiCredential, operatorTenantWhere } from "@/lib/apiAuth";
 import { ProviderEntitlementService } from "@/server/services/provider-entitlement.service";
+import { ProvidersService } from "@/server/services/providers.service";
 import { BenefitUsageService } from "@/server/services/benefit-usage.service";
 
 /**
@@ -23,6 +24,20 @@ async function getBenefits(req: Request) {
     // members whose client its contracts cover (404 otherwise). The operator key
     // is confined to its bound tenant (BD-06 / operatorTenantWhere).
     const credential = await getApiCredential(req);
+
+    // WP-N4 (N-014): a suspended/non-operational facility's key returns neither
+    // benefit balances nor member PII (before any member lookup). Operator keys
+    // carry no single provider, so this gate applies only to provider credentials.
+    if (credential?.kind === "provider") {
+      const facility = await prisma.provider.findFirst({
+        where: { id: credential.providerId, tenantId: credential.tenantId },
+        select: { contractStatus: true },
+      });
+      if (!facility || !ProvidersService.isOperational(facility.contractStatus)) {
+        return NextResponse.json({ error: "Facility is not currently active" }, { status: 403 });
+      }
+    }
+
     const scope =
       credential?.kind === "provider"
         ? await ProviderEntitlementService.entitledMemberWhere(credential.providerId)

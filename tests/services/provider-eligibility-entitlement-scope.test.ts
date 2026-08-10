@@ -47,6 +47,9 @@ function makeDb(memberRow: AnyRow) {
     // SP-6: the member-level verdict reads coverage periods (empty here — scoping
     // is what this suite proves, not the verdict math).
     memberCoveragePeriod: { findMany: vi.fn(async () => []) },
+    // WP-N4: check() gates on the facility's status before any member lookup;
+    // this suite exercises the entitlement scope of an ACTIVE facility.
+    provider: { findFirst: vi.fn(async () => ({ contractStatus: "ACTIVE" })) },
   };
   return { db, captured };
 }

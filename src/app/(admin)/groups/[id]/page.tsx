@@ -4,8 +4,14 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { ArrowLeft, Users, Receipt, FileText, CreditCard, Pencil, Wallet } from "lucide-react";
 import { BenefitTiersCard } from "@/components/groups/BenefitTiersCard";
+import { GroupStatusControls, type StatusTransition } from "@/components/groups/GroupStatusControls";
 import { SelfFundedPanel } from "./self-funded/SelfFundedPanel";
 import { SelfFundedSetupPanel } from "./self-funded/SelfFundedSetupPanel";
+import {
+  GROUP_STATUS_TRANSITIONS,
+  GROUP_TERMINAL_STATUSES,
+} from "@/server/services/groups.service";
+import type { GroupStatus } from "@prisma/client";
 
 export default async function GroupDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requireRole(ROLES.MEMBER_OPS);
@@ -17,6 +23,9 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
     include: {
       selfFundedAccount: { include: { transactions: { orderBy: { postedAt: "desc" }, take: 20 } } },
       package: true,
+      // S-009 / WP-S4: show the version the scheme is PINNED to (the version claims
+      // for this scheme resolve against), not merely the package's latest.
+      packageVersion: { select: { versionNumber: true } },
       client: { select: { currency: true } },
       broker: { select: { name: true } },
       benefitTiers: {
@@ -102,6 +111,32 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
     annualLimit: Number(p.annualLimit),
   }));
 
+  // WP-S2: the VALID next lifecycle moves for this scheme (the server is the
+  // source of truth for the transition table; the control component only renders
+  // what it is handed). Terminal schemes additionally offer a governed override.
+  const REASON_TARGETS = new Set<GroupStatus>(["SUSPENDED", "LAPSED", "TERMINATED"]);
+  const statusTransitions: StatusTransition[] = (
+    GROUP_STATUS_TRANSITIONS[group.status as GroupStatus] ?? []
+  ).map((target): StatusTransition => {
+    let label = target as string;
+    let tone: StatusTransition["tone"] = "primary";
+    if (target === "ACTIVE") label = group.status === "SUSPENDED" ? "Reactivate" : "Activate";
+    else if (target === "PENDING") label = "Move to Pending";
+    else if (target === "SUSPENDED") { label = "Suspend"; tone = "warn"; }
+    else if (target === "LAPSED") { label = "Mark Lapsed"; tone = "danger"; }
+    else if (target === "TERMINATED") { label = "Terminate"; tone = "danger"; }
+    return { target, label, tone, requiresReason: REASON_TARGETS.has(target), override: false };
+  });
+  if (GROUP_TERMINAL_STATUSES.includes(group.status as GroupStatus)) {
+    statusTransitions.push({
+      target: "ACTIVE",
+      label: "Reinstate (override)",
+      tone: "warn",
+      requiresReason: true,
+      override: true,
+    });
+  }
+
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
       {/* Header */}
@@ -168,6 +203,7 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
             ] : [
               { label: "Benefit Structure",      value: `${group.benefitTiers.length} tier${group.benefitTiers.length !== 1 ? "s" : ""} — see below` },
             ]),
+            { label: "Package Version",    value: group.packageVersion ? `v${group.packageVersion.versionNumber} (pinned)` : "—" },
             { label: "Payment Frequency",  value: group.paymentFrequency },
             { label: "Effective Date",     value: new Date(group.effectiveDate).toLocaleDateString("en-UG") },
             { label: "Renewal Date",       value: new Date(group.renewalDate).toLocaleDateString("en-UG") },
@@ -204,6 +240,9 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
           </div>
         </div>
       </div>
+
+      {/* Governed lifecycle transitions (WP-S2) */}
+      <GroupStatusControls groupId={id} currentStatus={group.status} transitions={statusTransitions} />
 
       {/* Benefit Tiers */}
       <BenefitTiersCard groupId={id} tiers={serializedTiers} packages={serializedPackages} currency={group.client?.currency ?? undefined} />
