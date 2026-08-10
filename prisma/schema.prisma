@@ -1995,6 +1995,14 @@ model PackageVersion {
   members           Member[]
   sharedLimitGroups SharedLimitGroup[]
   eligibilityRules  PackageProviderEligibility[]
+  // WP-2.3 / WP-2.4 — structured benefit rules carried immutably per version and
+  // copied forward on every edit (see updatePackageAction). Adding these back-
+  // relations changes NO column on PackageVersion (relation fields are virtual);
+  // the FK columns live on the new child tables, so a prod `db push` of them is
+  // additive and forward-safe (unlike Wave 1's uniques, they deploy with the
+  // normal migration and need no preflight collision report).
+  treatmentExclusions TreatmentExclusionRule[]
+  referralRules       ReferralRule[]
 
   @@unique([packageId, versionNumber])
 }
@@ -3730,6 +3738,11 @@ model ProviderContract {
   contractPackages   ContractPackage[]
   preauthRules       PreauthRule[]
   documentationRules DocumentationRule[]
+  // WP-2.3 / N-012 — structured treatment exclusions may be owned by a provider
+  // contract (not only a package version). Distinct from `exclusions`
+  // (ProviderContractExclusion), the legacy free-form adjudication list. One
+  // evaluation path (evaluateExclusions) consumes both owners.
+  treatmentExclusions TreatmentExclusionRule[]
 
   @@unique([tenantId, contractNumber])
   @@index([providerId, status])
@@ -4248,6 +4261,117 @@ model PackageProviderEligibility {
 
   @@index([packageVersionId])
   @@index([providerId])
+}
+
+// ─── STRUCTURED BENEFIT RULES (WP-2.3 exclusions / WP-2.4 referral) ───────────
+//
+// Additive tables. They introduce NO change to any existing column, so a prod
+// `db push` is forward-safe and ships with the normal migration (contrast Wave
+// 1's uniques, which each needed a preflight collision report first).
+
+// How a treatment exclusion applies. ABSOLUTE always excludes; CONDITIONAL
+// excludes UNLESS its `exceptionLogic` is satisfied (CT-023: cosmetic is excluded
+// unless reconstructive after a covered trauma).
+enum TreatmentExclusionType {
+  ABSOLUTE
+  CONDITIONAL
+}
+
+// The clinical class of the exclusion. Drives the evaluator's reason code:
+// EXPERIMENTAL → EXPERIMENTAL_EXCLUDED (CT-024); everything else →
+// TREATMENT_EXCLUDED (CT-023 and general treatment exclusions).
+enum TreatmentExclusionCategory {
+  COSMETIC
+  EXPERIMENTAL
+  CONGENITAL
+  ELECTIVE
+  LIFESTYLE
+  DENTAL_ELECTIVE
+  OTHER
+}
+
+// WP-2.3 (DEF-023) — a structured, version-immutable treatment exclusion.
+// Replaces (does not extend) the read-only `BenefitConfig.exclusions[]` string
+// array, which was enforced nowhere.
+//
+// DUAL OWNERSHIP (N-012): EXACTLY ONE of `packageVersionId` /
+// `providerContractId` is set. A package version owns package-level exclusions;
+// a provider contract owns contract-scoped exclusions. Both project to the same
+// evaluation path (evaluateExclusions). The XOR is enforced in the validation
+// module (SP-1) and the service before every write; a matching CHECK constraint
+// is a follow-up in prisma/sql (CHECK is not expressible in the Prisma schema).
+//
+// Immutable once its owning version is superseded: edits mint a new package
+// version and copy these rows forward (updatePackageAction); historical rows are
+// never mutated in place.
+model TreatmentExclusionRule {
+  id                 String            @id @default(cuid())
+  tenantId           String
+  packageVersionId   String?
+  packageVersion     PackageVersion?   @relation(fields: [packageVersionId], references: [id])
+  providerContractId String?
+  providerContract   ProviderContract? @relation(fields: [providerContractId], references: [id])
+
+  ruleCategory  TreatmentExclusionCategory
+  exclusionType TreatmentExclusionType     @default(ABSOLUTE)
+
+  // Scope (service / diagnosis / procedure code sets + benefit categories). A
+  // claim/PA matches when EVERY specified (non-empty) dimension intersects the
+  // context; empty dimensions are ignored; a rule with no scope matches nothing.
+  benefitCategories BenefitCategory[]
+  serviceCodes      String[]
+  diagnosisCodes    String[]
+  procedureCodes    String[]
+
+  // Structured exception (CONDITIONAL only) — interpreted by evaluateExclusions.
+  // e.g. { "type": "RECONSTRUCTIVE_AFTER_TRAUMA", "requiresPriorCoveredTrauma": true }.
+  exceptionLogic Json?
+
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+
+  sourceClause          String? // internal contract clause ref — never member/provider-facing
+  internalNote          String? // internal underwriting note — never member/provider-facing
+  memberSafeExplanation String // the ONLY member/provider-facing text
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([packageVersionId])
+  @@index([providerContractId])
+  @@index([tenantId])
+}
+
+// WP-2.4 (DEF-024) — a structured, version-immutable referral rule. Package-
+// version-owned only (NOT dual, and NOT a reuse of the provider INCLUDE/EXCLUDE
+// rules in PackageProviderEligibility). CT-025: specialist-outpatient referral
+// required except in an emergency.
+model ReferralRule {
+  id               String         @id @default(cuid())
+  tenantId         String
+  packageVersionId String
+  packageVersion   PackageVersion @relation(fields: [packageVersionId], references: [id])
+
+  // Scope — benefit / service / provider-specialty. Applies when EVERY specified
+  // (non-empty) dimension matches the context.
+  benefitCategories   BenefitCategory[]
+  serviceCodes        String[]
+  providerSpecialties String[]
+
+  requiresReferral   Boolean @default(true)
+  emergencyException Boolean @default(true) // an emergency bypasses the referral requirement (EO-022)
+
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+
+  sourceClause          String? // internal contract clause ref — never member/provider-facing
+  memberSafeExplanation String // the ONLY member/provider-facing text
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([packageVersionId])
+  @@index([tenantId])
 }
 
 model Practitioner {

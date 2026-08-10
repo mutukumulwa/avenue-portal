@@ -15,6 +15,14 @@ import { TRPCError } from "@trpc/server";
 import { auditChainService } from "./audit-chain.service";
 import { BenefitUsageService } from "./benefit-usage.service";
 import { inSerializableTx } from "@/lib/serializable-tx";
+// WP-2.3 / WP-2.4 — the SAME standalone pure evaluators SP-6 and the claims path
+// consume (never re-implemented inline). Wired below as gates 3.5 / 4.5 so
+// CT-023/CT-024/CT-025 are enforced at preauth today.
+import {
+  evaluateExclusions,
+  evaluateReferral,
+  type ExclusionExceptionLogic,
+} from "./eligibility/rules";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
@@ -168,6 +176,60 @@ export const preauthAdjudicationService = {
     }
     pass("EXCLUSION_CHECK");
 
+    // ── Gate 3.5: Structured treatment exclusions (WP-2.3) ────
+    // One evaluation path over BOTH owners (N-012): the member's pinned package
+    // version AND the servicing provider's active contract. `evaluateExclusions`
+    // is the SAME pure function SP-6 and the claims path call. CT-023 (cosmetic)
+    // / CT-024 (experimental). Auto-decision carries no verified reconstructive
+    // evidence, so the CT-023 exception is honoured by the evaluator only when a
+    // caller supplies the signal (claims / manual review).
+    if (member?.packageVersionId) {
+      const exDiagnosisCodes = (pa.diagnoses as Array<{ code: string }>).map((d) => d.code);
+      const [versionExclusions, contractExclusions] = await Promise.all([
+        prisma.treatmentExclusionRule.findMany({
+          where: { packageVersionId: member.packageVersionId, isActive: true },
+        }),
+        prisma.treatmentExclusionRule.findMany({
+          where: {
+            isActive: true,
+            providerContract: {
+              providerId: pa.providerId,
+              tenantId,
+              status: "ACTIVE",
+              startDate: { lte: serviceDate },
+              endDate: { gte: serviceDate },
+            },
+          },
+        }),
+      ]);
+      const exResult = evaluateExclusions(
+        [...versionExclusions, ...contractExclusions].map((r) => ({
+          id: r.id,
+          ruleCategory: r.ruleCategory,
+          exclusionType: r.exclusionType,
+          benefitCategories: r.benefitCategories,
+          serviceCodes: r.serviceCodes,
+          diagnosisCodes: r.diagnosisCodes,
+          procedureCodes: r.procedureCodes,
+          exceptionLogic: (r.exceptionLogic ?? null) as ExclusionExceptionLogic | null,
+          effectiveFrom: r.effectiveFrom,
+          effectiveTo: r.effectiveTo,
+          memberSafeExplanation: r.memberSafeExplanation,
+          isActive: r.isActive,
+        })),
+        {
+          serviceDate,
+          benefitCategory: pa.benefitCategory,
+          diagnosisCodes: exDiagnosisCodes,
+          procedureCodes,
+        },
+      );
+      if (exResult.excluded) {
+        return failGate("TREATMENT_EXCLUSION", `[${exResult.reasonCode}] ${exResult.memberSafeExplanation}`);
+      }
+    }
+    pass("TREATMENT_EXCLUSION");
+
     // ── Gate 4: Waiting period elapsed ────────────────────────
     const waitingPeriods = await prisma.waitingPeriodApplication.findMany({
       where: {
@@ -184,6 +246,51 @@ export const preauthAdjudicationService = {
         `Waiting period for ${pa.benefitCategory} ends ${earliest.endDate.toDateString()}`);
     }
     pass("WAITING_PERIOD");
+
+    // ── Gate 4.5: Referral requirement (WP-2.4) ───────────────
+    // `evaluateReferral` is the SAME pure function SP-6/claims call. CT-025:
+    // specialist-outpatient referral required except emergency. Auto-decision
+    // cannot see a referral-on-file (the PA carries no referral field), so a
+    // missing referral ROUTES TO HUMAN (a reviewer confirms the referral) rather
+    // than auto-declining; an emergency lifts the requirement (EO-022) and is
+    // recorded on the gate log for audit.
+    if (member?.packageVersionId) {
+      const referralRules = await prisma.referralRule.findMany({
+        where: { packageVersionId: member.packageVersionId, isActive: true },
+      });
+      const refResult = evaluateReferral(
+        referralRules.map((r) => ({
+          id: r.id,
+          benefitCategories: r.benefitCategories,
+          serviceCodes: r.serviceCodes,
+          providerSpecialties: r.providerSpecialties,
+          requiresReferral: r.requiresReferral,
+          emergencyException: r.emergencyException,
+          effectiveFrom: r.effectiveFrom,
+          effectiveTo: r.effectiveTo,
+          memberSafeExplanation: r.memberSafeExplanation,
+          isActive: r.isActive,
+        })),
+        {
+          serviceDate,
+          benefitCategory: pa.benefitCategory,
+          serviceCodes: procedureCodes,
+          isEmergency: pa.isEmergency,
+          hasReferral: false,
+        },
+      );
+      if (refResult.blocked) {
+        return routeHuman("REFERRAL", `[${refResult.reasonCode}] ${refResult.memberSafeExplanation}`);
+      }
+      pass(
+        "REFERRAL",
+        refResult.emergencyExceptionApplied
+          ? `[${refResult.reasonCode}] emergency referral exception applied — auditable`
+          : undefined,
+      );
+    } else {
+      pass("REFERRAL");
+    }
 
     // ── Gate 5: Cost within remaining cap ─────────────────────
     // PR-011 #4: the check is scoped to the benefit config for the PA's

@@ -13,6 +13,12 @@ import {
   FIELD_LABELS,
 } from "@/lib/validation/package";
 import { sharedLimitSchema } from "@/lib/validation/shared-limit";
+import {
+  treatmentExclusionSchema,
+  resolveExclusionOwner,
+  detectExclusionOverlap,
+} from "@/lib/validation/exclusion";
+import { referralRuleSchema, detectReferralOverlap } from "@/lib/validation/referral";
 
 /** Local P2002 detector (the settings/tenants copy lives in a `"use server"`
  *  file and can't be imported). SP-5: map the unique-constraint race to a
@@ -130,6 +136,8 @@ export async function updatePackageAction(
           benefits: true,
           sharedLimitGroups: { include: { benefitConfigs: true } },
           eligibilityRules: true,
+          treatmentExclusions: true,
+          referralRules: true,
         },
       },
     },
@@ -228,6 +236,52 @@ export async function updatePackageAction(
         });
       }
 
+      // Copy-forward treatment exclusions (WP-2.3) — scope is by code sets +
+      // benefit categories, so no id re-mapping is needed (unlike shared limits).
+      // Only the version-owned rows are carried (contract-owned rows belong to
+      // the contract, not the package version). Historical rows stay immutable.
+      for (const ex of oldVersion?.treatmentExclusions ?? []) {
+        await tx.treatmentExclusionRule.create({
+          data: {
+            tenantId,
+            packageVersionId: newVersion.id,
+            ruleCategory: ex.ruleCategory,
+            exclusionType: ex.exclusionType,
+            benefitCategories: ex.benefitCategories,
+            serviceCodes: ex.serviceCodes,
+            diagnosisCodes: ex.diagnosisCodes,
+            procedureCodes: ex.procedureCodes,
+            exceptionLogic: ex.exceptionLogic ?? undefined,
+            effectiveFrom: ex.effectiveFrom,
+            effectiveTo: ex.effectiveTo,
+            sourceClause: ex.sourceClause,
+            internalNote: ex.internalNote,
+            memberSafeExplanation: ex.memberSafeExplanation,
+            isActive: ex.isActive,
+          },
+        });
+      }
+
+      // Copy-forward referral rules (WP-2.4).
+      for (const ref of oldVersion?.referralRules ?? []) {
+        await tx.referralRule.create({
+          data: {
+            tenantId,
+            packageVersionId: newVersion.id,
+            benefitCategories: ref.benefitCategories,
+            serviceCodes: ref.serviceCodes,
+            providerSpecialties: ref.providerSpecialties,
+            requiresReferral: ref.requiresReferral,
+            emergencyException: ref.emergencyException,
+            effectiveFrom: ref.effectiveFrom,
+            effectiveTo: ref.effectiveTo,
+            sourceClause: ref.sourceClause,
+            memberSafeExplanation: ref.memberSafeExplanation,
+            isActive: ref.isActive,
+          },
+        });
+      }
+
       await tx.package.update({
         where: { id: packageId },
         data: { currentVersionId: newVersion.id },
@@ -255,6 +309,8 @@ export async function updatePackageAction(
       benefitCount: benefits.length,
       copiedSharedLimits: (oldVersion?.sharedLimitGroups ?? []).length,
       copiedProviderRules: (oldVersion?.eligibilityRules ?? []).length,
+      copiedExclusions: (oldVersion?.treatmentExclusions ?? []).length,
+      copiedReferralRules: (oldVersion?.referralRules ?? []).length,
     },
   });
 
@@ -464,4 +520,311 @@ export async function deleteProviderEligibilityAction(id: string): Promise<void>
 
   revalidatePath(`/packages/${packageId}/edit`);
   revalidatePath(`/packages/${packageId}`);
+}
+
+// ── Treatment Exclusions (WP-2.3 / DEF-023) ──────────────────────────────────
+
+/** Build the structured exceptionLogic object from the form (CONDITIONAL only).
+ *  Returns null for ABSOLUTE rules or when no exception is chosen. */
+function parseExceptionLogic(formData: FormData): unknown {
+  if (formData.get("exclusionType") !== "CONDITIONAL") return null;
+  const type = (formData.get("exceptionType") as string) || "NONE";
+  if (type === "NONE") return null;
+  if (type === "RECONSTRUCTIVE_AFTER_TRAUMA") {
+    return {
+      type,
+      triggerProcedureCodes: formData.getAll("exceptionTriggerProcedureCodes").map(String),
+      triggerDiagnosisCodes: formData.getAll("exceptionTriggerDiagnosisCodes").map(String),
+      requiresPriorCoveredTrauma: formData.get("exceptionRequiresPriorTrauma") === "on",
+    };
+  }
+  if (type === "DIAGNOSIS_PRESENT") {
+    return { type, diagnosisCodes: formData.getAll("exceptionDiagnosisCodes").map(String) };
+  }
+  if (type === "PROCEDURE_PRESENT") {
+    return { type, procedureCodes: formData.getAll("exceptionProcedureCodes").map(String) };
+  }
+  return null;
+}
+
+export async function createTreatmentExclusionAction(
+  _prev: unknown,
+  formData: FormData,
+): Promise<ActionResult> {
+  const session = await requireRole(ROLES.UNDERWRITING);
+  const tenantId = session.user.tenantId;
+  const packageVersionId = (formData.get("packageVersionId") as string) || null;
+  const providerContractId = (formData.get("providerContractId") as string) || null;
+
+  const parsed = treatmentExclusionSchema.safeParse({
+    ruleCategory: formData.get("ruleCategory"),
+    exclusionType: formData.get("exclusionType"),
+    benefitCategories: formData.getAll("benefitCategories").map(String),
+    serviceCodes: formData.getAll("serviceCodes").map(String),
+    diagnosisCodes: formData.getAll("diagnosisCodes").map(String),
+    procedureCodes: formData.getAll("procedureCodes").map(String),
+    exceptionLogic: parseExceptionLogic(formData),
+    effectiveFrom: (formData.get("effectiveFrom") as string) || undefined,
+    effectiveTo: (formData.get("effectiveTo") as string) || null,
+    sourceClause: (formData.get("sourceClause") as string) || null,
+    internalNote: (formData.get("internalNote") as string) || null,
+    memberSafeExplanation: (formData.get("memberSafeExplanation") ?? "") as string,
+  });
+  if (!parsed.success) return fail(parsed.error.flatten().fieldErrors);
+  const data = parsed.data;
+
+  // N-012: exactly one owner (package version OR provider contract).
+  const ownerRes = resolveExclusionOwner({ packageVersionId, providerContractId });
+  if (!ownerRes.ok) return fail(undefined, ownerRes.message);
+  const owner = ownerRes.owner;
+
+  // Tenant-ownership of the owner (client-supplied id) + resolve packageId.
+  let packageId: string | null = null;
+  if ("packageVersionId" in owner) {
+    const version = await prisma.packageVersion.findUnique({
+      where: { id: owner.packageVersionId },
+      select: { packageId: true, package: { select: { tenantId: true } } },
+    });
+    if (!version || version.package.tenantId !== tenantId) {
+      return fail(undefined, "Package version not found.");
+    }
+    packageId = version.packageId;
+  } else {
+    const contract = await prisma.providerContract.findFirst({
+      where: { id: owner.providerContractId, tenantId },
+      select: { id: true },
+    });
+    if (!contract) return fail(undefined, "Provider contract not found.");
+  }
+
+  // Overlap/conflict among the same owner's active rules.
+  const existing = await prisma.treatmentExclusionRule.findMany({
+    where:
+      "packageVersionId" in owner
+        ? { packageVersionId: owner.packageVersionId, isActive: true }
+        : { providerContractId: owner.providerContractId, isActive: true },
+    select: {
+      id: true,
+      ruleCategory: true,
+      benefitCategories: true,
+      serviceCodes: true,
+      diagnosisCodes: true,
+      procedureCodes: true,
+      effectiveFrom: true,
+      effectiveTo: true,
+      isActive: true,
+    },
+  });
+  const conflict = detectExclusionOverlap(existing, {
+    ruleCategory: data.ruleCategory,
+    benefitCategories: data.benefitCategories,
+    serviceCodes: data.serviceCodes,
+    diagnosisCodes: data.diagnosisCodes,
+    procedureCodes: data.procedureCodes,
+    effectiveFrom: data.effectiveFrom,
+    effectiveTo: data.effectiveTo ?? null,
+  });
+  if (conflict) {
+    return fail({
+      effectiveFrom: [
+        "This exclusion overlaps an existing rule of the same category and scope for an overlapping period.",
+      ],
+    });
+  }
+
+  const rule = await prisma.treatmentExclusionRule.create({
+    data: {
+      tenantId,
+      ...owner,
+      ruleCategory: data.ruleCategory,
+      exclusionType: data.exclusionType,
+      benefitCategories: data.benefitCategories,
+      serviceCodes: data.serviceCodes,
+      diagnosisCodes: data.diagnosisCodes,
+      procedureCodes: data.procedureCodes,
+      exceptionLogic: (data.exceptionLogic ?? undefined) as never,
+      effectiveFrom: data.effectiveFrom,
+      effectiveTo: data.effectiveTo ?? null,
+      sourceClause: data.sourceClause ?? null,
+      internalNote: data.internalNote ?? null,
+      memberSafeExplanation: data.memberSafeExplanation,
+    },
+  });
+
+  await writeAudit({
+    userId: session.user.id,
+    action: "TREATMENT_EXCLUSION_CREATE",
+    module: "PACKAGES",
+    description: `Treatment exclusion (${data.ruleCategory}/${data.exclusionType}) added`,
+    metadata: {
+      packageVersionId: packageVersionId ?? null,
+      providerContractId: providerContractId ?? null,
+      ruleId: rule.id,
+      ruleCategory: data.ruleCategory,
+      exclusionType: data.exclusionType,
+    },
+  });
+
+  if (packageId) {
+    revalidatePath(`/packages/${packageId}/edit`);
+    revalidatePath(`/packages/${packageId}`);
+    revalidatePath("/member/benefits");
+  }
+  return ok();
+}
+
+export async function deleteTreatmentExclusionAction(id: string): Promise<void> {
+  const session = await requireRole(ROLES.UNDERWRITING);
+  const tenantId = session.user.tenantId;
+
+  const rule = await prisma.treatmentExclusionRule.findUnique({
+    where: { id },
+    select: {
+      tenantId: true,
+      ruleCategory: true,
+      packageVersion: { select: { packageId: true } },
+    },
+  });
+  if (!rule || rule.tenantId !== tenantId) return; // tenant-scoped no-op
+  const packageId = rule.packageVersion?.packageId ?? null;
+
+  await prisma.treatmentExclusionRule.delete({ where: { id } });
+
+  await writeAudit({
+    userId: session.user.id,
+    action: "TREATMENT_EXCLUSION_DELETE",
+    module: "PACKAGES",
+    description: `Treatment exclusion (${rule.ruleCategory}) removed`,
+    metadata: { ruleId: id, packageId },
+  });
+
+  if (packageId) {
+    revalidatePath(`/packages/${packageId}/edit`);
+    revalidatePath(`/packages/${packageId}`);
+    revalidatePath("/member/benefits");
+  }
+}
+
+// ── Referral Rules (WP-2.4 / DEF-024) ────────────────────────────────────────
+
+export async function createReferralRuleAction(
+  _prev: unknown,
+  formData: FormData,
+): Promise<ActionResult> {
+  const session = await requireRole(ROLES.UNDERWRITING);
+  const tenantId = session.user.tenantId;
+  const packageVersionId = formData.get("packageVersionId") as string;
+
+  const parsed = referralRuleSchema.safeParse({
+    benefitCategories: formData.getAll("benefitCategories").map(String),
+    serviceCodes: formData.getAll("serviceCodes").map(String),
+    providerSpecialties: formData.getAll("providerSpecialties").map(String),
+    requiresReferral: formData.get("requiresReferral") === "on",
+    emergencyException: formData.get("emergencyException") === "on",
+    effectiveFrom: (formData.get("effectiveFrom") as string) || undefined,
+    effectiveTo: (formData.get("effectiveTo") as string) || null,
+    sourceClause: (formData.get("sourceClause") as string) || null,
+    memberSafeExplanation: (formData.get("memberSafeExplanation") ?? "") as string,
+  });
+  if (!parsed.success) return fail(parsed.error.flatten().fieldErrors);
+  const data = parsed.data;
+
+  // Tenant-ownership on the client-supplied version id.
+  const version = await prisma.packageVersion.findUnique({
+    where: { id: packageVersionId },
+    select: { packageId: true, package: { select: { tenantId: true } } },
+  });
+  if (!version || version.package.tenantId !== tenantId) {
+    return fail(undefined, "Package version not found.");
+  }
+  const packageId = version.packageId;
+
+  // Overlap/conflict among the version's active referral rules.
+  const existing = await prisma.referralRule.findMany({
+    where: { packageVersionId, isActive: true },
+    select: {
+      id: true,
+      benefitCategories: true,
+      serviceCodes: true,
+      providerSpecialties: true,
+      effectiveFrom: true,
+      effectiveTo: true,
+      isActive: true,
+    },
+  });
+  const conflict = detectReferralOverlap(existing, {
+    benefitCategories: data.benefitCategories,
+    serviceCodes: data.serviceCodes,
+    providerSpecialties: data.providerSpecialties,
+    effectiveFrom: data.effectiveFrom,
+    effectiveTo: data.effectiveTo ?? null,
+  });
+  if (conflict) {
+    return fail({
+      effectiveFrom: [
+        "This referral rule overlaps an existing rule with the same scope for an overlapping period.",
+      ],
+    });
+  }
+
+  const rule = await prisma.referralRule.create({
+    data: {
+      tenantId,
+      packageVersionId,
+      benefitCategories: data.benefitCategories,
+      serviceCodes: data.serviceCodes,
+      providerSpecialties: data.providerSpecialties,
+      requiresReferral: data.requiresReferral,
+      emergencyException: data.emergencyException,
+      effectiveFrom: data.effectiveFrom,
+      effectiveTo: data.effectiveTo ?? null,
+      sourceClause: data.sourceClause ?? null,
+      memberSafeExplanation: data.memberSafeExplanation,
+    },
+  });
+
+  await writeAudit({
+    userId: session.user.id,
+    action: "REFERRAL_RULE_CREATE",
+    module: "PACKAGES",
+    description: `Referral rule added to package ${packageId}`,
+    metadata: {
+      packageId,
+      packageVersionId,
+      ruleId: rule.id,
+      requiresReferral: data.requiresReferral,
+      emergencyException: data.emergencyException,
+    },
+  });
+
+  revalidatePath(`/packages/${packageId}/edit`);
+  revalidatePath(`/packages/${packageId}`);
+  revalidatePath("/member/benefits");
+  return ok();
+}
+
+export async function deleteReferralRuleAction(id: string): Promise<void> {
+  const session = await requireRole(ROLES.UNDERWRITING);
+  const tenantId = session.user.tenantId;
+
+  const rule = await prisma.referralRule.findUnique({
+    where: { id },
+    select: { tenantId: true, packageVersion: { select: { packageId: true } } },
+  });
+  if (!rule || rule.tenantId !== tenantId) return; // tenant-scoped no-op
+  const packageId = rule.packageVersion.packageId;
+
+  await prisma.referralRule.delete({ where: { id } });
+
+  await writeAudit({
+    userId: session.user.id,
+    action: "REFERRAL_RULE_DELETE",
+    module: "PACKAGES",
+    description: `Referral rule removed from package ${packageId}`,
+    metadata: { ruleId: id, packageId },
+  });
+
+  revalidatePath(`/packages/${packageId}/edit`);
+  revalidatePath(`/packages/${packageId}`);
+  revalidatePath("/member/benefits");
 }
