@@ -105,6 +105,9 @@ const db = vi.hoisted(() => ({
   packageVersion: { findFirst: vi.fn(async () => ({ benefits: [] })) },
   benefitUsage: { findMany: vi.fn(async () => []) },
   benefitHold: { findMany: vi.fn(async () => []) },
+  // SP-6: the eligibility route projects the evaluator core, which reads coverage
+  // periods (empty here — scope is what this suite proves, not the verdict).
+  memberCoveragePeriod: { findMany: vi.fn(async () => []) },
 }));
 
 const cred = vi.hoisted(() => ({ current: null as ApiCredential | null }));

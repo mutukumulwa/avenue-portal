@@ -2,7 +2,8 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, User as UserIcon, Calendar, Info, Phone, Mail, FileText } from "lucide-react";
+import { ArrowLeft, User as UserIcon, Calendar, Info, Phone, Mail, FileText, ShieldCheck, Wallet } from "lucide-react";
+import { evaluateEligibility, memberBenefitSummary } from "@/server/services/eligibility/evaluator";
 
 export default async function HRMemberDetailPage(
   props: { params: Promise<{ memberId: string }> }
@@ -36,6 +37,22 @@ export default async function HRMemberDetailPage(
   });
 
   if (!member) notFound();
+
+  // SP-6: the member is confirmed in the HR user's own group above (N3 guard) —
+  // the eligibility verdict + balances come from the SINGLE evaluator (own-group
+  // projection), never a re-computed status check, so HR sees the SAME numbers as
+  // admin / member / provider.
+  const [eligibility, balances] = await Promise.all([
+    evaluateEligibility({ tenantId: session.user.tenantId, memberRef: member.memberNumber }),
+    memberBenefitSummary(member.id),
+  ]);
+  const eligBadge =
+    eligibility.conclusion === "ELIGIBLE"
+      ? "bg-[#28A745]/10 text-[#28A745]"
+      : eligibility.conclusion === "MEMBER_ELIGIBLE_BENEFIT_BLOCKED"
+        ? "bg-[#FFC107]/10 text-[#856404]"
+        : "bg-[#DC3545]/10 text-[#DC3545]";
+  const money = (n: number | null) => (n == null ? "—" : `UGX ${n.toLocaleString("en-UG")}`);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -128,6 +145,69 @@ export default async function HRMemberDetailPage(
                   </div>
                   <div className="font-semibold text-brand-text-heading">{new Date(member.enrollmentDate).toLocaleDateString()}</div>
                 </div>
+             </div>
+          </div>
+
+          {/* SP-6 Eligibility & Balances (own-group projection of the single evaluator) */}
+          <div className="bg-white border border-[#EEEEEE] rounded-2xl shadow-sm overflow-hidden">
+             <div className="border-b border-[#EEEEEE] px-5 py-4 flex items-center">
+                <ShieldCheck className="w-5 h-5 text-brand-indigo mr-2" />
+                <h2 className="font-bold text-brand-text-heading font-heading">Eligibility &amp; Balances</h2>
+             </div>
+             <div className="p-5 space-y-4">
+                <div className="flex flex-wrap items-center gap-3">
+                   <span className={`px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-full ${eligBadge}`}>
+                      {eligibility.conclusion.replace(/_/g, " ")}
+                   </span>
+                   <span className="text-xs font-semibold text-brand-text-muted uppercase tracking-wider">{eligibility.reasonCode.replace(/_/g, " ")}</span>
+                   <span className="text-xs text-brand-text-muted">as of today</span>
+                </div>
+                {eligibility.explanations.length > 0 && (
+                   <p className="text-xs text-brand-text-body">{eligibility.explanations[0]}</p>
+                )}
+                <div className="grid grid-cols-3 gap-3">
+                   <div className="rounded-lg bg-[#F8F9FA] p-3">
+                      <div className="text-[10px] font-bold uppercase text-brand-text-muted tracking-wider">Annual Limit</div>
+                      <div className="font-bold text-brand-text-heading text-sm mt-0.5">{money(balances.totals.limit)}</div>
+                   </div>
+                   <div className="rounded-lg bg-[#F8F9FA] p-3">
+                      <div className="text-[10px] font-bold uppercase text-brand-text-muted tracking-wider">Utilised{balances.totals.held > 0 ? ` (+${balances.totals.held.toLocaleString("en-UG")} held)` : ""}</div>
+                      <div className="font-bold text-[#856404] text-sm mt-0.5">{money(balances.totals.used)}</div>
+                   </div>
+                   <div className="rounded-lg bg-[#F8F9FA] p-3">
+                      <div className="text-[10px] font-bold uppercase text-brand-text-muted tracking-wider">Remaining</div>
+                      <div className="font-bold text-[#28A745] text-sm mt-0.5">{money(balances.totals.remaining)}</div>
+                   </div>
+                </div>
+                {balances.rows.length === 0 ? (
+                   <p className="text-xs text-brand-text-muted italic">No pinned benefit schedule for this member.</p>
+                ) : (
+                   <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                         <thead>
+                            <tr className="text-left text-brand-text-muted border-b border-[#EEEEEE]">
+                               <th className="py-2 font-bold uppercase tracking-wider">Benefit</th>
+                               <th className="py-2 font-bold uppercase tracking-wider text-right">Limit</th>
+                               <th className="py-2 font-bold uppercase tracking-wider text-right">Used</th>
+                               <th className="py-2 font-bold uppercase tracking-wider text-right">Remaining</th>
+                            </tr>
+                         </thead>
+                         <tbody className="divide-y divide-[#EEEEEE]">
+                            {balances.rows.map((r) => (
+                               <tr key={r.category}>
+                                  <td className="py-2 font-semibold text-brand-text-heading">{r.category.replace(/_/g, " ")}</td>
+                                  <td className="py-2 text-right text-brand-text-body">{r.limit.toLocaleString("en-UG")}</td>
+                                  <td className="py-2 text-right text-brand-text-body">{r.used.toLocaleString("en-UG")}</td>
+                                  <td className="py-2 text-right font-semibold text-[#28A745]">{r.remaining.toLocaleString("en-UG")}</td>
+                               </tr>
+                            ))}
+                         </tbody>
+                      </table>
+                   </div>
+                )}
+                <p className="text-[10px] text-brand-text-muted flex items-center gap-1">
+                   <Wallet className="w-3 h-3" /> Point-in-time balances net of approved pre-authorisation holds. Not a guarantee of payment.
+                </p>
              </div>
           </div>
         </div>

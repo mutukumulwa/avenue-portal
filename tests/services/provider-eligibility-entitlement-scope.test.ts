@@ -44,6 +44,9 @@ function makeDb(memberRow: AnyRow) {
       }),
     },
     providerEligibilityCheck: { create: vi.fn(async () => ({ id: "chk_1" })) },
+    // SP-6: the member-level verdict reads coverage periods (empty here — scoping
+    // is what this suite proves, not the verdict math).
+    memberCoveragePeriod: { findMany: vi.fn(async () => []) },
   };
   return { db, captured };
 }
@@ -63,9 +66,14 @@ const ENTITLED_MEMBER = {
   lastName: "Namono",
   memberNumber: "MVX-1",
   status: "ACTIVE",
-  group: { name: "Lakeview Staff", status: "ACTIVE", clientId: "entitled-client" },
+  relationship: "PRINCIPAL",
+  dateOfBirth: new Date("1985-01-01"),
+  enrollmentDate: new Date("2026-01-01"),
+  coverEndDate: null,
+  packageVersionId: "pv1", // pinned → SP-6 verdict resolves ELIGIBLE
+  group: { name: "Lakeview Staff", status: "ACTIVE", clientId: "entitled-client", effectiveDate: new Date("2026-01-01"), renewalDate: new Date("2027-01-01"), client: { status: "ACTIVE" } },
   groupId: "g1",
-  package: { name: "Gold" },
+  package: { name: "Gold", maxAge: 65, dependentMaxAge: 24 },
   packageId: "pkg1",
 };
 

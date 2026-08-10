@@ -9,11 +9,14 @@ import {
 /**
  * SP-8 drift detector — the eligibility evaluator's reason-code enum must equal
  * the published oracle list (EO-001..024) plus the Wave 2 exclusion additions,
- * with NO strays. Locked verbatim to plan §SP-6 line 156.
+ * with NO strays. Locked to the RUN WORKBOOK `06 Eligibility Oracle` (which wins
+ * over the plan on any conflict): EO-023 uses `ACTIVE_DEPENDANT` in the reason
+ * column, so it is a distinct oracle code (the plan §SP-6 scaffold omitted it).
  */
 
 const ORACLE = [
   "ACTIVE",
+  "ACTIVE_DEPENDANT",
   "POLICY_NOT_STARTED",
   "NOT_YET_ENROLLED",
   "WAITING_PERIOD",

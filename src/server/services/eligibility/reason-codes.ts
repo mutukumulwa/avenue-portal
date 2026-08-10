@@ -13,9 +13,17 @@
  * the oracle base that SP-6 will populate.
  */
 
-/** The 18 oracle base codes (plan §SP-6, EO-001..024). */
+/**
+ * The oracle base codes (plan §SP-6). These are EXACTLY the distinct
+ * "Expected reason/status" values in `06 Eligibility Oracle` EO-001..024 — no
+ * strays (asserted by tests/services/eligibility/reason-codes.test.ts). Note
+ * `ACTIVE_DEPENDANT` (EO-023): the oracle distinguishes an active dependant from
+ * an active principal in the reason column, so the evaluator returns it as a
+ * distinct code rather than folding it into `ACTIVE`.
+ */
 export const ELIGIBILITY_ORACLE_REASON_CODES = [
   "ACTIVE",
+  "ACTIVE_DEPENDANT",
   "POLICY_NOT_STARTED",
   "NOT_YET_ENROLLED",
   "WAITING_PERIOD",

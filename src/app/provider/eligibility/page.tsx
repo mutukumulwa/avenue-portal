@@ -12,16 +12,27 @@ import { UserCheck, Search, CheckCircle2, XCircle } from "lucide-react";
  * When the D3 gate flips enforcement ON per provider, out-of-scope members
  * safely resolve as not-eligible with no enumeration.
  */
+const BENEFIT_OPTIONS = [
+  "OUTPATIENT", "INPATIENT", "MATERNITY", "DENTAL", "OPTICAL", "MENTAL_HEALTH",
+  "CHRONIC_DISEASE", "SURGICAL", "AMBULANCE_EMERGENCY", "WELLNESS_PREVENTIVE",
+];
+
 export default async function ProviderEligibility({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; serviceDate?: string; benefit?: string }>;
 }) {
   const { ctx } = await ProviderAccessService.resolveUserContext();
-  const { q } = await searchParams;
+  const { q, serviceDate: serviceDateParam, benefit } = await searchParams;
   const query = (q ?? "").trim();
+  const serviceDate = serviceDateParam ? new Date(serviceDateParam) : undefined;
+  const benefitCategory = (benefit ?? "").trim() || undefined;
 
-  const result = query ? await ProviderEligibilityService.check({ ctx, memberNumber: query }) : null;
+  // SP-6: the check now carries the service date + benefit so the verdict is
+  // point-in-time and the evidence row records the queried context.
+  const result = query
+    ? await ProviderEligibilityService.check({ ctx, memberNumber: query, serviceDate, benefitCategory })
+    : null;
   const eligible = result?.resultCode === "ELIGIBLE";
 
   return (
@@ -33,15 +44,38 @@ export default async function ProviderEligibility({
         <p className="text-brand-text-muted text-sm mt-1">Enter the member/card number to confirm cover before treating.</p>
       </div>
 
-      <form method="GET" className="flex gap-2">
-        <div className="relative flex-1">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-brand-text-muted" />
+      <form method="GET" className="flex flex-wrap gap-2 items-end">
+        <div className="relative flex-1 min-w-[200px]">
+          <label className="block text-[11px] uppercase font-bold text-brand-text-muted mb-1">Member / card number</label>
+          <Search size={16} className="absolute left-3 top-[34px] -translate-y-1/2 text-brand-text-muted" />
           <input
             name="q"
             defaultValue={query}
             placeholder="e.g. NWSC-2026-00001"
             className="w-full border border-[#EEEEEE] rounded-lg pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-brand-indigo"
           />
+        </div>
+        <div>
+          <label className="block text-[11px] uppercase font-bold text-brand-text-muted mb-1">Service date</label>
+          <input
+            name="serviceDate"
+            type="date"
+            defaultValue={serviceDateParam ?? ""}
+            className="border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo"
+          />
+        </div>
+        <div>
+          <label className="block text-[11px] uppercase font-bold text-brand-text-muted mb-1">Benefit</label>
+          <select
+            name="benefit"
+            defaultValue={benefitCategory ?? ""}
+            className="border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo"
+          >
+            <option value="">Any</option>
+            {BENEFIT_OPTIONS.map((b) => (
+              <option key={b} value={b}>{b.replace(/_/g, " ")}</option>
+            ))}
+          </select>
         </div>
         <button type="submit" className="rounded-lg bg-brand-indigo px-5 py-2 text-sm font-semibold text-white hover:bg-brand-secondary">Check</button>
       </form>
@@ -64,6 +98,9 @@ export default async function ProviderEligibility({
               <p className={`text-sm font-semibold ${eligible ? "text-[#28A745]" : "text-[#DC3545]"}`}>
                 {eligible ? "ELIGIBLE — cover is active" : "NOT ELIGIBLE"}
               </p>
+              {result.safeExplanation && (
+                <p className="text-xs text-brand-text-muted mt-0.5">{result.safeExplanation}</p>
+              )}
             </div>
           </div>
           <dl className="grid grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4 px-5 py-5 text-sm">

@@ -13,6 +13,8 @@ const cred = vi.hoisted(() => ({ current: null as ApiCredential | null }));
 const db = vi.hoisted(() => ({
   member: { findFirst: vi.fn() },
   contractApplicability: { findMany: vi.fn(async () => [{ clientId: "c1", groupId: null, inclusionType: "INCLUDE" }]) },
+  // SP-6: eligibility route projects the evaluator core (reads coverage periods).
+  memberCoveragePeriod: { findMany: vi.fn(async () => []) },
 }));
 
 vi.mock("@/lib/prisma", () => ({ prisma: db }));

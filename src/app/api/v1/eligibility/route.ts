@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { withApiKey, getApiCredential, operatorTenantWhere, providerScopeError } from "@/lib/apiAuth";
 import { ROUTE_SCOPE_CATALOG } from "@/lib/provider-api-scopes";
 import { ProviderEntitlementService } from "@/server/services/provider-entitlement.service";
+import { decideEligibility } from "@/server/services/eligibility/evaluator-core";
 
 async function getEligibility(req: Request) {
   try {
@@ -29,7 +30,7 @@ async function getEligibility(req: Request) {
     const member = await prisma.member.findFirst({
       where: { memberNumber, ...scope },
       include: {
-        group: { select: { name: true, status: true, tenantId: true } },
+        group: { select: { name: true, status: true, tenantId: true, effectiveDate: true, renewalDate: true, client: { select: { status: true } } } },
         package: { select: { name: true } },
       }
     });
@@ -38,8 +39,31 @@ async function getEligibility(req: Request) {
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
     }
 
-    // Determine absolute boolean eligibility
-    const isEligible = member.status === "ACTIVE" && member.group.status === "ACTIVE";
+    // SP-6: eligibility is the single evaluator's verdict — not a bare
+    // status===ACTIVE check. It honours the policy window, the member's pinned
+    // version, group/client status, coverage-as-of-service-date and enrolment.
+    const serviceParam = searchParams.get("serviceDate");
+    const serviceDate = serviceParam ? new Date(serviceParam) : new Date();
+    const coveragePeriods = await prisma.memberCoveragePeriod.findMany({
+      where: { memberId: member.id },
+      select: { startDate: true, endDate: true },
+    });
+    const decision = decideEligibility({
+      serviceDate,
+      memberExists: true,
+      member: {
+        status: member.status,
+        relationship: member.relationship,
+        dateOfBirth: member.dateOfBirth,
+        enrollmentDate: member.enrollmentDate,
+        coverEndDate: member.coverEndDate,
+        packageVersionId: member.packageVersionId,
+      },
+      client: member.group.client ? { status: member.group.client.status } : undefined,
+      group: { status: member.group.status, effectiveDate: member.group.effectiveDate, renewalDate: member.group.renewalDate },
+      coveragePeriods,
+    });
+    const isEligible = decision.conclusion === "ELIGIBLE";
 
     // Slade360 SMART interface shape
     const responseSchema = {
@@ -57,6 +81,8 @@ async function getEligibility(req: Request) {
         packageName: member.package.name,
         status: member.status,
         isEligible,
+        reason: decision.reasonCode,
+        asOfServiceDate: serviceDate.toISOString().split("T")[0],
       }
     };
 

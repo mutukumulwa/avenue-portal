@@ -5,6 +5,7 @@ import type { ProviderAccessContext } from "./provider-access.service";
 import { ProviderEntitlementService } from "./provider-entitlement.service";
 import { ProviderEntitlementShadowService } from "./provider-entitlement-shadow.service";
 import { ProviderAccessSettingsService } from "./provider-access-settings.service";
+import { decideEligibility } from "./eligibility/evaluator-core";
 
 /**
  * PNOS F1.11 — canonical provider eligibility check.
@@ -101,12 +102,15 @@ export const ProviderEligibilityService = {
       const where = await ProviderEntitlementService.entitledMemberWhere(ctx.providerId, serviceDate);
       const m = await db.member.findFirst({
         where: { memberNumber: { equals: input.memberNumber, mode: "insensitive" }, tenantId: ctx.tenantId, ...where },
-        select: { id: true, firstName: true, lastName: true, memberNumber: true, status: true, group: { select: { name: true, status: true, clientId: true } }, groupId: true, package: { select: { name: true } }, packageId: true },
+        select: VERDICT_MEMBER_SELECT,
       });
       // Safe not-found: an out-of-scope member is indistinguishable from an absent one (§9.1).
       if (!m) return finish("NOT_ELIGIBLE", "No eligible member found for this facility.");
-      const active = m.status === "ACTIVE" && m.group?.status === "ACTIVE";
-      return finish(active ? "ELIGIBLE" : "NOT_ELIGIBLE", active ? "Member cover is active for this facility." : "Member cover is not currently active.", {
+      // SP-6: the verdict is the single evaluator's member-level decision as of the
+      // service date (policy window, pinned version, group/client status, coverage
+      // periods, age) — not a bare status===ACTIVE check.
+      const verdict = await memberVerdict(db, m, serviceDate);
+      return finish(verdict.resultCode, verdict.safeExplanation, {
         id: m.id, firstName: m.firstName, lastName: m.lastName, memberNumber: m.memberNumber, clientId: m.group?.clientId ?? null, groupId: m.groupId, packageId: m.packageId, schemeName: m.group?.name ?? null, packageName: m.package?.name ?? null,
       });
     }
@@ -123,7 +127,7 @@ export const ProviderEligibilityService = {
     const where = await ProviderEntitlementService.entitledMemberWhere(ctx.providerId, serviceDate);
     const m = await db.member.findFirst({
       where: { memberNumber: { equals: input.memberNumber, mode: "insensitive" }, tenantId: ctx.tenantId, ...where },
-      select: { id: true, firstName: true, lastName: true, memberNumber: true, status: true, group: { select: { name: true, status: true, clientId: true } }, groupId: true, package: { select: { name: true } }, packageId: true },
+      select: VERDICT_MEMBER_SELECT,
     });
     if (m) {
       // fire-and-forget shadow (never throws, never blocks)
@@ -133,9 +137,81 @@ export const ProviderEligibilityService = {
       ).catch(() => {});
     }
     if (!m) return finish("NOT_ELIGIBLE", "No member found for that number.");
-    const active = m.status === "ACTIVE" && m.group?.status === "ACTIVE";
-    return finish(active ? "ELIGIBLE" : "NOT_ELIGIBLE", active ? "Member cover is active." : "Member cover is not currently active.", {
+    const verdict = await memberVerdict(db, m, serviceDate);
+    return finish(verdict.resultCode, verdict.safeExplanation, {
       id: m.id, firstName: m.firstName, lastName: m.lastName, memberNumber: m.memberNumber, clientId: m.group?.clientId ?? null, groupId: m.groupId, packageId: m.packageId, schemeName: m.group?.name ?? null, packageName: m.package?.name ?? null,
     });
   },
 } as const;
+
+/** The member fields the SP-6 member-level verdict needs. */
+const VERDICT_MEMBER_SELECT = {
+  id: true,
+  firstName: true,
+  lastName: true,
+  memberNumber: true,
+  status: true,
+  relationship: true,
+  dateOfBirth: true,
+  enrollmentDate: true,
+  coverEndDate: true,
+  packageVersionId: true,
+  groupId: true,
+  packageId: true,
+  group: { select: { name: true, status: true, clientId: true, effectiveDate: true, renewalDate: true, client: { select: { status: true } } } },
+  package: { select: { name: true, maxAge: true, dependentMaxAge: true } },
+} satisfies Prisma.MemberSelect;
+
+type VerdictMember = {
+  id: string;
+  status: string;
+  relationship: string;
+  dateOfBirth: Date | null;
+  enrollmentDate: Date;
+  coverEndDate: Date | null;
+  packageVersionId: string | null;
+  group: { status: string; effectiveDate: Date | null; renewalDate: Date | null; client: { status: string } | null } | null;
+  package: { maxAge: number; dependentMaxAge: number } | null;
+};
+
+/**
+ * Provider-portal member-level verdict: the SAME `decideEligibility` core every
+ * channel uses (never a re-computed status check), projected to the minimum-safe
+ * provider view (no balance/usage — §8.1). Benefit-context gates (network,
+ * referral, waiting, limit) require the page to pass a benefit category and are a
+ * follow-on; the member-life verdict here already honours the policy window,
+ * pinned version, group/client status, coverage-as-of-service-date and age.
+ */
+async function memberVerdict(
+  db: Db,
+  m: VerdictMember,
+  serviceDate: Date,
+): Promise<{ resultCode: EligibilityResultCode; safeExplanation: string }> {
+  const coveragePeriods = await db.memberCoveragePeriod.findMany({
+    where: { memberId: m.id },
+    select: { startDate: true, endDate: true },
+  });
+  const decision = decideEligibility({
+    serviceDate,
+    memberExists: true,
+    member: {
+      status: m.status,
+      relationship: m.relationship,
+      dateOfBirth: m.dateOfBirth,
+      enrollmentDate: m.enrollmentDate,
+      coverEndDate: m.coverEndDate,
+      packageVersionId: m.packageVersionId,
+    },
+    client: m.group?.client ? { status: m.group.client.status } : undefined,
+    group: m.group ? { status: m.group.status, effectiveDate: m.group.effectiveDate, renewalDate: m.group.renewalDate } : undefined,
+    coveragePeriods,
+    ageRules: m.package ? { maxAge: m.package.maxAge, dependentMaxAge: m.package.dependentMaxAge } : null,
+  });
+  const eligible = decision.conclusion === "ELIGIBLE";
+  return {
+    resultCode: eligible ? "ELIGIBLE" : "NOT_ELIGIBLE",
+    safeExplanation: eligible
+      ? "Member cover is active for this facility."
+      : "Member cover is not currently active for this service date.",
+  };
+}

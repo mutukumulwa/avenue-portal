@@ -1,10 +1,26 @@
 import { prisma } from "@/lib/prisma";
+import { BenefitUsageService } from "./benefit-usage.service";
 
 const SENSITIVE_FAMILY_CATEGORIES = new Set(["MATERNITY", "MENTAL_HEALTH"]);
 
 function toMoney(value: unknown) {
   return Number(value ?? 0);
 }
+
+/** The benefit-config shape the member-benefit projection reads. */
+type BenefitConfigLike = {
+  id: string;
+  category: string;
+  customCategoryName: string | null;
+  annualSubLimit: unknown;
+  perVisitLimit: unknown | null;
+  copayPercentage: unknown;
+  waitingPeriodDays: number;
+  notes: string | null;
+  exclusions: string[];
+};
+
+type HoldSums = Map<string, { expired: number; active: number }>;
 
 function normalizePhone(phone: string) {
   const compact = phone.replace(/[^\d+]/g, "");
@@ -48,35 +64,35 @@ function isSensitiveFamilyCategory(category: string) {
   return SENSITIVE_FAMILY_CATEGORIES.has(category);
 }
 
-function buildBenefitStates(member: {
-  enrollmentDate: Date;
-  package: {
-    annualLimit: unknown;
-    currentVersion: {
-      benefits: Array<{
-        id: string;
-        category: string;
-        customCategoryName: string | null;
-        annualSubLimit: unknown;
-        perVisitLimit: unknown | null;
-        copayPercentage: unknown;
-        waitingPeriodDays: number;
-        notes: string | null;
-        exclusions: string[];
-      }>;
-    } | null;
-  };
-  benefitUsages: Array<{
-    benefitConfigId: string;
-    periodStart: Date;
-    periodEnd: Date;
-    amountUsed: unknown;
-    activeHoldAmount: unknown;
-    claimCount: number;
-    lastUpdated: Date;
-  }>;
-}) {
-  const benefits = member.package.currentVersion?.benefits ?? [];
+function buildBenefitStates(
+  member: {
+    id: string;
+    enrollmentDate: Date;
+    package: {
+      annualLimit: unknown;
+      currentVersion: { benefits: Array<BenefitConfigLike> } | null;
+    };
+    /** SP-6 / F-PIN-1: the member's PINNED version — the terms adjudication uses. */
+    packageVersion?: { benefits: Array<BenefitConfigLike> } | null;
+    benefitUsages: Array<{
+      benefitConfigId: string;
+      periodStart: Date;
+      periodEnd: Date;
+      amountUsed: unknown;
+      activeHoldAmount: unknown;
+      claimCount: number;
+      lastUpdated: Date;
+    }>;
+  },
+  /** Expiry-reconciled live hold sums keyed by (memberId, category); see SP-6. */
+  holdSums?: HoldSums,
+) {
+  // F-PIN-1: project the member's PINNED version (what adjudication/usage price
+  // against), not the package's LATEST currentVersion — the two diverge after any
+  // package edit, and the latest version's benefit-config ids don't even match the
+  // member's usage rows (silently showing 0 used). Fall back to currentVersion only
+  // when the pin is absent.
+  const benefits = member.packageVersion?.benefits ?? member.package.currentVersion?.benefits ?? [];
   const period = benefitPeriod(member.enrollmentDate);
   const usageMap = new Map(
     member.benefitUsages
@@ -89,10 +105,14 @@ function buildBenefitStates(member: {
     const usage = usageMap.get(benefit.id);
     const limit = toMoney(benefit.annualSubLimit);
     const used = toMoney(usage?.amountUsed);
-    // CU-OBS-14: an approved PA reserves benefit server-side (BenefitHold) — the
-    // member-visible balance must subtract those active holds, or the member
-    // sees more "available" than is truly uncommitted.
-    const held = toMoney(usage?.activeHoldAmount);
+    // CU-OBS-14 + SP-6: an approved PA reserves benefit server-side (BenefitHold) —
+    // the member-visible balance must subtract those active holds, EXPIRY-RECONCILED
+    // (FG-C10). Taking the stored activeHoldAmount raw over-reserves when the worker
+    // lags; `reconcileStored` frees only provably-expired holds, never under-reserves.
+    const rawHeld = toMoney(usage?.activeHoldAmount);
+    const held = holdSums
+      ? BenefitUsageService.reconcileStored(rawHeld, holdSums.get(BenefitUsageService.holdKey(member.id, String(benefit.category))))
+      : rawHeld;
     const remaining = Math.max(0, limit - used - held);
     const usedPct = limit > 0 ? Math.min(1, (used + held) / limit) : 0;
 
@@ -162,6 +182,9 @@ export class MemberAppService {
             },
           },
         },
+        packageVersion: {
+          include: { benefits: { orderBy: { category: "asc" } } },
+        },
         benefitUsages: {
           include: { benefitConfig: { select: { category: true, customCategoryName: true } } },
         },
@@ -185,7 +208,8 @@ export class MemberAppService {
     if (candidates.length !== 1 || tenantIds.size !== 1) return null;
 
     const member = candidates[0];
-    const state = buildBenefitStates(member);
+    const holdSums = await BenefitUsageService.liveHoldSums(prisma, [member.id]);
+    const state = buildBenefitStates(member, holdSums);
 
     return {
       tenantId: member.tenantId,
@@ -270,6 +294,9 @@ export class MemberAppService {
                 },
               },
             },
+            packageVersion: {
+              include: { benefits: { orderBy: { category: "asc" } } },
+            },
             benefitUsages: {
               include: { benefitConfig: { select: { id: true, category: true, customCategoryName: true, annualSubLimit: true } } },
             },
@@ -318,7 +345,8 @@ export class MemberAppService {
     const member = user?.member;
     if (!member || member.tenantId !== tenantId) return null;
 
-    const benefitState = buildBenefitStates(member);
+    const holdSums = await BenefitUsageService.liveHoldSums(prisma, [member.id]);
+    const benefitState = buildBenefitStates(member, holdSums);
 
     const outstandingMemberShare = member.coContributionTransactions
       .filter((transaction) => ["PENDING", "PARTIAL"].includes(transaction.collectionStatus))
@@ -421,6 +449,9 @@ export class MemberAppService {
             },
           },
         },
+        packageVersion: {
+          include: { benefits: { orderBy: { category: "asc" } } },
+        },
         benefitUsages: {
           include: { benefitConfig: { select: { category: true } } },
         },
@@ -428,7 +459,8 @@ export class MemberAppService {
     });
 
     if (!member) return null;
-    const state = buildBenefitStates(member);
+    const holdSums = await BenefitUsageService.liveHoldSums(prisma, [member.id]);
+    const state = buildBenefitStates(member, holdSums);
     return {
       viewerMemberId: context.id,
       member: {
@@ -464,6 +496,9 @@ export class MemberAppService {
             },
           },
         },
+        packageVersion: {
+          include: { benefits: { orderBy: { category: "asc" } } },
+        },
         benefitUsages: true,
         claims: {
           orderBy: { dateOfService: "desc" },
@@ -483,8 +518,9 @@ export class MemberAppService {
       orderBy: [{ relationship: "asc" }, { firstName: "asc" }],
     });
 
+    const familyHoldSums = await BenefitUsageService.liveHoldSums(prisma, members.map((m) => m.id));
     const familyMembers = members.map((member) => {
-      const state = buildBenefitStates(member);
+      const state = buildBenefitStates(member, familyHoldSums);
       const isSelf = member.id === context.id;
       const categoryDetails = state.benefitStates.map((benefit) => {
         const masked = !isSelf && isSensitiveFamilyCategory(benefit.category);

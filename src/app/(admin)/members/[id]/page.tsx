@@ -9,6 +9,7 @@ import {
   initiateCoolingOffCancellationAction, initiateStandardCancellationAction,
   terminateForFraudAction, terminateForBreachAction, recordDeathAction,
 } from "./lifecycle-actions";
+import { BenefitUsageService } from "@/server/services/benefit-usage.service";
 import { MemberProfileTabs } from "@/components/members/MemberProfileTabs";
 import { FamilyTreeView } from "@/components/members/FamilyTreeView";
 import { MemberTransferPanel } from "./transfer/MemberTransferPanel";
@@ -28,6 +29,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
       package: {
         select: {
           name: true,
+          annualLimit: true,
           currentVersion: {
             select: {
               benefits: {
@@ -44,6 +46,15 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
           },
         },
       },
+      // F-PIN-1: the member's PINNED version is what usage/adjudication price
+      // against — the KPI limits must come from it, not the package's latest.
+      packageVersion: {
+        select: {
+          benefits: {
+            select: { id: true, category: true, annualSubLimit: true },
+          },
+        },
+      },
       dependents: {
         select: {
           id: true, firstName: true, lastName: true, memberNumber: true,
@@ -53,7 +64,8 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
       },
       benefitUsages: {
         select: {
-          id: true, amountUsed: true,
+          id: true, amountUsed: true, activeHoldAmount: true,
+          benefitConfigId: true, periodStart: true, periodEnd: true,
           benefitConfig: { select: { category: true, annualSubLimit: true } },
         },
         orderBy: { lastUpdated: "desc" },
@@ -120,11 +132,36 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
     lifecycleService.getTerminationRecord(id, session.user.tenantId),
   ]);
 
-  // Limit comes from the package benefit schedule (source of truth), not from usage records
-  const totalLimit = (member.package.currentVersion?.benefits ?? []).reduce(
-    (s, b) => s + Number(b.annualSubLimit), 0
+  // SP-6 money base (fixes the two-direction admin error): limits from the member's
+  // PINNED version; usage restricted to the CURRENT benefit period (enrollment
+  // anniversary) instead of summed across every period (was under-reporting); holds
+  // expiry-reconciled and subtracted (was ignored → over-reporting remaining).
+  const pinnedBenefits = member.packageVersion?.benefits ?? member.package.currentVersion?.benefits ?? [];
+  const categoryLimitTotal = pinnedBenefits.reduce((s, b) => s + Number(b.annualSubLimit), 0);
+  const overallLimit = member.package.annualLimit != null ? Number(member.package.annualLimit) : 0;
+  const totalLimit = overallLimit > 0 ? overallLimit : categoryLimitTotal;
+  const { periodStart, periodEnd } = BenefitUsageService.periodFor(member.enrollmentDate);
+  const currentPeriodUsages = member.benefitUsages.filter(
+    (u) => u.periodStart <= periodEnd && u.periodEnd >= periodStart,
   );
-  const totalUsed = member.benefitUsages.reduce((s, u) => s + Number(u.amountUsed), 0);
+  const holdSums = await BenefitUsageService.liveHoldSums(prisma, [member.id]);
+  const totalUsed = Math.min(
+    currentPeriodUsages.reduce((s, u) => s + Number(u.amountUsed), 0),
+    totalLimit,
+  );
+  const totalHeld = Math.min(
+    currentPeriodUsages.reduce(
+      (s, u) =>
+        s +
+        BenefitUsageService.reconcileStored(
+          Number(u.activeHoldAmount),
+          holdSums.get(BenefitUsageService.holdKey(member.id, String(u.benefitConfig.category))),
+        ),
+      0,
+    ),
+    Math.max(0, totalLimit - totalUsed),
+  );
+  const totalRemaining = Math.max(0, totalLimit - totalUsed - totalHeld);
 
   const statusColor = (s: string) => {
     switch (s) {
@@ -281,8 +318,8 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: "Annual Limit (UGX)", value: totalLimit.toLocaleString(), color: "text-brand-indigo" },
-          { label: "Utilised (UGX)", value: totalUsed.toLocaleString(), color: "text-[#FFC107]" },
-          { label: "Remaining (UGX)", value: Math.max(0, totalLimit - totalUsed).toLocaleString(), color: "text-[#28A745]" },
+          { label: `Utilised (UGX)${totalHeld > 0 ? ` +${totalHeld.toLocaleString()} reserved` : ""}`, value: totalUsed.toLocaleString(), color: "text-[#FFC107]" },
+          { label: "Remaining (UGX)", value: totalRemaining.toLocaleString(), color: "text-[#28A745]" },
           { label: "Total Claims", value: member.claims.length.toString(), color: "text-[#17A2B8]" },
         ].map(s => (
           <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-[8px] p-4 shadow-sm">
