@@ -1,4 +1,4 @@
-import { requireRole, ROLES } from "@/lib/rbac";
+import { requireRole, ROLES, type UserRole } from "@/lib/rbac";
 import { ClientsService } from "@/server/services/clients.service";
 import { ArrowLeft, Pencil, Building2, Network } from "lucide-react";
 import Link from "next/link";
@@ -28,7 +28,10 @@ export default async function ClientDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const session = await requireRole(ROLES.ADMIN_ONLY);
+  // DEF-004 / D2: READ-ONLY discovery for the Membership Officer; Edit stays
+  // ADMIN_ONLY (X-001).
+  const session = await requireRole(ROLES.CLIENT_READ);
+  const canWrite = ROLES.ADMIN_ONLY.includes(session.user.role as UserRole);
   const { id } = await params;
   const client = await ClientsService.getById(session.user.tenantId, id);
   if (!client) notFound();
@@ -67,14 +70,21 @@ export default async function ClientDetailPage({
           <p className="text-sm text-brand-text-muted">
             {TYPE_LABEL[client.type] ?? client.type} · {client.slug}
           </p>
+          {/* D2: breadcrumb terminology so the Membership Officer can see where a
+              client sits and where to walk next. */}
+          <p className="mt-1 text-xs text-brand-text-muted">
+            {client.name} → Group/Scheme → Package → Members
+          </p>
         </div>
-        <Link
-          href={`/clients/${client.id}/edit`}
-          className="inline-flex items-center gap-2 rounded-full border border-brand-border px-4 py-2 text-sm font-semibold text-brand-text-heading transition-colors hover:bg-brand-bg-alt"
-        >
-          <Pencil className="h-4 w-4" />
-          Edit
-        </Link>
+        {canWrite && (
+          <Link
+            href={`/clients/${client.id}/edit`}
+            className="inline-flex items-center gap-2 rounded-full border border-brand-border px-4 py-2 text-sm font-semibold text-brand-text-heading transition-colors hover:bg-brand-bg-alt"
+          >
+            <Pencil className="h-4 w-4" />
+            Edit
+          </Link>
+        )}
       </div>
 
       <dl className="grid grid-cols-2 gap-5 rounded-lg border border-brand-border bg-brand-bg p-6 sm:grid-cols-4">

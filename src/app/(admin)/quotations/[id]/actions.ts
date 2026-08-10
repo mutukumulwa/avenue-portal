@@ -4,6 +4,7 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { redirect, notFound } from "next/navigation";
 import { resolveSchemeClientId } from "@/server/services/clientResolve";
+import { normalizeLegalName } from "@/lib/normalize";
 
 export async function sendQuotationAction(formData: FormData) {
   const session = await requireRole(ROLES.UNDERWRITING);
@@ -65,6 +66,9 @@ export async function acceptQuotationAction(formData: FormData) {
         tenantId,
         clientId: await resolveSchemeClientId(tenantId, session.user.clientId),
         name: q.prospectName,
+        // WP-S1: normalized scheme-name key required before the client-scoped
+        // name-unique can deploy (every create path must populate it).
+        nameNormalized: normalizeLegalName(q.prospectName),
         industry: q.prospectIndustry ?? undefined,
         contactPersonName: q.prospectContact ?? q.prospectName,
         contactPersonPhone: "",

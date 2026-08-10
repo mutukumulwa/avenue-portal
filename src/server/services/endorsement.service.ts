@@ -1,10 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { peekNextDocumentNumber } from "@/lib/document-number";
 import { GLService } from "@/server/services/gl.service";
-import { nextMemberNumber } from "@/server/services/member-numbering.service";
 import { coverageService } from "@/server/services/coverage.service";
-import { assertEnrolmentAge } from "@/server/services/eligibility/enrolment-age";
-import type { Gender, MemberRelationship } from "@prisma/client";
+import { auditChainService } from "@/server/services/audit-chain.service";
+import { MembersService, type EnrolmentRelationship } from "@/server/services/members.service";
+import { normalizeNationalId } from "@/lib/normalize";
+import type { Gender } from "@prisma/client";
 
 /**
  * Resolve a leaver's inclusive last covered day (WP-3.5E). Prefers the
@@ -163,57 +164,78 @@ export class EndorsementsService {
       // Execute the changes
       if (endorsement.type === "MEMBER_ADDITION") {
       const details = endorsement.changeDetails as Record<string, string>;
-
-      const group = await prisma.group.findUnique({ where: { id: endorsement.groupId }});
       const effectiveDate = new Date(endorsement.effectiveDate);
+      const relationship = (details.relationship || "PRINCIPAL") as EnrolmentRelationship;
 
-      // WP-3.5D: age gate as of the endorsement effective date (rejects over-age /
-      // future / impossible DOB before the member is minted). Throws → the outer
-      // catch reverts the endorsement to SUBMITTED (stays pending + retryable).
-      const ageRules = await prisma.package.findUnique({
-        where: { id: group!.packageId },
-        select: { maxAge: true, dependentMaxAge: true },
-      });
-      assertEnrolmentAge(
-        {
-          relationship: details.relationship || "PRINCIPAL",
-          dateOfBirth: details.dateOfBirth,
-          firstName: details.firstName,
-          lastName: details.lastName,
-        },
-        effectiveDate,
-        ageRules,
-      );
-
-      // Client-configurable member number prefix (G9.6)
-      const memberNumber = await nextMemberNumber(tenantId, group?.clientId);
-
-      const newMember = await prisma.member.create({
-        data: {
-          tenantId,
-          memberNumber,
-          groupId: endorsement.groupId,
-          firstName: details.firstName,
-          lastName: details.lastName,
-          dateOfBirth: new Date(details.dateOfBirth),
-          gender: details.gender as Gender,
-          relationship: (details.relationship || "PRINCIPAL") as MemberRelationship,
-          status: "ACTIVE", // Activate upon approval
-          enrollmentDate: effectiveDate,
-          coverStartDate: effectiveDate,
-          packageId: group!.packageId,
-          packageVersionId: group!.packageVersionId,
+      // WP-3.5F: HR import carries the principal's National ID (not a member id) —
+      // resolve it to the principal member so the dependant is LINKED, not created
+      // as an orphan root. Missing principal → throw (outer catch reverts to
+      // SUBMITTED, endorsement stays pending + retryable).
+      let principalId: string | undefined;
+      if (relationship !== "PRINCIPAL" && details.principalIdNumber) {
+        const principal = await prisma.member.findFirst({
+          where: {
+            tenantId,
+            groupId: endorsement.groupId,
+            relationship: "PRINCIPAL",
+            idNumber: { equals: normalizeNationalId(details.principalIdNumber), mode: "insensitive" },
+          },
+          select: { id: true },
+        });
+        if (!principal) {
+          throw new Error(
+            `Principal with National ID "${details.principalIdNumber}" not found in this scheme — cannot link ${relationship} dependant.`,
+          );
         }
+        principalId = principal.id;
+      }
+
+      // WP-3.5F: route the HR / endorsement enrolment channel through the SAME
+      // createMember as manual enrolment. It applies duplicate detection, the fraud
+      // screen, principal validation, the age gate (rejects over-age / future DOB),
+      // the default-tier assignment, the client-prefixed member number, the coverage
+      // period AND carries idNumber / phone / email / principalId — all of which the
+      // old raw prisma.member.create silently dropped. A throw here (dup / age /
+      // missing principal) propagates to the outer catch → endorsement reverts to
+      // SUBMITTED (never applied without its member).
+      const { member: newMember } = await MembersService.createMember(tenantId, {
+        groupId: endorsement.groupId,
+        firstName: details.firstName,
+        lastName: details.lastName,
+        idNumber: details.idNumber || undefined,
+        dateOfBirth: details.dateOfBirth,
+        gender: details.gender as Gender,
+        phone: details.phone || undefined,
+        email: details.email || undefined,
+        relationship,
+        principalId,
+        effectiveDate,
+        birthNotificationDate: details.birthNotificationDate || undefined,
+        coveragePeriodReason: "ENDORSEMENT",
       });
 
-      // WP-3.5E: open a coverage period from the effective date so point-in-time
-      // eligibility sees the endorsement-added member (previously it got none).
-      await coverageService.openPeriod(prisma, tenantId, newMember.id, effectiveDate, "ENDORSEMENT");
-
-      // Document the member relation on the endorsement
+      // Document the member relation on the endorsement.
       await prisma.endorsement.update({
         where: { id: endorsement.id },
         data: { memberId: newMember.id },
+      });
+
+      // WP-3.5G: a distinct audit event on the (previously silent) endorsement
+      // approve→apply path.
+      await auditChainService.append({
+        actorId: approvedBy,
+        action: "ENDORSEMENT:MEMBER_ADDED",
+        module: "ENDORSEMENT",
+        entityType: "Endorsement",
+        entityId: endorsement.id,
+        payload: {
+          endorsementNumber: endorsement.endorsementNumber,
+          memberId: newMember.id,
+          memberNumber: newMember.memberNumber,
+          relationship,
+        },
+        tenantId,
+        description: `Endorsement ${endorsement.endorsementNumber} applied — member ${newMember.memberNumber} added`,
       });
     } else if (endorsement.type === "MEMBER_DELETION" && endorsement.changeDetails) {
        const details = endorsement.changeDetails as Record<string, string>;
@@ -229,6 +251,22 @@ export class EndorsementsService {
             data: { status: "TERMINATED", coverEndDate: lastDay, updatedAt: new Date() },
           });
           await coverageService.closeOpenPeriods(prisma, details.memberId, lastDay, "TERMINATED");
+
+          // WP-3.5G: audit the (previously silent) leaver application.
+          await auditChainService.append({
+            actorId: approvedBy,
+            action: "ENDORSEMENT:MEMBER_REMOVED",
+            module: "ENDORSEMENT",
+            entityType: "Endorsement",
+            entityId: endorsement.id,
+            payload: {
+              endorsementNumber: endorsement.endorsementNumber,
+              memberId: details.memberId,
+              lastDay: lastDay.toISOString(),
+            },
+            tenantId,
+            description: `Endorsement ${endorsement.endorsementNumber} applied — member ${details.memberId} terminated (last covered day ${lastDay.toDateString()})`,
+          });
        }
     }
 
@@ -293,5 +331,50 @@ export class EndorsementsService {
 
     // Status/reviewer/applied fields were set by the atomic claim above.
     return prisma.endorsement.findUnique({ where: { id: endorsementId } });
+  }
+
+  /**
+   * Rejects a pending endorsement. WP-3.5G: guards the source status (only a
+   * pending endorsement can be rejected — an already-applied/rejected one is not
+   * silently re-stamped) and audits the previously-silent rejection with the
+   * reviewer + reason.
+   */
+  static async rejectEndorsement(
+    tenantId: string,
+    endorsementId: string,
+    reviewedBy: string,
+    reason?: string,
+  ) {
+    const endorsement = await prisma.endorsement.findUnique({
+      where: { id: endorsementId, tenantId },
+      select: { id: true, status: true, endorsementNumber: true },
+    });
+    if (!endorsement) throw new Error("Endorsement not found");
+    if (endorsement.status !== "SUBMITTED" && endorsement.status !== "UNDER_REVIEW") {
+      throw new Error("Only pending endorsements can be rejected.");
+    }
+
+    const updated = await prisma.endorsement.update({
+      where: { id: endorsementId, tenantId },
+      data: {
+        status: "REJECTED",
+        reviewedBy,
+        reviewedAt: new Date(),
+        ...(reason ? { rejectionReason: reason } : {}),
+      },
+    });
+
+    await auditChainService.append({
+      actorId: reviewedBy,
+      action: "ENDORSEMENT:REJECTED",
+      module: "ENDORSEMENT",
+      entityType: "Endorsement",
+      entityId: endorsementId,
+      payload: { endorsementNumber: endorsement.endorsementNumber, reason: reason ?? null },
+      tenantId,
+      description: `Endorsement ${endorsement.endorsementNumber} rejected`,
+    });
+
+    return updated;
   }
 }

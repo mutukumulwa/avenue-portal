@@ -142,14 +142,24 @@ export async function authorizeCredentials(credentials: CredentialInput): Promis
       if (locking) {
         // G-22: write the audit row directly — writeAudit() calls next/headers,
         // whose context is unreliable inside authorize().
+        //
+        // WP-3.1 (DEF-005): carry tenantId so the lock event is inside the
+        // tenant hash chain (it was previously omitted → the row sat outside the
+        // chain and was invisible to tenant-scoped audit review). lockMinutes is
+        // derived from the constant, not hard-coded, so the record can never
+        // drift from the policy it documents.
         await prisma.auditLog
           .create({
             data: {
               userId: user.id,
+              tenantId: user.tenantId,
               action: "AUTH_ACCOUNT_LOCKED",
               module: "AUTH",
               description: "Account temporarily locked after repeated failed sign-ins",
-              metadata: { attempts: MAX_FAILED_ATTEMPTS, lockMinutes: 15 },
+              metadata: {
+                attempts: MAX_FAILED_ATTEMPTS,
+                lockMinutes: LOCK_DURATION_MS / 60_000,
+              },
             },
           })
           .catch(() => {}); // never let audit failure block the auth response
@@ -173,6 +183,26 @@ export async function authorizeCredentials(credentials: CredentialInput): Promis
       },
       select: { sessionVersion: true },
     });
+
+    // WP-3.1 (DEF-005): a login reaching this point with a lock still stamped on
+    // the row can only be a lock that has ELAPSED (a live lock fails earlier, at
+    // the lockedUntil check above). Record the recovery so lock → expiry →
+    // successful sign-in is a complete, observable lifecycle — not just a lock
+    // event with no matching release. tenantId keeps it inside the hash chain.
+    if (user.lockedUntil) {
+      await prisma.auditLog
+        .create({
+          data: {
+            userId: user.id,
+            tenantId: user.tenantId,
+            action: "AUTH_ACCOUNT_UNLOCKED",
+            module: "AUTH",
+            description: "Account lock cleared on successful sign-in after the lock window elapsed",
+            metadata: { reason: "LOCK_EXPIRED_LOGIN" },
+          },
+        })
+        .catch(() => {}); // audit failure must never block the auth response
+    }
 
     return {
       id: user.id,

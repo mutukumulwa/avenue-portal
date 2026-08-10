@@ -5,6 +5,7 @@ import { Lock, Mail, AlertCircle } from "lucide-react";
 import { Suspense, useRef, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
+import { SESSION_EXPIRED_REASON } from "@/lib/session-policy";
 
 function safeCallbackUrl(value: string | null) {
   if (
@@ -33,6 +34,11 @@ function LoginForm() {
   const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
+
+  // DEF-010: when a protected surface (or its client session guard) bounces an
+  // expired idle session back here it carries ?reason=expired. Surface WHY the
+  // user is looking at the sign-in screen instead of dropping them here silently.
+  const sessionExpired = searchParams.get("reason") === SESSION_EXPIRED_REASON;
 
   /** Field-level validation. Deliberately says nothing about account existence. */
   const validate = () => {
@@ -124,6 +130,19 @@ function LoginForm() {
               monitored and logged; unauthorized use is prohibited and may be
               prosecuted.
             </p>
+            {/* DEF-010: idle-timeout notice. Distinct from a failed sign-in — it
+                explains that the previous session expired, not that credentials
+                were wrong. */}
+            {sessionExpired && !error && (
+              <div
+                role="status"
+                className="mb-4 flex items-center gap-2 rounded-lg border border-[#FFC107]/40 bg-[#FFC107]/10 px-4 py-3 text-sm text-[#856404]"
+              >
+                <AlertCircle size={16} className="shrink-0" />
+                Your session timed out after a period of inactivity. Please sign in again. Any
+                unsaved work on the previous screen was not kept.
+              </div>
+            )}
             {/* noValidate: validation is owned by the component so errors are
                 persistent, associated and announced (DEF-004). */}
             <form onSubmit={handleLogin} className="space-y-5" noValidate>
@@ -152,9 +171,11 @@ function LoginForm() {
                     ref={emailRef}
                     type="email"
                     autoComplete="username"
+                    required
+                    aria-required="true"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    aria-invalid={fieldErrors.email ? true : undefined}
+                    aria-invalid={fieldErrors.email ? true : false}
                     aria-describedby={fieldErrors.email ? "login-email-error" : undefined}
                     className={`bg-white border text-brand-text-heading text-sm rounded-[8px] focus:ring-2 focus:ring-brand-indigo focus:border-brand-indigo block w-full pl-10 p-2.5 outline-none transition-all ${
                       fieldErrors.email ? "border-[#DC3545]" : "border-[#EEEEEE]"
@@ -183,9 +204,11 @@ function LoginForm() {
                     ref={passwordRef}
                     type="password"
                     autoComplete="current-password"
+                    required
+                    aria-required="true"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    aria-invalid={fieldErrors.password ? true : undefined}
+                    aria-invalid={fieldErrors.password ? true : false}
                     aria-describedby={fieldErrors.password ? "login-password-error" : undefined}
                     className={`bg-white border text-brand-text-heading text-sm rounded-[8px] focus:ring-2 focus:ring-brand-indigo focus:border-brand-indigo block w-full pl-10 p-2.5 outline-none transition-all ${
                       fieldErrors.password ? "border-[#DC3545]" : "border-[#EEEEEE]"

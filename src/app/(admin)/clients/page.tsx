@@ -1,4 +1,4 @@
-import { requireRole, ROLES } from "@/lib/rbac";
+import { requireRole, ROLES, type UserRole } from "@/lib/rbac";
 import { ClientsService } from "@/server/services/clients.service";
 import { PlusCircle, Landmark, ChevronRight } from "lucide-react";
 import Link from "next/link";
@@ -23,7 +23,10 @@ const statusBadge = (s: string) => {
 };
 
 export default async function ClientsPage() {
-  const session = await requireRole(ROLES.ADMIN_ONLY);
+  // DEF-004 / D2: READ-ONLY discovery for the Membership Officer. Create/edit
+  // pages and every client action stay on ADMIN_ONLY (X-001).
+  const session = await requireRole(ROLES.CLIENT_READ);
+  const canWrite = ROLES.ADMIN_ONLY.includes(session.user.role as UserRole);
   const clients = await ClientsService.list(session.user.tenantId);
 
   return (
@@ -37,14 +40,20 @@ export default async function ClientsPage() {
             Payer entities (insurers, HMOs, self-funded employers) whose schemes
             Medvex administers.
           </p>
+          {/* D2: orient the Membership Officer in the coverage hierarchy. */}
+          <p className="mt-1 text-xs text-brand-text-muted">
+            Client → Group/Scheme → Package → Members
+          </p>
         </div>
-        <Link
-          href="/clients/new"
-          className="inline-flex items-center gap-2 rounded-full bg-brand-indigo px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-indigo-hover"
-        >
-          <PlusCircle className="h-4 w-4" />
-          New Client
-        </Link>
+        {canWrite && (
+          <Link
+            href="/clients/new"
+            className="inline-flex items-center gap-2 rounded-full bg-brand-indigo px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-indigo-hover"
+          >
+            <PlusCircle className="h-4 w-4" />
+            New Client
+          </Link>
+        )}
       </div>
 
       {clients.length === 0 ? (

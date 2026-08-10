@@ -217,18 +217,38 @@ export async function resetUserPasswordAction(
   if (pwError) return { error: pwError };
 
   // Tenant-scoped target load (defence in depth: a hand-crafted POST cannot
-  // reach a user outside the actor's tenant).
+  // reach a user outside the actor's tenant). WP-3.1 (DEF-005): also read the
+  // lockout state so the reset can clear it and record whether a live lock was
+  // released.
   const target = await prisma.user.findFirst({
     where: { id: userId, tenantId: session.user.tenantId },
-    select: { id: true, email: true, role: true, firstName: true, lastName: true },
+    select: {
+      id: true, email: true, role: true, firstName: true, lastName: true,
+      lockedUntil: true, failedLoginCount: true,
+    },
   });
   if (!target) return { error: "User not found." };
 
   const passwordHash = await bcrypt.hash(password, 12);
 
+  // WP-3.1 (DEF-005): an admin password reset must ALSO release the throttle —
+  // previously the reset wrote only the hash + session bump, so a locked user
+  // stayed locked even after the operator handed them a fresh password (they
+  // could still not sign in until the 15-minute window elapsed). Clearing the
+  // counter and the lock is the documented recovery path (D6). The lock state
+  // travels with the SAME write as the credential.
+  const lockCleared =
+    (!!target.lockedUntil && target.lockedUntil > new Date()) || target.failedLoginCount > 0;
+
   await prisma.user.update({
     where: { id: userId, tenantId: session.user.tenantId },
-    data: { passwordHash, sessionVersion: { increment: 1 } },
+    data: {
+      passwordHash,
+      sessionVersion: { increment: 1 },
+      failedLoginCount: 0,
+      lockedUntil: null,
+      lastFailedLoginAt: null,
+    },
   });
 
   // Audit the reset (never the password itself).
@@ -242,8 +262,26 @@ export async function resetUserPasswordAction(
       targetEmail: target.email,
       targetRole: target.role,
       sessionsRevoked: true,
+      lockCleared,
     },
   });
+
+  // A distinct unlock event — only when there was actually a lock/streak to
+  // release — so "who cleared this lock, and when" is answerable independently
+  // of the password-reset record. Written directly (not via writeAudit) so the
+  // row can carry tenantId and stay inside the tenant hash chain.
+  if (lockCleared) {
+    await prisma.auditLog.create({
+      data: {
+        userId: session.user.id,
+        tenantId: session.user.tenantId,
+        action: "AUTH_ACCOUNT_UNLOCKED",
+        module: "AUTH",
+        description: `Account lock cleared by admin password reset for ${target.firstName} ${target.lastName} (${target.email})`,
+        metadata: { targetUserId: target.id, reason: "ADMIN_PASSWORD_RESET" },
+      },
+    });
+  }
 
   revalidatePath("/settings");
   return { ok: true };

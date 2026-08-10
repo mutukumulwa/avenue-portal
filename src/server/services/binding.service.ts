@@ -10,12 +10,25 @@ import { niraService } from "./integrations/nira.service";
 import { pdfService } from "./pdf.service";
 import { coverageService } from "./coverage.service";
 import { assertEnrolmentAge } from "./eligibility/enrolment-age";
+import { normalizeLegalName } from "@/lib/normalize";
 import { renderQuotationHtml } from "../templates/pdf/quotation.template";
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
 
 function leftPad(n: number, width: number) {
   return String(n).padStart(width, "0");
+}
+
+/**
+ * WP-3.5F: derive a bound member's relationship from the quotation life's ROLE,
+ * never its gender. The census carries no finer relationship than PRINCIPAL vs
+ * DEPENDANT, so a dependant defaults to CHILD (the fraud-safe classification —
+ * it is subject to the dependant age cap; the previous gender rule wrongly made
+ * every female dependant a SPOUSE, letting an adult "child" escape the cap). If
+ * the census ever captures a real relationship, thread it here.
+ */
+function deriveBoundRelationship(role: string): MemberRelationship {
+  return role === "PRINCIPAL" ? MemberRelationship.PRINCIPAL : MemberRelationship.CHILD;
 }
 
 async function nextMemberNumber(tenantId: string, clientId?: string | null): Promise<string> {
@@ -201,8 +214,7 @@ export const bindingService = {
     const packageVersionId = pkg?.currentVersionId ?? null;
     const coverStartForAge = quotation.requestedCoverStart ?? new Date();
     for (const life of quotation.lives) {
-      const relationship =
-        life.role === "PRINCIPAL" ? "PRINCIPAL" : life.gender === "FEMALE" ? "SPOUSE" : "CHILD";
+      const relationship = deriveBoundRelationship(life.role);
       assertEnrolmentAge(
         { relationship, dateOfBirth: life.dateOfBirth, firstName: life.firstName, lastName: life.lastName },
         coverStartForAge,
@@ -232,11 +244,16 @@ export const bindingService = {
       const renewalDate   = new Date(effectiveDate);
       renewalDate.setFullYear(renewalDate.getFullYear() + 1);
 
+      const groupName = quotation.legalName ?? quotation.prospectName ?? groupNumber;
       const group = await prisma.group.create({
         data: {
           tenantId,
           clientId: await resolveSchemeClientId(tenantId),
-          name: quotation.legalName ?? quotation.prospectName ?? groupNumber,
+          name: groupName,
+          // WP-S1: normalized scheme-name key so the client-scoped name-unique
+          // (@@unique([clientId, nameNormalized])) can deploy — every create path
+          // must populate it or the constraint would collide on "".
+          nameNormalized: normalizeLegalName(groupName),
           industry: quotation.prospectIndustry ?? undefined,
           contactPersonName:  quotation.prospectContact ?? quotation.legalName ?? "—",
           contactPersonPhone: "",
@@ -367,9 +384,8 @@ export const bindingService = {
         ? lifeIdToMemberId.get(life.principalLifeId)
         : undefined;
 
-      const rel: MemberRelationship =
-        life.gender === "FEMALE" ? MemberRelationship.SPOUSE :
-        MemberRelationship.CHILD;
+      // WP-3.5F: relationship from ROLE, not gender (see deriveBoundRelationship).
+      const rel: MemberRelationship = deriveBoundRelationship(life.role);
 
       const memberNumber = await nextMemberNumber(tenantId, clientId);
       const member = await prisma.member.create({
@@ -411,7 +427,14 @@ export const bindingService = {
       module: "BINDING",
       entityType: "Quotation",
       entityId: quotationId,
-      payload: { memberCount: createdMembers.length, groupId },
+      // WP-3.5F flag: the census carries no relationship, so dependants were
+      // defaulted to CHILD (subject to the dependant age cap). Surfaced here for
+      // audit review until the census captures a real relationship.
+      payload: {
+        memberCount: createdMembers.length,
+        groupId,
+        dependantsDefaultedToChild: dependantLives.length,
+      },
       tenantId,
       description: `${createdMembers.length} member(s) created in PENDING_ACTIVATION from quotation ${quotation.quoteNumber}`,
     });

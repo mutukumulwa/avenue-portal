@@ -1,0 +1,261 @@
+/**
+ * WP-3.5F / WP-3.5G — member enrolment + lifecycle integrity.
+ *
+ *  - normalized duplicate detection (national ID case/space, phone +256/256/0,
+ *    email case) + the new email dedup (M-005/006/007);
+ *  - normalized identity is what gets STORED;
+ *  - dependant guards: cannot own dependants (M-013), cannot cross schemes (M-014);
+ *  - default benefit tier auto-assigned at enrolment;
+ *  - newborn (CT-033): no national ID + DOB-effective when notified within 30 days;
+ *  - SIBLING enrols;
+ *  - the HR/endorsement channel routes MEMBER_ADDITION through createMember so it
+ *    carries idNumber/phone/email AND links the principal (was a raw create);
+ *  - the lifecycle state machine blocks terminal→active from the edit path.
+ */
+import { describe, it, expect, beforeEach, vi } from "vitest";
+
+const overrides = vi.hoisted(() => ({
+  idDup: null as any,
+  phoneDup: null as any,
+  emailDup: null as any,
+  nameDobDup: null as any,
+  principalById: null as any,
+  principalByIdNumber: null as any,
+}));
+
+const db = vi.hoisted(() => {
+  const state: any = {
+    group: { findUnique: vi.fn() },
+    package: { findUnique: vi.fn(async () => ({ maxAge: 65, dependentMaxAge: 24 })) },
+    groupBenefitTier: { findFirst: vi.fn(async () => null) },
+    member: {
+      // Route findFirst by its where-shape so a single mock serves every probe.
+      findFirst: vi.fn(async (args: any) => {
+        const w = args?.where ?? {};
+        if (w.relationship === "PRINCIPAL" && w.idNumber !== undefined) return overrides.principalByIdNumber;
+        if (w.id !== undefined) return overrides.principalById;
+        if (w.idNumber !== undefined) return overrides.idDup;
+        if (w.phone !== undefined) return overrides.phoneDup;
+        if (w.email !== undefined) return overrides.emailDup;
+        if (w.firstName !== undefined) return overrides.nameDobDup;
+        return null;
+      }),
+      findUnique: vi.fn(),
+      create: vi.fn(async (a: any) => ({ id: "newm", memberNumber: "MVX-2026-00001", ...a.data })),
+      update: vi.fn(async (a: any) => ({ id: a.where.id, ...a.data })),
+    },
+    memberCoveragePeriod: {
+      findFirst: vi.fn(async () => null),
+      findMany: vi.fn(async () => []),
+      create: vi.fn(async () => ({})),
+      update: vi.fn(async () => ({})),
+    },
+    endorsement: {
+      findUnique: vi.fn(),
+      updateMany: vi.fn(async () => ({ count: 1 })),
+      update: vi.fn(async () => ({})),
+    },
+  };
+  return state;
+});
+
+vi.mock("@/lib/prisma", () => ({ prisma: db }));
+vi.mock("@/server/services/fraud.service", () => ({
+  FraudService: { checkEnrollmentRisk: vi.fn(async () => []) },
+}));
+vi.mock("@/server/services/member-numbering.service", () => ({
+  nextMemberNumber: vi.fn(async () => "MVX-2026-00001"),
+}));
+vi.mock("@/server/services/audit-chain.service", () => ({
+  auditChainService: { append: vi.fn(async () => ({})) },
+}));
+vi.mock("@/server/services/gl.service", () => ({
+  GLService: { postEndorsementAdjustment: vi.fn(async () => ({})) },
+}));
+
+import { MembersService } from "@/server/services/members.service";
+import { EndorsementsService } from "@/server/services/endorsement.service";
+
+const lastCreate = () => db.member.create.mock.calls.at(-1)![0].data;
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  overrides.idDup = null;
+  overrides.phoneDup = null;
+  overrides.emailDup = null;
+  overrides.nameDobDup = null;
+  overrides.principalById = null;
+  overrides.principalByIdNumber = null;
+  db.package.findUnique.mockResolvedValue({ maxAge: 65, dependentMaxAge: 24 });
+  db.groupBenefitTier.findFirst.mockResolvedValue(null);
+  db.member.create.mockImplementation(async (a: any) => ({ id: "newm", memberNumber: "MVX-2026-00001", ...a.data }));
+  db.memberCoveragePeriod.findFirst.mockResolvedValue(null);
+  db.group.findUnique.mockResolvedValue({ id: "g1", packageId: "pkg1", packageVersionId: "pv1", clientId: "c1" });
+});
+
+const base = {
+  groupId: "g1", firstName: "John", lastName: "Doe",
+  dateOfBirth: "1990-01-01", gender: "MALE" as const, relationship: "PRINCIPAL" as const,
+};
+
+describe("createMember — normalized duplicate detection (M-005/006/007)", () => {
+  it("stores the NORMALIZED identity keys (id upper/no-space, phone E.164, email lowercase)", async () => {
+    await MembersService.createMember("t1", {
+      ...base, idNumber: "ck 12 34", phone: "0700123456", email: "A@B.com",
+    });
+    const d = lastCreate();
+    expect(d.idNumber).toBe("CK1234");
+    expect(d.phone).toBe("+256700123456");
+    expect(d.email).toBe("a@b.com");
+  });
+
+  it("probes the national ID case-insensitively against the normalized key", async () => {
+    await MembersService.createMember("t1", { ...base, idNumber: "ck 12 34" });
+    const idProbe = db.member.findFirst.mock.calls.find((c: any) => c[0]?.where?.idNumber !== undefined);
+    expect(idProbe![0].where.idNumber).toEqual({ equals: "CK1234", mode: "insensitive" });
+  });
+
+  it("probes the phone across every UG format so 0700… collides with a stored +256700…", async () => {
+    await MembersService.createMember("t1", { ...base, phone: "0700123456" });
+    const phoneProbe = db.member.findFirst.mock.calls.find((c: any) => c[0]?.where?.phone !== undefined);
+    expect(phoneProbe![0].where.phone.in).toContain("+256700123456");
+    expect(phoneProbe![0].where.phone.in).toContain("0700123456");
+  });
+
+  it("rejects a phone duplicate submitted in a different UG format", async () => {
+    overrides.phoneDup = { memberNumber: "MVX-1", firstName: "Ann", lastName: "Old" };
+    await expect(
+      MembersService.createMember("t1", { ...base, phone: "+256700123456" }),
+    ).rejects.toThrow(/phone .* already exists/i);
+    expect(db.member.create).not.toHaveBeenCalled();
+  });
+
+  it("rejects a case/space national-ID duplicate", async () => {
+    overrides.idDup = { memberNumber: "MVX-2", firstName: "Bob", lastName: "Old" };
+    await expect(
+      MembersService.createMember("t1", { ...base, idNumber: "CK1234" }),
+    ).rejects.toThrow(/National ID .* already exists/i);
+  });
+
+  it("rejects an email duplicate (case-folded) — new check", async () => {
+    overrides.emailDup = { memberNumber: "MVX-3", firstName: "Cy", lastName: "Old" };
+    await expect(
+      MembersService.createMember("t1", { ...base, email: "USER@Example.com" }),
+    ).rejects.toThrow(/email .* already exists/i);
+    const emailProbe = db.member.findFirst.mock.calls.find((c: any) => c[0]?.where?.email !== undefined);
+    expect(emailProbe![0].where.email).toEqual({ equals: "user@example.com", mode: "insensitive" });
+  });
+});
+
+describe("createMember — dependant guards (M-013 / M-014) + default tier", () => {
+  it("M-013: rejects linking a dependant to a member that is not a PRINCIPAL", async () => {
+    overrides.principalById = { id: "p1", relationship: "CHILD", groupId: "g1", group: { id: "g1", packageId: "pkg1", packageVersionId: "pv1", clientId: "c1" } };
+    await expect(
+      MembersService.createMember("t1", { ...base, relationship: "CHILD", principalId: "p1" }),
+    ).rejects.toThrow(/can only be linked to a PRINCIPAL/i);
+  });
+
+  it("M-014: rejects a dependant enrolled into a scheme other than its principal's", async () => {
+    overrides.principalById = { id: "p1", relationship: "PRINCIPAL", groupId: "gPrincipal", group: { id: "gPrincipal", packageId: "pkg1", packageVersionId: "pv1", clientId: "c1" } };
+    await expect(
+      MembersService.createMember("t1", { ...base, groupId: "gOther", relationship: "CHILD", principalId: "p1" }),
+    ).rejects.toThrow(/same scheme as its principal/i);
+  });
+
+  it("auto-assigns the scheme's default benefit tier", async () => {
+    db.groupBenefitTier.findFirst.mockResolvedValue({ id: "tierDefault" });
+    await MembersService.createMember("t1", base);
+    expect(lastCreate().benefitTierId).toBe("tierDefault");
+  });
+});
+
+describe("createMember — newborn (CT-033) + SIBLING", () => {
+  it("accepts a newborn with NO national ID and covers from the DOB when notified within 30 days", async () => {
+    await MembersService.createMember("t1", {
+      groupId: "g1", firstName: "Baby", lastName: "Doe",
+      dateOfBirth: "2026-08-01", gender: "FEMALE", relationship: "CHILD",
+      effectiveDate: "2026-08-20", birthNotificationDate: "2026-08-10", // 9 days after birth
+    });
+    const d = lastCreate();
+    // covered from birth, not the supplied effective date
+    expect(d.coverStartDate).toEqual(new Date("2026-08-01"));
+    expect(d.enrollmentDate).toEqual(new Date("2026-08-01"));
+    expect(d.birthNotificationDate).toEqual(new Date("2026-08-10"));
+    expect(d.idNumber).toBeNull(); // no ID required
+    expect(db.memberCoveragePeriod.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ startDate: new Date("2026-08-01") }) }),
+    );
+  });
+
+  it("a LATE birth notification (>30 days) keeps the supplied effective date", async () => {
+    await MembersService.createMember("t1", {
+      groupId: "g1", firstName: "Late", lastName: "Notice",
+      dateOfBirth: "2026-01-01", gender: "MALE", relationship: "CHILD",
+      effectiveDate: "2026-08-10", birthNotificationDate: "2026-08-10",
+    });
+    expect(lastCreate().coverStartDate).toEqual(new Date("2026-08-10"));
+  });
+
+  it("enrols a SIBLING dependant (new relationship)", async () => {
+    overrides.principalById = { id: "p1", relationship: "PRINCIPAL", groupId: "g1", group: { id: "g1", packageId: "pkg1", packageVersionId: "pv1", clientId: "c1" } };
+    await MembersService.createMember("t1", {
+      groupId: "g1", firstName: "Sib", lastName: "Ling",
+      dateOfBirth: "2000-01-01", gender: "MALE", relationship: "SIBLING", principalId: "p1",
+    });
+    expect(lastCreate().relationship).toBe("SIBLING");
+  });
+});
+
+describe("updateMember — lifecycle state machine (WP-3.5G)", () => {
+  it("BLOCKS a terminal → active reinstatement from the edit path", async () => {
+    db.member.findUnique.mockResolvedValue({ id: "m1", status: "TERMINATED", idNumber: null, phone: null });
+    await expect(
+      MembersService.updateMember("t1", "m1", {
+        firstName: "A", lastName: "B", dateOfBirth: "1990-01-01",
+        gender: "MALE", relationship: "PRINCIPAL", status: "ACTIVE",
+      }),
+    ).rejects.toThrow(/governed lifecycle state/i);
+    expect(db.member.update).not.toHaveBeenCalled();
+  });
+
+  it("returns the previous status so the caller can pick a distinct audit action", async () => {
+    db.member.findUnique.mockResolvedValue({ id: "m1", status: "ACTIVE", idNumber: null, phone: null });
+    const res = await MembersService.updateMember("t1", "m1", {
+      firstName: "A", lastName: "B", dateOfBirth: "1990-01-01",
+      gender: "MALE", relationship: "PRINCIPAL", status: "SUSPENDED",
+    });
+    expect(res.previousStatus).toBe("ACTIVE");
+  });
+});
+
+describe("endorsement MEMBER_ADDITION → createMember (WP-3.5F HR-channel parity)", () => {
+  it("carries idNumber/phone/email AND links the principal resolved from principalIdNumber", async () => {
+    // The endorsement resolves the principal by National ID → member id, then
+    // createMember re-validates that id — both lookups must resolve.
+    overrides.principalByIdNumber = { id: "principalMember" };
+    overrides.principalById = {
+      id: "principalMember", relationship: "PRINCIPAL", groupId: "g1",
+      group: { id: "g1", packageId: "pkg1", packageVersionId: "pv1", clientId: "c1" },
+    };
+    db.endorsement.findUnique.mockResolvedValue({
+      id: "e1", tenantId: "t1", status: "SUBMITTED", requestedBy: "maker", type: "MEMBER_ADDITION",
+      changeDetails: {
+        firstName: "Dep", lastName: "Endant", dateOfBirth: "2010-05-05", gender: "FEMALE",
+        relationship: "CHILD", idNumber: "cd 99 88", phone: "0700999888", email: "Dep@Family.com",
+        principalIdNumber: "PRIN123",
+      },
+      effectiveDate: new Date("2026-08-01"), proratedAmount: 0, groupId: "g1", endorsementNumber: "END-1",
+    });
+
+    await EndorsementsService.approveEndorsement("t1", "e1", "checker");
+
+    const d = lastCreate();
+    // Contact fields the OLD raw create dropped are now present + normalized.
+    expect(d.idNumber).toBe("CD9988");
+    expect(d.phone).toBe("+256700999888");
+    expect(d.email).toBe("dep@family.com");
+    // The dependant is LINKED to the principal (resolved from the National ID).
+    expect(d.principalId).toBe("principalMember");
+    expect(d.relationship).toBe("CHILD");
+  });
+});

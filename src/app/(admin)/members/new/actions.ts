@@ -22,12 +22,15 @@ export async function addMemberAction(
     gender:       formData.get("gender")       as "MALE" | "FEMALE" | "OTHER",
     phone:        formData.get("phone")        as string,
     email:        formData.get("email")        as string,
-    relationship: formData.get("relationship") as "PRINCIPAL" | "SPOUSE" | "CHILD" | "PARENT",
+    relationship: formData.get("relationship") as "PRINCIPAL" | "SPOUSE" | "CHILD" | "PARENT" | "SIBLING",
     // NW-D02: link a dependant to its principal when the form was opened from a
     // principal's "Add Dependent" action (/members/new?principalId=…).
     principalId:  (formData.get("principalId") as string | null)?.trim() || undefined,
     // WP-3.5E: enrolment effective date drives enrollmentDate + coverage period.
     effectiveDate: (formData.get("effectiveDate") as string | null)?.trim() || undefined,
+    // WP-3.5F newborn (CT-033): when supplied and within 30 days of DOB, cover
+    // starts from the date of birth (and no national ID is required).
+    birthNotificationDate: (formData.get("birthNotificationDate") as string | null)?.trim() || undefined,
   };
 
   let memberNumber: string | undefined;

@@ -4,6 +4,8 @@ import {
   normalizePrefix,
   normalizePhone,
   normalizeNationalId,
+  normalizeEmail,
+  ugandaPhoneVariants,
   PREFIX_RE,
 } from "@/lib/normalize";
 
@@ -79,8 +81,37 @@ describe("normalizePhone (member-wave stub)", () => {
   });
 });
 
-describe("normalizeNationalId (member-wave stub)", () => {
+describe("normalizeNationalId (M-005)", () => {
   it("uppercases and strips internal spaces", () => {
     expect(normalizeNationalId("  cm 123 ab ")).toBe("CM123AB");
+  });
+  it("folds case + interior-space variants to one key", () => {
+    expect(normalizeNationalId("ck 12 34")).toBe(normalizeNationalId("CK1234"));
+    expect(normalizeNationalId(" ck1234 ")).toBe("CK1234");
+  });
+});
+
+describe("normalizeEmail (M-007)", () => {
+  it("casefolds + trims so case/padding variants collide", () => {
+    expect(normalizeEmail("A@B.com")).toBe("a@b.com");
+    expect(normalizeEmail("  User@Example.COM ")).toBe("user@example.com");
+    expect(normalizeEmail("A@B.com")).toBe(normalizeEmail("a@b.com"));
+  });
+});
+
+describe("ugandaPhoneVariants (M-006)", () => {
+  it("returns every UG storage form of the same line so +256/256/0 collide", () => {
+    const v = ugandaPhoneVariants("0700123456");
+    expect(v).toContain("+256700123456");
+    expect(v).toContain("256700123456");
+    expect(v).toContain("0700123456");
+  });
+  it("a +256 and a 0 form of the same number share the E.164 variant", () => {
+    expect(ugandaPhoneVariants("+256700123456")).toContain("+256700123456");
+    expect(ugandaPhoneVariants("0700123456")).toContain("+256700123456");
+  });
+  it("returns [] for a non-UG / unparseable number (dedup then skipped)", () => {
+    expect(ugandaPhoneVariants("12345")).toEqual([]);
+    expect(ugandaPhoneVariants("abc")).toEqual([]);
   });
 });

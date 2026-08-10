@@ -1,4 +1,4 @@
-import { requireRole, ROLES } from "@/lib/rbac";
+import { requireRole, ROLES, type UserRole } from "@/lib/rbac";
 import { notFound } from "next/navigation";
 import { PackagesService } from "@/server/services/packages.service";
 import { prisma } from "@/lib/prisma";
@@ -8,7 +8,10 @@ import { CoContributionRulesManager } from "./CoContributionRulesManager";
 import { formatMoney } from "@/lib/utils";
 
 export default async function PackageDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await requireRole(ROLES.UNDERWRITING);
+  // DEF-004 / D2: READ-ONLY discovery for the Membership Officer; Edit and the
+  // co-contribution manager stay UNDERWRITING (X-002).
+  const session = await requireRole(ROLES.PACKAGE_READ);
+  const canWrite = ROLES.UNDERWRITING.includes(session.user.role as UserRole);
 
   const { id } = await params;
   const [pkg, coRules, annualCap] = await Promise.all([
@@ -80,10 +83,12 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
           <span className={`px-4 py-1.5 rounded-full text-xs font-bold uppercase ${statusColor(pkg.status)}`}>
             {pkg.status}
           </span>
-          <Link href={`/packages/${id}/edit`}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold bg-brand-indigo hover:bg-brand-secondary text-white transition-colors">
-            <Pencil size={14} /> Edit
-          </Link>
+          {canWrite && (
+            <Link href={`/packages/${id}/edit`}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold bg-brand-indigo hover:bg-brand-secondary text-white transition-colors">
+              <Pencil size={14} /> Edit
+            </Link>
+          )}
         </div>
       </div>
 
@@ -204,20 +209,24 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
         </div>
       )}
 
-      {/* Co-Contribution Rules */}
-      <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-[#EEEEEE] flex items-center gap-2">
-          <Percent size={15} className="text-brand-indigo" />
-          <h2 className="font-bold text-brand-text-heading font-heading">Co-Contribution Rules</h2>
+      {/* Co-Contribution Rules — the manager is a write surface (setCaps etc.),
+          so it is only mounted for package owners. The Membership Officer's
+          read-only discovery view omits it (X-002). */}
+      {canWrite && (
+        <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#EEEEEE] flex items-center gap-2">
+            <Percent size={15} className="text-brand-indigo" />
+            <h2 className="font-bold text-brand-text-heading font-heading">Co-Contribution Rules</h2>
+          </div>
+          <div className="p-5">
+            <CoContributionRulesManager
+              packageId={id}
+              rules={ruleViews}
+              annualCap={annualCapView}
+            />
+          </div>
         </div>
-        <div className="p-5">
-          <CoContributionRulesManager
-            packageId={id}
-            rules={ruleViews}
-            annualCap={annualCapView}
-          />
-        </div>
-      </div>
+      )}
 
       {/* Version history */}
       {pkg.versions.length > 1 && (

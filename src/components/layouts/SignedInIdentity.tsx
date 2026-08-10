@@ -19,16 +19,24 @@ export const ROLE_LABELS: Record<string, string> = {
 export function SignedInIdentity({
   name,
   role,
+  roleLabel: roleLabelOverride,
   subtitle,
   variant = "sidebar",
 }: {
   name?: string | null;
   role?: string | null;
+  /**
+   * DEF-002: a pre-resolved role label that WINS over the `role` lookup when
+   * present. Lets the provider portal show the real persona ("Biller", …) while
+   * still falling back to the generic ROLE_LABELS[role] ("Provider") when no
+   * persona is resolved (e.g. prod before the RBAC seed).
+   */
+  roleLabel?: string | null;
   subtitle?: string | null; // e.g. facility or group name
   variant?: "sidebar" | "bar";
 }) {
-  if (!name && !role) return null;
-  const roleLabel = role ? ROLE_LABELS[role] ?? role : null;
+  if (!name && !role && !roleLabelOverride) return null;
+  const roleLabel = roleLabelOverride ?? (role ? ROLE_LABELS[role] ?? role : null);
   const base =
     variant === "sidebar"
       ? "rounded-[8px] border border-[#EEEEEE] bg-brand-bg-alt/40 px-2.5 py-2"

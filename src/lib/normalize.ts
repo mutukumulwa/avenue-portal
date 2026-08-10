@@ -69,8 +69,39 @@ export function normalizePhone(input: string): string | null {
 
 /**
  * National-ID key (member wave M-005): trim, uppercase, strip internal spaces.
- * NOT consumed by Wave 1.
+ * So `"ck 12 34"`, `"CK1234"`, and `" ck1234 "` all fold to the same key.
  */
 export function normalizeNationalId(input: string): string {
   return input.trim().toUpperCase().replace(/\s+/g, "");
+}
+
+/**
+ * Email key (member wave M-007 — email duplicate detection): trim + casefold.
+ * Emails are case-insensitive for identity purposes, so `"A@B.com"` and
+ * `" a@b.com "` collide on the same key. Returns "" for blank input.
+ */
+export function normalizeEmail(input: string): string {
+  return input.trim().toLowerCase();
+}
+
+/**
+ * Every stored representation a Uganda phone number could take, for a duplicate
+ * probe that must catch `+256…` / `256…` / `0…` variants of the SAME line even
+ * when historical rows were stored un-normalized. Returns the E.164 key first
+ * (the form new members are stored in) plus the `256…` and `0…` legacy forms and
+ * the raw trimmed input. Empty array when the number is not a parseable UG line
+ * (caller then skips the phone dedup for a non-UG/garbage value).
+ */
+export function ugandaPhoneVariants(input: string): string[] {
+  const key = normalizePhone(input); // "+256700123456" or null
+  const variants = new Set<string>();
+  const raw = input.trim();
+  if (raw) variants.add(raw);
+  if (key) {
+    const local = key.slice(4); // strip "+256"
+    variants.add(key); // +256700123456
+    variants.add(`256${local}`); // 256700123456
+    variants.add(`0${local}`); // 0700123456
+  }
+  return key ? [...variants] : [];
 }

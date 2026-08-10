@@ -29,7 +29,7 @@ export type ParseResult = {
 };
 
 const VALID_GENDERS       = ["MALE", "FEMALE", "OTHER"];
-const VALID_RELATIONSHIPS = ["PRINCIPAL", "SPOUSE", "CHILD", "PARENT"];
+const VALID_RELATIONSHIPS = ["PRINCIPAL", "SPOUSE", "CHILD", "PARENT", "SIBLING"];
 
 function get(raw: Record<string, string>, ...keys: string[]) {
   for (const k of keys) {
@@ -57,7 +57,7 @@ function validateRow(raw: Record<string, string>, rowNum: number): ParsedRow {
   if (!gender || !VALID_GENDERS.includes(gender))
     errors.push(`gender must be MALE, FEMALE, or OTHER (got "${gender || "blank"}")`);
   if (!relationship || !VALID_RELATIONSHIPS.includes(relationship))
-    errors.push(`relationship must be PRINCIPAL, SPOUSE, CHILD, or PARENT (got "${relationship || "blank"}")`);
+    errors.push(`relationship must be PRINCIPAL, SPOUSE, CHILD, PARENT, or SIBLING (got "${relationship || "blank"}")`);
   if (dateOfBirth && isNaN(Date.parse(dateOfBirth)))
     errors.push(`dateOfBirth "${dateOfBirth}" is not a valid date (use YYYY-MM-DD)`);
   if (relationship !== "PRINCIPAL" && !principalIdNumber && VALID_RELATIONSHIPS.includes(relationship))
@@ -185,7 +185,7 @@ export async function confirmImportAction(
         gender:       row.gender as "MALE" | "FEMALE" | "OTHER",
         phone:        row.phone  || undefined,
         email:        row.email  || undefined,
-        relationship: row.relationship as "SPOUSE" | "CHILD" | "PARENT",
+        relationship: row.relationship as "SPOUSE" | "CHILD" | "PARENT" | "SIBLING",
         principalId,
       });
       imported++;

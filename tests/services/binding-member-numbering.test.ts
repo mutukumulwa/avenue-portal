@@ -89,10 +89,13 @@ const acceptedQuote = (over: any = {}) => ({
     {
       id: "l2",
       role: "DEPENDANT",
+      // WP-3.5F: dependants derive relationship from ROLE (→ CHILD), not gender, so
+      // this life is now a CHILD subject to the dependant age cap — a child-aged DOB
+      // keeps the happy path valid (a female born 1992 would age out as a CHILD).
       firstName: "Jane",
       lastName: "Doe",
       nationalId: null,
-      dateOfBirth: new Date("1992-02-02"),
+      dateOfBirth: new Date("2015-06-01"),
       gender: "FEMALE",
       principalLifeId: "l1",
       decision: null,

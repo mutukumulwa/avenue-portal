@@ -1,10 +1,13 @@
-import { requireRole, ROLES } from "@/lib/rbac";
+import { requireRole, ROLES, type UserRole } from "@/lib/rbac";
 import { PackagesService } from "@/server/services/packages.service";
 import { PlusCircle, FileText, Activity } from "lucide-react";
 import Link from "next/link";
 
 export default async function PackagesPage() {
-  const session = await requireRole(ROLES.UNDERWRITING);
+  // DEF-004 / D2: READ-ONLY discovery for the Membership Officer. The builder,
+  // edit and every package action stay on UNDERWRITING (X-002).
+  const session = await requireRole(ROLES.PACKAGE_READ);
+  const canWrite = ROLES.UNDERWRITING.includes(session.user.role as UserRole);
 
   const tenantId = session.user.tenantId;
   const packages = await PackagesService.getPackages(tenantId);
@@ -15,14 +18,18 @@ export default async function PackagesPage() {
         <div>
           <h1 className="text-2xl font-bold text-brand-text-heading font-['Sora']">Packages</h1>
           <p className="text-[#848E9F] font-['Hanken_Grotesk'] mt-1">Manage benefit packages and configuration limits.</p>
+          {/* D2: orient the Membership Officer in the coverage hierarchy. */}
+          <p className="mt-1 text-xs text-brand-text-muted">Client → Group/Scheme → Package → Members</p>
         </div>
-        <Link 
-          href="/packages/builder"
-          className="bg-[#0B1437] hover:bg-[#142150] text-white px-6 py-2 rounded-full font-semibold transition-colors flex items-center space-x-2 shadow-sm"
-        >
-          <PlusCircle size={18} />
-          <span>New Package</span>
-        </Link>
+        {canWrite && (
+          <Link
+            href="/packages/builder"
+            className="bg-[#0B1437] hover:bg-[#142150] text-white px-6 py-2 rounded-full font-semibold transition-colors flex items-center space-x-2 shadow-sm"
+          >
+            <PlusCircle size={18} />
+            <span>New Package</span>
+          </Link>
+        )}
       </div>
 
       <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">

@@ -40,6 +40,13 @@ const UNDERWRITING  = ROLES.UNDERWRITING;
 const ADMIN_ONLY    = ROLES.ADMIN_ONLY;
 const CLINICAL_ROLES = ROLES.CLINICAL;
 const CLAIMS_OPS    = ROLES.CLAIMS_OPS;
+// WP-3.5 nav-drift fixes: a link must be shown to a role only if the target
+// page's requireRole admits it (nav-role ⊆ page-guard) — pinned by
+// tests/consistency/nav-guard-parity.test.ts.
+const APPROVALS     = ROLES.APPROVALS;   // /approvals admits FINANCE_OFFICER (checker) — was hidden from them
+const CLIENT_READ   = ROLES.CLIENT_READ; // Membership Officer read-only discovery (D2)
+const PACKAGE_READ  = ROLES.PACKAGE_READ; // Membership Officer read-only discovery (D2)
+const ANALYTICS_READ = ROLES.ANALYTICS_READ; // ANALYTICS:VIEW holders — excludes CUSTOMER_SERVICE (D1-A)
 
 const NAV_GROUPS: NavGroup[] = [
   {
@@ -51,12 +58,12 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Membership",
     items: [
-      { label: "Clients",      href: "/clients",      icon: Landmark,         roles: ADMIN_ONLY   },
+      { label: "Clients",      href: "/clients",      icon: Landmark,         roles: CLIENT_READ  },
       { label: "Groups",       href: "/groups",       icon: Building2,        roles: OPS          },
       { label: "Members",      href: "/members",      icon: Users,            roles: OPS          },
       { label: "Onboarding Queue", href: "/onboarding-queue", icon: UserPlus,     roles: OPS          },
       { label: "Endorsements", href: "/endorsements", icon: FileText,         roles: OPS          },
-      { label: "Packages",     href: "/packages",     icon: BriefcaseMedical, roles: UNDERWRITING },
+      { label: "Packages",     href: "/packages",     icon: BriefcaseMedical, roles: PACKAGE_READ },
     ],
   },
   {
@@ -75,11 +82,17 @@ const NAV_GROUPS: NavGroup[] = [
           { label: "Letters of Undertaking",  href: "/lou"            },
         ],
       },
-      { label: "Offline Capture",    href: "/offline-capture",    icon: CloudOff,       roles: OPS        },
-      { label: "Offline Work Codes", href: "/offline-auth",       icon: KeyRound,       roles: OPS        },
-      { label: "Approvals",          href: "/approvals",          icon: ClipboardCheck, roles: OPS        },
+      // WP-3.5: these four target CLAIMS_READ-guarded pages; showing them to the
+      // membership set (OPS) gave CUSTOMER_SERVICE/UNDERWRITER dead links to
+      // Access Denied. Narrowed to CLAIMS_OPS to match the guards (never widen a
+      // guard — claims-surface-authorization.test.ts pins that direction).
+      { label: "Offline Capture",    href: "/offline-capture",    icon: CloudOff,       roles: CLAIMS_OPS },
+      { label: "Offline Work Codes", href: "/offline-auth",       icon: KeyRound,       roles: CLAIMS_OPS },
+      // /approvals admits FINANCE_OFFICER (the money-control checker); OPS hid it
+      // from them. APPROVALS is the page's own guard set.
+      { label: "Approvals",          href: "/approvals",          icon: ClipboardCheck, roles: APPROVALS  },
       { label: "Assessor Queue",     href: "/assessor-queue",     icon: Scale,          roles: UNDERWRITING },
-      { label: "Override Queue",     href: "/overrides",          icon: TriangleAlert,  roles: OPS        },
+      { label: "Override Queue",     href: "/overrides",          icon: TriangleAlert,  roles: CLAIMS_OPS },
       { label: "Cross-Border Care",  href: "/cross-border",       icon: Globe2,         roles: OPS        },
       { label: "Wellness",           href: "/wellness",           icon: HeartPulse,     roles: OPS        },
       // OBS-6: /settings/exceptions is ADMIN_ONLY-guarded — showing it to OPS
@@ -107,7 +120,11 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: "Insights",
     items: [
-      { label: "Strategic Purchasing", href: "/analytics", icon: BarChart3, roles: ANY_STAFF },
+      // WP-3.5: Strategic Purchasing is narrowed to the roles that actually hold
+      // ANALYTICS:VIEW (ANY_STAFF minus CUSTOMER_SERVICE, per catalog D1-A) so
+      // the Membership Officer is no longer shown an analytics link the catalog
+      // denies. Reports stays ANY_STAFF — CUSTOMER_SERVICE holds REPORT:VIEW.
+      { label: "Strategic Purchasing", href: "/analytics", icon: BarChart3, roles: ANALYTICS_READ },
       { label: "Reports",              href: "/reports",   icon: PieChart,  roles: ANY_STAFF },
     ],
   },
@@ -124,7 +141,8 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Service Requests", href: "/service-requests", icon: MessageSquareText,    roles: OPS },
       { label: "Complaints",       href: "/complaints",        icon: MessageSquareWarning, roles: OPS },
       {
-        label: "Fraud Alerts", href: "/fraud", icon: ShieldAlert, roles: OPS,
+        // WP-3.5: /fraud is CLAIMS_READ-guarded — was a dead link for CS/UW.
+        label: "Fraud Alerts", href: "/fraud", icon: ShieldAlert, roles: CLAIMS_OPS,
         children: [
           { label: "Claim Alerts",    href: "/fraud"                },
           { label: "Investigations",  href: "/fraud/investigations" },

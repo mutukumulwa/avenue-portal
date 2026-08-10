@@ -97,7 +97,49 @@ describe("DEF-002 — brute-force lockout", () => {
     expect(lockMs).toBeGreaterThan(LOCK_DURATION_MS - 5_000);
     expect(lockMs).toBeLessThan(LOCK_DURATION_MS + 5_000);
     expect(prismaMock.auditLog.create).toHaveBeenCalledTimes(1);
-    expect(prismaMock.auditLog.create.mock.calls[0][0].data.action).toBe("AUTH_ACCOUNT_LOCKED");
+    const lockAudit = prismaMock.auditLog.create.mock.calls[0][0].data;
+    expect(lockAudit.action).toBe("AUTH_ACCOUNT_LOCKED");
+    // WP-3.1 (DEF-005): the lock event must carry tenantId so it sits inside the
+    // tenant hash chain (it was previously omitted → outside the chain).
+    expect(lockAudit.tenantId).toBe("t1");
+    // Recorded lock window is derived from the constant, so it matches policy.
+    expect(lockAudit.metadata.lockMinutes).toBe(LOCK_DURATION_MS / 60_000);
+  });
+
+  it("a successful login after the lock window elapsed clears the lock AND audits AUTH_ACCOUNT_UNLOCKED with tenantId", async () => {
+    // A spent lock (lockedUntil in the past) no longer blocks; the successful
+    // login clears it — and now records the recovery so lock → expiry → sign-in
+    // is a complete, observable lifecycle.
+    prismaMock.user.findFirst.mockResolvedValue(
+      baseUser({ lockedUntil: new Date(Date.now() - 60_000), failedLoginCount: 0 }),
+    );
+    bcryptMock.compare.mockResolvedValue(true);
+    prismaMock.user.update.mockResolvedValue({ sessionVersion: 4 });
+
+    const res = await authorizeCredentials({ email: "a@x.com", password: "correct" });
+
+    expect(res).not.toBeNull();
+    const upd = prismaMock.user.update.mock.calls[0][0];
+    expect(upd.data.lockedUntil).toBeNull();
+    expect(upd.data.failedLoginCount).toBe(0);
+
+    expect(prismaMock.auditLog.create).toHaveBeenCalledTimes(1);
+    const unlockAudit = prismaMock.auditLog.create.mock.calls[0][0].data;
+    expect(unlockAudit.action).toBe("AUTH_ACCOUNT_UNLOCKED");
+    expect(unlockAudit.tenantId).toBe("t1");
+  });
+
+  it("a normal successful login (never locked) writes NO unlock audit", async () => {
+    prismaMock.user.findFirst.mockResolvedValue(
+      baseUser({ lockedUntil: null, failedLoginCount: 2, lastFailedLoginAt: new Date() }),
+    );
+    bcryptMock.compare.mockResolvedValue(true);
+
+    const res = await authorizeCredentials({ email: "a@x.com", password: "correct" });
+
+    expect(res).not.toBeNull();
+    // lockedUntil was null → nothing to unlock → no AUTH_ACCOUNT_UNLOCKED row.
+    expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
   });
 
   it("a locked account fails WITHOUT a password comparison, even with the correct password (AC 2)", async () => {

@@ -17,6 +17,10 @@ const db = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
+// WP-3.5G: the MEMBER_DELETION apply path now audits via the chain service.
+vi.mock("@/server/services/audit-chain.service", () => ({
+  auditChainService: { append: vi.fn(async () => ({})) },
+}));
 
 import { EndorsementsService } from "@/server/services/endorsement.service";
 

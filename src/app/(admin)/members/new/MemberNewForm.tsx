@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { addMemberAction } from "./actions";
 import { Save, AlertCircle, AlertTriangle } from "lucide-react";
+import { SessionExpiryGuard } from "@/components/layouts/SessionExpiryGuard";
 
 const inputCls = "w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo transition-colors";
 const labelCls = "text-xs font-bold text-brand-text-muted uppercase block mb-1";
@@ -45,6 +46,10 @@ export function MemberNewForm({ groups, principal }: Props) {
         </div>
       )}
 
+      {/* DEF-010: guard the submit against an expired idle session so the user
+          gets a clear re-login instead of native validation bubbles or a silent
+          redirect. The server action still fails closed (requireRole). */}
+      <SessionExpiryGuard>
       <form action={action} className="space-y-6">
         {/* NW-D02: carry the principal link so the dependant attaches to its family. */}
         {principal && <input type="hidden" name="principalId" value={principal.id} />}
@@ -87,6 +92,7 @@ export function MemberNewForm({ groups, principal }: Props) {
                 <option value="SPOUSE">Spouse</option>
                 <option value="CHILD">Child</option>
                 <option value="PARENT">Parent</option>
+                <option value="SIBLING">Sibling</option>
               </select>
             </div>
             <div>
@@ -130,7 +136,12 @@ export function MemberNewForm({ groups, principal }: Props) {
             <div className="col-span-2">
               <label className={labelCls}>National ID / Passport</label>
               <input name="idNumber" type="text" placeholder="e.g. 12345678" className={inputCls} />
-              <p className="text-[10px] text-brand-text-muted mt-1">Used for duplicate detection — must be unique across all members.</p>
+              <p className="text-[10px] text-brand-text-muted mt-1">Used for duplicate detection — must be unique across all members. Newborns may be enrolled without an ID.</p>
+            </div>
+            <div className="col-span-2">
+              <label className={labelCls}>Birth Notification Date <span className="font-normal text-brand-text-muted normal-case">(newborns only)</span></label>
+              <input name="birthNotificationDate" type="date" className={inputCls} />
+              <p className="text-[10px] text-brand-text-muted mt-1">When a birth is notified within 30 days, cover starts from the date of birth (no national ID required).</p>
             </div>
           </div>
         </div>
@@ -161,6 +172,7 @@ export function MemberNewForm({ groups, principal }: Props) {
           </button>
         </div>
       </form>
+      </SessionExpiryGuard>
     </div>
   );
 }

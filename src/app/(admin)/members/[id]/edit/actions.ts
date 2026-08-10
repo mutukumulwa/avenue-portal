@@ -4,6 +4,7 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { redirect } from "next/navigation";
 import { MembersService } from "@/server/services/members.service";
 import { writeAudit } from "@/lib/audit";
+import { memberTransitionAuditAction } from "@/lib/member-status";
 import type { MemberStatus, MemberRelationship, Gender } from "@prisma/client";
 
 export async function updateMemberAction(
@@ -15,9 +16,11 @@ export async function updateMemberAction(
 
   const firstName = formData.get("firstName") as string;
   const lastName  = formData.get("lastName")  as string;
+  const newStatus = formData.get("status") as MemberStatus;
 
+  let previousStatus: MemberStatus;
   try {
-    await MembersService.updateMember(session.user.tenantId, memberId, {
+    const result = await MembersService.updateMember(session.user.tenantId, memberId, {
       firstName,
       lastName,
       otherNames:   formData.get("otherNames")   as string,
@@ -27,18 +30,26 @@ export async function updateMemberAction(
       phone:        formData.get("phone")        as string,
       email:        formData.get("email")        as string,
       relationship: formData.get("relationship") as MemberRelationship,
-      status:       formData.get("status")       as MemberStatus,
+      status:       newStatus,
     });
+    previousStatus = result.previousStatus as MemberStatus;
   } catch (err) {
     return { error: (err as Error).message };
   }
 
+  // WP-3.5G: a DISTINCT audit action per lifecycle transition (MEMBER_SUSPENDED /
+  // MEMBER_REINSTATED / MEMBER_TERMINATED / …); a pure profile edit stays
+  // MEMBER_UPDATED.
+  const auditAction = memberTransitionAuditAction(previousStatus, newStatus);
   await writeAudit({
     userId: session.user.id,
-    action: "MEMBER_UPDATED",
+    action: auditAction,
     module: "MEMBERS",
-    description: `Member profile updated: ${firstName} ${lastName}`,
-    metadata: { memberId },
+    description:
+      auditAction === "MEMBER_UPDATED"
+        ? `Member profile updated: ${firstName} ${lastName}`
+        : `Member ${firstName} ${lastName}: status ${previousStatus} → ${newStatus}`,
+    metadata: { memberId, previousStatus, newStatus },
   });
 
   redirect(`/members/${memberId}`);

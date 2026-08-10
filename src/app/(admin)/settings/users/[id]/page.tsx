@@ -36,6 +36,9 @@ export default async function UserAccessDetailPage({
       id: true, firstName: true, lastName: true, email: true, role: true,
       isActive: true, lastLoginAt: true, createdAt: true, sessionVersion: true,
       totpEnabled: true,
+      // WP-3.1 (DEF-005): the throttle state so an operator can see a live lock,
+      // its remaining time, and the current failed-attempt streak.
+      lockedUntil: true, failedLoginCount: true, lastFailedLoginAt: true,
       group: { select: { id: true, name: true } },
       broker: { select: { id: true, name: true } },
       member: { select: { id: true, memberNumber: true, firstName: true, lastName: true } },
@@ -69,6 +72,20 @@ export default async function UserAccessDetailPage({
   const effective = effectivePermissions(user.role, dynamicCodes).sort();
   const overlayOnly = dynamicCodes.filter((c) => !baseline.includes(c)).sort();
   const isWildcard = effective.includes(ALL_PERMISSIONS);
+
+  // WP-3.1 (DEF-005): resolve the current lock state for display. A lock is
+  // "live" only while lockedUntil is in the future; a past lockedUntil is a spent
+  // lock that the next successful sign-in (or an admin reset) will clear.
+  const now = new Date();
+  const lockLive = !!user.lockedUntil && user.lockedUntil > now;
+  const lockRemainingMin = lockLive
+    ? Math.max(1, Math.ceil((user.lockedUntil!.getTime() - now.getTime()) / 60_000))
+    : 0;
+  const lockValue = lockLive
+    ? `Locked — ~${lockRemainingMin} min left`
+    : user.failedLoginCount > 0
+      ? `${user.failedLoginCount} failed attempt${user.failedLoginCount === 1 ? "" : "s"}`
+      : "Not locked";
 
   const actorIds = [
     ...new Set(assignments.flatMap((a) => [a.makerId, a.checkerId, a.revokedById].filter(Boolean) as string[])),
@@ -107,8 +124,22 @@ export default async function UserAccessDetailPage({
         <p className="text-brand-text-body font-body mt-1">{user.email}</p>
       </div>
 
+      {/* WP-3.1 (DEF-005): a live sign-in lock is called out prominently so an
+          operator can see it — and that an admin password reset will release it —
+          without reading the raw user row. */}
+      {lockLive && (
+        <div className="flex items-start gap-2 rounded-[8px] border border-[#DC3545]/30 bg-[#DC3545]/5 px-4 py-3">
+          <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-[#DC3545]" />
+          <p className="text-sm text-[#DC3545]">
+            This account is <strong>temporarily locked</strong> after repeated failed sign-ins —
+            about <strong>{lockRemainingMin} minute{lockRemainingMin === 1 ? "" : "s"}</strong> remaining.
+            It unlocks automatically when the window elapses, or immediately on an admin password reset.
+          </p>
+        </div>
+      )}
+
       {/* Identity and status */}
-      <section className="grid gap-4 md:grid-cols-4">
+      <section className="grid gap-4 md:grid-cols-3 lg:grid-cols-5">
         <Fact label="Portal role" value={user.role.replace(/_/g, " ")} />
         <Fact label="Status" value={user.isActive ? "Active" : "Inactive"} />
         <Fact
@@ -116,6 +147,7 @@ export default async function UserAccessDetailPage({
           value={user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleString("en-UG") : "Never"}
         />
         <Fact label="Authenticator" value={user.totpEnabled ? "Enrolled" : "Not enrolled"} />
+        <Fact label="Sign-in lock" value={lockValue} />
       </section>
 
       {/* Effective access — the decision that actually applies */}

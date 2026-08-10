@@ -47,7 +47,7 @@ const ICONS: Record<ProviderNavIconKey, LucideIcon> = {
  * items — never permissions, provider id, or branch scope. Hiding an item is
  * convenience only; every route stays server-authorized.
  */
-export function ProviderNav({ providerName, items, actorName }: { providerName: string; items: ProviderNavItemView[]; actorName?: string | null }) {
+export function ProviderNav({ providerName, items, actorName, roleLabel }: { providerName: string; items: ProviderNavItemView[]; actorName?: string | null; roleLabel?: string | null }) {
   const pathname = usePathname();
 
   return (
@@ -77,8 +77,9 @@ export function ProviderNav({ providerName, items, actorName }: { providerName: 
               </Link>
             );
           })}
-          {/* DEF-001: signed-in actor + generic Provider persona + facility (D-20). */}
-          <SignedInIdentity variant="bar" name={actorName} role="PROVIDER_USER" subtitle={providerName} />
+          {/* DEF-001/DEF-002: signed-in actor + real persona label (falls back to
+              the generic "Provider" when no persona role is resolved) + facility. */}
+          <SignedInIdentity variant="bar" name={actorName} role="PROVIDER_USER" roleLabel={roleLabel} subtitle={providerName} />
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold text-brand-error hover:bg-red-50 transition-colors"
@@ -90,7 +91,7 @@ export function ProviderNav({ providerName, items, actorName }: { providerName: 
       </div>
       {(actorName) && (
         <div className="md:hidden border-t border-[#EEEEEE] bg-white px-4 py-1.5 flex justify-end">
-          <SignedInIdentity variant="bar" name={actorName} role="PROVIDER_USER" subtitle={providerName} />
+          <SignedInIdentity variant="bar" name={actorName} role="PROVIDER_USER" roleLabel={roleLabel} subtitle={providerName} />
         </div>
       )}
       <div className="md:hidden border-t border-[#EEEEEE] bg-white">

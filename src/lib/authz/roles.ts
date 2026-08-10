@@ -36,6 +36,25 @@ export const ROLES = {
   FINANCE:      ["SUPER_ADMIN", "FINANCE_OFFICER"] as UserRole[],
   /** Underwriting — groups, packages, providers */
   UNDERWRITING: ["SUPER_ADMIN", "UNDERWRITER"] as UserRole[],
+
+  /**
+   * DEF-004 / decision D2 — READ-ONLY client discovery for the Membership
+   * Officer. Superset of ADMIN_ONLY (the client owner) plus CUSTOMER_SERVICE so
+   * the MO can locate a client and walk Client → Group/Scheme → Package →
+   * Members. This set gates the client LIST and DETAIL pages ONLY; create/edit
+   * pages and every client server action stay on ADMIN_ONLY, so discovery never
+   * becomes a write path (X-001).
+   */
+  CLIENT_READ:  ["SUPER_ADMIN", "CUSTOMER_SERVICE"] as UserRole[],
+
+  /**
+   * DEF-004 / decision D2 — READ-ONLY package discovery for the Membership
+   * Officer. UNDERWRITING (the package owner) plus CUSTOMER_SERVICE. Gates the
+   * package LIST and DETAIL pages ONLY; the builder, edit and rate-matrix pages
+   * and every package server action stay on UNDERWRITING, so a benefit config
+   * can never be changed from this grant (X-002).
+   */
+  PACKAGE_READ: ["SUPER_ADMIN", "UNDERWRITER", "CUSTOMER_SERVICE"] as UserRole[],
   /**
    * Day-to-day ops — register members, submit claims / pre-auths.
    *
@@ -83,6 +102,19 @@ export const ROLES = {
    * matrix so any change is a deliberate, reviewed one.
    */
   MONEY_READ:   ["SUPER_ADMIN", "FINANCE_OFFICER"] as UserRole[],
+
+  /**
+   * DEF-004 / WP-3.5 — roles that actually hold ANALYTICS:VIEW in the catalog
+   * (src/lib/authz/catalog.ts). This is ANY_STAFF minus CUSTOMER_SERVICE, which
+   * lost ANALYTICS:VIEW under decision D1 Branch A (membership-only). Used for
+   * the Strategic Purchasing NAV entry so a Membership Officer is no longer
+   * advertised an analytics surface the catalog says they cannot see. NOTE: the
+   * /analytics PAGE guard is still ROLES.ANY_STAFF (a broader enum set that does
+   * not read ANALYTICS:VIEW) — flagged for a page-guard follow-up; narrowing the
+   * guard is outside this pass's file scope.
+   */
+  ANALYTICS_READ: ["SUPER_ADMIN", "CLAIMS_OFFICER", "FINANCE_OFFICER", "UNDERWRITER",
+                   "MEDICAL_OFFICER", "REPORTS_VIEWER"] as UserRole[],
   /**
    * Maker–checker approvals queue (/approvals). Everyone in OPS PLUS
    * FINANCE_OFFICER — the money-control checker for governed changes such as

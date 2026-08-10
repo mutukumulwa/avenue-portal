@@ -2,6 +2,7 @@
 
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
+import { writeAudit } from "@/lib/audit";
 import Papa from "papaparse";
 import type { Gender, MemberRelationship } from "@prisma/client";
 import { checkEnrolmentAge } from "@/server/services/eligibility/enrolment-age";
@@ -28,7 +29,7 @@ export type ParseResult = {
 };
 
 const VALID_GENDERS       = ["MALE", "FEMALE", "OTHER"];
-const VALID_RELATIONSHIPS = ["PRINCIPAL", "SPOUSE", "CHILD", "PARENT"];
+const VALID_RELATIONSHIPS = ["PRINCIPAL", "SPOUSE", "CHILD", "PARENT", "SIBLING"];
 
 function get(raw: Record<string, string>, ...keys: string[]) {
   for (const k of keys) {
@@ -56,7 +57,7 @@ function validateRow(raw: Record<string, string>, rowNum: number): ParsedRow {
   if (!gender || !VALID_GENDERS.includes(gender))
     errors.push(`gender must be MALE, FEMALE, or OTHER (got "${gender || "blank"}")`);
   if (!relationship || !VALID_RELATIONSHIPS.includes(relationship))
-    errors.push(`relationship must be PRINCIPAL, SPOUSE, CHILD, or PARENT (got "${relationship || "blank"}")`);
+    errors.push(`relationship must be PRINCIPAL, SPOUSE, CHILD, PARENT, or SIBLING (got "${relationship || "blank"}")`);
   if (dateOfBirth && isNaN(Date.parse(dateOfBirth)))
     errors.push(`dateOfBirth "${dateOfBirth}" is not a valid date (use YYYY-MM-DD)`);
   if (relationship !== "PRINCIPAL" && !principalIdNumber && VALID_RELATIONSHIPS.includes(relationship))
@@ -182,6 +183,15 @@ export async function confirmHRImportAction(
       failed.push({ row: row.row, name: `${row.firstName} ${row.lastName}`, error: (err as Error).message });
     }
   }
+
+  // WP-3.5G: audit the (previously silent) HR bulk-import run.
+  await writeAudit({
+    userId: session.user.id,
+    action: "HR_MEMBERS_BULK_IMPORTED",
+    module: "MEMBERS",
+    description: `HR bulk import: ${imported} addition request(s) created, ${failed.length} failed.`,
+    metadata: { groupId, imported, failed: failed.length },
+  });
 
   return { imported, failed };
 }

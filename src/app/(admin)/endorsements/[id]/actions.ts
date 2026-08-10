@@ -3,7 +3,6 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { redirect } from "next/navigation";
 import { EndorsementsService } from "@/server/services/endorsement.service";
-import { prisma } from "@/lib/prisma";
 
 export async function approveEndorsementAction(formData: FormData) {
   const session = await requireRole(ROLES.MEMBER_OPS);
@@ -25,9 +24,14 @@ export async function rejectEndorsementAction(formData: FormData) {
   const session = await requireRole(ROLES.MEMBER_OPS);
 
   const endorsementId = formData.get("endorsementId") as string;
-  await prisma.endorsement.update({
-    where: { id: endorsementId, tenantId: session.user.tenantId },
-    data: { status: "REJECTED", reviewedBy: session.user.id, reviewedAt: new Date() },
-  });
+  const reason = (formData.get("rejectionReason") as string | null)?.trim() || undefined;
+  try {
+    // WP-3.5G: route through the service so the rejection is status-guarded + audited.
+    await EndorsementsService.rejectEndorsement(session.user.tenantId, endorsementId, session.user.id, reason);
+  } catch (err) {
+    if (err instanceof Error && err.message === "NEXT_REDIRECT") throw err;
+    const msg = err instanceof Error ? err.message : "Rejection failed";
+    redirect(`/endorsements/${endorsementId}?error=${encodeURIComponent(msg)}`);
+  }
   redirect("/endorsements");
 }

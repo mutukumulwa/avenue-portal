@@ -24,7 +24,7 @@ export const membersRouter = createTRPCRouter({
         gender: z.enum(["MALE", "FEMALE", "OTHER"]),
         phone: z.string().optional(),
         email: z.string().email().optional().or(z.literal("")),
-        relationship: z.enum(["PRINCIPAL", "SPOUSE", "CHILD", "PARENT"]).optional(),
+        relationship: z.enum(["PRINCIPAL", "SPOUSE", "CHILD", "PARENT", "SIBLING"]).optional(),
         principalId: z.string().optional(),
       })
     )

@@ -10,6 +10,7 @@
 
 import { BillingService } from "../services/billing.service";
 import { coverageService } from "../services/coverage.service";
+import { auditChainService } from "../services/audit-chain.service";
 import { prisma } from "@/lib/prisma";
 
 const SUSPENSION_THRESHOLD_DAYS = 60;
@@ -67,6 +68,18 @@ export async function runSuspensionCheckJob() {
         for (const m of affected) {
           await coverageService.closeOpenPeriods(prisma, m.id, suspendedAt, "SUSPENDED");
         }
+
+        // WP-3.5G: audit the (previously silent) automatic overdue-suspension.
+        await auditChainService.append({
+          actorId: "SYSTEM",
+          action: "GROUP:AUTO_SUSPENDED_OVERDUE",
+          module: "LIFECYCLE",
+          entityType: "Group",
+          entityId: groupId,
+          payload: { reason: "INVOICE_OVERDUE", thresholdDays: SUSPENSION_THRESHOLD_DAYS, membersSuspended: affected.length },
+          tenantId: tenant.id,
+          description: `Group ${group.name} auto-suspended (invoice overdue > ${SUSPENSION_THRESHOLD_DAYS}d) — ${affected.length} member(s) suspended`,
+        });
 
         console.info(`[suspension-check] Suspended group ${group.name} (${groupId}) due to overdue invoice.`);
       }

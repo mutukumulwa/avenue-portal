@@ -19,6 +19,8 @@ const db = vi.hoisted(() => {
       create: vi.fn(async (a: any) => ({ id: "m1", ...a.data })),
       update: vi.fn(async (a: any) => ({ id: a.where.id, ...a.data })),
     },
+    // WP-3.5F: createMember now auto-assigns the scheme's default benefit tier.
+    groupBenefitTier: { findFirst: vi.fn(async () => null) },
     memberCoveragePeriod: {
       findFirst: vi.fn(async () => null),
       findMany: vi.fn(async () => []),
@@ -37,6 +39,10 @@ const db = vi.hoisted(() => {
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
 vi.mock("@/server/services/fraud.service", () => ({
   FraudService: { checkEnrollmentRisk: vi.fn(async () => []) },
+}));
+// WP-3.5F/G: endorsement approve/apply + leaver now audit via the chain service.
+vi.mock("@/server/services/audit-chain.service", () => ({
+  auditChainService: { append: vi.fn(async () => ({})) },
 }));
 vi.mock("@/server/services/member-numbering.service", () => ({
   nextMemberNumber: vi.fn(async () => "MVX-2026-00001"),

@@ -2,6 +2,7 @@
 
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
+import { writeAudit } from "@/lib/audit";
 import type { MemberRelationship, Gender } from "@prisma/client";
 import type { ActionState } from "./types";
 
@@ -51,6 +52,15 @@ export async function addMemberEndorsementAction(
          email
       }
     }
+  });
+
+  // WP-3.5G: audit the (previously silent) HR add-member request.
+  await writeAudit({
+    userId: session.user.id,
+    action: "HR_MEMBER_ADDITION_REQUESTED",
+    module: "MEMBERS",
+    description: `HR requested member addition: ${firstName} ${lastName} (${relationship}) — ${endorsement.endorsementNumber}`,
+    metadata: { groupId, endorsementNumber: endorsement.endorsementNumber, relationship },
   });
 
   return { success: true, endorsementNumber: endorsement.endorsementNumber };

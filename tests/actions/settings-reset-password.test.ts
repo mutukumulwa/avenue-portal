@@ -7,6 +7,9 @@ const mockPrisma = vi.hoisted(() => ({
     findFirst: vi.fn(),
     update: vi.fn(),
   },
+  auditLog: {
+    create: vi.fn(),
+  },
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma }));
 
@@ -30,6 +33,7 @@ function fd(entries: Record<string, string>): FormData {
 const staffTarget = {
   id: "u1", email: "grace@medvex.co.ug", role: "CLAIMS_OFFICER",
   firstName: "Grace", lastName: "Okello",
+  lockedUntil: null, failedLoginCount: 0,
 };
 
 beforeEach(() => vi.clearAllMocks());
@@ -65,7 +69,7 @@ describe("resetUserPasswordAction", () => {
     expect(mockPrisma.user.update).not.toHaveBeenCalled();
   });
 
-  it("sets a bcrypt hash + bumps sessionVersion, and nothing else", async () => {
+  it("sets a bcrypt hash, bumps sessionVersion, and releases the lockout — never role/bindings", async () => {
     mockPrisma.user.findFirst.mockResolvedValue(staffTarget);
     mockPrisma.user.update.mockResolvedValue({});
 
@@ -75,12 +79,58 @@ describe("resetUserPasswordAction", () => {
     expect(mockPrisma.user.update).toHaveBeenCalledOnce();
     const arg = mockPrisma.user.update.mock.calls[0][0];
     expect(arg.where).toEqual({ id: "u1", tenantId: "t1" });
-    // Credential-only write: exactly the hash + the session revocation bump.
-    expect(Object.keys(arg.data).sort()).toEqual(["passwordHash", "sessionVersion"]);
+    // WP-3.1 (DEF-005): the credential write also clears the throttle so a locked
+    // user can actually use the new password — but still touches nothing else
+    // (no role/binding/isActive).
+    expect(Object.keys(arg.data).sort()).toEqual(
+      ["failedLoginCount", "lastFailedLoginAt", "lockedUntil", "passwordHash", "sessionVersion"],
+    );
     expect(arg.data.sessionVersion).toEqual({ increment: 1 });
+    expect(arg.data.failedLoginCount).toBe(0);
+    expect(arg.data.lockedUntil).toBeNull();
+    expect(arg.data.lastFailedLoginAt).toBeNull();
+    expect(arg.data.role).toBeUndefined();
     // Stored as a verifying bcrypt hash, never plaintext.
     expect(arg.data.passwordHash).not.toContain("N3wPassword!");
     expect(await bcrypt.compare("N3wPassword!", arg.data.passwordHash)).toBe(true);
+  });
+
+  it("WP-3.1 (DEF-005): resetting a LOCKED account clears the lock and writes an AUTH_ACCOUNT_UNLOCKED audit with tenantId", async () => {
+    mockPrisma.user.findFirst.mockResolvedValue({
+      ...staffTarget,
+      lockedUntil: new Date(Date.now() + 10 * 60_000), // live lock
+      failedLoginCount: 0,
+    });
+    mockPrisma.user.update.mockResolvedValue({});
+
+    const res = await resetUserPasswordAction(null, fd({ userId: "u1", password: "Unl0ckMeNow!" }));
+
+    expect(res).toEqual({ ok: true });
+    const arg = mockPrisma.user.update.mock.calls[0][0];
+    expect(arg.data.lockedUntil).toBeNull();
+    expect(arg.data.failedLoginCount).toBe(0);
+
+    // The reset audit records that a lock was released…
+    const resetAudit = writeAudit.mock.calls[0][0];
+    expect(resetAudit.action).toBe("USER_PASSWORD_RESET");
+    expect(resetAudit.metadata).toMatchObject({ lockCleared: true });
+
+    // …and a distinct, tenant-scoped unlock event is written directly.
+    expect(mockPrisma.auditLog.create).toHaveBeenCalledOnce();
+    const unlock = mockPrisma.auditLog.create.mock.calls[0][0].data;
+    expect(unlock.action).toBe("AUTH_ACCOUNT_UNLOCKED");
+    expect(unlock.tenantId).toBe("t1");
+    expect(unlock.metadata).toMatchObject({ targetUserId: "u1", reason: "ADMIN_PASSWORD_RESET" });
+  });
+
+  it("resetting an UNLOCKED account writes no unlock event", async () => {
+    mockPrisma.user.findFirst.mockResolvedValue(staffTarget);
+    mockPrisma.user.update.mockResolvedValue({});
+
+    await resetUserPasswordAction(null, fd({ userId: "u1", password: "N0LockHere!" }));
+
+    expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
+    expect(writeAudit.mock.calls[0][0].metadata).toMatchObject({ lockCleared: false });
   });
 
   it("BD-01: a locked portal row can still have its password reset, bindings untouched", async () => {

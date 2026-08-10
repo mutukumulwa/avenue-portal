@@ -16,7 +16,12 @@ import { HRSidebar } from "@/components/layouts/HRSidebar";
 import { FundSidebar } from "@/components/layouts/FundSidebar";
 import { ProviderNav } from "@/components/layouts/ProviderNav";
 import { MemberNav } from "@/components/layouts/MemberNav";
+import { BrokerSidebar } from "@/components/layouts/BrokerSidebar";
 import { SignedInIdentity } from "@/components/layouts/SignedInIdentity";
+import {
+  PROVIDER_ROLE_LABELS,
+  resolveProviderPersonaLabel,
+} from "@/components/layouts/provider-nav-model";
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -37,11 +42,48 @@ describe("DEF-001 — signed-in identity in every portal shell", () => {
     expect(screen.getAllByText("Fund Administrator").length).toBeGreaterThan(0);
   });
 
-  it("ProviderNav shows the actor name and the generic Provider persona (D-20)", () => {
+  it("ProviderNav falls back to the generic Provider persona when no persona role is resolved (prod pre-seed / D-20)", () => {
     render(<ProviderNav providerName="Nakasero Hospital" items={[]} actorName={NAME} />);
     expect(screen.getAllByLabelText("Signed-in user").length).toBeGreaterThan(0);
     expect(screen.getAllByText(NAME).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Provider").length).toBeGreaterThan(0);
+  });
+
+  it("DEF-002: ProviderNav shows the REAL persona label when one is threaded in (not the generic 'Provider')", () => {
+    render(
+      <ProviderNav providerName="Nakasero Hospital" items={[]} actorName={NAME} roleLabel="Biller" />,
+    );
+    expect(screen.getAllByText(NAME).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Biller").length).toBeGreaterThan(0);
+    // The generic label must be gone once a persona is known.
+    expect(screen.queryByText("Provider")).toBeNull();
+  });
+
+  it("DEF-002: each of the six provider personas renders its own label end-to-end", () => {
+    const personas: [string, string][] = [
+      ["PROVIDER_FRONT_DESK", "Front Desk"],
+      ["PROVIDER_CLINICIAN", "Clinician"],
+      ["PROVIDER_BILLER", "Biller"],
+      ["PROVIDER_FINANCE", "Finance"],
+      ["PROVIDER_ADMIN", "Admin"],
+      ["PROVIDER_INTEGRATION_ADMIN", "Integration Admin"],
+    ];
+    for (const [code, label] of personas) {
+      const roleLabel = resolveProviderPersonaLabel([code]);
+      expect(roleLabel).toBe(label);
+      const { unmount } = render(
+        <ProviderNav providerName="Nakasero Hospital" items={[]} actorName={NAME} roleLabel={roleLabel} />,
+      );
+      expect(screen.getAllByText(label).length).toBeGreaterThan(0);
+      unmount();
+    }
+  });
+
+  it("BrokerSidebar shows the actor name and the mapped Broker role label (DEF-001 completion)", () => {
+    render(<BrokerSidebar userRole="BROKER_USER" userName={NAME} />);
+    expect(screen.getAllByLabelText("Signed-in user").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(NAME).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Broker").length).toBeGreaterThan(0);
   });
 
   it("MemberNav shows the actor name and the generic Member persona (D-20)", () => {
@@ -54,5 +96,33 @@ describe("DEF-001 — signed-in identity in every portal shell", () => {
   it("SignedInIdentity renders nothing when neither name nor role is known (no empty block)", () => {
     const { container } = render(<SignedInIdentity />);
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe("DEF-002 — resolveProviderPersonaLabel (pure)", () => {
+  it("maps exactly the six persona codes", () => {
+    expect(Object.keys(PROVIDER_ROLE_LABELS).sort()).toEqual(
+      [
+        "PROVIDER_ADMIN",
+        "PROVIDER_BILLER",
+        "PROVIDER_CLINICIAN",
+        "PROVIDER_FINANCE",
+        "PROVIDER_FRONT_DESK",
+        "PROVIDER_INTEGRATION_ADMIN",
+      ].sort(),
+    );
+  });
+
+  it("returns null when no persona role is present (prod before the RBAC seed → generic fallback)", () => {
+    expect(resolveProviderPersonaLabel([])).toBeNull();
+    // The deprecated legacy bundle is not a persona → also falls back to generic.
+    expect(resolveProviderPersonaLabel(["PROVIDER_LEGACY"])).toBeNull();
+    // A TPA role code carried in by accident resolves to no provider persona.
+    expect(resolveProviderPersonaLabel(["CLAIMS_OFFICER"])).toBeNull();
+  });
+
+  it("is deterministic for a multi-persona user (most-representative wins)", () => {
+    expect(resolveProviderPersonaLabel(["PROVIDER_FRONT_DESK", "PROVIDER_ADMIN"])).toBe("Admin");
+    expect(resolveProviderPersonaLabel(["PROVIDER_BILLER", "PROVIDER_FINANCE"])).toBe("Finance");
   });
 });

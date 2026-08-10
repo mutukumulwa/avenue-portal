@@ -78,6 +78,23 @@ describe("sign-in form accessibility", () => {
     expect(totp.getAttribute("aria-invalid")).toBeNull();
   });
 
+  it("DEF-006: marks email and password as required to assistive tech", () => {
+    render(<LoginPage />);
+    for (const label of [/email address/i, /^password/i]) {
+      const field = screen.getByLabelText(label);
+      expect(field.hasAttribute("required")).toBe(true);
+      expect(field.getAttribute("aria-required")).toBe("true");
+    }
+  });
+
+  it("DEF-006: a valid field carries aria-invalid=\"false\" (not undefined) so state is explicit", () => {
+    render(<LoginPage />);
+    // Before any submit both required fields are pristine/valid — the attribute
+    // must be present and false, not absent.
+    expect(screen.getByLabelText(/email address/i).getAttribute("aria-invalid")).toBe("false");
+    expect(screen.getByLabelText(/^password/i).getAttribute("aria-invalid")).toBe("false");
+  });
+
   it("does not enumerate accounts in the authentication error", async () => {
     render(<LoginPage />);
 

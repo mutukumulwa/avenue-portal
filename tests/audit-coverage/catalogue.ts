@@ -53,6 +53,10 @@ export const KNOWN_AUDITING_TOKENS = [
   "overrideService.approve(",
   "overrideService.reject(",
   "ContractLifecycleService.", // every lifecycle transition logs to the audit chain
+  // WP-3.5F/G — the endorsement approve→apply + reject paths now audit internally
+  // (auditChainService.append inside the service).
+  "EndorsementsService.approveEndorsement(",
+  "EndorsementsService.rejectEndorsement(",
   "ProviderMasterDataChangeService.", // PNOS F7.4/F7.5/F7.6 — submit/transition/approve/verify/activate all audit internally
   "ProviderImprovementPlanService.", // PNOS F7.7/F8.6 — create/setStatus audit IMPROVEMENT_PLAN:* internally
   "NetworkPerformanceService.exportComparisonCsv(", // PNOS F8.6 — audits NETWORK_ANALYTICS:EXPORT internally
@@ -62,9 +66,9 @@ export const KNOWN_AUDITING_TOKENS = [
 export const AUDIT_EXCLUSIONS: Record<string, string> = {
   "(auth)/reset/actions.ts:confirmResetAction": "PRE_EXISTING_GAP — audit wiring pending",
   "(auth)/reset/actions.ts:requestResetAction": "PRE_EXISTING_GAP — audit wiring pending",
-  "(hr)/hr/roster/import/actions.ts:confirmHRImportAction": "PRE_EXISTING_GAP — audit wiring pending",
+  // WP-3.5G: confirmHRImportAction + addMemberEndorsementAction now call writeAudit —
+  // removed from the exclusion list so the harness polices them positively.
   "(hr)/hr/roster/import/actions.ts:parseHRImportAction": "READ_ONLY — parse/validate only; confirmHRImportAction persists",
-  "(hr)/hr/roster/new/actions.ts:addMemberEndorsementAction": "PRE_EXISTING_GAP — audit wiring pending",
   "analytics/renewals/[groupId]/renewal-actions.ts:commitScenarioAction": "PRE_EXISTING_GAP — audit wiring pending",
   "analytics/renewals/[groupId]/renewal-actions.ts:computeIntelligenceAction": "READ_MODEL refresh — derived analytics, no business state",
   "analytics/renewals/[groupId]/renewal-actions.ts:dispatchNoticeAction": "PRE_EXISTING_GAP — audit wiring pending",
@@ -106,8 +110,8 @@ export const AUDIT_EXCLUSIONS: Record<string, string> = {
   "cross-border/actions.ts:retireFacilityAction": "PRE_EXISTING_GAP — audit wiring pending",
   "cross-border/actions.ts:startTreatmentAction": "PRE_EXISTING_GAP — audit wiring pending",
   "cross-border/actions.ts:upsertFacilityAction": "PRE_EXISTING_GAP — audit wiring pending",
-  "endorsements/[id]/actions.ts:approveEndorsementAction": "PRE_EXISTING_GAP — audit wiring pending",
-  "endorsements/[id]/actions.ts:rejectEndorsementAction": "PRE_EXISTING_GAP — audit wiring pending",
+  // WP-3.5F/G: approveEndorsementAction + rejectEndorsementAction now delegate to
+  // EndorsementsService, which audits internally — removed from the exclusion list.
   "endorsements/[id]/amendment-actions.ts:applyAmendmentAction": "PRE_EXISTING_GAP — audit wiring pending",
   "endorsements/[id]/amendment-actions.ts:approveAmendmentAction": "PRE_EXISTING_GAP — audit wiring pending",
   "endorsements/[id]/amendment-actions.ts:computeProRataAction": "READ_MODEL — pro-rata preview computation",
@@ -149,8 +153,8 @@ export const AUDIT_EXCLUSIONS: Record<string, string> = {
   "members/[id]/onboarding/actions.ts:uploadKycDocAction": "PRE_EXISTING_GAP — audit wiring pending",
   "members/[id]/webauthn/actions.ts:createBranchEnrollmentApprovalAction": "PRE_EXISTING_GAP — audit wiring pending",
   "members/import/actions.ts:parseImportAction": "READ_ONLY — parse/validate only; confirmImportAction persists",
-  "members/reinstatement/actions.ts:approveReinstatementAction": "PRE_EXISTING_GAP — audit wiring pending",
-  "members/reinstatement/actions.ts:declineReinstatementAction": "PRE_EXISTING_GAP — audit wiring pending",
+  // WP-3.5G: approveReinstatementAction + declineReinstatementAction now call
+  // writeAudit — removed from the exclusion list so the harness polices them.
   "offline-capture/actions.ts:ingestOfflineOpsAction": "PRE_EXISTING_GAP — audit wiring pending",
   "offline-capture/actions.ts:unlockOfflineWorkAction": "PRE_EXISTING_GAP — audit wiring pending",
   // WP-2.0: all six package write sites now call writeAudit (PACKAGE_VERSION_CREATE /

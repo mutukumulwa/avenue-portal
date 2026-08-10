@@ -929,6 +929,9 @@ enum MemberRelationship {
   SPOUSE
   CHILD
   PARENT
+  // WP-3.5F: sibling dependant. Additive, forward-safe enum value — existing rows
+  // are unaffected; enrolment forms + import mappers expose it explicitly.
+  SIBLING
 }
 
 enum Gender {
@@ -967,6 +970,11 @@ model Member {
   activationDate         DateTime?
   coverStartDate         DateTime? // set during binding (may differ from activationDate)
   coverEndDate           DateTime?
+  // WP-3.5F newborn (CT-033): date the birth was notified to the operator. A
+  // newborn may be enrolled without a national ID and, when the birth is notified
+  // within 30 days, is covered from the date of birth (coverStart = DOB). Additive
+  // nullable column — pre-existing members are unaffected.
+  birthNotificationDate  DateTime?
   status                 MemberStatus       @default(PENDING_ACTIVATION)
   waitingPeriodEnd       DateTime? // General waiting period end
   smartCardNumber        String? // SMART card number if integrated

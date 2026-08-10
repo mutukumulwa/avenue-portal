@@ -59,6 +59,53 @@ export const PROVIDER_NAV_DEFINITIONS: ProviderNavDefinition[] = [
   { key: "integrations", label: "Integrations", href: "/provider/integrations", iconKey: "integrations", group: "Administration", requiredPermission: "provider.integrations.manage" },
 ];
 
+/**
+ * DEF-002 — human labels for the provider persona role codes (prisma/seeds/
+ * provider-rbac.ts). The signed-in-identity block showed a hard-coded generic
+ * "Provider" for every provider user regardless of their actual persona; this
+ * map turns the persona role code into the label an operator expects to see.
+ *
+ * Pure data (no React/next-auth) so the server layout can resolve the label and
+ * pass only the finished string to the client nav — the persona role codes never
+ * cross the boundary. PROVIDER_LEGACY is deliberately absent: a legacy/un-migrated
+ * user resolves to null here and falls back to the generic "Provider".
+ */
+export const PROVIDER_ROLE_LABELS: Record<string, string> = {
+  PROVIDER_FRONT_DESK: "Front Desk",
+  PROVIDER_CLINICIAN: "Clinician",
+  PROVIDER_BILLER: "Biller",
+  PROVIDER_FINANCE: "Finance",
+  PROVIDER_ADMIN: "Admin",
+  PROVIDER_INTEGRATION_ADMIN: "Integration Admin",
+};
+
+/**
+ * Most-representative-first precedence for the (rare) user holding more than one
+ * persona role, so the displayed label is deterministic rather than dependent on
+ * DB row order.
+ */
+const PROVIDER_PERSONA_PRIORITY: readonly string[] = [
+  "PROVIDER_ADMIN",
+  "PROVIDER_INTEGRATION_ADMIN",
+  "PROVIDER_FINANCE",
+  "PROVIDER_BILLER",
+  "PROVIDER_CLINICIAN",
+  "PROVIDER_FRONT_DESK",
+];
+
+/**
+ * Resolve the persona label for a user from their active role codes
+ * (rbacService.getUserRoles). Returns null when no persona role is present —
+ * e.g. in production before the RBAC seed assigns persona roles — so the caller
+ * falls back to the generic "Provider" persona.
+ */
+export function resolveProviderPersonaLabel(roleCodes: readonly string[]): string | null {
+  for (const code of PROVIDER_PERSONA_PRIORITY) {
+    if (roleCodes.includes(code)) return PROVIDER_ROLE_LABELS[code];
+  }
+  return null;
+}
+
 /** A browser-safe nav item — carries no permission/provider/branch authority. */
 export interface ProviderNavItemView {
   key: string;

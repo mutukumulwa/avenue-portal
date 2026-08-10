@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { PortalSwitcher } from "./PortalSwitcher";
+import { SignedInIdentity } from "./SignedInIdentity";
 
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/broker/dashboard", icon: LayoutDashboard },
@@ -24,7 +25,7 @@ const NAV_ITEMS = [
   { label: "Support", href: "/broker/support", icon: HelpCircle },
 ];
 
-export function BrokerSidebar({ userRole }: { userRole: string }) {
+export function BrokerSidebar({ userRole, userName }: { userRole: string; userName?: string | null }) {
   return (
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-[#EEEEEE] bg-white transition-transform">
       <div className="flex h-full flex-col overflow-y-auto px-3 py-4">
@@ -52,6 +53,11 @@ export function BrokerSidebar({ userRole }: { userRole: string }) {
           })}
         </ul>
         <div className="mt-auto pt-4 border-t border-[#EEEEEE]">
+          {/* DEF-001: the signed-in actor + persona must be evidenceable in the
+              broker shell too (it was the one portal still missing the block). */}
+          <div className="mb-2">
+            <SignedInIdentity name={userName} role={userRole} />
+          </div>
           <button
             onClick={() => signOut({ callbackUrl: "/login" })}
             className="w-full group flex items-center rounded-[8px] p-2 text-brand-error hover:bg-red-50 transition-colors"

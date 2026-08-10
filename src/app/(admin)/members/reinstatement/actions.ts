@@ -2,6 +2,7 @@
 
 import { requireRole, ROLES } from "@/lib/rbac";
 import { ReinstatementService } from "@/server/services/reinstatement.service";
+import { writeAudit } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
 
 export async function approveReinstatementAction(_prev: unknown, formData: FormData) {
@@ -13,6 +14,14 @@ export async function approveReinstatementAction(_prev: unknown, formData: FormD
     await ReinstatementService.approveReinstatement(
       session.user.tenantId, requestId, session.user.id, resetWaitingPeriod,
     );
+    // WP-3.5G: audit the (previously silent) reinstatement approval.
+    await writeAudit({
+      userId: session.user.id,
+      action: "MEMBER_REINSTATEMENT_APPROVED",
+      module: "MEMBERS",
+      description: `Reinstatement request ${requestId} approved${resetWaitingPeriod ? " (waiting period reset)" : ""}.`,
+      metadata: { requestId, resetWaitingPeriod },
+    });
     revalidatePath("/members/reinstatement");
     return { success: true };
   } catch (err) {
@@ -31,6 +40,14 @@ export async function declineReinstatementAction(_prev: unknown, formData: FormD
     await ReinstatementService.declineReinstatement(
       session.user.tenantId, requestId, session.user.id, declineReason,
     );
+    // WP-3.5G: audit the (previously silent) reinstatement decline.
+    await writeAudit({
+      userId: session.user.id,
+      action: "MEMBER_REINSTATEMENT_DECLINED",
+      module: "MEMBERS",
+      description: `Reinstatement request ${requestId} declined: ${declineReason}`,
+      metadata: { requestId },
+    });
     revalidatePath("/members/reinstatement");
     return { success: true };
   } catch (err) {

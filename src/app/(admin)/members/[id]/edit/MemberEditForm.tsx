@@ -1,8 +1,24 @@
 "use client";
 
 import { useActionState } from "react";
-import { Save, AlertCircle } from "lucide-react";
+import { Save, AlertCircle, Lock } from "lucide-react";
 import { updateMemberAction } from "./actions";
+import { editStatusOptions, isTerminalMemberStatus } from "@/lib/member-status";
+
+/** Human labels for every MemberStatus (covers terminal states shown read-only). */
+const STATUS_LABELS: Record<string, string> = {
+  PENDING_ACTIVATION: "Pending Activation",
+  ACTIVE: "Active",
+  SUSPENDED: "Suspended",
+  LAPSED: "Lapsed",
+  LAPSED_BEFORE_ACTIVATION: "Lapsed (before activation)",
+  TERMINATED: "Terminated",
+  CANCELLED_COOLING_OFF: "Cancelled (cooling-off)",
+  TERMINATED_FRAUD: "Terminated (fraud)",
+  TERMINATED_BREACH: "Terminated (breach)",
+  TERMINATED_DEATH: "Terminated (death)",
+  EXPIRED: "Expired",
+};
 
 const inputCls = "w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo transition-colors";
 const labelCls = "text-xs font-bold text-brand-text-muted uppercase block mb-1";
@@ -97,17 +113,32 @@ export function MemberEditForm({ member }: { member: MemberSnap }) {
                 <option value="SPOUSE">Spouse</option>
                 <option value="CHILD">Child</option>
                 <option value="PARENT">Parent</option>
+                <option value="SIBLING">Sibling</option>
               </select>
             </div>
             <div>
               <label className={labelCls}>Status *</label>
-              <select required name="status" defaultValue={member.status} className={inputCls}>
-                <option value="PENDING_ACTIVATION">Pending Activation</option>
-                <option value="ACTIVE">Active</option>
-                <option value="SUSPENDED">Suspended</option>
-                <option value="LAPSED">Lapsed</option>
-                <option value="TERMINATED">Terminated</option>
-              </select>
+              {/* WP-3.5G: a terminal member is a governed lifecycle state — the edit
+                  dropdown cannot reinstate or re-terminate it. Show it locked and
+                  submit the unchanged status; reinstatement is a separate flow. */}
+              {isTerminalMemberStatus(member.status) ? (
+                <>
+                  <input type="hidden" name="status" value={member.status} />
+                  <div className={`${inputCls} bg-[#F8F9FA] text-brand-text-muted flex items-center gap-2`}>
+                    <Lock size={13} className="shrink-0" />
+                    {STATUS_LABELS[member.status] ?? member.status}
+                  </div>
+                  <p className="text-[10px] text-brand-text-muted mt-1">
+                    Terminal state — reinstatement is a governed lifecycle flow, not an edit.
+                  </p>
+                </>
+              ) : (
+                <select required name="status" defaultValue={member.status} className={inputCls}>
+                  {editStatusOptions(member.status).map((s) => (
+                    <option key={s} value={s}>{STATUS_LABELS[s] ?? s}</option>
+                  ))}
+                </select>
+              )}
             </div>
           </div>
         </div>
