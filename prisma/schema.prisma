@@ -156,6 +156,16 @@ model Client {
   name String
   slug String // unique per operator (see @@unique)
 
+  // Normalized legal-name key for case/space/Unicode-insensitive duplicate
+  // detection (SP-3 / DEF-013/014). Computed via normalizeLegalName() on every
+  // create + rename. `@default("")` lets `db push` add the column to existing
+  // rows; the `@@unique([operatorTenantId, nameNormalized])` below is a DEPLOY
+  // step gated on a CLEAN collision report + backfill run first
+  // (scripts/uat/report-client-name-collisions.ts then
+  // scripts/uat/backfill-client-name-normalized.ts) — plan §7.1 (constraint
+  // ships only after its report is clean).
+  nameNormalized String @default("")
+
   // Transaction currency for this client (ISO 4217). Base for the platform is
   // UGX (AD-2); subsidiaries may differ and consolidate up via FX in G3.5.
   currency String @default("UGX")
@@ -200,6 +210,17 @@ model Client {
   wellnessPrograms         WellnessProgram[]
 
   @@unique([operatorTenantId, slug])
+  // DEF-013/014 — normalized-name uniqueness. DEPLOY-GATED: apply only after the
+  // collision report is clean AND nameNormalized is backfilled (plan §7.1).
+  @@unique([operatorTenantId, nameNormalized])
+  // DEF-015 — operator-wide member-number prefix uniqueness. DEPLOY-GATED: every
+  // default/fallback client currently holds "MVX", so this WILL collide until the
+  // governed MVX cleanup runs (scripts/uat/report-member-prefix-collisions.ts →
+  // reduce each (tenant, prefix) group to one row via the audited edit path). See
+  // WP-1.2 / plan §7.1. Prisma cannot express a partial unique in-schema; if the
+  // MVX rename proves infeasible at deploy, the fallback is a partial unique index
+  // in prisma/sql excluding slug='default'.
+  @@unique([operatorTenantId, memberNumberPrefix])
   @@index([operatorTenantId])
   @@index([operatorTenantId, status])
   @@index([parentClientId])

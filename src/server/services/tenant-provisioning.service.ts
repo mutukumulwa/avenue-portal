@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { normalizeLegalName } from "@/lib/normalize";
 import { ReasonCodeService } from "./reason-codes.service";
 import { OverrideControlService } from "./override-control.service";
 import { ServiceCategoryService } from "./service-category.service";
@@ -57,6 +58,7 @@ export class TenantProvisioningService {
       where: { operatorTenantId: tenantId, slug: "default" },
       select: { id: true },
     });
+    const defaultClientName = `${tenant.name} — Default Client`;
     await prisma.client.upsert({
       where: { operatorTenantId_slug: { operatorTenantId: tenantId, slug: "default" } },
       update: {},
@@ -64,8 +66,13 @@ export class TenantProvisioningService {
         id: `cl_${tenantId}`,
         operatorTenantId: tenantId,
         type: "INSURER",
-        name: `${tenant.name} — Default Client`,
+        name: defaultClientName,
+        // nameNormalized + memberNumberPrefix satisfy the Wave 1 @@unique
+        // constraints on Client. The default client is the one canonical MVX
+        // prefix per operator tenant.
+        nameNormalized: normalizeLegalName(defaultClientName),
         slug: "default",
+        memberNumberPrefix: "MVX",
         currency,
         status: "ACTIVE",
       },

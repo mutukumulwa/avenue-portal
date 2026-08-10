@@ -48,7 +48,11 @@ describe("TenantProvisioningService.provisionTenant", () => {
         operatorTenantId: "tenant_123",
         type: "INSURER",
         name: "Acme TPA — Default Client",
+        // Wave 1: default client carries the normalized-name key + the one
+        // canonical MVX prefix per tenant (satisfies the new @@unique pair).
+        nameNormalized: "acme tpa — default client",
         slug: "default",
+        memberNumberPrefix: "MVX",
         currency: "UGX",
         status: "ACTIVE",
       },

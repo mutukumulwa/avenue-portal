@@ -80,6 +80,8 @@ export default async function ClientDetailPage({
       <dl className="grid grid-cols-2 gap-5 rounded-lg border border-brand-border bg-brand-bg p-6 sm:grid-cols-4">
         <Field label="Type" value={TYPE_LABEL[client.type] ?? client.type} />
         <Field label="Currency" value={client.currency} />
+        <Field label="Member prefix" value={<span className="font-mono">{client.memberNumberPrefix}</span>} />
+        <Field label="Slug" value={<span className="font-mono">{client.slug}</span>} />
         <Field
           label="Parent client"
           value={

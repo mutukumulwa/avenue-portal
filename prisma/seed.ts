@@ -1,5 +1,6 @@
 import 'dotenv/config'
 import { prisma } from '../src/lib/prisma'
+import { normalizeLegalName } from '../src/lib/normalize'
 import bcrypt from 'bcryptjs'
 import { GLService } from '../src/server/services/gl.service'
 import { AnalyticsRefreshService } from '../src/server/services/analytics-refresh.service'
@@ -28,6 +29,7 @@ async function main() {
   // ── Default Client (multi-client TPA tenancy, G2.1) ──────────
   // The operator's directly-administered book. Every seeded scheme is linked
   // to it (sweep at the end of the seed) so no Group has a null clientId.
+  const defaultClientName = `${tenant.name} — Default Client`
   const defaultClient = await prisma.client.upsert({
     where:  { operatorTenantId_slug: { operatorTenantId: tenant.id, slug: 'default' } },
     update: {},
@@ -35,13 +37,41 @@ async function main() {
       id: `cl_${tenant.id}`,
       operatorTenantId: tenant.id,
       type: 'INSURER',
-      name: `${tenant.name} — Default Client`,
+      name: defaultClientName,
+      // nameNormalized + memberNumberPrefix are governed by @@unique on the Client
+      // model (Wave 1). The default client is the one canonical MVX prefix per tenant.
+      nameNormalized: normalizeLegalName(defaultClientName),
       slug: 'default',
+      memberNumberPrefix: 'MVX',
       currency: 'UGX',
       status: 'ACTIVE',
     },
   })
   console.log(`✅ Default client: ${defaultClient.name}`)
+
+  // Deterministic, tenant-unique member-number prefix for a seeded client.
+  // Acronym of the words, else a concatenation; forced to match the Wave 1
+  // format ^[A-Z][A-Z0-9]{2,5}$, then disambiguated against the operator-wide
+  // @@unique([operatorTenantId, memberNumberPrefix]).
+  const derivePrefix = async (name: string): Promise<string> => {
+    const words = name.toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean)
+    let base = words.map((w) => w[0]).join('')
+    if (base.length < 3) base = words.join('')
+    base = base.replace(/[^A-Z0-9]/g, '')
+    if (!/^[A-Z]/.test(base)) base = `X${base}`
+    base = base.slice(0, 6)
+    while (base.length < 3) base += 'X'
+    let candidate = base
+    for (let n = 2; ; n++) {
+      const clash = await prisma.client.findFirst({
+        where: { operatorTenantId: tenant.id, memberNumberPrefix: candidate },
+        select: { id: true },
+      })
+      if (!clash) return candidate
+      const suffix = String(n)
+      candidate = base.slice(0, 6 - suffix.length) + suffix
+    }
+  }
 
   // ── One Client per employer (payer boundary) ──────────────────────────────
   // Each employer scheme gets its OWN Client. Never pool distinct employers
@@ -51,11 +81,15 @@ async function main() {
   // the operator's own book — schemes are NOT hung off it.
   const clientFor = async (name: string, type: 'INSURER' | 'EMPLOYER_SELF_FUNDED') => {
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
-    return prisma.client.upsert({
-      where:  { operatorTenantId_slug: { operatorTenantId: tenant.id, slug } },
-      update: {},
-      create: {
+    const existing = await prisma.client.findUnique({
+      where: { operatorTenantId_slug: { operatorTenantId: tenant.id, slug } },
+    })
+    if (existing) return existing
+    return prisma.client.create({
+      data: {
         operatorTenantId: tenant.id, type, name, slug,
+        nameNormalized: normalizeLegalName(name),
+        memberNumberPrefix: await derivePrefix(name),
         currency: 'UGX', status: 'ACTIVE',
       },
     })
