@@ -12,6 +12,8 @@ const db = vi.hoisted(() => ({
     updateMany: vi.fn(async () => ({ count: 1 })),
   },
   member: { update: vi.fn(async () => ({ id: "m1" })) },
+  // WP-3.5E: MEMBER_DELETION now closes the leaver's coverage period.
+  memberCoveragePeriod: { findMany: vi.fn(async () => []), update: vi.fn(async () => ({})) },
 }));
 
 vi.mock("@/lib/prisma", () => ({ prisma: db }));

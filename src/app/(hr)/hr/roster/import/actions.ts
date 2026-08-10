@@ -4,6 +4,7 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import Papa from "papaparse";
 import type { Gender, MemberRelationship } from "@prisma/client";
+import { checkEnrolmentAge } from "@/server/services/eligibility/enrolment-age";
 
 export type ParsedRow = {
   row: number;
@@ -136,7 +137,20 @@ export async function confirmHRImportAction(
   const failed: ImportResult["failed"] = [];
   let imported = 0;
 
+  // WP-3.5D: reject over-age / future-DOB rows up front against the scheme
+  // package's caps (re-enforced when the endorsement is approved).
+  const group = await prisma.group.findUnique({ where: { id: groupId }, select: { packageId: true } });
+  const ageRules = group
+    ? await prisma.package.findUnique({ where: { id: group.packageId }, select: { maxAge: true, dependentMaxAge: true } })
+    : null;
+  const enrolmentAsOf = new Date();
+
   for (const row of valid) {
+    const age = checkEnrolmentAge({ relationship: row.relationship, dateOfBirth: row.dateOfBirth }, enrolmentAsOf, ageRules);
+    if (!age.ok) {
+      failed.push({ row: row.row, name: `${row.firstName} ${row.lastName}`, error: age.reason });
+      continue;
+    }
     try {
       const endorsementNumber = `REQ-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
 

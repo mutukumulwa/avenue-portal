@@ -29,6 +29,8 @@ const db = vi.hoisted(() => {
     membershipExclusion: { create: vi.fn(async () => ({})) },
     waitingPeriodApplication: { create: vi.fn(async () => ({})) },
     memberCoveragePeriod: { findFirst: vi.fn(async () => null), create: vi.fn(async () => ({})) },
+    // F-PIN-2 / WP-3.5D: binding resolves the package's current version (pin) + age caps.
+    package: { findUnique: vi.fn(async () => ({ currentVersionId: "pv1", maxAge: 65, dependentMaxAge: 24 })) },
     $transaction: vi.fn(async (fn: any) => fn(state)),
   };
   return state;

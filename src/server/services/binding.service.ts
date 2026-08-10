@@ -9,6 +9,7 @@ import { resolveMemberPrefix } from "./member-numbering.service";
 import { niraService } from "./integrations/nira.service";
 import { pdfService } from "./pdf.service";
 import { coverageService } from "./coverage.service";
+import { assertEnrolmentAge } from "./eligibility/enrolment-age";
 import { renderQuotationHtml } from "../templates/pdf/quotation.template";
 
 // ─── HELPERS ─────────────────────────────────────────────────────────────────
@@ -187,6 +188,28 @@ export const bindingService = {
       });
     }
 
+    // ── WP-3.5D / F-PIN-2: resolve the package once ───────────────────────────
+    // (1) `currentVersionId` pins the group + members to a fixed benefit version so
+    //     SP-6 never reads NOT_YET_ENROLLED on a bound member;
+    // (2) age caps drive the enrolment age gate. Pre-validate EVERY life BEFORE any
+    //     write (relationship derived exactly as the create loops do) so an over-age
+    //     life fails the whole bind cleanly — never a half-created group/member set.
+    const pkg = await prisma.package.findUnique({
+      where: { id: quotation.packageId, tenantId },
+      select: { currentVersionId: true, maxAge: true, dependentMaxAge: true },
+    });
+    const packageVersionId = pkg?.currentVersionId ?? null;
+    const coverStartForAge = quotation.requestedCoverStart ?? new Date();
+    for (const life of quotation.lives) {
+      const relationship =
+        life.role === "PRINCIPAL" ? "PRINCIPAL" : life.gender === "FEMALE" ? "SPOUSE" : "CHILD";
+      assertEnrolmentAge(
+        { relationship, dateOfBirth: life.dateOfBirth, firstName: life.firstName, lastName: life.lastName },
+        coverStartForAge,
+        pkg,
+      );
+    }
+
     // ── Find or create the Group (atomic double-bind guard) ────
     // Binding is one-shot per quotation. New business: create the group, then
     // atomically claim the quotation's empty group slot (groupId null → this
@@ -219,6 +242,7 @@ export const bindingService = {
           contactPersonPhone: "",
           contactPersonEmail: quotation.billingContactEmail ?? quotation.prospectEmail ?? "",
           packageId:          quotation.packageId!,
+          packageVersionId,
           contributionRate:   quotation.ratePerMember ?? 0,
           effectiveDate,
           renewalDate,
@@ -290,6 +314,7 @@ export const bindingService = {
           gender:       life.gender,
           relationship: MemberRelationship.PRINCIPAL,
           packageId:    quotation.packageId!,
+          packageVersionId,
           enrollmentDate: new Date(),
           coverStartDate:  coverStart,
           coverEndDate:    coverEnd,
@@ -360,6 +385,7 @@ export const bindingService = {
           relationship: rel,
           principalId:  principalMemberId,
           packageId:    quotation.packageId!,
+          packageVersionId,
           enrollmentDate: new Date(),
           coverStartDate:  coverStart,
           coverEndDate:    coverEnd,

@@ -6,6 +6,8 @@ import { prisma } from "@/lib/prisma";
 import { writeAudit } from "@/lib/audit";
 import { resolveSchemeClientId } from "@/server/services/clientResolve";
 import { nextMemberNumber } from "@/server/services/member-numbering.service";
+import { coverageService } from "@/server/services/coverage.service";
+import { assertEnrolmentAge } from "@/server/services/eligibility/enrolment-age";
 
 export async function enrollIndividualClientAction(formData: FormData) {
   const session = await requireRole(ROLES.MEMBER_OPS);
@@ -24,13 +26,21 @@ export async function enrollIndividualClientAction(formData: FormData) {
 
   const pkg = await prisma.package.findUnique({
     where: { id: packageId, tenantId },
-    select: { id: true, contributionAmount: true, currentVersionId: true },
+    select: { id: true, contributionAmount: true, currentVersionId: true, maxAge: true, dependentMaxAge: true },
   });
   if (!pkg) throw new Error("Package not found.");
 
   const effectiveDateObj = new Date(effectiveDate);
   const renewalDate = new Date(effectiveDateObj);
   renewalDate.setFullYear(renewalDate.getFullYear() + 1);
+
+  // WP-3.5D: age gate — the individual client is enrolled as a PRINCIPAL, so the
+  // package max-age applies as of the effective date (future/impossible DOB too).
+  assertEnrolmentAge(
+    { relationship: "PRINCIPAL", dateOfBirth: dateOfBirth, firstName, lastName },
+    effectiveDateObj,
+    pkg,
+  );
 
   // Individual clients get a synthetic "group" record named after the person
   // B4-WIDE: seed the synthetic individual-group ref from max+1 (not count()+1)
@@ -68,7 +78,7 @@ export async function enrollIndividualClientAction(formData: FormData) {
   // Enroll the individual as principal member of their own group (G9.6 prefix)
   const memberNumber = await nextMemberNumber(tenantId, session.user.clientId);
 
-  await prisma.member.create({
+  const member = await prisma.member.create({
     data: {
       tenantId,
       groupId:          group.id,
@@ -83,9 +93,14 @@ export async function enrollIndividualClientAction(formData: FormData) {
       relationship:     "PRINCIPAL",
       enrollmentDate:   effectiveDateObj,
       activationDate:   effectiveDateObj,
+      coverStartDate:   effectiveDateObj,
       status:           "ACTIVE",
     },
   });
+
+  // WP-3.5E: open a coverage period from the effective date so point-in-time
+  // eligibility sees this member (previously individual enrolees got none).
+  await coverageService.openPeriod(prisma, tenantId, member.id, effectiveDateObj, "ENROLMENT");
 
   await writeAudit({
     userId: session.user.id,

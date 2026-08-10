@@ -89,6 +89,17 @@ export function MemberNewForm({ groups, principal }: Props) {
                 <option value="PARENT">Parent</option>
               </select>
             </div>
+            <div>
+              <label className={labelCls}>Effective Date *</label>
+              <input
+                required
+                name="effectiveDate"
+                type="date"
+                defaultValue={new Date().toISOString().slice(0, 10)}
+                className={inputCls}
+              />
+              <p className="text-[10px] text-brand-text-muted mt-1">Cover start — drives eligibility from this date.</p>
+            </div>
           </div>
         </div>
 

@@ -14,6 +14,20 @@ import { EndorsementType, ProRataType } from "@prisma/client";
 import { auditChainService } from "./audit-chain.service";
 import { overrideService } from "./override.service";
 
+/**
+ * F-PIN-3: whenever an amendment changes a member's/group's `packageId`, the
+ * `packageVersionId` pin must move with it — otherwise the member stays pinned to
+ * a version of a DIFFERENT package (cost-share / usage price on the wrong terms).
+ * Resolves the target package's current version.
+ */
+async function resolvePackageVersionId(packageId: string): Promise<string | null> {
+  const pkg = await prisma.package.findUnique({
+    where: { id: packageId },
+    select: { currentVersionId: true },
+  });
+  return pkg?.currentVersionId ?? null;
+}
+
 // ─── AMENDMENT TAXONOMY ───────────────────────────────────────────────────────
 
 /**
@@ -354,9 +368,16 @@ export const amendmentService = {
       case "TIER_CHANGE":
         if (endorsement.memberId && endorsement.toBenefitTierId) {
           const tier = await prisma.groupBenefitTier.findUnique({ where: { id: endorsement.toBenefitTierId } });
+          // F-PIN-3: when the tier moves the member onto a (possibly different)
+          // package, re-pin packageVersionId to that package's current version.
+          const newVersionId = tier?.packageId ? await resolvePackageVersionId(tier.packageId) : undefined;
           await prisma.member.update({
             where: { id: endorsement.memberId },
-            data: { benefitTierId: endorsement.toBenefitTierId, packageId: tier?.packageId ?? undefined },
+            data: {
+              benefitTierId: endorsement.toBenefitTierId,
+              packageId: tier?.packageId ?? undefined,
+              ...(tier?.packageId ? { packageVersionId: newVersionId } : {}),
+            },
           });
         }
         break;
@@ -373,11 +394,22 @@ export const amendmentService = {
       case "PACKAGE_UPGRADE":
       case "PACKAGE_DOWNGRADE": {
         const newPkgId = String(details.toPackageId ?? "");
-        if (endorsement.memberId && newPkgId) {
-          await prisma.member.update({ where: { id: endorsement.memberId }, data: { packageId: newPkgId } });
-        } else if (!endorsement.memberId && newPkgId) {
-          // Group-level package change
-          await prisma.group.update({ where: { id: endorsement.groupId }, data: { packageId: newPkgId } });
+        if (newPkgId) {
+          // F-PIN-3: re-pin packageVersionId to the new package's current version
+          // alongside packageId (member- or group-level), never leaving a stale pin.
+          const newVersionId = await resolvePackageVersionId(newPkgId);
+          if (endorsement.memberId) {
+            await prisma.member.update({
+              where: { id: endorsement.memberId },
+              data: { packageId: newPkgId, packageVersionId: newVersionId },
+            });
+          } else {
+            // Group-level package change
+            await prisma.group.update({
+              where: { id: endorsement.groupId },
+              data: { packageId: newPkgId, packageVersionId: newVersionId },
+            });
+          }
         }
         break;
       }

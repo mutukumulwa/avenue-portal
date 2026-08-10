@@ -199,7 +199,7 @@ export const lifecycleService = {
 
   // ── 5. Cooling-off cancellation ───────────────────────────────────────────
 
-  async initiateCoolingOffCancellation(memberId: string, tenantId: string, requestedById: string) {
+  async initiateCoolingOffCancellation(memberId: string, tenantId: string, requestedById: string, effectiveDate?: Date) {
     const member = await prisma.member.findUnique({
       where: { id: memberId, tenantId },
       include: { group: { select: { brokerId: true, contributionRate: true } } },
@@ -216,6 +216,9 @@ export const lifecycleService = {
       });
     }
 
+    // WP-3.5E: honour the approved effective (last) day for cover-end + period close.
+    const effective = effectiveDate ?? new Date();
+
     // Full refund: contributions paid (approximate from contribution rate × days)
     const daysSinceStart = Math.ceil((Date.now() - coverStart.getTime()) / (24 * 60 * 60 * 1000));
     const refundAmount   = (Number(member.group.contributionRate) / 365) * daysSinceStart;
@@ -223,16 +226,16 @@ export const lifecycleService = {
     await prisma.$transaction(async (tx) => {
       await tx.member.update({
         where: { id: memberId },
-        data:  { status: "CANCELLED_COOLING_OFF" },
+        data:  { status: "CANCELLED_COOLING_OFF", coverEndDate: effective },
       });
-      await coverageService.closeOpenPeriods(tx, memberId, new Date(), "CANCELLED_COOLING_OFF");
+      await coverageService.closeOpenPeriods(tx, memberId, effective, "CANCELLED_COOLING_OFF");
 
       await tx.membershipCancellationRecord.create({
         data: {
           tenantId, memberId,
           cancellationType: CancellationType.COOLING_OFF,
           requestedById,
-          effectiveDate:    new Date(),
+          effectiveDate:    effective,
           isCoolingOff:     true,
           refundAmount,
           benefitsClawedBack: true,
@@ -264,6 +267,7 @@ export const lifecycleService = {
     tenantId: string,
     requestedById: string,
     adminFeeKes = 500,
+    effectiveDate?: Date,
   ) {
     const member = await prisma.member.findUnique({
       where: { id: memberId, tenantId },
@@ -273,6 +277,9 @@ export const lifecycleService = {
     if (member.status !== "ACTIVE") {
       throw new TRPCError({ code: "BAD_REQUEST", message: "Member must be ACTIVE for standard cancellation" });
     }
+
+    // WP-3.5E: honour the approved effective (last) day for cover-end + period close.
+    const effective = effectiveDate ?? new Date();
 
     // Pro-rata refund for remaining period minus admin fee
     const remainingMs     = member.group.renewalDate.getTime() - Date.now();
@@ -284,16 +291,16 @@ export const lifecycleService = {
     await prisma.$transaction(async (tx) => {
       await tx.member.update({
         where: { id: memberId },
-        data:  { status: "TERMINATED" },
+        data:  { status: "TERMINATED", coverEndDate: effective },
       });
-      await coverageService.closeOpenPeriods(tx, memberId, new Date(), "TERMINATED");
+      await coverageService.closeOpenPeriods(tx, memberId, effective, "TERMINATED");
 
       await tx.membershipCancellationRecord.create({
         data: {
           tenantId, memberId,
           cancellationType: CancellationType.STANDARD,
           requestedById,
-          effectiveDate:   new Date(),
+          effectiveDate:   effective,
           isCoolingOff:    false,
           refundAmount,
           adminFeeDeducted: adminFeeKes,
@@ -323,6 +330,7 @@ export const lifecycleService = {
     actorId: string,
     reasonCode: string,
     narrative?: string,
+    effectiveDate?: Date,
   ) {
     const member = await prisma.member.findUnique({
       where: { id: memberId, tenantId },
@@ -330,12 +338,15 @@ export const lifecycleService = {
     });
     if (!member) throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
 
+    // WP-3.5E: honour the approved effective (last) day for cover-end + period close.
+    const effective = effectiveDate ?? new Date();
+
     await prisma.$transaction(async (tx) => {
       await tx.member.update({
         where: { id: memberId },
-        data:  { status: "TERMINATED_FRAUD" },
+        data:  { status: "TERMINATED_FRAUD", coverEndDate: effective },
       });
-      await coverageService.closeOpenPeriods(tx, memberId, new Date(), "TERMINATED_FRAUD");
+      await coverageService.closeOpenPeriods(tx, memberId, effective, "TERMINATED_FRAUD");
 
       await tx.membershipTerminationRecord.create({
         data: {
@@ -344,7 +355,7 @@ export const lifecycleService = {
           initiatedById:   actorId,
           reasonCode,
           narrative,
-          effectiveDate:   new Date(),
+          effectiveDate:   effective,
           blacklisted:     true,
         },
       });
@@ -396,6 +407,7 @@ export const lifecycleService = {
     actorId: string,
     reasonCode: string,
     narrative?: string,
+    effectiveDate?: Date,
   ) {
     const member = await prisma.member.findUnique({
       where: { id: memberId, tenantId },
@@ -403,12 +415,15 @@ export const lifecycleService = {
     });
     if (!member) throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
 
+    // WP-3.5E: honour the approved effective (last) day for cover-end + period close.
+    const effective = effectiveDate ?? new Date();
+
     await prisma.$transaction(async (tx) => {
       await tx.member.update({
         where: { id: memberId },
-        data:  { status: "TERMINATED_BREACH" },
+        data:  { status: "TERMINATED_BREACH", coverEndDate: effective },
       });
-      await coverageService.closeOpenPeriods(tx, memberId, new Date(), "TERMINATED_BREACH");
+      await coverageService.closeOpenPeriods(tx, memberId, effective, "TERMINATED_BREACH");
 
       await tx.membershipTerminationRecord.create({
         data: {
@@ -417,7 +432,7 @@ export const lifecycleService = {
           initiatedById:   actorId,
           reasonCode,
           narrative,
-          effectiveDate:   new Date(),
+          effectiveDate:   effective,
           blacklisted:     false,
         },
       });
@@ -444,6 +459,7 @@ export const lifecycleService = {
     tenantId: string,
     actorId: string,
     proofDocUrl: string,
+    effectiveDate?: Date,
   ) {
     const member = await prisma.member.findUnique({
       where: { id: memberId, tenantId },
@@ -454,6 +470,9 @@ export const lifecycleService = {
     });
     if (!member) throw new TRPCError({ code: "NOT_FOUND", message: "Member not found" });
 
+    // WP-3.5E: honour the approved effective (last) day for cover-end + period close.
+    const effective = effectiveDate ?? new Date();
+
     // Pro-rata refund for unutilized period (to estate/beneficiary)
     const remainingDays = Math.max(0, Math.ceil((member.group.renewalDate.getTime() - Date.now()) / (24 * 60 * 60 * 1000)));
     const proRataRefund = (Number(member.group.contributionRate) / 365) * remainingDays;
@@ -461,9 +480,9 @@ export const lifecycleService = {
     await prisma.$transaction(async (tx) => {
       await tx.member.update({
         where: { id: memberId },
-        data:  { status: "TERMINATED_DEATH" },
+        data:  { status: "TERMINATED_DEATH", coverEndDate: effective },
       });
-      await coverageService.closeOpenPeriods(tx, memberId, new Date(), "TERMINATED_DEATH");
+      await coverageService.closeOpenPeriods(tx, memberId, effective, "TERMINATED_DEATH");
 
       await tx.membershipTerminationRecord.create({
         data: {
@@ -472,18 +491,23 @@ export const lifecycleService = {
           initiatedById:   actorId,
           reasonCode:      "PRINCIPAL_DEATH",
           narrative:       `Proof of death: ${proofDocUrl}`,
-          effectiveDate:   new Date(),
+          effectiveDate:   effective,
           proRataRefund,
           blacklisted:     false,
         },
       });
 
-      // Suspend active dependants (they need separate continuation or termination)
+      // Suspend active dependants (they need separate continuation or termination).
+      // WP-3.5E: close their open coverage periods at the same date so point-in-time
+      // eligibility stops covering them past the principal's death.
       if (member.dependents.length > 0) {
         await tx.member.updateMany({
           where: { id: { in: member.dependents.map((d) => d.id) }, tenantId },
           data:  { status: "SUSPENDED" },
         });
+        for (const dep of member.dependents) {
+          await coverageService.closeOpenPeriods(tx, dep.id, effective, "SUSPENDED");
+        }
       }
     });
 

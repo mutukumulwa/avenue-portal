@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import type { MemberStatus, MemberRelationship, Gender } from "@prisma/client";
 import { FraudService } from "./fraud.service";
 import { nextMemberNumber } from "./member-numbering.service";
+import { coverageService } from "./coverage.service";
+import { assertEnrolmentAge } from "./eligibility/enrolment-age";
 
 export class MembersService {
   /**
@@ -54,6 +56,12 @@ export class MembersService {
     email?: string;
     relationship?: "PRINCIPAL" | "SPOUSE" | "CHILD" | "PARENT";
     principalId?: string;
+    /**
+     * WP-3.5E: operator-supplied enrolment effective date. Drives enrollmentDate,
+     * coverStartDate and the opening MemberCoveragePeriod so point-in-time
+     * eligibility resolves by the real cover start, not "now". Defaults to today.
+     */
+    effectiveDate?: string | Date;
   }) {
     const group = await prisma.group.findUnique({
       where: { id: data.groupId, tenantId },
@@ -81,6 +89,25 @@ export class MembersService {
       effectiveGroup = principal.group;
       data.groupId = principal.groupId;
     }
+
+    // ── WP-3.5D: age gate at enrolment ────────────────────────────────────────
+    // Reject an over-age principal / dependant (and future/impossible DOB) against
+    // the scheme package's caps, as of the effective date. Exactly-max is eligible.
+    const effectiveDate = data.effectiveDate ? new Date(data.effectiveDate) : new Date();
+    const ageRules = await prisma.package.findUnique({
+      where: { id: effectiveGroup.packageId, tenantId },
+      select: { maxAge: true, dependentMaxAge: true },
+    });
+    assertEnrolmentAge(
+      {
+        relationship: data.relationship ?? "PRINCIPAL",
+        dateOfBirth: data.dateOfBirth,
+        firstName: data.firstName,
+        lastName: data.lastName,
+      },
+      effectiveDate,
+      ageRules,
+    );
 
     // ── Duplicate detection ───────────────────────────────────────────────────
     // 1. National ID uniqueness (skip if blank)
@@ -156,10 +183,16 @@ export class MembersService {
         principalId: data.principalId,
         packageId: effectiveGroup.packageId,
         packageVersionId: effectiveGroup.packageVersionId,
-        enrollmentDate: new Date(),
+        enrollmentDate: effectiveDate,
+        coverStartDate: effectiveDate,
         status: "ACTIVE", // For milestone simplicity
       },
     });
+
+    // WP-3.5E: open a coverage period from the effective date so the point-in-time
+    // engine (coverageService) sees this member. Manually / import-enrolled members
+    // previously got NONE — the eligibility engine was blind to them. Idempotent.
+    await coverageService.openPeriod(prisma, tenantId, member.id, effectiveDate, "ENROLMENT");
 
     return { member, warnings: enrollmentWarnings };
   }
@@ -202,7 +235,7 @@ export class MembersService {
       if (dup) throw new Error(`Phone "${newPhone}" is already assigned to ${dup.firstName} ${dup.lastName} (${dup.memberNumber})`);
     }
 
-    return prisma.member.update({
+    const updated = await prisma.member.update({
       where: { id: memberId, tenantId },
       data: {
         firstName: data.firstName,
@@ -217,5 +250,17 @@ export class MembersService {
         status: data.status,
       },
     });
+
+    // WP-3.5E: keep coverage history correct across a manual suspend / reinstate so
+    // point-in-time eligibility is right. Suspending closes the open period (no
+    // cover during suspension); reinstating from SUSPENDED reopens a fresh one,
+    // leaving the suspension window as an uncovered gap.
+    if (member.status !== "SUSPENDED" && data.status === "SUSPENDED") {
+      await coverageService.closeOpenPeriods(prisma, memberId, new Date(), "SUSPENDED");
+    } else if (member.status === "SUSPENDED" && data.status === "ACTIVE") {
+      await coverageService.openPeriod(prisma, tenantId, memberId, new Date(), "REINSTATEMENT");
+    }
+
+    return updated;
   }
 }

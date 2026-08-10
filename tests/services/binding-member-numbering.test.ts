@@ -36,6 +36,8 @@ const db = vi.hoisted(() => {
     membershipExclusion: { create: vi.fn(async () => ({})) },
     waitingPeriodApplication: { create: vi.fn(async () => ({})) },
     memberCoveragePeriod: { findFirst: vi.fn(async () => null), create: vi.fn(async () => ({})) },
+    // F-PIN-2 / WP-3.5D: binding resolves the package's current version (pin) + age caps.
+    package: { findUnique: vi.fn(async () => ({ currentVersionId: "pv1", maxAge: 65, dependentMaxAge: 24 })) },
     $transaction: vi.fn(async (fn: any) => fn(state)),
   };
   return state;
@@ -128,6 +130,44 @@ describe("createMemberships — client member-number prefix (WP-3.5C / CT-004)",
     }
     // The real resolveMemberPrefix consulted the client master for the prefix.
     expect(db.client.findFirst).toHaveBeenCalled();
+  });
+
+  it("pins the group + bound members to the package current version (F-PIN-2)", async () => {
+    db.quotation.findUnique.mockResolvedValue(acceptedQuote());
+
+    await bindingService.createMemberships("q1", "t1", "maker1");
+
+    // Group carries the pin so members inherit a fixed benefit version.
+    expect(db.group.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ packageVersionId: "pv1" }) }),
+    );
+    // Every member (principal + dependant) has a NON-NULL pin — SP-6 would otherwise
+    // read NOT_YET_ENROLLED off a null pin.
+    const pins = db.member.create.mock.calls.map((c: any) => c[0].data.packageVersionId);
+    expect(pins).toHaveLength(2);
+    for (const p of pins) expect(p).toBe("pv1");
+  });
+
+  it("rejects binding when a life is over the package dependant max age (WP-3.5D)", async () => {
+    db.package.findUnique.mockResolvedValueOnce({ currentVersionId: "pv1", maxAge: 65, dependentMaxAge: 24 });
+    db.quotation.findUnique.mockResolvedValue(
+      acceptedQuote({
+        lives: [
+          { id: "l1", role: "PRINCIPAL", firstName: "John", lastName: "Doe", nationalId: null,
+            dateOfBirth: new Date("1990-01-01"), gender: "MALE", principalLifeId: null, decision: null },
+          // Male dependant (→ CHILD) born 1990 → ~36y as of 2026-08-01 cover start, over 24.
+          { id: "l2", role: "DEPENDANT", firstName: "Old", lastName: "Child", nationalId: null,
+            dateOfBirth: new Date("1990-01-01"), gender: "MALE", principalLifeId: "l1", decision: null },
+        ],
+      }),
+    );
+
+    await expect(bindingService.createMemberships("q1", "t1", "maker1")).rejects.toThrow(
+      /maximum dependant age/i,
+    );
+    // Pre-validated BEFORE any write — no group / member created.
+    expect(db.group.create).not.toHaveBeenCalled();
+    expect(db.member.create).not.toHaveBeenCalled();
   });
 
   it("uses the existing group's client on a renewal/re-bind (groupId already set)", async () => {

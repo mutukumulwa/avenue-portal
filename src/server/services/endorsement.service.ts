@@ -2,8 +2,29 @@ import { prisma } from "@/lib/prisma";
 import { peekNextDocumentNumber } from "@/lib/document-number";
 import { GLService } from "@/server/services/gl.service";
 import { nextMemberNumber } from "@/server/services/member-numbering.service";
+import { coverageService } from "@/server/services/coverage.service";
+import { assertEnrolmentAge } from "@/server/services/eligibility/enrolment-age";
 import type { Gender, MemberRelationship } from "@prisma/client";
 
+/**
+ * Resolve a leaver's inclusive last covered day (WP-3.5E). Prefers the
+ * operator-approved `lastDay` from the endorsement's changeDetails, then the
+ * endorsement effectiveDate, then today — always returns a valid Date.
+ */
+function resolveLeaverLastDay(
+  rawLastDay: unknown,
+  effectiveDate: Date | string | null | undefined,
+): Date {
+  if (rawLastDay != null && rawLastDay !== "") {
+    const d = new Date(rawLastDay as string);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  if (effectiveDate != null && effectiveDate !== "") {
+    const d = new Date(effectiveDate);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  return new Date();
+}
 
 export class EndorsementsService {
   /**
@@ -144,9 +165,29 @@ export class EndorsementsService {
       const details = endorsement.changeDetails as Record<string, string>;
 
       const group = await prisma.group.findUnique({ where: { id: endorsement.groupId }});
+      const effectiveDate = new Date(endorsement.effectiveDate);
+
+      // WP-3.5D: age gate as of the endorsement effective date (rejects over-age /
+      // future / impossible DOB before the member is minted). Throws → the outer
+      // catch reverts the endorsement to SUBMITTED (stays pending + retryable).
+      const ageRules = await prisma.package.findUnique({
+        where: { id: group!.packageId },
+        select: { maxAge: true, dependentMaxAge: true },
+      });
+      assertEnrolmentAge(
+        {
+          relationship: details.relationship || "PRINCIPAL",
+          dateOfBirth: details.dateOfBirth,
+          firstName: details.firstName,
+          lastName: details.lastName,
+        },
+        effectiveDate,
+        ageRules,
+      );
+
       // Client-configurable member number prefix (G9.6)
       const memberNumber = await nextMemberNumber(tenantId, group?.clientId);
-      
+
       const newMember = await prisma.member.create({
         data: {
           tenantId,
@@ -158,12 +199,17 @@ export class EndorsementsService {
           gender: details.gender as Gender,
           relationship: (details.relationship || "PRINCIPAL") as MemberRelationship,
           status: "ACTIVE", // Activate upon approval
-          enrollmentDate: new Date(endorsement.effectiveDate),
+          enrollmentDate: effectiveDate,
+          coverStartDate: effectiveDate,
           packageId: group!.packageId,
           packageVersionId: group!.packageVersionId,
         }
       });
-      
+
+      // WP-3.5E: open a coverage period from the effective date so point-in-time
+      // eligibility sees the endorsement-added member (previously it got none).
+      await coverageService.openPeriod(prisma, tenantId, newMember.id, effectiveDate, "ENDORSEMENT");
+
       // Document the member relation on the endorsement
       await prisma.endorsement.update({
         where: { id: endorsement.id },
@@ -172,10 +218,17 @@ export class EndorsementsService {
     } else if (endorsement.type === "MEMBER_DELETION" && endorsement.changeDetails) {
        const details = endorsement.changeDetails as Record<string, string>;
        if (details.memberId) {
+          // WP-3.5E leaver inclusive-last-day (EO-010/011): honour the APPROVED last
+          // day (falling back to the endorsement effective date, then today). The
+          // member stays covered THROUGH that day — coverEndDate + the coverage
+          // period both close ON it, so a member off effective the 6th is covered on
+          // the 6th, not the 7th (coverageService.evaluate is inclusive: date <= end).
+          const lastDay = resolveLeaverLastDay(details.lastDay, endorsement.effectiveDate);
           await prisma.member.update({
             where: { id: details.memberId },
-            data: { status: "TERMINATED", updatedAt: new Date() },
+            data: { status: "TERMINATED", coverEndDate: lastDay, updatedAt: new Date() },
           });
+          await coverageService.closeOpenPeriods(prisma, details.memberId, lastDay, "TERMINATED");
        }
     }
 

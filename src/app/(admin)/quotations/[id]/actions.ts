@@ -53,6 +53,13 @@ export async function acceptQuotationAction(formData: FormData) {
     const count = await prisma.group.count({ where: { tenantId } });
     const groupNumber = `GRP-${new Date().getFullYear()}-${String(count + 1).padStart(5, "0")}`;
 
+    // F-PIN-2: pin the group to the package's current version so members inherit a
+    // fixed benefit version and SP-6 never reads NOT_YET_ENROLLED / fails open.
+    const pkg = await prisma.package.findUnique({
+      where: { id: q.packageId, tenantId },
+      select: { currentVersionId: true },
+    });
+
     const group = await prisma.group.create({
       data: {
         tenantId,
@@ -63,6 +70,7 @@ export async function acceptQuotationAction(formData: FormData) {
         contactPersonPhone: "",
         contactPersonEmail: q.prospectEmail ?? "",
         packageId: q.packageId,
+        packageVersionId: pkg?.currentVersionId ?? null,
         contributionRate: q.ratePerMember ?? 0,
         effectiveDate,
         renewalDate,

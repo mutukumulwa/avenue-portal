@@ -26,6 +26,8 @@ export async function addMemberAction(
     // NW-D02: link a dependant to its principal when the form was opened from a
     // principal's "Add Dependent" action (/members/new?principalId=…).
     principalId:  (formData.get("principalId") as string | null)?.trim() || undefined,
+    // WP-3.5E: enrolment effective date drives enrollmentDate + coverage period.
+    effectiveDate: (formData.get("effectiveDate") as string | null)?.trim() || undefined,
   };
 
   let memberNumber: string | undefined;

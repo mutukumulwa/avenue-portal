@@ -452,8 +452,10 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
                 </button>
               </form>
               {/* Standard cancellation */}
-              <form action={initiateStandardCancellationAction}>
+              <form action={initiateStandardCancellationAction} className="flex items-center gap-1">
                 <input type="hidden" name="memberId" value={id} />
+                <input name="effectiveDate" type="date" title="Effective (last covered) day — defaults to today"
+                  className="border border-[#EEEEEE] rounded-[6px] px-2 py-1.5 text-xs" />
                 <button type="submit"
                   className="border border-[#6C757D] text-[#6C757D] px-3 py-1.5 rounded-full text-xs font-semibold hover:bg-[#6C757D]/10 transition-colors">
                   Standard Cancel
@@ -474,6 +476,8 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
               <input type="hidden" name="memberId" value={id} />
               <input name="proofDocUrl" type="url" required placeholder="Proof of death document URL"
                 className="flex-1 border border-[#EEEEEE] rounded-[6px] px-3 py-1.5 text-xs focus:ring-1 focus:ring-brand-indigo focus:outline-none" />
+              <input name="effectiveDate" type="date" title="Date of death (last covered day) — defaults to today"
+                className="border border-[#EEEEEE] rounded-[6px] px-2 py-1.5 text-xs" />
               <button type="submit"
                 className="border border-[#DC3545] text-[#DC3545] px-3 py-1.5 rounded-full text-xs font-semibold hover:bg-[#DC3545]/10 transition-colors whitespace-nowrap">
                 Record Death
@@ -494,6 +498,8 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
                 </select>
                 <input name="narrative" type="text" placeholder="Narrative (optional)"
                   className="flex-1 border border-[#EEEEEE] rounded-[6px] px-2 py-1.5 text-xs" />
+                <input name="effectiveDate" type="date" title="Effective (last covered) day — defaults to today"
+                  className="border border-[#EEEEEE] rounded-[6px] px-2 py-1.5 text-xs" />
                 <button type="submit"
                   className="border border-[#DC3545] text-[#DC3545] px-3 py-1.5 rounded-full text-xs font-semibold hover:bg-[#DC3545]/10 transition-colors whitespace-nowrap">
                   Terminate (Breach)
@@ -510,6 +516,8 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
                 </select>
                 <input name="narrative" type="text" placeholder="Supporting case reference"
                   className="flex-1 border border-[#EEEEEE] rounded-[6px] px-2 py-1.5 text-xs" />
+                <input name="effectiveDate" type="date" title="Effective (last covered) day — defaults to today"
+                  className="border border-[#EEEEEE] rounded-[6px] px-2 py-1.5 text-xs" />
                 <button type="submit"
                   className="bg-[#DC3545] text-white px-3 py-1.5 rounded-full text-xs font-semibold hover:bg-[#C82333] transition-colors whitespace-nowrap">
                   Terminate + Blacklist

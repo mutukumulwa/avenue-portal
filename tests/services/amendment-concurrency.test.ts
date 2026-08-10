@@ -14,6 +14,8 @@ const db = vi.hoisted(() => ({
     update: vi.fn(async (a: any) => a.data),
   },
   groupBenefitTier: { findUnique: vi.fn(async () => ({ packageId: "pkg1" })) },
+  // F-PIN-3: a tier/package change re-pins packageVersionId to the target package's current version.
+  package: { findUnique: vi.fn(async () => ({ currentVersionId: "pv1" })) },
   member: { update: vi.fn(async () => ({ id: "m1" })), findUnique: vi.fn(async () => null) },
   invoice: { count: vi.fn(async () => 0), create: vi.fn(async () => ({})) },
   group: { findUnique: vi.fn(async () => null), update: vi.fn(async () => ({})) },
