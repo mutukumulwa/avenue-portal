@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, underwritingProcedure } from "../trpc";
 import { prisma } from "@/lib/prisma";
 import { ContractExtractionService } from "@/server/services/contract-extraction.service";
 
@@ -13,7 +13,7 @@ export const contractImportRouter = createTRPCRouter({
     .query(({ input }) => ContractExtractionService.parse(input.markdown)),
 
   // Persist an extraction run (status PARSED) for the review wizard.
-  create: protectedProcedure
+  create: underwritingProcedure
     .input(z.object({ markdown: z.string().min(1), fileName: z.string().optional(), sourceDocumentId: z.string().optional() }))
     .mutation(async ({ ctx, input }) =>
       ContractExtractionService.createExtraction(ctx.tenantId, { ...input, createdById: ctx.session.user.id }),
@@ -27,7 +27,7 @@ export const contractImportRouter = createTRPCRouter({
     .input(z.object({ id: z.string() }))
     .query(async ({ ctx, input }) => prisma.contractExtraction.findUnique({ where: { id: input.id, tenantId: ctx.tenantId } })),
 
-  submitReviewAnswers: protectedProcedure
+  submitReviewAnswers: underwritingProcedure
     .input(z.object({ id: z.string(), answers: z.record(z.string(), z.unknown()) }))
     .mutation(async ({ ctx, input }) => {
       const ext = await prisma.contractExtraction.findUnique({ where: { id: input.id, tenantId: ctx.tenantId } });
@@ -35,7 +35,7 @@ export const contractImportRouter = createTRPCRouter({
       return prisma.contractExtraction.update({ where: { id: input.id }, data: { reviewAnswers: input.answers as never, status: "REVIEWED" } });
     }),
 
-  commit: protectedProcedure
+  commit: underwritingProcedure
     .input(
       z.object({
         id: z.string(),

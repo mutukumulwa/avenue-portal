@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, underwritingProcedure, permissionProcedure } from "../trpc";
 import { prisma } from "@/lib/prisma";
 import { peekNextDocumentNumber } from "@/lib/document-number";
 import { quotationBuilderService } from "@/server/services/quotation-builder.service";
@@ -30,7 +30,7 @@ export const quotationsRouter = createTRPCRouter({
       });
     }),
 
-  create: protectedProcedure
+  create: underwritingProcedure
     .input(
       z.object({
         groupId: z.string().optional(),
@@ -86,7 +86,7 @@ export const quotationsRouter = createTRPCRouter({
       });
     }),
 
-  updateStatus: protectedProcedure
+  updateStatus: underwritingProcedure
     .input(
       z.object({
         id: z.string(),
@@ -102,7 +102,7 @@ export const quotationsRouter = createTRPCRouter({
 
   // ─── QUOTATION BUILDER (Process 4) ───────────────────────
 
-  buildQuote: protectedProcedure
+  buildQuote: permissionProcedure("QUOTATION:ISSUE")
     .input(z.object({
       quotationId: z.string(),
       groupSizeDiscountOverridePct: z.number().min(0).max(0.5).optional(),
@@ -131,7 +131,7 @@ export const quotationsRouter = createTRPCRouter({
       return quotationBuilderService.getVersionHistory(input.quotationId, ctx.tenantId);
     }),
 
-  issueQuote: protectedProcedure
+  issueQuote: permissionProcedure("QUOTATION:ISSUE")
     .input(z.object({ quotationId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await rbacService.requirePermission(ctx.session.user.id, "QUOTATION:ISSUE", ctx.tenantId);
@@ -149,7 +149,7 @@ export const quotationsRouter = createTRPCRouter({
     });
   }),
 
-  createCustomModel: protectedProcedure
+  createCustomModel: permissionProcedure("QUOTATION:ISSUE")
     .input(z.object({
       fileType: z.enum(["EXCEL", "PYTHON"]),
       fileUrl:  z.string().url(),
@@ -163,7 +163,7 @@ export const quotationsRouter = createTRPCRouter({
       });
     }),
 
-  runCustomModel: protectedProcedure
+  runCustomModel: permissionProcedure("QUOTATION:ISSUE")
     .input(z.object({
       quotationId: z.string(),
       modelFileId: z.string(),

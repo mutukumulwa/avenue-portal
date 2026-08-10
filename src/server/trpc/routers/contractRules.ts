@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, underwritingProcedure } from "../trpc";
 import { prisma } from "@/lib/prisma";
 
 // CRUD for the Phase-3 rule entities (spec §5.7–5.11) — the backend the rule
@@ -31,7 +31,7 @@ export const contractRulesRouter = createTRPCRouter({
     }),
 
   // ── Pricing rules (§5.7) ──
-  createPricingRule: protectedProcedure
+  createPricingRule: underwritingProcedure
     .input(
       z.object({
         contractId: z.string(),
@@ -53,12 +53,12 @@ export const contractRulesRouter = createTRPCRouter({
       return prisma.pricingRule.create({ data: { tenantId: ctx.tenantId, ...input, params: input.params as never } });
     }),
 
-  deactivatePricingRule: protectedProcedure
+  deactivatePricingRule: underwritingProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => prisma.pricingRule.update({ where: { id: input.id }, data: { isActive: false } })),
 
   // ── Packages (§5.8) ──
-  createPackage: protectedProcedure
+  createPackage: underwritingProcedure
     .input(
       z.object({
         contractId: z.string(),
@@ -90,12 +90,12 @@ export const contractRulesRouter = createTRPCRouter({
       });
     }),
 
-  deactivatePackage: protectedProcedure
+  deactivatePackage: underwritingProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => prisma.contractPackage.update({ where: { id: input.id }, data: { isActive: false } })),
 
   // ── Pre-auth rules (§5.10) ──
-  createPreauthRule: protectedProcedure
+  createPreauthRule: underwritingProcedure
     .input(
       z.object({
         contractId: z.string(),
@@ -121,12 +121,12 @@ export const contractRulesRouter = createTRPCRouter({
       return prisma.preauthRule.create({ data: { tenantId: ctx.tenantId, ...input } });
     }),
 
-  deactivatePreauthRule: protectedProcedure
+  deactivatePreauthRule: underwritingProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => prisma.preauthRule.update({ where: { id: input.id }, data: { isActive: false } })),
 
   // ── Documentation rules (§5.11) ──
-  createDocumentationRule: protectedProcedure
+  createDocumentationRule: underwritingProcedure
     .input(
       z.object({
         contractId: z.string(),
@@ -147,12 +147,12 @@ export const contractRulesRouter = createTRPCRouter({
       return prisma.documentationRule.create({ data: { tenantId: ctx.tenantId, ...input, appliesWhen: input.appliesWhen as never } });
     }),
 
-  deactivateDocumentationRule: protectedProcedure
+  deactivateDocumentationRule: underwritingProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => prisma.documentationRule.update({ where: { id: input.id }, data: { isActive: false } })),
 
   // ── Exclusions (§5.9, generalised) ──
-  createExclusion: protectedProcedure
+  createExclusion: underwritingProcedure
     .input(
       z.object({
         contractId: z.string(),
@@ -175,7 +175,7 @@ export const contractRulesRouter = createTRPCRouter({
       });
     }),
 
-  deleteExclusion: protectedProcedure
+  deleteExclusion: underwritingProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => prisma.providerContractExclusion.delete({ where: { id: input.id } })),
 });

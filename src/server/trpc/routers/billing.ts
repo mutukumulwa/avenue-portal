@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, financeProcedure } from "../trpc";
 import { prisma } from "@/lib/prisma";
 import { peekNextDocumentNumber } from "@/lib/document-number";
 
@@ -34,7 +34,7 @@ export const billingRouter = createTRPCRouter({
       });
     }),
 
-  createInvoice: protectedProcedure
+  createInvoice: financeProcedure
     .input(
       z.object({
         groupId: z.string(),
@@ -71,7 +71,7 @@ export const billingRouter = createTRPCRouter({
       });
     }),
 
-  sendInvoice: protectedProcedure
+  sendInvoice: financeProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       return prisma.invoice.update({
@@ -80,7 +80,7 @@ export const billingRouter = createTRPCRouter({
       });
     }),
 
-  voidInvoice: protectedProcedure
+  voidInvoice: financeProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       return prisma.invoice.update({
@@ -90,7 +90,7 @@ export const billingRouter = createTRPCRouter({
     }),
 
   // ─── PAYMENTS ────────────────────────────────────────────
-  recordPayment: protectedProcedure
+  recordPayment: financeProcedure
     .input(
       z.object({
         groupId: z.string(),

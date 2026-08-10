@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, superAdminProcedure } from "../trpc";
 import { prisma } from "@/lib/prisma";
 import { ServiceCategoryService } from "@/server/services/service-category.service";
 
@@ -24,7 +24,7 @@ export const providersRouter = createTRPCRouter({
       });
     }),
 
-  create: protectedProcedure
+  create: superAdminProcedure
     .input(
       z.object({
         name: z.string().min(1),
@@ -54,7 +54,7 @@ export const providersRouter = createTRPCRouter({
       });
     }),
 
-  update: protectedProcedure
+  update: superAdminProcedure
     .input(
       z.object({
         id: z.string(),
@@ -84,7 +84,7 @@ export const providersRouter = createTRPCRouter({
       });
     }),
 
-  addTariff: protectedProcedure
+  addTariff: superAdminProcedure
     .input(
       z.object({
         providerId: z.string(),

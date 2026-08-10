@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, permissionProcedure } from "../trpc";
 import { rbacService } from "@/server/services/rbac.service";
 
 export const rolesRouter = createTRPCRouter({
@@ -39,7 +39,7 @@ export const rolesRouter = createTRPCRouter({
     return rbacService.getUserPermissions(ctx.session.user.id, ctx.tenantId);
   }),
 
-  assignRole: protectedProcedure
+  assignRole: permissionProcedure("ROLE:ASSIGN")
     .input(
       z.object({
         userId: z.string(),
@@ -57,7 +57,7 @@ export const rolesRouter = createTRPCRouter({
       );
     }),
 
-  approveAssignment: protectedProcedure
+  approveAssignment: permissionProcedure("ROLE:APPROVE_ASSIGNMENT")
     .input(z.object({ assignmentId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       return rbacService.approveRoleAssignment(
@@ -67,7 +67,7 @@ export const rolesRouter = createTRPCRouter({
       );
     }),
 
-  revokeRole: protectedProcedure
+  revokeRole: permissionProcedure("ROLE:REVOKE")
     .input(z.object({ assignmentId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       return rbacService.revokeRole(input.assignmentId, ctx.session.user.id, ctx.tenantId);

@@ -12,7 +12,7 @@ export default async function HRProfilePage() {
   }
 
   const group = await prisma.group.findUnique({
-    where: { id: groupId },
+    where: { id: groupId, tenantId: session.user.tenantId },
     include: { package: true, broker: true }
   });
 

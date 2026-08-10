@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, memberOpsProcedure } from "../trpc";
 import { EndorsementsService } from "../../services/endorsement.service";
 
 export const endorsementsRouter = createTRPCRouter({
@@ -13,7 +13,7 @@ export const endorsementsRouter = createTRPCRouter({
       return EndorsementsService.getEndorsementById(ctx.tenantId, input.id);
     }),
 
-  create: protectedProcedure
+  create: memberOpsProcedure
     .input(
       z.object({
         groupId: z.string(),
@@ -33,7 +33,7 @@ export const endorsementsRouter = createTRPCRouter({
       return EndorsementsService.createEndorsement(ctx.tenantId, parsedInput);
     }),
 
-  approve: protectedProcedure
+  approve: memberOpsProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       return EndorsementsService.approveEndorsement(ctx.tenantId, input.id, ctx.user?.id || "SYSTEM");

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, clinicalProcedure } from "../trpc";
 import { ClaimsService } from "@/server/services/claims.service";
 import { preauthAdjudicationService } from "@/server/services/preauth-adjudication.service";
 import { PreauthIntakeService } from "@/server/services/preauth-intake/service";
@@ -26,7 +26,7 @@ export const preauthRouter = createTRPCRouter({
       return pa;
     }),
 
-  create: protectedProcedure
+  create: clinicalProcedure
     .input(
       z.object({
         memberId: z.string(),
@@ -74,7 +74,7 @@ export const preauthRouter = createTRPCRouter({
       return PreauthReadService.getById({ tenantId: ctx.tenantId }, result.preauthId);
     }),
 
-  adjudicate: protectedProcedure
+  adjudicate: clinicalProcedure
     .input(
       z.object({
         preauthId: z.string(),
@@ -106,7 +106,7 @@ export const preauthRouter = createTRPCRouter({
       );
     }),
 
-  convertToClaim: protectedProcedure
+  convertToClaim: clinicalProcedure
     .input(z.object({ preauthId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       return ClaimsService.createClaimWithPreauth(ctx.tenantId, input.preauthId);

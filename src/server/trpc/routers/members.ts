@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, memberOpsProcedure } from "../trpc";
 import { MembersService } from "../../services/members.service";
 
 export const membersRouter = createTRPCRouter({
@@ -13,7 +13,7 @@ export const membersRouter = createTRPCRouter({
       return MembersService.getMemberById(ctx.tenantId, input.id);
     }),
 
-  create: protectedProcedure
+  create: memberOpsProcedure
     .input(
       z.object({
         groupId: z.string().min(1),

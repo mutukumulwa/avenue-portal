@@ -1,6 +1,24 @@
 import { prisma } from "@/lib/prisma";
 import { TRPCError } from "@trpc/server";
+import { effectivePermissions, permitted } from "@/lib/authz/catalog";
 
+// ─── PROD-BLOCKER-1: baseline-backed authorization ───────────────────────────
+//
+// Production has ZERO Role/Permission/UserRoleAssignment rows. Read purely from
+// UserRoleAssignment, getUserPermissions/hasPermission/hasRole return
+// []/false/FORBIDDEN for EVERYONE — including SUPER_ADMIN — so every surface
+// gated on this service fails closed, and rbac.service's own assignRole
+// (requires ROLE:ASSIGN, below) can never mint the first assignment: a bootstrap
+// deadlock.
+//
+// The fix mirrors the hybrid model the session layer already uses
+// (effectivePermissions/hasPerm in src/lib/authz/catalog.ts, loadUserPermissions
+// in src/lib/auth-credentials.ts): effective authority = the enum-role baseline
+// from the canonical catalog UNION the dynamic UserRoleAssignment overlay. The
+// overlay is strictly ADDITIVE (catalog decision D2-b) — it only ever adds, so a
+// role with zero dynamic rows resolves to EXACTLY its documented baseline (never
+// a superset), and revoking a baseline right is a role change, not a row delete.
+//
 // ─── TYPES ───────────────────────────────────────────────────────────────────
 
 export interface RbacContext {
@@ -12,30 +30,42 @@ export interface RbacContext {
 
 export const rbacService = {
   /**
-   * Returns all active permission codes for a user.
-   * Used to hydrate session and for per-request checks.
+   * Returns all effective permission codes for a user: the enum-role baseline
+   * from the canonical catalog UNION the dynamic UserRoleAssignment overlay.
+   * Used for per-request checks.
+   *
+   * With zero dynamic rows (production today) this returns exactly the role's
+   * baseline — for SUPER_ADMIN that is the "*" wildcard, so callers must test
+   * results with permitted() (as hasPermission does), which understands it.
+   * The baseline lookup is tenant-scoped, matching the dynamic overlay's scope.
    */
   async getUserPermissions(userId: string, tenantId: string): Promise<string[]> {
-    const assignments = await prisma.userRoleAssignment.findMany({
-      where: { userId, tenantId, isActive: true, status: "ACTIVE" },
-      include: {
-        role: {
-          include: {
-            permissions: {
-              include: { permission: { select: { code: true } } },
+    const [assignments, user] = await Promise.all([
+      prisma.userRoleAssignment.findMany({
+        where: { userId, tenantId, isActive: true, status: "ACTIVE" },
+        include: {
+          role: {
+            include: {
+              permissions: {
+                include: { permission: { select: { code: true } } },
+              },
             },
           },
         },
-      },
-    });
+      }),
+      prisma.user.findFirst({
+        where: { id: userId, tenantId },
+        select: { role: true },
+      }),
+    ]);
 
-    const codes = new Set<string>();
+    const dynamic = new Set<string>();
     for (const assignment of assignments) {
       for (const rp of assignment.role.permissions) {
-        codes.add(rp.permission.code);
+        dynamic.add(rp.permission.code);
       }
     }
-    return [...codes];
+    return effectivePermissions(user?.role ?? null, [...dynamic]);
   },
 
   /**
@@ -52,32 +82,30 @@ export const rbacService = {
   /**
    * Checks whether a user has a specific permission.
    * Use this in service/router guards rather than checking User.role directly.
+   *
+   * Resolves the same baseline∪overlay set as getUserPermissions and matches via
+   * permitted(), so SUPER_ADMIN's "*" baseline satisfies every code even with no
+   * dynamic rows — the fix for the ROLE:ASSIGN bootstrap deadlock and for every
+   * quotation/intake/binding/override/role-admin gate that read this service.
    */
   async hasPermission(
     userId: string,
     permission: string,
     tenantId: string,
   ): Promise<boolean> {
-    const count = await prisma.userRoleAssignment.count({
-      where: {
-        userId,
-        tenantId,
-        isActive: true,
-        status: "ACTIVE",
-        role: {
-          permissions: {
-            some: {
-              permission: { code: permission },
-            },
-          },
-        },
-      },
-    });
-    return count > 0;
+    const permissions = await rbacService.getUserPermissions(userId, tenantId);
+    return permitted(permissions, permission);
   },
 
   /**
    * Checks whether a user holds a specific role code.
+   *
+   * Baseline fallback: a user's enum role IS a role they effectively hold, even
+   * with zero dynamic UserRoleAssignment rows (production today). This mirrors
+   * the seed's enum→assignment migration and unblocks role-gated flows such as
+   * override approval by a baseline SUPER_ADMIN. Only the enum roles have a
+   * baseline; provider persona roles are dynamic-only by design, so a persona
+   * check still requires an assignment.
    */
   async hasRole(userId: string, roleCode: string, tenantId: string): Promise<boolean> {
     const count = await prisma.userRoleAssignment.count({
@@ -89,7 +117,13 @@ export const rbacService = {
         role: { code: roleCode },
       },
     });
-    return count > 0;
+    if (count > 0) return true;
+
+    const user = await prisma.user.findFirst({
+      where: { id: userId, tenantId },
+      select: { role: true },
+    });
+    return user?.role === roleCode;
   },
 
   /**

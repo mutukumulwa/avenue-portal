@@ -48,6 +48,8 @@ export function CoContributionRulesManager({ packageId, rules, annualCap }: Prop
   const [showCapForm, setShowCapForm]   = useState(false);
   const [selectedType, setSelectedType] = useState("PERCENTAGE");
   const [error, setError]               = useState<string | null>(null);
+  const [capFieldErrors, setCapFieldErrors] = useState<Record<string, string[]>>({});
+  const [capFormError, setCapFormError]     = useState<string | null>(null);
   const [isPending, startTransition]    = useTransition();
 
   function handleAdd(e: React.FormEvent<HTMLFormElement>) {
@@ -81,11 +83,37 @@ export function CoContributionRulesManager({ packageId, rules, annualCap }: Prop
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     fd.set("packageId", packageId);
-    setError(null);
+    setCapFormError(null);
+    setCapFieldErrors({});
+
+    // Client-side mirror of the server rules — instant feedback only. The
+    // server action (SP-1 capsSchema) is the actual control; this can never be
+    // the sole guard.
+    const individual = Number(fd.get("individualCap"));
+    const rawFamily = fd.get("familyCap");
+    const family = rawFamily === null || rawFamily === "" ? null : Number(rawFamily);
+    const mirror: Record<string, string[]> = {};
+    if (!Number.isFinite(individual) || individual <= 0) {
+      mirror.individualCap = ["Enter an individual cap greater than zero."];
+    }
+    if (family != null && (!Number.isFinite(family) || family <= 0)) {
+      mirror.familyCap = ["Family cap must be greater than zero."];
+    } else if (family != null && Number.isFinite(individual) && family < individual) {
+      mirror.familyCap = ["Family cap cannot be below the individual cap."];
+    }
+    if (Object.keys(mirror).length > 0) {
+      setCapFieldErrors(mirror);
+      return;
+    }
+
     startTransition(async () => {
       const res = await upsertAnnualCapAction(fd);
-      if (res.error) setError(res.error);
-      else setShowCapForm(false);
+      if (res.ok) {
+        setShowCapForm(false);
+      } else {
+        setCapFieldErrors(res.fieldErrors ?? {});
+        setCapFormError(res.formError ?? null);
+      }
     });
   }
 
@@ -114,18 +142,28 @@ export function CoContributionRulesManager({ packageId, rules, annualCap }: Prop
 
       {/* Annual cap form */}
       {showCapForm && (
-        <form onSubmit={handleCapSave} className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-[#F8F9FA] border border-[#EEEEEE] rounded-lg p-4">
+        <form onSubmit={handleCapSave} noValidate className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-[#F8F9FA] border border-[#EEEEEE] rounded-lg p-4">
           <div className="space-y-1">
             <label className="text-xs font-semibold text-brand-text-muted uppercase">Individual Annual Cap (UGX)</label>
             <input name="individualCap" type="number" step="0.01" min="1" required
               defaultValue={annualCap ? annualCap.individualCap : ""}
+              aria-invalid={capFieldErrors.individualCap ? true : undefined}
+              aria-describedby={capFieldErrors.individualCap ? "individualCap-error" : undefined}
               className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo" />
+            {capFieldErrors.individualCap && (
+              <p id="individualCap-error" role="alert" className="text-xs text-[#DC3545]">{capFieldErrors.individualCap[0]}</p>
+            )}
           </div>
           <div className="space-y-1">
             <label className="text-xs font-semibold text-brand-text-muted uppercase">Family Annual Cap (UGX) — optional</label>
             <input name="familyCap" type="number" step="0.01" min="1"
               defaultValue={annualCap?.familyCap ?? ""}
+              aria-invalid={capFieldErrors.familyCap ? true : undefined}
+              aria-describedby={capFieldErrors.familyCap ? "familyCap-error" : undefined}
               className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo" />
+            {capFieldErrors.familyCap && (
+              <p id="familyCap-error" role="alert" className="text-xs text-[#DC3545]">{capFieldErrors.familyCap[0]}</p>
+            )}
           </div>
           <div className="flex items-end gap-2">
             <button type="button" onClick={() => setShowCapForm(false)}
@@ -135,6 +173,9 @@ export function CoContributionRulesManager({ packageId, rules, annualCap }: Prop
               {isPending ? "Saving…" : "Save Caps"}
             </button>
           </div>
+          {capFormError && (
+            <p role="alert" className="md:col-span-3 text-xs text-[#DC3545] bg-[#DC3545]/5 border border-[#DC3545]/20 rounded px-3 py-2">{capFormError}</p>
+          )}
         </form>
       )}
 

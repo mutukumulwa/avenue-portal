@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, underwritingProcedure } from "../trpc";
 import { prisma } from "@/lib/prisma";
 import { ContractLifecycleService } from "@/server/services/contract-lifecycle.service";
 import { ProviderContractsService } from "@/server/services/provider-contracts.service";
@@ -96,7 +96,7 @@ export const contractsRouter = createTRPCRouter({
     }),
 
   // ── Create draft (spec §4.1 / §20 minimum viable) ───────────────────────
-  create: protectedProcedure
+  create: underwritingProcedure
     .input(
       z.object({
         providerId: z.string(),
@@ -159,7 +159,7 @@ export const contractsRouter = createTRPCRouter({
     }),
 
   // ── Update draft metadata ───────────────────────────────────────────────
-  update: protectedProcedure
+  update: underwritingProcedure
     .input(
       z.object({
         id: z.string(),
@@ -210,44 +210,44 @@ export const contractsRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => ContractLifecycleService.validate(ctx.tenantId, input.id)),
 
   // ── Lifecycle transitions (spec §4.2) ───────────────────────────────────
-  submitForReview: protectedProcedure
+  submitForReview: underwritingProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => ContractLifecycleService.submitForReview(ctx.tenantId, input.id, ctx.session.user.id)),
 
-  approve: protectedProcedure
+  approve: underwritingProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => ContractLifecycleService.approve(ctx.tenantId, input.id, ctx.session.user.id)),
 
-  requestClarification: protectedProcedure
+  requestClarification: underwritingProcedure
     .input(z.object({ id: z.string(), comment: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => ContractLifecycleService.requestClarification(ctx.tenantId, input.id, ctx.session.user.id, input.comment)),
 
-  returnToDraft: protectedProcedure
+  returnToDraft: underwritingProcedure
     .input(z.object({ id: z.string(), reason: z.string().optional() }))
     .mutation(async ({ ctx, input }) => ContractLifecycleService.returnToDraft(ctx.tenantId, input.id, ctx.session.user.id, input.reason)),
 
-  activate: protectedProcedure
+  activate: underwritingProcedure
     .input(z.object({ id: z.string(), allowUnsigned: z.boolean().optional(), backdateOverrideId: z.string().optional() }))
     .mutation(async ({ ctx, input }) => ContractLifecycleService.activate(ctx.tenantId, input.id, ctx.session.user.id, { allowUnsigned: input.allowUnsigned, backdateOverrideId: input.backdateOverrideId })),
 
-  suspend: protectedProcedure
+  suspend: underwritingProcedure
     .input(z.object({ id: z.string(), reason: z.string().optional() }))
     .mutation(async ({ ctx, input }) => ContractLifecycleService.suspend(ctx.tenantId, input.id, ctx.session.user.id, input.reason)),
 
-  reinstate: protectedProcedure
+  reinstate: underwritingProcedure
     .input(z.object({ id: z.string(), reason: z.string().optional() }))
     .mutation(async ({ ctx, input }) => ContractLifecycleService.reinstate(ctx.tenantId, input.id, ctx.session.user.id, input.reason)),
 
-  terminate: protectedProcedure
+  terminate: underwritingProcedure
     .input(z.object({ id: z.string(), reason: z.string().optional() }))
     .mutation(async ({ ctx, input }) => ContractLifecycleService.terminate(ctx.tenantId, input.id, ctx.session.user.id, input.reason)),
 
-  archive: protectedProcedure
+  archive: underwritingProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => ContractLifecycleService.archive(ctx.tenantId, input.id, ctx.session.user.id)),
 
   // ── Applicability (spec §5.4) ───────────────────────────────────────────
-  addApplicability: protectedProcedure
+  addApplicability: underwritingProcedure
     .input(
       z.object({
         contractId: z.string(),
@@ -277,12 +277,12 @@ export const contractsRouter = createTRPCRouter({
       });
     }),
 
-  removeApplicability: protectedProcedure
+  removeApplicability: underwritingProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => prisma.contractApplicability.update({ where: { id: input.id }, data: { isActive: false } })),
 
   // ── Branch coverage for LISTED contracts (spec §5.1) ────────────────────
-  addContractBranch: protectedProcedure
+  addContractBranch: underwritingProcedure
     .input(z.object({ contractId: z.string(), branchId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const contract = await prisma.providerContract.findUnique({ where: { id: input.contractId, tenantId: ctx.tenantId } });
@@ -290,12 +290,12 @@ export const contractsRouter = createTRPCRouter({
       return prisma.contractBranch.create({ data: { contractId: input.contractId, branchId: input.branchId } });
     }),
 
-  removeContractBranch: protectedProcedure
+  removeContractBranch: underwritingProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => prisma.contractBranch.delete({ where: { id: input.id } })),
 
   // ── Source documents (spec §3.2) ────────────────────────────────────────
-  addSourceDocument: protectedProcedure
+  addSourceDocument: underwritingProcedure
     .input(z.object({ contractId: z.string(), fileUrl: z.string().optional(), fileName: z.string().optional(), documentId: z.string().optional(), sourceRole: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
       const contract = await prisma.providerContract.findUnique({ where: { id: input.contractId, tenantId: ctx.tenantId } });

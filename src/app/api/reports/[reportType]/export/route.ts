@@ -1,8 +1,29 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getAnalyticsAccessScope, type AnalyticsAccessScope } from "@/lib/analytics-access";
+import { ROLES, type UserRole } from "@/lib/authz/roles";
 import { prisma } from "@/lib/prisma";
 import { getExclusionRejectionRows } from "@/server/services/report-exclusions";
+
+/**
+ * Report types that scope their own query by the caller's analytics group access
+ * (the analytics-* family below). Every OTHER report type queries the whole
+ * tenant with no per-group projection, so a group-restricted principal must be
+ * denied it rather than handed the tenant-wide register (PROD-BLOCKER-3).
+ */
+const GROUP_SCOPED_REPORTS = new Set([
+  "analytics-portfolio-mlr",
+  "analytics-scheme-profitability",
+  "analytics-provider-performance",
+  "analytics-renewal-recommendations",
+  "analytics-risk-distribution",
+]);
+
+/** True when the caller's analytics scope confines them to specific group(s). */
+function scopeIsGroupRestricted(scope?: AnalyticsAccessScope): boolean {
+  if (!scope) return false;
+  return scope.noAccess === true || scope.groupId != null || scope.allowedGroupIds != null;
+}
 
 function escapeCsv(value: string): string {
   if (value.includes(",") || value.includes('"') || value.includes("\n")) {
@@ -907,10 +928,27 @@ export async function GET(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // PROD-BLOCKER-3: exporting the tenant's report register is internal/reporting
+  // staff work. Match the admin report page's gate (ROLES.ANY_STAFF) so members,
+  // providers, HR and fund administrators cannot pull it — an authenticated
+  // tenant session is NOT sufficient.
+  const role = session.user.role as UserRole | undefined;
+  if (!role || !ROLES.ANY_STAFF.includes(role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const { reportType } = await params;
   const tenantId = session.user.tenantId;
 
   const analyticsScope = await getAnalyticsAccessScope(session);
+  // Defence-in-depth on top of the role gate: a group-restricted principal must
+  // never receive a tenant-wide export. The GROUP_SCOPED_REPORTS apply their own
+  // in-query group filter; every other report is tenant-wide, so deny those to a
+  // restricted scope rather than leak the whole tenant.
+  if (scopeIsGroupRestricted(analyticsScope) && !GROUP_SCOPED_REPORTS.has(reportType)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const result = await fetchReportData(tenantId, reportType, analyticsScope);
   if (!result) {
     return NextResponse.json({ error: "Unknown report type" }, { status: 404 });

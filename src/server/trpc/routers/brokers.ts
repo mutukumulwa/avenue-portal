@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, roleProcedure, superAdminProcedure, financeProcedure } from "../trpc";
 import { prisma } from "@/lib/prisma";
 import { CommissionService } from "@/server/services/commission.service";
 
@@ -19,6 +19,13 @@ function requireStaff(role?: string | null) {
 function requireSuperAdmin(role?: string | null) {
   if (role !== "SUPER_ADMIN") throw new TRPCError({ code: "FORBIDDEN" });
 }
+
+// PROD-BLOCKER-2 boundary gates. Mutations previously ran on protectedProcedure
+// (session-only) and relied on the inline requireStaff/requireSuperAdmin checks
+// below; the two legacy commission mutations had NO check at all. These gates
+// reject unauthorised roles at the procedure boundary — the inline calls are kept
+// as defense in depth. brokerStaffProcedure mirrors requireStaff()'s role set.
+const brokerStaffProcedure = roleProcedure(...staffRoles);
 
 export const brokersRouter = createTRPCRouter({
   getAll: protectedProcedure
@@ -79,7 +86,7 @@ export const brokersRouter = createTRPCRouter({
       });
     }),
 
-  create: protectedProcedure
+  create: brokerStaffProcedure
     .input(z.object({
       name: z.string().min(1),
       legalName: z.string().optional(),
@@ -127,7 +134,7 @@ export const brokersRouter = createTRPCRouter({
       });
     }),
 
-  update: protectedProcedure
+  update: brokerStaffProcedure
     .input(z.object({
       id: z.string(),
       name: z.string().optional(),
@@ -161,7 +168,7 @@ export const brokersRouter = createTRPCRouter({
       return prisma.broker.update({ where: { id, tenantId: ctx.tenantId }, data });
     }),
 
-  deactivate: protectedProcedure
+  deactivate: brokerStaffProcedure
     .input(z.object({ id: z.string(), effectiveTo: z.date(), reason: z.string().min(3) }))
     .mutation(async ({ ctx, input }) => {
       requireStaff(ctx.session.user.role);
@@ -171,7 +178,7 @@ export const brokersRouter = createTRPCRouter({
       });
     }),
 
-  approve: protectedProcedure
+  approve: superAdminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       requireSuperAdmin(ctx.session.user.role);
@@ -181,7 +188,7 @@ export const brokersRouter = createTRPCRouter({
       });
     }),
 
-  createProducer: protectedProcedure
+  createProducer: brokerStaffProcedure
     .input(z.object({
       brokerId: z.string(),
       producerName: z.string().min(1),
@@ -207,7 +214,7 @@ export const brokersRouter = createTRPCRouter({
       });
     }),
 
-  recordKycDocument: protectedProcedure
+  recordKycDocument: brokerStaffProcedure
     .input(z.object({
       brokerId: z.string(),
       documentType: z.enum(kycDocumentTypes),
@@ -221,7 +228,7 @@ export const brokersRouter = createTRPCRouter({
       return prisma.brokerKycDocument.create({ data: { ...input, uploadedById: ctx.session.user.id } });
     }),
 
-  verifyKycDocument: protectedProcedure
+  verifyKycDocument: brokerStaffProcedure
     .input(z.object({ documentId: z.string(), verified: z.boolean(), notes: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
       requireStaff(ctx.session.user.role);
@@ -236,7 +243,7 @@ export const brokersRouter = createTRPCRouter({
       });
     }),
 
-  createScheduleDraft: protectedProcedure
+  createScheduleDraft: brokerStaffProcedure
     .input(z.object({
       brokerId: z.string(),
       scheduleName: z.string().min(1),
@@ -258,21 +265,21 @@ export const brokersRouter = createTRPCRouter({
       });
     }),
 
-  submitScheduleForApproval: protectedProcedure
+  submitScheduleForApproval: brokerStaffProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       requireStaff(ctx.session.user.role);
       return CommissionService.submitScheduleForApproval(input.id, ctx.session.user.id);
     }),
 
-  approveSchedule: protectedProcedure
+  approveSchedule: superAdminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       requireSuperAdmin(ctx.session.user.role);
       return CommissionService.approveSchedule(input.id, ctx.session.user.id);
     }),
 
-  rejectSchedule: protectedProcedure
+  rejectSchedule: superAdminProcedure
     .input(z.object({ id: z.string(), reason: z.string().min(3) }))
     .mutation(async ({ ctx, input }) => {
       requireSuperAdmin(ctx.session.user.role);
@@ -331,14 +338,14 @@ export const brokersRouter = createTRPCRouter({
       });
     }),
 
-  generatePayoutBatch: protectedProcedure
+  generatePayoutBatch: brokerStaffProcedure
     .input(z.object({ asOfDate: z.date(), brokerIds: z.array(z.string()).optional() }))
     .mutation(async ({ ctx, input }) => {
       requireStaff(ctx.session.user.role);
       return CommissionService.generatePayoutBatch({ ...input, generatedById: ctx.session.user.id });
     }),
 
-  approvePayoutBatch: protectedProcedure
+  approvePayoutBatch: superAdminProcedure
     .input(z.object({ batchId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       requireSuperAdmin(ctx.session.user.role);
@@ -363,13 +370,13 @@ export const brokersRouter = createTRPCRouter({
       });
     }),
 
-  approveCommission: protectedProcedure
+  approveCommission: financeProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input }) => {
       return prisma.commission.update({ where: { id: input.id }, data: { paymentStatus: "APPROVED" } });
     }),
 
-  markCommissionPaid: protectedProcedure
+  markCommissionPaid: financeProcedure
     .input(z.object({ id: z.string(), paymentReference: z.string().optional() }))
     .mutation(async ({ input }) => {
       return prisma.commission.update({

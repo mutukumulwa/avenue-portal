@@ -21,7 +21,7 @@ export default async function HREndorsementsPage(
   const statusFilter = searchParams.status || "";
   const typeFilter = searchParams.type || "";
 
-  const whereClause: Prisma.EndorsementWhereInput = { groupId };
+  const whereClause: Prisma.EndorsementWhereInput = { groupId, tenantId: session.user.tenantId };
   if (statusFilter) whereClause.status = statusFilter as EndorsementStatus;
   if (typeFilter) whereClause.type = typeFilter as EndorsementType;
 

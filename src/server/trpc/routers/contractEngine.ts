@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, adminProcedure } from "../trpc";
 import { prisma } from "@/lib/prisma";
 import { ContractEngine } from "@/server/services/contract-engine/engine";
 import { ReasonCodeService } from "@/server/services/reason-codes.service";
@@ -61,7 +61,7 @@ export const contractEngineRouter = createTRPCRouter({
     }),
 
   // Idempotent per-tenant reason-code catalog seed (admin utility).
-  seedReasonCodes: protectedProcedure.mutation(async ({ ctx }) => {
+  seedReasonCodes: adminProcedure.mutation(async ({ ctx }) => {
     const n = await ReasonCodeService.seedForTenant(ctx.tenantId);
     return { seeded: n };
   }),

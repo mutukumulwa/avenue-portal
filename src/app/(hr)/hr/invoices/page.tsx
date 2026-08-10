@@ -11,7 +11,7 @@ export default async function HRInvoicesPage() {
   }
 
   const invoices = await prisma.invoice.findMany({
-    where: { groupId },
+    where: { groupId, tenantId: session.user.tenantId },
     orderBy: { createdAt: "desc" }
   });
 

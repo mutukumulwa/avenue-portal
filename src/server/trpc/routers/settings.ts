@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, superAdminProcedure } from "../trpc";
 import { prisma } from "@/lib/prisma";
 
 export const settingsRouter = createTRPCRouter({
@@ -8,7 +8,7 @@ export const settingsRouter = createTRPCRouter({
     return prisma.tenant.findUnique({ where: { id: ctx.tenantId } });
   }),
 
-  updateTenant: protectedProcedure
+  updateTenant: superAdminProcedure
     .input(
       z.object({
         name: z.string().optional(),
@@ -33,7 +33,7 @@ export const settingsRouter = createTRPCRouter({
     });
   }),
 
-  updateUserRole: protectedProcedure
+  updateUserRole: superAdminProcedure
     .input(
       z.object({
         userId: z.string(),
@@ -57,7 +57,7 @@ export const settingsRouter = createTRPCRouter({
       });
     }),
 
-  toggleUserActive: protectedProcedure
+  toggleUserActive: superAdminProcedure
     .input(z.object({ userId: z.string(), isActive: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       return prisma.user.update({
@@ -74,7 +74,7 @@ export const settingsRouter = createTRPCRouter({
     });
   }),
 
-  upsertNotificationTemplate: protectedProcedure
+  upsertNotificationTemplate: superAdminProcedure
     .input(
       z.object({
         id: z.string().optional(),
@@ -105,7 +105,7 @@ export const settingsRouter = createTRPCRouter({
     });
   }),
 
-  upsertIntegration: protectedProcedure
+  upsertIntegration: superAdminProcedure
     .input(
       z.object({
         provider: z.enum(["SMART", "SLADE360", "HMS", "SHA", "ERP"]),

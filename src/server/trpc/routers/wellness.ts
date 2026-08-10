@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, memberOpsProcedure } from "../trpc";
 import { WellnessService } from "../../services/wellness.service";
 
 const programType = z.enum(["SCREENING", "CHRONIC_DISEASE_MGMT", "INCENTIVE"]);
@@ -13,7 +13,7 @@ export const wellnessRouter = createTRPCRouter({
     .input(z.object({ type: programType.optional(), clientId: z.string().nullable().optional(), includeInactive: z.boolean().optional() }).optional())
     .query(({ ctx, input }) => WellnessService.listPrograms(ctx.tenantId, input ?? {})),
 
-  upsertProgram: protectedProcedure
+  upsertProgram: memberOpsProcedure
     .input(
       z.object({
         id: z.string().optional(),
@@ -30,19 +30,19 @@ export const wellnessRouter = createTRPCRouter({
     )
     .mutation(({ ctx, input }) => WellnessService.upsertProgram(ctx.tenantId, input)),
 
-  retireProgram: protectedProcedure
+  retireProgram: memberOpsProcedure
     .input(z.object({ id: z.string() }))
     .mutation(({ ctx, input }) => WellnessService.retireProgram(ctx.tenantId, input.id)),
 
-  enroll: protectedProcedure
+  enroll: memberOpsProcedure
     .input(z.object({ programId: z.string(), memberId: z.string() }))
     .mutation(({ ctx, input }) => WellnessService.enroll(ctx.tenantId, input.programId, input.memberId)),
 
-  withdraw: protectedProcedure
+  withdraw: memberOpsProcedure
     .input(z.object({ enrollmentId: z.string() }))
     .mutation(({ ctx, input }) => WellnessService.withdraw(ctx.tenantId, input.enrollmentId)),
 
-  logActivity: protectedProcedure
+  logActivity: memberOpsProcedure
     .input(
       z.object({
         enrollmentId: z.string(),

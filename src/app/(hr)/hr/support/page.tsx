@@ -1,5 +1,6 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
+import { notFound } from "next/navigation";
 import Link from "next/link";
 import { PlusCircle, MessageSquareText, Clock } from "lucide-react";
 
@@ -24,7 +25,10 @@ const getPriorityLabel = (p: string) => {
 
 export default async function HRSupportPage() {
   const session = await requireRole(ROLES.HR);
-  const groupId = session.user.groupId!;
+  // N3 (PRIVACY-S1-B): never assert groupId — guard the null case so an ungrouped
+  // HR user (or SUPER_ADMIN) cannot list every group's service requests.
+  if (!session.user.groupId) notFound();
+  const groupId = session.user.groupId;
 
   const requests = await prisma.serviceRequest.findMany({
     where: { groupId, tenantId: session.user.tenantId },

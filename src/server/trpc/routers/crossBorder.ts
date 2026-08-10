@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, memberOpsProcedure } from "../trpc";
 import { CrossBorderService } from "../../services/cross-border.service";
 
 const caseStatusEnum = z.enum([
@@ -25,7 +25,7 @@ export const crossBorderRouter = createTRPCRouter({
     .input(z.object({ country: z.string().optional(), onlyVetted: z.boolean().optional(), includeInactive: z.boolean().optional() }).optional())
     .query(({ ctx, input }) => CrossBorderService.listFacilities(ctx.tenantId, input ?? {})),
 
-  upsertFacility: protectedProcedure
+  upsertFacility: memberOpsProcedure
     .input(
       z.object({
         id: z.string().optional(),
@@ -44,7 +44,7 @@ export const crossBorderRouter = createTRPCRouter({
     )
     .mutation(({ ctx, input }) => CrossBorderService.upsertFacility(ctx.tenantId, input)),
 
-  retireFacility: protectedProcedure
+  retireFacility: memberOpsProcedure
     .input(z.object({ id: z.string() }))
     .mutation(({ ctx, input }) => CrossBorderService.retireFacility(ctx.tenantId, input.id)),
 
@@ -57,7 +57,7 @@ export const crossBorderRouter = createTRPCRouter({
     .input(z.object({ id: z.string() }))
     .query(({ ctx, input }) => CrossBorderService.getCase(ctx.tenantId, input.id)),
 
-  openCase: protectedProcedure
+  openCase: memberOpsProcedure
     .input(
       z.object({
         clientId: z.string().min(1),
@@ -72,15 +72,15 @@ export const crossBorderRouter = createTRPCRouter({
       CrossBorderService.openCase(ctx.tenantId, { ...input, createdById: ctx.session.user.id }),
     ),
 
-  assignFacility: protectedProcedure
+  assignFacility: memberOpsProcedure
     .input(z.object({ caseId: z.string(), facilityId: z.string() }))
     .mutation(({ ctx, input }) => CrossBorderService.assignFacility(ctx.tenantId, input.caseId, input.facilityId)),
 
-  captureEstimate: protectedProcedure
+  captureEstimate: memberOpsProcedure
     .input(z.object({ caseId: z.string(), lines: z.array(lineInput).min(1) }))
     .mutation(({ ctx, input }) => CrossBorderService.captureEstimate(ctx.tenantId, input.caseId, input.lines)),
 
-  issueGop: protectedProcedure
+  issueGop: memberOpsProcedure
     .input(
       z.object({
         caseId: z.string(),
@@ -97,23 +97,23 @@ export const crossBorderRouter = createTRPCRouter({
       }),
     ),
 
-  startTreatment: protectedProcedure
+  startTreatment: memberOpsProcedure
     .input(z.object({ caseId: z.string() }))
     .mutation(({ ctx, input }) => CrossBorderService.startTreatment(ctx.tenantId, input.caseId)),
 
-  addInvoiceLine: protectedProcedure
+  addInvoiceLine: memberOpsProcedure
     .input(z.object({ caseId: z.string(), line: lineInput }))
     .mutation(({ ctx, input }) => CrossBorderService.addInvoiceLine(ctx.tenantId, input.caseId, input.line)),
 
-  consolidateInvoice: protectedProcedure
+  consolidateInvoice: memberOpsProcedure
     .input(z.object({ caseId: z.string() }))
     .mutation(({ ctx, input }) => CrossBorderService.consolidateInvoice(ctx.tenantId, input.caseId)),
 
-  settle: protectedProcedure
+  settle: memberOpsProcedure
     .input(z.object({ caseId: z.string(), period: z.string().optional() }))
     .mutation(({ ctx, input }) => CrossBorderService.settle(ctx.tenantId, input.caseId, { period: input.period })),
 
-  cancelCase: protectedProcedure
+  cancelCase: memberOpsProcedure
     .input(z.object({ caseId: z.string() }))
     .mutation(({ ctx, input }) => CrossBorderService.cancelCase(ctx.tenantId, input.caseId)),
 });

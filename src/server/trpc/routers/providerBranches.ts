@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, superAdminProcedure } from "../trpc";
 import { prisma } from "@/lib/prisma";
 
 // Provider branches + name aliases (digital-contract spec §5.2). Branches make
@@ -15,7 +15,7 @@ export const providerBranchesRouter = createTRPCRouter({
       }),
     ),
 
-  createBranch: protectedProcedure
+  createBranch: superAdminProcedure
     .input(
       z.object({
         providerId: z.string(),
@@ -32,7 +32,7 @@ export const providerBranchesRouter = createTRPCRouter({
       return prisma.providerBranch.create({ data: { tenantId: ctx.tenantId, ...input } });
     }),
 
-  updateBranch: protectedProcedure
+  updateBranch: superAdminProcedure
     .input(
       z.object({
         id: z.string(),
@@ -57,7 +57,7 @@ export const providerBranchesRouter = createTRPCRouter({
       prisma.providerAlias.findMany({ where: { tenantId: ctx.tenantId, providerId: input.providerId }, orderBy: { aliasName: "asc" } }),
     ),
 
-  createAlias: protectedProcedure
+  createAlias: superAdminProcedure
     .input(z.object({ providerId: z.string(), aliasName: z.string().min(1), source: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
       const provider = await prisma.provider.findUnique({ where: { id: input.providerId, tenantId: ctx.tenantId } });
@@ -65,7 +65,7 @@ export const providerBranchesRouter = createTRPCRouter({
       return prisma.providerAlias.create({ data: { tenantId: ctx.tenantId, ...input } });
     }),
 
-  deleteAlias: protectedProcedure
+  deleteAlias: superAdminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const alias = await prisma.providerAlias.findUnique({ where: { id: input.id } });

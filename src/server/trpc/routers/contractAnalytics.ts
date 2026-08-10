@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, underwritingProcedure } from "../trpc";
 import { ContractAnalyticsService } from "@/server/services/contract-analytics.service";
 import { ContractReconciliationService } from "@/server/services/contract-reconciliation.service";
 
@@ -22,7 +22,7 @@ export const contractAnalyticsRouter = createTRPCRouter({
 
   reconciliations: protectedProcedure.query(async ({ ctx }) => ContractReconciliationService.list(ctx.tenantId)),
 
-  computeReconciliation: protectedProcedure
+  computeReconciliation: underwritingProcedure
     .input(
       z.object({
         poolId: z.string(),
@@ -43,7 +43,7 @@ export const contractAnalyticsRouter = createTRPCRouter({
       }),
     ),
 
-  approveReconciliation: protectedProcedure
+  approveReconciliation: underwritingProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => ContractReconciliationService.approve(ctx.tenantId, input.id, ctx.session.user.id)),
 });

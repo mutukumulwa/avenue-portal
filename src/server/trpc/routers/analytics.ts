@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { AnalyticsAlertSeverity, AnalyticsAlertStatus, AnalyticsAlertType, RiskTier } from "@prisma/client";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, adminProcedure } from "../trpc";
 import { AnalyticsRefreshService } from "@/server/services/analytics-refresh.service";
 import { AnalyticsService } from "@/server/services/analytics.service";
 import { getAnalyticsAccessScope } from "@/lib/analytics-access";
@@ -182,7 +182,7 @@ export const analyticsRouter = createTRPCRouter({
       return AnalyticsService.getAlerts({ ...scope, tenantId: requireTenantId(ctx.tenantId) }, input);
     }),
 
-  acknowledgeAlert: protectedProcedure
+  acknowledgeAlert: adminProcedure
     .input(alertActionInput)
     .mutation(async ({ ctx, input }) => {
       const scope = await getAnalyticsAccessScope(ctx.session);
@@ -193,7 +193,7 @@ export const analyticsRouter = createTRPCRouter({
       );
     }),
 
-  resolveAlert: protectedProcedure
+  resolveAlert: adminProcedure
     .input(resolveAlertInput)
     .mutation(async ({ ctx, input }) => {
       const scope = await getAnalyticsAccessScope(ctx.session);
@@ -205,7 +205,7 @@ export const analyticsRouter = createTRPCRouter({
       );
     }),
 
-  refreshFoundation: protectedProcedure
+  refreshFoundation: adminProcedure
     .input(refreshInput)
     .mutation(async ({ ctx, input }) => {
       if (!ctx.session.user.role || !ROLES.ADMIN_ONLY.includes(ctx.session.user.role as UserRole)) {

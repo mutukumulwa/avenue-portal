@@ -46,8 +46,12 @@ import { preauthRouter } from "@/server/trpc/routers/preauth";
 import { createCallerFactory } from "@/server/trpc/trpc";
 import { PreauthIntakeService } from "@/server/services/preauth-intake/service";
 
-const caller = () => createCallerFactory(preauthRouter)({ session: { user: { id: "u1", role: "ADMIN" } }, tenantId: "t1" } as never);
-const callerAs = (clientId?: string) => createCallerFactory(preauthRouter)({ session: { user: { id: "u1", role: "ADMIN" } }, tenantId: "t1", clientId } as never);
+// WP-3.5B: preauth mutations (create/adjudicate/convertToClaim) are now gated to
+// clinicalProcedure; the caller must carry a clinical role (SUPER_ADMIN passes).
+// Reads (list/getById) stay on protectedProcedure. Authorization is proven in
+// tests/security/trpc-mutation-authorization.test.ts; this file tests the pipeline.
+const caller = () => createCallerFactory(preauthRouter)({ session: { user: { id: "u1", role: "SUPER_ADMIN" } }, tenantId: "t1" } as never);
+const callerAs = (clientId?: string) => createCallerFactory(preauthRouter)({ session: { user: { id: "u1", role: "SUPER_ADMIN" } }, tenantId: "t1", clientId } as never);
 
 const input = {
   memberId: "member-1",

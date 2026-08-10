@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, underwritingProcedure, permissionProcedure } from "../trpc";
 import { intakeService } from "@/server/services/intake.service";
 import { rbacService } from "@/server/services/rbac.service";
 import { ClientType, FundingMode, Gender, LifeRole, UWDecisionType } from "@prisma/client";
@@ -21,7 +21,7 @@ const lifeInputSchema = z.object({
 
 export const intakeRouter = createTRPCRouter({
   // ── Create a new intake quotation ──────────────────────────────────────────
-  create: protectedProcedure
+  create: underwritingProcedure
     .input(z.object({
       clientType: z.nativeEnum(ClientType),
       fundingMode: z.nativeEnum(FundingMode).optional(),
@@ -44,7 +44,7 @@ export const intakeRouter = createTRPCRouter({
     }),
 
   // ── Add lives manually ────────────────────────────────────────────────────
-  addLives: protectedProcedure
+  addLives: underwritingProcedure
     .input(z.object({
       quotationId: z.string(),
       lives: z.array(lifeInputSchema).min(1),
@@ -54,28 +54,28 @@ export const intakeRouter = createTRPCRouter({
     }),
 
   // ── Parse a census file (returns structured lives + row errors) ────────────
-  parseCensus: protectedProcedure
+  parseCensus: underwritingProcedure
     .input(z.object({ fileUrl: z.string().url() }))
     .mutation(async ({ input }) => {
       return intakeService.parseCensusFile(input.fileUrl);
     }),
 
   // ── Submit for validation (runs all gates) ────────────────────────────────
-  submitForValidation: protectedProcedure
+  submitForValidation: underwritingProcedure
     .input(z.object({ quotationId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       return intakeService.submitForValidation(input.quotationId, ctx.tenantId, ctx.session.user.id);
     }),
 
   // ── Assemble the risk profile for display ─────────────────────────────────
-  assembleRiskProfile: protectedProcedure
+  assembleRiskProfile: underwritingProcedure
     .input(z.object({ quotationId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       return intakeService.assembleRiskProfile(input.quotationId, ctx.tenantId);
     }),
 
   // ── Record a per-life underwriting decision ───────────────────────────────
-  recordDecision: protectedProcedure
+  recordDecision: permissionProcedure("UNDERWRITING:RECORD_DECISION")
     .input(z.object({
       quotationId: z.string(),
       quotationLifeId: z.string(),
@@ -93,7 +93,7 @@ export const intakeRouter = createTRPCRouter({
     }),
 
   // ── Submit for pricing ────────────────────────────────────────────────────
-  submitForPricing: protectedProcedure
+  submitForPricing: permissionProcedure("UNDERWRITING:ASSESS")
     .input(z.object({
       quotationId: z.string(),
       projectedGrossKes: z.number().optional(),
@@ -108,7 +108,7 @@ export const intakeRouter = createTRPCRouter({
     }),
 
   // ── Senior approval ───────────────────────────────────────────────────────
-  approveSenior: protectedProcedure
+  approveSenior: permissionProcedure("UNDERWRITING:APPROVE_SENIOR")
     .input(z.object({ quotationId: z.string(), note: z.string().min(5) }))
     .mutation(async ({ ctx, input }) => {
       await rbacService.requirePermission(ctx.session.user.id, "UNDERWRITING:APPROVE_SENIOR", ctx.tenantId);
@@ -116,20 +116,20 @@ export const intakeRouter = createTRPCRouter({
     }),
 
   // ── Decline / withdraw / return ───────────────────────────────────────────
-  decline: protectedProcedure
+  decline: permissionProcedure("UNDERWRITING:DECLINE")
     .input(z.object({ quotationId: z.string(), reason: z.string().min(5) }))
     .mutation(async ({ ctx, input }) => {
       await rbacService.requirePermission(ctx.session.user.id, "UNDERWRITING:DECLINE", ctx.tenantId);
       return intakeService.decline(input.quotationId, ctx.tenantId, ctx.session.user.id, input.reason);
     }),
 
-  withdraw: protectedProcedure
+  withdraw: underwritingProcedure
     .input(z.object({ quotationId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       return intakeService.withdraw(input.quotationId, ctx.tenantId, ctx.session.user.id);
     }),
 
-  returnToSubmitter: protectedProcedure
+  returnToSubmitter: permissionProcedure("UNDERWRITING:ASSESS")
     .input(z.object({ quotationId: z.string(), reason: z.string().min(5) }))
     .mutation(async ({ ctx, input }) => {
       await rbacService.requirePermission(ctx.session.user.id, "UNDERWRITING:ASSESS", ctx.tenantId);

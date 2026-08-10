@@ -22,7 +22,7 @@ export default async function RosterPage(
   const statusFilter = searchParams.status || "";
   const relFilter = searchParams.relationship || "";
 
-  const whereClause: Prisma.MemberWhereInput = { groupId };
+  const whereClause: Prisma.MemberWhereInput = { groupId, tenantId: session.user.tenantId };
   if (q) {
     whereClause.OR = [
       { firstName: { contains: q, mode: "insensitive" } },

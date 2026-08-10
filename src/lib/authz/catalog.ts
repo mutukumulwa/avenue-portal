@@ -215,3 +215,19 @@ export const INTERNAL_STAFF_ROLES: readonly UserRole[] = [
   "MEDICAL_OFFICER",
   "REPORTS_VIEWER",
 ];
+
+/**
+ * Internal staff roles authorised to perform MUTATIONS (writes) on the admin /
+ * operator surface. Identical to INTERNAL_STAFF_ROLES except REPORTS_VIEWER is
+ * removed: a reports viewer is strictly read-only (it holds REPORT:VIEW /
+ * ANALYTICS:VIEW but no write grant), so it must never satisfy a write gate.
+ *
+ * PROD-BLOCKER-2 / L-13: the tRPC `adminProcedure` — the default gate for
+ * internal-staff mutations — derives from THIS set rather than
+ * INTERNAL_STAFF_ROLES. The old adminProcedure admitted REPORTS_VIEWER (an open
+ * matrix item flagged at catalog.ts) because it used INTERNAL_STAFF_ROLES; that
+ * is corrected here. Read gating (the admin shell, INTERNAL_STAFF_ROLES ===
+ * ROLES.ANY_STAFF) is unchanged — a reports viewer keeps its read surfaces.
+ */
+export const INTERNAL_STAFF_MUTATION_ROLES: readonly UserRole[] =
+  INTERNAL_STAFF_ROLES.filter((role) => role !== "REPORTS_VIEWER");

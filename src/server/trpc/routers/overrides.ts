@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, adminProcedure, permissionProcedure } from "../trpc";
 import { overrideService } from "@/server/services/override.service";
 import { rbacService } from "@/server/services/rbac.service";
 import { OverrideType, OverrideReasonCode } from "@prisma/client";
@@ -32,7 +32,7 @@ const reasonCodeEnum = z.enum([
 ] as const);
 
 export const overridesRouter = createTRPCRouter({
-  request: protectedProcedure
+  request: permissionProcedure("OVERRIDE:REQUEST")
     .input(
       z.object({
         overrideType: overrideTypeEnum,
@@ -56,7 +56,7 @@ export const overridesRouter = createTRPCRouter({
       });
     }),
 
-  approve: protectedProcedure
+  approve: adminProcedure
     .input(
       z.object({
         overrideId: z.string(),
@@ -74,7 +74,7 @@ export const overridesRouter = createTRPCRouter({
       });
     }),
 
-  reject: protectedProcedure
+  reject: adminProcedure
     .input(z.object({ overrideId: z.string(), reason: z.string().min(5) }))
     .mutation(async ({ ctx, input }) => {
       return overrideService.reject({

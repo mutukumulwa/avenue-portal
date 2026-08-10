@@ -111,10 +111,18 @@ export const ProviderEligibilityService = {
       });
     }
 
-    // NOT-ENFORCED (default): permissive tenant-only lookup (today's behavior) +
-    // shadow comparison for the readiness report. Live behavior unchanged.
+    // NOT-ENFORCED (default): member resolution is STILL entitlement-scoped even
+    // with deny-by-default enforcement OFF (PRIVACY-S1-A). A provider must never
+    // be able to resolve — or even confirm the existence of — a member outside
+    // the clients/groups its active contracts cover; a tenant-only lookup here
+    // was a card-number enumeration + name-disclosure oracle. The enforcement
+    // flag governs the branch-in-context gate and shadow sampling, never whether
+    // member PII crosses the entitlement boundary. An out-of-entitlement number
+    // is indistinguishable from an absent one (same "No member found" message),
+    // mirroring the enforced path's non-enumerating not-found.
+    const where = await ProviderEntitlementService.entitledMemberWhere(ctx.providerId, serviceDate);
     const m = await db.member.findFirst({
-      where: { memberNumber: { equals: input.memberNumber, mode: "insensitive" }, tenantId: ctx.tenantId },
+      where: { memberNumber: { equals: input.memberNumber, mode: "insensitive" }, tenantId: ctx.tenantId, ...where },
       select: { id: true, firstName: true, lastName: true, memberNumber: true, status: true, group: { select: { name: true, status: true, clientId: true } }, groupId: true, package: { select: { name: true } }, packageId: true },
     });
     if (m) {

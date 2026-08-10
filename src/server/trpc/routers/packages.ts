@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, underwritingProcedure } from "../trpc";
 import { PackagesService } from "../../services/packages.service";
 
 const BenefitSchema = z.object({
@@ -34,7 +34,7 @@ export const packagesRouter = createTRPCRouter({
       return PackagesService.getPackageById(ctx.tenantId, input.id);
     }),
 
-  create: protectedProcedure
+  create: underwritingProcedure
     .input(
       z.object({
         name: z.string().min(1, "Name is required"),
@@ -64,7 +64,7 @@ export const packagesRouter = createTRPCRouter({
       });
     }),
 
-  createSharedLimit: protectedProcedure
+  createSharedLimit: underwritingProcedure
     .input(
       z.object({
         packageVersionId: z.string(),
@@ -98,7 +98,7 @@ export const packagesRouter = createTRPCRouter({
       return group;
     }),
 
-  deleteSharedLimit: protectedProcedure
+  deleteSharedLimit: underwritingProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input, ctx }) => {
       await ctx.prisma.benefitConfigSharedLimit.deleteMany({

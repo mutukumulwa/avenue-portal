@@ -3,6 +3,9 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { writeAudit } from "@/lib/audit";
+import { capsSchema } from "@/lib/validation/co-contribution";
+import { ok, fail, type ActionResult } from "@/lib/action-result";
 
 export async function createCoContributionRuleAction(
   formData: FormData,
@@ -88,24 +91,69 @@ export async function deleteCoContributionRuleAction(
 
 export async function upsertAnnualCapAction(
   formData: FormData,
-): Promise<{ error?: string }> {
+): Promise<ActionResult> {
   const session = await requireRole(ROLES.UNDERWRITING);
 
-  const packageId   = formData.get("packageId") as string;
-  const individual  = Number(formData.get("individualCap"));
-  const family      = formData.get("familyCap") ? Number(formData.get("familyCap")) : null;
+  const packageId = formData.get("packageId") as string;
+  if (!packageId) return fail({ packageId: ["Package is required."] });
 
-  if (!packageId || isNaN(individual) || individual <= 0) return { error: "Individual cap is required." };
+  // Optional family cap: an absent or blank field means "no family cap" (D4).
+  // Coercion would otherwise turn "" into 0 and trip the positive() check.
+  const rawFamily = formData.get("familyCap");
+  const parsed = capsSchema.safeParse({
+    individualCap: formData.get("individualCap"),
+    familyCap: rawFamily === null || rawFamily === "" ? null : rawFamily,
+  });
+  if (!parsed.success) {
+    // Do NOT throw for validation — return field errors so the form can render
+    // them adjacent to the inputs and preserve entered values (SP-2).
+    return fail(parsed.error.flatten().fieldErrors);
+  }
+  const { individualCap, familyCap } = parsed.data;
 
-  const pkg = await prisma.package.findUnique({ where: { id: packageId }, select: { tenantId: true } });
-  if (!pkg || pkg.tenantId !== session.user.tenantId) return { error: "Package not found." };
+  // Preserve tenant scoping: the package must belong to the actor's tenant.
+  const pkg = await prisma.package.findUnique({
+    where: { id: packageId },
+    select: { tenantId: true },
+  });
+  if (!pkg || pkg.tenantId !== session.user.tenantId) {
+    return fail(undefined, "Package not found.");
+  }
 
-  await prisma.annualCoContributionCap.upsert({
-    where: { packageId },
-    update: { individualCap: individual, familyCap: family },
-    create: { packageId, tenantId: session.user.tenantId, individualCap: individual, familyCap: family },
+  // Atomic read-then-write so the audit before/after is a coherent snapshot
+  // (SP-5 mutation envelope).
+  const prior = await prisma.$transaction(async (tx) => {
+    const before = await tx.annualCoContributionCap.findUnique({
+      where: { packageId },
+      select: { individualCap: true, familyCap: true },
+    });
+    await tx.annualCoContributionCap.upsert({
+      where: { packageId },
+      update: { individualCap, familyCap },
+      create: { packageId, tenantId: session.user.tenantId, individualCap, familyCap },
+    });
+    return before;
+  });
+
+  await writeAudit({
+    userId: session.user.id,
+    action: "PACKAGE_CAPS_UPSERT",
+    module: "PACKAGES",
+    description: `Annual co-contribution caps updated for package ${packageId}`,
+    metadata: {
+      packageId,
+      before: JSON.stringify(
+        prior
+          ? {
+              individualCap: Number(prior.individualCap),
+              familyCap: prior.familyCap == null ? null : Number(prior.familyCap),
+            }
+          : null,
+      ),
+      after: JSON.stringify({ individualCap, familyCap }),
+    },
   });
 
   revalidatePath(`/packages/${packageId}`);
-  return {};
+  return ok();
 }

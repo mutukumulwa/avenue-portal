@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, superAdminProcedure } from "../trpc";
 import { TerminologyService } from "../../services/terminology.service";
 
 const scopeEnum = z.enum(["SYSTEM", "HOUSE", "CLIENT", "LOCALE"]);
@@ -21,7 +21,7 @@ export const terminologyRouter = createTRPCRouter({
       return TerminologyService.list(ctx.tenantId, input);
     }),
 
-  createDraft: protectedProcedure
+  createDraft: superAdminProcedure
     .input(
       z.object({
         scope: scopeEnum,
@@ -36,19 +36,19 @@ export const terminologyRouter = createTRPCRouter({
       return TerminologyService.createDraft(ctx.tenantId, input, ctx.session.user.id);
     }),
 
-  submit: protectedProcedure
+  submit: superAdminProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       return TerminologyService.submit(ctx.tenantId, input.id, ctx.session.user.id);
     }),
 
-  approve: protectedProcedure
+  approve: superAdminProcedure
     .input(z.object({ id: z.string(), notes: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
       return TerminologyService.approve(ctx.tenantId, input.id, ctx.session.user.id, input.notes);
     }),
 
-  reject: protectedProcedure
+  reject: superAdminProcedure
     .input(z.object({ id: z.string(), notes: z.string().optional() }))
     .mutation(async ({ ctx, input }) => {
       return TerminologyService.reject(ctx.tenantId, input.id, ctx.session.user.id, input.notes);

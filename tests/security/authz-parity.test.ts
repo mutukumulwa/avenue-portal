@@ -16,6 +16,7 @@ import {
   ROLE_GRANTS,
   SEED_DIVERGENCE_EXEMPT,
   INTERNAL_STAFF_ROLES,
+  INTERNAL_STAFF_MUTATION_ROLES,
   effectivePermissions,
   permitted,
   hasPerm,
@@ -106,6 +107,29 @@ describe("DEF-003 — role sets exclude the roles that leaked", () => {
 
   it("INTERNAL_STAFF_ROLES and ROLES.ANY_STAFF are the same set", () => {
     expect(sorted(INTERNAL_STAFF_ROLES)).toEqual(sorted(ROLES.ANY_STAFF));
+  });
+});
+
+describe("PROD-BLOCKER-2 — tRPC mutation authority excludes read-only roles", () => {
+  it("INTERNAL_STAFF_MUTATION_ROLES is internal staff minus REPORTS_VIEWER", () => {
+    expect(sorted(INTERNAL_STAFF_MUTATION_ROLES)).toEqual(
+      sorted(INTERNAL_STAFF_ROLES.filter((r) => r !== "REPORTS_VIEWER")),
+    );
+  });
+
+  it("REPORTS_VIEWER (read-only) is not in the mutation-authority set", () => {
+    // The open matrix item: the old adminProcedure admitted REPORTS_VIEWER.
+    expect(INTERNAL_STAFF_MUTATION_ROLES).not.toContain("REPORTS_VIEWER");
+  });
+
+  it("every mutation-authority role is still an internal-staff role (no portal role leaked in)", () => {
+    for (const role of INTERNAL_STAFF_MUTATION_ROLES) {
+      expect(INTERNAL_STAFF_ROLES).toContain(role);
+    }
+    // and no employer/intermediary/member/provider role slipped into writes
+    for (const role of ["HR_MANAGER", "FUND_ADMINISTRATOR", "BROKER_USER", "MEMBER_USER", "PROVIDER_USER"] as UserRole[]) {
+      expect(INTERNAL_STAFF_MUTATION_ROLES).not.toContain(role);
+    }
   });
 });
 
@@ -239,7 +263,9 @@ describe("no surface re-declares role sets", () => {
 
   it("tRPC adminProcedure derives its role list from the catalog", () => {
     const src = read("src/server/trpc/trpc.ts");
-    expect(src).toContain("INTERNAL_STAFF_ROLES");
+    // WP-3.5B: adminProcedure (the internal-staff MUTATION gate) derives from the
+    // catalog's mutation-authority set rather than a restated literal list.
+    expect(src).toContain("INTERNAL_STAFF_MUTATION_ROLES");
     expect(src).not.toMatch(/\[\s*"SUPER_ADMIN",\s*"CLAIMS_OFFICER"/);
   });
 

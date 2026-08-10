@@ -1,10 +1,14 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
+import { notFound } from "next/navigation";
 import { Activity, ShieldCheck, FileText, AlertTriangle } from "lucide-react";
 
 export default async function HRUtilizationPage() {
   const session = await requireRole(ROLES.HR);
-  const groupId = session.user.groupId!;
+  // N3 (PRIVACY-S1-B): never assert groupId — an undefined key would degrade the
+  // queries below to cross-group aggregates. Guard the null case instead.
+  if (!session.user.groupId) notFound();
+  const groupId = session.user.groupId;
 
   // 1. Fetch group to establish current invoice baseline
   const group = await prisma.group.findUnique({

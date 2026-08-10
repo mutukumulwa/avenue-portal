@@ -1,12 +1,12 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, underwritingProcedure, permissionProcedure } from "../trpc";
 import { bindingService } from "@/server/services/binding.service";
 import { rbacService } from "@/server/services/rbac.service";
 import { AcceptanceMethod } from "@prisma/client";
 
 export const bindingRouter = createTRPCRouter({
   // Accept a quotation (method + optional document URL)
-  acceptQuotation: protectedProcedure
+  acceptQuotation: underwritingProcedure
     .input(z.object({
       quotationId:  z.string(),
       method:       z.nativeEnum(AcceptanceMethod),
@@ -27,7 +27,7 @@ export const bindingRouter = createTRPCRouter({
     }),
 
   // Create membership records (maker step)
-  createMemberships: protectedProcedure
+  createMemberships: permissionProcedure("MEMBER:CREATE")
     .input(z.object({ quotationId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await rbacService.requirePermission(ctx.session.user.id, "MEMBER:CREATE", ctx.tenantId);
@@ -35,7 +35,7 @@ export const bindingRouter = createTRPCRouter({
     }),
 
   // Approve the binder (checker step — must differ from maker)
-  approveBinder: protectedProcedure
+  approveBinder: permissionProcedure("QUOTATION:APPROVE_BINDER")
     .input(z.object({ quotationId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await rbacService.requirePermission(ctx.session.user.id, "QUOTATION:APPROVE_BINDER", ctx.tenantId);
@@ -43,7 +43,7 @@ export const bindingRouter = createTRPCRouter({
     }),
 
   // Post the debit note / fund deposit request
-  postDebitNote: protectedProcedure
+  postDebitNote: permissionProcedure("BILLING:POST_DEBIT_NOTE")
     .input(z.object({ quotationId: z.string() }))
     .mutation(async ({ ctx, input }) => {
       await rbacService.requirePermission(ctx.session.user.id, "BILLING:POST_DEBIT_NOTE", ctx.tenantId);

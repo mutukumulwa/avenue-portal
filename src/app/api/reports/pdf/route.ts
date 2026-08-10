@@ -10,6 +10,8 @@
 
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { getAnalyticsAccessScope } from "@/lib/analytics-access";
+import { ROLES, type UserRole } from "@/lib/authz/roles";
 import { pdfService } from "@/server/services/pdf.service";
 // NOTE: pdf-lib dropped encryption support. Password protection (R-24) requires
 // node-qpdf (native binary wrapper) or Puppeteer's DevTools Protocol encryption.
@@ -107,6 +109,20 @@ export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user?.tenantId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // PROD-BLOCKER-3: same gate as the CSV export — only internal/reporting staff
+  // may render a tenant report to PDF; an authenticated session is not enough.
+  const role = session.user.role as UserRole | undefined;
+  if (!role || !ROLES.ANY_STAFF.includes(role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  // Every PDF report here is tenant-wide (none apply per-group projection), so a
+  // group-restricted principal must be denied rather than handed the tenant.
+  const analyticsScope = await getAnalyticsAccessScope(session);
+  if (analyticsScope.noAccess === true || analyticsScope.groupId != null || analyticsScope.allowedGroupIds != null) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const { searchParams } = new URL(req.url);

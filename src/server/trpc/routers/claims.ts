@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, clinicalProcedure } from "../trpc";
 import { ClaimsService } from "@/server/services/claims.service";
 import { TRPCError } from "@trpc/server";
 import { prisma } from "@/lib/prisma";
@@ -38,7 +38,7 @@ export const claimsRouter = createTRPCRouter({
       return ClaimsService.getClaimById(ctx.tenantId, input.id);
     }),
 
-  adjudicate: protectedProcedure
+  adjudicate: clinicalProcedure
     .input(
       z.object({
         claimId: z.string(),

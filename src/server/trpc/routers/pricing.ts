@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, protectedProcedure, underwritingProcedure } from "../trpc";
 import { prisma } from "@/lib/prisma";
 
 export const pricingRouter = createTRPCRouter({
@@ -26,7 +26,7 @@ export const pricingRouter = createTRPCRouter({
     }),
 
   // Create a new pricing model
-  createModel: protectedProcedure
+  createModel: underwritingProcedure
     .input(
       z.object({
         name: z.string().min(1),
@@ -46,7 +46,7 @@ export const pricingRouter = createTRPCRouter({
     }),
 
   // Update a rate table entry
-  upsertRateTableEntry: protectedProcedure
+  upsertRateTableEntry: underwritingProcedure
     .input(
       z.object({
         id: z.string().optional(),
@@ -94,7 +94,7 @@ export const pricingRouter = createTRPCRouter({
     }),
 
   // Delete a rate table entry
-  deleteRateTableEntry: protectedProcedure
+  deleteRateTableEntry: underwritingProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input, ctx }) => {
       const entry = await prisma.contributionRateTable.findUnique({

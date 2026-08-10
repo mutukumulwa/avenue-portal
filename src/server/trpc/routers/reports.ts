@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createTRPCRouter, protectedProcedure } from "../trpc";
+import { createTRPCRouter, reportsProcedure } from "../trpc";
 import { prisma } from "@/lib/prisma";
 
 const dateRangeInput = z.object({
@@ -9,7 +9,7 @@ const dateRangeInput = z.object({
 
 export const reportsRouter = createTRPCRouter({
   // 1. Claims Summary
-  claimsSummary: protectedProcedure
+  claimsSummary: reportsProcedure
     .input(dateRangeInput)
     .query(async ({ ctx, input }) => {
       const claims = await prisma.claim.findMany({
@@ -47,7 +47,7 @@ export const reportsRouter = createTRPCRouter({
     }),
 
   // 2. Membership Report
-  membershipReport: protectedProcedure
+  membershipReport: reportsProcedure
     .input(dateRangeInput)
     .query(async ({ ctx, input }) => {
       const [members, groups] = await Promise.all([
@@ -76,7 +76,7 @@ export const reportsRouter = createTRPCRouter({
     }),
 
   // 3. Pre-Auth Report
-  preauthReport: protectedProcedure
+  preauthReport: reportsProcedure
     .input(dateRangeInput)
     .query(async ({ ctx, input }) => {
       const preauths = await prisma.preAuthorization.findMany({
@@ -100,7 +100,7 @@ export const reportsRouter = createTRPCRouter({
     }),
 
   // 4. Billing / Collections Report
-  billingReport: protectedProcedure
+  billingReport: reportsProcedure
     .input(dateRangeInput)
     .query(async ({ ctx, input }) => {
       const invoices = await prisma.invoice.findMany({
@@ -124,7 +124,7 @@ export const reportsRouter = createTRPCRouter({
     }),
 
   // 5. Utilization Report
-  utilizationReport: protectedProcedure
+  utilizationReport: reportsProcedure
     .input(dateRangeInput.extend({ groupId: z.string().optional() }))
     .query(async ({ ctx, input }) => {
       const usages = await prisma.benefitUsage.findMany({
@@ -149,7 +149,7 @@ export const reportsRouter = createTRPCRouter({
     }),
 
   // 6. Endorsement Report
-  endorsementReport: protectedProcedure
+  endorsementReport: reportsProcedure
     .input(dateRangeInput)
     .query(async ({ ctx, input }) => {
       const endorsements = await prisma.endorsement.findMany({
@@ -171,7 +171,7 @@ export const reportsRouter = createTRPCRouter({
     }),
 
   // 7. Quotation Pipeline Report
-  quotationReport: protectedProcedure
+  quotationReport: reportsProcedure
     .input(dateRangeInput)
     .query(async ({ ctx, input }) => {
       const quotations = await prisma.quotation.findMany({

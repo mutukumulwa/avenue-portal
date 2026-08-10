@@ -9,11 +9,19 @@ export default async function HRMemberDetailPage(
 ) {
   const params = await props.params;
   const session = await requireRole(ROLES.HR);
-  
+
+  // N3 (PRIVACY-S1-B): a `groupId!` non-null assertion is a lie for SUPER_ADMIN
+  // (which is in ROLES.HR) or any ungrouped HR user — Prisma drops an undefined
+  // key, so the query would degrade to a cross-group AND cross-tenant findFirst
+  // that renders DOB / idNumber / phone / email. Guard the null case, and scope
+  // by tenantId too. notFound() is called at top level, never inside try/catch.
+  if (!session.user.groupId) notFound();
+
   const member = await prisma.member.findFirst({
-    where: { 
+    where: {
       id: params.memberId,
-      groupId: session.user.groupId! 
+      tenantId: session.user.tenantId,
+      groupId: session.user.groupId,
     },
     include: {
       group: true,
