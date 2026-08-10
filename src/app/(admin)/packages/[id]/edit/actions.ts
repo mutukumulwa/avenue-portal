@@ -4,133 +4,464 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { redirect, notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { writeAudit } from "@/lib/audit";
+import { ok, fail, type ActionResult } from "@/lib/action-result";
+import {
+  BENEFIT_CATEGORY_VALUES,
+  packageCoreSchema,
+  packageBenefitInputSchema,
+  FIELD_LABELS,
+} from "@/lib/validation/package";
+import { sharedLimitSchema } from "@/lib/validation/shared-limit";
 
-const BENEFIT_CATEGORIES = [
-  "INPATIENT","OUTPATIENT","MATERNITY","DENTAL","OPTICAL",
-  "MENTAL_HEALTH","CHRONIC_DISEASE","SURGICAL","AMBULANCE_EMERGENCY",
-  "LAST_EXPENSE","WELLNESS_PREVENTIVE","REHABILITATION","CUSTOM",
-] as const;
+/** Local P2002 detector (the settings/tenants copy lives in a `"use server"`
+ *  file and can't be imported). SP-5: map the unique-constraint race to a
+ *  friendly ActionResult instead of a raw 500. */
+function isP2002(err: unknown): boolean {
+  return typeof err === "object" && err !== null && (err as { code?: string }).code === "P2002";
+}
 
-export async function updatePackageAction(formData: FormData) {
+/** Revalidate every surface a package-config change can be seen on: the detail
+ *  page, its edit screen, the list, and the member benefits surface (stale
+ *  terms shown to members was an explicit DEF-021/C5 finding). */
+function revalidatePackageSurfaces(packageId: string): void {
+  revalidatePath(`/packages/${packageId}`);
+  revalidatePath(`/packages/${packageId}/edit`);
+  revalidatePath("/packages");
+  revalidatePath("/member/benefits");
+}
+
+/**
+ * WP-2.0 — edit a package. Every save mints a NEW immutable `PackageVersion`.
+ *
+ * Fixes bundled here (all verified open at 39bb24e):
+ *   - validation: money/percent/age/cross-field bounds on core + every benefit
+ *     row, via the canonical schema. Returns SP-2 field errors (no throw / no
+ *     redirect-on-error); redirect only on success, outside try/catch.
+ *   - orphaning: copy-forward the current version's SharedLimitGroups AND
+ *     PackageProviderEligibility rows into the new version (re-mapping the
+ *     shared-limit benefit links by category to the new BenefitConfig ids), so a
+ *     benefit edit no longer silently strands every pool + provider rule on the
+ *     old version.
+ *   - data loss: carry forward each benefit's non-edited fields (funding, cost-
+ *     share, exclusions, notes) rather than blanking them.
+ *   - version numbering: nextVersion = MAX(versionNumber)+1 (was
+ *     currentVersion.versionNumber+1 → P2002 500 when the pointer wasn't latest).
+ *   - audit: PACKAGE_VERSION_CREATE with before/after.
+ */
+export async function updatePackageAction(
+  _prev: ActionResult,
+  formData: FormData,
+): Promise<ActionResult> {
   const session = await requireRole(ROLES.UNDERWRITING);
-
   const tenantId = session.user.tenantId;
   const packageId = formData.get("packageId") as string;
+  if (!packageId) return fail(undefined, "Package is required.");
 
+  // 1) Core fields.
+  const coreParsed = packageCoreSchema.safeParse({
+    name: (formData.get("name") ?? "") as string,
+    type: formData.get("type"),
+    status: formData.get("status"),
+    description: (formData.get("description") as string) || null,
+    annualLimit: formData.get("annualLimit"),
+    contributionAmount: formData.get("contributionAmount"),
+    minAge: formData.get("minAge"),
+    maxAge: formData.get("maxAge"),
+    dependentMaxAge: formData.get("dependentMaxAge"),
+  });
+  const fieldErrors: Record<string, string[]> = {};
+  if (!coreParsed.success) Object.assign(fieldErrors, coreParsed.error.flatten().fieldErrors);
+
+  // 2) Enabled benefit rows (validate each; key errors to the per-category
+  //    input names so the form renders them adjacent to the offending cell).
+  const enabledCats = BENEFIT_CATEGORY_VALUES.filter(
+    (cat) => formData.get(`benefit_enabled_${cat}`) === "on",
+  );
+  const benefits: {
+    category: (typeof BENEFIT_CATEGORY_VALUES)[number];
+    annualSubLimit: number;
+    copayPercentage: number;
+    waitingPeriodDays: number;
+    perVisitLimit: number | null;
+  }[] = [];
+  for (const cat of enabledCats) {
+    const rawPerVisit = formData.get(`benefit_pervisit_${cat}`);
+    const rowParsed = packageBenefitInputSchema.safeParse({
+      category: cat,
+      annualSubLimit: formData.get(`benefit_limit_${cat}`),
+      copayPercentage: formData.get(`benefit_copay_${cat}`) ?? undefined,
+      waitingPeriodDays: formData.get(`benefit_wait_${cat}`) ?? undefined,
+      perVisitLimit: rawPerVisit == null || rawPerVisit === "" ? null : rawPerVisit,
+    });
+    if (!rowParsed.success) {
+      const e = rowParsed.error.flatten().fieldErrors;
+      if (e.annualSubLimit) fieldErrors[`benefit_limit_${cat}`] = e.annualSubLimit;
+      if (e.copayPercentage) fieldErrors[`benefit_copay_${cat}`] = e.copayPercentage;
+      if (e.waitingPeriodDays) fieldErrors[`benefit_wait_${cat}`] = e.waitingPeriodDays;
+      if (e.perVisitLimit) fieldErrors[`benefit_pervisit_${cat}`] = e.perVisitLimit;
+      continue;
+    }
+    // Cross-field: a benefit sub-limit may not exceed the package annual limit.
+    if (coreParsed.success && rowParsed.data.annualSubLimit > coreParsed.data.annualLimit) {
+      fieldErrors[`benefit_limit_${cat}`] = [
+        `${FIELD_LABELS.annualSubLimit} cannot exceed the package ${FIELD_LABELS.annualLimit.toLowerCase()}.`,
+      ];
+      continue;
+    }
+    benefits.push({
+      category: cat,
+      annualSubLimit: rowParsed.data.annualSubLimit,
+      copayPercentage: rowParsed.data.copayPercentage ?? 0,
+      waitingPeriodDays: rowParsed.data.waitingPeriodDays ?? 0,
+      perVisitLimit: rowParsed.data.perVisitLimit ?? null,
+    });
+  }
+
+  if (Object.keys(fieldErrors).length > 0 || !coreParsed.success) return fail(fieldErrors);
+  const core = coreParsed.data;
+
+  // 3) Load the package with everything the new version must inherit.
   const pkg = await prisma.package.findUnique({
     where: { id: packageId, tenantId },
-    include: { currentVersion: true },
-  });
-  if (!pkg) notFound();
-
-  // Update package-level fields
-  await prisma.package.update({
-    where: { id: packageId, tenantId },
-    data: {
-      name:               formData.get("name") as string,
-      description:        (formData.get("description") as string) || null,
-      annualLimit:        Number(formData.get("annualLimit")),
-      contributionAmount: Number(formData.get("contributionAmount")),
-      minAge:             Number(formData.get("minAge")),
-      maxAge:             Number(formData.get("maxAge")),
-      dependentMaxAge:    Number(formData.get("dependentMaxAge")),
-      type:               formData.get("type") as never,
-      status:             formData.get("status") as never,
-    },
-  });
-
-  // Build the new benefit list from the form
-  const newBenefits = BENEFIT_CATEGORIES
-    .filter(cat => formData.get(`benefit_enabled_${cat}`) === "on")
-    .map(cat => ({
-      category:        cat as never,
-      annualSubLimit:  Number(formData.get(`benefit_limit_${cat}`) ?? 0),
-      copayPercentage: Number(formData.get(`benefit_copay_${cat}`) ?? 0),
-      waitingPeriodDays: Number(formData.get(`benefit_wait_${cat}`) ?? 0),
-    }));
-
-  // Create a new PackageVersion with incremented versionNumber
-  const nextVersion = (pkg.currentVersion?.versionNumber ?? 0) + 1;
-
-  const newVersion = await prisma.packageVersion.create({
-    data: {
-      packageId,
-      versionNumber: nextVersion,
-      effectiveFrom: new Date(),
-      benefits: {
-        create: newBenefits,
+    include: {
+      currentVersion: {
+        include: {
+          benefits: true,
+          sharedLimitGroups: { include: { benefitConfigs: true } },
+          eligibilityRules: true,
+        },
       },
     },
   });
+  if (!pkg) notFound();
+  const oldVersion = pkg.currentVersion;
 
-  // Point the package at the new version
-  await prisma.package.update({
-    where: { id: packageId },
-    data: { currentVersionId: newVersion.id },
+  // 4) nextVersion from MAX — never the (possibly non-latest) current pointer.
+  const agg = await prisma.packageVersion.aggregate({
+    where: { packageId },
+    _max: { versionNumber: true },
+  });
+  const nextVersion = (agg._max.versionNumber ?? 0) + 1;
+
+  // Preserve each benefit's non-edited fields across the version bump.
+  const oldByCat = new Map((oldVersion?.benefits ?? []).map((b) => [b.category, b]));
+  const newBenefitData = benefits.map((b) => {
+    const prev = oldByCat.get(b.category);
+    return {
+      category: b.category,
+      annualSubLimit: b.annualSubLimit,
+      perVisitLimit: b.perVisitLimit,
+      copayPercentage: b.copayPercentage,
+      waitingPeriodDays: b.waitingPeriodDays,
+      customCategoryName: prev?.customCategoryName ?? null,
+      coInsurancePct: prev?.coInsurancePct ?? 0,
+      deductibleAmount: prev?.deductibleAmount ?? 0,
+      fundingModel: prev?.fundingModel ?? "FEE_FOR_SERVICE",
+      fundingOverrides: prev?.fundingOverrides ?? undefined,
+      notes: prev?.notes ?? null,
+      exclusions: prev?.exclusions ?? [],
+    };
   });
 
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.package.update({
+        where: { id: packageId, tenantId },
+        data: {
+          name: core.name,
+          description: core.description ?? null,
+          annualLimit: core.annualLimit,
+          contributionAmount: core.contributionAmount,
+          minAge: core.minAge,
+          maxAge: core.maxAge,
+          dependentMaxAge: core.dependentMaxAge,
+          type: core.type,
+          status: core.status,
+        },
+      });
+
+      const newVersion = await tx.packageVersion.create({
+        data: {
+          packageId,
+          versionNumber: nextVersion,
+          effectiveFrom: new Date(),
+          benefits: { create: newBenefitData },
+        },
+        include: { benefits: { select: { id: true, category: true } } },
+      });
+
+      // category → new BenefitConfig id (one config per category per version).
+      const newIdByCat = new Map(newVersion.benefits.map((b) => [b.category, b.id]));
+
+      // Copy-forward shared-limit groups, re-mapping their benefit links.
+      for (const grp of oldVersion?.sharedLimitGroups ?? []) {
+        const remapped: string[] = [];
+        for (const link of grp.benefitConfigs) {
+          const oldB = (oldVersion?.benefits ?? []).find((b) => b.id === link.benefitConfigId);
+          const newId = oldB ? newIdByCat.get(oldB.category) : undefined;
+          if (newId) remapped.push(newId);
+        }
+        if (remapped.length === 0) continue; // all its benefits were removed
+        const newGrp = await tx.sharedLimitGroup.create({
+          data: {
+            packageVersionId: newVersion.id,
+            name: grp.name,
+            limitAmount: grp.limitAmount,
+            appliesTo: grp.appliesTo,
+          },
+        });
+        await tx.benefitConfigSharedLimit.createMany({
+          data: remapped.map((id) => ({ sharedLimitGroupId: newGrp.id, benefitConfigId: id })),
+        });
+      }
+
+      // Copy-forward provider eligibility rules (keyed only to the version).
+      for (const rule of oldVersion?.eligibilityRules ?? []) {
+        await tx.packageProviderEligibility.create({
+          data: {
+            packageVersionId: newVersion.id,
+            providerId: rule.providerId,
+            providerTier: rule.providerTier,
+            inclusionType: rule.inclusionType,
+          },
+        });
+      }
+
+      await tx.package.update({
+        where: { id: packageId },
+        data: { currentVersionId: newVersion.id },
+      });
+    });
+  } catch (err) {
+    if (isP2002(err)) {
+      return fail(
+        undefined,
+        "This package was changed concurrently. Reopen the latest version and try again.",
+      );
+    }
+    throw err;
+  }
+
+  await writeAudit({
+    userId: session.user.id,
+    action: "PACKAGE_VERSION_CREATE",
+    module: "PACKAGES",
+    description: `Package ${packageId} edited → version ${nextVersion}`,
+    metadata: {
+      packageId,
+      versionNumber: nextVersion,
+      previousVersion: oldVersion?.versionNumber ?? null,
+      benefitCount: benefits.length,
+      copiedSharedLimits: (oldVersion?.sharedLimitGroups ?? []).length,
+      copiedProviderRules: (oldVersion?.eligibilityRules ?? []).length,
+    },
+  });
+
+  revalidatePackageSurfaces(packageId);
   redirect(`/packages/${packageId}`);
 }
 
-export async function createSharedLimitAction(_prev: unknown, formData: FormData) {
+// ── Shared Limits (WP-2.5) ──────────────────────────────────────────────────
+
+export async function createSharedLimitAction(
+  _prev: unknown,
+  formData: FormData,
+): Promise<ActionResult> {
   const session = await requireRole(ROLES.UNDERWRITING);
-  void session;
-
+  const tenantId = session.user.tenantId;
   const packageVersionId = formData.get("packageVersionId") as string;
-  const name = (formData.get("name") as string).trim();
-  const limitAmount = Number(formData.get("limitAmount"));
-  const appliesTo = formData.get("appliesTo") as "MEMBER" | "FAMILY";
-  const benefitConfigIds = formData.getAll("benefitConfigIds") as string[];
 
-  if (!name) return { error: "Name is required" };
-  if (limitAmount <= 0) return { error: "Limit must be greater than 0" };
-  if (benefitConfigIds.length < 2) return { error: "Select at least 2 benefits" };
-
-  const group = await prisma.sharedLimitGroup.create({
-    data: { packageVersionId, name, limitAmount, appliesTo },
+  const parsed = sharedLimitSchema.safeParse({
+    name: (formData.get("name") ?? "") as string,
+    limitAmount: formData.get("limitAmount"),
+    appliesTo: formData.get("appliesTo"),
+    benefitConfigIds: formData.getAll("benefitConfigIds").map(String),
   });
-  await prisma.benefitConfigSharedLimit.createMany({
-    data: benefitConfigIds.map(id => ({ sharedLimitGroupId: group.id, benefitConfigId: id })),
+  if (!parsed.success) return fail(parsed.error.flatten().fieldErrors);
+  const { name, limitAmount, appliesTo, benefitConfigIds } = parsed.data;
+
+  // Resolve version → package → tenant ownership (client-supplied version id).
+  const version = await prisma.packageVersion.findUnique({
+    where: { id: packageVersionId },
+    select: { packageId: true, package: { select: { tenantId: true } } },
+  });
+  if (!version || version.package.tenantId !== tenantId) {
+    return fail(undefined, "Package version not found.");
+  }
+  const packageId = version.packageId;
+
+  // Every submitted benefit id must belong to THIS version (tenant+pkg+version).
+  const owned = await prisma.benefitConfig.findMany({
+    where: { id: { in: benefitConfigIds }, packageVersionId },
+    select: { id: true },
+  });
+  if (owned.length !== benefitConfigIds.length) {
+    return fail({
+      benefitConfigIds: ["One or more selected benefits are not part of this package version."],
+    });
+  }
+
+  // Duplicate-group guard: same (case-insensitive) name within the version.
+  const dup = await prisma.sharedLimitGroup.findFirst({
+    where: { packageVersionId, name: { equals: name, mode: "insensitive" } },
+    select: { id: true },
+  });
+  if (dup) {
+    return fail({ name: ["A shared limit group with this name already exists for this version."] });
+  }
+
+  // Atomic: group + links together (no half-created pool).
+  const group = await prisma.$transaction(async (tx) => {
+    const g = await tx.sharedLimitGroup.create({
+      data: { packageVersionId, name, limitAmount, appliesTo },
+    });
+    await tx.benefitConfigSharedLimit.createMany({
+      data: benefitConfigIds.map((id) => ({ sharedLimitGroupId: g.id, benefitConfigId: id })),
+    });
+    return g;
   });
 
-  revalidatePath(`/packages/${packageVersionId}/edit`);
-  return { success: true };
+  await writeAudit({
+    userId: session.user.id,
+    action: "SHARED_LIMIT_CREATE",
+    module: "PACKAGES",
+    description: `Shared limit "${name}" created on package ${packageId}`,
+    metadata: {
+      packageId,
+      packageVersionId,
+      sharedLimitGroupId: group.id,
+      appliesTo,
+      limitAmount: String(limitAmount),
+      benefitCount: benefitConfigIds.length,
+    },
+  });
+
+  revalidatePath(`/packages/${packageId}/edit`);
+  revalidatePath(`/packages/${packageId}`);
+  revalidatePath("/member/benefits");
+  return ok();
 }
 
-export async function deleteSharedLimitAction(id: string) {
-  await requireRole(ROLES.UNDERWRITING);
-  await prisma.benefitConfigSharedLimit.deleteMany({ where: { sharedLimitGroupId: id } });
-  await prisma.sharedLimitGroup.delete({ where: { id } });
-  revalidatePath("/packages");
+export async function deleteSharedLimitAction(id: string): Promise<void> {
+  const session = await requireRole(ROLES.UNDERWRITING);
+  const tenantId = session.user.tenantId;
+
+  const grp = await prisma.sharedLimitGroup.findUnique({
+    where: { id },
+    select: {
+      name: true,
+      packageVersion: { select: { packageId: true, package: { select: { tenantId: true } } } },
+    },
+  });
+  if (!grp || grp.packageVersion.package.tenantId !== tenantId) return; // tenant-scoped no-op
+  const packageId = grp.packageVersion.packageId;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.benefitConfigSharedLimit.deleteMany({ where: { sharedLimitGroupId: id } });
+    await tx.sharedLimitGroup.delete({ where: { id } });
+  });
+
+  await writeAudit({
+    userId: session.user.id,
+    action: "SHARED_LIMIT_DELETE",
+    module: "PACKAGES",
+    description: `Shared limit "${grp.name}" deleted from package ${packageId}`,
+    metadata: { packageId, sharedLimitGroupId: id },
+  });
+
+  revalidatePath(`/packages/${packageId}/edit`);
+  revalidatePath(`/packages/${packageId}`);
+  revalidatePath("/member/benefits");
 }
 
-// ── Provider Eligibility ───────────────────────────────────────────────────
+// ── Provider Eligibility ────────────────────────────────────────────────────
 
-export async function createProviderEligibilityAction(_prev: unknown, formData: FormData) {
-  await requireRole(ROLES.UNDERWRITING);
-
+export async function createProviderEligibilityAction(
+  _prev: unknown,
+  formData: FormData,
+): Promise<ActionResult> {
+  const session = await requireRole(ROLES.UNDERWRITING);
+  const tenantId = session.user.tenantId;
   const packageVersionId = formData.get("packageVersionId") as string;
   const inclusionType = formData.get("inclusionType") as "INCLUDE" | "EXCLUDE";
   const providerId = (formData.get("providerId") as string) || null;
   const providerTier = (formData.get("providerTier") as string) || null;
 
-  if (!providerId && !providerTier) return { error: "Select a specific provider or a provider tier" };
+  if (!providerId && !providerTier) {
+    return fail({ providerId: ["Select a specific provider or a provider tier."] });
+  }
 
-  await prisma.packageProviderEligibility.create({
+  const version = await prisma.packageVersion.findUnique({
+    where: { id: packageVersionId },
+    select: { packageId: true, package: { select: { tenantId: true } } },
+  });
+  if (!version || version.package.tenantId !== tenantId) {
+    return fail(undefined, "Package version not found.");
+  }
+  const packageId = version.packageId;
+
+  if (providerId) {
+    const prov = await prisma.provider.findFirst({
+      where: { id: providerId, tenantId },
+      select: { id: true },
+    });
+    if (!prov) return fail({ providerId: ["Provider not found."] });
+  }
+
+  const rule = await prisma.packageProviderEligibility.create({
     data: {
       packageVersionId,
       inclusionType,
       providerId: providerId || null,
-      providerTier: providerTier as never || null,
+      providerTier: (providerTier as never) || null,
     },
   });
 
-  revalidatePath("/packages");
-  return { success: true };
+  await writeAudit({
+    userId: session.user.id,
+    action: "PACKAGE_PROVIDER_ELIGIBILITY_CREATE",
+    module: "PACKAGES",
+    description: `Provider eligibility rule (${inclusionType}) added to package ${packageId}`,
+    metadata: {
+      packageId,
+      packageVersionId,
+      ruleId: rule.id,
+      inclusionType,
+      providerId: providerId ?? null,
+      providerTier: providerTier ?? null,
+    },
+  });
+
+  revalidatePath(`/packages/${packageId}/edit`);
+  revalidatePath(`/packages/${packageId}`);
+  return ok();
 }
 
-export async function deleteProviderEligibilityAction(id: string) {
-  await requireRole(ROLES.UNDERWRITING);
+export async function deleteProviderEligibilityAction(id: string): Promise<void> {
+  const session = await requireRole(ROLES.UNDERWRITING);
+  const tenantId = session.user.tenantId;
+
+  const rule = await prisma.packageProviderEligibility.findUnique({
+    where: { id },
+    select: {
+      inclusionType: true,
+      packageVersion: { select: { packageId: true, package: { select: { tenantId: true } } } },
+    },
+  });
+  if (!rule || rule.packageVersion.package.tenantId !== tenantId) return; // tenant-scoped no-op
+  const packageId = rule.packageVersion.packageId;
+
   await prisma.packageProviderEligibility.delete({ where: { id } });
-  revalidatePath("/packages");
+
+  await writeAudit({
+    userId: session.user.id,
+    action: "PACKAGE_PROVIDER_ELIGIBILITY_DELETE",
+    module: "PACKAGES",
+    description: `Provider eligibility rule (${rule.inclusionType}) removed from package ${packageId}`,
+    metadata: { packageId, ruleId: id },
+  });
+
+  revalidatePath(`/packages/${packageId}/edit`);
+  revalidatePath(`/packages/${packageId}`);
 }

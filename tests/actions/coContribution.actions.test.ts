@@ -82,7 +82,8 @@ describe('createCoContributionRuleAction', () => {
     const result = await createCoContributionRuleAction(fd({
       packageId: 'pkg-1', networkTier: 'TIER_1', type: 'FIXED_AMOUNT',
     }))
-    expect(result.error).toBe('Fixed amount required.')
+    // WP-2.0: message now comes from the canonical schema (richer copy).
+    expect(result.error).toMatch(/fixed amount/i)
   })
 
   it('returns error for PERCENTAGE without percentage value', async () => {
@@ -91,7 +92,8 @@ describe('createCoContributionRuleAction', () => {
     const result = await createCoContributionRuleAction(fd({
       packageId: 'pkg-1', networkTier: 'TIER_1', type: 'PERCENTAGE',
     }))
-    expect(result.error).toBe('Percentage required.')
+    // WP-2.0: message now comes from the canonical schema (richer copy).
+    expect(result.error).toMatch(/percentage/i)
   })
 
   it('creates rule and returns empty object on success', async () => {

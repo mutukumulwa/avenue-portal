@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Plus, Pencil, Trash2, X, Check, Star } from "lucide-react";
 import { createTierAction, updateTierAction, deleteTierAction } from "@/app/(admin)/groups/[id]/tiers/actions";
+import { BASE_CURRENCY, formatMoney } from "@/lib/utils";
 
 interface Package { id: string; name: string; annualLimit: number; }
 interface Tier {
@@ -20,6 +21,9 @@ interface Props {
   groupId: string;
   tiers: Tier[];
   packages: Package[];
+  /** Client currency for money labels/values (DEF-021). Defaults to the
+   *  platform base (UGX) when the scheme's client currency isn't threaded. */
+  currency?: string;
 }
 
 const inputCls = "w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo";
@@ -29,11 +33,13 @@ function TierForm({
   packages,
   initial,
   onClose,
+  currency,
 }: {
   groupId: string;
   packages: Package[];
   initial?: Tier;
   onClose: () => void;
+  currency: string;
 }) {
   const [loading, setLoading] = useState(false);
 
@@ -71,7 +77,7 @@ function TierForm({
           <select name="packageId" required defaultValue={initial?.packageId} className={inputCls}>
             <option value="">Select package…</option>
             {packages.map(p => (
-              <option key={p.id} value={p.id}>{p.name} (UGX {p.annualLimit.toLocaleString()} limit)</option>
+              <option key={p.id} value={p.id}>{p.name} ({formatMoney(p.annualLimit, currency)} limit)</option>
             ))}
           </select>
         </div>
@@ -79,7 +85,7 @@ function TierForm({
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="text-xs font-bold text-brand-text-muted uppercase block mb-1">Contribution Rate (KES/yr) *</label>
+          <label className="text-xs font-bold text-brand-text-muted uppercase block mb-1">Contribution Rate ({currency}/yr) *</label>
           <input
             name="contributionRate"
             type="number"
@@ -127,7 +133,7 @@ function TierForm({
   );
 }
 
-export function BenefitTiersCard({ groupId, tiers, packages }: Props) {
+export function BenefitTiersCard({ groupId, tiers, packages, currency = BASE_CURRENCY }: Props) {
   const [showAdd, setShowAdd]   = useState(false);
   const [editId, setEditId]     = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -164,7 +170,7 @@ export function BenefitTiersCard({ groupId, tiers, packages }: Props) {
 
       <div className="p-4 space-y-3">
         {showAdd && (
-          <TierForm groupId={groupId} packages={packages} onClose={() => setShowAdd(false)} />
+          <TierForm groupId={groupId} packages={packages} currency={currency} onClose={() => setShowAdd(false)} />
         )}
 
         {tiers.length === 0 && !showAdd && (
@@ -184,6 +190,7 @@ export function BenefitTiersCard({ groupId, tiers, packages }: Props) {
               <TierForm
                 groupId={groupId}
                 packages={packages}
+                currency={currency}
                 initial={tier}
                 onClose={() => setEditId(null)}
               />
@@ -199,7 +206,7 @@ export function BenefitTiersCard({ groupId, tiers, packages }: Props) {
                       )}
                     </div>
                     <p className="text-xs text-brand-text-muted mt-0.5">
-                      {tier.package.name} · UGX {tier.contributionRate.toLocaleString()}/yr · {tier._count.members} member{tier._count.members !== 1 ? "s" : ""}
+                      {tier.package.name} · {formatMoney(tier.contributionRate, currency)}/yr · {tier._count.members} member{tier._count.members !== 1 ? "s" : ""}
                     </p>
                     {tier.description && <p className="text-xs text-brand-text-muted">{tier.description}</p>}
                   </div>

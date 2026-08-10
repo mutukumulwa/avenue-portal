@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { peekNextDocumentNumber } from "@/lib/document-number";
+import { maxByNumericSuffix, peekNextDocumentNumber } from "@/lib/document-number";
 import { TRPCError } from "@trpc/server";
 import { AcceptanceMethod, FundingMode, MemberRelationship } from "@prisma/client";
 import { auditChainService } from "./audit-chain.service";
@@ -20,10 +20,12 @@ function leftPad(n: number, width: number) {
 async function nextMemberNumber(tenantId: string, clientId?: string | null): Promise<string> {
   const prefix = await resolveMemberPrefix(tenantId, clientId);
   // B4-WIDE: seed from max+1 (not count()+1) so a purge/gap can't collide.
+  // WP-3.5C: max by NUMERIC suffix, not the DB's lexical order (past 99999
+  // "…-100000" < "…-99999" lexically, collapsing the max into a live number).
   return peekNextDocumentNumber(prefix, (yp) =>
     prisma.member
-      .findFirst({ where: { tenantId, memberNumber: { startsWith: yp } }, orderBy: { memberNumber: "desc" }, select: { memberNumber: true } })
-      .then((r) => r?.memberNumber ?? null),
+      .findMany({ where: { tenantId, memberNumber: { startsWith: yp } }, select: { memberNumber: true } })
+      .then((rows) => maxByNumericSuffix(rows.map((r) => r.memberNumber))),
   );
 }
 
@@ -194,6 +196,11 @@ export const bindingService = {
     // never nulls it), so it is a safe claim marker — there is no post-ACCEPTED
     // quotation status to guard on.
     let groupId = quotation.groupId;
+    // WP-3.5C / CT-004: resolve the owning client so bound members are minted
+    // with the client's member-number prefix (e.g. LMU-…), NOT the operator
+    // default (MVX-…). Source of truth is the group (member → group → client);
+    // both the new-business and renewal/re-bind branches below populate it.
+    let clientId: string | null = null;
     if (!groupId) {
       // Create a Group from quotation details
       const groupCount = await prisma.group.count({ where: { tenantId } });
@@ -222,6 +229,7 @@ export const bindingService = {
           notes: `Created from quotation ${quotation.quoteNumber}`,
         },
       });
+      clientId = group.clientId;
 
       const claimed = await prisma.quotation.updateMany({
         where: { id: quotationId, tenantId, groupId: null },
@@ -246,6 +254,12 @@ export const bindingService = {
           message: "Memberships have already been created for this quotation — refresh to see them.",
         });
       }
+      // Adopt the existing group's owning client for member numbering (WP-3.5C).
+      const owningGroup = await prisma.group.findUnique({
+        where: { id: groupId },
+        select: { clientId: true },
+      });
+      clientId = owningGroup?.clientId ?? null;
     }
 
     // ── Build a principalId map for dependants ────────────────
@@ -263,7 +277,7 @@ export const bindingService = {
 
     // Create principals
     for (const life of principalLives) {
-      const memberNumber = await nextMemberNumber(tenantId);
+      const memberNumber = await nextMemberNumber(tenantId, clientId);
       const member = await prisma.member.create({
         data: {
           tenantId,
@@ -332,7 +346,7 @@ export const bindingService = {
         life.gender === "FEMALE" ? MemberRelationship.SPOUSE :
         MemberRelationship.CHILD;
 
-      const memberNumber = await nextMemberNumber(tenantId);
+      const memberNumber = await nextMemberNumber(tenantId, clientId);
       const member = await prisma.member.create({
         data: {
           tenantId,

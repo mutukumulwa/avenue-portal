@@ -60,6 +60,9 @@ export class PackagesService {
       annualSubLimit: number;
       copayPercentage?: number;
       waitingPeriodDays?: number;
+      // DEF-022: per-visit cap wired to the (already-built) enforcement at
+      // benefit-usage.service.ts. null/undefined = no per-visit cap.
+      perVisitLimit?: number | null;
       // WP-F1/D8: how this benefit pays providers. HYBRID uses fundingOverrides
       // ([{ tier, model }]) validated below.
       fundingModel?: "FEE_FOR_SERVICE" | "CAPITATION" | "HYBRID";
@@ -100,6 +103,7 @@ export class PackagesService {
               create: data.benefits.map((b) => ({
                 category: b.category,
                 annualSubLimit: b.annualSubLimit,
+                perVisitLimit: b.perVisitLimit ?? null,
                 copayPercentage: b.copayPercentage ?? 0,
                 waitingPeriodDays: b.waitingPeriodDays ?? 0,
                 fundingModel: b.fundingModel ?? "FEE_FOR_SERVICE",

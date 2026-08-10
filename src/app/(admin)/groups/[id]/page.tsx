@@ -17,6 +17,7 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
     include: {
       selfFundedAccount: { include: { transactions: { orderBy: { postedAt: "desc" }, take: 20 } } },
       package: true,
+      client: { select: { currency: true } },
       broker: { select: { name: true } },
       benefitTiers: {
         include: {
@@ -205,7 +206,7 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
       </div>
 
       {/* Benefit Tiers */}
-      <BenefitTiersCard groupId={id} tiers={serializedTiers} packages={serializedPackages} />
+      <BenefitTiersCard groupId={id} tiers={serializedTiers} packages={serializedPackages} currency={group.client?.currency ?? undefined} />
 
       <SelfFundedSetupPanel
         groupId={group.id}

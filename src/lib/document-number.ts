@@ -28,6 +28,29 @@ function extractSuffix(documentNumber: string): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+/**
+ * The document/member number with the greatest NUMERIC suffix, or null when the
+ * list is empty. Callers pass EVERY existing `${prefix}-${year}-*` number for the
+ * series (not the DB's lexical-first row); this picks the true max by integer
+ * suffix so a 6-digit `…-100000` correctly outranks a 5-digit `…-99999`. Past
+ * 99999 the zero-pad widens and the string order inverts (`"…-100000" < "…-99999"`),
+ * so a lexical `orderBy … desc` would collapse the max and re-mint an existing
+ * number. Pair with {@link peekNextDocumentNumber} / {@link createWithDocumentNumber}:
+ * their `findLatestNumber` must return exactly this.
+ */
+export function maxByNumericSuffix(numbers: readonly string[]): string | null {
+  let best: string | null = null;
+  let bestSuffix = -1;
+  for (const n of numbers) {
+    const suffix = extractSuffix(n);
+    if (suffix > bestSuffix) {
+      bestSuffix = suffix;
+      best = n;
+    }
+  }
+  return best;
+}
+
 /** Connector-agnostic P2002 detection (Prisma or a raw driver error shape). */
 function isUniqueViolation(e: unknown): boolean {
   const code =

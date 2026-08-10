@@ -4,41 +4,73 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { writeAudit } from "@/lib/audit";
-import { capsSchema } from "@/lib/validation/co-contribution";
+import { capsSchema, coContributionRuleSchema } from "@/lib/validation/co-contribution";
 import { ok, fail, type ActionResult } from "@/lib/action-result";
+
+/** Optional numeric form field: absent/blank → null (so coercion never turns
+ *  "" into 0 and trips a positive() check); otherwise the raw string for zod. */
+function optionalNumber(v: FormDataEntryValue | null): string | null {
+  return v == null || v === "" ? null : String(v);
+}
 
 export async function createCoContributionRuleAction(
   formData: FormData,
 ): Promise<{ error?: string }> {
   const session = await requireRole(ROLES.UNDERWRITING);
 
-  const packageId     = formData.get("packageId") as string;
-  const benefitCat    = (formData.get("benefitCategory") as string) || null;
-  const networkTier   = formData.get("networkTier") as string;
-  const type          = formData.get("type") as string;
-  const fixedAmount   = formData.get("fixedAmount") ? Number(formData.get("fixedAmount")) : null;
-  const percentage    = formData.get("percentage")  ? Number(formData.get("percentage"))  : null;
-  const perVisitCap   = formData.get("perVisitCap") ? Number(formData.get("perVisitCap")) : null;
+  const packageId = formData.get("packageId") as string;
+  if (!packageId) return { error: "Missing required fields." };
 
-  if (!packageId || !networkTier || !type) return { error: "Missing required fields." };
-  if (type === "FIXED_AMOUNT" && !fixedAmount) return { error: "Fixed amount required." };
-  if ((type === "PERCENTAGE" || type === "HYBRID") && !percentage) return { error: "Percentage required." };
+  // Canonical validation (WP-2.0): percent 0–100, money finite/≥0/≤2dp, and the
+  // type↔amount cross-field rule. Previously `percentage=500` and a negative
+  // `fixedAmount`/`perVisitCap` persisted from this door.
+  const parsed = coContributionRuleSchema.safeParse({
+    benefitCategory: (formData.get("benefitCategory") as string) || null,
+    networkTier: formData.get("networkTier"),
+    type: formData.get("type"),
+    fixedAmount: optionalNumber(formData.get("fixedAmount")),
+    percentage: optionalNumber(formData.get("percentage")),
+    perVisitCap: optionalNumber(formData.get("perVisitCap")),
+  });
+  if (!parsed.success) {
+    const flat = parsed.error.flatten();
+    const first =
+      Object.values(flat.fieldErrors).flat()[0] ?? flat.formErrors[0] ?? "Invalid co-contribution rule.";
+    return { error: first };
+  }
+  const { benefitCategory, networkTier, type, fixedAmount, percentage, perVisitCap } = parsed.data;
 
   // Verify package belongs to this tenant
   const pkg = await prisma.package.findUnique({ where: { id: packageId }, select: { tenantId: true } });
   if (!pkg || pkg.tenantId !== session.user.tenantId) return { error: "Package not found." };
 
-  await prisma.coContributionRule.create({
+  const rule = await prisma.coContributionRule.create({
     data: {
       packageId,
       tenantId: session.user.tenantId,
-      benefitCategory: benefitCat as never,
+      benefitCategory: (benefitCategory as never) ?? null,
       networkTier: networkTier as never,
       type: type as never,
-      fixedAmount,
-      percentage,
-      perVisitCap,
+      fixedAmount: fixedAmount ?? null,
+      percentage: percentage ?? null,
+      perVisitCap: perVisitCap ?? null,
       effectiveFrom: new Date(),
+    },
+  });
+
+  await writeAudit({
+    userId: session.user.id,
+    action: "PACKAGE_COCONTRIBUTION_RULE_CREATE",
+    module: "PACKAGES",
+    description: `Co-contribution rule (${type} / ${networkTier}) added to package ${packageId}`,
+    metadata: {
+      packageId,
+      ruleId: rule.id,
+      type,
+      networkTier,
+      benefitCategory: benefitCategory ?? null,
+      percentage: percentage ?? null,
+      fixedAmount: fixedAmount ?? null,
     },
   });
 

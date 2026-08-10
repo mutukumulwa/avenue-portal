@@ -94,6 +94,46 @@ describe("P1.1 computeAvailability — one result, minimum across constraints", 
     expect(a!.binding!.kind).toBe("PER_VISIT");
   });
 
+  // DEF-022: with the write path now wired, prove the (already-built)
+  // enforcement fires at the 300,000 per-visit boundary — at/below/above.
+  describe("DEF-022 — BenefitConfig.perVisitLimit = 300,000 boundary", () => {
+    it("below the cap: a 299,999 claim is fully payable, ceiling = 300,000", async () => {
+      baseline({ perVisitLimit: 300_000 });
+      const a = await BenefitUsageService.computeAvailability(db, {
+        memberId: "m1", benefitCategory: "OUTPATIENT", requestedAmount: 299_999,
+      });
+      expect(a!.payableCeiling).toBe(300_000);
+      expect(a!.requestedAmount).toBe(299_999);
+    });
+
+    it("at the cap: a 300,000 claim is exactly at the ceiling", async () => {
+      baseline({ perVisitLimit: 300_000 });
+      const a = await BenefitUsageService.computeAvailability(db, {
+        memberId: "m1", benefitCategory: "OUTPATIENT", requestedAmount: 300_000,
+      });
+      expect(a!.payableCeiling).toBe(300_000);
+    });
+
+    it("above the cap: a 500,000 claim is capped at 300,000 with the PER_VISIT reason code", async () => {
+      baseline({ perVisitLimit: 300_000 });
+      const a = await BenefitUsageService.computeAvailability(db, {
+        memberId: "m1", benefitCategory: "OUTPATIENT", requestedAmount: 500_000,
+      });
+      expect(a!.payableCeiling).toBe(300_000);
+      expect(a!.binding!.kind).toBe("PER_VISIT");
+      expect(a!.reasonCode).toBe("BENEFIT_PER_VISIT_EXCEEDED");
+    });
+
+    it("Package.perVisitLimit is enforced the same way", async () => {
+      baseline({ pkgPerVisit: 300_000 });
+      const a = await BenefitUsageService.computeAvailability(db, {
+        memberId: "m1", benefitCategory: "OUTPATIENT", requestedAmount: 400_000,
+      });
+      expect(a!.payableCeiling).toBe(300_000);
+      expect(a!.binding!.kind).toBe("PER_VISIT");
+    });
+  });
+
   it("OVERALL (Package.annualLimit, DEC-03) binds when other categories consumed it", async () => {
     baseline({ annualLimit: 100_000 });
     // Overall query: this member's rows across categories in the period.

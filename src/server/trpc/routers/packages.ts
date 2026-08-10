@@ -1,27 +1,9 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure, underwritingProcedure } from "../trpc";
 import { PackagesService } from "../../services/packages.service";
-
-const BenefitSchema = z.object({
-  category: z.enum([
-    "INPATIENT",
-    "OUTPATIENT",
-    "MATERNITY",
-    "DENTAL",
-    "OPTICAL",
-    "MENTAL_HEALTH",
-    "CHRONIC_DISEASE",
-    "SURGICAL",
-    "AMBULANCE_EMERGENCY",
-    "LAST_EXPENSE",
-    "WELLNESS_PREVENTIVE",
-    "REHABILITATION",
-    "CUSTOM",
-  ]),
-  annualSubLimit: z.number().min(0),
-  copayPercentage: z.number().min(0).max(100).optional(),
-  waitingPeriodDays: z.number().min(0).optional(),
-});
+import { packageCreateSchema } from "@/lib/validation/package";
+import { sharedLimitBaseSchema, sharedLimitRefinement } from "@/lib/validation/shared-limit";
 
 export const packagesRouter = createTRPCRouter({
   getAll: protectedProcedure.query(async ({ ctx }) => {
@@ -34,24 +16,16 @@ export const packagesRouter = createTRPCRouter({
       return PackagesService.getPackageById(ctx.tenantId, input.id);
     }),
 
+  // Routed through the SAME canonical schema as the builder server action
+  // (SP-1): money finite/≥0/≤2dp, percent 0–100, ages int 0–120 + minAge<maxAge,
+  // and each benefit sub-limit ≤ the package annual limit.
   create: underwritingProcedure
-    .input(
-      z.object({
-        name: z.string().min(1, "Name is required"),
-        description: z.string().optional(),
-        type: z.enum(["INDIVIDUAL", "FAMILY", "GROUP", "CORPORATE"]),
-        annualLimit: z.number().min(0),
-        contributionAmount: z.number().min(0),
-        minAge: z.number().optional(),
-        maxAge: z.number().optional(),
-        dependentMaxAge: z.number().optional(),
-        exclusions: z.array(z.string()).optional(),
-        status: z.enum(["DRAFT", "ACTIVE", "ARCHIVED"]).optional(),
-        benefits: z.array(BenefitSchema).min(1, "At least one benefit is required"),
-      })
-    )
+    .input(packageCreateSchema)
     .mutation(async ({ ctx, input }) => {
-      return PackagesService.createPackage(ctx.tenantId, input);
+      return PackagesService.createPackage(ctx.tenantId, {
+        ...input,
+        description: input.description ?? undefined,
+      });
     }),
 
   // Shared Limit Groups
@@ -64,48 +38,66 @@ export const packagesRouter = createTRPCRouter({
       });
     }),
 
+  // Same canonical shared-limit rules as the server action (SP-1): limit > 0,
+  // D1 min-category rule, no duplicate membership. Tenant-ownership on the
+  // client-supplied version id, and every benefit id must belong to that
+  // version — written atomically.
   createSharedLimit: underwritingProcedure
-    .input(
-      z.object({
-        packageVersionId: z.string(),
-        name: z.string().min(1),
-        limitAmount: z.number().min(0),
-        appliesTo: z.enum(["MEMBER", "FAMILY"]),
-        benefitConfigIds: z.array(z.string()),
-      })
-    )
+    .input(sharedLimitBaseSchema.extend({ packageVersionId: z.string().min(1) }).superRefine(sharedLimitRefinement))
     .mutation(async ({ input, ctx }) => {
-      // Create the group
-      const group = await ctx.prisma.sharedLimitGroup.create({
-        data: {
-          packageVersionId: input.packageVersionId,
-          name: input.name,
-          limitAmount: input.limitAmount,
-          appliesTo: input.appliesTo,
-        },
+      const version = await ctx.prisma.packageVersion.findUnique({
+        where: { id: input.packageVersionId },
+        select: { package: { select: { tenantId: true } } },
       });
+      if (!version || version.package.tenantId !== ctx.tenantId) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Package version not found." });
+      }
 
-      // Link benefits
-      if (input.benefitConfigIds.length > 0) {
-        await ctx.prisma.benefitConfigSharedLimit.createMany({
+      const owned = await ctx.prisma.benefitConfig.findMany({
+        where: { id: { in: input.benefitConfigIds }, packageVersionId: input.packageVersionId },
+        select: { id: true },
+      });
+      if (owned.length !== input.benefitConfigIds.length) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "One or more selected benefits are not part of this package version.",
+        });
+      }
+
+      return ctx.prisma.$transaction(async (tx) => {
+        const group = await tx.sharedLimitGroup.create({
+          data: {
+            packageVersionId: input.packageVersionId,
+            name: input.name,
+            limitAmount: input.limitAmount,
+            appliesTo: input.appliesTo,
+          },
+        });
+        await tx.benefitConfigSharedLimit.createMany({
           data: input.benefitConfigIds.map((id) => ({
             sharedLimitGroupId: group.id,
             benefitConfigId: id,
           })),
         });
-      }
-
-      return group;
+        return group;
+      });
     }),
 
   deleteSharedLimit: underwritingProcedure
     .input(z.object({ id: z.string() }))
     .mutation(async ({ input, ctx }) => {
-      await ctx.prisma.benefitConfigSharedLimit.deleteMany({
-        where: { sharedLimitGroupId: input.id },
-      });
-      return ctx.prisma.sharedLimitGroup.delete({
+      // Tenant-ownership on the client-supplied group id (was an unscoped
+      // delete-by-id — cross-tenant delete door).
+      const grp = await ctx.prisma.sharedLimitGroup.findUnique({
         where: { id: input.id },
+        select: { packageVersion: { select: { package: { select: { tenantId: true } } } } },
+      });
+      if (!grp || grp.packageVersion.package.tenantId !== ctx.tenantId) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Shared limit not found." });
+      }
+      return ctx.prisma.$transaction(async (tx) => {
+        await tx.benefitConfigSharedLimit.deleteMany({ where: { sharedLimitGroupId: input.id } });
+        return tx.sharedLimitGroup.delete({ where: { id: input.id } });
       });
     }),
 });

@@ -3,7 +3,14 @@ import Decimal from "decimal.js";
 import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure, underwritingProcedure, adminProcedure } from "../trpc";
 import { CoContributionService } from "@/server/services/coContribution/coContribution.service";
-import { capsBaseSchema, capsRefinement } from "@/lib/validation/co-contribution";
+import {
+  capsBaseSchema,
+  capsRefinement,
+  coContributionRuleBaseSchema,
+  coContributionRuleRefinement,
+  CO_CONTRIBUTION_TYPES,
+} from "@/lib/validation/co-contribution";
+import { money, percent } from "@/lib/validation/money";
 import { prisma } from "@/lib/prisma";
 
 export const coContributionRouter = createTRPCRouter({
@@ -18,29 +25,28 @@ export const coContributionRouter = createTRPCRouter({
       });
     }),
 
+  // Same canonical rule validation as the server action (SP-1): percent 0–100,
+  // money finite/≥0/≤2dp, and the type↔amount cross-field rule.
   createRule: underwritingProcedure
     .input(
-      z.object({
-        packageId: z.string(),
-        benefitCategory: z.string().optional(),
-        networkTier: z.enum(["TIER_1", "TIER_2", "TIER_3"]),
-        type: z.enum(["FIXED_AMOUNT", "PERCENTAGE", "HYBRID", "NONE"]),
-        fixedAmount: z.number().optional(),
-        percentage: z.number().min(0).max(100).optional(),
-        perVisitCap: z.number().optional(),
-        perEncounterCap: z.number().optional(),
-        effectiveFrom: z.string().optional(),
-        effectiveTo: z.string().optional(),
-      }),
+      coContributionRuleBaseSchema
+        .extend({
+          packageId: z.string().min(1),
+          perEncounterCap: money.positive().nullable().optional(),
+          effectiveFrom: z.string().optional(),
+          effectiveTo: z.string().optional(),
+        })
+        .superRefine(coContributionRuleRefinement),
     )
     .mutation(async ({ ctx, input }) => {
+      const { effectiveFrom, effectiveTo, benefitCategory, ...rest } = input;
       return prisma.coContributionRule.create({
         data: {
-          ...input,
+          ...rest,
           tenantId: ctx.tenantId,
-          benefitCategory: input.benefitCategory as never ?? null,
-          effectiveFrom: input.effectiveFrom ? new Date(input.effectiveFrom) : new Date(),
-          effectiveTo: input.effectiveTo ? new Date(input.effectiveTo) : null,
+          benefitCategory: (benefitCategory as never) ?? null,
+          effectiveFrom: effectiveFrom ? new Date(effectiveFrom) : new Date(),
+          effectiveTo: effectiveTo ? new Date(effectiveTo) : null,
         },
       });
     }),
@@ -49,11 +55,11 @@ export const coContributionRouter = createTRPCRouter({
     .input(
       z.object({
         id: z.string(),
-        type: z.enum(["FIXED_AMOUNT", "PERCENTAGE", "HYBRID", "NONE"]).optional(),
-        fixedAmount: z.number().optional(),
-        percentage: z.number().min(0).max(100).optional(),
-        perVisitCap: z.number().optional().nullable(),
-        perEncounterCap: z.number().optional().nullable(),
+        type: z.enum(CO_CONTRIBUTION_TYPES).optional(),
+        fixedAmount: money.nullable().optional(),
+        percentage: percent.nullable().optional(),
+        perVisitCap: money.positive().nullable().optional(),
+        perEncounterCap: money.positive().nullable().optional(),
         isActive: z.boolean().optional(),
         effectiveTo: z.string().optional().nullable(),
       }),

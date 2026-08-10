@@ -153,12 +153,9 @@ export const AUDIT_EXCLUSIONS: Record<string, string> = {
   "members/reinstatement/actions.ts:declineReinstatementAction": "PRE_EXISTING_GAP — audit wiring pending",
   "offline-capture/actions.ts:ingestOfflineOpsAction": "PRE_EXISTING_GAP — audit wiring pending",
   "offline-capture/actions.ts:unlockOfflineWorkAction": "PRE_EXISTING_GAP — audit wiring pending",
-  "packages/[id]/edit/actions.ts:createProviderEligibilityAction": "PRE_EXISTING_GAP — audit wiring pending",
-  "packages/[id]/edit/actions.ts:createSharedLimitAction": "PRE_EXISTING_GAP — audit wiring pending",
-  "packages/[id]/edit/actions.ts:deleteProviderEligibilityAction": "PRE_EXISTING_GAP — audit wiring pending",
-  "packages/[id]/edit/actions.ts:deleteSharedLimitAction": "PRE_EXISTING_GAP — audit wiring pending",
-  "packages/[id]/edit/actions.ts:updatePackageAction": "PRE_EXISTING_GAP — audit wiring pending",
-  "packages/builder/actions.ts:createPackageAction": "PRE_EXISTING_GAP — audit wiring pending",
+  // WP-2.0: all six package write sites now call writeAudit (PACKAGE_VERSION_CREATE /
+  // SHARED_LIMIT_* / PACKAGE_PROVIDER_ELIGIBILITY_* / PACKAGE_CREATE) — removed from
+  // the exclusion list so the harness polices them positively.
   "providers/[id]/actions.ts:addCredentialAction": "PRE_EXISTING_GAP — audit wiring pending",
   "providers/[id]/actions.ts:createPractitionerAndLinkAction": "PRE_EXISTING_GAP — audit wiring pending",
   "providers/[id]/actions.ts:deleteCptTariffAction": "PRE_EXISTING_GAP — audit wiring pending",

@@ -3,8 +3,9 @@ import { notFound } from "next/navigation";
 import { PackagesService } from "@/server/services/packages.service";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle, Clock, Shield, Pencil, Percent } from "lucide-react";
+import { ArrowLeft, CheckCircle, Clock, Shield, Pencil, Percent, Activity, Users } from "lucide-react";
 import { CoContributionRulesManager } from "./CoContributionRulesManager";
+import { formatMoney } from "@/lib/utils";
 
 export default async function PackageDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requireRole(ROLES.UNDERWRITING);
@@ -19,6 +20,15 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
     prisma.annualCoContributionCap.findUnique({ where: { packageId: id } }),
   ]);
   if (!pkg) notFound();
+
+  // Shared-limit pools on the CURRENT version (WP-2.5: pools are version-owned
+  // and must appear in the immutable version display).
+  const sharedLimits = pkg.currentVersion
+    ? await prisma.sharedLimitGroup.findMany({
+        where: { packageVersionId: pkg.currentVersion.id },
+        include: { benefitConfigs: { include: { benefitConfig: { select: { category: true } } } } },
+      })
+    : [];
 
   // Prisma Decimal fields don't survive the RSC boundary — hand the client
   // manager plain numbers.
@@ -80,9 +90,9 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
       {/* KPI row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Annual Limit (UGX)", value: Number(pkg.annualLimit).toLocaleString(), color: "text-brand-indigo" },
-          { label: "Contribution (KES/yr)", value: Number(pkg.contributionAmount).toLocaleString(), color: "text-[#28A745]" },
-          { label: "Total Sub-Limit (UGX)", value: totalSubLimit.toLocaleString(), color: "text-[#17A2B8]" },
+          { label: "Annual Limit", value: formatMoney(pkg.annualLimit), color: "text-brand-indigo" },
+          { label: "Contribution / yr", value: formatMoney(pkg.contributionAmount), color: "text-[#28A745]" },
+          { label: "Total Sub-Limit", value: formatMoney(totalSubLimit), color: "text-[#17A2B8]" },
           { label: "Benefit Categories", value: currentBenefits.length.toString(), color: "text-[#6C757D]" },
         ].map(s => (
           <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-[8px] p-4 shadow-sm">
@@ -141,6 +151,11 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
                     {Number(b.copayPercentage) > 0 && (
                       <span className="text-[10px] text-brand-text-muted">Co-pay: {Number(b.copayPercentage)}%</span>
                     )}
+                    {b.perVisitLimit != null && (
+                      <span className="text-[10px] text-brand-text-muted flex items-center gap-1">
+                        <Activity size={10} /> {formatMoney(b.perVisitLimit)} per visit
+                      </span>
+                    )}
                     {b.waitingPeriodDays > 0 && (
                       <span className="text-[10px] text-brand-text-muted flex items-center gap-1">
                         <Clock size={10} /> {b.waitingPeriodDays}d wait
@@ -148,7 +163,7 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
                     )}
                   </div>
                 </div>
-                <span className="font-bold text-brand-indigo text-sm">UGX {Number(b.annualSubLimit).toLocaleString()}</span>
+                <span className="font-bold text-brand-indigo text-sm">{formatMoney(b.annualSubLimit)}</span>
               </div>
             ))}
             {currentBenefits.length === 0 && (
@@ -157,6 +172,37 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
           </div>
         </div>
       </div>
+
+      {/* Shared limit pools (version-owned) */}
+      {sharedLimits.length > 0 && (
+        <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#EEEEEE] flex items-center gap-2">
+            <Users size={15} className="text-brand-indigo" />
+            <h2 className="font-bold text-brand-text-heading font-heading">Shared Limit Pools</h2>
+          </div>
+          <div className="p-5 grid gap-3">
+            {sharedLimits.map((sl) => (
+              <div key={sl.id} className="border border-[#EEEEEE] rounded-lg p-4 flex justify-between items-start">
+                <div>
+                  <h3 className="font-bold text-brand-text-heading text-sm">{sl.name}</h3>
+                  <div className="flex items-center gap-3 text-xs text-brand-text-muted mt-1">
+                    <span className="font-semibold text-brand-text-heading">{formatMoney(sl.limitAmount)}</span>
+                    <span>•</span>
+                    <span>Applies to {sl.appliesTo}</span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {sl.benefitConfigs.map((bc) => (
+                      <span key={bc.benefitConfigId} className="bg-[#F1F3F5] text-brand-text-muted text-[10px] font-semibold px-2 py-0.5 rounded uppercase">
+                        {bc.benefitConfig.category.replace(/_/g, " ")}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Co-Contribution Rules */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">

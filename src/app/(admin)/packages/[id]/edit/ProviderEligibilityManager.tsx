@@ -4,6 +4,7 @@ import { useState, useActionState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, ShieldCheck, ShieldOff, X } from "lucide-react";
 import { createProviderEligibilityAction, deleteProviderEligibilityAction } from "./actions";
+import type { ActionResult } from "@/lib/action-result";
 
 type EligibilityRule = {
   id: string;
@@ -31,17 +32,20 @@ export function ProviderEligibilityManager({
   const [ruleType, setRuleType] = useState<"provider" | "tier">("provider");
   const [isPending, startTransition] = useTransition();
 
-  const [state, formAction, creating] = useActionState(
-    async (_prev: unknown, fd: FormData) => {
+  const [state, formAction, creating] = useActionState<ActionResult, FormData>(
+    async (_prev, fd) => {
       const result = await createProviderEligibilityAction(_prev, fd);
-      if (!result?.error) {
+      if (result.ok) {
         setAdding(false);
         startTransition(() => router.refresh());
       }
       return result;
     },
-    null,
+    { ok: true },
   );
+
+  const formError = state.ok ? undefined : state.formError;
+  const providerErr = state.ok ? undefined : state.fieldErrors?.providerId?.[0];
 
   const handleDelete = (id: string) => {
     if (!confirm("Remove this eligibility rule?")) return;
@@ -79,7 +83,8 @@ export function ProviderEligibilityManager({
         <form action={formAction} className="bg-gray-50 border border-gray-200 rounded p-4 space-y-4">
           <input type="hidden" name="packageVersionId" value={packageVersionId} />
 
-          {state?.error && <p className="text-xs text-red-600 font-semibold">{state.error}</p>}
+          {formError && <p role="alert" className="text-xs text-red-600 font-semibold">{formError}</p>}
+          {providerErr && <p role="alert" className="text-xs text-red-600 font-semibold">{providerErr}</p>}
 
           <div className="grid grid-cols-2 gap-4">
             <div>
