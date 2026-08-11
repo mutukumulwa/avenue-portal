@@ -22,9 +22,13 @@ const db = vi.hoisted(() => ({
   commissionLedgerEntry: { create: vi.fn(async () => ({})) },
 }));
 
+const rbac = vi.hoisted(() => ({ hasRole: vi.fn(async () => true) }));
+
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
 vi.mock("@/server/services/audit-chain.service", () => ({ auditChainService: { append: vi.fn(async () => ({})) } }));
 vi.mock("@/server/services/override.service", () => ({ overrideService: {} }));
+// WP-E1: approveAmendment now enforces the E-004 approver-role matrix via rbacService.
+vi.mock("@/server/services/rbac.service", () => ({ rbacService: rbac }));
 
 import { amendmentService } from "@/server/services/amendment.service";
 
@@ -38,6 +42,7 @@ const endo = (over: any = {}) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  rbac.hasRole.mockResolvedValue(true);
   db.endorsement.updateMany.mockResolvedValue({ count: 1 });
 });
 

@@ -13,6 +13,7 @@ import { TRPCError } from "@trpc/server";
 import { EndorsementType, ProRataType } from "@prisma/client";
 import { auditChainService } from "./audit-chain.service";
 import { overrideService } from "./override.service";
+import { rbacService } from "./rbac.service";
 
 /**
  * F-PIN-3: whenever an amendment changes a member's/group's `packageId`, the
@@ -58,6 +59,77 @@ export const AMENDMENT_RULES: Record<EndorsementType, {
   BENEFIT_MODIFICATION:  { approverRoles: ["UNDERWRITER"],                                   hasProRata: false, requiresAssessment: false, selfApprove: false },
   SALARY_CHANGE:         { approverRoles: ["CUSTOMER_SERVICE","SENIOR_MEMBERSHIP_ASSESSOR"], hasProRata: true,  requiresAssessment: false, selfApprove: false },
 };
+
+// ─── SHARED GOVERNANCE GUARDS (WP-E1 convergence) ──────────────────────────────
+//
+// One approver-role matrix and one material-evidence control, enforced by BOTH
+// endorsement engines. The legacy EndorsementsService (ADD/DELETE) and this
+// Process-7 amendmentService both call these so `MEMBER_ADDITION`/`MEMBER_DELETION`
+// stop being second-class citizens that skip the controls the other types get.
+
+/**
+ * A material change is one that moves money or eligibility (has pro-rata or needs
+ * re-assessment). Contact/beneficiary/group-data edits are non-material.
+ */
+export function isMaterialAmendment(type: EndorsementType): boolean {
+  const rules = AMENDMENT_RULES[type];
+  return !!rules && (rules.hasProRata || rules.requiresAssessment);
+}
+
+/**
+ * E-004: the checker must hold a role authorised to approve THIS amendment type
+ * (from AMENDMENT_RULES), not merely be a different user from the maker. A
+ * SUPER_ADMIN escape hatch mirrors overrideService.approve. `rbacService.hasRole`
+ * resolves the enum-role baseline ∪ dynamic overlay, so this is correct even in a
+ * prod tenant with zero UserRoleAssignment rows (PROD-BLOCKER-1 landmine L-6).
+ *
+ * Types whose matrix lists no approver role (self-approve: contact/group-data)
+ * are exempt by design.
+ */
+export async function assertApproverAuthorized(
+  type: EndorsementType,
+  approverId: string,
+  tenantId: string,
+): Promise<void> {
+  const roles = AMENDMENT_RULES[type]?.approverRoles ?? [];
+  if (roles.length === 0) return;
+  for (const role of roles) {
+    if (await rbacService.hasRole(approverId, role, tenantId)) return;
+  }
+  if (await rbacService.hasRole(approverId, "SUPER_ADMIN", tenantId)) return;
+  throw new TRPCError({
+    code: "FORBIDDEN",
+    message: `Approver must hold one of: ${roles.join(", ")} to approve a ${type.replace(/_/g, " ")}.`,
+  });
+}
+
+/**
+ * E-015: a material change may not be APPROVED without evidence — either a source
+ * reference recorded on the change (sourceReference / documentReference / docRef)
+ * or a supporting Document linked to the endorsement. Non-material changes are
+ * exempt. The changeDetails check short-circuits the DB read when a reference is
+ * present.
+ */
+export async function assertMaterialEvidence(
+  endorsement: { id: string; type: EndorsementType; changeDetails: unknown },
+  tenantId: string,
+): Promise<void> {
+  if (!isMaterialAmendment(endorsement.type)) return;
+  const details = (endorsement.changeDetails ?? {}) as Record<string, unknown>;
+  const hasReference = ["sourceReference", "documentReference", "docRef"].some(
+    (k) => typeof details[k] === "string" && (details[k] as string).trim() !== "",
+  );
+  if (hasReference) return;
+  const linkedDocuments = await prisma.document.count({
+    where: { endorsementId: endorsement.id, tenantId },
+  });
+  if (linkedDocuments > 0) return;
+  throw new TRPCError({
+    code: "PRECONDITION_FAILED",
+    message:
+      "Material change control (E-015): a source reference or supporting document is required before this endorsement can be approved.",
+  });
+}
 
 // ─── SERVICE ──────────────────────────────────────────────────────────────────
 
@@ -295,6 +367,13 @@ export const amendmentService = {
       throw new TRPCError({ code: "FORBIDDEN", message: "Maker and checker must be different users" });
     }
 
+    // E-004: the checker must hold a role authorised for THIS amendment type, not
+    // merely be a different user. (AMENDMENT_RULES was defined but never enforced.)
+    await assertApproverAuthorized(endorsement.type as EndorsementType, approverId, tenantId);
+    // E-015: a material (money/eligibility) change needs a source reference or a
+    // linked document before it can be approved.
+    await assertMaterialEvidence(endorsement, tenantId);
+
     // SYS-1: the status transition is the atomic decision gate — a concurrent
     // approval matches 0 rows → CONFLICT, so the amendment carries exactly one
     // approval (SoD is pre-checked above for a clearer message).
@@ -443,6 +522,19 @@ export const amendmentService = {
         }
         break;
       }
+
+      case "BENEFICIARY_UPDATE":
+        // E-phase: there is NO beneficiary-designation model on the member record
+        // (schema gap — flagged, not added here). The former `default: break`
+        // silently marked the amendment APPLIED while mutating nothing. Reject
+        // explicitly so a beneficiary change can never masquerade as applied; the
+        // outer catch reverts APPLIED→APPROVED so it stays pending, not lost.
+        throw new TRPCError({
+          code: "METHOD_NOT_SUPPORTED",
+          message:
+            "BENEFICIARY_UPDATE cannot be applied: no beneficiary-designation model exists on the member record. " +
+            "This control blocks a silent no-op (E-phase P0 — requires a Beneficiary schema).",
+        });
 
       // MEMBER_ADDITION / DEPENDENT_ADDITION handled by existing EndorsementsService
       // MEMBER_DELETION / DEPENDENT_DELETION handled by existing EndorsementsService

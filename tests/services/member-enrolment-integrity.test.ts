@@ -55,11 +55,19 @@ const db = vi.hoisted(() => {
       updateMany: vi.fn(async () => ({ count: 1 })),
       update: vi.fn(async () => ({})),
     },
+    // WP-E1: E-007 back-date override + day-count ProRataCalculation + E-015 doc check.
+    overrideRecord: { findUnique: vi.fn(async () => ({ id: "ovr1", tenantId: "t1", overrideType: "BACK_DATED_AMENDMENT", status: "APPROVED" })) },
+    proRataCalculation: { upsert: vi.fn(async () => ({})) },
+    document: { count: vi.fn(async () => 0) },
   };
   return state;
 });
 
+const rbac = vi.hoisted(() => ({ hasRole: vi.fn(async () => true) }));
+
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
+// WP-E1: E-004 approver-role matrix resolves via rbacService.hasRole.
+vi.mock("@/server/services/rbac.service", () => ({ rbacService: rbac }));
 vi.mock("@/server/services/fraud.service", () => ({
   FraudService: { checkEnrollmentRisk: vi.fn(async () => []) },
 }));
@@ -80,6 +88,10 @@ const lastCreate = () => db.member.create.mock.calls.at(-1)![0].data;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  rbac.hasRole.mockResolvedValue(true);
+  db.overrideRecord.findUnique.mockResolvedValue({ id: "ovr1", tenantId: "t1", overrideType: "BACK_DATED_AMENDMENT", status: "APPROVED" });
+  db.proRataCalculation.upsert.mockResolvedValue({});
+  db.document.count.mockResolvedValue(0);
   overrides.idDup = null;
   overrides.phoneDup = null;
   overrides.emailDup = null;
@@ -242,9 +254,10 @@ describe("endorsement MEMBER_ADDITION → createMember (WP-3.5F HR-channel parit
       changeDetails: {
         firstName: "Dep", lastName: "Endant", dateOfBirth: "2010-05-05", gender: "FEMALE",
         relationship: "CHILD", idNumber: "cd 99 88", phone: "0700999888", email: "Dep@Family.com",
-        principalIdNumber: "PRIN123",
+        principalIdNumber: "PRIN123", sourceReference: "HR-LTR-2026-0005",
       },
-      effectiveDate: new Date("2026-08-01"), proratedAmount: 0, groupId: "g1", endorsementNumber: "END-1",
+      // WP-E1: past effective date → E-007 override linked (APPROVED in beforeEach).
+      effectiveDate: new Date("2026-08-01"), proratedAmount: 0, groupId: "g1", overrideRecordId: "ovr1", endorsementNumber: "END-1",
     });
 
     await EndorsementsService.approveEndorsement("t1", "e1", "checker");

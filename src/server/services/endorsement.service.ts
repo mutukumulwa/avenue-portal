@@ -4,8 +4,109 @@ import { GLService } from "@/server/services/gl.service";
 import { coverageService } from "@/server/services/coverage.service";
 import { auditChainService } from "@/server/services/audit-chain.service";
 import { MembersService, type EnrolmentRelationship } from "@/server/services/members.service";
+import {
+  assertApproverAuthorized,
+  assertMaterialEvidence,
+} from "@/server/services/amendment.service";
 import { normalizeNationalId } from "@/lib/normalize";
-import type { Gender } from "@prisma/client";
+import type { EndorsementType, Gender, ProRataType } from "@prisma/client";
+
+/**
+ * WP-E1 — E-007 back-date governance for the legacy ADD/DELETE approve→apply path.
+ * A joiner/leaver whose effective date is before today may only be approved when an
+ * APPROVED `BACK_DATED_AMENDMENT` override is linked to the endorsement — no
+ * unlimited silent back-dating. Mirrors amendmentService.submitForApproval, but
+ * derives "back-dated" from effectiveDate because legacy endorsements never set the
+ * stored `backDated` flag.
+ */
+async function assertBackDateGovernance(
+  endorsement: { effectiveDate: Date | string | null; overrideRecordId: string | null },
+  tenantId: string,
+): Promise<void> {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const eff = endorsement.effectiveDate ? new Date(endorsement.effectiveDate) : null;
+  const backDated = !!eff && !Number.isNaN(eff.getTime()) && eff < startOfToday;
+  if (!backDated) return;
+
+  if (!endorsement.overrideRecordId) {
+    throw new Error(
+      "Back-dated endorsement (E-007): an APPROVED BACK_DATED_AMENDMENT override must be linked before approval — no silent back-dating.",
+    );
+  }
+  const override = await prisma.overrideRecord.findUnique({
+    where: { id: endorsement.overrideRecordId },
+  });
+  if (
+    !override ||
+    override.tenantId !== tenantId ||
+    override.overrideType !== "BACK_DATED_AMENDMENT" ||
+    override.status !== "APPROVED"
+  ) {
+    throw new Error(
+      "Back-dated endorsement (E-007): the linked back-date override must be an APPROVED BACK_DATED_AMENDMENT record for this tenant.",
+    );
+  }
+}
+
+/**
+ * WP-E1 — day-count pro-rata for ADD/DELETE, persisted as the same
+ * `ProRataCalculation` artifact the amendment engine produces for every other
+ * financial type (the legacy engine only stored a flat contribution/365 figure on
+ * the endorsement). This is the auditable day-count breakdown surfaced on the
+ * review screen; it does NOT alter `endorsement.proratedAmount` or the GL/invoice
+ * posting. Returns null (writes nothing) when the group has no positive
+ * contribution to prorate.
+ */
+async function persistDayCountProRata(
+  tenantId: string,
+  endorsement: { id: string; groupId: string; effectiveDate: Date | string },
+  direction: Extract<ProRataType, "CHARGE" | "CREDIT">,
+): Promise<{ adjustmentAmount: number; adjustmentType: ProRataType; daysRemaining: number; totalDaysInPeriod: number; prorataFactor: number } | null> {
+  const group = await prisma.group.findUnique({
+    where: { id: endorsement.groupId },
+    select: { effectiveDate: true, renewalDate: true, contributionRate: true },
+  });
+  const annualContribution = Number(group?.contributionRate ?? 0);
+  if (!group || !(annualContribution > 0)) return null;
+
+  const periodStart = new Date(group.effectiveDate);
+  const periodEnd = new Date(group.renewalDate);
+  const effectiveDate = new Date(endorsement.effectiveDate);
+  if ([periodStart, periodEnd, effectiveDate].some((d) => Number.isNaN(d.getTime()))) return null;
+
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const totalDaysInPeriod = Math.max(1, Math.ceil((periodEnd.getTime() - periodStart.getTime()) / DAY_MS));
+  const daysRemaining = Math.max(0, Math.ceil((periodEnd.getTime() - effectiveDate.getTime()) / DAY_MS));
+  const prorataFactor = daysRemaining / totalDaysInPeriod;
+
+  // PR-034: money is 2dp — round the day-count magnitude once, at the boundary.
+  const magnitude = Math.round(annualContribution * prorataFactor * 100) / 100;
+  const signedAmount = direction === "CREDIT" ? -magnitude : magnitude;
+  // A joiner enters (0 → contribution = charge); a leaver exits (contribution → 0 = credit).
+  const previousContribution = direction === "CREDIT" ? annualContribution : 0;
+  const newContribution = direction === "CREDIT" ? 0 : annualContribution;
+
+  const row = {
+    previousContribution,
+    newContribution,
+    periodStartDate: periodStart,
+    periodEndDate: periodEnd,
+    effectiveDate,
+    daysRemaining,
+    totalDaysInPeriod,
+    prorataFactor,
+    adjustmentAmount: signedAmount,
+    adjustmentType: direction as ProRataType,
+  };
+  await prisma.proRataCalculation.upsert({
+    where: { endorsementId: endorsement.id },
+    update: { ...row, computedAt: new Date() },
+    create: { tenantId, endorsementId: endorsement.id, ...row },
+  });
+
+  return { adjustmentAmount: signedAmount, adjustmentType: direction, daysRemaining, totalDaysInPeriod, prorataFactor };
+}
 
 /**
  * Resolve a leaver's inclusive last covered day (WP-3.5E). Prefers the
@@ -139,6 +240,16 @@ export class EndorsementsService {
       );
     }
 
+    // ── WP-E1: the governed controls the amendment engine has, now enforced on
+    // the legacy ADD/DELETE approve→apply route too. All run BEFORE the atomic
+    // claim, so a rejected control leaves the endorsement untouched (SUBMITTED).
+    //   E-004 — approver holds a role authorised for THIS type (not just maker≠checker);
+    //   E-015 — a material change carries a source reference / linked document;
+    //   E-007 — a back-dated joiner/leaver has an APPROVED back-date override.
+    await assertApproverAuthorized(endorsement.type as EndorsementType, approvedBy, tenantId);
+    await assertMaterialEvidence(endorsement, tenantId);
+    await assertBackDateGovernance(endorsement, tenantId);
+
     // FG-C6: atomically claim the endorsement BEFORE any side effect so two
     // concurrent approvals can't both create the member / post the GL / raise the
     // invoice. The loser matches 0 rows → throws. On a later failure we revert to
@@ -214,11 +325,22 @@ export class EndorsementsService {
         coveragePeriodReason: "ENDORSEMENT",
       });
 
-      // Document the member relation on the endorsement.
+      // WP-E1: before/after snapshots for ADD. The joiner did not exist before,
+      // so `before` is null; `after` records the minted member. Day-count pro-rata
+      // is persisted as a ProRataCalculation artifact (a joiner is a CHARGE).
+      const afterSnapshot = {
+        memberId: newMember.id,
+        memberNumber: newMember.memberNumber,
+        relationship,
+        status: (newMember as { status?: string }).status ?? "ACTIVE",
+        effectiveDate: effectiveDate.toISOString(),
+        snapshotAt: new Date().toISOString(),
+      };
       await prisma.endorsement.update({
         where: { id: endorsement.id },
-        data: { memberId: newMember.id },
+        data: { memberId: newMember.id, beforeSnapshot: null as never, afterSnapshot: afterSnapshot as never },
       });
+      await persistDayCountProRata(tenantId, endorsement, "CHARGE");
 
       // WP-3.5G: a distinct audit event on the (previously silent) endorsement
       // approve→apply path.
@@ -246,11 +368,44 @@ export class EndorsementsService {
           // period both close ON it, so a member off effective the 6th is covered on
           // the 6th, not the 7th (coverageService.evaluate is inclusive: date <= end).
           const lastDay = resolveLeaverLastDay(details.lastDay, endorsement.effectiveDate);
+
+          // WP-E1: capture the leaver's state BEFORE termination for the snapshot
+          // (defensive — a missing member simply yields a null before-snapshot).
+          let beforeSnapshot: Record<string, unknown> | null = null;
+          try {
+            const priorMember = await prisma.member.findUnique({
+              where: { id: details.memberId },
+              select: {
+                id: true, memberNumber: true, status: true,
+                benefitTierId: true, packageId: true,
+                coverStartDate: true, coverEndDate: true,
+              },
+            });
+            if (priorMember) beforeSnapshot = { ...priorMember, snapshotAt: new Date().toISOString() };
+          } catch {
+            beforeSnapshot = null;
+          }
+
           await prisma.member.update({
             where: { id: details.memberId },
             data: { status: "TERMINATED", coverEndDate: lastDay, updatedAt: new Date() },
           });
           await coverageService.closeOpenPeriods(prisma, details.memberId, lastDay, "TERMINATED");
+
+          // WP-E1: after-snapshot + day-count pro-rata (a leaver is a CREDIT).
+          await prisma.endorsement.update({
+            where: { id: endorsement.id },
+            data: {
+              beforeSnapshot: beforeSnapshot as never,
+              afterSnapshot: {
+                memberId: details.memberId,
+                status: "TERMINATED",
+                coverEndDate: lastDay.toISOString(),
+                snapshotAt: new Date().toISOString(),
+              } as never,
+            },
+          });
+          await persistDayCountProRata(tenantId, endorsement, "CREDIT");
 
           // WP-3.5G: audit the (previously silent) leaver application.
           await auditChainService.append({

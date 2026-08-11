@@ -9,6 +9,8 @@
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
+const rbac = vi.hoisted(() => ({ hasRole: vi.fn(async () => true) }));
+
 const db = vi.hoisted(() => {
   const state: any = {
     group: { findUnique: vi.fn() },
@@ -32,11 +34,22 @@ const db = vi.hoisted(() => {
       updateMany: vi.fn(async () => ({ count: 1 })),
       update: vi.fn(async () => ({})),
     },
+    // WP-E1: E-007 back-date override lookup + day-count ProRataCalculation artifact.
+    overrideRecord: { findUnique: vi.fn(async () => null) },
+    proRataCalculation: { upsert: vi.fn(async () => ({})) },
+    document: { count: vi.fn(async () => 0) },
   };
   return state;
 });
 
+// WP-E1: an APPROVED back-date override — the coverage fixtures use past effective
+// dates (a leaver who left last week / a joiner backdated to period start), which
+// E-007 governs. The evidence + override make the governed apply proceed.
+const APPROVED_BACKDATE_OVERRIDE = { id: "ovr1", tenantId: "t1", overrideType: "BACK_DATED_AMENDMENT", status: "APPROVED" };
+
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
+// WP-E1: E-004 approver-role matrix resolves via rbacService.hasRole.
+vi.mock("@/server/services/rbac.service", () => ({ rbacService: rbac }));
 vi.mock("@/server/services/fraud.service", () => ({
   FraudService: { checkEnrollmentRisk: vi.fn(async () => []) },
 }));
@@ -58,6 +71,7 @@ import { coverageService } from "@/server/services/coverage.service";
 // Baseline impls re-established every test so nothing leaks across blocks.
 beforeEach(() => {
   vi.clearAllMocks();
+  rbac.hasRole.mockResolvedValue(true);
   db.package.findUnique.mockResolvedValue({ maxAge: 65, dependentMaxAge: 24 });
   db.member.findFirst.mockResolvedValue(null);
   db.member.create.mockImplementation(async (a: any) => ({ id: "m1", ...a.data }));
@@ -68,6 +82,9 @@ beforeEach(() => {
   db.memberCoveragePeriod.update.mockResolvedValue({});
   db.endorsement.updateMany.mockResolvedValue({ count: 1 });
   db.endorsement.update.mockResolvedValue({});
+  db.overrideRecord.findUnique.mockResolvedValue(APPROVED_BACKDATE_OVERRIDE);
+  db.proRataCalculation.upsert.mockResolvedValue({});
+  db.document.count.mockResolvedValue(0);
 });
 
 describe("MembersService.createMember — coverage period + effective date + pin + age", () => {
@@ -166,8 +183,9 @@ describe("EndorsementsService.approveEndorsement — MEMBER_ADDITION coverage pe
   it("opens a coverage period at the endorsement effective date for the added member", async () => {
     db.endorsement.findUnique.mockResolvedValue({
       id: "e1", tenantId: "t1", status: "SUBMITTED", requestedBy: "maker", type: "MEMBER_ADDITION",
-      changeDetails: { firstName: "Ann", lastName: "New", dateOfBirth: "1995-05-05", gender: "FEMALE", relationship: "PRINCIPAL" },
-      effectiveDate: new Date("2026-08-01"), proratedAmount: 0, groupId: "g1", endorsementNumber: "END-1",
+      changeDetails: { firstName: "Ann", lastName: "New", dateOfBirth: "1995-05-05", gender: "FEMALE", relationship: "PRINCIPAL", sourceReference: "HR-LTR-2026-0001" },
+      // WP-E1: past effective date → E-007 needs an APPROVED back-date override (mocked in beforeEach).
+      effectiveDate: new Date("2026-08-01"), proratedAmount: 0, groupId: "g1", overrideRecordId: "ovr1", endorsementNumber: "END-1",
     });
 
     await EndorsementsService.approveEndorsement("t1", "e1", "checker");
@@ -191,8 +209,8 @@ describe("EndorsementsService.approveEndorsement — MEMBER_ADDITION coverage pe
   it("rejects an over-age added member — reverts the endorsement, mints no member", async () => {
     db.endorsement.findUnique.mockResolvedValue({
       id: "e1", tenantId: "t1", status: "SUBMITTED", requestedBy: "maker", type: "MEMBER_ADDITION",
-      changeDetails: { firstName: "Old", lastName: "Guy", dateOfBirth: "1950-01-01", gender: "MALE", relationship: "PRINCIPAL" },
-      effectiveDate: new Date("2026-08-01"), proratedAmount: 0, groupId: "g1", endorsementNumber: "END-1",
+      changeDetails: { firstName: "Old", lastName: "Guy", dateOfBirth: "1950-01-01", gender: "MALE", relationship: "PRINCIPAL", sourceReference: "HR-LTR-2026-0002" },
+      effectiveDate: new Date("2026-08-01"), proratedAmount: 0, groupId: "g1", overrideRecordId: "ovr1", endorsementNumber: "END-1",
     });
 
     await expect(EndorsementsService.approveEndorsement("t1", "e1", "checker")).rejects.toThrow(/maximum age/i);
@@ -208,8 +226,8 @@ describe("EndorsementsService.approveEndorsement — MEMBER_DELETION inclusive l
     db.memberCoveragePeriod.findMany.mockResolvedValue([{ id: "cp1", startDate: new Date("2026-01-01") }]);
     db.endorsement.findUnique.mockResolvedValue({
       id: "e1", tenantId: "t1", status: "SUBMITTED", requestedBy: "maker", type: "MEMBER_DELETION",
-      changeDetails: { memberId: "delm", lastDay: "2026-08-06" },
-      effectiveDate: new Date("2026-08-10"), proratedAmount: 0, groupId: "g1", endorsementNumber: "END-2",
+      changeDetails: { memberId: "delm", lastDay: "2026-08-06", sourceReference: "HR-LTR-2026-0003" },
+      effectiveDate: new Date("2026-08-10"), proratedAmount: 0, groupId: "g1", overrideRecordId: "ovr1", endorsementNumber: "END-2",
     });
 
     await EndorsementsService.approveEndorsement("t1", "e1", "checker");
@@ -232,8 +250,8 @@ describe("EndorsementsService.approveEndorsement — MEMBER_DELETION inclusive l
     db.memberCoveragePeriod.findMany.mockResolvedValue([{ id: "cp1", startDate: new Date("2026-01-01") }]);
     db.endorsement.findUnique.mockResolvedValue({
       id: "e1", tenantId: "t1", status: "SUBMITTED", requestedBy: "maker", type: "MEMBER_DELETION",
-      changeDetails: { memberId: "delm" },
-      effectiveDate: new Date("2026-08-10"), proratedAmount: 0, groupId: "g1", endorsementNumber: "END-3",
+      changeDetails: { memberId: "delm", sourceReference: "HR-LTR-2026-0004" },
+      effectiveDate: new Date("2026-08-10"), proratedAmount: 0, groupId: "g1", overrideRecordId: "ovr1", endorsementNumber: "END-3",
     });
 
     await EndorsementsService.approveEndorsement("t1", "e1", "checker");

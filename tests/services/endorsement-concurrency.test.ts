@@ -6,17 +6,26 @@
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
+const rbac = vi.hoisted(() => ({ hasRole: vi.fn(async () => true) }));
+
 const db = vi.hoisted(() => ({
   endorsement: {
     findUnique: vi.fn(),
     updateMany: vi.fn(async () => ({ count: 1 })),
+    // WP-E1: the apply path now writes before/after snapshots via endorsement.update.
+    update: vi.fn(async () => ({})),
   },
-  member: { update: vi.fn(async () => ({ id: "m1" })) },
+  // WP-E1: a leaver's prior state is read (before-snapshot) before termination.
+  member: { update: vi.fn(async () => ({ id: "m1" })), findUnique: vi.fn(async () => null) },
   // WP-3.5E: MEMBER_DELETION now closes the leaver's coverage period.
   memberCoveragePeriod: { findMany: vi.fn(async () => []), update: vi.fn(async () => ({})) },
+  // WP-E1: day-count pro-rata reads the group; null → skipped (no contribution to prorate).
+  group: { findUnique: vi.fn(async () => null) },
 }));
 
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
+// WP-E1: E-004 approver-role matrix resolves via rbacService.hasRole.
+vi.mock("@/server/services/rbac.service", () => ({ rbacService: rbac }));
 // WP-3.5G: the MEMBER_DELETION apply path now audits via the chain service.
 vi.mock("@/server/services/audit-chain.service", () => ({
   auditChainService: { append: vi.fn(async () => ({})) },
@@ -32,14 +41,17 @@ const submittedDeletion = () => ({
   status: "SUBMITTED",
   requestedBy: "maker",
   type: "MEMBER_DELETION",
-  changeDetails: { memberId: "m1" },
+  // WP-E1: sourceReference satisfies the E-015 material-evidence control.
+  changeDetails: { memberId: "m1", sourceReference: "HR-LTR-2026-0007" },
   proratedAmount: 0,
   groupId: "g1",
+  // No effectiveDate → not back-dated → E-007 override not required.
   endorsementNumber: "END-2026-00001",
 });
 
 beforeEach(() => {
   vi.clearAllMocks();
+  rbac.hasRole.mockResolvedValue(true);
   db.endorsement.findUnique.mockResolvedValue(submittedDeletion());
   db.endorsement.updateMany.mockResolvedValue({ count: 1 });
 });
