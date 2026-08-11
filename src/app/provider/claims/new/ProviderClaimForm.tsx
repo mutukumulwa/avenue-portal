@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { Plus, Trash2, Save, AlertCircle } from "lucide-react";
 import { submitProviderClaimAction } from "./actions";
 import type { ServiceType, BenefitCategory, ClaimLineCategory } from "@prisma/client";
@@ -36,6 +36,15 @@ export function ProviderClaimForm({
 }) {
   const today = new Date().toISOString().split("T")[0];
   const [memberNumber, setMemberNumber] = useState(prefillMemberNumber);
+  // ELIG-GAP-019: recover any member number typed into the field BEFORE React
+  // hydrated (a fast clerk on a slow device). Without this, controlled-input
+  // hydration discards those keystrokes and can submit an empty/wrong member.
+  const memberRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    const typed = memberRef.current?.value;
+    if (typed && typed !== memberNumber) setMemberNumber(typed);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [serviceType, setServiceType] = useState<ServiceType>("OUTPATIENT");
   const [benefitCategory, setBenefitCategory] = useState<BenefitCategory>("OUTPATIENT");
   const [dateOfService, setDateOfService] = useState(today);
@@ -98,7 +107,7 @@ export function ProviderClaimForm({
         <div className="grid md:grid-cols-2 gap-4">
           <div>
             <label className={labelCls}>Member / card number *</label>
-            <input name="memberNumber" value={memberNumber} onChange={(e) => setMemberNumber(e.target.value)} placeholder="e.g. NWSC-2026-00001" className={inputCls} />
+            <input ref={memberRef} name="memberNumber" value={memberNumber} onChange={(e) => setMemberNumber(e.target.value)} placeholder="e.g. NWSC-2026-00001" className={inputCls} />
             {prefillMemberName && <p className="text-[11px] text-brand-text-muted mt-1">{prefillMemberName}</p>}
           </div>
           <div>

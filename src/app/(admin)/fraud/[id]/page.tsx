@@ -1,4 +1,5 @@
 import { requireRole, ROLES } from "@/lib/rbac";
+import { diagnosisCodeOf, type DiagnosisShape } from "@/lib/diagnoses";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -37,7 +38,8 @@ export default async function FraudCasePage({
 
   const claim   = alert.claim;
   const member  = claim.member;
-  const diagnoses = (claim.diagnoses as { icdCode: string; description: string; isPrimary: boolean }[]) ?? [];
+  // ELIG-GAP-023: tolerate both diagnosis shapes (icdCode / code).
+  const diagnoses = (claim.diagnoses as unknown as DiagnosisShape[]) ?? [];
 
   // Member's claim history at same provider (last 90 days from claim date) — the "velocity" evidence
   const windowStart = new Date(claim.dateOfService);
@@ -165,7 +167,7 @@ export default async function FraudCasePage({
                 <div className="flex flex-wrap gap-2">
                   {diagnoses.map((d, i) => (
                     <span key={i} className={`text-xs px-2 py-0.5 rounded font-mono ${d.isPrimary ? "bg-brand-indigo/10 text-brand-indigo font-bold" : "bg-[#E6E7E8] text-[#6C757D]"}`}>
-                      {d.icdCode} — {d.description}
+                      {diagnosisCodeOf(d)} — {d.description}
                     </span>
                   ))}
                 </div>

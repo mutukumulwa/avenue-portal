@@ -45,13 +45,24 @@ export default async function ProviderPreauth({
     ...(active !== "all" ? { status: active as PreauthStatus } : {}),
   });
 
+  // ELIG-GAP-022: the confirmation banner must reflect the PA's COMMITTED status,
+  // not a hardcoded "under review" — an auto-approved PA reads "approved", so it
+  // agrees with the list row and the detail page.
+  const submittedPa = submitted ? preauths.find((p) => p.preauthNumber === submitted) : undefined;
+  const SUBMITTED_PHRASE: Partial<Record<PreauthStatus, string>> = {
+    APPROVED: "approved", DECLINED: "declined", SUBMITTED: "submitted and under review",
+    UNDER_REVIEW: "under review", CANCELLED: "cancelled", EXPIRED: "expired",
+  };
+
   return (
     <div className="space-y-5">
       {submitted && (
         <div className="bg-brand-indigo/5 border border-brand-indigo/30 rounded-lg px-4 py-3 text-sm font-semibold text-brand-indigo" role="status">
           {replayed
             ? `Already received — pre-authorization ${submitted} (idempotent replay, nothing was duplicated).`
-            : `Pre-authorization ${submitted} submitted. It is now under review.`}
+            : submittedPa
+              ? `Pre-authorization ${submitted} ${SUBMITTED_PHRASE[submittedPa.status] ?? `submitted (${submittedPa.status})`}.`
+              : `Pre-authorization ${submitted} submitted.`}
         </div>
       )}
       <div className="flex flex-wrap items-center justify-between gap-3">

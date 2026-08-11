@@ -1,4 +1,5 @@
 import { requireRole, ROLES } from "@/lib/rbac";
+import { diagnosisCodeOf, type DiagnosisShape } from "@/lib/diagnoses";
 import { notFound } from "next/navigation";
 import { PreauthReadService } from "@/server/services/preauth-read.service";
 import { prisma } from "@/lib/prisma";
@@ -56,7 +57,9 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
 
   const canAdjudicate = ["SUBMITTED", "UNDER_REVIEW"].includes(pa.status);
   const canConvert = pa.status === "APPROVED";
-  const diagnoses = pa.diagnoses as { icdCode?: string; description: string; isPrimary?: boolean }[];
+  // ELIG-GAP-023: PreAuthorization.diagnoses persists `code` (not `icdCode`) —
+  // read via the shape-tolerant normaliser so the code chip renders.
+  const diagnoses = (pa.diagnoses as unknown as DiagnosisShape[]) ?? [];
   const procedures = pa.procedures as { cptCode?: string; description: string; quantity?: number; unitCost?: number; total?: number }[];
 
   const isEmergency   = enriched?.isEmergency ?? false;
@@ -131,7 +134,7 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
             {Array.isArray(diagnoses) && diagnoses.map((d, i) => (
               <li key={i} className="flex justify-between items-start text-sm border-b border-[#EEEEEE] pb-2 last:border-0">
                 <span className="text-brand-text-body">{d.description}</span>
-                {d.icdCode && <span className="text-xs font-mono bg-[#F8F9FA] px-2 py-1 rounded">{d.icdCode}</span>}
+                {diagnosisCodeOf(d) && <span className="text-xs font-mono bg-[#F8F9FA] px-2 py-1 rounded">{diagnosisCodeOf(d)}</span>}
               </li>
             ))}
           </ul>
