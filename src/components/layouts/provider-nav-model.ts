@@ -16,7 +16,7 @@
 export type ProviderNavGroupKey = "Home" | "Care" | "Claims" | "Finance" | "Network" | "Administration";
 
 export type ProviderNavIconKey =
-  | "dashboard" | "inbox" | "eligibility" | "cases" | "preauth" | "claims" | "new-claim" | "settlements" | "contracts" | "performance" | "profile" | "api-keys" | "integrations";
+  | "dashboard" | "inbox" | "eligibility" | "cases" | "preauth" | "claims" | "new-claim" | "settlements" | "contracts" | "performance" | "profile" | "users" | "api-keys" | "integrations";
 
 /** Feature flags that gate a nav item's visibility (resolved server-side, passed to computeProviderNav). */
 export type ProviderNavFlagKey = "contractView";
@@ -55,6 +55,8 @@ export const PROVIDER_NAV_DEFINITIONS: ProviderNavDefinition[] = [
   { key: "performance", label: "Performance", href: "/provider/performance", iconKey: "performance", group: "Network", requiredPermission: "provider.performance.read" },
   // F7.6 — read-only profile + change-request tracker (perm-gated, no flag).
   { key: "profile", label: "Profile", href: "/provider/profile", iconKey: "profile", group: "Administration", requiredPermission: "provider.profile.read" },
+  // ELIG-GAP-005 — provider self-service user administration (F1.5 service, now with a UI).
+  { key: "users", label: "Users", href: "/provider/users", iconKey: "users", group: "Administration", requiredPermission: "provider.users.manage" },
   { key: "api-keys", label: "API Keys", href: "/provider/api-keys", iconKey: "api-keys", group: "Administration", requiredPermission: "provider.api_keys.manage" },
   { key: "integrations", label: "Integrations", href: "/provider/integrations", iconKey: "integrations", group: "Administration", requiredPermission: "provider.integrations.manage" },
 ];
@@ -128,22 +130,21 @@ function toView(d: ProviderNavDefinition): ProviderNavItemView {
 /**
  * Compute the permission-filtered, grouped navigation for a provider user.
  *
- * Backward-compatible rollout posture (no silent flip, spec D3 spirit): a user
- * with NO provider.* permission is treated as un-migrated (legacy) and sees the
- * full current working set, so enabling this nav does not blank the portal for
- * existing users before F1.9 assigns persona roles. A user who HAS any provider
- * permission is filtered precisely to what they hold (Home is always shown).
+ * FAIL-CLOSED (ELIG-GAP-004, Phase 2): a nav item is shown ONLY when the user
+ * holds its exact required permission (Home has none, so it is always shown).
+ * The previous "no provider.* permission ⇒ show the full set" legacy fallback is
+ * REMOVED — every provider user is now provisioned with a persona role at
+ * onboarding (Phase 1) or by the RBAC backfill (Phase 0), so a zero-permission
+ * user is an error state that must see nothing, not everything.
  */
 export function computeProviderNav(permissions: string[], opts: { flags?: Partial<Record<ProviderNavFlagKey, boolean>> } = {}): ProviderNavGroupView[] {
   const permSet = new Set(permissions);
-  const hasAnyProviderPerm = permissions.some((p) => p.startsWith("provider."));
 
   const visible = PROVIDER_NAV_DEFINITIONS.filter((d) => {
-    // A flag-gated item is hidden until its flag is on — regardless of permission
-    // or the legacy fallback (the underlying page is 404-gated on the same flag).
+    // A flag-gated item is hidden until its flag is on (the underlying page is
+    // 404-gated on the same flag).
     if (d.flagKey && !opts.flags?.[d.flagKey]) return false;
     if (!d.requiredPermission) return true; // Home
-    if (!hasAnyProviderPerm) return true; // legacy/un-migrated → full set
     return permSet.has(d.requiredPermission);
   });
 
@@ -162,16 +163,14 @@ export function flattenProviderNav(groups: ProviderNavGroupView[]): ProviderNavI
 }
 
 /**
- * Page-access guard — the server-side counterpart of the nav's legacy posture.
+ * Page-access guard — the server-side counterpart of the nav filter.
  *
- * Nav visibility is convenience; a page must independently authorize direct-URL
- * access (§10.1). To stay consistent with computeProviderNav during the pre-F1.9
- * rollout: a MIGRATED user (holds any provider.* permission) needs the exact
- * `code`; an UN-MIGRATED/legacy user (no provider.* permission at all) is allowed
- * so the portal is not broken before persona roles are assigned. Pages call this
- * and redirect to /unauthorized on false.
+ * FAIL-CLOSED (ELIG-GAP-004, Phase 2): the caller must hold the exact `code`.
+ * Nav visibility is convenience; a page independently authorizes direct-URL
+ * access (§10.1) by calling this and redirecting to /unauthorized on false. The
+ * previous "no provider.* permission ⇒ allow" legacy fallback is REMOVED — a
+ * provider user with no duty permission is denied, matching the nav.
  */
 export function providerPermits(permissions: string[], code: string): boolean {
-  const hasAnyProviderPerm = permissions.some((p) => p.startsWith("provider."));
-  return !hasAnyProviderPerm || permissions.includes(code);
+  return permissions.includes(code);
 }

@@ -1,7 +1,9 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ArrowLeft, FileText, Download, Pencil } from "lucide-react";
 import { ProviderAccessService } from "@/server/services/provider-access.service";
+import { providerPermits } from "@/components/layouts/provider-nav-model";
+import { diagnosisCodeOf, type DiagnosisShape } from "@/lib/diagnoses";
 import { ProviderDocumentService } from "@/server/services/provider-document.service";
 import { providerCanWithdraw } from "@/server/services/claim-withdrawal/policy";
 import { listWithdrawalReasons } from "@/server/services/claim-withdrawal/catalog";
@@ -29,6 +31,9 @@ export default async function ProviderClaimDetail({ params }: { params: Promise<
   // F2.8: resolve the canonical access context so the documents section can be
   // authorized through ProviderDocumentService (never a direct fileUrl).
   const { ctx, provider } = await ProviderAccessService.resolveUserContext();
+  // ELIG-GAP-020 / Phase 2: require the read permission (fail-closed). Cross-provider
+  // claims still return notFound (non-enumerating) below.
+  if (!providerPermits(ctx.permissions, "provider.claim.read")) redirect("/unauthorized");
   const tenantId = ctx.tenantId;
   const { id } = await params;
 
@@ -67,7 +72,9 @@ export default async function ProviderClaimDetail({ params }: { params: Promise<
   // F5.8: the submission chain (F5.2) — both the immutable superseded records and the current one.
   const chain = await ClaimSubmissionChainService.getChain({ tenantId, providerId: provider.id }, claim.id);
 
-  const diagnoses = (claim.diagnoses as unknown as Array<{ code: string; description: string }>) ?? [];
+  // ELIG-GAP-023: Claim.diagnoses persists `icdCode` (not `code`) — read via the
+  // shape-tolerant normaliser so the code is not rendered blank.
+  const diagnoses = (claim.diagnoses as unknown as DiagnosisShape[]) ?? [];
 
   // F2.8 consumer: authorized document list. A caller without provider.claim.read
   // (e.g. a legacy user not yet migrated to the provider RBAC) simply gets no
@@ -135,8 +142,8 @@ export default async function ProviderClaimDetail({ params }: { params: Promise<
         <div className="bg-white border border-[#EEEEEE] rounded-lg p-4">
           <p className="text-[11px] font-bold uppercase text-brand-text-muted mb-2">Diagnoses</p>
           <div className="flex flex-wrap gap-2">
-            {diagnoses.map((d) => (
-              <span key={d.code} className="text-xs bg-[#E6E7E8] text-[#495057] rounded-full px-2.5 py-0.5">{d.code} — {d.description}</span>
+            {diagnoses.map((d, i) => (
+              <span key={diagnosisCodeOf(d) ?? i} className="text-xs bg-[#E6E7E8] text-[#495057] rounded-full px-2.5 py-0.5">{diagnosisCodeOf(d)} — {d.description}</span>
             ))}
           </div>
         </div>

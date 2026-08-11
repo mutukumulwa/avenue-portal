@@ -21,6 +21,18 @@ export type ProviderApiScope = (typeof PROVIDER_API_SCOPES)[number];
 
 export const PROVIDER_API_SCOPE_SET: ReadonlySet<string> = new Set(PROVIDER_API_SCOPES);
 
+/** Human labels for the key-creation UI (ELIG-GAP-017). Kept in sync with PROVIDER_API_SCOPES. */
+export const PROVIDER_API_SCOPE_LABELS: Record<ProviderApiScope, string> = {
+  "api.eligibility.read": "Eligibility — read",
+  "api.benefits.read": "Benefits — read",
+  "api.preauth.write": "Pre-authorisation — submit",
+  "api.claim.write": "Claims — submit",
+  "api.claim.read": "Claims — read",
+  "api.upload.write": "Document upload",
+  "api.remittance.read": "Remittance — read",
+  "api.integration.deliver": "HMS batch delivery",
+};
+
 /**
  * Route group → required scope. Keys are stable group identifiers (not literal
  * paths, which vary), consumed by the F1.7 per-route-group enforcement unit.
@@ -41,11 +53,13 @@ export function isKnownProviderApiScope(scope: string): scope is ProviderApiScop
 }
 
 /**
- * F1.6 gap #5: may this user administer provider API keys? Legacy-aware (same
- * posture as F1.4): an un-migrated user (no provider.* permission) keeps today's
- * access; a migrated user must hold provider.api_keys.manage.
+ * May this user administer provider API keys?
+ *
+ * FAIL-CLOSED (ELIG-GAP-004/009, Phase 2): the user must hold
+ * provider.api_keys.manage. The previous "un-migrated user (no provider.*
+ * permission) keeps access" legacy fallback is REMOVED — minting/revoking a
+ * facility credential is an administrator action, never a default.
  */
 export function permissionsAllowKeyAdmin(permissions: string[]): boolean {
-  const migrated = permissions.some((p) => p.startsWith("provider."));
-  return !migrated || permissions.includes("provider.api_keys.manage");
+  return permissions.includes("provider.api_keys.manage");
 }

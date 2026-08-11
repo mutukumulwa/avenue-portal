@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { requireProvider } from "@/lib/provider-portal";
+import { redirect } from "next/navigation";
+import { ProviderAccessService } from "@/server/services/provider-access.service";
+import { ProviderEntitlementService } from "@/server/services/provider-entitlement.service";
+import { providerPermits } from "@/components/layouts/provider-nav-model";
 import { prisma } from "@/lib/prisma";
 import { ProviderClaimForm } from "./ProviderClaimForm";
 
@@ -9,14 +12,21 @@ export default async function ProviderNewClaim({
 }: {
   searchParams: Promise<{ memberId?: string }>;
 }) {
-  const { provider, tenantId } = await requireProvider();
+  // ELIG-GAP-020: this page previously ran on requireProvider() alone (identity,
+  // no permission). Filing a claim now requires provider.claim.create (fail-closed
+  // after Phase 2).
+  const { ctx, provider } = await ProviderAccessService.resolveUserContext();
+  if (!providerPermits(ctx.permissions, "provider.claim.create")) redirect("/unauthorized");
   const { memberId } = await searchParams;
 
   const [icd, cpt, prefill] = await Promise.all([
     prisma.iCD10Code.findMany({ select: { code: true, description: true }, orderBy: { code: "asc" }, take: 500 }),
     prisma.cPTCode.findMany({ select: { code: true, description: true, averageCost: true, serviceCategory: true }, orderBy: { code: "asc" }, take: 500 }),
+    // ELIG-GAP-024: entitlement-scope the prefill so a foreign/uncovered memberId
+    // resolves to null (no member number / name prefill). entitledMemberWhere is
+    // deny-by-default; the only `id`-bearing return is its impossible sentinel.
     memberId
-      ? prisma.member.findFirst({ where: { id: memberId, tenantId }, select: { memberNumber: true, firstName: true, lastName: true } })
+      ? prisma.member.findFirst({ where: { id: memberId, tenantId: ctx.tenantId, ...(await ProviderEntitlementService.entitledMemberWhere(ctx.providerId)) }, select: { memberNumber: true, firstName: true, lastName: true } })
       : null,
   ]);
 

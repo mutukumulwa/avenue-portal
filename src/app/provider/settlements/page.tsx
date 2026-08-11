@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { requireProvider } from "@/lib/provider-portal";
+import { redirect } from "next/navigation";
+import { ProviderAccessService } from "@/server/services/provider-access.service";
+import { providerPermits } from "@/components/layouts/provider-nav-model";
 import { prisma } from "@/lib/prisma";
 import { ProviderAccessSettingsService } from "@/server/services/provider-access-settings.service";
 import { Banknote } from "lucide-react";
@@ -19,7 +21,10 @@ const TONE: Record<string, string> = {
 };
 
 export default async function ProviderSettlements() {
-  const { provider, tenantId } = await requireProvider();
+  // ELIG-GAP-020 / Phase 2: require the settlement read permission (fail-closed).
+  const { ctx, provider } = await ProviderAccessService.resolveUserContext();
+  if (!providerPermits(ctx.permissions, "provider.settlement.read")) redirect("/unauthorized");
+  const tenantId = ctx.tenantId;
 
   // F6.4: the per-batch remittance detail is a provider-facing surface, live only
   // after the F6.1 §12 finance sign-off (providerRemittanceV2). When off, the list

@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { requireProvider } from "@/lib/provider-portal";
+import { redirect } from "next/navigation";
+import { ProviderAccessService } from "@/server/services/provider-access.service";
+import { providerPermits } from "@/components/layouts/provider-nav-model";
 import { prisma } from "@/lib/prisma";
 import { FilePlus2 } from "lucide-react";
 
@@ -24,7 +26,10 @@ export default async function ProviderClaims({
 }: {
   searchParams: Promise<{ status?: string; submitted?: string; replayed?: string }>;
 }) {
-  const { provider, tenantId } = await requireProvider();
+  // ELIG-GAP-020 / Phase 2: identity is not authorization — require the read permission (fail-closed).
+  const { ctx, provider } = await ProviderAccessService.resolveUserContext();
+  if (!providerPermits(ctx.permissions, "provider.claim.read")) redirect("/unauthorized");
+  const tenantId = ctx.tenantId;
   const { status, submitted, replayed } = await searchParams;
   const active = status && FILTERS.includes(status) ? status : "all";
 

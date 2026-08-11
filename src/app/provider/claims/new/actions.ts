@@ -2,7 +2,9 @@
 
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { requireProvider } from "@/lib/provider-portal";
+import { ProviderAccessService } from "@/server/services/provider-access.service";
+import { providerPermits } from "@/components/layouts/provider-nav-model";
+import { parseValidDate } from "@/lib/dates";
 import { runClaimIntake } from "@/server/services/claim-intake";
 import type { ServiceType, BenefitCategory, ClaimLineCategory } from "@prisma/client";
 
@@ -20,10 +22,20 @@ export interface ProviderClaimInput {
 export async function submitProviderClaimAction(
   input: ProviderClaimInput,
 ): Promise<{ error?: string } | void> {
-  const { session, providerId, tenantId } = await requireProvider();
+  // ELIG-GAP-020: claim submission previously ran on requireProvider() alone (no
+  // permission). Require provider.claim.create (fail-closed after Phase 2) BEFORE
+  // any member resolution or intake side effect.
+  const { ctx, session } = await ProviderAccessService.resolveUserContext();
+  if (!providerPermits(ctx.permissions, "provider.claim.create")) {
+    return { error: "You do not have permission to submit claims." };
+  }
+  const { providerId, tenantId } = ctx;
 
   const memberNumber = (input.memberNumber ?? "").trim();
   if (!memberNumber) return { error: "Enter the member/card number." };
+  // ELIG-GAP-007: reject a malformed date of service before it reaches the
+  // entitlement gate / Prisma (an Invalid Date would 500).
+  if (!parseValidDate(input.dateOfService)) return { error: "Enter a valid date of service." };
   if (!input.primaryDiagnosis?.code) return { error: "Add a primary diagnosis." };
   const lines = (input.lineItems ?? []).filter((l) => l.description?.trim() && Number(l.unitCost) > 0);
   if (lines.length === 0) return { error: "Add at least one service line with an amount." };

@@ -51,12 +51,12 @@ describe("F1.4 computeProviderNav", () => {
     expect(h).not.toContain("/provider/api-keys");
   });
 
-  it("legacy/un-migrated user (no provider.* perms) sees the full working set (no blank portal)", () => {
-    // The "full working set" excludes flag-gated items (F7.3 contracts) until their flag is on.
-    const ungatedHrefs = PROVIDER_NAV_DEFINITIONS.filter((d) => !d.flagKey).map((d) => d.href);
-    expect(hrefs([])).toEqual(ungatedHrefs);
-    // a user with only unrelated TPA perms is also treated as legacy here
-    expect(hrefs(["CLAIM:VIEW", "MEMBER:VIEW"])).toEqual(ungatedHrefs);
+  it("ELIG-GAP-004: a zero-permission user sees only Home (fail-closed; the full-set fallback is removed)", () => {
+    // Home (dashboard) is the only definition with no requiredPermission.
+    const homeHrefs = PROVIDER_NAV_DEFINITIONS.filter((d) => !d.requiredPermission).map((d) => d.href);
+    expect(hrefs([])).toEqual(homeHrefs);
+    // a user with only unrelated TPA perms is likewise denied every provider item
+    expect(hrefs(["CLAIM:VIEW", "MEMBER:VIEW"])).toEqual(homeHrefs);
   });
 
   it("Home is always present even with an unrelated single provider perm", () => {
@@ -64,9 +64,9 @@ describe("F1.4 computeProviderNav", () => {
   });
 
   it("never emits an unfinished route", () => {
-    // NOTE: /provider/preauth (F3.8), /provider/inbox (F4.7), /provider/payment-queries (F6.11), /provider/profile (F7.6), /provider/performance (F8.5), /provider/integrations (F9.8) are now FINISHED — removed from forbidden.
+    // NOTE: /provider/preauth (F3.8), /provider/inbox (F4.7), /provider/payment-queries (F6.11), /provider/profile (F7.6), /provider/performance (F8.5), /provider/integrations (F9.8), /provider/users (ELIG-GAP-005) are now FINISHED — removed from forbidden.
     // /provider/contracts (F7.3) is BUILT but flag-gated: with no flags passed it must stay hidden even with every permission.
-    const forbidden = ["/provider/contracts", "/provider/users"];
+    const forbidden = ["/provider/contracts"];
     // even a super-broad permission set only yields existing (and flag-enabled) routes
     const allPerms = PROVIDER_NAV_DEFINITIONS.map((d) => d.requiredPermission).filter(Boolean) as string[];
     const h = hrefs(allPerms);
@@ -132,8 +132,8 @@ describe("F3.8 providerPermits (page-access guard)", () => {
     expect(providerPermits(["provider.claim.read"], "provider.preauth.read")).toBe(false);
   });
 
-  it("allows an un-migrated/legacy user (no provider.* perms) — matches the nav's rollout posture", () => {
-    expect(providerPermits([], "provider.preauth.read")).toBe(true);
-    expect(providerPermits(["CLAIM:VIEW", "MEMBER:VIEW"], "provider.preauth.read")).toBe(true);
+  it("ELIG-GAP-004: denies a zero-permission user and a user with only unrelated perms (fail-closed)", () => {
+    expect(providerPermits([], "provider.preauth.read")).toBe(false);
+    expect(providerPermits(["CLAIM:VIEW", "MEMBER:VIEW"], "provider.preauth.read")).toBe(false);
   });
 });

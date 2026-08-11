@@ -1,4 +1,6 @@
-import { requireProvider } from "@/lib/provider-portal";
+import { redirect } from "next/navigation";
+import { ProviderAccessService } from "@/server/services/provider-access.service";
+import { providerPermits } from "@/components/layouts/provider-nav-model";
 import { prisma } from "@/lib/prisma";
 import { CaseService } from "@/server/services/case.service";
 import { Layers } from "lucide-react";
@@ -24,7 +26,10 @@ const TONE: Record<string, string> = {
  * OWN cases (providerId from the session) — never another facility's (A1).
  */
 export default async function ProviderCases() {
-  const { provider, tenantId } = await requireProvider();
+  // ELIG-GAP-020 / Phase 2: require the case read permission (fail-closed).
+  const { ctx, provider } = await ProviderAccessService.resolveUserContext();
+  if (!providerPermits(ctx.permissions, "provider.case.read")) redirect("/unauthorized");
+  const tenantId = ctx.tenantId;
 
   const cases = await prisma.clinicalCase.findMany({
     where: { tenantId, providerId: provider.id },
