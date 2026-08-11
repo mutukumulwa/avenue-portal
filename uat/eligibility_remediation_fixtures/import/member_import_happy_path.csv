@@ -1,0 +1,6 @@
+firstName,lastName,dateOfBirth,gender,relationship,principalIdNumber,idNumber,phone,email,isExample
+Sanyu,Bulk,1988-04-12,FEMALE,PRINCIPAL,,CFBULK1001,+256701110001,sanyu.bulk+uat@example.invalid,false
+Chloe,Bulk,2015-02-28,FEMALE,CHILD,CFBULK1001,CFBULK1003,,chloe.bulk+uat@example.invalid,false
+Baraka,Bulk,1989-11-03,MALE,SPOUSE,CFBULK1001,CFBULK1002,+256701110002,baraka.bulk+uat@example.invalid,false
+Žanna,Løk,1992-07-17,OTHER,PRINCIPAL,,CFBULK2001,+256701120001,zanna.lok+uat@example.invalid,false
+Mirembe,Batch,1993-02-05,FEMALE,PRINCIPAL,,CFBULK3001,+256701130001,mirembe.batch+uat@example.invalid,false

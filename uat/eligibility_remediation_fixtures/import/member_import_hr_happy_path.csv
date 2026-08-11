@@ -1,0 +1,4 @@
+firstName,lastName,dateOfBirth,gender,relationship,principalIdNumber,idNumber,phone,email,isExample
+Hawa,HRBatch,1987-01-12,FEMALE,PRINCIPAL,,CFHR1001,+256702110001,hawa.hrbatch+uat@example.invalid,false
+Isaac,HRBatch,1986-03-09,MALE,SPOUSE,CFHR1001,CFHR1002,+256702110002,isaac.hrbatch+uat@example.invalid,false
+Jalia,HRBatch,2017-07-21,FEMALE,CHILD,CFHR1001,CFHR1003,,,false

@@ -1,0 +1,3 @@
+firstName,lastName,dateOfBirth,gender,relationship,principalIdNumber,idNumber,phone,email,isExample
+Ready,Principal,1990-01-01,FEMALE,PRINCIPAL,,CFEX0001,,ready.principal+uat@example.invalid,false
+Example,DeleteMe,1990-01-01,FEMALE,PRINCIPAL,,CFEXAMPLE01,,,true

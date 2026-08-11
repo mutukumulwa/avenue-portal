@@ -1,0 +1,3 @@
+relationship,lastName,firstName,gender,idNumber,principalIdNumber,dateOfBirth,email,phone,isExample
+PRINCIPAL,Reorder,Rita,FEMALE,CFREORD001,,1991-09-09,rita.reorder+uat@example.invalid,+256704110001,false
+CHILD,Reorder,Rex,MALE,CFREORD002,CFREORD001,2019-10-10,,,false

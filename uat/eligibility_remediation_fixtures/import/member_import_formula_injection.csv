@@ -1,0 +1,6 @@
+firstName,lastName,dateOfBirth,gender,relationship,principalIdNumber,idNumber,phone,email,isExample
+=2+2,Formula,1990-01-01,FEMALE,PRINCIPAL,,CFINJECT01,,inject1+uat@example.invalid,false
+"+SUM(1,2)",PlusFormula,1990-01-02,MALE,PRINCIPAL,,CFINJECT02,,inject2+uat@example.invalid,false
+@CMD,AtSign,1990-01-03,OTHER,PRINCIPAL,,CFINJECT03,,inject3+uat@example.invalid,false
+-1+cmd,MinusFormula,1990-01-04,FEMALE,PRINCIPAL,,CFINJECT04,,inject4+uat@example.invalid,false
+Tabbed,	LeadTab,1990-01-05,MALE,PRINCIPAL,,CFINJECT05,,inject5+uat@example.invalid,false

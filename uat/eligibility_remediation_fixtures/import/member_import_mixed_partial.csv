@@ -1,0 +1,8 @@
+firstName,lastName,dateOfBirth,gender,relationship,principalIdNumber,idNumber,phone,email,isExample
+Valid,Principal,1990-01-01,FEMALE,PRINCIPAL,,CFMIX0001,+256700920001,valid.principal+uat@example.invalid,false
+Child,OfValid,2018-03-03,MALE,CHILD,CFMIX0001,CFMIX0002,,,false
+,MissingFirst,1990-01-01,MALE,PRINCIPAL,,CFMIX0003,,,false
+Bad,Gender,1990-01-01,UNKNOWN,PRINCIPAL,,CFMIX0004,,,false
+Orphan,Child,2018-01-01,FEMALE,CHILD,DOESNOTEXIST,CFMIX0005,,,false
+Future,Birth,2099-01-01,FEMALE,PRINCIPAL,,CFMIX0006,,,false
+Missing,PrincipalRef,2016-05-05,MALE,SPOUSE,,CFMIX0007,,,false

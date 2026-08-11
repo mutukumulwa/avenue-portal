@@ -1,0 +1,5 @@
+firstName,lastName,dateOfBirth,gender,relationship,principalIdNumber,idNumber,phone,email,isExample
+Dupe,First,1990-01-01,MALE,PRINCIPAL,,CFDUP9001,+256705110001,dupe.first+uat@example.invalid,false
+Dupe,AgainInFile,1991-02-02,MALE,PRINCIPAL,,CFDUP9001,+256705110002,dupe.again+uat@example.invalid,false
+Sanyu,Controlled,1988-04-12,FEMALE,PRINCIPAL,,CFBULK1001,+256705110003,sanyu.controlled+uat@example.invalid,false
+Clean,Unique,1992-03-03,FEMALE,PRINCIPAL,,CFDUP9004,+256705110004,clean.unique+uat@example.invalid,false
