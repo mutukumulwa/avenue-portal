@@ -18,8 +18,14 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
 
   const { id } = await params;
 
-  const group = await prisma.group.findUnique({
-    where: { id, tenantId: session.user.tenantId },
+  // Client confinement (G2.1 / DEF-020): a confined operator cannot open another
+  // client's scheme by pasting its id — the clientId filter makes it not-found.
+  const group = await prisma.group.findFirst({
+    where: {
+      id,
+      tenantId: session.user.tenantId,
+      ...(session.user.clientId ? { clientId: session.user.clientId } : {}),
+    },
     include: {
       selfFundedAccount: { include: { transactions: { orderBy: { postedAt: "desc" }, take: 20 } } },
       package: true,

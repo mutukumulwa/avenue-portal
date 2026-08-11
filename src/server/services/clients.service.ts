@@ -21,9 +21,11 @@ export class ClientsService {
     );
   }
 
-  static async list(operatorTenantId: string) {
+  // `confinedClientId` (G2.1 / DEF-020): when the caller is a client-confined operator
+  // (User.clientId set), the client list is limited to that one client.
+  static async list(operatorTenantId: string, confinedClientId?: string) {
     return prisma.client.findMany({
-      where: { operatorTenantId },
+      where: { operatorTenantId, ...(confinedClientId ? { id: confinedClientId } : {}) },
       include: {
         parentClient: { select: { id: true, name: true } },
         _count: { select: { groups: true, subsidiaries: true, users: true } },
@@ -32,7 +34,9 @@ export class ClientsService {
     });
   }
 
-  static async getById(operatorTenantId: string, id: string) {
+  static async getById(operatorTenantId: string, id: string, confinedClientId?: string) {
+    // A confined operator cannot open another client by id.
+    if (confinedClientId && confinedClientId !== id) return null;
     return prisma.client.findFirst({
       where: { id, operatorTenantId },
       include: {

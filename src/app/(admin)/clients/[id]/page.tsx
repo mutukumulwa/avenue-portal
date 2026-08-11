@@ -33,7 +33,7 @@ export default async function ClientDetailPage({
   const session = await requireRole(ROLES.CLIENT_READ);
   const canWrite = ROLES.ADMIN_ONLY.includes(session.user.role as UserRole);
   const { id } = await params;
-  const client = await ClientsService.getById(session.user.tenantId, id);
+  const client = await ClientsService.getById(session.user.tenantId, id, session.user.clientId);
   if (!client) notFound();
 
   const Field = ({ label, value }: { label: string; value: React.ReactNode }) => (

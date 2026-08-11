@@ -33,9 +33,13 @@ export default async function GroupsPage({
 
   const { q, status } = await searchParams;
   const tenantId = session.user.tenantId;
+  // Client confinement (G2.1 / DEF-020): a client-confined operator (User.clientId set)
+  // sees only their own client's schemes — on the list, the count, AND search.
+  const confined = session.user.clientId ? { clientId: session.user.clientId } : {};
 
   const where = {
     tenantId,
+    ...confined,
     ...(status ? { status: status as never } : {}),
     ...(q ? {
       OR: [
@@ -59,7 +63,7 @@ export default async function GroupsPage({
       orderBy: { createdAt: "desc" },
       take: 200,
     }),
-    prisma.group.count({ where: { tenantId } }),
+    prisma.group.count({ where: { tenantId, ...confined } }),
   ]);
 
   return (

@@ -27,7 +27,7 @@ export default async function ClientsPage() {
   // pages and every client action stay on ADMIN_ONLY (X-001).
   const session = await requireRole(ROLES.CLIENT_READ);
   const canWrite = ROLES.ADMIN_ONLY.includes(session.user.role as UserRole);
-  const clients = await ClientsService.list(session.user.tenantId);
+  const clients = await ClientsService.list(session.user.tenantId, session.user.clientId);
 
   return (
     <div className="space-y-6">

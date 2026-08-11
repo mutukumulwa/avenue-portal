@@ -22,8 +22,14 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
 
   const { id } = await params;
 
-  const member = await prisma.member.findUnique({
-    where: { id, tenantId: session.user.tenantId },
+  // Client confinement (G2.1 / DEF-020): a confined operator cannot open a member
+  // of another client by pasting its id (member's client is via its group).
+  const member = await prisma.member.findFirst({
+    where: {
+      id,
+      tenantId: session.user.tenantId,
+      ...(session.user.clientId ? { group: { clientId: session.user.clientId } } : {}),
+    },
     include: {
       group: { select: { id: true, name: true, renewalDate: true } },
       package: {
