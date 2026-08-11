@@ -61,3 +61,23 @@ BEGIN
       CHECK ("individualCap" > 0 AND ("familyCap" IS NULL OR "familyCap" > 0));
   END IF;
 END $$;
+
+-- ── TreatmentExclusionRule: exactly ONE owner (package version XOR provider
+-- contract) — the Wave 2 rules model's dual-ownership invariant (WP-2.3 /
+-- N-012). Enforced in code (resolveExclusionOwner) at every write path; this is
+-- the DB backstop. Table is new in this deploy, so no preflight rows can exist;
+-- for re-runs the preflight audit (MUST return zero rows) is:
+--   SELECT id FROM "TreatmentExclusionRule"
+--   WHERE  ("packageVersionId" IS NULL) = ("providerContractId" IS NULL);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'exclusion_owner_xor'
+      AND conrelid = '"TreatmentExclusionRule"'::regclass
+  ) THEN
+    ALTER TABLE "TreatmentExclusionRule"
+      ADD CONSTRAINT exclusion_owner_xor
+      CHECK (("packageVersionId" IS NULL) <> ("providerContractId" IS NULL));
+  END IF;
+END $$;
