@@ -209,8 +209,14 @@ export class OfflinePackService {
       list.push({ category: b.category, limit: b.limit, remaining: b.remaining });
       byMember.set(b.memberNumber, list);
     }
+    // ELIG-GAP (Phase 3): scope the snapshot roster to the facility's entitled
+    // members. The roster already comes from the entitlement-scoped buildPayload,
+    // so this is defence-in-depth against a future refactor that accepts an
+    // external roster, keeping it consistent with the deny-by-default pattern.
+    const { ProviderEntitlementService } = await import("./provider-entitlement.service");
+    const rosterEntitledWhere = await ProviderEntitlementService.entitledMemberWhere(auth.providerId);
     const rosterMembers = await prisma.member.findMany({
-      where: { tenantId: auth.tenantId, memberNumber: { in: payload.roster.map((r) => r.memberNumber) } },
+      where: { AND: [{ tenantId: auth.tenantId, memberNumber: { in: payload.roster.map((r) => r.memberNumber) } }, rosterEntitledWhere] },
       select: { id: true, memberNumber: true },
     });
     await prisma.eligibilitySnapshot.createMany({

@@ -6,16 +6,16 @@ import { ProviderAccessSettingsService } from "./provider-access-settings.servic
 /**
  * PNOS F1.12 — entitlement gate for PROVIDER-PORTAL claim submission.
  *
- * The provider-portal intake channel currently resolves the claimed member by
- * tenant alone (claim-intake/context.ts PROVIDER_PORTAL sets
- * scopeMembersByEntitlement:false — the documented bypass). This gate removes
- * that bypass ONLY when deny-by-default is enabled for the provider (D3 flag,
- * same ProviderAccessSettings as F1.11), evaluated at the CLAIM'S service date.
+ * ELIG-GAP-020 (Phase 3, PRIVACY-S1-A): member resolution is ALWAYS
+ * entitlement-scoped at the CLAIM'S service date — a provider can never resolve
+ * (or file a claim for) a member outside the clients its active contracts cover,
+ * regardless of the D3 enforcement flag. Previously this scoping applied ONLY
+ * when deny-by-default was enabled; that flag is now decoupled from whether PII/
+ * among-clients scoping applies (it may still govern other posture elsewhere).
  *
- * When enforced, an out-of-entitlement member is simply not resolvable — the
- * caller returns its normal "no member found" result, so this is a structural
- * reject (no claim is created), matching the B2B API's entitlement-scoped
- * resolution. When not enforced (default), behavior is unchanged. Receipt /
+ * An out-of-entitlement member is simply not resolvable — the caller returns its
+ * normal "no member found" result, so this is a structural reject (no claim is
+ * created), matching the B2B API's entitlement-scoped resolution. Receipt /
  * idempotency / routing all remain owned by Claims Autopilot downstream.
  */
 
@@ -36,9 +36,10 @@ export const ProviderClaimEntitlementGate = {
     db: Db = prisma,
   ): Promise<SubmittableMemberResult> {
     const enforced = await ProviderAccessSettingsService.isEntitlementEnforced(input.tenantId, input.providerId, db);
-    const scope = enforced
-      ? await ProviderEntitlementService.entitledMemberWhere(input.providerId, input.serviceDate)
-      : {};
+    // ELIG-GAP-020 (PRIVACY-S1-A): ALWAYS entitlement-scope — not only when the
+    // D3 flag is on. `entitledMemberWhere` is deny-by-default (returns an
+    // impossible filter when the provider has no active applicability).
+    const scope = await ProviderEntitlementService.entitledMemberWhere(input.providerId, input.serviceDate);
     const member = await db.member.findFirst({
       where: { tenantId: input.tenantId, memberNumber: { equals: input.memberNumber, mode: "insensitive" }, ...scope },
       select: { id: true },

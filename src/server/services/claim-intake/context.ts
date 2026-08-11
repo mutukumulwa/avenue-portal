@@ -85,7 +85,10 @@ function channelMeta(caller: CallerIdentity): ChannelMeta {
     case "operatorUser":
       return { channel: "ADMIN_PORTAL", source: "MANUAL", providerOwnsInvoiceNamespace: true, isSystemActor: false, providerDerived: false, requireOperationalProvider: true, scopeMembersByEntitlement: false };
     case "providerUser":
-      return { channel: "PROVIDER_PORTAL", source: "MANUAL", providerOwnsInvoiceNamespace: true, isSystemActor: false, providerDerived: true, requireOperationalProvider: true, scopeMembersByEntitlement: false };
+      // ELIG-GAP-020 (Phase 3, PRIVACY-S1-A): the provider portal now
+      // entitlement-scopes member resolution like the provider API — a facility
+      // can never file a claim for a member outside its contracted clients.
+      return { channel: "PROVIDER_PORTAL", source: "MANUAL", providerOwnsInvoiceNamespace: true, isSystemActor: false, providerDerived: true, requireOperationalProvider: true, scopeMembersByEntitlement: true };
     case "providerKey":
       // A provider facility system; default HMS unless the key declares SMART/Slade.
       return { channel: "API_V1", source: caller.sourceHint ?? "HMS", providerOwnsInvoiceNamespace: true, isSystemActor: false, providerDerived: true, requireOperationalProvider: true, scopeMembersByEntitlement: true };

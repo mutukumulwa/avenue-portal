@@ -3,6 +3,7 @@ import { ArrowLeft } from "lucide-react";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { ProviderAccessService } from "@/server/services/provider-access.service";
+import { ProviderEntitlementService } from "@/server/services/provider-entitlement.service";
 import { providerPermits } from "@/components/layouts/provider-nav-model";
 import { ProviderPreauthForm } from "./ProviderPreauthForm";
 
@@ -18,7 +19,8 @@ export default async function ProviderNewPreauth({
   const [icd, cpt, prefill] = await Promise.all([
     prisma.iCD10Code.findMany({ select: { code: true, description: true }, orderBy: { code: "asc" }, take: 500 }),
     prisma.cPTCode.findMany({ select: { code: true, description: true, averageCost: true }, orderBy: { code: "asc" }, take: 500 }),
-    memberId ? prisma.member.findFirst({ where: { id: memberId, tenantId: ctx.tenantId }, select: { memberNumber: true } }) : null,
+    // ELIG-GAP-024: entitlement-scope the prefill so a foreign/uncovered memberId resolves to null.
+    memberId ? prisma.member.findFirst({ where: { id: memberId, tenantId: ctx.tenantId, ...(await ProviderEntitlementService.entitledMemberWhere(ctx.providerId)) }, select: { memberNumber: true } }) : null,
   ]);
 
   const operational = provider.contractStatus === "ACTIVE";
