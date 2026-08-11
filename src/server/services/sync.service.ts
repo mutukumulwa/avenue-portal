@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { parseValidDateOr } from "@/lib/dates";
 import { getSystemActorId } from "./system-actor.service";
 import { BenefitUsageService } from "./benefit-usage.service";
 import { ClaimIntakeService } from "./claim-intake/intake.service";
@@ -237,9 +238,9 @@ export class SyncService {
       encounter: {
         serviceType: serviceType as never,
         benefitCategory: "OUTPATIENT" as const,
-        serviceFrom: payload.dateOfService
-          ? new Date(payload.dateOfService as string).toISOString().slice(0, 10)
-          : new Date().toISOString().slice(0, 10),
+        // ELIG-GAP-007: a malformed offline date coerces to today rather than
+        // throwing a RangeError on .toISOString() (which would fail the whole op).
+        serviceFrom: parseValidDateOr(payload.dateOfService as string | undefined, new Date()).toISOString().slice(0, 10),
       },
       diagnoses,
       lines: lineItems.map((l) => ({

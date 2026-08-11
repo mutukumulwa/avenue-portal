@@ -3,6 +3,7 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { writeAudit } from "@/lib/audit";
+import { parseValidDate } from "@/lib/dates";
 import type { MemberRelationship, Gender } from "@prisma/client";
 import type { ActionState } from "./types";
 
@@ -29,6 +30,10 @@ export async function addMemberEndorsementAction(
   if (!firstName || !lastName || !dateOfBirth || !gender || !relationship || !effectiveDate) {
     return { error: "Please fill in all required fields." };
   }
+  // ELIG-GAP-007: a malformed date here would throw a RangeError on
+  // .toISOString() below (an unhandled 500). Reject with a field error instead.
+  if (!parseValidDate(dateOfBirth)) return { error: "Enter a valid date of birth (YYYY-MM-DD)." };
+  if (!parseValidDate(effectiveDate)) return { error: "Enter a valid effective date (YYYY-MM-DD)." };
 
   const endorsementNumber = `REQ-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
 
