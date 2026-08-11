@@ -2,10 +2,23 @@
 
 import { useActionState, useRef, useState } from "react";
 import { parseImportAction, confirmImportAction } from "./actions";
-import type { ParseResult, ImportResult, ParsedRow } from "./actions";
-import { Upload, CheckCircle, XCircle, AlertTriangle } from "lucide-react";
+import type { ParseResult, ImportResult } from "./actions";
+import { buildCsv } from "@/lib/csv-safe";
+import { Upload, CheckCircle, XCircle, AlertTriangle, Download, Info } from "lucide-react";
 
 type Group = { id: string; name: string };
+
+/** WP-B1: download the persisted reject list — every cell CSV-injection-safe. */
+function downloadRejects(failed: ImportResult["failed"]) {
+  const csv = buildCsv(["Row", "Name", "Reason"], failed.map(f => [f.row, f.name, f.error]));
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "member-import-rejects.csv";
+  a.click();
+  URL.revokeObjectURL(url);
+}
 
 export function MemberImportClient({ groups }: { groups: Group[] }) {
   const [parseResult, parseAction, parsePending] = useActionState<ParseResult | null, FormData>(parseImportAction, null);
@@ -15,7 +28,6 @@ export function MemberImportClient({ groups }: { groups: Group[] }) {
 
   const validRows  = parseResult?.rows.filter(r => !r.error) ?? [];
   const errorRows  = parseResult?.rows.filter(r =>  r.error) ?? [];
-  const confirmed  = !!importResult;
 
   return (
     <div className="space-y-6">
@@ -90,6 +102,18 @@ export function MemberImportClient({ groups }: { groups: Group[] }) {
             </div>
           </div>
 
+          {/* Parser notes — unknown/ignored columns, missing required headers */}
+          {parseResult.notes && parseResult.notes.length > 0 && (
+            <div className="bg-[#FFF9E6] border border-[#FFE58F] rounded-lg px-4 py-3 space-y-1">
+              {parseResult.notes.map((n, i) => (
+                <div key={i} className="flex items-start gap-2 text-xs text-[#8A6D3B]">
+                  <Info size={14} className="mt-0.5 shrink-0" />
+                  <span>{n}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
           {/* Error rows */}
           {errorRows.length > 0 && (
             <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
@@ -161,6 +185,7 @@ export function MemberImportClient({ groups }: { groups: Group[] }) {
             <form action={importAction}>
               <input type="hidden" name="groupId" value={selectedGroup} />
               <input type="hidden" name="rows" value={JSON.stringify(parseResult.rows)} />
+              <input type="hidden" name="fileName" value={parseResult.fileName ?? ""} />
               <button
                 type="submit"
                 disabled={importPending}
@@ -181,19 +206,38 @@ export function MemberImportClient({ groups }: { groups: Group[] }) {
               <CheckCircle size={20} />
               <h2 className="font-bold text-lg font-heading">Import complete</h2>
             </div>
-            <p className="text-brand-text-body text-sm">
-              <span className="font-bold text-[#28A745]">{importResult.imported}</span> member{importResult.imported !== 1 ? "s" : ""} successfully imported.
-              {importResult.failed.length > 0 && (
-                <> <span className="font-bold text-[#DC3545]">{importResult.failed.length}</span> failed (see below).</>
-              )}
-            </p>
+            {importResult.error ? (
+              <p className="text-[#DC3545] text-sm font-semibold">{importResult.error}</p>
+            ) : (
+              <p className="text-brand-text-body text-sm">
+                <span className="font-bold text-[#28A745]">{importResult.imported}</span> member{importResult.imported !== 1 ? "s" : ""} successfully imported.
+                {importResult.failed.length > 0 && (
+                  <> <span className="font-bold text-[#DC3545]">{importResult.failed.length}</span> failed (see below).</>
+                )}
+              </p>
+            )}
+            {importResult.alreadyImported && (
+              <div className="flex items-start gap-2 text-xs text-[#8A6D3B] bg-[#FFF9E6] border border-[#FFE58F] rounded-lg px-3 py-2">
+                <Info size={14} className="mt-0.5 shrink-0" />
+                <span>This file was already imported for this group — no duplicate members were created (showing the original result).</span>
+              </div>
+            )}
           </div>
 
           {importResult.failed.length > 0 && (
             <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
-              <div className="px-5 py-3 border-b border-[#EEEEEE] flex items-center gap-2 text-[#DC3545]">
-                <XCircle size={15} />
-                <span className="font-bold text-sm">Failed rows</span>
+              <div className="px-5 py-3 border-b border-[#EEEEEE] flex items-center justify-between text-[#DC3545]">
+                <div className="flex items-center gap-2">
+                  <XCircle size={15} />
+                  <span className="font-bold text-sm">Failed rows</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => downloadRejects(importResult.failed)}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-brand-indigo hover:text-brand-secondary transition-colors"
+                >
+                  <Download size={13} /> Download reject list
+                </button>
               </div>
               <table className="w-full text-xs">
                 <thead>

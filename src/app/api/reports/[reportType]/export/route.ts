@@ -4,6 +4,7 @@ import { getAnalyticsAccessScope, type AnalyticsAccessScope } from "@/lib/analyt
 import { ROLES, type UserRole } from "@/lib/authz/roles";
 import { prisma } from "@/lib/prisma";
 import { getExclusionRejectionRows } from "@/server/services/report-exclusions";
+import { csvSafeCell } from "@/lib/csv-safe";
 
 /**
  * Report types that scope their own query by the caller's analytics group access
@@ -25,11 +26,12 @@ function scopeIsGroupRestricted(scope?: AnalyticsAccessScope): boolean {
   return scope.noAccess === true || scope.groupId != null || scope.allowedGroupIds != null;
 }
 
+// WP-B2: every exported cell is neutralized against CSV formula injection
+// (a `=`/`+`/`-`/`@`/tab-leading value a spreadsheet would execute) AND
+// RFC-4180-quoted, via the shared helper. A member name imported as
+// `=HYPERLINK(...)` can no longer become live code in the downloaded register.
 function escapeCsv(value: string): string {
-  if (value.includes(",") || value.includes('"') || value.includes("\n")) {
-    return `"${value.replace(/"/g, '""')}"`;
-  }
-  return value;
+  return csvSafeCell(value);
 }
 
 function buildCsv(headers: string[], rows: string[][]): string {

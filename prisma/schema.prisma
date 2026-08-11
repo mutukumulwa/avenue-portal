@@ -8546,3 +8546,40 @@ model ClinicalShadowVerdict {
   @@index([tenantId, ruleCode, verdict])
   @@index([tenantId, createdAt])
 }
+
+/// WP-B1 — bulk-import safety ledger. One row per CONFIRMED member/roster import
+/// run (admin `MEMBERS_ADMIN` lane and HR `HR_ENDORSEMENT` lane).
+///
+/// Two guarantees hang off this table:
+///   1. IDEMPOTENCY (B-011). `idempotencyKey` = sha256 of (lane + tenant + group +
+///      the canonical content of the submitted rows). The `@@unique([tenantId,
+///      idempotencyKey])` makes re-uploading the SAME file for the SAME group a
+///      deterministic no-op — the confirm action reserves this row first, so a
+///      concurrent duplicate submit loses the race on the unique and returns the
+///      winner's recorded result instead of importing everything twice.
+///   2. DURABLE REJECT LIST. `rejects` persists the failed-row list (row, name,
+///      reason) that used to live only in ephemeral React state and vanished on
+///      navigation; it is downloadable after the fact.
+///
+/// Relation-free by design: this is a purely ADDITIVE model that touches no
+/// existing model (no back-relations added elsewhere). `tenantId`/`groupId`/
+/// `createdBy` are plain scalar scope keys.
+model ImportBatch {
+  id             String   @id @default(cuid())
+  tenantId       String
+  groupId        String
+  lane           String // "MEMBERS_ADMIN" | "HR_ENDORSEMENT"
+  idempotencyKey String // sha256(lane + tenant + group + canonical row content)
+  fileName       String?
+  totalRows      Int      @default(0)
+  importedCount  Int      @default(0)
+  failedCount    Int      @default(0)
+  rejects        Json     @default("[]") // [{ row, name, error }] — durable reject list
+  createdBy      String? // acting user id
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@unique([tenantId, idempotencyKey])
+  @@index([tenantId, groupId])
+  @@index([tenantId, createdAt])
+}
