@@ -6,6 +6,17 @@
       "runtimeExecutable": "npm",
       "runtimeArgs": ["run", "dev"],
       "port": 3000
+    },
+    {
+      "name": "elig-verify-dev",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000,
+      "autoPort": true,
+      "env": {
+        "DATABASE_URL": "postgresql://postgres@localhost:54331/elig_verify",
+        "DIRECT_URL": "postgresql://postgres@localhost:54331/elig_verify"
+      }
     }
   ]
 }

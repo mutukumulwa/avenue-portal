@@ -4024,6 +4024,21 @@ async function main() {
     console.log(`✅ Reason codes: ${reasonCodes} · Override controls: ${overrideControls} · Service categories: ${serviceCategories} · Roles: ${roles} · GL accounts: ${glAccounts}`)
   }
 
+  // ═══════════════════════════════════════════════════════════
+  // Provider-network layer (ELIG remediation TASK 0.4): branches, ACTIVE
+  // contracts + applicability, practitioners + credentials, and provider users
+  // with real persona roles + branch scope. Runs AFTER provisionTenant (roles
+  // must exist) and after all clients/providers/users exist. Without this the
+  // portal's authorization gates and auto-decision run against ABSENT data,
+  // which is what the 2026-08-11 eligibility UAT exploited.
+  // ═══════════════════════════════════════════════════════════
+  console.log('\n🏥 Seeding provider network (branches, contracts, applicability, practitioners, provider users)...')
+  {
+    const { seedProviderNetwork } = await import('./seeds/provider-network')
+    const r = await seedProviderNetwork(prisma, tenantId)
+    console.log(`✅ Providers: ${r.providers} · Branches +${r.branchesCreated} · Contracts +${r.contractsCreated} · Applicability +${r.applicabilityCreated} · Practitioners +${r.practitionersCreated} · Provider users: ${r.usersProvisioned}`)
+  }
+
   console.log('\n🎉 Seed complete! All features populated.\n')
   console.log(`  Login: admin@medvex.co.ug / ${SEED_PASSWORD}`)
   console.log('')
