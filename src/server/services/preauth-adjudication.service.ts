@@ -14,6 +14,7 @@ import { peekNextDocumentNumber } from "@/lib/document-number";
 import { TRPCError } from "@trpc/server";
 import { auditChainService } from "./audit-chain.service";
 import { BenefitUsageService } from "./benefit-usage.service";
+import { ProviderEntitlementService } from "./provider-entitlement.service";
 import { inSerializableTx } from "@/lib/serializable-tx";
 // WP-2.3 / WP-2.4 — the SAME standalone pure evaluators SP-6 and the claims path
 // consume (never re-implemented inline). Wired below as gates 3.5 / 4.5 so
@@ -158,9 +159,15 @@ export const preauthAdjudicationService = {
     pass("PROCEDURE_COVERED");
 
     // ── Gate 3: Diagnosis not on exclusion list ────────────────
-    const diagnoses = pa.diagnoses as Array<{ code: string }>;
-    if (diagnoses.length > 0) {
-      const diagnosisCodes = diagnoses.map((d) => d.code);
+    // ELIG-GAP-021: guard the JSON cast (a non-array value would throw on .length),
+    // and do NOT auto-pass when there is no diagnosis to screen — a PA with zero
+    // diagnoses is anomalous and routes to human instead of silently passing.
+    const diagnoses = Array.isArray(pa.diagnoses) ? (pa.diagnoses as Array<{ code?: string }>) : [];
+    if (diagnoses.length === 0) {
+      return routeHuman("EXCLUSION_CHECK", "No diagnosis on the pre-authorisation to screen — manual review required");
+    }
+    const diagnosisCodes = diagnoses.map((d) => d.code).filter((c): c is string => !!c);
+    if (diagnosisCodes.length > 0) {
       const exclusions = await prisma.membershipExclusion.findMany({
         where: {
           tenantId,
@@ -184,7 +191,9 @@ export const preauthAdjudicationService = {
     // evidence, so the CT-023 exception is honoured by the evaluator only when a
     // caller supplies the signal (claims / manual review).
     if (member?.packageVersionId) {
-      const exDiagnosisCodes = (pa.diagnoses as Array<{ code: string }>).map((d) => d.code);
+      // ELIG-GAP-021: reuse the guarded, code-filtered diagnosis list (Gate 3) rather
+      // than re-casting the raw JSON (which would throw on a non-array value).
+      const exDiagnosisCodes = diagnosisCodes;
       const [versionExclusions, contractExclusions] = await Promise.all([
         prisma.treatmentExclusionRule.findMany({
           where: { packageVersionId: member.packageVersionId, isActive: true },
@@ -351,6 +360,20 @@ export const preauthAdjudicationService = {
     if (pa.provider.contractStatus !== "ACTIVE") {
       return failGate("PROVIDER_NETWORK", `Provider contract status is ${pa.provider.contractStatus}`);
     }
+    // ELIG-GAP-021: the coarse Provider.contractStatus enum is NOT proof of a real
+    // applicable contract — it passed on a provider with ZERO ProviderContract rows.
+    // Require an active contract whose applicability covers THIS member's client at
+    // the service date (reuse the deny-by-default entitlement fragment). If the
+    // member is not resolvable within the provider's entitlement, there is no
+    // contract basis to auto-approve → fail the network gate.
+    const networkEntitledWhere = await ProviderEntitlementService.entitledMemberWhere(pa.providerId, serviceDate);
+    const contractCovers = await prisma.member.findFirst({
+      where: { AND: [{ id: pa.memberId, tenantId }, networkEntitledWhere] },
+      select: { id: true },
+    });
+    if (!contractCovers) {
+      return failGate("PROVIDER_NETWORK", "No active provider contract covers this member at the service date");
+    }
     pass("PROVIDER_NETWORK");
 
     // ── Gate 9.5: Practitioner credential check (D-06) ────────
@@ -371,14 +394,18 @@ export const preauthAdjudicationService = {
       },
       take: 10,
     });
-    if (providerPractitioners.length > 0) {
-      const hasValidCredential = providerPractitioners.some(
-        (pp) => pp.practitioner.credentials.length > 0
-      );
-      if (!hasValidCredential) {
-        return routeHuman("PRACTITIONER_CREDENTIAL",
-          `No practitioner at ${pa.provider.name} has a current valid credential — manual review required`);
-      }
+    // ELIG-GAP-021: absence of practitioner/credential data must NOT auto-pass this
+    // gate. Previously the whole check was skipped when the provider had zero
+    // practitioners, so a provider with no credentialed clinician auto-approved.
+    // Now zero practitioners OR none with a current valid credential routes to human.
+    const hasValidCredential = providerPractitioners.some(
+      (pp) => pp.practitioner.credentials.length > 0
+    );
+    if (!hasValidCredential) {
+      return routeHuman("PRACTITIONER_CREDENTIAL",
+        providerPractitioners.length === 0
+          ? `No practitioner is registered for ${pa.provider.name} — manual credential review required`
+          : `No practitioner at ${pa.provider.name} has a current valid credential — manual review required`);
     }
     pass("PRACTITIONER_CREDENTIAL");
 
