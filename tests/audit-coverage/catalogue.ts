@@ -60,6 +60,7 @@ export const KNOWN_AUDITING_TOKENS = [
   "ProviderMasterDataChangeService.", // PNOS F7.4/F7.5/F7.6 — submit/transition/approve/verify/activate all audit internally
   "ProviderImprovementPlanService.", // PNOS F7.7/F8.6 — create/setStatus audit IMPROVEMENT_PLAN:* internally
   "NetworkPerformanceService.exportComparisonCsv(", // PNOS F8.6 — audits NETWORK_ANALYTICS:EXPORT internally
+  "renewalService.bindRenewal(", // WP-V1 — appends RENEWAL:BOUND (member transition) internally
   "auditChain", // catch-all for direct chain use
 ];
 

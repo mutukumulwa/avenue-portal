@@ -970,6 +970,16 @@ model Member {
   activationDate         DateTime?
   coverStartDate         DateTime? // set during binding (may differ from activationDate)
   coverEndDate           DateTime?
+  // ── WP-V1 (renewal transition, V-007) ─────────────────────
+  // Benefit-period anchor. NULL (every pre-renewal member) → the usage math
+  // anchors the annual period to the member's `enrollmentDate` anniversary
+  // (unchanged legacy behaviour). Set to the successor scheme's `effectiveDate`
+  // by `renewalService.bindRenewal` when a member is carried across a renewal, so
+  // new-period usage resets exactly once at the renewal boundary while prior-period
+  // rows (keyed by their own `periodStart`) stay intact as history. Additive,
+  // nullable, forward-safe: `benefit-usage.service.ts` reads
+  // `benefitPeriodAnchor ?? enrollmentDate`, so existing rows are unaffected.
+  benefitPeriodAnchor    DateTime?
   // WP-3.5F newborn (CT-033): date the birth was notified to the operator. A
   // newborn may be enrolled without a national ID and, when the birth is notified
   // within 30 days, is covered from the date of birth (coverStart = DOB). Additive

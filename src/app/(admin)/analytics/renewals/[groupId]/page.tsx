@@ -8,7 +8,7 @@ import { renewalService } from "@/server/services/renewal.service";
 import { prisma } from "@/lib/prisma";
 import {
   computeIntelligenceAction, saveScenarioAction,
-  commitScenarioAction, dispatchNoticeAction,
+  commitScenarioAction, dispatchNoticeAction, bindRenewalAction,
 } from "./renewal-actions";
 
 type SearchParams = {
@@ -248,7 +248,8 @@ export default async function RenewalWorkspacePage({
   if (!workspace) notFound();
 
   // Process 11: spec algorithm recommendation + saved scenarios + group renewal status
-  const [enrichedAnalysis, savedScenarios, groupStatus] = await Promise.all([
+  // + WP-V1 renewal-transition preview (reads only — mutates no live cover).
+  const [enrichedAnalysis, savedScenarios, groupStatus, transitionPreview] = await Promise.all([
     prisma.renewalAnalysis.findFirst({
       where: { tenantId: scope.tenantId, groupId },
       orderBy: { renewalDate: "asc" },
@@ -257,8 +258,9 @@ export default async function RenewalWorkspacePage({
     renewalService.getScenariosForAnalysis(workspace.analysis.id, scope.tenantId),
     prisma.group.findUnique({
       where: { id: groupId },
-      select: { renewalStatus: true, renewalNoticeDispatchedAt: true, priorPeriodReconciled: true },
+      select: { renewalStatus: true, renewalNoticeDispatchedAt: true, priorPeriodReconciled: true, supersededByGroupId: true },
     }),
+    renewalService.previewRenewal(groupId, scope.tenantId).catch(() => null),
   ]);
 
   const daysToRenewal = daysUntil(workspace.analysis.renewalDate);
@@ -487,6 +489,86 @@ export default async function RenewalWorkspacePage({
           </form>
         )}
       </div>
+
+      {/* ── WP-V1: Renewal transition preview & bind (reads only until bind) ── */}
+      {transitionPreview && (
+        <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="font-bold text-brand-text-heading text-sm font-heading flex items-center gap-2">
+              <Users size={15} className="text-brand-indigo" /> Member Transition
+            </h2>
+            <span className="text-[11px] text-brand-text-muted">
+              Boundary {formatDate(new Date(transitionPreview.newCoverStart))} · preview reads live cover, changes nothing
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <p className="text-xs text-brand-text-muted">Carry forward</p>
+              <p className="font-semibold text-brand-text-heading mt-0.5 tabular-nums">{transitionPreview.carryForwardCount} active</p>
+            </div>
+            <div>
+              <p className="text-xs text-brand-text-muted">Age-out exceptions</p>
+              <p className={`font-semibold mt-0.5 tabular-nums ${transitionPreview.ageOutExceptions.length ? "text-[#DC3545]" : "text-[#28A745]"}`}>
+                {transitionPreview.ageOutExceptions.length}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-brand-text-muted">Age-band crossings</p>
+              <p className="font-semibold text-brand-text-heading mt-0.5 tabular-nums">{transitionPreview.bandCrossings.length}</p>
+            </div>
+            <div>
+              <p className="text-xs text-brand-text-muted">Holds past boundary</p>
+              <p className={`font-semibold mt-0.5 tabular-nums ${transitionPreview.straddlingHolds.length ? "text-[#856404]" : "text-brand-text-heading"}`}>
+                {transitionPreview.straddlingHolds.length}
+              </p>
+            </div>
+          </div>
+
+          {transitionPreview.ageOutExceptions.length > 0 && (
+            <div className="rounded-[6px] border border-[#DC3545]/30 bg-[#DC3545]/5 p-3 space-y-2">
+              <p className="text-xs font-bold text-[#DC3545] flex items-center gap-1">
+                <AlertTriangle size={12} /> Over-age dependants — flagged for review before bind (not auto-terminated)
+              </p>
+              <ul className="text-[13px] text-brand-text-body space-y-1">
+                {transitionPreview.ageOutExceptions.map((ex) => (
+                  <li key={ex.memberId} className="flex items-center justify-between gap-3">
+                    <span>{ex.name} <span className="text-brand-text-muted">({ex.memberNumber} · {ex.relationship.toLowerCase()})</span></span>
+                    <span className="tabular-nums text-brand-text-muted">age {ex.age ?? "—"} &gt; max {ex.dependentMaxAge ?? "—"}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {transitionPreview.straddlingHolds.length > 0 && (
+            <p className="text-[11px] text-[#856404]">
+              {transitionPreview.straddlingHolds.length} active pre-auth hold(s) expire after the renewal boundary — the reservation is carried
+              conservatively across the boundary (reads never go negative); retire or convert them explicitly if they should not span periods.
+            </p>
+          )}
+
+          {groupStatus?.supersededByGroupId && transitionPreview.successorGroupId ? (
+            <form action={bindRenewalAction} className="flex items-center gap-3">
+              <input type="hidden" name="groupId" value={groupId} />
+              <input type="hidden" name="newGroupId" value={transitionPreview.successorGroupId} />
+              <button type="submit"
+                disabled={!groupStatus?.priorPeriodReconciled}
+                className="bg-brand-indigo text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-brand-secondary transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                <CheckCircle2 size={13} /> Bind & Transition {transitionPreview.carryForwardCount} Members
+              </button>
+              {!groupStatus?.priorPeriodReconciled && (
+                <span className="text-[11px] text-[#856404]">Reconcile the prior period first.</span>
+              )}
+            </form>
+          ) : (
+            <p className="text-[11px] text-brand-text-muted">
+              Binding transitions members onto the successor scheme (re-pins package version, re-anchors the benefit period, resets usage once).
+              It becomes available once a renewal quotation is bound into a successor scheme.
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -10,6 +10,10 @@
 import { prisma } from "@/lib/prisma";
 import { TRPCError } from "@trpc/server";
 import { auditChainService } from "./audit-chain.service";
+// WP-V1/V-004: reuse the ONE calendar-correct age classifier the SP-6 eligibility
+// evaluator uses, so the pre-bind age-out list can never drift from the live
+// OVER_AGE_DEPENDANT verdict (this only reads the helper; it does not edit it).
+import { classifyAge } from "./eligibility/age";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
@@ -248,12 +252,38 @@ export const renewalService = {
     return crossings;
   },
 
-  // ── 5. Bind renewal ───────────────────────────────────────────────────────
+  // ── 5. Bind renewal — transition members onto the successor scheme ─────────
 
   /**
-   * Marks the prior group as superseded and updates its renewal status to BOUND.
-   * Preserves WaitingPeriodApplication records — does NOT reset them.
-   * Member numbers are carried over (no card replacement).
+   * V-001..V-008. Binds the renewal AND carries the prior scheme's members onto
+   * the successor group, in ONE transaction, exactly once:
+   *
+   *   - Each carried member's `groupId`, `packageId` and `packageVersionId` are
+   *     re-pinned to the successor group's current package/version (V-002/003), so
+   *     post-renewal claims price on THIS year's config and the members reappear in
+   *     the successor's pipeline — instead of the pre-fix behaviour where the bind
+   *     touched two Group rows and no members (stranding everyone on last year's
+   *     config, invisible to the pipeline).
+   *   - Each carried member's `benefitPeriodAnchor` is set to the successor's
+   *     `effectiveDate` (V-007), so `BenefitUsageService.periodFor` rolls the annual
+   *     period from the renewal boundary. New-period usage rows are keyed by the new
+   *     `periodStart` and start at zero exactly once; the prior period's rows (their
+   *     own `periodStart` / old-version `benefitConfigId`) are left untouched as
+   *     history — usage resets once, prior usage preserved.
+   *
+   * History is NOT rewritten: the prior group keeps its own `packageVersionId`, its
+   * rows are not deleted, and the old benefit-usage rows stay addressable by their
+   * old (member, benefitConfig, periodStart) key — so the old version/coverage stays
+   * reconstructable for a pre-renewal service date. Waiting periods and member
+   * numbers are carried over unchanged (no card replacement).
+   *
+   * Idempotent: a group already bound (its `supersededByGroupId` set) is rejected,
+   * and the member move targets only members STILL in the prior group, so a retry
+   * never double-moves or duplicates.
+   *
+   * Age-outs are NOT actioned here (see `previewRenewal` for the pre-bind exception
+   * list); this method carries every ACTIVE member forward without silent
+   * termination, per V-004.
    */
   async bindRenewal(
     priorGroupId: string,
@@ -261,22 +291,67 @@ export const renewalService = {
     tenantId: string,
     actorId: string,
   ) {
+    if (priorGroupId === newGroupId) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "Successor group must differ from the prior group" });
+    }
     const priorGroup = await prisma.group.findUnique({ where: { id: priorGroupId, tenantId } });
     if (!priorGroup) throw new TRPCError({ code: "NOT_FOUND", message: "Prior group not found" });
     if (!priorGroup.priorPeriodReconciled) {
       throw new TRPCError({ code: "BAD_REQUEST", message: "Prior period must be reconciled before binding renewal" });
     }
+    // Idempotency guard — a superseded group is already bound; never transition twice.
+    if (priorGroup.supersededByGroupId) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "This scheme has already been bound to a successor and its members transitioned.",
+      });
+    }
 
-    await prisma.$transaction([
-      prisma.group.update({
+    const newGroup = await prisma.group.findUnique({ where: { id: newGroupId, tenantId } });
+    if (!newGroup) throw new TRPCError({ code: "NOT_FOUND", message: "Successor group not found" });
+    // Fail CLOSED: never strand carried members on a null pin (F-PIN-2). A successor
+    // scheme must be pinned to a concrete package version before members move onto it.
+    if (!newGroup.packageVersionId) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Successor scheme has no pinned package version — cannot transition members onto an unpriceable version.",
+      });
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      // Carry ACTIVE members forward. Suspended/lapsed/terminated/expired members are
+      // NOT auto-renewed (a suspended or ended membership is a lifecycle decision, not
+      // a renewal carry-forward). Target only members STILL in the prior group so a
+      // retry moves nobody twice.
+      const members = await tx.member.findMany({
+        where: { tenantId, groupId: priorGroupId, status: "ACTIVE" },
+        select: { id: true, memberNumber: true },
+      });
+      const memberIds = members.map((m) => m.id);
+
+      if (memberIds.length > 0) {
+        await tx.member.updateMany({
+          where: { id: { in: memberIds } },
+          data: {
+            groupId:             newGroupId,
+            packageId:           newGroup.packageId,
+            packageVersionId:    newGroup.packageVersionId,
+            benefitPeriodAnchor: newGroup.effectiveDate,
+          },
+        });
+      }
+
+      await tx.group.update({
         where: { id: priorGroupId },
         data:  { supersededByGroupId: newGroupId, renewalStatus: "BOUND" },
-      }),
-      prisma.group.update({
+      });
+      await tx.group.update({
         where: { id: newGroupId },
         data:  { renewalStatus: "BOUND" },
-      }),
-    ]);
+      });
+
+      return { memberIds, memberNumbers: members.map((m) => m.memberNumber) };
+    });
 
     await auditChainService.append({
       actorId,
@@ -284,10 +359,121 @@ export const renewalService = {
       module:     "RENEWAL",
       entityType: "Group",
       entityId:   priorGroupId,
-      payload:    { priorGroupId, newGroupId },
+      payload: {
+        priorGroupId,
+        newGroupId,
+        packageVersionId: newGroup.packageVersionId,
+        benefitPeriodAnchor: newGroup.effectiveDate,
+        transitionedMemberCount: result.memberIds.length,
+        transitionedMemberIds: result.memberIds,
+        transitionedMemberNumbers: result.memberNumbers,
+      },
       tenantId,
-      description: `Renewal bound: ${priorGroup.name} → new group ${newGroupId}`,
+      description: `Renewal bound: ${priorGroup.name} → ${newGroup.name}; ${result.memberIds.length} member(s) carried onto package version ${newGroup.packageVersionId} (benefit period re-anchored to ${newGroup.effectiveDate.toISOString().slice(0, 10)}).`,
     });
+
+    return { transitionedMemberCount: result.memberIds.length, memberIds: result.memberIds };
+  },
+
+  // ── 5b. Renewal preview (V-001 / V-004 / V-008) — reads only, mutates nothing ─
+
+  /**
+   * Reconciliation preview BEFORE bind. Reads live cover and reports what a
+   * `bindRenewal` would do WITHOUT mutating anything:
+   *
+   *   - `carryForwardCount` — ACTIVE members that would be carried over (V-001).
+   *   - `ageOutExceptions` — CHILD dependants who are OVER the successor package's
+   *     `dependentMaxAge` as of the new cover start (V-004). Flagged for a human
+   *     decision; NEVER auto-terminated and NEVER turned into an endorsement here.
+   *   - `bandCrossings` — age-band reclassifications (consumes the previously-dead
+   *     `reclassifyAgeBands` output so it is surfaced, not silently discarded).
+   *   - `straddlingHolds` — ACTIVE pre-auth holds whose expiry is after the renewal
+   *     boundary (V-008 visibility); see the note in the return type.
+   *
+   * `newGroupId` is optional: pre-bind there is usually no successor group yet, so
+   * the boundary + age caps fall back to the PRIOR scheme's `renewalDate` and
+   * package (the renewed package inherits its caps). When a successor group exists
+   * (already created / already bound) its `effectiveDate` + package win.
+   */
+  async previewRenewal(priorGroupId: string, tenantId: string, newGroupId?: string) {
+    const priorGroup = await prisma.group.findUnique({
+      where: { id: priorGroupId, tenantId },
+      select: {
+        id: true, name: true, renewalDate: true, effectiveDate: true,
+        supersededByGroupId: true, priorPeriodReconciled: true,
+        package: { select: { maxAge: true, dependentMaxAge: true } },
+      },
+    });
+    if (!priorGroup) throw new TRPCError({ code: "NOT_FOUND", message: "Prior group not found" });
+
+    const successorId = newGroupId ?? priorGroup.supersededByGroupId ?? undefined;
+    const successor = successorId
+      ? await prisma.group.findUnique({
+          where: { id: successorId, tenantId },
+          select: {
+            id: true, name: true, effectiveDate: true, packageVersionId: true,
+            package: { select: { maxAge: true, dependentMaxAge: true } },
+          },
+        })
+      : null;
+
+    // The renewal boundary + which age caps apply. Successor scheme wins when known,
+    // else the prior scheme's renewalDate is the boundary and its caps apply.
+    const newCoverStart = successor?.effectiveDate ?? priorGroup.renewalDate;
+    const ageRules = successor?.package ?? priorGroup.package ?? null;
+
+    const members = await prisma.member.findMany({
+      where: { tenantId, groupId: priorGroupId, status: "ACTIVE" },
+      select: { id: true, memberNumber: true, firstName: true, lastName: true, dateOfBirth: true, relationship: true },
+    });
+
+    const ageOutExceptions = members
+      .map((m) => {
+        const cls = classifyAge({ relationship: m.relationship, dateOfBirth: m.dateOfBirth }, newCoverStart, ageRules);
+        return { member: m, cls };
+      })
+      .filter((x) => x.cls.over)
+      .map((x) => ({
+        memberId:     x.member.id,
+        memberNumber: x.member.memberNumber,
+        name:         `${x.member.firstName} ${x.member.lastName}`,
+        relationship: x.member.relationship,
+        age:          x.cls.age,
+        dependentMaxAge: ageRules?.dependentMaxAge ?? null,
+      }));
+
+    // Consume the age-band reclassifier (previously dead) for the band-crossing view.
+    const bandCrossings = await this.reclassifyAgeBands(priorGroupId, tenantId, newCoverStart);
+
+    // V-008 visibility: ACTIVE pre-auth holds that outlive the renewal boundary. See
+    // the flagged limitation — the reservation is carried conservatively, not rebound
+    // to a single period, so this list lets an operator retire them explicitly.
+    const straddlingHolds = members.length
+      ? await prisma.benefitHold.findMany({
+          where: { tenantId, memberId: { in: members.map((m) => m.id) }, status: "ACTIVE", expiresAt: { gt: newCoverStart } },
+          select: { id: true, memberId: true, benefitCategory: true, heldAmount: true, expiresAt: true, preAuthId: true },
+        })
+      : [];
+
+    return {
+      priorGroupId,
+      priorGroupName: priorGroup.name,
+      successorGroupId: successor?.id ?? null,
+      successorGroupName: successor?.name ?? null,
+      newCoverStart,
+      priorPeriodReconciled: priorGroup.priorPeriodReconciled,
+      carryForwardCount: members.length,
+      ageOutExceptions,
+      bandCrossings,
+      straddlingHolds: straddlingHolds.map((h) => ({
+        holdId:          h.id,
+        memberId:        h.memberId,
+        preAuthId:       h.preAuthId,
+        benefitCategory: h.benefitCategory,
+        heldAmount:      Number(h.heldAmount),
+        expiresAt:       h.expiresAt,
+      })),
+    };
   },
 
   // ── 6. Pipeline query ──────────────────────────────────────────────────────

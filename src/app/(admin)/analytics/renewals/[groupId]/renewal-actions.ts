@@ -41,3 +41,20 @@ export async function dispatchNoticeAction(formData: FormData) {
   await renewalService.dispatchRenewalNotice(groupId, session.user.tenantId);
   revalidatePath(`/analytics/renewals/${groupId}`);
 }
+
+/**
+ * WP-V1: bind the renewal and transition the prior scheme's ACTIVE members onto
+ * the successor group (re-pin group/package/version, re-anchor the benefit period,
+ * usage resets once). Audited internally by `renewalService.bindRenewal` via
+ * `auditChainService.append`. `newGroupId` is the already-created successor scheme.
+ */
+export async function bindRenewalAction(formData: FormData) {
+  const session = await requireRole(ROLES.UNDERWRITING);
+  const groupId    = formData.get("groupId") as string;    // prior group
+  const newGroupId = formData.get("newGroupId") as string; // successor group
+  if (!newGroupId) {
+    throw new Error("A successor scheme must be selected before binding the renewal.");
+  }
+  await renewalService.bindRenewal(groupId, newGroupId, session.user.tenantId, session.user.id);
+  revalidatePath(`/analytics/renewals/${groupId}`);
+}

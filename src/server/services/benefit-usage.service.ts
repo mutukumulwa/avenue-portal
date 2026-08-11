@@ -19,7 +19,10 @@ import type { BenefitCategory } from "@prisma/client";
  *  - All writes are scoped to the benefit config resolved from the member's
  *    package version + benefit category — never "whatever period row matches".
  *  - The benefit period is anchored to the member's enrollment anniversary
- *    (same derivation the legacy reserve logic used).
+ *    (same derivation the legacy reserve logic used), UNLESS the member carries a
+ *    `benefitPeriodAnchor` (set by `renewalService.bindRenewal` on a renewal
+ *    transition, WP-V1/V-007) — then the period rolls from that renewal boundary,
+ *    so a carried-over member's usage resets exactly once at renewal.
  */
 
 export interface ResolvedBenefitConfig {
@@ -77,9 +80,14 @@ const KIND_REASON_CODE: Record<BenefitConstraintKind, string> = {
 };
 
 export class BenefitUsageService {
-  /** Enrollment-anniversary benefit period containing `now`. */
-  static periodFor(enrollmentDate: Date, now: Date = new Date()): { periodStart: Date; periodEnd: Date } {
-    const enroll = new Date(enrollmentDate);
+  /**
+   * Annual benefit period containing `now`, rolling from `anchorDate`'s
+   * month/day. `anchorDate` is the member's enrollment date by default, or the
+   * `benefitPeriodAnchor` (renewal boundary) once a member is carried across a
+   * renewal (WP-V1). Callers resolve `benefitPeriodAnchor ?? enrollmentDate`.
+   */
+  static periodFor(anchorDate: Date, now: Date = new Date()): { periodStart: Date; periodEnd: Date } {
+    const enroll = new Date(anchorDate);
     let periodStart = new Date(now.getFullYear(), enroll.getMonth(), enroll.getDate());
     if (periodStart > now) periodStart = new Date(now.getFullYear() - 1, enroll.getMonth(), enroll.getDate());
     const periodEnd = new Date(periodStart.getFullYear() + 1, enroll.getMonth(), enroll.getDate());
@@ -99,7 +107,7 @@ export class BenefitUsageService {
   ): Promise<ResolvedBenefitConfig | null> {
     const member = await tx.member.findUnique({
       where: { id: memberId },
-      select: { packageVersionId: true, enrollmentDate: true },
+      select: { packageVersionId: true, enrollmentDate: true, benefitPeriodAnchor: true },
     });
     if (!member?.packageVersionId) return null;
 
@@ -109,7 +117,9 @@ export class BenefitUsageService {
     });
     if (!config) return null;
 
-    const { periodStart, periodEnd } = this.periodFor(member.enrollmentDate, now);
+    // WP-V1/V-007: renewed members carry a `benefitPeriodAnchor` (successor scheme
+    // effectiveDate); pre-renewal members have NULL → enrollment anniversary (legacy).
+    const { periodStart, periodEnd } = this.periodFor(member.benefitPeriodAnchor ?? member.enrollmentDate, now);
     return {
       configId: config.id,
       benefitCategory: String(benefitCategory),
@@ -435,6 +445,7 @@ export class BenefitUsageService {
         relationship: true,
         principalId: true,
         enrollmentDate: true,
+        benefitPeriodAnchor: true,
         packageVersionId: true,
         package: { select: { annualLimit: true, perVisitLimit: true } },
       },
@@ -447,7 +458,9 @@ export class BenefitUsageService {
     });
     if (!config) return null;
 
-    const { periodStart, periodEnd } = this.periodFor(member.enrollmentDate, now);
+    // WP-V1/V-007: anchor the period to the renewal boundary for carried-over
+    // members (else the enrollment anniversary — unchanged legacy behaviour).
+    const { periodStart, periodEnd } = this.periodFor(member.benefitPeriodAnchor ?? member.enrollmentDate, now);
     const category = String(opts.benefitCategory);
     const familyRootId = member.relationship === "PRINCIPAL" ? opts.memberId : member.principalId ?? opts.memberId;
 
