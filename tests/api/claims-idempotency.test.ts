@@ -24,9 +24,10 @@ const inlineMock = vi.hoisted(() => vi.fn(async () => undefined));
 vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 vi.mock("@/lib/apiAuth", () => ({
   withApiKey: (h: unknown) => h,
-  getApiCredential: vi.fn(async () => ({ kind: "provider", tenantId: "tenant-1", providerId: "provider-A", keyId: "k1" })),
+  getApiCredential: vi.fn(async () => ({ kind: "provider", tenantId: "tenant-1", providerId: "provider-A", keyId: "k1", scopes: ["api.claim.write", "api.claim.read"], allowedBranchIds: [] })),
   providerScopeWhere: () => ({}),
   operatorTenantWhere: () => ({}),
+  providerScopeError: () => null, // scope enforcement covered by provider-api-scope-*.test.ts
 }));
 vi.mock("@/server/services/claim-intake/intake.service", () => ({
   ClaimIntakeService: { submit: submitMock },

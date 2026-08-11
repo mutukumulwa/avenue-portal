@@ -2,9 +2,9 @@
  * F1.7 — per-route scope enforcement, eligibility group.
  *
  * Mock-based (matches tests/api/ convention). Proves: correct scope succeeds,
- * wrong scope is denied 403 FORBIDDEN_SCOPE, unscoped legacy key still works
- * (no silent break), operator key is exempt, and a missing/unknown credential
- * is unaffected by scope logic (auth handled separately).
+ * wrong scope is denied 403 FORBIDDEN_SCOPE, an UNSCOPED key is now denied
+ * (fail-closed, ELIG-GAP-009 — the legacy pass is removed), operator key is
+ * exempt, and a missing/unknown credential is unaffected by scope logic.
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { ApiCredential } from "@/lib/apiAuth";
@@ -55,9 +55,12 @@ describe("F1.7 eligibility scope enforcement", () => {
     expect(db.member.findFirst).not.toHaveBeenCalled(); // denied before any data access
   });
 
-  it("unscoped legacy key still works (no silent break)", async () => {
+  it("unscoped key is DENIED 403 (fail-closed, ELIG-GAP-009 — no legacy pass)", async () => {
     cred.current = provider([]);
-    expect((await getEligibility(req())).status).toBe(200);
+    const res = await getEligibility(req());
+    expect(res.status).toBe(403);
+    expect((await res.json()).code).toBe("FORBIDDEN_SCOPE");
+    expect(db.member.findFirst).not.toHaveBeenCalled();
   });
 
   it("operator key is exempt from scope restriction", async () => {

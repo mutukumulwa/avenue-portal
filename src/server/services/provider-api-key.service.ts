@@ -136,13 +136,22 @@ export class ProviderApiKeyService {
 
   // ── pure scope/branch checks (used by F1.7 route enforcement) ──────────────
 
-  /** A key with no scopes is treated as unscoped-legacy (F1.7 decides whether a route accepts that). */
+  /**
+   * FAIL-CLOSED (ELIG-GAP-009, Phase 6): the key must explicitly carry the
+   * required scope. The previous "empty scopes ⇒ every scope" behaviour is
+   * REMOVED — an unscoped key now has NO access. Safe because the key-creation UI
+   * (Phase 5) requires at least one scope, so no path mints an empty-scope key.
+   */
   static hasScope(cred: { scopes: string[] }, required: string): boolean {
-    return cred.scopes.length === 0 ? true : cred.scopes.includes(required);
+    return (cred.scopes ?? []).includes(required);
   }
 
-  /** Empty allowedBranchIds ⇒ not branch-restricted (allowed). Otherwise the branch must be listed. */
+  /**
+   * FAIL-CLOSED (ELIG-GAP-009, Phase 6): the branch must be explicitly listed.
+   * The previous "empty allowedBranchIds ⇒ every branch" behaviour is REMOVED —
+   * the key-creation UI now requires at least one branch.
+   */
   static allowsBranch(cred: { allowedBranchIds: string[] }, branchId: string): boolean {
-    return cred.allowedBranchIds.length === 0 ? true : cred.allowedBranchIds.includes(branchId);
+    return (cred.allowedBranchIds ?? []).includes(branchId);
   }
 }

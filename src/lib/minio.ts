@@ -54,11 +54,14 @@ export async function ensureBucket() {
   }
 }
 
-export async function uploadFile(buffer: Buffer, originalName: string, mimeType: string): Promise<string> {
+export async function uploadFile(buffer: Buffer, originalName: string, mimeType: string, keyPrefix?: string): Promise<string> {
   await ensureBucket();
-  
+
   const ext = originalName.split(".").pop();
-  const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
+  const base = `${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
+  // ELIG-GAP (Phase 6): an optional key prefix namespaces the object by
+  // tenant/provider so B2B uploads are isolated per facility, not a shared bucket root.
+  const fileName = keyPrefix ? `${keyPrefix.replace(/^\/+|\/+$/g, "")}/${base}` : base;
 
   await minioClient.putObject(DEFAULT_BUCKET, fileName, buffer, buffer.length, {
     "Content-Type": mimeType,

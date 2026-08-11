@@ -18,6 +18,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { ApiCredential } from "@/lib/apiAuth";
+import { PROVIDER_API_SCOPES } from "@/lib/provider-api-scopes";
 
 type MemberRow = {
   memberNumber: string;
@@ -131,7 +132,7 @@ import { GET as getBenefits } from "@/app/api/v1/benefits/route";
 import { GET as getClaim } from "@/app/api/v1/claims/route";
 import { ProviderEntitlementService } from "@/server/services/provider-entitlement.service";
 
-const provider = (id: string): ApiCredential => ({ kind: "provider", tenantId: "tenant-1", providerId: id, keyId: `k-${id}`, scopes: [], allowedBranchIds: [] });
+const provider = (id: string): ApiCredential => ({ kind: "provider", tenantId: "tenant-1", providerId: id, keyId: `k-${id}`, scopes: [...PROVIDER_API_SCOPES], allowedBranchIds: [] });
 const operator: ApiCredential = { kind: "operator" };
 
 const eligibilityReq = (n: string) => new Request(`https://x/api/v1/eligibility?memberNumber=${n}`);

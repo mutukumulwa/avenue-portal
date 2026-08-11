@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { ApiCredential } from "@/lib/apiAuth";
+import { PROVIDER_API_SCOPES } from "@/lib/provider-api-scopes";
 
 /**
  * WP-N4 (N-014) — the B2B eligibility/benefits routes must not return a member
@@ -30,7 +31,7 @@ vi.mock("@/lib/apiAuth", async (importOriginal) => {
 import { GET as getEligibility } from "@/app/api/v1/eligibility/route";
 import { GET as getBenefits } from "@/app/api/v1/benefits/route";
 
-const provider: ApiCredential = { kind: "provider", tenantId: "t1", providerId: "pA", keyId: "k1", scopes: [], allowedBranchIds: [] };
+const provider: ApiCredential = { kind: "provider", tenantId: "t1", providerId: "pA", keyId: "k1", scopes: [...PROVIDER_API_SCOPES], allowedBranchIds: [] };
 const operator: ApiCredential = { kind: "operator" };
 const eligReq = () => new Request("https://x/api/v1/eligibility?memberNumber=M-1");
 const benReq = () => new Request("https://x/api/v1/benefits?memberNumber=M-1");

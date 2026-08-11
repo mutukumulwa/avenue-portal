@@ -5,6 +5,8 @@ import { ROUTE_SCOPE_CATALOG } from "@/lib/provider-api-scopes";
 import { ProviderEntitlementService } from "@/server/services/provider-entitlement.service";
 import { ProvidersService } from "@/server/services/providers.service";
 import { decideEligibility } from "@/server/services/eligibility/evaluator-core";
+import { parseValidDate } from "@/lib/dates";
+import { rateLimit } from "@/lib/rate-limit";
 
 async function getEligibility(req: Request) {
   try {
@@ -23,6 +25,17 @@ async function getEligibility(req: Request) {
     // keys pass; a scoped key must carry api.eligibility.read (operator exempt).
     const scopeErr = providerScopeError(credential, ROUTE_SCOPE_CATALOG.eligibility);
     if (scopeErr) return scopeErr;
+
+    // ELIG-GAP-015: dampen per-credential enumeration/amplification of the
+    // expensive entitlement + bcrypt path (429 + Retry-After beyond the threshold).
+    const limiterKey = credential?.kind === "provider" ? `elig:${credential.keyId}` : "elig:operator";
+    const limited = rateLimit(limiterKey, 60, 60_000);
+    if (!limited.allowed) {
+      return NextResponse.json(
+        { error: "Too many eligibility checks — slow down and retry." },
+        { status: 429, headers: { "retry-after": String(limited.retryAfterSeconds) } },
+      );
+    }
 
     // WP-N4 (N-014): a suspended/non-operational facility's key returns neither
     // eligibility nor member PII (before any member lookup). Operator keys carry
@@ -57,8 +70,13 @@ async function getEligibility(req: Request) {
     // SP-6: eligibility is the single evaluator's verdict — not a bare
     // status===ACTIVE check. It honours the policy window, the member's pinned
     // version, group/client status, coverage-as-of-service-date and enrolment.
+    // ELIG-GAP-007: a malformed serviceDate must be a controlled 400, never an
+    // Invalid Date reaching the evaluator's date arithmetic.
     const serviceParam = searchParams.get("serviceDate");
-    const serviceDate = serviceParam ? new Date(serviceParam) : new Date();
+    const serviceDate = serviceParam ? parseValidDate(serviceParam) : new Date();
+    if (serviceDate === null) {
+      return NextResponse.json({ error: "Invalid serviceDate — use YYYY-MM-DD" }, { status: 400 });
+    }
     const coveragePeriods = await prisma.memberCoveragePeriod.findMany({
       where: { memberId: member.id },
       select: { startDate: true, endDate: true },

@@ -14,22 +14,22 @@ import { PROVIDER_ROLE_PERMISSIONS } from "@/../prisma/seeds/provider-rbac";
 const URL_SET = !!process.env.AUTOPILOT_TEST_DB && process.env.DATABASE_URL === process.env.AUTOPILOT_TEST_DB;
 
 describe("F1.6 scope/branch/admin helpers (pure)", () => {
-  it("hasScope: unscoped key is permissive; scoped key must list the scope", () => {
-    expect(ProviderApiKeyService.hasScope({ scopes: [] }, "api.claim.write")).toBe(true);
+  it("hasScope: fail-closed — an unscoped key has NO access; scoped key must list the scope (ELIG-GAP-009)", () => {
+    expect(ProviderApiKeyService.hasScope({ scopes: [] }, "api.claim.write")).toBe(false); // empty ⇒ denied
     expect(ProviderApiKeyService.hasScope({ scopes: ["api.claim.write"] }, "api.claim.write")).toBe(true);
     expect(ProviderApiKeyService.hasScope({ scopes: ["api.eligibility.read"] }, "api.claim.write")).toBe(false);
   });
 
-  it("allowsBranch: empty ⇒ unrestricted; listed ⇒ only those branches", () => {
-    expect(ProviderApiKeyService.allowsBranch({ allowedBranchIds: [] }, "b1")).toBe(true);
+  it("allowsBranch: fail-closed — empty ⇒ NO branch; listed ⇒ only those branches (ELIG-GAP-009)", () => {
+    expect(ProviderApiKeyService.allowsBranch({ allowedBranchIds: [] }, "b1")).toBe(false); // empty ⇒ denied
     expect(ProviderApiKeyService.allowsBranch({ allowedBranchIds: ["b1"] }, "b1")).toBe(true);
     expect(ProviderApiKeyService.allowsBranch({ allowedBranchIds: ["b1"] }, "b2")).toBe(false);
   });
 
-  it("permissionsAllowKeyAdmin: legacy allowed, migrated needs manage perm", () => {
-    expect(permissionsAllowKeyAdmin([])).toBe(true); // un-migrated legacy
-    expect(permissionsAllowKeyAdmin(["CLAIM:VIEW"])).toBe(true); // only TPA perms = still legacy for provider
-    expect(permissionsAllowKeyAdmin(PROVIDER_ROLE_PERMISSIONS.PROVIDER_BILLER)).toBe(false); // migrated, no key-admin
+  it("permissionsAllowKeyAdmin: fail-closed — requires provider.api_keys.manage (ELIG-GAP-004/009)", () => {
+    expect(permissionsAllowKeyAdmin([])).toBe(false); // zero permissions ⇒ denied (no legacy fallback)
+    expect(permissionsAllowKeyAdmin(["CLAIM:VIEW"])).toBe(false); // unrelated TPA perms ⇒ denied
+    expect(permissionsAllowKeyAdmin(PROVIDER_ROLE_PERMISSIONS.PROVIDER_BILLER)).toBe(false); // provider persona, no key-admin
     expect(permissionsAllowKeyAdmin(PROVIDER_ROLE_PERMISSIONS.PROVIDER_ADMIN)).toBe(true); // has provider.api_keys.manage
     expect(permissionsAllowKeyAdmin(PROVIDER_ROLE_PERMISSIONS.PROVIDER_INTEGRATION_ADMIN)).toBe(true);
   });

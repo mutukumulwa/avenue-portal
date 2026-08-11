@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { withApiKey, getApiCredential } from "@/lib/apiAuth";
+import { withApiKey, getApiCredential, providerScopeError } from "@/lib/apiAuth";
+import { ROUTE_SCOPE_CATALOG } from "@/lib/provider-api-scopes";
 import { looksLowLevel } from "@/lib/safe-action-error";
 import { HmsBatchService } from "@/server/services/hms-batch.service";
 
@@ -22,6 +23,9 @@ async function postHmsBatch(req: Request) {
     // cannot retarget another facility. An operator key still resolves the
     // facility from the payload.
     const credential = await getApiCredential(req);
+    // ELIG-GAP-009 (Phase 6): enforce the HMS-batch delivery scope (fail-closed).
+    const scopeErr = providerScopeError(credential, ROUTE_SCOPE_CATALOG["hms-batch"]);
+    if (scopeErr) return scopeErr;
     const providerFromKey = credential?.kind === "provider" ? credential.providerId : null;
 
     // OBS-D2/G8: prefer the key's tenant; fall back to the single-operator

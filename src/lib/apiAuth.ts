@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { timingSafeEqual } from "crypto";
+import { timingSafeEqual, randomUUID } from "crypto";
 import { ProviderApiKeyService } from "@/server/services/provider-api-key.service";
 
 export type ApiCredential =
@@ -98,11 +98,11 @@ export function operatorTenantWhere(credential: ApiCredential | null): { tenantI
 /**
  * PNOS F1.7 — per-route scope enforcement for provider credentials.
  *
- * Returns a safe 403 response when a PROVIDER key that HAS scopes does not carry
- * the route's required scope; returns null (allowed) otherwise. Unscoped legacy
- * keys pass (ProviderApiKeyService.hasScope is permissive for empty scopes), so
- * enabling enforcement does not break existing integrations — it tightens
- * automatically as keys are minted with scopes. Operator keys are not
+ * Returns a safe 403 response when a PROVIDER key does not carry the route's
+ * required scope; returns null (allowed) otherwise. FAIL-CLOSED (ELIG-GAP-009,
+ * Phase 6): ProviderApiKeyService.hasScope now requires the scope explicitly, so
+ * an unscoped key is denied — the Phase-5 UI mints scoped keys, so no legitimate
+ * integration relies on the old empty-scope pass. Operator keys are not
  * scope-restricted (they are the global integration channel).
  */
 export function providerScopeError(credential: ApiCredential | null, requiredScope: string): NextResponse | null {
@@ -121,9 +121,18 @@ export function providerScopeError(credential: ApiCredential | null, requiredSco
  */
 export function withApiKey(handler: (req: Request, ...args: unknown[]) => Promise<Response>) {
   return async (req: Request, ...args: unknown[]) => {
+    // ELIG-GAP-016: stamp every B2B response with a correlation id (so support can
+    // trace an incident with no PII in the identifier) and an explicit no-store
+    // cache policy (these responses carry member PII / financial data).
+    const requestId = randomUUID();
+    const stamp = (res: Response): Response => {
+      res.headers.set("x-request-id", requestId);
+      if (!res.headers.has("cache-control")) res.headers.set("cache-control", "no-store");
+      return res;
+    };
     if (!(await validateApiKey(req))) {
-      return NextResponse.json({ error: "Unauthorized. Invalid or missing API Key." }, { status: 401 });
+      return stamp(NextResponse.json({ error: "Unauthorized. Invalid or missing API Key." }, { status: 401 }));
     }
-    return handler(req, ...args);
+    return stamp(await handler(req, ...args));
   };
 }

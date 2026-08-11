@@ -17,6 +17,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { ApiCredential } from "@/lib/apiAuth";
+import { PROVIDER_API_SCOPES } from "@/lib/provider-api-scopes";
 
 const cred = vi.hoisted(() => ({ current: null as ApiCredential | null }));
 const svc = vi.hoisted(() => ({ result: null as unknown, captured: null as unknown }));
@@ -44,7 +45,7 @@ vi.mock("@/server/services/preauth-intake/service", async (io) => {
 
 import { POST as postPreauth } from "@/app/api/v1/preauth/route";
 
-const provider = (id: string): ApiCredential => ({ kind: "provider", tenantId: "tenant-1", providerId: id, keyId: `k-${id}`, scopes: [], allowedBranchIds: [] });
+const provider = (id: string): ApiCredential => ({ kind: "provider", tenantId: "tenant-1", providerId: id, keyId: `k-${id}`, scopes: [...PROVIDER_API_SCOPES], allowedBranchIds: [] });
 const operator: ApiCredential = { kind: "operator", tenantId: "tenant-1" };
 const req = (body: Record<string, unknown>) => new Request("https://x/api/v1/preauth", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
 const validBody = (over: Record<string, unknown> = {}) => ({ memberNumber: "AVH-DEMO-SAF-0023-S", benefitCategory: "OUTPATIENT", diagnoses: ["A00"], estimatedCost: 5000, ...over });

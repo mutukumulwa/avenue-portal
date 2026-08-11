@@ -27,6 +27,7 @@ vi.mock("@/lib/apiAuth", () => ({
   getApiCredential: credentialMock,
   providerScopeWhere: () => ({}),
   operatorTenantWhere: () => ({}),
+  providerScopeError: () => null, // scope enforcement covered by provider-api-scope-*.test.ts
 }));
 vi.mock("@/server/services/claim-intake/intake.service", () => ({
   ClaimIntakeService: { submit: submitMock },
@@ -38,7 +39,7 @@ vi.mock("@/server/services/claim-intake", () => ({
 import { POST } from "@/app/api/v1/claims/route";
 import { IntakeError } from "@/server/services/claim-intake/errors";
 
-const providerCredential = { kind: "provider", tenantId: "tenant-1", providerId: "provider-A", keyId: "k1" };
+const providerCredential = { kind: "provider", tenantId: "tenant-1", providerId: "provider-A", keyId: "k1", scopes: ["api.claim.write", "api.claim.read"], allowedBranchIds: [] };
 
 const validBody = () => ({
   memberNumber: "AVH-2024-00010",

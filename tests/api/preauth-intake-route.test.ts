@@ -81,9 +81,11 @@ describe("F3.4 preauth route adapter", () => {
     expect(PreauthIntakeService.submit).not.toHaveBeenCalled();
   });
 
-  it("an unscoped legacy key still works (no silent break)", async () => {
+  it("an unscoped key is DENIED 403 FORBIDDEN_SCOPE (fail-closed, ELIG-GAP-009)", async () => {
     cred.current = providerKey([]);
-    expect((await post(validBody)).status).toBe(201);
+    const res = await post(validBody);
+    expect(res.status).toBe(403);
+    expect((await res.json()).code).toBe("FORBIDDEN_SCOPE");
   });
 
   it("replay → 200; a member-not-found rejection → 404; a validation rejection → 422", async () => {

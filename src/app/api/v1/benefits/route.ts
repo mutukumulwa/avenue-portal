@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { withApiKey, getApiCredential, operatorTenantWhere } from "@/lib/apiAuth";
+import { withApiKey, getApiCredential, operatorTenantWhere, providerScopeError } from "@/lib/apiAuth";
+import { ROUTE_SCOPE_CATALOG } from "@/lib/provider-api-scopes";
+import { rateLimit } from "@/lib/rate-limit";
 import { ProviderEntitlementService } from "@/server/services/provider-entitlement.service";
 import { ProvidersService } from "@/server/services/providers.service";
 import { BenefitUsageService } from "@/server/services/benefit-usage.service";
@@ -24,6 +26,21 @@ async function getBenefits(req: Request) {
     // members whose client its contracts cover (404 otherwise). The operator key
     // is confined to its bound tenant (BD-06 / operatorTenantWhere).
     const credential = await getApiCredential(req);
+    // ELIG-GAP-009 (Phase 6): enforce the benefits read scope (this route
+    // previously never checked it). Fail-closed: an unscoped key is denied.
+    const scopeErr = providerScopeError(credential, ROUTE_SCOPE_CATALOG.benefits);
+    if (scopeErr) return scopeErr;
+
+    // ELIG-GAP-015: per-credential rate limit (shared threshold with eligibility so
+    // it cannot be bypassed by alternating the two member-reading endpoints).
+    const limiterKey = credential?.kind === "provider" ? `elig:${credential.keyId}` : "elig:operator";
+    const limited = rateLimit(limiterKey, 60, 60_000);
+    if (!limited.allowed) {
+      return NextResponse.json(
+        { error: "Too many benefit lookups — slow down and retry." },
+        { status: 429, headers: { "retry-after": String(limited.retryAfterSeconds) } },
+      );
+    }
 
     // WP-N4 (N-014): a suspended/non-operational facility's key returns neither
     // benefit balances nor member PII (before any member lookup). Operator keys

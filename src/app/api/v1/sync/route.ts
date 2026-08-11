@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { withApiKey } from "@/lib/apiAuth";
+import { withApiKey, getApiCredential } from "@/lib/apiAuth";
 import { SyncService } from "@/server/services/sync.service";
 import { enqueueSyncReconcile } from "@/lib/queue";
 
@@ -30,13 +30,17 @@ async function postSync(req: Request) {
       }
     }
 
-    // TODO(G8): map the API key → operator tenant. Single-operator scaffold
-    // resolves the sole tenant.
-    const tenant = await prisma.tenant.findFirst({ select: { id: true } });
-    if (!tenant) return NextResponse.json({ error: "No operator tenant" }, { status: 500 });
+    // ELIG-GAP (Phase 6): confine the sync ingest to the KEY's own tenant — never
+    // `tenant.findFirst()`, which let ANY valid key write into the first tenant.
+    // A per-facility key uses its bound tenant; only an unbound operator key falls
+    // back to the single-operator scaffold.
+    const credential = await getApiCredential(req);
+    if (!credential) return NextResponse.json({ error: "Unauthorized. Invalid or missing API Key." }, { status: 401 });
+    const tenantId = credential.tenantId ?? (await prisma.tenant.findFirst({ select: { id: true } }))?.id;
+    if (!tenantId) return NextResponse.json({ error: "No operator tenant" }, { status: 500 });
 
     const results = await SyncService.ingest(
-      tenant.id,
+      tenantId,
       operations.map((o: any) => ({
         clientUuid: o.clientUuid,
         opKey: o.opKey,

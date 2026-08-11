@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { withApiKey, getApiCredential, providerScopeWhere, operatorTenantWhere, type ApiCredential } from "@/lib/apiAuth";
+import { withApiKey, getApiCredential, providerScopeWhere, operatorTenantWhere, providerScopeError, type ApiCredential } from "@/lib/apiAuth";
+import { ROUTE_SCOPE_CATALOG } from "@/lib/provider-api-scopes";
 import { ClaimLineCategory, ServiceType, BenefitCategory } from "@prisma/client";
 import { z } from "zod";
 import { LIMITS } from "@/server/services/claim-intake/schema";
 import { ClaimIntakeService } from "@/server/services/claim-intake/intake.service";
+import { ProviderEntitlementService } from "@/server/services/provider-entitlement.service";
 import { processAcceptedRunInline } from "@/server/services/claim-intake";
 import { IntakeError, toHttpResponse } from "@/server/services/claim-intake/errors";
 import type { CallerIdentity } from "@/server/services/claim-intake/context";
@@ -151,6 +153,9 @@ async function postClaim(req: Request) {
 
     const credential = await getApiCredential(req);
     if (!credential) return NextResponse.json({ error: "Unauthorized. Invalid or missing API Key." }, { status: 401 });
+    // ELIG-GAP-009 (Phase 6): enforce the claim-submit scope (fail-closed).
+    const scopeErr = providerScopeError(credential, ROUTE_SCOPE_CATALOG["claims.submit"]);
+    if (scopeErr) return scopeErr;
     const resolved = await resolveCaller(credential, data.providerCode);
     if (resolved instanceof NextResponse) return resolved;
 
@@ -209,8 +214,15 @@ async function postClaim(req: Request) {
     // atomically inside the canonical persist via `origin.preauthId`.
     const origin: PersistOrigin = {};
     if (data.preauthReference) {
+      // ELIG-GAP (Phase 3): scope the PA-linkage member lookup by entitlement for
+      // a provider key, so a facility key cannot use a foreign member's number to
+      // probe another client's PAs (a cross-client existence oracle). Integration
+      // keys resolve within the tenant (matching the main claim member resolution).
+      const memberScope = resolved.identity.kind === "providerKey"
+        ? await ProviderEntitlementService.entitledMemberWhere(resolved.providerId)
+        : {};
       const member = await prisma.member.findFirst({
-        where: { tenantId: resolved.tenantId, memberNumber: data.memberNumber },
+        where: { tenantId: resolved.tenantId, memberNumber: data.memberNumber, ...memberScope },
         select: { id: true },
       });
       if (member) {
@@ -319,6 +331,9 @@ async function getClaim(req: Request) {
     // E2E-D02: a facility key may only read its own claims. A claim belonging to
     // another facility resolves to null and returns the existing 404 shape.
     const credential = await getApiCredential(req);
+    // ELIG-GAP-009 (Phase 6): enforce the claim-read scope (fail-closed).
+    const scopeErr = providerScopeError(credential, ROUTE_SCOPE_CATALOG["claims.read"]);
+    if (scopeErr) return scopeErr;
 
     const claim = await prisma.claim.findFirst({
       where: { claimNumber, ...providerScopeWhere(credential), ...operatorTenantWhere(credential) },
