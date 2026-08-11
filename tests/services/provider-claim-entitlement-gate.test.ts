@@ -1,63 +1,46 @@
 /**
- * F1.12 — provider claim-submission entitlement gate.
- *
- * OPT-IN DB. Proves: with the flag OFF (default) the documented bypass is
- * preserved (any tenant member resolves); with the flag ON an out-of-entitlement
- * member is unresolvable (structural reject), entitlement is evaluated at the
- * claim's SERVICE DATE, and an in-scope member resolves.
+ * ELIG-GAP-020 — the provider-portal claim entitlement gate must resolve the
+ * member entitlement-scoped ALWAYS, not only when the deny-by-default flag is on.
+ * A provider can never file a claim for a member outside its contracted clients.
  */
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const URL_SET = !!process.env.AUTOPILOT_TEST_DB && process.env.DATABASE_URL === process.env.AUTOPILOT_TEST_DB;
-const DAY = 24 * 60 * 60 * 1000;
+const entitlement = vi.hoisted(() => ({ entitledMemberWhere: vi.fn(async () => ({ group: { clientId: { in: ["c1"] } } })) }));
+const settings = vi.hoisted(() => ({ isEntitlementEnforced: vi.fn(async () => false) })); // flag OFF
 
-describe.skipIf(!URL_SET)("F1.12 ProviderClaimEntitlementGate (opt-in DB)", () => {
-  let prisma: typeof import("@/lib/prisma").prisma;
-  let gate: typeof import("@/server/services/provider-claim-entitlement-gate.service").ProviderClaimEntitlementGate;
-  let world: import("../factories/provider-network").ProviderWorld;
-  let tenantId: string, providerA: string;
+vi.mock("@/server/services/provider-entitlement.service", () => ({ ProviderEntitlementService: entitlement }));
+vi.mock("@/server/services/provider-access-settings.service", () => ({ ProviderAccessSettingsService: settings }));
 
-  async function setEnforcement(on: boolean) {
-    await prisma.tenant.update({ where: { id: tenantId }, data: { config: { providerAccess: { entitlementEnforcement: on, enforcedProviderIds: [] } } } });
-  }
+import { ProviderClaimEntitlementGate } from "@/server/services/provider-claim-entitlement-gate.service";
 
-  beforeAll(async () => {
-    prisma = (await import("@/lib/prisma")).prisma;
-    gate = (await import("@/server/services/provider-claim-entitlement-gate.service")).ProviderClaimEntitlementGate;
-    const { buildProviderWorld } = await import("../factories/provider-network");
-    world = await buildProviderWorld(prisma);
-    tenantId = world.tenants.alpha.id;
-    providerA = world.providers.a.id;
+const svcDate = new Date("2026-08-11T00:00:00Z");
+
+function dbWith(member: { id: string } | null) {
+  return { member: { findFirst: vi.fn(async () => member) } } as never;
+}
+
+describe("ProviderClaimEntitlementGate.resolveSubmittableMember", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("entitlement-scopes the lookup even with the enforcement flag OFF (ELIG-GAP-020)", async () => {
+    const db = dbWith({ id: "m1" });
+    const res = await ProviderClaimEntitlementGate.resolveSubmittableMember(
+      { tenantId: "t1", providerId: "pA", memberNumber: "M-1", serviceDate: svcDate }, db,
+    );
+    // The entitlement fragment is ALWAYS requested, at the claim's service date.
+    expect(entitlement.entitledMemberWhere).toHaveBeenCalledWith("pA", svcDate);
+    // ...and spread into the member lookup where-clause.
+    const where = (db as unknown as { member: { findFirst: ReturnType<typeof vi.fn> } }).member.findFirst.mock.calls[0][0].where;
+    expect(where).toMatchObject({ tenantId: "t1", group: { clientId: { in: ["c1"] } } });
+    expect(res.member).toEqual({ id: "m1" });
   });
 
-  afterAll(async () => { if (world) await world.teardown(); });
-
-  it("flag OFF (default): the bypass is preserved — an EXCLUDEd member still resolves", async () => {
-    await setEnforcement(false);
-    const now = new Date();
-    // memberAlpha2 is in groupAlpha2, which provider A's contract EXCLUDEs
-    const r = await gate.resolveSubmittableMember({ tenantId, providerId: providerA, memberNumber: world.members.alpha2.memberNumber, serviceDate: now });
-    expect(r.enforced).toBe(false);
-    expect(r.member).not.toBeNull(); // bypass: tenant-only resolution
-  });
-
-  it("flag ON: an out-of-entitlement member is unresolvable (structural reject)", async () => {
-    await setEnforcement(true);
-    const now = new Date();
-    const excluded = await gate.resolveSubmittableMember({ tenantId, providerId: providerA, memberNumber: world.members.alpha2.memberNumber, serviceDate: now });
-    expect(excluded.enforced).toBe(true);
-    expect(excluded.member).toBeNull(); // EXCLUDEd → no claim can be filed
-
-    const inScope = await gate.resolveSubmittableMember({ tenantId, providerId: providerA, memberNumber: world.members.alpha.memberNumber, serviceDate: now });
-    expect(inScope.member).not.toBeNull(); // INCLUDEd → resolvable
-  });
-
-  it("flag ON: entitlement is evaluated at the claim's service date", async () => {
-    await setEnforcement(true);
-    // provider A's INCLUDE applicability begins ~90 days ago; a service date 200
-    // days ago predates it ⇒ even the in-group member is not yet entitled.
-    const beforeApplicability = new Date(Date.now() - 200 * DAY);
-    const r = await gate.resolveSubmittableMember({ tenantId, providerId: providerA, memberNumber: world.members.alpha.memberNumber, serviceDate: beforeApplicability });
-    expect(r.member).toBeNull();
+  it("returns member:null when the member is out of entitlement (deny-by-default)", async () => {
+    const db = dbWith(null);
+    const res = await ProviderClaimEntitlementGate.resolveSubmittableMember(
+      { tenantId: "t1", providerId: "pA", memberNumber: "FOREIGN", serviceDate: svcDate }, db,
+    );
+    expect(entitlement.entitledMemberWhere).toHaveBeenCalled();
+    expect(res.member).toBeNull();
   });
 });
