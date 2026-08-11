@@ -15,6 +15,7 @@ import {
   ScrollText,
   BarChart3,
   IdCard,
+  Users,
   KeyRound,
   Cable,
   LogOut,
@@ -37,6 +38,7 @@ const ICONS: Record<ProviderNavIconKey, LucideIcon> = {
   contracts: ScrollText,
   performance: BarChart3,
   profile: IdCard,
+  users: Users,
   "api-keys": KeyRound,
   integrations: Cable,
 };

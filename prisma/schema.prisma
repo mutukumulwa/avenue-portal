@@ -333,6 +333,9 @@ model User {
   // Two-factor auth (R81/H-01): base32 TOTP secret + enabled flag.
   totpSecret     String?
   totpEnabled    Boolean   @default(false)
+  // ELIG-GAP-006: when an admin sets an initial/temporary password, this is true
+  // and requireRole confines the user to /change-password until they replace it.
+  mustChangePassword Boolean @default(false)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 

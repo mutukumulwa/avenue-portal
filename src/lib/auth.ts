@@ -67,6 +67,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.permissions = user.permissions;
         token.sessionVersion = user.sessionVersion;
         token.mustEnrollTotp = user.mustEnrollTotp;
+        token.mustChangePassword = user.mustChangePassword;
         return token;
       }
       // Subsequent requests: invalidate if a newer login has superseded this
@@ -95,6 +96,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.providerId = token.providerId as string | undefined;
         session.user.permissions = token.permissions as string[] | undefined;
         session.user.mustEnrollTotp = token.mustEnrollTotp as boolean | undefined;
+        session.user.mustChangePassword = token.mustChangePassword as boolean | undefined;
       }
       return session;
     }

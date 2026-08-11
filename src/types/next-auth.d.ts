@@ -13,6 +13,8 @@ declare module "next-auth" {
       permissions?: string[];
       /** WP-8 (DEC-09): privileged role signed in without an enrolled authenticator. */
       mustEnrollTotp?: boolean;
+      /** ELIG-GAP-006: admin-set temporary password; confined to /change-password until replaced. */
+      mustChangePassword?: boolean;
     } & DefaultSession["user"];
   }
 
@@ -28,6 +30,8 @@ declare module "next-auth" {
     sessionVersion?: number;
     /** WP-8 (DEC-09): privileged role signed in without an enrolled authenticator. */
     mustEnrollTotp?: boolean;
+      /** ELIG-GAP-006: admin-set temporary password; confined to /change-password until replaced. */
+      mustChangePassword?: boolean;
   }
 }
 
@@ -44,5 +48,7 @@ declare module "next-auth/jwt" {
     sessionVersion?: number;
     /** WP-8 (DEC-09): privileged role signed in without an enrolled authenticator. */
     mustEnrollTotp?: boolean;
+      /** ELIG-GAP-006: admin-set temporary password; confined to /change-password until replaced. */
+      mustChangePassword?: boolean;
   }
 }

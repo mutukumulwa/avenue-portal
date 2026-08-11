@@ -22,7 +22,13 @@ export default async function SettingsPage() {
     prisma.group.findMany({ where: { tenantId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
     prisma.broker.findMany({ where: { tenantId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
     prisma.group.findMany({ where: { tenantId, fundingMode: "SELF_FUNDED" }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
-    prisma.provider.findMany({ where: { tenantId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.provider.findMany({
+      where: { tenantId },
+      // ELIG-GAP-005: the invite modal needs each facility's branches so a provider
+      // user is created with a branch scope (not an empty, deny-by-default set).
+      select: { id: true, name: true, branches: { where: { isActive: true }, select: { id: true, name: true }, orderBy: { name: "asc" } } },
+      orderBy: { name: "asc" },
+    }),
   ]);
 
   const roleColor = (role: string) => {

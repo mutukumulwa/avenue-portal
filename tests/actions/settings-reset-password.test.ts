@@ -80,11 +80,13 @@ describe("resetUserPasswordAction", () => {
     const arg = mockPrisma.user.update.mock.calls[0][0];
     expect(arg.where).toEqual({ id: "u1", tenantId: "t1" });
     // WP-3.1 (DEF-005): the credential write also clears the throttle so a locked
-    // user can actually use the new password — but still touches nothing else
-    // (no role/binding/isActive).
+    // user can actually use the new password. ELIG-GAP-006: it also flags
+    // mustChangePassword so the admin-issued password must be replaced at next
+    // login — but it still touches nothing else (no role/binding/isActive).
     expect(Object.keys(arg.data).sort()).toEqual(
-      ["failedLoginCount", "lastFailedLoginAt", "lockedUntil", "passwordHash", "sessionVersion"],
+      ["failedLoginCount", "lastFailedLoginAt", "lockedUntil", "mustChangePassword", "passwordHash", "sessionVersion"],
     );
+    expect(arg.data.mustChangePassword).toBe(true);
     expect(arg.data.sessionVersion).toEqual({ increment: 1 });
     expect(arg.data.failedLoginCount).toBe(0);
     expect(arg.data.lockedUntil).toBeNull();

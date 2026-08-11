@@ -27,6 +27,12 @@ export async function requireRole(
   const session = await getCachedSession();
   if (!session?.user) redirect("/login");
 
+  // ELIG-GAP-006: a user with an admin-set temporary password is confined to
+  // /change-password (a universal gate, checked before role) until they replace
+  // it. The /change-password page reads the session directly (not requireRole),
+  // so there is no redirect loop. Self-heals on the forced re-login after change.
+  if (session.user.mustChangePassword) redirect("/change-password");
+
   const role = session.user.role as UserRole | undefined;
   if (!role || !allowed.includes(role)) redirect("/unauthorized");
 

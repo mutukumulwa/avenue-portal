@@ -8,6 +8,7 @@ import bcrypt from "bcryptjs";
 import { Prisma, type UserRole } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { ALL_USER_ROLES, PORTAL_ROLES as PORTAL_ROLE_LIST, isPortalRole } from "@/lib/constants";
+import { PROVIDER_PERSONA_ROLE_CODES } from "@/../prisma/seeds/provider-rbac";
 
 const PORTAL_ROLES = new Set<UserRole>(PORTAL_ROLE_LIST as readonly UserRole[]);
 
@@ -27,6 +28,12 @@ export async function inviteUserAction(
   const memberId  = (formData.get("memberId")  as string | null) || null;
   const providerId = (formData.get("providerId") as string | null) || null;
   const fundGroupIds = formData.getAll("fundGroupIds").map(String).filter(Boolean);
+  // ELIG-GAP-005: a provider user is not usable without a persona duty role and a
+  // branch. Collect both so the invite provisions a COMPLETE provider user (role
+  // + branch scope), not a zero-permission account that then relies on a fail-open
+  // fallback for access.
+  const providerRoleCode = (formData.get("providerRoleCode") as string | null) || null;
+  const providerBranchIds = formData.getAll("providerBranchIds").map(String).filter(Boolean);
 
   if (!email || !firstName || !lastName || !role || !password) {
     return { error: "All fields are required." };
@@ -50,10 +57,25 @@ export async function inviteUserAction(
     return { error: "Select at least one self-funded scheme for this fund administrator." };
   }
   if (role === "PROVIDER_USER" && !providerId) return { error: "Select the facility for this provider user." };
+  if (role === "PROVIDER_USER" && !providerRoleCode) return { error: "Select the provider role for this user." };
+  if (role === "PROVIDER_USER" && providerBranchIds.length === 0) return { error: "Assign at least one branch to this provider user." };
 
+  // Resolved during validation, consumed in the atomic create below.
+  let providerRoleId: string | null = null;
   if (role === "PROVIDER_USER" && providerId) {
     const provider = await prisma.provider.findFirst({ where: { id: providerId, tenantId: session.user.tenantId }, select: { id: true } });
     if (!provider) return { error: "Facility not found." };
+    // The persona must be a grantable provider role — never a TPA role or the deprecated PROVIDER_LEGACY.
+    if (!PROVIDER_PERSONA_ROLE_CODES.includes(providerRoleCode as string)) return { error: "Invalid provider role." };
+    const providerRole = await prisma.role.findUnique({
+      where: { tenantId_code: { tenantId: session.user.tenantId, code: providerRoleCode as string } },
+      select: { id: true, isActive: true },
+    });
+    if (!providerRole || !providerRole.isActive) return { error: "Provider role is not available; run the RBAC seed for this tenant." };
+    providerRoleId = providerRole.id;
+    // Every selected branch must belong to this facility within the tenant (defence in depth against a posted foreign id).
+    const branchCount = await prisma.providerBranch.count({ where: { id: { in: providerBranchIds }, providerId, tenantId: session.user.tenantId } });
+    if (branchCount !== providerBranchIds.length) return { error: "One or more selected branches are not part of this facility." };
   }
 
   if (role === "BROKER_USER" && brokerId) {
@@ -89,23 +111,50 @@ export async function inviteUserAction(
 
   const passwordHash = await bcrypt.hash(password, 12);
 
-  const user = await prisma.user.create({
-    data: {
-      tenantId: session.user.tenantId,
-      email,
-      firstName,
-      lastName,
-      role,
-      passwordHash,
-      isActive: true,
-      ...(role === "HR_MANAGER" && groupId ? { groupId } : {}),
-      ...(role === "BROKER_USER" && brokerId ? { brokerId } : {}),
-      ...(role === "MEMBER_USER" && memberId ? { memberId } : {}),
-      ...(role === "PROVIDER_USER" && providerId ? { providerId } : {}),
-      ...(role === "FUND_ADMINISTRATOR"
-        ? { managedFundGroups: { connect: fundGroupIds.map(id => ({ id })) } }
-        : {}),
-    },
+  // ELIG-GAP-005: create the user AND (for a provider user) its persona role +
+  // branch scope atomically, so an invite never yields a half-provisioned
+  // provider account. requirePermission/entitlement are fail-closed after Phase
+  // 2/3, so a provider user MUST carry a real duty role and branch from birth.
+  const user = await prisma.$transaction(async (tx) => {
+    const created = await tx.user.create({
+      data: {
+        tenantId: session.user.tenantId,
+        email,
+        firstName,
+        lastName,
+        role,
+        passwordHash,
+        isActive: true,
+        // ELIG-GAP-006: the admin-entered password is temporary — force a
+        // replacement at first login before any portal/data access.
+        mustChangePassword: true,
+        ...(role === "HR_MANAGER" && groupId ? { groupId } : {}),
+        ...(role === "BROKER_USER" && brokerId ? { brokerId } : {}),
+        ...(role === "MEMBER_USER" && memberId ? { memberId } : {}),
+        ...(role === "PROVIDER_USER" && providerId ? { providerId } : {}),
+        ...(role === "FUND_ADMINISTRATOR"
+          ? { managedFundGroups: { connect: fundGroupIds.map(id => ({ id })) } }
+          : {}),
+      },
+    });
+
+    if (role === "PROVIDER_USER" && providerId && providerRoleId) {
+      // Persona duty role — status MUST be ACTIVE (default PENDING_APPROVAL grants nothing).
+      await tx.userRoleAssignment.create({
+        data: {
+          userId: created.id, roleId: providerRoleId, tenantId: session.user.tenantId,
+          makerId: session.user.id, checkerId: session.user.id, isActive: true, status: "ACTIVE",
+        },
+      });
+      // Branch scope — an empty scope denies branch-scoped resources (F1.3).
+      for (const providerBranchId of providerBranchIds) {
+        await tx.providerUserBranchAssignment.create({
+          data: { tenantId: session.user.tenantId, providerId, userId: created.id, providerBranchId, createdBy: session.user.id },
+        });
+      }
+    }
+
+    return created;
   });
 
   await writeAudit({
@@ -113,7 +162,10 @@ export async function inviteUserAction(
     action: "USER_INVITED",
     module: "SETTINGS",
     description: `User invited: ${firstName} ${lastName} (${email}) as ${role}`,
-    metadata: { newUserId: user.id, role, linkedPortal: PORTAL_ROLES.has(role), fundSchemeCount: fundGroupIds.length },
+    metadata: {
+      newUserId: user.id, role, linkedPortal: PORTAL_ROLES.has(role), fundSchemeCount: fundGroupIds.length,
+      ...(role === "PROVIDER_USER" ? { providerId, providerRoleCode, providerBranchCount: providerBranchIds.length } : {}),
+    },
   });
 
   // OBS-1: return a success flag instead of navigating. A server redirect inside
@@ -244,6 +296,9 @@ export async function resetUserPasswordAction(
     where: { id: userId, tenantId: session.user.tenantId },
     data: {
       passwordHash,
+      // ELIG-GAP-006: an admin-issued reset is temporary — force the user to set
+      // their own password at next login before any portal/data access.
+      mustChangePassword: true,
       sessionVersion: { increment: 1 },
       failedLoginCount: 0,
       lockedUntil: null,

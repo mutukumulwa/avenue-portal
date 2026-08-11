@@ -83,6 +83,7 @@ export async function authorizeCredentials(credentials: CredentialInput): Promis
           providerId: true,
           totpSecret: true,
           totpEnabled: true,
+          mustChangePassword: true,
           // DEF-002: the lockout state travels with the credential lookup.
           failedLoginCount: true,
           lastFailedLoginAt: true,
@@ -220,6 +221,9 @@ export async function authorizeCredentials(credentials: CredentialInput): Promis
       // allowed (grace) but requireRole confines the session to Settings →
       // Security until enrolment completes.
       mustEnrollTotp: totpEnrolmentRequiredNow(user.role, user.totpEnabled),
+      // ELIG-GAP-006: a temporary/admin-set password confines the user to
+      // /change-password (enforced in requireRole) until they replace it.
+      mustChangePassword: user.mustChangePassword,
     };
   });
 }

@@ -21,17 +21,32 @@ const ROLES = [
   { value: "PROVIDER_USER",   label: "Provider (Facility)" },
 ];
 
+// ELIG-GAP-005: the six grantable provider personas (must match
+// PROVIDER_PERSONA_ROLE_CODES / PROVIDER_ROLE_LABELS). PROVIDER_LEGACY is never offered.
+const PROVIDER_PERSONAS = [
+  { value: "PROVIDER_FRONT_DESK", label: "Front Desk" },
+  { value: "PROVIDER_CLINICIAN", label: "Clinician" },
+  { value: "PROVIDER_BILLER", label: "Biller" },
+  { value: "PROVIDER_FINANCE", label: "Finance" },
+  { value: "PROVIDER_ADMIN", label: "Admin" },
+  { value: "PROVIDER_INTEGRATION_ADMIN", label: "Integration Admin" },
+];
+
 interface InviteUserModalProps {
   groups?: { id: string; name: string }[];
   brokers?: { id: string; name: string }[];
   fundGroups?: { id: string; name: string }[];
-  providers?: { id: string; name: string }[];
+  providers?: { id: string; name: string; branches: { id: string; name: string }[] }[];
 }
 
 export function InviteUserModal({ groups = [], brokers = [], fundGroups = [], providers = [] }: InviteUserModalProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [selectedRole, setSelectedRole] = useState("");
+  // ELIG-GAP-005: track the chosen facility so the branch picker shows only that
+  // facility's branches. Reset the branch selection when the facility changes.
+  const [selectedProviderId, setSelectedProviderId] = useState("");
+  const selectedProvider = providers.find((p) => p.id === selectedProviderId);
   // OBS-1: on a successful invite, close the modal and refresh so the Users &
   // Access list re-renders immediately (previously it stayed blank until
   // reload). Handled in the action callback, not an effect, so there is no
@@ -42,6 +57,7 @@ export function InviteUserModal({ groups = [], brokers = [], fundGroups = [], pr
       if (res.ok) {
         setOpen(false);
         setSelectedRole("");
+        setSelectedProviderId("");
         router.refresh();
       }
       return res;
@@ -140,13 +156,46 @@ export function InviteUserModal({ groups = [], brokers = [], fundGroups = [], pr
                 </div>
               )}
               {selectedRole === "PROVIDER_USER" && (
-                <div>
-                  <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Facility</label>
-                  <select name="providerId" required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo bg-white">
-                    <option value="">Select facility…</option>
-                    {providers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
-                  <p className="text-[10px] text-brand-text-muted mt-1">This user will only see this facility&apos;s eligibility, claims and settlements.</p>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Facility</label>
+                    <select
+                      name="providerId"
+                      required
+                      value={selectedProviderId}
+                      onChange={(e) => setSelectedProviderId(e.target.value)}
+                      className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo bg-white"
+                    >
+                      <option value="">Select facility…</option>
+                      {providers.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                    <p className="text-[10px] text-brand-text-muted mt-1">This user will only see this facility&apos;s eligibility, claims and settlements.</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Provider role</label>
+                    <select name="providerRoleCode" required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo bg-white">
+                      <option value="">Select provider role…</option>
+                      {PROVIDER_PERSONAS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                    </select>
+                    <p className="text-[10px] text-brand-text-muted mt-1">Determines what this user can do at the facility (eligibility, claims, pre-auth, finance…).</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Branch(es)</label>
+                    {!selectedProvider ? (
+                      <p className="text-[11px] text-brand-text-muted">Select a facility first.</p>
+                    ) : selectedProvider.branches.length === 0 ? (
+                      <p className="text-[11px] text-[#856404]">This facility has no active branches. Add a branch to the facility before inviting its staff.</p>
+                    ) : (
+                      <>
+                        <select name="providerBranchIds" multiple required className="w-full min-h-24 border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo bg-white">
+                          {selectedProvider.branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                        </select>
+                        <p className="text-[10px] text-brand-text-muted mt-1">Hold Command/Ctrl to select multiple branches. The user can only act at assigned branches.</p>
+                      </>
+                    )}
+                  </div>
                 </div>
               )}
               {selectedRole === "FUND_ADMINISTRATOR" && (

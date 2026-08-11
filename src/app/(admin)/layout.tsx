@@ -27,8 +27,14 @@ export default async function AdminLayout({
       const { resolvePostLoginPath } = await import("@/lib/post-login");
       const home = resolvePostLoginPath(userRole);
       if (home !== "/dashboard" && home !== "/reports") {
+        // ELIG-GAP-014: a portal-owning role (provider, fund admin, HR, member,
+        // broker) hitting an admin route must get a BRANDED, explained denial —
+        // not a silent bounce to their dashboard that reads as a broken link.
+        // /unauthorized never renders the admin shell, so the DEF-003 tenant-
+        // scoping concern (no cross-employer reach) is preserved, and its
+        // recovery button sends them to their own portal.
         const { redirect } = await import("next/navigation");
-        redirect(home);
+        redirect("/unauthorized");
       }
     }
 
