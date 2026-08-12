@@ -22,7 +22,14 @@ vi.mock("@/server/services/provider-access-settings.service", () => ({
   ProviderAccessSettingsService: { isEntitlementEnforced: async () => settings.enforced },
 }));
 vi.mock("@/server/services/provider-entitlement.service", () => ({
-  ProviderEntitlementService: { entitledMemberWhere: vi.fn(async () => ENTITLEMENT_WHERE) },
+  ProviderEntitlementService: {
+    entitledMemberWhere: vi.fn(async () => ENTITLEMENT_WHERE),
+    // UAT-HF P03.03 added this collaborator. `true` = the facility IS entitled to
+    // members, which is the scenario this suite describes: the number is absent
+    // or out of THIS provider's entitlement, not a facility with no agreement at
+    // all. Both still collapse to one non-enumerating message.
+    hasEffectiveEntitlement: vi.fn(async () => true),
+  },
 }));
 vi.mock("@/server/services/provider-entitlement-shadow.service", () => ({
   ProviderEntitlementShadowService: { shadowCompareMemberLookup: vi.fn(async () => "AGREE_ALLOW") },

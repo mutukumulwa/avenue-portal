@@ -7,6 +7,14 @@ import { ProviderEntitlementShadowService } from "./provider-entitlement-shadow.
 import { ProviderAccessSettingsService } from "./provider-access-settings.service";
 import { ProvidersService } from "./providers.service";
 import { decideEligibility } from "./eligibility/evaluator-core";
+import {
+  ELIGIBILITY_REASON_CATALOGUE,
+  memberSafeText,
+  operatorGuidanceText,
+  verdictForReason,
+  type EligibilityDecisionReason,
+  type EligibilityDecisionV2,
+} from "./eligibility/decision-contract";
 
 /**
  * PNOS F1.11 — canonical provider eligibility check.
@@ -59,6 +67,12 @@ export interface EligibilitySafeResult {
   checkId: string;
   /** ALWAYS present — eligibility is never a promise of payment (§8.1). */
   disclaimer: string;
+  /**
+   * UAT-HF P03.03 — the canonical decision (P03.02). Added ALONGSIDE the older
+   * fields so existing consumers keep working while they migrate; new consumers
+   * should branch on `decision.reasonCode`, never on a rendered string.
+   */
+  decision: EligibilityDecisionV2;
 }
 
 const DISCLAIMER =
@@ -74,9 +88,11 @@ export const ProviderEligibilityService = {
     // helper to persist safe evidence + return
     const finish = async (
       resultCode: EligibilityResultCode,
-      safeExplanation: string,
+      reasonCode: EligibilityDecisionReason,
       member?: { id: string; firstName: string; lastName: string; memberNumber: string; clientId: string | null; groupId: string | null; packageId: string | null; requiresPreauth?: boolean; schemeName?: string | null; packageName?: string | null },
     ): Promise<EligibilitySafeResult> => {
+      // One catalogue, one string per audience (P03.02). No surface invents copy.
+      const safeExplanation = memberSafeText(reasonCode);
       const displayValidUntil = new Date(serviceDate.getTime() + 24 * 60 * 60 * 1000);
       const check = await db.providerEligibilityCheck.create({
         data: {
@@ -88,8 +104,42 @@ export const ProviderEligibilityService = {
         },
         select: { id: true },
       });
+      const decision: EligibilityDecisionV2 = {
+        verdict: verdictForReason(reasonCode),
+        reasonCode,
+        memberSafeExplanation: safeExplanation,
+        operatorGuidance: operatorGuidanceText(reasonCode),
+        serviceDate: serviceDate.toISOString(),
+        dataAsOf: new Date().toISOString(),
+        validUntil: displayValidUntil.toISOString(),
+        packageName: member?.packageName ?? null,
+        packageVersionId: null,
+        schemeName: member?.schemeName ?? null,
+        network: {
+          inNetwork: reasonCode !== "OUT_OF_NETWORK" && reasonCode !== "PROVIDER_NOT_ENTITLED",
+          networkTier: null,
+          providerName: null,
+          providerBranchName: null,
+        },
+        coverStatus: {
+          covered: ELIGIBILITY_REASON_CATALOGUE[reasonCode].memberStillCovered && !!member,
+          reasonCode,
+        },
+        benefit: {
+          benefitCategory: input.benefitCategory ?? null,
+          usable: verdictForReason(reasonCode) === "ELIGIBLE",
+          remainingLimit: null,
+          currency: null,
+          waitingEligibleFrom: null,
+          referralRequired: reasonCode === "MISSING_REFERRAL",
+          referralOnFile: false,
+        },
+        correlationId: requestId,
+        checkId: check.id,
+        disclaimer: DISCLAIMER,
+      };
       return {
-        found: !!member, resultCode, safeExplanation, serviceDate: serviceDate.toISOString(), displayValidUntil: displayValidUntil.toISOString(),
+        found: !!member, resultCode, safeExplanation, decision, serviceDate: serviceDate.toISOString(), displayValidUntil: displayValidUntil.toISOString(),
         enforcementApplied: enforced, checkId: check.id, disclaimer: DISCLAIMER,
         ...(member ? { memberId: member.id, member: { firstName: member.firstName, lastName: member.lastName, memberNumber: member.memberNumber }, schemeName: member.schemeName ?? null, packageName: member.packageName ?? null, requiresPreauth: member.requiresPreauth ?? false } : {}),
       };
@@ -105,13 +155,13 @@ export const ProviderEligibilityService = {
       select: { contractStatus: true },
     });
     if (!facility || !ProvidersService.isOperational(facility.contractStatus)) {
-      return finish("NOT_ELIGIBLE", "This facility is not currently active for eligibility checks.");
+      return finish("NOT_ELIGIBLE", "PROVIDER_NOT_ENTITLED");
     }
 
     // ENFORCED path: branch must be in the caller's context; member must be entitled.
     if (enforced) {
       if (input.providerBranchId && !ctx.allowedProviderBranchIds.includes(input.providerBranchId)) {
-        return finish("OUT_OF_NETWORK", "This facility branch is not authorised for this lookup.");
+        return finish("OUT_OF_NETWORK", "OUT_OF_NETWORK");
       }
       const where = await ProviderEntitlementService.entitledMemberWhere(ctx.providerId, serviceDate);
       const m = await db.member.findFirst({
@@ -119,12 +169,18 @@ export const ProviderEligibilityService = {
         select: VERDICT_MEMBER_SELECT,
       });
       // Safe not-found: an out-of-scope member is indistinguishable from an absent one (§9.1).
-      if (!m) return finish("NOT_ELIGIBLE", "No eligible member found for this facility.");
+      if (!m) {
+        // DEF-053: a facility entitled to NOBODY returned the same words as a
+        // wrong card number, so the desk was told to check a card that was never
+        // the problem.
+        const entitled = await ProviderEntitlementService.hasEffectiveEntitlement(ctx.providerId, serviceDate);
+        return finish("NOT_ELIGIBLE", entitled ? "NOT_FOUND" : "PROVIDER_NOT_ENTITLED");
+      }
       // SP-6: the verdict is the single evaluator's member-level decision as of the
       // service date (policy window, pinned version, group/client status, coverage
       // periods, age) — not a bare status===ACTIVE check.
       const verdict = await memberVerdict(db, m, serviceDate);
-      return finish(verdict.resultCode, verdict.safeExplanation, {
+      return finish(verdict.resultCode, verdict.reasonCode, {
         id: m.id, firstName: m.firstName, lastName: m.lastName, memberNumber: m.memberNumber, clientId: m.group?.clientId ?? null, groupId: m.groupId, packageId: m.packageId, schemeName: m.group?.name ?? null, packageName: m.package?.name ?? null,
       });
     }
@@ -150,9 +206,12 @@ export const ProviderEligibilityService = {
         db,
       ).catch(() => {});
     }
-    if (!m) return finish("NOT_ELIGIBLE", "No member found for that number.");
+    if (!m) {
+      const entitled = await ProviderEntitlementService.hasEffectiveEntitlement(ctx.providerId, serviceDate);
+      return finish("NOT_ELIGIBLE", entitled ? "NOT_FOUND" : "PROVIDER_NOT_ENTITLED");
+    }
     const verdict = await memberVerdict(db, m, serviceDate);
-    return finish(verdict.resultCode, verdict.safeExplanation, {
+    return finish(verdict.resultCode, verdict.reasonCode, {
       id: m.id, firstName: m.firstName, lastName: m.lastName, memberNumber: m.memberNumber, clientId: m.group?.clientId ?? null, groupId: m.groupId, packageId: m.packageId, schemeName: m.group?.name ?? null, packageName: m.package?.name ?? null,
     });
   },
@@ -200,7 +259,12 @@ async function memberVerdict(
   db: Db,
   m: VerdictMember,
   serviceDate: Date,
-): Promise<{ resultCode: EligibilityResultCode; safeExplanation: string }> {
+): Promise<{
+  resultCode: EligibilityResultCode;
+  reasonCode: EligibilityDecisionReason;
+  safeExplanation: string;
+  operatorGuidance: string;
+}> {
   const coveragePeriods = await db.memberCoveragePeriod.findMany({
     where: { memberId: m.id },
     select: { startDate: true, endDate: true },
@@ -222,10 +286,16 @@ async function memberVerdict(
     ageRules: m.package ? { maxAge: m.package.maxAge, dependentMaxAge: m.package.dependentMaxAge } : null,
   });
   const eligible = decision.conclusion === "ELIGIBLE";
+  // UAT-HF P03.03. This function used to compute the full evaluator decision and
+  // then THROW THE REASON AWAY, returning a binary verdict and one of two generic
+  // sentences. The evaluator already knew whether the member was SUSPENDED,
+  // LAPSED, in a WAITING_PERIOD or past an AGE_BOUNDARY — the provider surface
+  // simply discarded it. That is DEF-058 ("status-only verdict") at its source,
+  // and a large part of why nine probes produced one identical string.
   return {
     resultCode: eligible ? "ELIGIBLE" : "NOT_ELIGIBLE",
-    safeExplanation: eligible
-      ? "Member cover is active for this facility."
-      : "Member cover is not currently active for this service date.",
+    reasonCode: decision.reasonCode,
+    safeExplanation: memberSafeText(decision.reasonCode),
+    operatorGuidance: operatorGuidanceText(decision.reasonCode),
   };
 }

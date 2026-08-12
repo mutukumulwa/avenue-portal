@@ -26,6 +26,36 @@ export class ProviderEntitlementService {
    * contracted clients/groups. Deny-by-default: a provider with no active,
    * effective INCLUDE applicability resolves no members (impossible filter).
    */
+  /**
+   * UAT-HF P03.03 — does this facility have ANY effective entitlement at all?
+   *
+   * This is the signal that distinguishes DEF-053's two very different
+   * situations, which the product previously reported with the same words:
+   *
+   *   * the facility IS entitled, but this particular number is not one of its
+   *     members (or does not exist) — a card problem;
+   *   * the facility is entitled to NOBODY, so no number could ever resolve — a
+   *     facility-data problem, and the actual cause of the run's nine identical
+   *     "No eligible member found" results.
+   *
+   * Without it, `entitledMemberWhere`'s deny-by-default filter silently turns
+   * the second case into the first, and the desk is told to check a card that
+   * was never the problem.
+   */
+  static async hasEffectiveEntitlement(providerId: string, now: Date = new Date()): Promise<boolean> {
+    const include = await prisma.contractApplicability.findFirst({
+      where: {
+        isActive: true,
+        inclusionType: { not: "EXCLUDE" },
+        contract: { providerId, status: "ACTIVE" },
+        effectiveFrom: { lte: now },
+        OR: [{ effectiveTo: null }, { effectiveTo: { gte: now } }],
+      },
+      select: { id: true },
+    });
+    return include !== null;
+  }
+
   static async entitledMemberWhere(
     providerId: string,
     now: Date = new Date(),

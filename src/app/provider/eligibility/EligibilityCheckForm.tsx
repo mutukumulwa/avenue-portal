@@ -21,7 +21,6 @@ import {
   BENEFIT_OPTIONS,
   EMPTY_ELIGIBILITY_STATE,
   MAX_MEMBER_LEN,
-  NOT_FOUND_MESSAGE,
   checkEligibilityAction,
   type EligibilityCheckState,
 } from "./actions";
@@ -134,7 +133,15 @@ export function EligibilityCheckForm({ memberNumberExample }: { memberNumberExam
             old message "echoes the raw input unnormalised", which both reflects
             unvalidated text and confirms what was tried on a shared screen.
           */}
-          {NOT_FOUND_MESSAGE}
+          <p>{result.decision.memberSafeExplanation}</p>
+          {/*
+            P03.03: the collapsed member-safe line above is the same for a wrong
+            card, an out-of-entitlement member and a facility with no cover
+            agreement — that protects against enumeration. The operator still
+            needs to know WHICH it is, and DEF-053's message told them to check a
+            card that was often never the problem.
+          */}
+          <p className="mt-1 font-normal text-brand-text-body">{result.decision.operatorGuidance}</p>
         </div>
       )}
 
@@ -154,7 +161,12 @@ export function EligibilityCheckForm({ memberNumberExample }: { memberNumberExam
               <p className={`text-sm font-semibold ${eligible ? "text-[#28A745]" : "text-[#DC3545]"}`}>
                 {eligible ? "ELIGIBLE — cover is active" : "NOT ELIGIBLE"}
               </p>
-              {result.safeExplanation && <p className="mt-0.5 text-xs text-brand-text-muted">{result.safeExplanation}</p>}
+              {result.decision.memberSafeExplanation && (
+                <p className="mt-0.5 text-xs text-brand-text-muted">{result.decision.memberSafeExplanation}</p>
+              )}
+              {/* DEF-058: "cover is active but this benefit is exhausted" must be
+                  readable as exactly that, not as "not eligible". */}
+              <p className="mt-1 text-xs font-medium text-brand-text-body">{result.decision.operatorGuidance}</p>
             </div>
           </div>
           <dl className="grid grid-cols-2 gap-x-6 gap-y-4 px-5 py-5 text-sm md:grid-cols-3">
