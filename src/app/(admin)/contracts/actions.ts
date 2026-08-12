@@ -210,6 +210,39 @@ export async function editContractHeaderAction(fd: FormData) {
   );
 }
 
+/**
+ * UAT-HF P02.03 — propose a correction to a damaged contract term (DEF-050).
+ *
+ * The run's row could not be reached by ANY UI route. This is that route.
+ * Nothing is written to the contract here: a different authorised user must
+ * approve the proposal on the Overrides console first.
+ */
+export async function requestContractDateRepairAction(fd: FormData) {
+  const { tenantId, userId, id } = await withContract(fd);
+  await guarded(
+    id,
+    () =>
+      ContractLifecycleService.requestDateRepair(tenantId, id, userId, {
+        startDate: str(fd, "startDate") ?? "",
+        endDate: str(fd, "endDate") ?? "",
+        reviewDueDate: str(fd, "reviewDueDate") ?? null,
+        justification: str(fd, "justification") ?? "",
+        sourceDocumentRef: str(fd, "sourceDocumentRef") ?? "",
+      }),
+    "Correction proposed — a different authorised user must approve it on the Overrides console.",
+  );
+}
+
+/** UAT-HF P02.03 — apply a correction that a DIFFERENT user has approved. */
+export async function applyContractDateRepairAction(fd: FormData) {
+  const { tenantId, userId, id } = await withContract(fd);
+  await guarded(
+    id,
+    () => ContractLifecycleService.applyApprovedDateRepair(tenantId, id, userId),
+    "Contract term corrected. The contract, its tariffs and its applicability are unchanged otherwise.",
+  );
+}
+
 export async function voidContractAction(fd: FormData) {
   const { tenantId, userId, id } = await withContract(fd);
   const reason = str(fd, "reason") ?? "";

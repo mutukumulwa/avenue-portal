@@ -9,6 +9,7 @@ import { ManagePanel } from "./ManagePanel";
 import { FeeSchedule } from "./FeeSchedule";
 import { CapitationPanel } from "./CapitationPanel";
 import { ContractExclusionsManager } from "./ContractExclusionsManager";
+import { DateRepairPanel } from "./DateRepairPanel";
 import {
   INVALID_DATE_LABEL,
   MAX_CALENDAR_DATE,
@@ -158,6 +159,26 @@ export default async function ContractDetailPage({
   const renewStart = datesRenderable ? (addCalendarDays(calendarDateFromUtcDate(c.endDate)!, 1) ?? "") : "";
   const renewEnd = datesRenderable ? (addCalendarDays(calendarDateFromUtcDate(c.endDate)!, 366) ?? "") : "";
 
+  // P02.03 — only a damaged contract offers the governed repair route, so this
+  // costs nothing on the 99% of contracts that are fine.
+  const repairOverrides = datesRenderable
+    ? []
+    : await prisma.overrideRecord.findMany({
+        where: {
+          tenantId,
+          entityType: "ProviderContract",
+          entityId: c.id,
+          overrideType: "CONTRACT_DATE_REPAIR",
+          status: { in: ["PENDING", "APPROVED"] },
+        },
+        select: { status: true, postState: true },
+        orderBy: { createdAt: "desc" },
+      });
+  const hasApprovedRepair = repairOverrides.some(
+    (o) => o.status === "APPROVED" && !(o.postState as { appliedAt?: string } | null)?.appliedAt,
+  );
+  const hasPendingRepair = !hasApprovedRepair && repairOverrides.some((o) => o.status === "PENDING");
+
   return (
     <div className="p-6 max-w-6xl mx-auto">
       {/* Breadcrumb — a contract belongs to a provider, so always offer the way
@@ -258,6 +279,22 @@ export default async function ContractDetailPage({
           </div>
         </div>
       </div>
+
+      {!datesRenderable && (
+        <div className="mb-5">
+          <DateRepairPanel
+            contractId={c.id}
+            contractNumber={c.contractNumber}
+            current={{
+              startDate: formatStoredDate(c.startDate),
+              endDate: formatStoredDate(c.endDate),
+              reviewDueDate: formatStoredDate(c.reviewDueDate),
+            }}
+            hasApprovedRepair={hasApprovedRepair}
+            hasPendingRepair={hasPendingRepair}
+          />
+        </div>
+      )}
 
       {/* Lifecycle action bar (spec §4.2) */}
       <div className="mb-6 flex flex-wrap items-center gap-2 rounded-xl border border-gray-200 bg-white p-3">

@@ -3,8 +3,11 @@ import { MAX_CALENDAR_DATE, MIN_CALENDAR_DATE, calendarDateFromUtcDate } from "@
 import {
   CONTRACT_DATE_LABELS,
   isRenderableContractDate,
+  validateContractTerm,
   validateContractTermPatch,
 } from "@/lib/validation/provider-contract";
+import { DomainEventService } from "@/server/services/domain-event.service";
+import type { OverrideReasonCode } from "@prisma/client";
 import { auditChainService } from "./audit-chain.service";
 import { ProviderContractsService } from "./provider-contracts.service";
 import type { Prisma, ProviderContractStatus, OverrideType } from "@prisma/client";
@@ -273,6 +276,225 @@ export class ContractLifecycleService {
       { diff },
       `Contract ${c.contractNumber} header edited in ${c.status}: ${Object.keys(diff).join(", ")}`,
     );
+    return updated;
+  }
+
+  /**
+   * UAT-HF P02.03 — STEP 1 of the governed repair of a damaged contract date.
+   *
+   * DEF-050's row could not be reached by any UI route: `/contracts` and
+   * `/contracts/{id}` both threw, and `/contracts/{id}/edit` returned Page Not
+   * Found. It was fixed by editing the database directly — which is precisely
+   * what a governed product should never require.
+   *
+   * P02.02 made the row readable again. This makes it CORRECTABLE, under the
+   * same maker/checker rail the product already uses for contract backdating:
+   * the maker proposes the corrected term with a reason and a source document,
+   * a different authorised user approves it, and only then can it be applied.
+   *
+   * Nothing is written to the contract here. The proposal lives on the override
+   * record until it is approved.
+   */
+  static async requestDateRepair(
+    tenantId: string,
+    contractId: string,
+    userId: string,
+    input: {
+      startDate: string;
+      endDate: string;
+      reviewDueDate?: string | null;
+      reasonCode?: OverrideReasonCode;
+      justification: string;
+      sourceDocumentRef: string;
+    },
+  ): Promise<{ overrideId: string }> {
+    const c = await prisma.providerContract.findUnique({ where: { id: contractId, tenantId } });
+    if (!c) throw new Error("Contract not found");
+
+    // The proposed term must satisfy DEC-02 exactly like any other write. A
+    // repair that stores another unrenderable date helps nobody.
+    const term = validateContractTerm({
+      startDate: input.startDate,
+      endDate: input.endDate,
+      reviewDueDate: input.reviewDueDate ?? undefined,
+    });
+    if (!term.ok) {
+      throw new Error(
+        Object.entries(term.fieldErrors)
+          .map(([field, messages]) => `${CONTRACT_DATE_LABELS[field] ?? field}: ${messages[0]}`)
+          .join(" "),
+      );
+    }
+
+    const justification = input.justification.trim();
+    if (justification.length < 10) {
+      throw new Error("Explain the correction in at least 10 characters — this is the audit record.");
+    }
+    const sourceDocumentRef = input.sourceDocumentRef.trim();
+    if (!sourceDocumentRef) {
+      throw new Error("A source document reference is required — a contract term is a signed agreement.");
+    }
+
+    const { overrideService } = await import("@/server/services/override.service");
+    const record = await overrideService.request({
+      tenantId,
+      makerId: userId,
+      overrideType: "CONTRACT_DATE_REPAIR",
+      entityType: "ProviderContract",
+      entityId: contractId,
+      reasonCode: input.reasonCode ?? "SYSTEM_ERROR_CORRECTION",
+      justification,
+      preState: {
+        // Rendered through the safe helpers: the whole point is that these
+        // values may be unrenderable, and the audit record must survive them.
+        before: {
+          startDate: calendarDateFromUtcDate(c.startDate) ?? "unrenderable",
+          endDate: calendarDateFromUtcDate(c.endDate) ?? "unrenderable",
+          reviewDueDate: c.reviewDueDate ? (calendarDateFromUtcDate(c.reviewDueDate) ?? "unrenderable") : null,
+        },
+        proposed: {
+          startDate: input.startDate,
+          endDate: input.endDate,
+          reviewDueDate: input.reviewDueDate ?? null,
+        },
+        sourceDocumentRef,
+        // The optimistic-concurrency token. If anything touches the contract
+        // between proposal and approval, the proposal is stale and is refused.
+        contractUpdatedAt: c.updatedAt.toISOString(),
+      },
+    });
+
+    return { overrideId: (record as { id: string }).id };
+  }
+
+  /**
+   * UAT-HF P02.03 — STEP 2: apply a repair a DIFFERENT user has approved.
+   *
+   * The approved override is resolved from the database by contract id; a
+   * client-supplied override id is never trusted, exactly as `activate` does for
+   * CONTRACT_BACKDATE. The contract is never deleted — only its term is
+   * corrected, so applicability, tariffs and versions are untouched.
+   */
+  static async applyApprovedDateRepair(tenantId: string, contractId: string, userId: string) {
+    const c = await prisma.providerContract.findUnique({ where: { id: contractId, tenantId } });
+    if (!c) throw new Error("Contract not found");
+
+    const approved = await prisma.overrideRecord.findFirst({
+      where: {
+        tenantId,
+        entityType: "ProviderContract",
+        entityId: contractId,
+        overrideType: "CONTRACT_DATE_REPAIR",
+        status: "APPROVED",
+      },
+      orderBy: { resolvedAt: "desc" },
+    });
+    if (!approved) {
+      throw new Error(
+        "This repair has not been approved yet. A different authorised user must approve it on the Overrides console.",
+      );
+    }
+
+    const pre = (approved.preState ?? {}) as {
+      proposed?: { startDate?: string; endDate?: string; reviewDueDate?: string | null };
+      sourceDocumentRef?: string;
+      contractUpdatedAt?: string;
+      before?: Record<string, unknown>;
+    };
+
+    // Single-use: an approved repair must not be replayable into a later,
+    // different state.
+    if ((approved.postState as { appliedAt?: string } | null)?.appliedAt) {
+      throw new Error("This repair has already been applied. Raise a new one if a further correction is needed.");
+    }
+
+    // Stale check. Something else changed the contract after the proposal was
+    // made, so the approver did not approve THIS state.
+    if (pre.contractUpdatedAt && pre.contractUpdatedAt !== c.updatedAt.toISOString()) {
+      throw new Error(
+        "This contract changed after the repair was proposed, so the approval no longer applies. " +
+          "Raise the correction again against the current values.",
+      );
+    }
+
+    const term = validateContractTerm({
+      startDate: pre.proposed?.startDate,
+      endDate: pre.proposed?.endDate,
+      reviewDueDate: pre.proposed?.reviewDueDate ?? undefined,
+    });
+    if (!term.ok) throw new Error("The approved proposal is not a valid contract term. Raise the correction again.");
+
+    const before = {
+      startDate: calendarDateFromUtcDate(c.startDate) ?? "unrenderable",
+      endDate: calendarDateFromUtcDate(c.endDate) ?? "unrenderable",
+      reviewDueDate: c.reviewDueDate ? (calendarDateFromUtcDate(c.reviewDueDate) ?? "unrenderable") : null,
+    };
+
+    const updated = await prisma.$transaction(async (tx) => {
+      // Conditional on updatedAt so a concurrent write between the check above
+      // and this update cannot be silently overwritten.
+      const claimed = await tx.providerContract.updateMany({
+        where: { id: contractId, tenantId, updatedAt: c.updatedAt },
+        data: {
+          startDate: term.dates.startDate,
+          endDate: term.dates.endDate,
+          reviewDueDate: term.dates.reviewDueDate,
+        },
+      });
+      if (claimed.count === 0) {
+        throw new Error("This contract changed while the repair was being applied. Nothing was saved — try again.");
+      }
+
+      await tx.overrideRecord.update({
+        where: { id: approved.id },
+        data: {
+          postState: {
+            appliedAt: new Date().toISOString(),
+            appliedById: userId,
+            before,
+            after: pre.proposed ?? null,
+          },
+        },
+      });
+
+      await DomainEventService.record(
+        {
+          tenantId,
+          eventType: "contract.dates.repaired",
+          entityType: "PROVIDERCONTRACT",
+          entityId: contractId,
+          entityRef: c.contractNumber,
+          description:
+            `Contract term corrected to ${pre.proposed?.startDate} → ${pre.proposed?.endDate} ` +
+            `(was ${before.startDate} → ${before.endDate}).`,
+          actor: { id: userId },
+          payload: {
+            before,
+            after: pre.proposed ?? null,
+            sourceDocumentRef: pre.sourceDocumentRef ?? null,
+            overrideId: approved.id,
+            makerId: approved.makerId,
+            checkerId: approved.checkerId,
+          },
+          reasonCode: approved.reasonCode,
+          reasonNote: approved.justification,
+        },
+        tx,
+      );
+
+      return tx.providerContract.findUniqueOrThrow({ where: { id: contractId } });
+    });
+
+    await this.logEvent(
+      prisma as never,
+      tenantId,
+      userId,
+      "CONTRACT:DATES_REPAIRED",
+      contractId,
+      { before, after: pre.proposed, overrideId: approved.id, checkerId: approved.checkerId },
+      `Contract ${c.contractNumber} term repaired (override ${approved.id}, approved by ${approved.checkerId ?? "?"}).`,
+    );
+
     return updated;
   }
 

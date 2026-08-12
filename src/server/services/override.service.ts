@@ -61,6 +61,12 @@ export const OVERRIDE_APPROVER_ROLES: Record<OverrideType, string[]> = {
   ESCALATE_TO_PAYER:                 ["SENIOR_CLAIMS_OFFICER"],
   ESCALATE_TO_MEDICAL_REVIEW:        ["MEDICAL_OFFICER"],
   CONTRACT_BACKDATE:                 ["SENIOR_UNDERWRITER", "COMPLIANCE_OFFICER"],
+  // UAT-HF P02.03 — repairing a stored contract date (DEF-050). A single
+  // approver, deliberately: the module is already contained by P02.02, but a
+  // damaged contract still blocks real work, and requiring dual control to fix
+  // a date the product itself wrote would make the recovery slower than the
+  // outage. The term change is still maker/checker, reasoned and audited.
+  CONTRACT_DATE_REPAIR:              ["SENIOR_UNDERWRITER"],
   CUSTOM:                            ["SENIOR_UNDERWRITER"],
 };
 

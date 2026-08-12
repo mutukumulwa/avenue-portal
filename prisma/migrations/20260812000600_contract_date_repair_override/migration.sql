@@ -1,0 +1,3 @@
+-- AlterEnum
+ALTER TYPE "OverrideType" ADD VALUE 'CONTRACT_DATE_REPAIR';
+

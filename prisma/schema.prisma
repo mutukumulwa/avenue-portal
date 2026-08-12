@@ -6832,6 +6832,11 @@ enum OverrideType {
   ESCALATE_TO_PAYER
   ESCALATE_TO_MEDICAL_REVIEW
   CONTRACT_BACKDATE
+  /// UAT-HF P02.03 — correcting a stored contract date that the UI cannot render
+  /// (DEF-050). Deliberately its OWN type rather than reusing CUSTOM: CUSTOM
+  /// already authorises unsigned-contract activation, and one approval must not
+  /// silently authorise a different act on the same contract.
+  CONTRACT_DATE_REPAIR
   CUSTOM
 }
 
