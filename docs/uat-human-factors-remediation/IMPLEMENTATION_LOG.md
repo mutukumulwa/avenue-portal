@@ -1202,6 +1202,26 @@ The old path was not "occasionally racy under load". Fifty simultaneous readers 
 
 **`peekMemberNumber` keeps the old max-scan** for previews only, and the three tests that covered numeric-suffix ordering moved onto it: a preview that collapses past 99999 would show an operator a number that is already in use.
 
+### P05.03 — Make enrollment one idempotent transaction
+
+| Field | Value |
+|---|---|
+| **Task** | P05.03 |
+| **Defect IDs** | DEF-031, DEF-034, DEF-075; the partial-coverage class |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none |
+| **Tests added** | 3 in `enrolment-coverage-periods.test.ts`; `$transaction` shims in 3 suites |
+| **Commands / results** | typecheck 0; lint 0 errors; suite 290 files / 3180 passed. |
+| **Evidence** | `src/server/services/members.service.ts` |
+| **Feature flags** | none. |
+| **Remaining risks** | **The idempotency half was already delivered by P04.01** — the receipt is reserved in the *action*, outside this transaction, so a crash between `reserve` and the transaction leaves a reserved receipt with no member. That is the correct failure (the operator is told the outcome is unknown and must check) but it is not the same as reserving inside the transaction, which needs the receipt write to move into it. **No domain event is written yet** — the plan's "write event/receipt … all in one transaction" is half done; `DomainEventService` exists (P01.03) and nothing calls it. `FraudService.checkEnrollmentRisk` still reads through the global client, so its reads are outside the transaction; it is advisory-only and reads *other* members, so this is deliberate rather than overlooked. |
+
+**The failure this closes.** Enrolment was a sequence of independent writes: allocate a number, create the member row, open a coverage period. A failure after the member committed left a member with **no coverage period** — invisible to the point-in-time eligibility engine — and nothing on the outside said so. It is the same shape as DEF-067 and DEF-034: work that half-happened and reported nothing.
+
+Every read and write now goes through one `tx`, including the member-number allocation (P05.02's `tx` parameter exists for this) and the coverage period. A test asserts `nextMemberNumber` receives the transaction client, because allocating outside it would consume a number on *every* failure rather than only on a rollback.
+
+**What the rollback test actually proves.** Mocks cannot roll a real transaction back, so the assertion is the property that makes rollback work: the coverage failure **escapes the transaction callback** rather than being swallowed. If `createMember` caught it and returned success — the exact shape that produced members without coverage — the test fails.
+
 ---
 
 ## Corrections made to the implementation plan

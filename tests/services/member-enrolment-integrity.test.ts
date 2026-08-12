@@ -63,6 +63,9 @@ const db = vi.hoisted(() => {
     proRataCalculation: { upsert: vi.fn(async () => ({})) },
     document: { count: vi.fn(async () => 0) },
   };
+  // UAT-HF P05.03: createMember now runs inside one transaction. The shim hands
+  // the callback the same mock client, so the assertions below are unchanged.
+  state.$transaction = async (fn: (tx: unknown) => unknown) => fn(state);
   return state;
 });
 

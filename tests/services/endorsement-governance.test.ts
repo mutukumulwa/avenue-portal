@@ -46,6 +46,9 @@ const db = vi.hoisted(() => {
     invoice: { findFirst: vi.fn(async () => null), create: vi.fn(async () => ({})) },
     commissionLedgerEntry: { create: vi.fn(async () => ({})) },
   };
+  // UAT-HF P05.03: createMember runs inside one transaction; the shim hands the
+  // callback the same mock client so these assertions are unchanged.
+  state.$transaction = async (fn: (tx: unknown) => unknown) => fn(state);
   return state;
 });
 

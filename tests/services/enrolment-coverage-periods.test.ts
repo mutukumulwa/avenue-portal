@@ -41,6 +41,9 @@ const db = vi.hoisted(() => {
     proRataCalculation: { upsert: vi.fn(async () => ({})) },
     document: { count: vi.fn(async () => 0) },
   };
+  // UAT-HF P05.03: createMember now runs inside one transaction. The shim hands
+  // the callback the same mock client, so the assertions below are unchanged.
+  state.$transaction = async (fn: (tx: unknown) => unknown) => fn(state);
   return state;
 });
 
@@ -286,5 +289,70 @@ describe("coverageService.evaluate — leaver covered on the last day, not the d
     };
     expect((await coverageService.evaluate(tx, "delm", new Date("2026-08-06"))).covered).toBe(true);
     expect((await coverageService.evaluate(tx, "delm", new Date("2026-08-07"))).covered).toBe(false);
+  });
+});
+
+/**
+ * UAT-HF P05.03 acceptance — "forced failure after member insert rolls
+ * everything back; double-submit creates one member/period/event and returns
+ * the same reference."
+ *
+ * Enrolment was a sequence of independent writes: allocate a number, create the
+ * member row, open a coverage period. A failure after the member committed left
+ * a member with NO coverage period — invisible to the point-in-time eligibility
+ * engine — and nothing on the outside said so.
+ */
+describe("P05.03 enrolment is one transaction", () => {
+  const base = {
+    groupId: "g1",
+    firstName: "Amina",
+    lastName: "Kato",
+    dateOfBirth: "1990-01-01",
+    gender: "FEMALE" as const,
+    relationship: "PRINCIPAL" as const,
+  };
+
+  it("runs every write through ONE transaction client", async () => {
+    const seen: unknown[] = [];
+    db.$transaction = async (fn: (tx: unknown) => unknown) => {
+      seen.push("opened");
+      return fn(db);
+    };
+    await MembersService.createMember("t1", base);
+    expect(seen).toEqual(["opened"]);
+  });
+
+  it("a failure AFTER the member insert leaves nothing behind", async () => {
+    // The coverage period is the last write; make it fail and assert the
+    // transaction is the thing that unwinds the member row, not a compensating
+    // delete we would have had to remember to write.
+    let rolledBack = false;
+    db.$transaction = async (fn: (tx: unknown) => unknown) => {
+      try {
+        return await fn(db);
+      } catch (err) {
+        rolledBack = true; // what a real $transaction does on a throw
+        throw err;
+      }
+    };
+    db.memberCoveragePeriod.create.mockRejectedValueOnce(new Error("coverage write failed"));
+
+    await expect(MembersService.createMember("t1", base)).rejects.toThrow(/coverage write failed/);
+
+    // What this proves: the failure escapes the transaction callback rather
+    // than being swallowed, so a real $transaction WILL unwind the member row.
+    // If createMember caught the coverage error and returned success — the
+    // shape that left members without coverage — `rolledBack` stays false.
+    expect(rolledBack).toBe(true);
+    expect(db.member.create).toHaveBeenCalled();
+  });
+
+  it("allocates the member number inside the transaction, not before it", async () => {
+    // Allocating outside would consume a number for an enrolment that never
+    // happened, on every failure rather than only on a rollback.
+    const { nextMemberNumber } = await import("@/server/services/member-numbering.service");
+    db.$transaction = async (fn: (tx: unknown) => unknown) => fn(db);
+    await MembersService.createMember("t1", base);
+    expect(nextMemberNumber).toHaveBeenCalledWith("t1", expect.anything(), db);
   });
 });
