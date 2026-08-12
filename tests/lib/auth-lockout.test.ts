@@ -15,6 +15,10 @@ const prismaMock = vi.hoisted(() => ({
 const bcryptMock = vi.hoisted(() => ({ compare: vi.fn(), hash: vi.fn() }));
 const totpMock = vi.hoisted(() => ({
   verifyTotp: vi.fn(() => true),
+  // UAT-HF P10.03: the credential path now asks WHICH time step matched and
+  // spends it, so a used code cannot open a second session (DEF-013).
+  verifyTotpCounter: vi.fn((): number | null => 1_000_000),
+  consumeTotpCounter: vi.fn(async () => true),
   totpEnrolmentRequiredNow: vi.fn(() => false),
 }));
 
@@ -22,6 +26,8 @@ vi.mock("@/lib/prisma", () => ({ prisma: prismaMock }));
 vi.mock("bcryptjs", () => ({ default: bcryptMock }));
 vi.mock("@/lib/totp", () => ({
   verifyTotp: totpMock.verifyTotp,
+  verifyTotpCounter: totpMock.verifyTotpCounter,
+  consumeTotpCounter: totpMock.consumeTotpCounter,
   totpEnrolmentRequiredNow: totpMock.totpEnrolmentRequiredNow,
 }));
 vi.mock("@/lib/perf", () => ({
@@ -62,6 +68,8 @@ beforeEach(() => {
   prismaMock.user.update.mockResolvedValue({ sessionVersion: 1 });
   prismaMock.auditLog.create.mockResolvedValue({});
   totpMock.verifyTotp.mockReturnValue(true);
+  totpMock.verifyTotpCounter.mockReturnValue(1_000_000);
+  totpMock.consumeTotpCounter.mockResolvedValue(true);
 });
 
 describe("DEF-002 — brute-force lockout", () => {
@@ -200,12 +208,52 @@ describe("DEF-002 — brute-force lockout", () => {
     );
     bcryptMock.compare.mockResolvedValue(true); // password correct
     totpMock.verifyTotp.mockReturnValue(false); // TOTP wrong
+    totpMock.verifyTotpCounter.mockReturnValue(null); // …so no step matched
 
     const res = await authorizeCredentials({ email: "a@x.com", password: "correct", totp: "000000" });
 
     expect(res).toBeNull();
     const upd = prismaMock.user.update.mock.calls[0][0];
     expect(upd.data.failedLoginCount).toBe(2); // incremented from 1
+  });
+
+  /**
+   * UAT-HF P10.03 — DEF-013. A replayed code is cryptographically VALID; it is
+   * refused because the step was already spent. It must be indistinguishable
+   * from a wrong code, including in the lockout counter, or the counter itself
+   * tells an attacker their guess was right.
+   */
+  it("a REPLAYED TOTP on a correct password counts as a failure too", async () => {
+    prismaMock.user.findFirst.mockResolvedValue(
+      baseUser({
+        totpEnabled: true,
+        totpSecret: "SECRET",
+        failedLoginCount: 1,
+        lastFailedLoginAt: new Date(),
+      }),
+    );
+    bcryptMock.compare.mockResolvedValue(true); // password correct
+    totpMock.verifyTotpCounter.mockReturnValue(1_000_000); // code IS valid…
+    totpMock.consumeTotpCounter.mockResolvedValue(false); // …but already spent
+
+    const res = await authorizeCredentials({ email: "a@x.com", password: "correct", totp: "123456" });
+
+    expect(res).toBeNull();
+    expect(prismaMock.user.update.mock.calls[0][0].data.failedLoginCount).toBe(2);
+  });
+
+  it("does not spend a TOTP step when the password is wrong", async () => {
+    prismaMock.user.findFirst.mockResolvedValue(
+      baseUser({ totpEnabled: true, totpSecret: "SECRET" }),
+    );
+    bcryptMock.compare.mockResolvedValue(false); // password wrong
+    totpMock.verifyTotpCounter.mockReturnValue(1_000_000);
+
+    await authorizeCredentials({ email: "a@x.com", password: "wrong", totp: "123456" });
+
+    // Otherwise a wrong password burns a legitimate user's current code, and
+    // they are told "incorrect" for a code that was correct.
+    expect(totpMock.consumeTotpCounter).not.toHaveBeenCalled();
   });
 
   it("an unknown email returns null and never touches the counter (non-existent accounts untouched)", async () => {

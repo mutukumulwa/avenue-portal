@@ -64,20 +64,54 @@ export function generateTotp(secret: string, at: number = Date.now(), step = 30)
   return hotp(base32Decode(secret), Math.floor(at / 1000 / step));
 }
 
-/** Verify a token, tolerating ±`window` steps of clock drift. */
+/**
+ * Which time step a token matched, or null.
+ *
+ * UAT-HF P10.03 — DEF-013: "A code was used to sign in successfully; after
+ * logout the SAME code was submitted again in a brand-new browser profile and
+ * was ACCEPTED, opening a second authenticated session ... There is no
+ * one-time-use enforcement." With ±1 step of drift tolerance the replay window
+ * is roughly 90 seconds.
+ *
+ * A boolean cannot be made single-use: to reject a replay you have to know
+ * WHICH code was accepted, and a counter is the only thing that identifies it
+ * without storing the code. Callers persist the returned counter and refuse
+ * anything at or below it — see `consumeTotpCounter`.
+ *
+ * Steps are checked from oldest to newest so a token that somehow matches more
+ * than one step (astronomically unlikely, but the loop must be deterministic)
+ * yields the LOWEST counter — never a higher one, which would silently burn
+ * intervening steps.
+ */
+export function verifyTotpCounter(
+  secret: string,
+  token: string,
+  at: number = Date.now(),
+  window = 1,
+): number | null {
+  if (!/^\d{6}$/.test(token || "")) return null;
+  const key = base32Decode(secret);
+  const counter = Math.floor(at / 1000 / 30);
+  for (let w = -window; w <= window; w++) {
+    if (hotp(key, counter + w) === token) return counter + w;
+  }
+  return null;
+}
+
+/**
+ * Verify a token, tolerating ±`window` steps of clock drift.
+ *
+ * ⚠️ This answers "is this code currently valid", NOT "may this code be used".
+ * It cannot detect a replay. Anything that grants a session or authorises a
+ * privileged change must use {@link verifyTotpCounter} and persist the counter.
+ */
 export function verifyTotp(
   secret: string,
   token: string,
   at: number = Date.now(),
   window = 1,
 ): boolean {
-  if (!/^\d{6}$/.test(token || "")) return false;
-  const key = base32Decode(secret);
-  const counter = Math.floor(at / 1000 / 30);
-  for (let w = -window; w <= window; w++) {
-    if (hotp(key, counter + w) === token) return true;
-  }
-  return false;
+  return verifyTotpCounter(secret, token, at, window) !== null;
 }
 
 /** otpauth:// URI for authenticator apps (rendered as text/QR at enrolment). */
@@ -123,4 +157,51 @@ export function totpEnrolmentRequiredNow(
   env: Record<string, string | undefined> = process.env,
 ): boolean {
   return totpEnforcementActive(env) && totpEnrolmentRequired(role, totpEnabled);
+}
+
+/**
+ * UAT-HF P10.03 — spend a TOTP time step, atomically.
+ *
+ * DEF-013 in one function. The conditional update is the whole mechanism:
+ *
+ *   UPDATE "User" SET "lastTotpCounter" = $counter
+ *    WHERE id = $id AND ("lastTotpCounter" IS NULL OR "lastTotpCounter" < $counter)
+ *
+ * A row is matched only if this step is strictly newer than the last one spent,
+ * so:
+ *
+ *   * a replay of a consumed code matches nothing → rejected;
+ *   * two simultaneous attempts with the SAME code race on the same row, one
+ *     matches and one does not → exactly one session, which is the acceptance's
+ *     "parallel same-code attempts yield exactly one session";
+ *   * a code from an EARLIER step than one already spent is also rejected, so
+ *     the ±1 drift window cannot be walked backwards.
+ *
+ * Read-then-write would reopen the race it exists to close, so the check lives
+ * in the WHERE clause.
+ *
+ * Returns false when the step was already spent. Callers must treat that
+ * exactly like a wrong code — including counting it as a failed attempt — so a
+ * replay is not distinguishable from a bad code by response or by timing.
+ */
+export async function consumeTotpCounter(
+  db: {
+    user: {
+      updateMany(args: {
+        where: Record<string, unknown>;
+        data: Record<string, unknown>;
+      }): Promise<{ count: number }>;
+    };
+  },
+  userId: string,
+  counter: number,
+): Promise<boolean> {
+  const result = await db.user.updateMany({
+    where: {
+      id: userId,
+      OR: [{ lastTotpCounter: null }, { lastTotpCounter: { lt: counter } }],
+    },
+    data: { lastTotpCounter: counter },
+  });
+  return result.count === 1;
 }

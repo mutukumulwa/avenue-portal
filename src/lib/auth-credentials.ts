@@ -2,7 +2,7 @@ import type { User } from "next-auth";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { measureAsync } from "@/lib/perf";
-import { verifyTotp, totpEnrolmentRequiredNow } from "@/lib/totp";
+import { consumeTotpCounter, verifyTotpCounter, totpEnrolmentRequiredNow } from "@/lib/totp";
 import { effectivePermissions } from "@/lib/authz/catalog";
 
 /**
@@ -114,7 +114,16 @@ export async function authorizeCredentials(credentials: CredentialInput): Promis
     let totpOk = true;
     if (user.totpEnabled && user.totpSecret) {
       const code = (credentials.totp as string | undefined)?.trim();
-      totpOk = !!code && verifyTotp(user.totpSecret, code);
+      // UAT-HF P10.03 — DEF-013. Verifying that a code is *currently valid* is
+      // not enough: the run signed in, logged out, and signed in AGAIN with the
+      // same code in a fresh browser profile. The time step has to be spent.
+      const counter = code ? verifyTotpCounter(user.totpSecret, code) : null;
+      totpOk =
+        counter !== null &&
+        // Only spend the step once the password is known good, so a wrong
+        // password cannot burn a legitimate user's code out from under them.
+        isPasswordValid &&
+        (await consumeTotpCounter(prisma, user.id, counter));
     }
     const authOk = isPasswordValid && totpOk;
 

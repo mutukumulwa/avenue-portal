@@ -4,7 +4,7 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { writeAudit } from "@/lib/audit";
-import { generateSecret, otpauthUri, verifyTotp, TOTP_ENFORCED_ROLES, totpEnforcementActive } from "@/lib/totp";
+import { generateSecret, otpauthUri, verifyTotpCounter, consumeTotpCounter, TOTP_ENFORCED_ROLES, totpEnforcementActive } from "@/lib/totp";
 
 /**
  * Begin 2FA enrolment (R81): generate + store a secret (not yet enabled) and
@@ -36,7 +36,16 @@ export async function confirmTotpAction(
     select: { totpSecret: true },
   });
   if (!user?.totpSecret) return { error: "Start enrolment first." };
-  if (!verifyTotp(user.totpSecret, code)) return { error: "Incorrect code — try again." };
+
+  // UAT-HF P10.03 — DEF-013. Enrolment spends a step like any other use, so the
+  // code that switched two-factor ON cannot then be replayed to sign in.
+  const counter = verifyTotpCounter(user.totpSecret, code);
+  if (counter === null) return { error: "Incorrect code — try again." };
+  if (!(await consumeTotpCounter(prisma, session.user.id, counter))) {
+    // Same wording as a wrong code: a replay must not be distinguishable from
+    // a mistype by what the screen says.
+    return { error: "Incorrect code — try again." };
+  }
 
   await prisma.user.update({ where: { id: session.user.id }, data: { totpEnabled: true } });
   await writeAudit({

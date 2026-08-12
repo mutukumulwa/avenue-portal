@@ -334,6 +334,16 @@ model User {
   // Two-factor auth (R81/H-01): base32 TOTP secret + enabled flag.
   totpSecret         String?
   totpEnabled        Boolean   @default(false)
+  /// UAT-HF P10.03 — the highest TOTP time step this user has already spent.
+  ///
+  /// DEF-013: a code used to sign in was accepted AGAIN, in a fresh browser
+  /// profile, opening a second session — "there is no one-time-use
+  /// enforcement". A one-time password that can be used twice is not one.
+  ///
+  /// Acceptance is a conditional update requiring `counter > lastTotpCounter`,
+  /// which makes replay and the parallel-same-code race the same check: two
+  /// simultaneous attempts with one code, exactly one session.
+  lastTotpCounter    Int?
   // ELIG-GAP-006: when an admin sets an initial/temporary password, this is true
   // and requireRole confines the user to /change-password until they replace it.
   mustChangePassword Boolean   @default(false)

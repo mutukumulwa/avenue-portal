@@ -1224,6 +1224,36 @@ Every read and write now goes through one `tx`, including the member-number allo
 
 ---
 
+## P10 — Authentication and session hardening
+
+### P10.03 — Prevent TOTP replay
+
+| Field | Value |
+|---|---|
+| **Task** | P10.03 |
+| **Defect IDs** | DEF-013 |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | `20260812001000_totp_replay_guard` — `User.lastTotpCounter`, nullable, **no backfill** |
+| **Tests added** | `tests/lib/totp-replay.test.ts` (17); 2 added and 1 repaired in `auth-lockout.test.ts` |
+| **Commands / results** | typecheck 0; lint 0 errors; suite 291 files / 3199 passed. **11 migrations applied from empty with zero drift.** |
+| **Evidence** | `src/lib/totp.ts`, `src/lib/auth-credentials.ts`, `src/app/(admin)/settings/security/actions.ts` |
+| **Feature flags** | none — this is unconditional, and `REQUIRE_PRIVILEGED_2FA` only governs *enrolment*. |
+| **Remaining risks** | **The register asks for a policy owner first** — DEF-013 says "No policy document was supplied for this run, so the required behaviour is unconfirmed" and "A named security owner should first confirm the intended policy." Single-use is what a one-time password means and no reasonable policy permits replay, so this ships; if the owner sets a different window (a shorter drift tolerance, say) it is a constant, not a redesign. The counter is per **user**, not per session or challenge — correct today because there is one TOTP factor per user, but P10.01's challenge model may want it per challenge. Password reset and any other TOTP consumer added later must call `consumeTotpCounter`; nothing enforces that structurally. |
+
+**A boolean cannot be made single-use.** `verifyTotp` returned true/false, so nothing downstream could know *which* code had been accepted, and therefore nothing could refuse it a second time. `verifyTotpCounter` returns the matched time step; `verifyTotp` is now the boolean view of it and is documented as answering "is this valid", not "may this be used".
+
+**Replay and the parallel race are the same check.** Acceptance is a conditional update — `WHERE id = ? AND (lastTotpCounter IS NULL OR lastTotpCounter < ?)`. One statement gives all of: a consumed code matches nothing; ten simultaneous attempts with one code produce exactly one session; and a code from an *earlier* step is refused, so the ±1 drift window cannot be walked backwards. A read-then-write would reopen the race it exists to close.
+
+**The step is spent only after the password verifies.** Otherwise a wrong password burns a legitimate user's current code and they are told "incorrect" for a code that was correct — a denial-of-service on your own users, built while fixing a hardening gap.
+
+**A replay is indistinguishable from a mistype.** It folds into the same `authOk` the lockout counter keys on, and the enrolment screen returns the identical sentence. A replay that produced a *different* response would tell an attacker their captured code was genuine.
+
+**Enrolment spends a step too**, or the code that switched two-factor on is immediately replayable as a sign-in.
+
+**No backfill, deliberately.** NULL means "nothing spent yet", so every existing user's next sign-in is accepted normally and starts their counter. Nobody is locked out by a backfill, because there is no backfill to get wrong.
+
+---
+
 ## Corrections made to the implementation plan
 
 The plan is treated as authoritative but not infallible. Where a plan statement was checked against
