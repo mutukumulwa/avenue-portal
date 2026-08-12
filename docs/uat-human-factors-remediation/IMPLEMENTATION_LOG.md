@@ -71,7 +71,71 @@ Surgical staging is the mitigation.
 
 ### P00.02 — Restore the mandated Next documentation and align dependencies
 
-_pending_
+| Field | Value |
+|---|---|
+| **Task** | P00.02 |
+| **Defect IDs** | none — removes an implementation-drift risk that gates every `src/app/**` task |
+| **Commit** | _pending_ |
+| **Migrations / backfills** | none |
+| **Tests added** | none — no product code touched |
+| **Commands / results** | `npm run lint` → **terminates in 21s** (previously never finished). 756 problems: 556 errors / 200 warnings, **all pre-existing**, none introduced here. `npm run typecheck` still fails with the same 5 `mustChangePassword` errors — P00.03 owns those. |
+| **Routes exercised** | none |
+| **Evidence** | `docs/vendor/nextjs-15.5.15/PROVENANCE.md` |
+| **Feature flags** | none |
+| **Remaining risks** | Repo-wide lint is red with 556 pre-existing errors → tracked as **P00.02b**. Vendored docs must be re-vendored on any Next upgrade or they silently become wrong; refresh procedure is in `PROVENANCE.md`. |
+
+**Steps 1 and 3 — why the mandated docs were missing, and what replaced them.**
+
+Next ships **no `dist/docs` in any published release.** Verified twice: the installed
+`next@15.5.15` has no such directory (its `dist/` is build/runtime output only), and the jsDelivr
+file manifest for the published 15.5.15 tarball contains no path beginning `/dist/docs` and no file
+containing "docs" at all. Next's documentation lives in the GitHub repository under `docs/` and on
+nextjs.org — it is never published to npm. `AGENTS.md`'s rule was therefore unfollowable as written,
+not broken by a bad install.
+
+This triggered the task's **Stop** condition. With owner approval (2026-08-12), the official
+version-matched docs were vendored from `vercel/next.js` at tag `v15.5.15`
+(commit `412eb90b6587ec02e8361c92efa9091487e7348f`) into `docs/vendor/nextjs-15.5.15/` — 3.0 MB,
+370 files — and `AGENTS.md` was repointed there. All five guides the task names are present and
+indexed in `PROVENANCE.md`:
+
+| Required guide | Vendored path (under `docs/vendor/nextjs-15.5.15/`) |
+|---|---|
+| Server Actions | `01-app/01-getting-started/08-updating-data.mdx` |
+| Error boundaries | `01-app/01-getting-started/10-error-handling.mdx` + `01-app/03-api-reference/03-file-conventions/error.mdx` |
+| Caching / revalidation | `01-app/01-getting-started/09-caching-and-revalidating.mdx` + `01-app/02-guides/caching.mdx` |
+| Forms | `01-app/02-guides/forms.mdx` |
+| Route handlers | `01-app/01-getting-started/15-route-handlers-and-middleware.mdx` + `01-app/03-api-reference/03-file-conventions/route.mdx` |
+
+`src/app/**` edits are now unblocked.
+
+**Step 2 — the dependency "mismatch" is deliberate and must not be "fixed".**
+
+The plan flags Next 15.5.15 against `eslint-config-next` 16.2.2 and says not to leave them paired
+"unless official compatibility documentation explicitly permits it". Investigation shows the pairing
+is *required*, not accidental:
+
+- `eslint-config-next@16.2.2` declares peer dependencies on **`eslint` and `typescript` only — it
+  has no `next` peer dependency at all**, so the package's own metadata asserts no coupling to the
+  framework version. That is the authoritative statement the task asks for.
+- `eslint-config-next@15.5.15` publishes **no `exports` field**, so it does not provide the
+  `eslint-config-next/core-web-vitals` and `eslint-config-next/typescript` subpaths that
+  `eslint.config.mjs` imports. Downgrading to match Next would **break the flat ESLint config
+  outright.**
+- The only other way to "align" is upgrading Next 15 → 16, a major framework change with breaking
+  App Router behaviour. Doing that at the start of a remediation programme — immediately before
+  P02/P03/P04 rewrite App Router code — would invalidate the tested baseline for no benefit.
+
+**Decision: keep Next 15.5.15 + `eslint-config-next` 16.2.2 and pin the reason here.** No reinstall
+was necessary; the lockfile already resolves a coherent set.
+
+**Step 4 — why repo-wide lint never finished.**
+
+`eslint.config.mjs` ignored `".next/**"`, which in flat config is anchored at the repository root
+and therefore does **not** match build output nested inside git worktrees. Lint was walking
+`.claude/worktrees/stoic-gauss-1e06aa/.next/**` and the 198 MB `outputs/` evidence tree. Added
+`**/.next/**`, `.claude/**`, `outputs/**`, `coverage/**`, and `docs/vendor/**`. `src`, `tests`,
+`scripts`, and `prisma` remain linted, as the task requires.
 
 ### P00.03 — Reconcile and repair the existing eligibility branch
 
