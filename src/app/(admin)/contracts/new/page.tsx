@@ -4,6 +4,8 @@ import Link from "next/link";
 import { ArrowLeft, AlertTriangle } from "lucide-react";
 import { createContractAction } from "../actions";
 import { MAX_CALENDAR_DATE, MIN_CALENDAR_DATE } from "@/lib/calendar-date";
+import { ALLOWED_CURRENCIES } from "@/lib/validation/client";
+import { TenantSettingsService } from "@/server/services/tenant-settings.service";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +19,11 @@ export default async function NewContractPage({
 }) {
   const session = await requireRole(ROLES.UNDERWRITING);
   const { error, providerId } = await searchParams;
+
+  // DEF-052: the field below was a free-text input with defaultValue="KES" on a
+  // Uganda deployment. It is now a closed list seeded from the tenant's own
+  // configured currency, so the wrong denomination cannot be typed or inherited.
+  const tenantCurrency = await TenantSettingsService.getDefaultCurrency(session.user.tenantId);
 
   const providers = await prisma.provider.findMany({
     where: { tenantId: session.user.tenantId },
@@ -109,8 +116,24 @@ export default async function NewContractPage({
           <h2 className="text-sm font-semibold text-[#000523] mb-4">Commercial & operational terms</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             <div>
-              <label className={label}>Currency</label>
-              <input name="currency" defaultValue="KES" className={field} />
+              <label className={label} htmlFor="currency">
+                Currency <span className="text-brand-error">*</span>
+              </label>
+              <select id="currency" name="currency" required defaultValue={tenantCurrency ?? ""} className={field}>
+                {/* No pre-selected denomination when the tenant has not
+                    configured one — the operator must choose deliberately. */}
+                {!tenantCurrency && <option value="">Select a currency…</option>}
+                {ALLOWED_CURRENCIES.map((code) => (
+                  <option key={code} value={code}>
+                    {code}
+                  </option>
+                ))}
+              </select>
+              {!tenantCurrency && (
+                <p className="mt-1 text-xs text-[#9a4b06]">
+                  No default currency is configured for this tenant — choose one explicitly.
+                </p>
+              )}
             </div>
             <div>
               <label className={label}>Payment term (days)</label>

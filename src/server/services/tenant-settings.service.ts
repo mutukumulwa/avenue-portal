@@ -68,6 +68,34 @@ export class TenantSettingsService {
     return this.parseClaimControls(tenant?.config);
   }
 
+  /**
+   * UAT-HF P02.04 — the tenant's default transaction currency, from
+   * `Tenant.config.currency`.
+   *
+   * DEF-052: contract creation defaulted to a literal "KES" on a Uganda
+   * deployment — in the form (`defaultValue="KES"`), in the action
+   * (`?? "KES"`), in the import path and in the schema default. Four copies of
+   * one wrong assumption, which is what happens with no single source.
+   *
+   * Returns `null` when the tenant has not configured one, so the caller can
+   * REQUIRE an explicit choice rather than silently inventing a denomination —
+   * money whose currency was guessed is worse than money with none.
+   */
+  static async getDefaultCurrency(tenantId: string): Promise<string | null> {
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { config: true } });
+    return this.parseDefaultCurrency(tenant?.config);
+  }
+
+  /** Pure parse of the currency key. A malformed value is treated as absent. */
+  static parseDefaultCurrency(config: unknown): string | null {
+    if (!config || typeof config !== "object" || Array.isArray(config)) return null;
+    const raw = (config as Record<string, unknown>).currency;
+    if (typeof raw !== "string") return null;
+    const code = raw.trim().toUpperCase();
+    // ISO 4217 is exactly three letters; anything else is a mis-edited blob.
+    return /^[A-Z]{3}$/.test(code) ? code : null;
+  }
+
   /** Pure parse+validate of a raw `Tenant.config` value (unit-testable). */
   static parseClaimControls(config: unknown): ClaimControlSettings {
     const claims =

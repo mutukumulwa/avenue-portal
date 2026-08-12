@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { ContractExtractionService } from "@/server/services/contract-extraction.service";
 import { CONTRACT_DATE_LABELS, validateContractTerm } from "@/lib/validation/provider-contract";
+import { TenantSettingsService } from "@/server/services/tenant-settings.service";
 
 // Server actions for the markdown-import wizard (spec §11.3 import mode / §12).
 
@@ -29,7 +30,16 @@ export async function commitExtractionAction(formData: FormData) {
   const title = (formData.get("title") as string | null)?.trim();
   const startDate = formData.get("startDate") as string;
   const endDate = formData.get("endDate") as string;
-  const currency = ((formData.get("currency") as string | null)?.trim()) || "KES";
+  // DEF-052: was `|| "KES"`. The import door gets the same rule as the form.
+  const currency =
+    ((formData.get("currency") as string | null)?.trim().toUpperCase()) ||
+    (await TenantSettingsService.getDefaultCurrency(session.user.tenantId));
+  if (!currency) {
+    redirect(
+      `/contracts/import/${id}?error=` +
+        encodeURIComponent("Select a currency — this tenant has no default currency configured."),
+    );
+  }
   if (!providerId || !title || !startDate || !endDate) {
     redirect(`/contracts/import/${id}?error=Provider,+title,+start+and+end+date+are+required`);
   }

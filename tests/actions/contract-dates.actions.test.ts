@@ -31,6 +31,13 @@ const redirect = vi.hoisted(() =>
 );
 vi.mock("next/navigation", () => ({ redirect }));
 
+// P02.04 added a tenant-currency lookup to this action. This suite is about
+// DATES, so pin a configured currency and let the currency rules be proved by
+// tests/actions/contract-currency.actions.test.ts.
+vi.mock("@/server/services/tenant-settings.service", () => ({
+  TenantSettingsService: { getDefaultCurrency: vi.fn(async () => "UGX") },
+}));
+
 vi.mock("@/server/services/provider-contracts.service", () => ({
   ProviderContractsService: { nextContractNumber: vi.fn(async () => "PC-2026-999") },
 }));

@@ -3717,7 +3717,14 @@ model ProviderContract {
   executionStatus ContractExecutionStatus @default(UNSIGNED) // UNSIGNED blocks activation without override
   signatories     Json? // [{ party, name, designation, date }]
 
-  currency String  @default("KES") // ISO 4217; corpus = KES. Default seeded from Client.currency at creation
+  /// UAT-HF P02.04 / DEF-052. Was @default("KES") on a Uganda deployment.
+  /// Application code now always supplies the tenant's configured currency
+  /// explicitly; this default only catches a writer that omits the field
+  /// (provider-contracts.service's renewal does), so it must be the platform
+  /// base rather than a foreign denomination. Changing the default does NOT
+  /// touch existing rows — reclassifying those is P12.02, after the preflight
+  /// report in scripts/reports/contract-currency-preflight.ts.
+  currency String  @default("UGX") // ISO 4217; platform base is UGX (DEC-01)
   country  String?
   region   String?
 

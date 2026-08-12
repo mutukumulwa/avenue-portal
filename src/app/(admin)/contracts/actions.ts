@@ -10,6 +10,7 @@ import {
   CONTRACT_DATE_LABELS,
   validateContractTerm,
 } from "@/lib/validation/provider-contract";
+import { TenantSettingsService } from "@/server/services/tenant-settings.service";
 import type {
   ContractType,
   ContractBranchScope,
@@ -71,6 +72,20 @@ export async function createContractAction(formData: FormData) {
     redirect("/contracts/new?error=" + encodeURIComponent(fieldErrorMessage(term.fieldErrors)));
   }
 
+  // DEF-052: this used to be `str(formData, "currency") ?? "KES"` — a Kenyan
+  // denomination hard-coded into a Uganda deployment. The tenant's configured
+  // currency is the default; where none is configured the operator must choose,
+  // because money whose currency was guessed is worse than money with none.
+  const chosenCurrency = str(formData, "currency")?.toUpperCase();
+  const tenantCurrency = await TenantSettingsService.getDefaultCurrency(tenantId);
+  const contractCurrency = chosenCurrency ?? tenantCurrency;
+  if (!contractCurrency) {
+    redirect(
+      "/contracts/new?error=" +
+        encodeURIComponent("Select a currency — this tenant has no default currency configured."),
+    );
+  }
+
   const provider = await prisma.provider.findUnique({ where: { id: providerId, tenantId } });
   if (!provider) redirect("/contracts/new?error=Provider+not+found");
 
@@ -88,7 +103,7 @@ export async function createContractAction(formData: FormData) {
       reviewDueDate: term.dates.reviewDueDate,
       branchScope: (str(formData, "branchScope") as ContractBranchScope) ?? "ALL_BRANCHES",
       externalContractRef: str(formData, "externalContractRef"),
-      currency: str(formData, "currency") ?? "KES",
+      currency: contractCurrency,
       executionStatus: (str(formData, "executionStatus") as ContractExecutionStatus) ?? "UNSIGNED",
       paymentTermDays: num(formData, "paymentTermDays") ?? 30,
       paymentTermType: (str(formData, "paymentTermType") as PaymentTermType) ?? "CALENDAR",
