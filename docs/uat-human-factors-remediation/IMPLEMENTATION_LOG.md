@@ -1252,6 +1252,34 @@ Every read and write now goes through one `tx`, including the member-number allo
 
 **No backfill, deliberately.** NULL means "nothing spent yet", so every existing user's next sign-in is accepted normally and starts their counter. Nobody is locked out by a backfill, because there is no backfill to get wrong.
 
+### P10.04 — Enforce true idle and absolute session limits
+
+| Field | Value |
+|---|---|
+| **Task** | P10.04 |
+| **Defect IDs** | DEF-015 |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none — the clocks live in the JWT |
+| **Tests added** | `tests/lib/session-limits.test.ts` (24) |
+| **Commands / results** | typecheck 0; lint 0 errors; suite 292 files / 3223 passed. |
+| **Evidence** | `src/lib/session-policy.ts`, `src/lib/auth.ts`, `src/components/layouts/SessionExpiryGuard.tsx` |
+| **Feature flags** | none. |
+| **Remaining risks** | **Not verified against a real 32-minute idle browser** — the acceptance's fake-clock half is covered; the wall-clock half needs the harness. `mayPerformPrivilegedWrite` is exported and tested but **no server action calls it**; the absolute cap is nonetheless enforced server-side because the `jwt` callback returns null past it, so `auth()` fails and `requireRole` refuses. The idle window is still NextAuth's rolling `maxAge` rather than a persisted last-meaningful-activity timestamp — good enough now that nothing polls, but a second background caller added later would reintroduce the defect, and only the one-fetch test would catch it. `SessionExpiryGuard` wraps only the enrolment form. |
+
+**The register offered two hypotheses; it was the first, and the culprit was our own fix for DEF-010.**
+
+> "Not diagnosed from the front end. A rolling session refreshed by background client requests would explain it; so would an unenforced expiry."
+
+`SessionExpiryGuard` — added to give DEF-010 a user-facing expiry signal — read `/api/auth/session` **every 60 seconds and again on every window focus**. NextAuth re-issues the session cookie with a fresh `exp` on that endpoint once `updateAge` (5 minutes) has elapsed. A 60-second poll therefore kept the rolling 30-minute window permanently topped up: **the guard built to notice expiry was the reason expiry never arrived.** That is why the run measured 32 minutes of genuine inactivity and found the session still live.
+
+The session is now read **once, on mount**. That read is user-initiated by definition — somebody navigated to the page — and refreshing on genuine navigation is the rolling window working as designed. Everything after it is computed from local clocks and touches the network never. A test pins the endpoint to exactly one `fetch` call, because this defect is a single re-added `setInterval` away from returning.
+
+**An absolute cap, which nothing extends.** A rolling window cannot bound total session lifetime. `authenticatedAt` is stamped once at sign-in and never refreshed; the `jwt` callback signs the session out past 12 hours, **before** the single-session check, which fails *open* when the version is unknown. A test asserts that ordering, and asserts there is exactly one assignment to `token.authenticatedAt` — a second would make the cap rolling, which is the one thing it exists not to be.
+
+**Client and server resolve UNKNOWN differently, on purpose.** When the session cannot be read, the client guard stays inert (a false bounce throws away typed work to protect nothing) and `mayPerformPrivilegedWrite` refuses. The acceptance asks for exactly this asymmetry: "fail closed if authoritative session state cannot be verified for privileged write."
+
+**The expiry message says the work survives.** P04.02 keeps the draft in tab storage, and an operator who is not told that will assume the opposite and retype.
+
 ---
 
 ## Corrections made to the implementation plan

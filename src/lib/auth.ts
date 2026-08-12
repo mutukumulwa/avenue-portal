@@ -6,7 +6,11 @@ import { cache } from "react";
 import { measureAsync } from "@/lib/perf";
 import { totpEnrolmentRequiredNow } from "@/lib/totp";
 import { authorizeCredentials } from "@/lib/auth-credentials";
-import { SESSION_IDLE_MAX_AGE_S, SESSION_UPDATE_AGE_S } from "@/lib/session-policy";
+import {
+  SESSION_ABSOLUTE_MAX_AGE_S,
+  SESSION_IDLE_MAX_AGE_S,
+  SESSION_UPDATE_AGE_S,
+} from "@/lib/session-policy";
 
 /**
  * Current sessionVersion for a user, cached briefly to bound the per-request DB
@@ -68,8 +72,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         token.sessionVersion = user.sessionVersion;
         token.mustEnrollTotp = user.mustEnrollTotp;
         token.mustChangePassword = user.mustChangePassword;
+        // UAT-HF P10.04 — DEF-015. Stamped ONCE, at authentication, and never
+        // refreshed. The rolling idle window (NextAuth `maxAge`) bounds
+        // inactivity; this bounds total session lifetime, which no amount of
+        // activity may extend. An admin workstation on a shared front desk must
+        // not still be signed in tomorrow because somebody kept clicking.
+        token.authenticatedAt = Date.now();
         return token;
       }
+      // UAT-HF P10.04 — the absolute cap, enforced before anything else. A
+      // session past its maximum age is over regardless of how recently it was
+      // used, so this runs ahead of the (fail-open) single-session check.
+      if (typeof token.authenticatedAt === "number") {
+        if (Date.now() - token.authenticatedAt >= SESSION_ABSOLUTE_MAX_AGE_S * 1000) {
+          return null; // past the absolute limit → sign out
+        }
+      }
+
       // Subsequent requests: invalidate if a newer login has superseded this
       // session (single-session, R25). Fail-open when the version is unknown.
       if (token.id && typeof token.sessionVersion === "number") {
@@ -97,6 +116,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.permissions = token.permissions as string[] | undefined;
         session.user.mustEnrollTotp = token.mustEnrollTotp as boolean | undefined;
         session.user.mustChangePassword = token.mustChangePassword as boolean | undefined;
+        // P10.04: the client guard needs the absolute deadline, not just the
+        // rolling one NextAuth publishes as `expires`.
+        session.user.authenticatedAt = token.authenticatedAt as number | undefined;
       }
       return session;
     }

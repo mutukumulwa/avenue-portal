@@ -15,6 +15,12 @@ declare module "next-auth" {
       mustEnrollTotp?: boolean;
       /** ELIG-GAP-006: admin-set temporary password; confined to /change-password until replaced. */
       mustChangePassword?: boolean;
+      /**
+       * UAT-HF P10.04 (DEF-015): when this session was authenticated, in ms.
+       * Stamped once and never refreshed — the absolute lifetime is measured
+       * from here, and no amount of activity extends it.
+       */
+      authenticatedAt?: number;
     } & DefaultSession["user"];
   }
 
@@ -32,6 +38,8 @@ declare module "next-auth" {
     mustEnrollTotp?: boolean;
       /** ELIG-GAP-006: admin-set temporary password; confined to /change-password until replaced. */
       mustChangePassword?: boolean;
+    /** UAT-HF P10.04 (DEF-015): authentication instant; never refreshed. */
+    authenticatedAt?: number;
   }
 }
 
@@ -50,5 +58,7 @@ declare module "next-auth/jwt" {
     mustEnrollTotp?: boolean;
       /** ELIG-GAP-006: admin-set temporary password; confined to /change-password until replaced. */
       mustChangePassword?: boolean;
+    /** UAT-HF P10.04 (DEF-015): authentication instant; never refreshed. */
+    authenticatedAt?: number;
   }
 }
