@@ -674,7 +674,24 @@ the divergence stays visible to a reviewer.
 |---|---|---|---|---|
 | **P00** | **PASS** — 0 errors (was 5) | **PASS** — 0 errors (was 556), 207 warnings | **PASS** — 260 files / 2611 tests passed, 88 files / 578 skipped | _awaiting owner review_ |
 
-P00 gate run 2026-08-12 on `09662f7`. All three commands green.
+| **P01** | **PASS** — 0 errors | **PASS** — 0 errors, 207 warnings | **PASS** — 270 files / 2778 tests passed, 88 files / 598 skipped | _awaiting owner review_ |
+
+P00 gate run 2026-08-12 on `09662f7`. P01 gate run 2026-08-12 on `ffa2ffd`; both guards
+(`currency:guard`, `locale:guard`) also green. All commands green at both gates.
+
+**P01 movement**
+
+| Measure | P00 exit | P01 exit |
+|---|---|---|
+| Test files / tests passing | 260 / 2611 | **270 / 2778** (+10 files, +167 tests) |
+| Prisma migrations | 3 | **5** (`OperationReceipt`, `DomainEvent`) |
+| Build-time guards | 2 | **3** (added `locale:guard`) |
+
+**What P01 did NOT do, by design.** Every primitive is available and tested; **none is adopted by a
+production screen**. No form uses the mutation envelope (P04.01), no command reserves a receipt or
+records an event (P05/P07), no screen uses the accessible primitives (P11), and no job runs
+`projectPending` yet. P01 makes the correct thing cheap; the phases that follow make it universal.
+Until then **no defect in P01's coverage list is closed** — only preventable.
 
 **Baseline movement across the phase**
 
