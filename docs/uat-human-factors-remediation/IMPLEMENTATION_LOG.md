@@ -440,6 +440,54 @@ response is `Cache-Control: no-store` so a stale "still processing" cannot provo
 `params` is a `Promise` and must be awaited — a breaking change from the shape in training data, and
 exactly what `AGENTS.md` exists to catch.
 
+### P01.03 — Transactional audit/notification outbox
+
+| Field | Value |
+|---|---|
+| **Task** | P01.03 |
+| **Defect IDs** | DEF-040, DEF-041, DEF-042, DEF-045, DEF-048, DEF-059, DEF-077, DEF-081 |
+| **Commit** | _pending_ |
+| **Migrations / backfills** | `20260812000400_domain_event` — `DomainEvent` table, `DomainEventProjectionState` enum, `ActivityLog.domainEventId` (unique, `SET NULL`), and an **append-only trigger**. Additive; no backfill. Fresh-DB deploy + zero-drift verified. |
+| **Tests added** | `tests/db/domain-event.test.ts` — **12** (2 pure, 10 real DB) |
+| **Commands / results** | Real-DB run → **12 passed**. Full suite → **265 files / 2669 tests passed**, 88 files / 598 skipped. typecheck 0; lint 0 errors. |
+| **Routes exercised** | none — the projector is a service; wiring it into the worker is P07.05 / P12.01 |
+| **Evidence** | `src/server/services/domain-event.service.ts`, the migration |
+| **Feature flags** | none |
+| **Remaining risks** | **No scheduled job runs `projectPending` yet** — it must be added to `src/server/jobs/` before any command relies on it, or events will sit PENDING forever. No lifecycle command records events yet (P07). A `MEMBER` event whose `entityId` is not a real member fails its `ActivityLog` foreign key and lands in `FAILED`; that is correct but means P07 must record events only for members that exist at commit time. |
+
+**What was already there, and what was actually missing.** A good transactional notification outbox
+already exists (`NotificationOutbox` + `src/server/services/notifications/outbox.ts`, PNOS F4.8) and
+already accepts a transaction client. Building a rival would have repeated the mistake this plan
+warns about, so P01.03 **reuses** it.
+
+The real gap was the *audit* half. DEF-040: "Standard Cancel" terminated a member on one unconfirmed
+click and computed a **UGX 1,196,212.33** refund, and the member's Activity Log still read *"No
+activity recorded yet."* The cause is structural — lifecycle writes go to the audit-chain model while
+the member page reads `ActivityLog`, so the two never meet.
+
+**The shape.** A command records one `DomainEvent` inside its own transaction, alongside the state
+change and the operation receipt. Fan-out to `ActivityLog` happens afterwards in `projectPending`.
+So state can never commit without its event, and a downed mail worker can never roll back a
+committed business change.
+
+**Idempotency is structural, not hopeful.** `ActivityLog.domainEventId` is unique, so a projector
+that crashed *after* inserting but *before* marking the event cannot double-post. A test rewinds
+exactly that bookkeeping and asserts the re-run reports `alreadyProjected: 1` with still one row.
+
+**Immutability is enforced by the database.** Prisma cannot express "append-only", so the migration
+adds a trigger: projection bookkeeping may change, nothing else may, and nothing may be deleted.
+Tests prove `payload`, `description` and `actorName` all reject an `UPDATE`, and `DELETE` is refused
+— while a projection-state update still succeeds. Without it, "immutable" would be a comment.
+
+**Failures stay visible.** A projection that keeps failing is retried up to 5 times, then marked
+`FAILED` — never dropped — appears in `listUnprojected`, and can be `replayFailed` once the cause is
+fixed. Tested end to end using a `MEMBER` event with a non-existent member, which is a genuine
+foreign-key failure rather than a simulated one.
+
+**Actor identity is denormalised onto the event** (`actorName`, `actorRole`) because DEF-047 found
+the endorsement panel showing a raw internal id — `"Maker cmsoxn5j0002tbpvqg8gomey4"`. An audit trail
+has to survive the actor being renamed or deactivated.
+
 ---
 
 ## Corrections made to the implementation plan

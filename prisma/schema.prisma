@@ -5212,6 +5212,12 @@ model ActivityLog {
   metadata    Json?
   createdAt   DateTime @default(now())
 
+  /// UAT-HF P01.03. Set when this row was PROJECTED from a DomainEvent rather
+  /// than written directly. Unique, so replaying the projector after a worker
+  /// crash cannot produce a second activity line for the same event.
+  domainEventId String?      @unique
+  domainEvent   DomainEvent? @relation(fields: [domainEventId], references: [id], onDelete: SetNull)
+
   // Polymorphic references
   groupId       String?
   group         Group?            @relation(fields: [groupId], references: [id])
@@ -5249,6 +5255,85 @@ model AuditLog {
   @@index([createdAt])
   @@index([tenantId, chainSequence])
   @@index([tenantId, entityType, entityId])
+}
+
+// ─── DOMAIN EVENTS (UAT-HF P01.03) ──────────────────────
+//
+// The immutable record of what actually happened, written in the SAME transaction
+// as the state change and its operation receipt.
+//
+// The run's sharpest example is DEF-040: "Standard Cancel" terminated a member on
+// one unconfirmed click and computed a refund of UGX 1,196,212.33 — and the member's
+// Activity Log still read "No activity recorded yet." The termination and the money
+// were absent from the trail. The cause is structural: lifecycle writes go to the
+// audit-chain model while the member page reads ActivityLog, so the two never meet
+// (DEF-045, DEF-048, DEF-059, DEF-081 are the same shape).
+//
+// Fixing it by writing ActivityLog directly would just move the problem. Instead a
+// command records ONE event transactionally, and a projector fans it out into the
+// activity log and the notification outbox afterwards. State can therefore never
+// commit without its event, and a failed projection is visible and replayable
+// rather than silently lost.
+
+enum DomainEventProjectionState {
+  /// Recorded, not yet fanned out.
+  PENDING
+  /// Projected into the activity log (and notifications, where applicable).
+  PROJECTED
+  /// Projection failed repeatedly; needs attention. Never silently dropped.
+  FAILED
+}
+
+model DomainEvent {
+  id       String @id @default(cuid())
+  tenantId String
+
+  /// Dotted, stable name, e.g. "member.lifecycle.terminated".
+  eventType String
+
+  entityType String
+  entityId   String
+  /// Quotable business reference, e.g. "UX26-2026-00017". Never PII.
+  entityRef String?
+
+  // Denormalised actor identity. DEF-047 found the endorsement panel showing a raw
+  // internal id ("Maker cmsoxn5j0002tbpvqg8gomey4"); an audit trail has to survive
+  // the actor being renamed or deactivated, so the display name is captured here.
+  actorId   String?
+  actorName String?
+  actorRole String?
+
+  /// One human sentence, written by the command that recorded the event, e.g.
+  /// "Cover terminated with effect from 31 Aug 2026 (last covered day)." This is
+  /// what the activity log shows. It is part of the immutable record because the
+  /// run's complaint was not that text was wrong but that it was absent.
+  description String
+
+  /// When the change took business effect. May differ from createdAt.
+  occurredAt DateTime @default(now())
+
+  /// The command, or before/after. Immutable — see the trigger in the migration.
+  payload Json
+
+  /// Why. DEF-040/041 found lifecycle transitions firing with no reason at all.
+  reasonCode String?
+  reasonNote String?
+
+  correlationId      String?
+  operationReceiptId String?
+
+  projectionState    DomainEventProjectionState @default(PENDING)
+  projectedAt        DateTime?
+  projectionAttempts Int                        @default(0)
+  projectionError    String?
+
+  createdAt DateTime @default(now())
+
+  activityLog ActivityLog?
+
+  @@index([tenantId, entityType, entityId, occurredAt])
+  @@index([projectionState, createdAt])
+  @@index([tenantId, eventType, occurredAt])
 }
 
 // ─── OPERATION RECEIPTS (UAT-HF P01.02) ─────────────────
