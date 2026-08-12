@@ -488,6 +488,56 @@ foreign-key failure rather than a simulated one.
 the endorsement panel showing a raw internal id — `"Maker cmsoxn5j0002tbpvqg8gomey4"`. An audit trail
 has to survive the actor being renamed or deactivated.
 
+### P01.04 — Error boundaries and recovery surfaces
+
+| Field | Value |
+|---|---|
+| **Task** | P01.04 |
+| **Defect IDs** | DEF-050 (containment), DEF-065, DEF-070 |
+| **Commit** | _pending_ |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/components/error-boundaries.test.tsx` — **13** |
+| **Commands / results** | Boundary tests → **13 passed**. Full suite → **266 files / 2682 tests passed**, 88 files / 598 skipped. typecheck 0; lint 0 errors. |
+| **Routes exercised** | none in a browser — boundaries are unit-rendered. A live check belongs with P02.02, which needs a seeded bad contract row. |
+| **Evidence** | `src/components/errors/ErrorRecovery.tsx`, the four boundary files |
+| **Feature flags** | none |
+| **Remaining risks** | `reportBoundaryError` logs to `console` only; real telemetry is P12.01. No boundary was exercised against a running server — `next build` was not run, so a Next-specific wiring mistake would not have been caught by typecheck alone. Segment boundaries exist for the admin area and contracts only; other segments still escalate to the app boundary. |
+
+**Four boundaries, each with a different job.**
+
+| File | Catches | Keeps alive |
+|---|---|---|
+| `app/global-error.tsx` | failure of the root layout itself | nothing — it replaces the layout |
+| `app/error.tsx` | anything under the root layout | the app shell |
+| `app/(admin)/error.tsx` | any admin page | the admin sidebar and navigation |
+| `app/(admin)/contracts/error.tsx` | provider contracts specifically | the whole admin shell |
+
+The contracts boundary is the DEF-050 containment. That S1 took the entire Provider
+Contracts module down for every user — `RangeError: Invalid time value` in **both** the list and
+detail renderers — and **no UI recovery path existed**, because the offending row was reachable only
+through the two crashing routes. It had to be deleted out-of-band in production. A boundary there
+keeps the operator inside the product while the data is repaired. It contains the blast radius; P02
+still owns the cause.
+
+**The digest is the reference DEF-070 asked for.** The run recorded that server errors already
+carried digests but nothing surfaced on the client path. `error.digest` is exactly the identifier
+Next generates to match the server log, so it is rendered as the quotable reference.
+
+**`error.message` is never rendered, and that is not incidental.** The version-matched docs are
+explicit: for *server* errors the client receives a generic message, but for *client* errors it is
+the real exception text. A test asserts that an error reading
+`"RangeError: Invalid time value at formatContractDate (member NWSC-2026-00001)"` renders neither the
+member number, nor the message, nor the stack.
+
+**Every surface offers a way out, not only "try again".** Retrying is safe here because a boundary
+only ever re-runs a read — writes are kept local by P01.01 — but DEF-050's module was unusable
+precisely because every route into it crashed and nothing offered an exit.
+
+**One deliberate lint exception.** `global-error.tsx` uses a plain `<a>` rather than `next/link`, and
+`@next/next/no-html-link-for-pages` objects. The rule is right in general and wrong here: this
+boundary replaces the root layout, so the router is part of what may have failed, and a full document
+load *is* the recovery. Disabled on that single line with the reason written beside it.
+
 ---
 
 ## Corrections made to the implementation plan
