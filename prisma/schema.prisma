@@ -5251,6 +5251,72 @@ model AuditLog {
   @@index([tenantId, entityType, entityId])
 }
 
+// ─── OPERATION RECEIPTS (UAT-HF P01.02) ─────────────────
+//
+// One row per *intended business effect*, reserved BEFORE the write and completed
+// in the same transaction as it. This is what makes "did my submit land?"
+// answerable at all.
+//
+// DEF-065: a dropped response destroyed the operator's input and hid a write that
+// HAD committed — the server returned 200 and created UX26-2026-00037 while the
+// screen showed only a crash. DEF-034: a double-click silently discarded an
+// enrolment. DEF-068: a dropped import confirm left no way to learn the outcome.
+// All three are the same missing thing: a durable record of intent, keyed by
+// something the client chose before it sent anything.
+
+enum OperationReceiptState {
+  /// Reserved; the command has not started work yet.
+  RECEIVED
+  /// The command is running. A second submit arriving here must NOT write again.
+  PROCESSING
+  /// Committed. A replay returns the stored reference instead of writing.
+  SUCCEEDED
+  /// Provably did not commit. The same key may be retried.
+  FAILED
+  /// We cannot tell. Never auto-retried; requires a human or a reconciliation job.
+  UNKNOWN
+}
+
+model OperationReceipt {
+  id String @id @default(cuid())
+
+  // Deliberately plain columns, not relations. AuditLog's User foreign key is
+  // RESTRICT, which is why the UAT run could not delete its 17 personas without
+  // destroying 72 audit rows. A receipt must never become a reason a tenant or
+  // user cannot be removed, and it outlives both by design.
+  tenantId String
+  actorId  String
+
+  /// Stable command name, e.g. "members.create". Part of the idempotency key.
+  operationType String
+  /// Chosen by the CLIENT before the first attempt and resent on every retry.
+  idempotencyKey String
+  /// SHA-256 of the canonicalised request. Same key + different hash = conflict.
+  requestHash String
+
+  state OperationReceiptState @default(RECEIVED)
+
+  /// What the command affected, once known.
+  entityType String?
+  entityId   String?
+  /// Quotable business reference, e.g. "UX26-2026-00017". Never PII.
+  entityRef String?
+
+  /// Safe, non-PII outcome code for support and dashboards, e.g. "CONFLICT".
+  resultCode String?
+  /// The attempt's correlation id, tying this row to the server logs.
+  correlationId String?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+
+  /// The idempotency boundary: one actor's one named intent, once.
+  @@unique([tenantId, actorId, operationType, idempotencyKey])
+  @@index([tenantId, state, createdAt])
+  @@index([tenantId, entityType, entityId])
+}
+
 // ─── MEDICAL CODE REFERENCE ─────────────────────────────
 model ICD10Code {
   code           String   @id // "E11.9"

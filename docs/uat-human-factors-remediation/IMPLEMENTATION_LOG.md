@@ -394,6 +394,52 @@ trees accumulated in `document.body` for a whole file and a later test could fai
 test's DOM. Added `afterEach(cleanup)`. Verified against the full suite: nothing else depended on the
 old behaviour. This would otherwise have bitten every component test P01.06 and P11.01 add.
 
+### P01.02 — Correlation and durable operation receipts
+
+| Field | Value |
+|---|---|
+| **Task** | P01.02 |
+| **Defect IDs** | DEF-065, DEF-068, DEF-070, DEF-075 |
+| **Commit** | _pending_ |
+| **Migrations / backfills** | `20260812000300_operation_receipt` — new `OperationReceipt` table + `OperationReceiptState` enum. Additive only; no backfill. Verified on a fresh DB: 4/4 migrations apply, drift check "No difference detected". |
+| **Tests added** | `tests/db/operation-receipt.test.ts` (14, real DB + 4 pure) and `tests/api/operation-status-route.test.ts` (10) — **24 new tests** |
+| **Commands / results** | Real-DB run → **14 passed**. Route tests → **10 passed**. Full suite → **264 files / 2667 tests passed**, 88 files / 588 skipped. typecheck 0; lint 0 errors. |
+| **Routes exercised** | `GET /api/operations/[operationId]` (new) |
+| **Evidence** | `src/server/services/operation-receipt.service.ts`, the migration, both test files |
+| **Feature flags** | none |
+| **Remaining risks** | No production command reserves a receipt yet — P04.01 adopts it on the critical forms, and until then the mechanism is inert in the running app. The endpoint is actor-scoped only; a tenant-wide *support* lookup is P12.01. Nothing yet reaps old receipts, so a retention job belongs to P12.02. |
+
+**The acceptance test is DEF-065 reproduced deliberately.** A transaction commits a real row and
+completes its receipt; the "response" is then thrown away; the operator resubmits the same draft
+with the same operation id. The test asserts the second attempt returns **REPLAY**, that
+**exactly one entity exists**, and that the outcome is discoverable from the opaque id alone.
+
+**Design decisions worth recording.**
+
+- **The unique index is the guard, not a pre-write probe.** A test fires 8 concurrent reservations
+  of one key and asserts exactly one `RESERVED` and seven `IN_PROGRESS`, with one row in the table.
+  This is the pattern plan §1.3 says the codebase is missing everywhere else.
+- **Only a provably `FAILED` attempt may be retried under the same key.** `UNKNOWN` returns
+  `UNKNOWN_PRIOR` and is never auto-reserved — retrying there is exactly how a duplicate gets
+  created. `SUCCEEDED` replays; anything in flight refuses.
+- **Same key + different payload is a `CONFLICT`, not a replay.** Returning the old result for a
+  changed request would silently discard the user's edit.
+- **`tenantId`/`actorId` are plain columns with no foreign key.** `AuditLog`'s `User` FK is
+  `RESTRICT`, which is why the run could not delete its 17 personas without destroying 72 audit
+  rows. A receipt must never become the reason a user cannot be removed.
+- **A rolled-back write leaves no false success**, asserted by a test that throws after both writes
+  inside one transaction and checks the receipt is still `PROCESSING` with no `entityRef`.
+
+**Privacy.** The lookup key is the client's random idempotency key, and the route validates its
+shape, so `NWSC-2026-00001`, an email or a national ID are rejected with 400 **before any query
+runs** — tested explicitly. An operation that is not the caller's returns **404, not 403**, so
+existence is never confirmed. The projection carries no request payload and no request hash, and the
+response is `Cache-Control: no-store` so a stale "still processing" cannot provoke a resubmit.
+
+**Reading the version-matched docs earned its keep.** `route.mdx` for Next 15.5.15 documents that
+`params` is a `Promise` and must be awaited — a breaking change from the shape in training data, and
+exactly what `AGENTS.md` exists to catch.
+
 ---
 
 ## Corrections made to the implementation plan
