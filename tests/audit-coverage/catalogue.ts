@@ -66,6 +66,11 @@ export const KNOWN_AUDITING_TOKENS = [
 ];
 
 export const AUDIT_EXCLUSIONS: Record<string, string> = {
+  // UAT-HF P04.01 — the "check before you retry" lookup. A READ of the
+  // caller's own operation receipt; it writes nothing. The enrolment it
+  // reports on is itself audited by addMemberAction.
+  "members/new/actions.ts:lookupEnrolmentOutcomeAction":
+    "READ_ONLY - reads the caller's own OperationReceipt so an operator can discover a prior attempt's outcome",
   // UAT-HF P03.05 — eligibility is a READ. It writes no business state; the
   // service records its own ProviderEligibilityCheck evidence row with actor,
   // provider, member, service date and result, which is the point-in-time

@@ -1,7 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
-import { addMemberAction } from "./actions";
+import { useMutationAction } from "@/components/forms/useMutationAction";
+import { ErrorSummary } from "@/components/forms/ErrorSummary";
+import { MutationOutcome } from "@/components/forms/MutationOutcome";
+import { addMemberAction, type MemberCreated } from "./actions";
 import { Save, AlertCircle, AlertTriangle } from "lucide-react";
 import { SessionExpiryGuard } from "@/components/layouts/SessionExpiryGuard";
 
@@ -21,24 +23,45 @@ interface Props {
 }
 
 export function MemberNewForm({ groups, principal }: Props) {
-  const [state, action, pending] = useActionState(addMemberAction, null);
+  /**
+   * UAT-HF P04.01 — DEF-034. This form already carried `disabled={pending}` at
+   * the tested build and the double-click still lost the enrolment: React's
+   * `pending` does not flip until the transition starts, so a fast second click
+   * lands on a live control and aborts the first submit.
+   *
+   * `useMutationAction` mints ONE operation id per mounted draft and resends it,
+   * so the server recognises the second click as the same intent (P01.02) and
+   * replays instead of writing again — or losing the work.
+   */
+  const { state, formAction: action, pending, operationId } = useMutationAction<MemberCreated>(addMemberAction);
+  const warnings = state?.ok ? (state.data?.warnings ?? []) : [];
 
   return (
     <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-6">
-      {state?.error && (
-        <div className="mb-5 flex items-start gap-2 bg-[#DC3545]/5 border border-[#DC3545]/30 text-[#DC3545] rounded-lg px-4 py-3 text-sm">
-          <AlertCircle size={16} className="shrink-0 mt-0.5" />
-          <span>{state.error}</span>
-        </div>
-      )}
-      {state?.warnings && state.warnings.length > 0 && (
+      {/* Field-level problems, focus-managed (P01.01). */}
+      <ErrorSummary failure={state && !state.ok ? state : null} />
+
+      {/*
+        Every non-validation outcome gets its own distinct state, including
+        "we could not confirm whether this was saved" — which is what a dropped
+        response after a commit actually is, and what DEF-034's blank form hid.
+      */}
+      <div className="mb-5">
+        <MutationOutcome
+          result={state}
+          nextHref={state?.ok && state.data?.memberId ? `/members/${state.data.memberId}` : undefined}
+          checkHref={`/api/operations/${operationId}`}
+        />
+      </div>
+
+      {warnings.length > 0 && (
         <div className="mb-5 bg-[#FFC107]/5 border border-[#FFC107]/40 rounded-lg px-4 py-3 space-y-2">
           <div className="flex items-center gap-2 text-[#856404]">
             <AlertTriangle size={15} className="shrink-0" />
             <p className="text-sm font-bold">Member enrolled — enrollment risk flags detected</p>
           </div>
           <ul className="space-y-1 pl-5 list-disc">
-            {state.warnings.map((w, i) => (
+            {warnings.map((w, i) => (
               <li key={i} className="text-xs text-[#856404]">{w}</li>
             ))}
           </ul>
