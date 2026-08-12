@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { ArrowLeft, AlertTriangle } from "lucide-react";
 import { createContractAction } from "../actions";
+import { MAX_CALENDAR_DATE, MIN_CALENDAR_DATE } from "@/lib/calendar-date";
 
 export const dynamic = "force-dynamic";
 
@@ -91,15 +92,15 @@ export default async function NewContractPage({
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className={label}>Start date *</label>
-              <input type="date" name="startDate" required className={field} />
+              <input type="date" name="startDate" required min={MIN_CALENDAR_DATE} max={MAX_CALENDAR_DATE} className={field} />
             </div>
             <div>
               <label className={label}>End date *</label>
-              <input type="date" name="endDate" required className={field} />
+              <input type="date" name="endDate" required min={MIN_CALENDAR_DATE} max={MAX_CALENDAR_DATE} className={field} />
             </div>
             <div>
               <label className={label}>Review-due date</label>
-              <input type="date" name="reviewDueDate" className={field} />
+              <input type="date" name="reviewDueDate" min={MIN_CALENDAR_DATE} max={MAX_CALENDAR_DATE} className={field} />
             </div>
           </div>
         </section>

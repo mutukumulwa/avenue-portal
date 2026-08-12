@@ -1,4 +1,10 @@
 import { prisma } from "@/lib/prisma";
+import { MAX_CALENDAR_DATE, MIN_CALENDAR_DATE, calendarDateFromUtcDate } from "@/lib/calendar-date";
+import {
+  CONTRACT_DATE_LABELS,
+  isRenderableContractDate,
+  validateContractTermPatch,
+} from "@/lib/validation/provider-contract";
 import { auditChainService } from "./audit-chain.service";
 import { ProviderContractsService } from "./provider-contracts.service";
 import type { Prisma, ProviderContractStatus, OverrideType } from "@prisma/client";
@@ -212,27 +218,54 @@ export class ContractLifecycleService {
       );
     }
 
+    // UAT-HF P02.01 — validate the three date fields HERE, not only in the
+    // action, so the tRPC and API doors cannot bypass DEC-02. Callers pass raw
+    // strings; this is the single place they become Dates.
+    const patch = validateContractTermPatch(
+      {
+        startDate: fields.startDate as string | undefined,
+        endDate: fields.endDate as string | undefined,
+        reviewDueDate: fields.reviewDueDate as string | undefined,
+      },
+      { startDate: c.startDate, endDate: c.endDate },
+    );
+    if (!patch.ok) {
+      throw new Error(
+        Object.entries(patch.fieldErrors)
+          .map(([field, messages]) => `${CONTRACT_DATE_LABELS[field] ?? field}: ${messages[0]}`)
+          .join(" "),
+      );
+    }
+    const resolved: Partial<Record<DraftEditableField, unknown>> = { ...fields };
+    for (const key of ["startDate", "endDate", "reviewDueDate"] as const) {
+      if (key in patch.dates) resolved[key] = patch.dates[key];
+      else if (key in fields) delete resolved[key];
+    }
+
     // Whitelist + diff.
     const data: Record<string, unknown> = {};
     const diff: Record<string, { before: unknown; after: unknown }> = {};
     for (const key of DRAFT_EDITABLE_FIELDS) {
-      if (!(key in fields)) continue;
-      const after = fields[key];
+      if (!(key in resolved)) continue;
+      const after = resolved[key];
       const before = (c as Record<string, unknown>)[key];
-      const beforeCmp = before instanceof Date ? before.toISOString() : before;
-      const afterCmp = after instanceof Date ? after.toISOString() : after;
+      // Compare and render through the safe helpers: `before` is whatever is
+      // ALREADY stored, and an unguarded toISOString() on a damaged legacy row
+      // is exactly the DEF-050 crash — here it would take out the edit that was
+      // trying to repair it.
+      const safe = (v: unknown) => (v instanceof Date ? (calendarDateFromUtcDate(v) ?? "invalid-date") : v);
+      const beforeCmp = safe(before);
+      const afterCmp = safe(after);
       if (beforeCmp === afterCmp) continue;
       data[key] = after;
-      diff[key] = {
-        before: before instanceof Date ? before.toISOString().slice(0, 10) : before,
-        after: after instanceof Date ? after.toISOString().slice(0, 10) : after,
-      };
+      diff[key] = { before: safe(before), after: safe(after) };
     }
     if (Object.keys(data).length === 0) return c;
 
-    if (data.startDate && data.endDate && (data.endDate as Date) <= (data.startDate as Date)) {
-      throw new Error("End date must be after the start date.");
-    }
+    // DEC-02 requires end >= start; a single-day term is unusual but not
+    // invalid, and refusing it would be an invented commercial rule. The
+    // cross-field check itself now lives in validateContractTermPatch above,
+    // which also catches editing ONE date into an inverted term.
 
     const updated = await prisma.providerContract.update({ where: { id: contractId }, data: data as never });
     await this.logEvent(
@@ -494,6 +527,16 @@ export class ContractLifecycleService {
     contractId: string,
     opts: { startDate: Date; endDate: Date; upliftPct: number; userId?: string },
   ) {
+    // UAT-HF P02.01 — the renewal door takes Dates rather than strings, so guard
+    // them here too. A caller that built `new Date("70831-02-20")` must not get
+    // a renewed contract the register then cannot render (DEF-050).
+    if (!isRenderableContractDate(opts.startDate) || !isRenderableContractDate(opts.endDate)) {
+      throw new Error(`Renewal dates must fall between ${MIN_CALENDAR_DATE} and ${MAX_CALENDAR_DATE}.`);
+    }
+    if (opts.endDate < opts.startDate) {
+      throw new Error("The end date must be on or after the start date.");
+    }
+
     const old = await prisma.providerContract.findUnique({
       where: { id: contractId, tenantId },
       include: {

@@ -77,7 +77,30 @@ describe("editDraftHeader (PR-010)", () => {
         startDate: new Date("2026-08-01"),
         endDate: new Date("2026-07-01"),
       }),
-    ).rejects.toThrow(/End date must be after/);
+    ).rejects.toThrow(/on or after the start date/);
+  });
+
+  /**
+   * UAT-HF P02.01 / DEC-02. This rule CHANGED: it used to be "end must be AFTER
+   * start", which forbade a single-day term. DEC-02 requires only end >= start
+   * and says explicitly "do not invent a narrower commercial duration", so a
+   * one-day contract is now accepted. The assertion above was updated to the new
+   * message for the same reason, not to make a failing test pass.
+   */
+  it("allows a single-day term (DEC-02: end >= start)", async () => {
+    await expect(
+      ContractLifecycleService.editDraftHeader(T, "pc1", "u1", {
+        startDate: new Date("2026-08-01"),
+        endDate: new Date("2026-08-01"),
+      }),
+    ).resolves.toBeTruthy();
+  });
+
+  /** DEF-050: the five-digit year that killed the module must be refused here too. */
+  it("rejects an out-of-range year through the service door", async () => {
+    await expect(
+      ContractLifecycleService.editDraftHeader(T, "pc1", "u1", { endDate: "70831-02-20" }),
+    ).rejects.toThrow(/between 1900-01-01 and 9999-12-31/);
   });
 });
 

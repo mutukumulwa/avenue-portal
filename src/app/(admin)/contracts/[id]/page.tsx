@@ -9,6 +9,7 @@ import { ManagePanel } from "./ManagePanel";
 import { FeeSchedule } from "./FeeSchedule";
 import { CapitationPanel } from "./CapitationPanel";
 import { ContractExclusionsManager } from "./ContractExclusionsManager";
+import { MAX_CALENDAR_DATE, MIN_CALENDAR_DATE } from "@/lib/calendar-date";
 import {
   submitForReviewAction,
   approveContractAction,
@@ -315,8 +316,8 @@ export default async function ContractDetailPage({
                 <span className="block text-xs font-medium text-[#6C757D] mb-1">Renew for the next period</span>
                 <span className="text-xs text-[#6C757D]">Clones tariffs, rules, packages, applicability &amp; branches into a new DRAFT.</span>
               </div>
-              <label className="text-xs text-[#6C757D]">Start<input type="date" name="startDate" required defaultValue={renewStart} className="block rounded-lg border border-gray-200 px-2 py-1.5 text-sm" /></label>
-              <label className="text-xs text-[#6C757D]">End<input type="date" name="endDate" required defaultValue={renewEnd} className="block rounded-lg border border-gray-200 px-2 py-1.5 text-sm" /></label>
+              <label className="text-xs text-[#6C757D]">Start<input type="date" name="startDate" required min={MIN_CALENDAR_DATE} max={MAX_CALENDAR_DATE} defaultValue={renewStart} className="block rounded-lg border border-gray-200 px-2 py-1.5 text-sm" /></label>
+              <label className="text-xs text-[#6C757D]">End<input type="date" name="endDate" required min={MIN_CALENDAR_DATE} max={MAX_CALENDAR_DATE} defaultValue={renewEnd} className="block rounded-lg border border-gray-200 px-2 py-1.5 text-sm" /></label>
               <label className="text-xs text-[#6C757D]">Uplift %<input type="number" step="0.1" name="upliftPct" defaultValue={0} className="block w-20 rounded-lg border border-gray-200 px-2 py-1.5 text-sm" /></label>
               <button type="submit" className="rounded-lg bg-[#6610F2] px-4 py-2 text-sm font-medium text-white hover:bg-[#560bd0]">Renew</button>
             </form>

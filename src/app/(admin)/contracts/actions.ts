@@ -6,6 +6,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { ContractLifecycleService } from "@/server/services/contract-lifecycle.service";
 import { ProviderContractsService } from "@/server/services/provider-contracts.service";
+import {
+  CONTRACT_DATE_LABELS,
+  validateContractTerm,
+} from "@/lib/validation/provider-contract";
 import type {
   ContractType,
   ContractBranchScope,
@@ -22,6 +26,20 @@ function str(fd: FormData, key: string): string | undefined {
   const v = fd.get(key);
   return typeof v === "string" && v.trim() !== "" ? v.trim() : undefined;
 }
+/**
+ * UAT-HF P02.01. Render field errors into one message that NAMES the offending
+ * field, so "the end date is before the start date" is not reported as a generic
+ * "invalid input".
+ *
+ * This module signals failures with `?error=`; migrating these forms to the
+ * P01.01 mutation envelope (which also preserves typed input) is P04.01's task.
+ */
+function fieldErrorMessage(fieldErrors: Record<string, string[]>): string {
+  return Object.entries(fieldErrors)
+    .map(([field, messages]) => `${CONTRACT_DATE_LABELS[field] ?? field}: ${messages[0]}`)
+    .join(" ");
+}
+
 function num(fd: FormData, key: string): number | undefined {
   const v = str(fd, key);
   if (v === undefined) return undefined;
@@ -41,6 +59,18 @@ export async function createContractAction(formData: FormData) {
   if (!providerId || !title || !startDate || !endDate) {
     redirect("/contracts/new?error=" + encodeURIComponent("Provider, title, start and end date are required."));
   }
+  // DEF-050: the run's crash row carried startDate 60901-02-20 / endDate
+  // 70831-02-20. `new Date(str)` accepted both without complaint because nothing
+  // validated them. Validate BEFORE touching the database.
+  const term = validateContractTerm({
+    startDate,
+    endDate,
+    reviewDueDate: str(formData, "reviewDueDate"),
+  });
+  if (!term.ok) {
+    redirect("/contracts/new?error=" + encodeURIComponent(fieldErrorMessage(term.fieldErrors)));
+  }
+
   const provider = await prisma.provider.findUnique({ where: { id: providerId, tenantId } });
   if (!provider) redirect("/contracts/new?error=Provider+not+found");
 
@@ -53,9 +83,9 @@ export async function createContractAction(formData: FormData) {
       title: title!,
       contractType: (str(formData, "contractType") as ContractType) ?? "RATE_SCHEDULE",
       status: "DRAFT",
-      startDate: new Date(startDate!),
-      endDate: new Date(endDate!),
-      reviewDueDate: str(formData, "reviewDueDate") ? new Date(str(formData, "reviewDueDate")!) : null,
+      startDate: term.dates.startDate,
+      endDate: term.dates.endDate,
+      reviewDueDate: term.dates.reviewDueDate,
       branchScope: (str(formData, "branchScope") as ContractBranchScope) ?? "ALL_BRANCHES",
       externalContractRef: str(formData, "externalContractRef"),
       currency: str(formData, "currency") ?? "KES",
@@ -134,16 +164,18 @@ export async function terminateContractAction(fd: FormData) {
 // ── PR-010: DRAFT header edit + void ─────────────────────────────────────
 export async function editContractHeaderAction(fd: FormData) {
   const { tenantId, userId, id } = await withContract(fd);
-  const date = (k: string) => (str(fd, k) ? new Date(str(fd, k)!) : undefined);
+  // Pass the RAW strings through; the service validates them (P02.01), so the
+  // tRPC and API doors get the same rule rather than trusting this action.
+  const raw = (k: string) => str(fd, k);
   await guarded(
     id,
     () =>
       ContractLifecycleService.editDraftHeader(tenantId, id, userId, {
         title: str(fd, "title"),
         contractType: str(fd, "contractType"),
-        startDate: date("startDate"),
-        endDate: date("endDate"),
-        reviewDueDate: date("reviewDueDate"),
+        startDate: raw("startDate"),
+        endDate: raw("endDate"),
+        reviewDueDate: raw("reviewDueDate"),
         branchScope: str(fd, "branchScope"),
         externalContractRef: str(fd, "externalContractRef"),
         currency: str(fd, "currency"),
@@ -225,12 +257,17 @@ export async function renewContractAction(fd: FormData) {
   if (!id || !startDate || !endDate) {
     redirect(`/contracts/${id}?error=${encodeURIComponent("Renewal needs a start and end date.")}`);
   }
+  const renewalTerm = validateContractTerm({ startDate, endDate });
+  if (!renewalTerm.ok) {
+    redirect(`/contracts/${id}?error=${encodeURIComponent(fieldErrorMessage(renewalTerm.fieldErrors))}`);
+  }
+
   const upliftPct = num(fd, "upliftPct") ?? 0;
   let renewed: { id: string };
   try {
     renewed = await ContractLifecycleService.renew(session.user.tenantId, id!, {
-      startDate: new Date(startDate!),
-      endDate: new Date(endDate!),
+      startDate: renewalTerm.dates.startDate,
+      endDate: renewalTerm.dates.endDate,
       upliftPct,
       userId: session.user.id,
     });
