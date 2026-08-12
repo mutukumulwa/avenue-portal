@@ -4,7 +4,7 @@ const db = vi.hoisted(() => ({
   syncOperation: {
     findUnique: vi.fn(),
     create: vi.fn(async (a: MockDbArgs) => ({ id: "op_" + a.data!.opKey })),
-    update: vi.fn(async () => ({ tenantId: "t1", opKey: "k1", entityType: "Claim" })),
+    update: vi.fn(async (_a: MockDbArgs) => ({ tenantId: "t1", opKey: "k1", entityType: "Claim" })),
   },
   member: { findFirst: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(async (): Promise<unknown[]> => []) },
   provider: { findFirst: vi.fn() },
