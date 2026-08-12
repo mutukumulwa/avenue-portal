@@ -134,28 +134,53 @@ describe("createMember — normalized duplicate detection (M-005/006/007)", () =
     expect(phoneProbe![0].where.phone.in).toContain("0700123456");
   });
 
-  it("rejects a phone duplicate submitted in a different UG format", async () => {
-    overrides.phoneDup = { memberNumber: "MVX-1", firstName: "Ann", lastName: "Old" };
+  /**
+   * UAT-HF P05.04 rewrote the three assertions below, and the reason matters
+   * more than the diff.
+   *
+   * They asserted that a duplicate PHONE and a duplicate EMAIL are rejected.
+   * DEC-07 is signed and explicit that they must not be: "Shared household
+   * numbers are legitimate and common — a principal and their dependants
+   * routinely share one number ... a duplicate phone is at most a *candidate
+   * warning*, never a hard conflict." So the old expectations encoded a defect,
+   * and were changed to the governed behaviour rather than to make them pass.
+   *
+   * They also asserted the message wording — 'phone "…" already exists: Ann Old
+   * (MVX-1)' — which is DEF-078's disclosure itself, an S2 privacy finding.
+   */
+  it("does NOT reject a shared phone — households share a line (DEC-07)", async () => {
+    overrides.phoneDup = { id: "m-other", memberNumber: "MVX-1", firstName: "Ann", lastName: "Old" };
+    const result = await MembersService.createMember("t1", { ...base, phone: "+256700123456" });
+    expect(db.member.create).toHaveBeenCalled();
+    // Not silent, though: it surfaces as a candidate warning beside the success.
+    expect(result.warnings.join(" ")).toMatch(/phone number is already recorded/i);
+  });
+
+  it("does NOT reject a shared email, for the same reason", async () => {
+    overrides.emailDup = { id: "m-other", memberNumber: "MVX-3", firstName: "Cy", lastName: "Old" };
+    const result = await MembersService.createMember("t1", { ...base, email: "USER@Example.com" });
+    expect(db.member.create).toHaveBeenCalled();
+    expect(result.warnings.join(" ")).toMatch(/email address is already recorded/i);
+    const emailProbe = db.member.findFirst.mock.calls.find((c: any) => c[0]?.where?.email !== undefined);
+    expect(emailProbe![0].where.email).toEqual({ equals: "user@example.com", mode: "insensitive" });
+  });
+
+  it("still rejects a case/space national-ID duplicate — the one hard conflict", async () => {
+    overrides.idDup = { id: "m-other", memberNumber: "MVX-2", firstName: "Bob", lastName: "Old" };
     await expect(
-      MembersService.createMember("t1", { ...base, phone: "+256700123456" }),
-    ).rejects.toThrow(/phone .* already exists/i);
+      MembersService.createMember("t1", { ...base, idNumber: "CK1234" }),
+    ).rejects.toThrow(/national ID is already recorded against another member/i);
     expect(db.member.create).not.toHaveBeenCalled();
   });
 
-  it("rejects a case/space national-ID duplicate", async () => {
-    overrides.idDup = { memberNumber: "MVX-2", firstName: "Bob", lastName: "Old" };
-    await expect(
-      MembersService.createMember("t1", { ...base, idNumber: "CK1234" }),
-    ).rejects.toThrow(/National ID .* already exists/i);
-  });
-
-  it("rejects an email duplicate (case-folded) — new check", async () => {
-    overrides.emailDup = { memberNumber: "MVX-3", firstName: "Cy", lastName: "Old" };
-    await expect(
-      MembersService.createMember("t1", { ...base, email: "USER@Example.com" }),
-    ).rejects.toThrow(/email .* already exists/i);
-    const emailProbe = db.member.findFirst.mock.calls.find((c: any) => c[0]?.where?.email !== undefined);
-    expect(emailProbe![0].where.email).toEqual({ equals: "user@example.com", mode: "insensitive" });
+  it("names nobody when it rejects — DEF-078", async () => {
+    overrides.idDup = { id: "m-other", memberNumber: "MVX-2", firstName: "Bob", lastName: "Old" };
+    const error = await MembersService.createMember("t1", { ...base, idNumber: "CK1234" }).catch(
+      (e: Error) => e,
+    );
+    // The run could supply an identifier and learn who held it, one guess at a
+    // time. Not any more, in either direction.
+    expect(String(error)).not.toMatch(/Bob|Old|MVX-2/);
   });
 });
 

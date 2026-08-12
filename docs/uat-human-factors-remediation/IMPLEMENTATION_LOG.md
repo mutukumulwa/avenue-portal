@@ -1081,6 +1081,32 @@ The three-way comparison is also what distinguishes *your* edit from *theirs*: a
 
 ---
 
+## P05 — Member identity, enrollment, search, and profile integrity
+
+### P05.04 — Privacy-safe duplicate handling
+
+| Field | Value |
+|---|---|
+| **Task** | P05.04 |
+| **Defect IDs** | DEF-078 (S2), and the DEC-07 policy error found alongside it |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/services/identity-match.test.ts` (24); 3 existing assertions rewritten in `member-enrolment-integrity.test.ts`, 1 added |
+| **Commands / results** | typecheck 0; lint 0 errors; suite 287 files / 3104 passed. |
+| **Evidence** | `src/server/services/identity-match.service.ts`, `src/server/services/members.service.ts` |
+| **Feature flags** | none. |
+| **Remaining risks** | **The authorized review screen is not built** — `mayReviewDuplicates` and `DUPLICATE_REVIEW_PERMISSION` exist and are tested, but no route resolves a match to a person, and `member.duplicate.review` is granted to no role. Until that ships an operator who hits a hard conflict cannot get the answer from anyone in-product. **No DB unique constraint yet**: the acceptance's "concurrent exact-ID creation is stopped by DB constraint" needs the `@@unique([tenantId, nationalIdNormalized])` that P05.01 adds, so two simultaneous enrolments can still both pass the probe. The import channel does not call this service yet (P06.01). |
+
+**The disclosure was structural, not a wording slip.** All four probes did `select: { memberNumber, firstName, lastName }`, so a name and member number were sitting in scope waiting to be interpolated — and were, in four messages. The fix does not rewrite the sentences; it stops fetching the data. `findIdentityMatches` selects `{ id: true }` and returns an opaque id, so there is no code path in which a name *could* be interpolated by accident. A test asserts the returned object has exactly three keys.
+
+**The register asked for something harder than "stop disclosing".** It records that this message "is also the only thing that prevented a duplicate member after the silently committed write in O-005, and the member number it disclosed was the sole means by which that write's outcome became discoverable at all." Deleting the disclosure would have closed an S2 privacy finding by reopening an S1 discoverability one. So the guard still blocks, and the message now routes the operator to the **operation receipt** (P01.02) for "did my enrolment save?" and to a permissioned colleague for "who holds this ID?" — two different questions that the old message answered with one dangerous sentence.
+
+**A policy error found while here.** The code threw on a duplicate **phone**. DEC-07 says the opposite, in terms: "Shared household numbers are legitimate and common — a principal and their dependants routinely share one number ... a duplicate phone is at most a *candidate warning*, never a hard conflict." So refusing a shared phone was both a disclosure and a wrong refusal — a family enrolling a second dependant on one number was being turned away. Phone, email and name+DOB now flow into the `warnings` channel the enrolment form already renders; only national ID blocks.
+
+**Three existing tests asserted the defect.** They required a duplicate phone and email to be *rejected*, and pinned the disclosing message text verbatim. They were rewritten to the governed behaviour with the reason recorded beside them, not adjusted to pass.
+
+---
+
 ## Corrections made to the implementation plan
 
 The plan is treated as authoritative but not infallible. Where a plan statement was checked against

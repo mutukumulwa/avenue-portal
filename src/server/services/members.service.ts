@@ -5,7 +5,14 @@ import { nextMemberNumber } from "./member-numbering.service";
 import { coverageService } from "./coverage.service";
 import { assertEnrolmentAge } from "./eligibility/enrolment-age";
 import { GroupsService } from "./groups.service";
-import { normalizeNationalId, normalizeEmail, normalizePhone, ugandaPhoneVariants } from "@/lib/normalize";
+import { normalizeNationalId, normalizeEmail, normalizePhone } from "@/lib/normalize";
+import {
+  DuplicateIdentityError,
+  blockingMatch,
+  blockingMessage,
+  candidateWarnings,
+  findIdentityMatches,
+} from "@/server/services/identity-match.service";
 import { canEditTransition } from "@/lib/member-status";
 
 /** Relationships an enrolment path may assign (SIBLING added in WP-3.5F). */
@@ -163,65 +170,36 @@ export class MembersService {
     const phoneKey = data.phone?.trim() ? normalizePhone(data.phone) : null;
     const emailKey = data.email?.trim() ? normalizeEmail(data.email) : "";
 
-    // 1. National ID uniqueness (skip if blank). Case-insensitive against the
-    //    normalized key so "ck 12 34" and "CK1234" are the same member.
-    if (idKey) {
-      const idDup = await prisma.member.findFirst({
-        where: { tenantId, idNumber: { equals: idKey, mode: "insensitive" } },
-        select: { memberNumber: true, firstName: true, lastName: true },
-      });
-      if (idDup) {
-        throw new Error(
-          `A member with National ID "${data.idNumber}" already exists: ${idDup.firstName} ${idDup.lastName} (${idDup.memberNumber})`
-        );
-      }
-    }
-
-    // 2. Phone uniqueness (skip if blank). Match every Uganda format of the same
-    //    line so +256700…, 256700… and 0700… collide.
-    if (data.phone?.trim()) {
-      const variants = ugandaPhoneVariants(data.phone);
-      const phoneDup = await prisma.member.findFirst({
-        where: { tenantId, phone: { in: variants.length ? variants : [data.phone.trim()] } },
-        select: { memberNumber: true, firstName: true, lastName: true },
-      });
-      if (phoneDup) {
-        throw new Error(
-          `A member with phone "${data.phone}" already exists: ${phoneDup.firstName} ${phoneDup.lastName} (${phoneDup.memberNumber})`
-        );
-      }
-    }
-
-    // 3. Email uniqueness (M-007 — none existed before). Case-insensitive.
-    if (emailKey) {
-      const emailDup = await prisma.member.findFirst({
-        where: { tenantId, email: { equals: emailKey, mode: "insensitive" } },
-        select: { memberNumber: true, firstName: true, lastName: true },
-      });
-      if (emailDup) {
-        throw new Error(
-          `A member with email "${data.email}" already exists: ${emailDup.firstName} ${emailDup.lastName} (${emailDup.memberNumber})`
-        );
-      }
-    }
-
-    // 4. Name + DOB uniqueness within the same group
-    const dob = new Date(data.dateOfBirth);
-    const nameDobDup = await prisma.member.findFirst({
-      where: {
-        tenantId,
-        groupId: data.groupId,
-        firstName: { equals: data.firstName.trim(), mode: "insensitive" },
-        lastName:  { equals: data.lastName.trim(),  mode: "insensitive" },
-        dateOfBirth: dob,
-      },
-      select: { memberNumber: true, firstName: true, lastName: true },
+    // ── UAT-HF P05.04 — DEF-078 / DEC-07 ─────────────────────────────────────
+    // These four probes used to throw messages naming the other member and
+    // their member number, e.g. 'A member with phone "…" already exists:
+    // Margaret Bukenya (NWSC-2026-00362)' — including members in a different
+    // client group. That turned the enrolment form into an identifier lookup:
+    // supply a phone, learn who holds it, one guess at a time.
+    //
+    // Two things change. The messages no longer name anybody, and only the
+    // NATIONAL ID still blocks: DEC-07 is explicit that "a principal and their
+    // dependants routinely share one number", so refusing a duplicate phone was
+    // both a disclosure and simply wrong. Phone, email and name+DOB now flow
+    // into the same `warnings` channel the form already renders.
+    const identityMatches = await findIdentityMatches(prisma, tenantId, {
+      nationalId: data.idNumber,
+      phone: data.phone,
+      email: data.email,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      dateOfBirth: data.dateOfBirth,
     });
-    if (nameDobDup) {
-      throw new Error(
-        `A member named "${data.firstName} ${data.lastName}" with the same date of birth already exists in this group (${nameDobDup.memberNumber})`
-      );
+
+    const blocking = blockingMatch(identityMatches);
+    if (blocking) {
+      // Still a hard stop — the run noted this guard "is also the only thing
+      // that prevented a duplicate member after the silently committed write in
+      // O-005". The protection stays; only the disclosure goes.
+      throw new DuplicateIdentityError(blockingMessage(blocking));
     }
+
+    const identityWarnings = candidateWarnings(identityMatches);
 
     // ── Enrollment fraud risk check (soft warnings, never blocks) ────────────
     const enrollmentWarnings = await FraudService.checkEnrollmentRisk({
@@ -270,7 +248,8 @@ export class MembersService {
     // previously got NONE — the eligibility engine was blind to them. Idempotent.
     await coverageService.openPeriod(prisma, tenantId, member.id, effectiveDate, data.coveragePeriodReason ?? "ENROLMENT");
 
-    return { member, warnings: enrollmentWarnings };
+    // P05.04: candidate identity matches are warnings, never blocks (DEC-07).
+    return { member, warnings: [...identityWarnings, ...enrollmentWarnings] };
   }
 
   /**
@@ -303,25 +282,18 @@ export class MembersService {
       );
     }
 
-    // National ID uniqueness (skip if unchanged or blank)
-    const newId = data.idNumber?.trim();
-    if (newId && newId !== member.idNumber) {
-      const dup = await prisma.member.findFirst({
-        where: { tenantId, idNumber: newId, NOT: { id: memberId } },
-        select: { memberNumber: true, firstName: true, lastName: true },
-      });
-      if (dup) throw new Error(`National ID "${newId}" is already assigned to ${dup.firstName} ${dup.lastName} (${dup.memberNumber})`);
-    }
-
-    // Phone uniqueness (skip if unchanged or blank)
-    const newPhone = data.phone?.trim();
-    if (newPhone && newPhone !== member.phone) {
-      const dup = await prisma.member.findFirst({
-        where: { tenantId, phone: newPhone, NOT: { id: memberId } },
-        select: { memberNumber: true, firstName: true, lastName: true },
-      });
-      if (dup) throw new Error(`Phone "${newPhone}" is already assigned to ${dup.firstName} ${dup.lastName} (${dup.memberNumber})`);
-    }
+    // UAT-HF P05.04 — DEF-078. Both probes here named the other member and their
+    // member number, and the phone one blocked a legitimate shared household
+    // line besides (DEC-07). Same service as enrolment, so the two channels
+    // cannot drift: national ID blocks, phone does not.
+    const editMatches = await findIdentityMatches(
+      prisma,
+      tenantId,
+      { nationalId: data.idNumber, phone: data.phone },
+      { excludeMemberId: memberId },
+    );
+    const editBlocking = blockingMatch(editMatches);
+    if (editBlocking) throw new DuplicateIdentityError(blockingMessage(editBlocking));
 
     const updated = await prisma.member.update({
       where: { id: memberId, tenantId },
