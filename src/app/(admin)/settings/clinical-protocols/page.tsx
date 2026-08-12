@@ -173,7 +173,7 @@ export default async function ClinicalProtocolsPage({ searchParams }: { searchPa
             {canManage ? " Use the import form above to add the first version." : " A clinical officer can import the first version."}
           </p>
         ) : (
-          <div className="mt-3 overflow-x-auto">
+          <div className="min-w-0 mt-3 overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
                 <tr>

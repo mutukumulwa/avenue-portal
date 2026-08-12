@@ -182,7 +182,7 @@ export default async function HRMemberDetailPage(
                 {balances.rows.length === 0 ? (
                    <p className="text-xs text-brand-text-muted italic">No pinned benefit schedule for this member.</p>
                 ) : (
-                   <div className="overflow-x-auto">
+                   <div className="min-w-0 max-w-full overflow-x-auto">
                       <table className="w-full text-xs">
                          <thead>
                             <tr className="text-left text-brand-text-muted border-b border-[#EEEEEE]">

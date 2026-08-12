@@ -90,7 +90,7 @@ export default async function PrivacyPage({
       </section>
 
       {/* DSR queue */}
-      <section className="overflow-x-auto rounded-lg border border-brand-border bg-brand-bg">
+      <section className="min-w-0 overflow-x-auto rounded-lg border border-brand-border bg-brand-bg">
         <h2 className="border-b border-brand-border px-4 py-3 text-sm font-semibold uppercase text-brand-text-muted">Data-subject requests</h2>
         <table className="w-full min-w-[720px] text-sm">
           <thead className="bg-brand-bg-alt text-left text-xs uppercase text-brand-text-muted">
@@ -208,7 +208,7 @@ export default async function PrivacyPage({
 
       {/* Processor + breach tables */}
       <div className="grid gap-6 md:grid-cols-2">
-        <section className="overflow-x-auto rounded-lg border border-brand-border bg-brand-bg">
+        <section className="min-w-0 overflow-x-auto rounded-lg border border-brand-border bg-brand-bg">
           <h2 className="border-b border-brand-border px-4 py-3 text-sm font-semibold uppercase text-brand-text-muted">Processor register</h2>
           <table className="w-full text-sm">
             <thead className="bg-brand-bg-alt text-left text-xs uppercase text-brand-text-muted">
@@ -228,7 +228,7 @@ export default async function PrivacyPage({
           </table>
         </section>
 
-        <section className="overflow-x-auto rounded-lg border border-brand-border bg-brand-bg">
+        <section className="min-w-0 overflow-x-auto rounded-lg border border-brand-border bg-brand-bg">
           <h2 className="border-b border-brand-border px-4 py-3 text-sm font-semibold uppercase text-brand-text-muted">Breach incidents</h2>
           <table className="w-full text-sm">
             <thead className="bg-brand-bg-alt text-left text-xs uppercase text-brand-text-muted">

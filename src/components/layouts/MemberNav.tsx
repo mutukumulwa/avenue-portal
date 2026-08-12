@@ -86,7 +86,7 @@ export function MemberNav({ actorName }: { actorName?: string | null } = {}) {
         </div>
         <div className="relative max-w-5xl mx-auto overflow-hidden">
           <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-white to-transparent" />
-          <div className="overflow-x-auto px-2 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="min-w-0 overflow-x-auto px-2 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <div className="flex min-w-max items-stretch gap-2">
             {NAV_ITEMS.map((item) => {
               const Icon = item.icon;

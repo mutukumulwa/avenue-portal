@@ -38,7 +38,7 @@ export default async function BrokerSubmissionDetailPage({ params }: { params: P
           <div><span className="text-brand-text-muted">Pro-Rata</span><p className="font-bold text-brand-text-heading">UGX {Number(endorsement.proratedAmount ?? 0).toLocaleString()}</p></div>
         </div>
         {details && (
-          <pre className="bg-[#F8F9FA] border border-[#EEEEEE] rounded-md p-3 text-xs overflow-x-auto">
+          <pre className="min-w-0 bg-[#F8F9FA] border border-[#EEEEEE] rounded-md p-3 text-xs overflow-x-auto">
             {JSON.stringify(details, null, 2)}
           </pre>
         )}

@@ -42,7 +42,7 @@ export function ClaimLineageTable({
       <div className="px-5 py-3 border-b border-[#EEEEEE]">
         <h2 className="font-bold text-brand-text-heading font-heading">Submission history</h2>
       </div>
-      <div className="overflow-x-auto">
+      <div className="min-w-0 max-w-full overflow-x-auto">
         <table className="w-full text-sm">
           <caption className="sr-only">Every version of this claim, oldest first, with the change in billed amount and its status.</caption>
           <thead className="text-[11px] uppercase text-brand-text-muted">

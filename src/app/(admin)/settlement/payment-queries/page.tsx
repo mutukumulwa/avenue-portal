@@ -33,7 +33,7 @@ export default async function FinancePaymentQueue() {
         {queries.length === 0 ? (
           <div className="px-5 py-12 text-center text-brand-text-muted text-sm">No payment queries.</div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="min-w-0 max-w-full overflow-x-auto">
             <table className="w-full text-sm text-left min-w-[46rem]">
               <caption className="sr-only">Provider payment queries</caption>
               <thead>

@@ -97,7 +97,7 @@ export default async function ProviderPreauth({
             No pre-authorizations{active !== "all" ? ` with status ${active.replace(/_/g, " ")}` : ""}.
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="min-w-0 max-w-full overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-[11px] uppercase text-brand-text-muted">
                 <tr className="border-b border-[#EEEEEE]">

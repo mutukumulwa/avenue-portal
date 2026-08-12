@@ -66,7 +66,7 @@ export default async function SettlementReconciliationDashboard() {
             {run ? "No reconciliation exceptions — every settled batch conserves." : "No reconciliation run yet."}
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="min-w-0 max-w-full overflow-x-auto">
             <table className="w-full text-sm text-left min-w-[52rem]">
               <caption className="sr-only">Settlement reconciliation exceptions</caption>
               <thead>

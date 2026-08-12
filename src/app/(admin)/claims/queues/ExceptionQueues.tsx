@@ -79,7 +79,7 @@ export async function ExceptionQueues({ tenantId, queue, route }: { tenantId: st
       </div>
 
       {queue && (
-        <div className="overflow-x-auto rounded-lg border border-brand-border bg-brand-bg">
+        <div className="min-w-0 overflow-x-auto rounded-lg border border-brand-border bg-brand-bg">
           <div className="flex flex-wrap items-center gap-2 border-b border-brand-border px-4 py-2.5">
             {byQueue.get(queue)?.routes.map((r) => (
               <Link

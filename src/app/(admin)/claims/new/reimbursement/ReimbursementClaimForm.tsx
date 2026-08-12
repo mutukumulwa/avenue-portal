@@ -161,7 +161,7 @@ export function ReimbursementClaimForm({ members, providers }: { members: Member
       {/* Service lines */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-3">
         <h3 className="font-bold text-brand-text-heading text-sm">Service Lines (from provider receipt)</h3>
-        <div className="overflow-x-auto">
+        <div className="min-w-0 max-w-full overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-[10px] font-bold uppercase text-brand-text-muted border-b border-[#EEEEEE]">

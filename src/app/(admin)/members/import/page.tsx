@@ -117,7 +117,7 @@ export default async function MemberImportPage() {
         {/* Example layout */}
         <div>
           <p className="font-bold text-brand-text-heading text-xs uppercase tracking-wide mb-2">Example — Kamau family</p>
-          <div className="overflow-x-auto">
+          <div className="min-w-0 max-w-full overflow-x-auto">
             <table className="w-full text-[10px] border-collapse font-mono">
               <thead>
                 <tr className="bg-brand-indigo text-white">

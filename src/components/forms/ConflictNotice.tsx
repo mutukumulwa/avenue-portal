@@ -78,7 +78,7 @@ export function ConflictNotice({ conflict }: { conflict: ConflictDetail | null |
 
 function ComparisonTable({ rows }: { rows: ConflictDetail["fields"] }) {
   return (
-    <div className="mt-1.5 overflow-x-auto">
+    <div className="min-w-0 mt-1.5 overflow-x-auto">
       <table className="w-full min-w-0 text-xs">
         <thead>
           <tr className="text-left text-[#856404]">

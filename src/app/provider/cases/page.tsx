@@ -67,7 +67,7 @@ export default async function ProviderCases() {
           No inpatient cases at your facility yet.
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-[#EEEEEE] bg-white">
+        <div className="min-w-0 overflow-x-auto rounded-xl border border-[#EEEEEE] bg-white">
           <table className="w-full min-w-[860px] text-sm">
             <thead>
               <tr className="border-b border-[#EEEEEE] text-left text-xs uppercase text-brand-text-muted">

@@ -38,7 +38,7 @@ export default async function ProviderPaymentQueries() {
             No payment queries. Raise one from a settlement statement if a payment looks wrong.
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="min-w-0 max-w-full overflow-x-auto">
             <table className="w-full text-sm text-left min-w-[40rem]">
               <caption className="sr-only">Your payment queries</caption>
               <thead>

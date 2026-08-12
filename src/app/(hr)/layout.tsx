@@ -52,7 +52,7 @@ export default async function HRLayout({
         )}
         <div className="flex min-h-screen bg-brand-bg-alt/30">
           <HRSidebar groupName={groupName} userRole={session.user.role as string} userName={session.user.name ?? null} />
-          <div className="flex-1 ml-60 p-8">
+          <div className="min-w-0 flex-1 ml-60 p-8">
             <Breadcrumbs />
             {children}
           </div>

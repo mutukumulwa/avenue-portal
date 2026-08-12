@@ -133,7 +133,7 @@ export default async function AdminFeesPage({
         </section>
       </div>
 
-      <section className="overflow-x-auto rounded-lg border border-brand-border bg-brand-bg">
+      <section className="min-w-0 overflow-x-auto rounded-lg border border-brand-border bg-brand-bg">
         <h2 className="border-b border-brand-border px-4 py-3 text-sm font-semibold uppercase text-brand-text-muted">Agreements</h2>
         <table className="w-full min-w-[620px] text-sm">
           <thead className="bg-brand-bg-alt text-left text-xs uppercase text-brand-text-muted">
@@ -172,7 +172,7 @@ export default async function AdminFeesPage({
         </table>
       </section>
 
-      <section className="overflow-x-auto rounded-lg border border-brand-border bg-brand-bg">
+      <section className="min-w-0 overflow-x-auto rounded-lg border border-brand-border bg-brand-bg">
         <h2 className="border-b border-brand-border px-4 py-3 text-sm font-semibold uppercase text-brand-text-muted">Ledger (latest 50)</h2>
         <table className="w-full min-w-[760px] text-sm">
           <thead className="bg-brand-bg-alt text-left text-xs uppercase text-brand-text-muted">

@@ -179,7 +179,7 @@ export default async function ProtocolPackDetailPage({
             findings are recorded and reported, but no claim is diverted.
           </p>
         </div>
-        <div className="mt-3 overflow-x-auto">
+        <div className="min-w-0 mt-3 overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
               <tr>
@@ -253,7 +253,7 @@ export default async function ProtocolPackDetailPage({
       {/* ── Tests ────────────────────────────────────────────────────────── */}
       <section className="rounded-lg border bg-white overflow-hidden">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500 px-5 pt-5">Tests</h2>
-        <div className="mt-3 overflow-x-auto">
+        <div className="min-w-0 mt-3 overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
               <tr>

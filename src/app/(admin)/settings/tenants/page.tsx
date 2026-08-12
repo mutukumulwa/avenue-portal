@@ -132,7 +132,7 @@ export default async function TenantsPage({
         <TenantCreateForm />
       </section>
 
-      <section className="overflow-x-auto rounded-lg border border-brand-border bg-brand-bg">
+      <section className="min-w-0 overflow-x-auto rounded-lg border border-brand-border bg-brand-bg">
         <table className="w-full text-sm">
           <thead className="bg-brand-bg-alt text-left text-xs uppercase text-brand-text-muted">
             <tr>

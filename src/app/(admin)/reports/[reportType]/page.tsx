@@ -1762,7 +1762,7 @@ export default async function ReportDetailPage({
           )}
         </div>
         {data.length > 0 ? (
-          <div className="overflow-x-auto">
+          <div className="min-w-0 max-w-full overflow-x-auto">
             <table className="w-full text-sm text-left font-ui">
               <thead>
                 <tr className="bg-[#F8F9FA] border-b border-[#EEEEEE] text-[13px] uppercase tracking-normal text-brand-text-muted">

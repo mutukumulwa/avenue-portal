@@ -155,7 +155,7 @@ export default async function CaseDetailPage({
         </div>
 
         {recon.slices.length > 0 ? (
-          <div className="mt-4 overflow-x-auto rounded-lg border border-[#EEEEEE]">
+          <div className="min-w-0 mt-4 overflow-x-auto rounded-lg border border-[#EEEEEE]">
             <table className="w-full border-collapse text-left text-sm">
               <thead>
                 <tr className="bg-[#E6E7E8] text-xs font-semibold uppercase text-[#6C757D]">

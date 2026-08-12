@@ -79,7 +79,7 @@ export default async function ProviderIntegrations() {
         {deliveries.items.length === 0 ? (
           <p className="text-sm text-brand-text-muted">No deliveries yet.</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="min-w-0 max-w-full overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-xs text-brand-text-muted border-b border-[#EEEEEE]">

@@ -56,7 +56,22 @@ export default async function AdminLayout({
         )}
         <div className="flex min-h-screen bg-brand-bg-alt/30">
           <AdminSidebar userRole={userRole} userName={session?.user?.name ?? null} />
-          <div className="flex-1 ml-60 p-8">
+          {/*
+            UAT-HF P11.02 — DEF-072. Two changes, and BOTH are needed:
+
+            `min-w-0` — a flex item defaults to `min-width: auto`, so it refuses
+            to shrink below its content. That is why the run measured the table
+            wrapper at "scrollWidth 870 = clientWidth 870": the wrapper expanded
+            to fit the table instead of becoming a scroll port, and
+            `overflow-x-auto` never engaged. This one class is what makes every
+            such wrapper below actually scroll.
+
+            `md:ml-60` — the offset was unconditional, so at 360 px the content
+            began 240 px in and had ~56 px left after padding. Fixing the scroll
+            without this would have produced a working scroll port too narrow to
+            use.
+          */}
+          <div className="min-w-0 flex-1 p-4 md:ml-60 md:p-8">
             <Breadcrumbs />
             {children}
           </div>

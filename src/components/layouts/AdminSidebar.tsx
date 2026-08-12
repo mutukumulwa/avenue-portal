@@ -10,11 +10,11 @@ import {
   ShieldAlert, MessageSquareWarning, Wallet, Fingerprint, Stethoscope,
   BarChart3, TriangleAlert, Landmark, ClipboardCheck, CloudOff,
   ShieldCheck, Lock, FileSignature, Globe2, HeartPulse, KeyRound,
-  UserPlus, Scale, Banknote,
+  UserPlus, Scale, Banknote, Menu, X,
 } from "lucide-react";
 import { PortalSwitcher } from "./PortalSwitcher";
 import { SignedInIdentity } from "./SignedInIdentity";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { UserRole } from "@prisma/client";
 import { ROLES } from "@/lib/authz/roles";
 
@@ -329,9 +329,58 @@ export function AdminSidebar({
     .filter(group => group.items.length > 0);
 
   const showSetup = !userRole || ADMIN_ONLY.includes(userRole);
+  /**
+   * P11.02: the drawer is open only for the route it was opened on.
+   *
+   * Storing WHICH route it was opened for, rather than a boolean plus an effect
+   * that resets it, means navigation closes it for free — no synchronisation to
+   * get wrong. It also starts closed, so the drawer never covers a phone screen
+   * on load, and `md:translate-x-0` makes it permanent from tablet up.
+   *
+   * Leaving it open across a navigation would put the destination page behind
+   * the drawer, so tapping a link would appear to do nothing — the DEF-069
+   * class of "the control looks broken".
+   */
+  const [openForPath, setOpenForPath] = useState<string | null>(null);
+  const mobileOpen = openForPath === pathname;
+  const setMobileOpen = (open: boolean) => setOpenForPath(open ? pathname : null);
 
   return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-60 border-r border-[#EEEEEE] bg-white">
+    <>
+      {/*
+        UAT-HF P11.02 — DEF-072 / DEF-009.
+        The sidebar was `fixed w-60` at every width, with the content carrying an
+        unconditional `ml-60`. On the 360 px viewport the run tested, that left
+        the whole application about 56 px wide once padding was taken off — which
+        is why "five of six columns including the row action" could not be
+        reached, and why no amount of scroll fixing alone would have helped.
+        Below `md` the sidebar is now a drawer, and the content gets the screen.
+      */}
+      <button
+        type="button"
+        aria-expanded={mobileOpen}
+        aria-controls="admin-sidebar"
+        onClick={() => setMobileOpen(!mobileOpen)}
+        className="fixed left-3 top-3 z-50 rounded-lg border border-[#EEEEEE] bg-white p-2 shadow-sm md:hidden"
+      >
+        {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+        <span className="sr-only">{mobileOpen ? "Close menu" : "Open menu"}</span>
+      </button>
+
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/30 md:hidden"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+    <aside
+      id="admin-sidebar"
+      className={`fixed left-0 top-0 z-40 h-screen w-60 border-r border-[#EEEEEE] bg-white transition-transform md:translate-x-0 ${
+        mobileOpen ? "translate-x-0" : "-translate-x-full"
+      }`}
+    >
       <div className="flex h-full flex-col overflow-y-auto px-3 py-4">
         {/* Logo */}
         <Link href="/dashboard" className="mb-5 flex items-center pl-1 space-x-2">
@@ -391,5 +440,6 @@ export function AdminSidebar({
         </div>
       </div>
     </aside>
+    </>
   );
 }

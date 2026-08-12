@@ -115,7 +115,7 @@ function SchemeGrid({
         </div>
         <Building2 className="h-5 w-5 text-brand-indigo" />
       </div>
-      <div className="overflow-x-auto">
+      <div className="min-w-0 max-w-full overflow-x-auto">
         <table className="w-full min-w-[860px] text-left text-sm font-ui">
           <thead className="border-b border-[#EEEEEE] bg-[#F8F9FA] text-[13px] uppercase tracking-normal text-brand-text-muted">
             <tr>

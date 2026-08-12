@@ -31,7 +31,7 @@ export default async function ReconciliationPage() {
         <p className="text-xs text-brand-text-muted">
           Upload an Excel (.xlsx) or CSV file. The first row must be a header row. Required columns:
         </p>
-        <div className="overflow-x-auto">
+        <div className="min-w-0 max-w-full overflow-x-auto">
           <table className="text-xs border-collapse">
             <thead>
               <tr className="bg-[#E6E7E8]">

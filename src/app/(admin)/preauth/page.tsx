@@ -53,7 +53,7 @@ export default async function PreAuthPage() {
       </div>
 
       <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="min-w-0 max-w-full overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#E6E7E8] text-[#6C757D] font-semibold text-sm border-b border-[#EEEEEE]">

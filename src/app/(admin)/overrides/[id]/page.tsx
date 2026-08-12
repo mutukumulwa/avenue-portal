@@ -150,13 +150,13 @@ export default async function OverrideDetailPage({ params }: { params: Promise<{
           <div className="grid grid-cols-2 gap-4 text-xs font-mono">
             <div>
               <p className="font-bold text-brand-text-muted mb-1 uppercase text-[10px]">Before</p>
-              <pre className="bg-[#F8F9FA] rounded p-2 overflow-x-auto text-[10px]">
+              <pre className="min-w-0 bg-[#F8F9FA] rounded p-2 overflow-x-auto text-[10px]">
                 {record.preState ? JSON.stringify(record.preState, null, 2) : "—"}
               </pre>
             </div>
             <div>
               <p className="font-bold text-brand-text-muted mb-1 uppercase text-[10px]">After</p>
-              <pre className="bg-[#F8F9FA] rounded p-2 overflow-x-auto text-[10px]">
+              <pre className="min-w-0 bg-[#F8F9FA] rounded p-2 overflow-x-auto text-[10px]">
                 {record.postState ? JSON.stringify(record.postState, null, 2) : "Pending application"}
               </pre>
             </div>

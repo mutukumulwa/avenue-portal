@@ -107,8 +107,11 @@ export default async function MembersPage({
         />
       </Suspense>
 
-      <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+      {/* P11.02 — DEF-072: `min-w-0` on the card and the port, so the wrapper can
+          be narrower than the 870px table and actually scroll. `overflow-hidden`
+          on the card would otherwise clip rather than scroll. */}
+      <div className="min-w-0 bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm">
+        <div className="min-w-0 max-w-full overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#E6E7E8] text-[#6C757D] font-semibold text-sm border-b border-[#EEEEEE]">

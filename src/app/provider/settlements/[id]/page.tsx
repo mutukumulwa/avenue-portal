@@ -187,7 +187,7 @@ function ClaimBlock({
         </p>
       )}
 
-      <div className="overflow-x-auto">
+      <div className="min-w-0 max-w-full overflow-x-auto">
         <table className="w-full text-sm text-left min-w-[46rem]">
           <caption className="sr-only">Line items for claim {claim.claimNumber}</caption>
           <thead>

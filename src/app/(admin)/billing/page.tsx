@@ -86,7 +86,7 @@ export default async function BillingPage() {
         <div className="px-6 py-4 border-b border-[#EEEEEE]">
           <h2 className="font-bold text-brand-text-heading font-heading">Invoices</h2>
         </div>
-        <div className="overflow-x-auto">
+        <div className="min-w-0 max-w-full overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#E6E7E8] text-[#6C757D] font-semibold text-sm border-b border-[#EEEEEE]">
@@ -184,7 +184,7 @@ export default async function BillingPage() {
         <div className="px-6 py-4 border-b border-[#EEEEEE]">
           <h2 className="font-bold text-brand-text-heading font-heading">Recent Payments</h2>
         </div>
-        <div className="overflow-x-auto">
+        <div className="min-w-0 max-w-full overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-[#E6E7E8] text-[#6C757D] font-semibold text-sm border-b border-[#EEEEEE]">

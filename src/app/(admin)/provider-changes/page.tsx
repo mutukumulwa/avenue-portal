@@ -32,7 +32,7 @@ export default async function ProviderChangesQueue() {
         {rows.length === 0 ? (
           <p className="px-5 py-12 text-center text-brand-text-muted text-sm">No change requests.</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="min-w-0 max-w-full overflow-x-auto">
             <table className="w-full text-sm min-w-[46rem]">
               <thead className="text-[11px] uppercase text-brand-text-muted"><tr className="border-b border-[#EEEEEE]">
                 <th className="text-left px-5 py-2 font-bold">Provider</th><th className="text-left px-5 py-2 font-bold">Category</th><th className="text-left px-5 py-2 font-bold">Risk</th><th className="text-left px-5 py-2 font-bold">Status</th><th className="text-left px-5 py-2 font-bold">Due</th>

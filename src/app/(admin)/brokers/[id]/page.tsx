@@ -201,7 +201,7 @@ export default async function BrokerDetailPage({
         })}
       </div>
 
-      <div className="flex gap-1 bg-[#F8F9FA] rounded-lg p-1 overflow-x-auto w-fit max-w-full">
+      <div className="min-w-0 flex gap-1 bg-[#F8F9FA] rounded-lg p-1 overflow-x-auto w-fit max-w-full">
         {tabs.map(t => {
           const Icon = t.icon;
           return (
@@ -553,7 +553,7 @@ function TableShell({
       {empty ? (
         <p className="px-6 py-8 text-sm text-brand-text-body">{emptyText}</p>
       ) : (
-        <div className="overflow-x-auto">
+        <div className="min-w-0 max-w-full overflow-x-auto">
           <table className="w-full text-left border-collapse">{children}</table>
         </div>
       )}

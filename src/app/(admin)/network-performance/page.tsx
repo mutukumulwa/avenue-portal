@@ -46,7 +46,7 @@ export default async function NetworkPerformanceWorkspace({ searchParams }: { se
         {rows.length === 0 ? (
           <p className="px-5 py-12 text-center text-brand-text-muted text-sm">No scores for this metric and period.</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="min-w-0 max-w-full overflow-x-auto">
             <table className="w-full text-sm min-w-[44rem]">
               <thead className="text-[11px] uppercase text-brand-text-muted"><tr className="border-b border-[#EEEEEE]">
                 <th className="text-left px-5 py-2 font-bold">Provider</th><th className="text-right px-5 py-2 font-bold">Value</th><th className="text-right px-5 py-2 font-bold">Sample</th><th className="text-left px-5 py-2 font-bold">Flag</th><th className="text-left px-5 py-2 font-bold">Action</th>

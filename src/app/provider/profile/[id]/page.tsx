@@ -56,7 +56,7 @@ export default async function ChangeRequestDetail({ params }: { params: Promise<
       {/* Current vs proposed diff */}
       <section className="bg-white border border-[#EEEEEE] rounded-lg overflow-hidden">
         <h2 className="px-5 py-2.5 text-[11px] font-bold uppercase text-brand-text-muted border-b border-[#EEEEEE]">Requested change</h2>
-        <div className="overflow-x-auto">
+        <div className="min-w-0 max-w-full overflow-x-auto">
           <table className="w-full text-sm min-w-[32rem]">
             <thead className="text-[11px] uppercase text-brand-text-muted"><tr className="border-b border-[#EEEEEE]"><th className="text-left px-5 py-2 font-bold">Field</th><th className="text-left px-5 py-2 font-bold">Current</th><th className="text-left px-5 py-2 font-bold">Proposed</th></tr></thead>
             <tbody className="divide-y divide-[#F4F4F4]">

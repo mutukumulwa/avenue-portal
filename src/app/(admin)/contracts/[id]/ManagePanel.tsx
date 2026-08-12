@@ -41,7 +41,7 @@ export async function ManagePanel({
       {/* Tariffs */}
       <section className="rounded-xl border border-gray-200 bg-white p-5">
         <h2 className="text-sm font-semibold text-[#000523] mb-3">Tariff lines ({tariffs.length})</h2>
-        <div className="overflow-x-auto">
+        <div className="min-w-0 max-w-full overflow-x-auto">
           <table className="w-full text-xs">
             <thead className="text-left text-[#6C757D]"><tr><th className="py-1">Service</th><th className="py-1">Type</th><th className="py-1">UoM</th><th className="py-1 text-right">Rate</th><th className="py-1">PA</th>{editable && <th />}</tr></thead>
             <tbody className="divide-y divide-gray-100">

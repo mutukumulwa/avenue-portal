@@ -54,7 +54,7 @@ export default async function ProviderContractsList() {
         {contracts.length === 0 ? (
           <div className="px-5 py-12 text-center text-brand-text-muted text-sm">No contracts on file for your facility.</div>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="min-w-0 max-w-full overflow-x-auto">
             <table className="w-full text-sm min-w-[44rem]">
               <thead className="text-[11px] uppercase text-brand-text-muted">
                 <tr className="border-b border-[#EEEEEE]">

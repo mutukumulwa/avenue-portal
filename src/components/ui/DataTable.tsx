@@ -58,7 +58,7 @@ export function DataTable<Row>({ caption, columns, rows, rowKey, empty, classNam
         tabIndex={0}
         role="region"
         aria-label={caption}
-        className="w-full max-w-full overflow-x-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal"
+        className="min-w-0 w-full max-w-full overflow-x-auto focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal"
       >
         <table className="w-full min-w-max border-collapse text-sm">
           {/* sr-only, not hidden: it is the table's accessible name. */}

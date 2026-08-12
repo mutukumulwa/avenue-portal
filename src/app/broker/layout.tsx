@@ -12,7 +12,7 @@ export default async function BrokerLayout({ children }: { children: React.React
     return (
       <div className="flex min-h-screen bg-brand-bg-alt/30">
         <BrokerSidebar userRole={session.user.role as string} userName={session.user.name ?? null} />
-        <div className="flex-1 ml-64 p-8">
+        <div className="min-w-0 flex-1 ml-64 p-8">
           {children}
         </div>
       </div>

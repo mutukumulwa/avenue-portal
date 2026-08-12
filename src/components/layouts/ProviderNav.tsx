@@ -97,7 +97,7 @@ export function ProviderNav({ providerName, items, actorName, roleLabel }: { pro
         </div>
       )}
       <div className="md:hidden border-t border-[#EEEEEE] bg-white">
-        <div className="overflow-x-auto px-2 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="min-w-0 overflow-x-auto px-2 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <div className="flex min-w-max items-stretch gap-2">
             {items.map((item) => {
               const Icon = ICONS[item.iconKey];

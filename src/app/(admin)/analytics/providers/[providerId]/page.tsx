@@ -385,7 +385,7 @@ export default async function ProviderAnalyticsDetailPage({
         ) : detail.recentClaims.length === 0 ? (
           <p className="px-5 py-8 text-center text-sm text-brand-text-muted">No claims on record yet.</p>
         ) : (
-          <div className="overflow-x-auto">
+          <div className="min-w-0 max-w-full overflow-x-auto">
             <table className="w-full min-w-[700px] text-left text-sm font-ui">
               <thead className="border-b border-[#EEEEEE] bg-[#F8F9FA] text-[13px] uppercase tracking-normal text-brand-text-muted">
                 <tr>

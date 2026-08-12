@@ -130,7 +130,7 @@ export default async function RateMatrixDetailPage({ params }: { params: Promise
           Add a benefit limit band above to start building the matrix.
         </div>
       ) : (
-        <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-x-auto">
+        <div className="min-w-0 bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-x-auto">
           <table className="text-sm text-left min-w-full">
             <thead>
               <tr className="bg-[#E6E7E8] border-b border-[#EEEEEE]">

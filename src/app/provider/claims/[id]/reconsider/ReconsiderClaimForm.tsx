@@ -114,7 +114,7 @@ export function ReconsiderClaimForm({
 
       <div>
         <h3 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-3">Disputed lines</h3>
-        <div className="overflow-x-auto">
+        <div className="min-w-0 max-w-full overflow-x-auto">
           <table className="w-full text-sm">
             <caption className="sr-only">Select the claim lines to reconsider and enter the corrected allowed amount for each.</caption>
             <thead className="text-[11px] uppercase text-brand-text-muted">

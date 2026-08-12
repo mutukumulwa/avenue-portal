@@ -35,7 +35,7 @@ export default async function HRInvoicesPage() {
       </div>
 
       <div className="bg-white border border-[#EEEEEE] rounded-2xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="min-w-0 max-w-full overflow-x-auto">
           <table className="w-full text-left text-sm whitespace-nowrap">
             <thead>
               <tr className="bg-[#F8F9FA] border-b border-[#EEEEEE] text-brand-text-muted font-heading text-xs uppercase tracking-wider">

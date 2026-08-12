@@ -86,7 +86,7 @@ export function RateTableEditor({ pricingModelId, initialData }: { pricingModelI
         <div className="px-4 py-2 bg-red-50 border-b border-red-100 text-red-600 text-xs font-semibold">{error}</div>
       )}
 
-      <div className="overflow-x-auto">
+      <div className="min-w-0 max-w-full overflow-x-auto">
         <table className="w-full text-left text-sm text-brand-text-body">
           <thead className="bg-[#F8F9FA] text-xs uppercase text-brand-text-muted border-b border-[#EEEEEE]">
             <tr>

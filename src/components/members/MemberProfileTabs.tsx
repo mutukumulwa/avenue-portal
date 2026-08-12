@@ -806,7 +806,7 @@ export function MemberProfileTabs({ member, age }: { member: Member; age: number
   return (
     <div className="space-y-4">
       {/* Tab bar */}
-      <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-x-auto">
+      <div className="min-w-0 bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-x-auto">
         <div className="flex min-w-max">
           {TABS.map(tab => {
             const Icon = tab.icon;

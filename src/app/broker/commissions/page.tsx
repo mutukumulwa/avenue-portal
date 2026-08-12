@@ -101,7 +101,7 @@ export default async function BrokerCommissionsPage() {
         <div className="px-6 py-4 border-b border-[#EEEEEE]">
           <h2 className="font-bold text-brand-text-heading font-heading">Ledger</h2>
         </div>
-        <div className="overflow-x-auto">
+        <div className="min-w-0 max-w-full overflow-x-auto">
           <table className="w-full text-left border-collapse text-sm">
             <thead>
               <tr className="bg-[#F8F9FA] text-[10px] font-bold uppercase text-brand-text-muted border-b border-[#EEEEEE]">
@@ -142,7 +142,7 @@ export default async function BrokerCommissionsPage() {
         <div className="px-6 py-4 border-b border-[#EEEEEE]">
           <h2 className="font-bold text-brand-text-heading font-heading">Payout Batches</h2>
         </div>
-        <div className="overflow-x-auto">
+        <div className="min-w-0 max-w-full overflow-x-auto">
           <table className="w-full text-left border-collapse text-sm">
             <thead>
               <tr className="bg-[#F8F9FA] text-[10px] font-bold uppercase text-brand-text-muted border-b border-[#EEEEEE]">

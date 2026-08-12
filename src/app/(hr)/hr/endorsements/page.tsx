@@ -61,7 +61,7 @@ export default async function HREndorsementsPage(
           <EndorsementFilters statusFilter={statusFilter} typeFilter={typeFilter} />
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="min-w-0 max-w-full overflow-x-auto">
           <table className="w-full text-left text-sm whitespace-nowrap">
             <thead>
               <tr className="bg-white border-b border-[#EEEEEE] text-brand-text-muted font-heading text-xs uppercase tracking-wider">

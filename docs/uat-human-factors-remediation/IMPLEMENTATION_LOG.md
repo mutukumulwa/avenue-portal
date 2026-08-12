@@ -1399,6 +1399,34 @@ A negative is still refused, but **as a negative**: the run's complaint was that
 
 ---
 
+## P11 — Accessibility, responsive behaviour, privacy
+
+### P11.02 — Responsive table and navigation behaviour
+
+| Field | Value |
+|---|---|
+| **Task** | P11.02 |
+| **Defect IDs** | DEF-072 (S2); refines DEF-009 |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/components/responsive-layout.test.tsx` (12), including a repo-wide ratchet |
+| **Commands / results** | typecheck 0; lint 0 errors; suite 296 files / 3287 passed. |
+| **Evidence** | `src/app/(admin)/layout.tsx`, `src/components/layouts/AdminSidebar.tsx`, `src/app/(admin)/members/page.tsx`, 34 wrappers across `src/` |
+| **Feature flags** | none. |
+| **Remaining risks** | **Not measured in a real browser** — jsdom has no layout engine, so the tests assert the classes that produce the behaviour, not `scrollWidth < clientWidth`. Confirming the run's exact measurement needs the 360×800 touch harness. **Only the admin shell got the drawer**: the HR, fund and broker portals have the same unconditional `ml-60`/`ml-64` and each needs its own sidebar converting, which is three more components and was not done. Sticky identity columns and card layouts (the other two options the register offered) are not implemented — this takes the scroll-container route only. |
+
+**"The issue is not that horizontal scrolling is required, it is that horizontal scrolling does not work."** The register's own refinement, and the measurement behind it is unambiguous: "the wrapper measures scrollWidth 870 and clientWidth 870 — it is exactly as wide as its content, so the overflow container never engages".
+
+That is a flex item's default `min-width: auto`. The wrapper cannot shrink below its content, so it grows to the table's 870px and never becomes a scroll port. `min-w-0` is the entire fix — and it has to be on the wrapper **and** on its flex ancestor, or the ancestor pushes the width back out.
+
+**Two changes, and one alone would not have helped.** The shell also carried an unconditional `ml-60`: on the 360px viewport tested, the content began 240px in and had roughly 56px left after padding. Fixing only the scroll would have produced a working scroll port too narrow to use; fixing only the margin would have left a table that still refuses to scroll. Below `md` the sidebar is now a drawer and the content gets the screen.
+
+**The drawer closes on navigation by construction.** It stores *which route* it was opened for rather than a boolean plus a resetting effect — so navigating closes it with no synchronisation to get wrong. Leaving it open would put the destination page behind the drawer, and tapping a link would appear to do nothing: the DEF-069 class of "the control looks broken", which this branch has already fixed once.
+
+**34 wrappers, and a ratchet.** Every `overflow-x-auto` in `src/` now carries `min-w-0`, and a test walks the tree and fails on any that does not. One bare wrapper is one more table with unreachable columns, and the two classes only work as a pair.
+
+---
+
 ## Corrections made to the implementation plan
 
 The plan is treated as authoritative but not infallible. Where a plan statement was checked against

@@ -175,7 +175,7 @@ export default async function FraudCasePage({
             )}
 
             {/* Claim lines */}
-            <div className="overflow-x-auto">
+            <div className="min-w-0 max-w-full overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-[#F8F9FA] text-[#6C757D] text-xs font-bold uppercase border-b border-[#EEEEEE]">

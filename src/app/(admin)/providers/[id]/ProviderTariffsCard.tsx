@@ -144,7 +144,7 @@ export function ProviderTariffsCard({
         <TariffForm providerId={providerId} clients={clients} onDone={() => setAdding(false)} />
       )}
 
-      <div className="overflow-x-auto">
+      <div className="min-w-0 max-w-full overflow-x-auto">
       <table className="w-full min-w-[640px] text-sm">
         <thead>
           <tr className="bg-[#F8F9FA] text-[10px] font-bold uppercase text-brand-text-muted border-b border-[#EEEEEE]">

@@ -150,7 +150,7 @@ export default async function ClaimsPage({
 
       <div className="bg-white border border-[#EEEEEE] rounded-lg shadow-sm overflow-hidden">
         {/* Self-contained scrolling (issue 1): the table scrolls, the page doesn't. */}
-        <div className="max-h-[65vh] overflow-y-auto overscroll-contain overflow-x-auto">
+        <div className="min-w-0 max-h-[65vh] overflow-y-auto overscroll-contain overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead className="sticky top-0 z-10">
               <tr className="bg-[#E6E7E8] text-[#6C757D] font-semibold text-sm border-b border-[#EEEEEE]">

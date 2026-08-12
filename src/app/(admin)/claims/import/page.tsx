@@ -41,7 +41,7 @@ export default async function ClaimsBulkImportPage() {
         <p className="text-sm text-brand-text-muted">
           Your Excel file must use the following columns in this exact order:
         </p>
-        <div className="overflow-x-auto">
+        <div className="min-w-0 max-w-full overflow-x-auto">
           <table className="text-xs border-collapse w-full">
             <thead>
               <tr className="bg-[#E6E7E8]">

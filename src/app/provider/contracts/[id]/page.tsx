@@ -143,7 +143,7 @@ export default async function ProviderContractDetail({
       {/* Covered populations */}
       {servedScope.length > 0 && (
         <Section title="Covered populations">
-          <div className="overflow-x-auto">
+          <div className="min-w-0 max-w-full overflow-x-auto">
             <table className="w-full text-sm min-w-[40rem]">
               <thead className="text-[11px] uppercase text-brand-text-muted">
                 <tr className="border-b border-[#EEEEEE]"><th className="text-left px-5 py-2 font-bold">Payer</th><th className="text-left px-5 py-2 font-bold">Scheme</th><th className="text-left px-5 py-2 font-bold">Plan</th><th className="text-left px-5 py-2 font-bold">Benefit</th><th className="text-left px-5 py-2 font-bold">Tier</th></tr>
@@ -238,7 +238,7 @@ export default async function ProviderContractDetail({
           <button type="submit" className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-brand-indigo rounded-lg px-3 py-1.5"><Search size={14} /> Search</button>
           {(code || name) && <a href={`/provider/contracts/${header.id}?date=${dateInput}`} className="text-xs text-brand-text-muted underline self-center">clear</a>}
         </form>
-        <div className="overflow-x-auto">
+        <div className="min-w-0 max-w-full overflow-x-auto">
           <table className="w-full text-sm min-w-[52rem]">
             <thead className="text-[11px] uppercase text-brand-text-muted">
               <tr className="border-b border-[#EEEEEE]">

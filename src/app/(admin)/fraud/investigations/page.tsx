@@ -74,7 +74,7 @@ export default async function FraudInvestigationsPage({
         </div>
       )}
 
-      <section className="overflow-x-auto rounded-lg border border-brand-border bg-brand-bg">
+      <section className="min-w-0 overflow-x-auto rounded-lg border border-brand-border bg-brand-bg">
         <table className="w-full min-w-[720px] text-sm">
           <thead className="bg-brand-bg-alt text-left text-xs uppercase text-brand-text-muted">
             <tr>

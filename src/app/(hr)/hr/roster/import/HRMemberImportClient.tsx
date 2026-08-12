@@ -130,7 +130,7 @@ export function HRMemberImportClient() {
                 <CheckCircle size={15} />
                 <span className="font-bold text-sm">Valid rows — ready to submit</span>
               </div>
-              <div className="overflow-x-auto max-h-72 overflow-y-auto">
+              <div className="min-w-0 overflow-x-auto max-h-72 overflow-y-auto">
                 <table className="w-full text-xs">
                   <thead className="sticky top-0">
                     <tr className="bg-[#E6E7E8] text-[#6C757D] font-semibold border-b border-[#EEEEEE]">
