@@ -1994,7 +1994,7 @@ model Package {
   name               String // "Medvex Essential"
   description        String?
   type               PackageType   @default(GROUP)
-  annualLimit        Decimal // Overall annual limit in KES
+  annualLimit        Decimal // Overall annual limit, in the package's currency (base UGX)
   perVisitLimit      Decimal?
   contributionAmount Decimal // Per-member annual contribution
   status             PackageStatus @default(DRAFT)

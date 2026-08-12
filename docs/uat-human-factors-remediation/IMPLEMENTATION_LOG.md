@@ -538,6 +538,79 @@ precisely because every route into it crashed and nothing offered an exit.
 boundary replaces the root layout, so the router is part of what may have failed, and a full document
 load *is* the recovery. Disabled on that single line with the reason written beside it.
 
+### P01.05 — Canonical Uganda date, money, phone and country configuration
+
+| Field | Value |
+|---|---|
+| **Task** | P01.05 |
+| **Defect IDs** | DEF-006, DEF-017, DEF-020, DEF-049, DEF-052, DEF-063; supports DEF-018, DEF-021, DEF-029, DEF-032, DEF-039 |
+| **Commit** | _pending_ |
+| **Migrations / backfills** | none. One schema **comment** corrected (`Package.annualLimit` said "in KES"). |
+| **Tests added** | `tests/lib/calendar-date.test.ts` (33), `tests/lib/money.test.ts` (37), `tests/lib/locale-config.test.ts` (9) — **79 new tests** |
+| **Commands / results** | Full suite → **269 files / 2748 tests passed**, 88 files / 598 skipped. typecheck 0; lint 0 errors. `npm run currency:guard` OK; `npm run locale:guard` OK (884 files, 0 new). |
+| **Routes exercised** | none — primitives only. P11.03 adopts them across surfaces. |
+| **Evidence** | `src/lib/locale-config.ts`, `src/lib/calendar-date.ts`, `src/lib/money.ts`, `scripts/check-locale-defaults.mjs`, `scripts/locale-guard-baseline.json` |
+| **Feature flags** | none |
+| **Remaining risks** | 54 known locale violations remain in 39 files, baselined and owned by P03.04/P11.03. Nothing in the product uses these primitives yet. **Four `@default("KES")` columns remain in the schema — see below.** |
+
+**Extended, not replaced.** `src/lib/dates.ts` (ELIG-GAP-007) keeps owning *instant* parsing;
+`src/lib/normalize.ts` already had `normalizePhone`/`ugandaPhoneVariants` with Uganda coverage in
+`tests/lib/normalize.test.ts`, so P01.05's phone acceptance is met by reusing them rather than
+writing a rival. `formatMoney` in `utils.ts` already used `en-UG` and a `BASE_CURRENCY` of UGX.
+
+**Calendar days are strings, never `Date`s.** A cover start, a DOB and a last-covered day have no
+time and no timezone; the moment they become a `Date` they acquire one. Tests prove the boundary
+case directly: `2026-08-11T22:30Z` is already **12 Aug** in `Africa/Nairobi`, which
+`toISOString().slice(0,10)` gets wrong for three hours of every Ugandan day.
+`parseCalendarDate` rejects five-digit years (DEF-050's shape), rejects `2026-02-30` rather than
+rolling it into March, and rejects `01/02/2026` outright rather than guessing (DEF-020).
+`formatCalendarDate` renders `1 Jul 2026` — a named month cannot be read six months out the way
+`"7/1/2026"` vs `"01/07/2026"` was (DEF-017) — and **never throws**, returning
+`"Invalid date — repair required"` where an unguarded `toISOString()` took out a module.
+
+**DEC-12 is a named function**, `ineligibleFromLastCoveredDay`, not an inline `+1` scattered through
+lifecycle code. "Termination date" is exactly the field users get wrong.
+
+**Money rejects rather than coerces.** `parseFloat("300k")` returns `300` — that *is* DEF-018, a
+1000× understatement of a member's cover. `parseMoney` returns a distinct `MAGNITUDE_SUFFIX` failure
+whose message names the amount the user probably meant, because "not a number" would not tell them
+what the system did **not** do with their input. Amounts are `Prisma.Decimal`; a test pins that
+`0.1 + 0.2` is exact. `parsePercent` returns 0 as a *value*, never an error — DEF-021 was the
+classic `if (!value)` truthiness bug.
+
+**Three real bugs in my own first draft, caught by the tests.** The currency-code strip was greedy:
+it matched any three trailing letters, so `"abc"` became `""` and reported EMPTY, and `"2 million"`
+lost its `"ion"` and stopped looking like a magnitude suffix. Whitespace is now required as the
+separator. `parsePercent` also rejected `"-1"` as non-numeric instead of out-of-range, contradicting
+DEF-021's own note that `101 / -1 / blank` are all refused with explicit **range** messages.
+
+**The guard is a ratchet, not a big-bang gate.** `check-locale-defaults.mjs` flags Kenyan calling
+codes, Nairobi fallback coordinates, `County` as a user-facing label, and browser-locale date
+output. It found **41 violation sites across 39 files** — all pre-existing, all owned by P03.04 and
+P11.03, none by P01.05. Failing the build on them would have broken it until P11.03 lands, so the
+known set is recorded in `locale-guard-baseline.json` and only **new** violations fail. Verified both
+directions: adding a `+254` fails with exit 1; annotating it `// locale-guard-ok: <reason>` passes.
+The guard also reports when a file improves, so the baseline can be tightened rather than silently
+slipping.
+
+Among what it found: `FacilitiesMap.tsx:52,57` hard-codes `{ lat: -1.2921, lng: 36.8219 }` — the
+literal Nairobi city centre — as the geolocation fallback. That is DEF-007/DEF-033 in source.
+
+**Finding for P02.04 — not fixed here, deliberately.** Four schema columns still carry
+`@default("KES")` on a Uganda deployment:
+
+| Model | Line |
+|---|---|
+| **`ProviderContract.currency`** | `prisma/schema.prisma:3720` |
+| `ContractPackage.currency` | `4098` |
+| `CommissionLedgerEntry.currency` | `4761` |
+| `CommissionPayoutBatch.currency` | `4790` |
+
+The first is **DEF-052 at the schema level**, and P02.04 names it explicitly. It is left alone here
+because changing a column default is a migration with data consequences, and P02.04 requires a
+preflight that classifies "legitimate multi-currency" against "mistaken default" **before** any
+backfill. Recording it so it is not rediscovered.
+
 ---
 
 ## Corrections made to the implementation plan

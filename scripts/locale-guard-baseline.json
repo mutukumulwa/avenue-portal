@@ -1,0 +1,121 @@
+{
+  "src/app/(admin)/check-ins/[id]/page.tsx": {
+    "ambiguous-date-format": 2
+  },
+  "src/app/(admin)/check-ins/visit/[id]/page.tsx": {
+    "ambiguous-date-format": 1
+  },
+  "src/app/(admin)/claims/[id]/PreauthPanel.tsx": {
+    "ambiguous-date-format": 1
+  },
+  "src/app/(admin)/complaints/page.tsx": {
+    "ambiguous-date-format": 1
+  },
+  "src/app/(admin)/contracts/[id]/ContractExclusionsManager.tsx": {
+    "ambiguous-date-format": 1
+  },
+  "src/app/(admin)/fraud/check-ins/page.tsx": {
+    "ambiguous-date-format": 1
+  },
+  "src/app/(admin)/fraud/page.tsx": {
+    "ambiguous-date-format": 1
+  },
+  "src/app/(admin)/groups/[id]/edit/GroupEditForm.tsx": {
+    "kenyan-admin-unit": 1,
+    "kenyan-calling-code": 1
+  },
+  "src/app/(admin)/groups/new/individual/page.tsx": {
+    "kenyan-calling-code": 1
+  },
+  "src/app/(admin)/groups/new/page.tsx": {
+    "kenyan-calling-code": 1
+  },
+  "src/app/(admin)/members/[id]/edit/MemberEditForm.tsx": {
+    "kenyan-calling-code": 1
+  },
+  "src/app/(admin)/members/[id]/transfer/actions.ts": {
+    "ambiguous-date-format": 2
+  },
+  "src/app/(admin)/members/new/MemberNewForm.tsx": {
+    "kenyan-calling-code": 1
+  },
+  "src/app/(admin)/offline-auth/page.tsx": {
+    "kenyan-calling-code": 1
+  },
+  "src/app/(admin)/packages/[id]/edit/ReferralRulesManager.tsx": {
+    "ambiguous-date-format": 1
+  },
+  "src/app/(admin)/packages/[id]/edit/TreatmentExclusionsManager.tsx": {
+    "ambiguous-date-format": 1
+  },
+  "src/app/(admin)/preauth/[id]/page.tsx": {
+    "ambiguous-date-format": 1
+  },
+  "src/app/(admin)/providers/ProvidersTable.tsx": {
+    "kenyan-admin-unit": 1
+  },
+  "src/app/(admin)/providers/[id]/ProviderAdminCard.tsx": {
+    "kenyan-admin-unit": 1
+  },
+  "src/app/(admin)/providers/[id]/ProviderBranchesCard.tsx": {
+    "kenyan-admin-unit": 1
+  },
+  "src/app/(admin)/providers/new/ProviderNewForm.tsx": {
+    "kenyan-admin-unit": 1,
+    "kenyan-calling-code": 1
+  },
+  "src/app/(hr)/hr/endorsements/page.tsx": {
+    "ambiguous-date-format": 2
+  },
+  "src/app/(hr)/hr/invoices/page.tsx": {
+    "ambiguous-date-format": 1
+  },
+  "src/app/(hr)/hr/profile/page.tsx": {
+    "ambiguous-date-format": 4
+  },
+  "src/app/(hr)/hr/roster/[memberId]/page.tsx": {
+    "ambiguous-date-format": 3
+  },
+  "src/app/(hr)/hr/roster/new/HRAddMemberForm.tsx": {
+    "kenyan-calling-code": 1
+  },
+  "src/app/(hr)/hr/roster/page.tsx": {
+    "ambiguous-date-format": 1
+  },
+  "src/app/(hr)/hr/support/page.tsx": {
+    "ambiguous-date-format": 1
+  },
+  "src/app/broker/support/page.tsx": {
+    "kenyan-calling-code": 1
+  },
+  "src/app/member/check-in/MemberCheckInCard.tsx": {
+    "ambiguous-date-format": 2
+  },
+  "src/app/member/facilities/FacilitiesMap.tsx": {
+    "nairobi-coordinates": 2
+  },
+  "src/app/member/profile/ProfileForm.tsx": {
+    "kenyan-calling-code": 1
+  },
+  "src/app/member/security/page.tsx": {
+    "ambiguous-date-format": 1
+  },
+  "src/app/member/support/page.tsx": {
+    "kenyan-calling-code": 1
+  },
+  "src/components/ui/DocumentList.tsx": {
+    "ambiguous-date-format": 1
+  },
+  "src/components/ui/LocationPickerMap.tsx": {
+    "nairobi-coordinates": 1
+  },
+  "src/server/services/low-bandwidth-channel.service.ts": {
+    "kenyan-calling-code": 2
+  },
+  "src/server/services/member-app.service.ts": {
+    "kenyan-calling-code": 3
+  },
+  "src/lib/validation/group.ts": {
+    "kenyan-admin-unit": 1
+  }
+}
