@@ -6,7 +6,7 @@ import { SearchFilterBar } from "@/components/ui/SearchFilterBar";
 import { Pagination } from "@/components/ui/Pagination";
 import { Suspense } from "react";
 import { measureAsync } from "@/lib/perf";
-import { memberSearchClause } from "@/lib/member-search";
+import { memberSearchClause, memberSearchTake } from "@/lib/member-search";
 
 const STATUS_OPTIONS = [
   { value: "ACTIVE",             label: "Active"              },
@@ -33,7 +33,8 @@ export default async function MembersPage({
 
   const { q, status, relationship, page: pageParam } = await searchParams;
   const tenantId = session.user.tenantId;
-  const PAGE_SIZE = 50;
+  // P05.07: clamped to the shared enumeration cap.
+  const PAGE_SIZE = memberSearchTake(50);
   const page = Math.max(1, Number(pageParam) || 1);
 
   const where = {

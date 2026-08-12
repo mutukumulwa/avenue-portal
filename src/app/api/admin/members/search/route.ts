@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCachedSession } from "@/lib/auth";
 import { ROLES } from "@/lib/rbac";
-import { memberSearchClause } from "@/lib/member-search";
+import { memberSearchClause, memberSearchTake } from "@/lib/member-search";
 import type { UserRole } from "@/lib/rbac";
 
 /**
@@ -41,7 +41,8 @@ export async function GET(req: Request) {
       group: { select: { name: true } },
     },
     orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
-    take: 25,
+    // P05.07: one enumeration cap, applied by every search route.
+    take: memberSearchTake(25),
   });
 
   return NextResponse.json({

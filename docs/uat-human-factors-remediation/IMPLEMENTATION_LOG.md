@@ -1149,6 +1149,28 @@ The three-way comparison is also what distinguishes *your* edit from *theirs*: a
 
 **NULLs are distinct in a Postgres unique index**, so members enrolled without a national ID — newborns under CT-033, and anyone predating the field — coexist in any number without a partial index. That is the plan's "unique tenant + non-null national ID only", for free.
 
+### P05.07 — Canonical multi-identifier search
+
+| Field | Value |
+|---|---|
+| **Task** | P05.07 |
+| **Defect IDs** | DEF-030, DEF-064 |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none — consumes P05.01's columns |
+| **Tests added** | 18 added to `tests/lib/member-search.test.ts` (26 total), 1 rewritten |
+| **Commands / results** | typecheck 0; lint 0 errors; suite 289 files / 3164 passed. |
+| **Evidence** | `src/lib/member-search.ts`, `src/app/api/admin/members/search/route.ts`, `src/app/(admin)/members/page.tsx` |
+| **Feature flags** | none. |
+| **Remaining risks** | **Closure depends on the P05.01 backfill having run.** Until `20260812000700` is applied in production the canonical columns are NULL and only the pre-existing raw probes match — the search is no worse than before, but DEF-030 is not closed. The raw-column probes are kept for exactly that window and should be removed once the backfill is verified. **Provider-side search is untouched**: DEF-053 made it unobservable during the run, and it is P03/P09's surface. Timing-based enumeration is not addressed — the cap bounds how much a query returns, not how long a miss takes. |
+
+**One asymmetry, two defect numbers.** DEF-030's mechanism line is the whole story: "Storage normalises the local form; search does not." DEF-064 is the same sentence about punctuation instead of country codes. P05.01 put canonical keys on the member; this matches against them, so the write path and the read path finally agree on what "the same value" means.
+
+**Every token is tried as text AND as every identifier it could be.** The raw `contains` probes are all still there, so nothing that was findable before becomes unfindable; the canonical probes are added beside them. A token that parses as a Uganda phone also probes `phoneNormalized`; one that looks like a member number probes it with punctuation stripped.
+
+**Two enumeration guards, because the fix makes the search stronger.** A single-character token no longer substring-matches — "a" would return most of the register — though a short *exact* identifier still probes the key columns, since "42" as a member number is a real query. And `memberSearchTake` gives both call sites one cap instead of each picking its own, or not picking one.
+
+**The clause carries no scope of its own, and a test asserts it.** It never contains `tenantId`, `clientId` or `providerId`; the caller composes those. A search helper that quietly widened scope would be a far worse defect than the one being fixed.
+
 ---
 
 ## Corrections made to the implementation plan
