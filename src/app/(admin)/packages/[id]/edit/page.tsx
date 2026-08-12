@@ -5,6 +5,10 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { PackageEditForm } from "./PackageEditForm";
+import {
+  describeArchiveImpact,
+  getPackageArchiveImpact,
+} from "@/server/services/package-archive-impact.service";
 import { SharedLimitsManager } from "./SharedLimitsManager";
 import { ProviderEligibilityManager } from "./ProviderEligibilityManager";
 import { TreatmentExclusionsManager } from "./TreatmentExclusionsManager";
@@ -18,6 +22,11 @@ export default async function EditPackagePage({ params }: { params: Promise<{ id
   if (!pkg) notFound();
 
   const benefits = pkg.currentVersion?.benefits ?? [];
+
+  // UAT-HF P09.06 — DEF-025: resolved here so the operator sees which schemes
+  // and how many members are affected BEFORE choosing Archived, rather than
+  // being refused after the fact.
+  const archiveImpact = await getPackageArchiveImpact(prisma, session.user.tenantId, id);
 
   const versionId = pkg.currentVersion?.id ?? "";
   const [sharedLimits, eligibilityRules, allProviders, treatmentExclusions, referralRules] = await Promise.all([
@@ -60,6 +69,15 @@ export default async function EditPackagePage({ params }: { params: Promise<{ id
           which each own their own <form>; nested forms were the DEF-026 bug). */}
       <PackageEditForm
         packageId={id}
+        impact={{
+          summary: describeArchiveImpact(archiveImpact, pkg.name),
+          inUse: archiveImpact.inUse,
+          schemes: archiveImpact.schemes.map((s) => ({
+            id: s.id,
+            name: s.name,
+            ...(s.tierName ? { tierName: s.tierName } : {}),
+          })),
+        }}
         pkg={{
           name: pkg.name,
           description: pkg.description ?? null,

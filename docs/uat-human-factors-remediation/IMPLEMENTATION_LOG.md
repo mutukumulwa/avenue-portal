@@ -1425,6 +1425,30 @@ That is a flex item's default `min-width: auto`. The wrapper cannot shrink below
 
 **34 wrappers, and a ratchet.** Every `overflow-x-auto` in `src/` now carries `min-w-0`, and a test walks the tree and fails on any that does not. One bare wrapper is one more table with unreachable columns, and the two classes only work as a pair.
 
+### P09.06 (part) — Archive through dependency impact
+
+| Field | Value |
+|---|---|
+| **Task** | P09.06 — the impact + confirmation half; migration control is not done |
+| **Defect IDs** | DEF-025 (S2) |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/services/package-archive-impact.test.ts` (21) |
+| **Commands / results** | typecheck 0; lint 0 errors; suite 297 files / 3308 passed. |
+| **Evidence** | `src/server/services/package-archive-impact.service.ts`, package edit action/form/page |
+| **Feature flags** | none. |
+| **Remaining risks** | **No migration control** — the plan's "dependency impact **and migration control**" means offering to move the affected schemes to a successor package, and that is not built; the operator is told what will be stranded and must move them by hand. Archiving is still reached through the Status dropdown rather than a dedicated destructive control, so DEF-025's "visually distinct from Save" limb (UX-004) is only partly met: the warning is distinct, the control is not. Other archivable entities (providers, rate cards) were not audited for the same pattern. |
+
+**The dependency data existed all along; nothing asked for it.** The register's sharpest line is that archiving a package an ACTIVE scheme was bound to "produced **no dependency warning of any kind**". `getPackageArchiveImpact` asks: which schemes point at this package — directly *and* through a named benefit tier — and how many members are enrolled on it.
+
+**Members are counted, not just schemes.** A scheme with no members is a configuration problem; one with two thousand is an incident, and an operator should be able to tell those apart *before* clicking.
+
+**The warning appears on selection, not after the save.** Choosing "Archived" names the package, lists the affected schemes (and the tier, when the binding goes through one), states the consequence, and requires an explicit acknowledgement. The server refuses without it, so the guard holds for a hand-crafted POST — but the *point* is the explanation, which a server-side refusal alone would deliver too late.
+
+**It says what archiving does NOT do.** "Archiving it does NOT move or end their cover — it leaves those schemes pointing at an archived package." An operator who assumes it ends cover will hesitate when they should not; one who assumes it migrates members will be wrong in a more expensive direction.
+
+**Only the transition INTO archived is guarded.** Re-saving an already-archived package is not a destructive act and is not obstructed — a test pins that, because a confirmation that fires on every save is one people learn to dismiss.
+
 ---
 
 ## Corrections made to the implementation plan

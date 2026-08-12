@@ -19,6 +19,11 @@ import {
   detectExclusionOverlap,
 } from "@/lib/validation/exclusion";
 import { referralRuleSchema, detectReferralOverlap } from "@/lib/validation/referral";
+import {
+  ARCHIVE_ACKNOWLEDGEMENT_FIELD,
+  describeArchiveImpact,
+  getPackageArchiveImpact,
+} from "@/server/services/package-archive-impact.service";
 
 /** Local P2002 detector (the settings/tenants copy lives in a `"use server"`
  *  file and can't be imported). SP-5: map the unique-constraint race to a
@@ -143,6 +148,39 @@ export async function updatePackageAction(
     },
   });
   if (!pkg) notFound();
+
+  // ── UAT-HF P09.06 — DEF-025 ────────────────────────────────────────────────
+  // "Repeating the selection on a package that an ACTIVE scheme is bound to
+  // produced no dependency warning of any kind — nothing indicates the package
+  // is in use or which scheme would be affected."
+  //
+  // Archiving is refused unless the operator has been shown the impact and
+  // acknowledged it. The check is here, on the server, so it holds for a
+  // hand-crafted POST as well as for the form — and it only bites on the
+  // transition INTO archived, so re-saving an already-archived package is not
+  // obstructed.
+  if (core.status === "ARCHIVED" && pkg.status !== "ARCHIVED") {
+    const impact = await getPackageArchiveImpact(prisma, tenantId, packageId);
+    const acknowledged = formData.get(ARCHIVE_ACKNOWLEDGEMENT_FIELD) === "yes";
+    if (impact.inUse && !acknowledged) {
+      return fail(
+        { status: [describeArchiveImpact(impact, pkg.name)] },
+        "Archiving was not applied. Confirm the effect on the schemes below first.",
+      );
+    }
+    await writeAudit({
+      userId: session.user.id,
+      action: "PACKAGE_ARCHIVED",
+      module: "PACKAGES",
+      description: `Package archived: ${pkg.name}`,
+      metadata: {
+        packageId,
+        schemesAffected: impact.schemes.length,
+        membersAffected: impact.memberCount,
+        acknowledgedInUse: acknowledged,
+      },
+    });
+  }
   const oldVersion = pkg.currentVersion;
 
   // 4) nextVersion from MAX — never the (possibly non-latest) current pointer.

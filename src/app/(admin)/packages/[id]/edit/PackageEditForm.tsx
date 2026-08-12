@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import Link from "next/link";
 import { updatePackageAction } from "./actions";
 import type { ActionResult } from "@/lib/action-result";
@@ -50,15 +50,28 @@ const cellInputCls =
  * Uses `useActionState` so the SP-2 `ActionResult` field errors render adjacent
  * to inputs and the entered values are preserved on a validation failure.
  */
+/** UAT-HF P09.06 — what archiving this package would affect, resolved server-side. */
+export type ArchiveImpactView = {
+  summary: string;
+  inUse: boolean;
+  schemes: { id: string; name: string; tierName?: string }[];
+};
+
 export function PackageEditForm({
   packageId,
   pkg,
   benefits,
+  impact,
 }: {
   packageId: string;
   pkg: PackageView;
   benefits: BenefitRow[];
+  impact: ArchiveImpactView;
 }) {
+  const [status, setStatus] = useState(pkg.status);
+  // Only the TRANSITION into archived is a destructive act; re-saving an
+  // already-archived package is not, and must not be nagged.
+  const archivingNow = status === "ARCHIVED" && pkg.status !== "ARCHIVED";
   const [state, formAction, pending] = useActionState<ActionResult, FormData>(
     updatePackageAction,
     { ok: true },
@@ -92,13 +105,66 @@ export function PackageEditForm({
             {err("name") && <p role="alert" className="text-xs text-[#DC3545] mt-1">{err("name")}</p>}
           </div>
           <div>
-            <label className={labelCls}>Status</label>
-            <select name="status" defaultValue={pkg.status} className={inputCls}>
+            <label className={labelCls} htmlFor="package-status">Status</label>
+            <select
+              id="package-status"
+              name="status"
+              defaultValue={pkg.status}
+              onChange={(e) => setStatus(e.target.value)}
+              className={inputCls}
+            >
               <option value="DRAFT">Draft</option>
               <option value="ACTIVE">Active</option>
               <option value="ARCHIVED">Archived</option>
             </select>
             {err("status") && <p role="alert" className="text-xs text-[#DC3545] mt-1">{err("status")}</p>}
+
+            {/*
+              UAT-HF P09.06 — DEF-025. Archiving was "committed by the same
+              generic 'Save Changes' button used for harmless edits", with "no
+              dialog, no alert, no inline warning and no statement of
+              consequence", and — the part that matters — no dependency warning
+              even when an ACTIVE scheme was bound to the package.
+
+              Selecting Archived now states the impact by name and requires an
+              explicit acknowledgement before the save is accepted. The server
+              refuses without it, so this is the explanation rather than the
+              control.
+            */}
+            {archivingNow && (
+              <div
+                role="alert"
+                className="mt-2 rounded-lg border border-[#FFC107]/50 bg-[#FFC107]/10 px-3 py-2.5 text-xs text-[#856404]"
+              >
+                <p className="font-bold">This archives {pkg.name}.</p>
+                <p className="mt-1">{impact.summary}</p>
+                {impact.schemes.length > 0 && (
+                  <ul className="mt-1.5 list-disc pl-4">
+                    {impact.schemes.map((s) => (
+                      <li key={`${s.id}-${s.tierName ?? ""}`}>
+                        {s.name}
+                        {s.tierName ? ` — via the "${s.tierName}" tier` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {impact.inUse && (
+                  <label className="mt-2 flex items-start gap-2 font-semibold">
+                    <input
+                      type="checkbox"
+                      name="__confirmArchiveInUse"
+                      value="yes"
+                      className="mt-0.5"
+                      required
+                    />
+                    <span>
+                      I understand this package is in use and that archiving it does not move or
+                      end anyone&rsquo;s cover.
+                    </span>
+                  </label>
+                )}
+              </div>
+            )}
           </div>
           <div className="md:col-span-2">
             <label className={labelCls}>Description</label>
