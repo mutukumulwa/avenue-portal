@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { withApiKey, getApiCredential } from "@/lib/apiAuth";
-import { SyncService } from "@/server/services/sync.service";
+import {
+  OFFLINE_ALLOWED_ENTITY_TYPES,
+  SyncService,
+  isOfflineAllowedEntityType,
+} from "@/server/services/sync.service";
 import { enqueueSyncReconcile } from "@/lib/queue";
 
 /**
@@ -36,6 +40,18 @@ async function postSync(req: Request) {
       return NextResponse.json({ error: "operations[] is required" }, { status: 400 });
     }
     for (const op of operations) {
+      // UAT-HF P04.04 / DEC-08: reject an entity type outside the allowlist AT
+      // THE DOOR. Buffering it and then acknowledging it is how DEF-067 lost
+      // data — the device deletes its copy on a "synced" it never earned.
+      if (op?.entityType && !isOfflineAllowedEntityType(String(op.entityType))) {
+        return NextResponse.json(
+          {
+            error: `Entity type "${op.entityType}" cannot be captured offline. Nothing was stored.`,
+            allowed: OFFLINE_ALLOWED_ENTITY_TYPES,
+          },
+          { status: 400 },
+        );
+      }
       if (!op?.clientUuid || !op?.opKey || !op?.entityType || !op?.capturedAt) {
         return NextResponse.json(
           { error: "each operation needs clientUuid, opKey, entityType, capturedAt" },

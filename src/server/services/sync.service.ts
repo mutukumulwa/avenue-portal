@@ -25,6 +25,24 @@ import { processAcceptedRunInline } from "./claim-intake";
  * reaches a terminal state (SYNCED | CONFLICT | REJECTED), and retries are safe.
  */
 
+/**
+ * DEC-08 — the only entity types that may ever be captured offline. A type
+ * outside this list is rejected at ingest rather than buffered and then
+ * silently acknowledged.
+ */
+export const OFFLINE_ALLOWED_ENTITY_TYPES = ["Claim", "PreAuth", "CheckIn", "Image"] as const;
+export type OfflineEntityType = (typeof OFFLINE_ALLOWED_ENTITY_TYPES)[number];
+
+/** Entity types with a real server-side handler TODAY. The rest are rejected. */
+export const OFFLINE_IMPLEMENTED_ENTITY_TYPES = ["Claim"] as const;
+
+/** Reason prefix for an operation that will never be applied as captured. */
+export const UNSUPPORTED_REASON = "REJECTED_UNSUPPORTED";
+
+export function isOfflineAllowedEntityType(value: string): value is OfflineEntityType {
+  return (OFFLINE_ALLOWED_ENTITY_TYPES as readonly string[]).includes(value);
+}
+
 export interface IncomingOp {
   clientUuid: string;
   opKey: string;
@@ -118,7 +136,7 @@ export class SyncService {
     // terminal state; a CONFLICT is never silently dropped — it surfaces for
     // review. A RETRY outcome (transient canonical failure BEFORE acceptance)
     // leaves the op PENDING so the next reconcile pass retries it (F5.5).
-    let outcome: { state: "SYNCED" | "CONFLICT" | "RETRY"; reason?: string };
+    let outcome: { state: "SYNCED" | "CONFLICT" | "RETRY" | "REJECTED"; reason?: string };
     switch (op.entityType) {
       case "Claim":
         outcome = await this.reconcileClaim(
@@ -126,8 +144,31 @@ export class SyncService {
           op.payload as Record<string, unknown>,
         );
         break;
+
+      // UAT-HF P04.04 / DEF-067. This used to be `default: { state: "SYNCED" }`,
+      // which marked EVERY non-Claim operation synchronised WITHOUT APPLYING IT.
+      // The device then deletes its local copy believing the work landed, so a
+      // check-in, pre-auth or image captured offline is destroyed by the very
+      // act of "syncing" it. Silent data loss, reported as success.
+      //
+      // DEC-08 allows these types to be store-and-forward only once each handler
+      // is complete. Until then they are REJECTED with a reason — visible,
+      // never acknowledged.
+      case "PreAuth":
+      case "CheckIn":
+      case "Image":
+        outcome = {
+          state: "REJECTED",
+          reason: `${UNSUPPORTED_REASON}: offline capture for ${op.entityType} is not yet supported by the server. The operation was NOT applied — re-enter it online.`,
+        };
+        break;
+
       default:
-        outcome = { state: "SYNCED" };
+        // An entity type outside the DEC-08 allowlist entirely.
+        outcome = {
+          state: "REJECTED",
+          reason: `${UNSUPPORTED_REASON}: "${op.entityType}" is not an entity type this server accepts. The operation was NOT applied.`,
+        };
     }
     if (outcome.state === "RETRY") return { state: "PENDING", reason: outcome.reason };
     return this.finalise(operationId, outcome.state, outcome.reason);
@@ -280,7 +321,7 @@ export class SyncService {
 
   private static async finalise(
     operationId: string,
-    state: "SYNCED" | "CONFLICT",
+    state: "SYNCED" | "CONFLICT" | "REJECTED",
     reason?: string,
   ): Promise<{ state: string; reason?: string }> {
     const op = await prisma.syncOperation.update({
@@ -288,7 +329,9 @@ export class SyncService {
       data: {
         state,
         syncedAt: state === "SYNCED" ? new Date() : null,
-        conflictReason: state === "CONFLICT" ? (reason ?? "Conflict") : null,
+        // REJECTED carries its reason in the same column so the operator sees
+        // WHY an operation will never be applied, not just that it was not.
+        conflictReason: state === "SYNCED" ? null : (reason ?? (state === "CONFLICT" ? "Conflict" : "Rejected")),
       },
       select: { tenantId: true, opKey: true, entityType: true },
     });

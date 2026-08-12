@@ -59,13 +59,44 @@ describe("SyncService — store-and-forward (G4)", () => {
   });
 
   describe("reconcile", () => {
-    it("marks a well-formed PENDING op SYNCED", async () => {
+    /**
+     * UAT-HF P04.04 / DEF-067. This test previously asserted that an op with NO
+     * entityType is marked SYNCED — i.e. it encoded the defect as correct
+     * behaviour. The reconciler had `default: { state: "SYNCED" }`, so every
+     * non-Claim operation was acknowledged WITHOUT BEING APPLIED, and the device
+     * then deleted its local copy believing the work had landed.
+     *
+     * The expectation is inverted deliberately: an operation the server cannot
+     * apply must never be reported as synchronised.
+     */
+    it("REJECTS an op whose entity type has no handler, instead of silently syncing it", async () => {
       db.syncOperation.findUnique.mockResolvedValue({ id: "o1", state: "PENDING", payload: { a: 1 } });
       const res = await SyncService.reconcile("o1");
-      expect(res.state).toBe("SYNCED");
+      expect(res.state).toBe("REJECTED");
+      expect(res.reason).toMatch(/REJECTED_UNSUPPORTED/);
       expect(db.syncOperation.update).toHaveBeenCalledWith(
-        expect.objectContaining({ data: expect.objectContaining({ state: "SYNCED" }) }),
+        expect.objectContaining({ data: expect.objectContaining({ state: "REJECTED" }) }),
       );
+    });
+
+    it.each(["PreAuth", "CheckIn", "Image"])(
+      "%s is rejected with a reason until its handler exists (DEC-08), never acknowledged",
+      async (entityType) => {
+        db.syncOperation.findUnique.mockResolvedValue({ id: "o1", state: "PENDING", entityType, payload: { a: 1 } });
+        const res = await SyncService.reconcile("o1");
+        expect(res.state).toBe("REJECTED");
+        // The operator is told the work was NOT applied and what to do.
+        expect(res.reason).toMatch(/not applied/i);
+        expect(res.reason).toMatch(/re-enter it online/i);
+      },
+    );
+
+    it("records the rejection reason so it is visible, not just absent", async () => {
+      db.syncOperation.findUnique.mockResolvedValue({ id: "o1", state: "PENDING", entityType: "CheckIn", payload: {} });
+      await SyncService.reconcile("o1");
+      const call = db.syncOperation.update.mock.calls.at(-1)?.[0] as MockDbArgs;
+      expect((call.data as Record<string, unknown>).conflictReason).toMatch(/REJECTED_UNSUPPORTED/);
+      expect((call.data as Record<string, unknown>).syncedAt).toBeNull();
     });
 
     it("flags a malformed payload as CONFLICT (never silently dropped)", async () => {
