@@ -781,6 +781,39 @@ override is marked consumed so it cannot authorise a second edit.
 applicability. The immutable event carries before, after, source document, reason **and the
 checker's id**; DEF-047's complaint was an audit trail showing only a raw internal maker id.
 
+## P03 — Canonical eligibility and network resolution
+
+### P03.01 (part) — Provider entitlement readiness report
+
+| Field | Value |
+|---|---|
+| **Task** | P03.01 — readiness reporting only; the seed/apply/re-run cycle is an ops step |
+| **Defect IDs** | DEF-053, DEF-007 |
+| **Commit** | _pending_ |
+| **Migrations / backfills** | none — this REPORTS on data the existing seeds/backfills produce |
+| **Tests added** | none yet — the report is read-only and depends on live data shape; behavioural coverage lands with P03.02's evaluator tests |
+| **Commands / results** | typecheck 0; lint 0 errors; suite 275 files / 2842 passed. |
+| **Evidence** | `scripts/reports/provider-entitlement-readiness.ts` |
+| **Feature flags** | none changed. Gates the existing per-provider `ProviderAccessSettingsService.isEntitlementEnforced`. |
+| **Remaining risks** | **Not yet run against any real database** — it must be, and must reach zero, before fail-closed enforcement is enabled. The seeds/backfills themselves are unchanged and unrun here. P03.02–P03.05 are not started. |
+
+**The mechanism behind DEF-053, located precisely.** `ProviderEntitlementService.entitledMemberWhere`
+returns `{ id: "__no_provider_entitlement__" }` — a deliberate match-nothing filter — when a provider
+has **no effective INCLUDE applicability**. A facility with no applicability rows is entitled to zero
+members, so *every* card number returns not-found, and the UI collapses that into a message blaming
+the card. That is exactly what the run saw: nine probes across three ACTIVE members returning one
+identical string while the member portal showed UGX 30.0M cover with UGX 0 used. DEF-007 is the same
+failure from the member side.
+
+**So the data, not the lookup, is what must be fixed first.** The report checks the *same predicate
+the evaluator uses* — active applicability, on an ACTIVE contract, effective now, INCLUDE — because a
+report that checks different criteria than the evaluator would certify a readiness the evaluator
+disagrees with.
+
+It also states the ordering rule plainly: **do not enable fail-closed enforcement while any gap
+remains.** Over incomplete data that converts a wrong answer into a denied one, which is worse at the
+point of care.
+
 ---
 
 ## Corrections made to the implementation plan

@@ -16,25 +16,28 @@ const db = vi.hoisted(() => ({
   providerContract: {
     findUnique: vi.fn(),
     findUniqueOrThrow: vi.fn(),
-    updateMany: vi.fn(async () => ({ count: 1 })),
+    updateMany: vi.fn(async (_a: MockDbArgs) => ({ count: 1 })),
     update: vi.fn(async (a: MockDbArgs) => ({ id: a.where!.id })),
     delete: vi.fn(),
     deleteMany: vi.fn(),
   },
-  overrideRecord: { findFirst: vi.fn(async () => null), update: vi.fn(async () => ({})) },
+  overrideRecord: {
+    findFirst: vi.fn(async (): Promise<MockDbRow | null> => null),
+    update: vi.fn(async (_a: MockDbArgs) => ({})),
+  },
   providerTariff: { deleteMany: vi.fn() },
   contractApplicability: { deleteMany: vi.fn() },
-  $transaction: vi.fn(async (_fn: (tx: unknown) => unknown) => undefined),
+  $transaction: vi.fn(async (_fn: (tx: unknown) => unknown): Promise<unknown> => undefined),
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
 
 const audit = vi.hoisted(() => ({ append: vi.fn(async () => ({})) }));
 vi.mock("@/server/services/audit-chain.service", () => ({ auditChainService: audit }));
 
-const events = vi.hoisted(() => ({ record: vi.fn(async () => ({ id: "evt1" })) }));
+const events = vi.hoisted(() => ({ record: vi.fn(async (_a: MockDbRow, _tx?: unknown) => ({ id: "evt1" })) }));
 vi.mock("@/server/services/domain-event.service", () => ({ DomainEventService: events }));
 
-const overrides = vi.hoisted(() => ({ request: vi.fn(async () => ({ id: "ov1" })) }));
+const overrides = vi.hoisted(() => ({ request: vi.fn(async (_a: MockDbRow) => ({ id: "ov1" })) }));
 vi.mock("@/server/services/override.service", () => ({
   overrideService: overrides,
   OVERRIDE_APPROVER_ROLES: {},
