@@ -1054,6 +1054,31 @@ from both sides. The existing test asserted this defect as intended behaviour ("
 PENDING op SYNCED", with a fixture that had no `entityType` at all); it was inverted, with the reason
 recorded beside it.
 
+### P04.05 — Freshness and conflict rules
+
+| Field | Value |
+|---|---|
+| **Task** | P04.05 |
+| **Defect IDs** | DEF-077, DEF-062, DEF-066 |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none — the precondition uses `updatedAt`, which every model already has |
+| **Tests added** | `tests/lib/concurrency.test.ts` (30), `tests/components/conflict-notice.test.tsx` (19) |
+| **Commands / results** | typecheck 0; lint 0 errors; suite 286 files / 3079 passed. |
+| **Evidence** | `src/lib/concurrency.ts`, `src/components/forms/{ConflictNotice.tsx,SnapshotFreshness.tsx,useStaleDataGuard.ts}` |
+| **Feature flags** | none. |
+| **Remaining risks** | **No production write uses the precondition yet** — P05.05 adopts it on the member edit path, which is the screen DEF-077 was found on, and until that lands the defect is preventable rather than closed. DEF-067's "provisional versus final delta" for offline-captured claims is **not** built: P04.04 made the sync outcome honest, but there is no screen showing a provisional amount against its final one. `SnapshotFreshness` is mounted by no page yet. |
+
+**DEF-077 is two faults, and fixing either alone leaves the other.** The run recorded that staff B's save "SUCCEEDED with no conflict banner" and that "B's whole-form submit wrote every field from its stale copy, so a field neither operator intended to touch was reverted". So:
+
+1. **No precondition** — the update never said what it expected to find, so it could not notice the world had moved. `applyWithPrecondition` puts the expectation in the WHERE clause, because reading the row and then updating it leaves exactly the race it is meant to close.
+2. **Whole-record writes** — even *with* a precondition, submitting every field from a stale copy reverts what the operator never touched. `changedFields` returns only their real edits.
+
+**A conflict must not be a second act of destruction.** The acceptance says a conflict must "preserve both submitted/current values", so `describeConflict` compares three copies — loaded, submitted, current — and `ConflictNotice` renders the operator's typed values beside the record's. A banner that says "reload and try again" satisfies the words and loses the work.
+
+The three-way comparison is also what distinguishes *your* edit from *theirs*: a field the operator never touched is somebody else's change, and re-applying it would repeat the defect. Those rows are labelled keep-theirs rather than offered as a choice.
+
+**DEF-062 is deliberately conservative.** Staleness is marked on *return* to a tab, not on a timer — a user reading a record for two minutes has not gone stale; one coming back to a tab left open an hour ago has. The register holds DEF-062 at S3 only because status does not gate actions on a fresh page either, and warns: "If DEF-058 is fixed without also fixing this, the severity rises." P07.06 must not land without this.
+
 ---
 
 ## Corrections made to the implementation plan

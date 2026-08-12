@@ -25,6 +25,7 @@
  */
 import type { ActionFailure, ActionResult } from "@/lib/action-result";
 import { newCorrelationId } from "@/lib/correlation";
+import type { ConflictDetail } from "@/lib/concurrency";
 
 /**
  * Why a mutation failed, in the only terms a caller can act on.
@@ -76,6 +77,13 @@ export type MutationFailure = {
   retryable: boolean;
   /** Mirrors `message` so existing ActionResult consumers keep rendering. */
   formError: string;
+  /**
+   * UAT-HF P04.05 — set on a CONFLICT caused by a stale copy. Carries what this
+   * operator submitted alongside what the record says now, so a rejected save
+   * preserves their work instead of discarding it in the act of protecting the
+   * record (DEF-077).
+   */
+  conflict?: ConflictDetail;
 };
 
 export type MutationResult<T = void> = MutationSuccess<T> | MutationFailure;
@@ -139,6 +147,8 @@ export function mutationFail(
     correlationId?: string;
     /** Only honoured for kinds where a retry can ever be safe. */
     retryable?: boolean;
+    /** P04.05 — stale-copy detail; only meaningful on CONFLICT. */
+    conflict?: ConflictDetail;
   } = {},
 ): MutationFailure {
   const message = options.message?.trim() || DEFAULT_MESSAGE[kind];
@@ -154,7 +164,28 @@ export function mutationFail(
     retryable,
     ...(hasFields ? { fieldErrors: options.fieldErrors } : {}),
     ...(options.operationId ? { operationId: options.operationId } : {}),
+    ...(options.conflict ? { conflict: options.conflict } : {}),
   };
+}
+
+/**
+ * A save rejected because the record moved underneath it (P04.05, DEF-077).
+ *
+ * Distinct from a bare `mutationFail("CONFLICT")` because it carries the
+ * comparison: the acceptance requires the operator's submitted values to
+ * survive the rejection so they can re-apply them deliberately.
+ */
+export function mutationConflict(
+  conflict: ConflictDetail,
+  options: { operationId?: string; correlationId?: string; message?: string } = {},
+): MutationFailure {
+  const untouched = conflict.fields.filter((f) => f.untouched).length;
+  const message =
+    options.message ??
+    (untouched > 0
+      ? `Somebody else changed this ${conflict.entity} while you were editing it. Your changes were NOT saved. Compare them below — the values you did not touch have moved too.`
+      : `Somebody else changed this ${conflict.entity} while you were editing it. Your changes were NOT saved. Compare them below, then re-apply the ones you still want.`);
+  return mutationFail("CONFLICT", { ...options, message, conflict });
 }
 
 export function isMutationFailure(value: unknown): value is MutationFailure {
