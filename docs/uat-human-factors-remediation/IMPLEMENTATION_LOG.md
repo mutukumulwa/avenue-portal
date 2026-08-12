@@ -339,6 +339,63 @@ DEF-001 happened.
 
 ---
 
+## P01 — Shared correctness primitives
+
+### P01.01 — Extend the server-action result into a mutation envelope
+
+| Field | Value |
+|---|---|
+| **Task** | P01.01 |
+| **Defect IDs** | DEF-034, DEF-065, DEF-068, DEF-070, DEF-071, DEF-075 |
+| **Commit** | _pending_ |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/lib/mutation-contract.test.ts` (33) and `tests/components/mutation-envelope.test.tsx` (9) — **42 new tests** |
+| **Commands / results** | `npx vitest run` → **262 files / 2653 tests passed**, 88 files / 578 skipped. typecheck 0; targeted lint clean. |
+| **Routes exercised** | none — primitives only. P04.01 adopts them on real forms. |
+| **Evidence** | `src/lib/mutation-contract.ts`, `src/lib/correlation.ts`, `src/components/forms/**` |
+| **Feature flags** | none |
+| **Remaining risks** | `operationId` is currently minted and echoed but **not yet persisted** — a replay is not actually detected until P01.02 ships `OperationReceipt`. Until then `MutationOutcome`'s "check whether it was saved" link has nowhere authoritative to point. No production form uses the envelope yet; that is P04.01. |
+
+**The contract.** `MutationResult<T>` is a strict superset of `ActionResult<T>`: success keeps
+`data`, failure mirrors `message` into `formError` and keeps `fieldErrors`, so all **20 existing
+`ActionResult` consumers keep working untouched**.
+
+**The distinction the run actually needed.** DEF-065 in one sentence: *"any network interruption
+during a submit crashes the client, destroys all typed input, never recovers on reconnect, and can
+hide a write that committed (server returned 200 and created UX26-2026-00037 while the operator saw
+only a crash)."* That is three failures, and the envelope separates the one that matters:
+**`UNKNOWN_OUTCOME` means we cannot say whether it committed**, so it can never be marked
+retryable — enforced in `mutationFail`, not merely by convention, and asserted by test.
+
+Two deliberate hard rules:
+
+- **An unrecognised error maps to `UNKNOWN_OUTCOME`, not "failed."** Recognised Prisma/Zod codes are
+  provably pre-commit and get their honest kind; anything else cannot be proven to have rolled back,
+  so it must not invite a resubmit.
+- **`redirect()`/`notFound()` are rethrown, never mapped.** Swallowing them turns a successful
+  redirect into a fake error — a long-standing landmine in this repo.
+
+A test asserts a P2002 carrying `Member.nationalId = CM12345678` produces a failure whose JSON
+contains no national ID, no `P2002`, and no field name — DEF-027/DEF-078 in miniature. The original
+error is logged server-side against the correlation id, where support needs it.
+
+**Two bugs found while writing the tests, both fixed.**
+
+1. `ErrorSummary` and `MutationOutcome` both rendered the same message for a failure with no field
+   errors, so one fault read as two. They now have exclusive responsibilities: the summary owns
+   field-level problems (and the whole of `VALIDATION`), the banner owns the form-level outcome and
+   the support reference. Focus follows the same split so they cannot fight over it.
+2. The `FORBIDDEN` and `UNAVAILABLE` banner headings repeated their own default body text. Added
+   `isDefaultMessage()` so the body only echoes the envelope's `message` when a caller supplied
+   specific copy, and says something new otherwise.
+
+**Adjacent fix: `tests/setup.ts` had no cleanup.** It loaded the jest-dom matchers only, so rendered
+trees accumulated in `document.body` for a whole file and a later test could fail on the *previous*
+test's DOM. Added `afterEach(cleanup)`. Verified against the full suite: nothing else depended on the
+old behaviour. This would otherwise have bitten every component test P01.06 and P11.01 add.
+
+---
+
 ## Corrections made to the implementation plan
 
 The plan is treated as authoritative but not infallible. Where a plan statement was checked against
