@@ -30,9 +30,6 @@
   "src/app/(admin)/groups/new/page.tsx": {
     "kenyan-calling-code": 1
   },
-  "src/app/(admin)/members/[id]/edit/MemberEditForm.tsx": {
-    "kenyan-calling-code": 1
-  },
   "src/app/(admin)/members/[id]/transfer/actions.ts": {
     "ambiguous-date-format": 2
   },

@@ -1,9 +1,16 @@
 "use client";
 
 import { useActionState } from "react";
-import { Save, AlertCircle, Lock } from "lucide-react";
-import { updateMemberAction } from "./actions";
-import { editStatusOptions, isTerminalMemberStatus } from "@/lib/member-status";
+import { Save, Lock } from "lucide-react";
+import Link from "next/link";
+import { updateMemberProfileAction, type ProfileUpdated } from "./actions";
+import { isTerminalMemberStatus } from "@/lib/member-status";
+import { ErrorSummary } from "@/components/forms/ErrorSummary";
+import { MutationOutcome } from "@/components/forms/MutationOutcome";
+import { ConflictNotice } from "@/components/forms/ConflictNotice";
+import { EXPECTED_UPDATED_AT_FIELD } from "@/lib/concurrency";
+import { EXAMPLES } from "@/lib/locale-config";
+import type { MutationResult } from "@/lib/mutation-contract";
 
 /** Human labels for every MemberStatus (covers terminal states shown read-only). */
 const STATUS_LABELS: Record<string, string> = {
@@ -25,6 +32,8 @@ const labelCls = "text-xs font-bold text-brand-text-muted uppercase block mb-1";
 
 interface MemberSnap {
   id: string;
+  /** UAT-HF P05.05 — the precondition. What this copy of the record looked like. */
+  updatedAt: string; // ISO
   firstName: string;
   lastName: string;
   otherNames: string | null;
@@ -38,19 +47,43 @@ interface MemberSnap {
 }
 
 export function MemberEditForm({ member }: { member: MemberSnap }) {
-  const boundAction = updateMemberAction.bind(null, member.id);
-  const [state, action, pending] = useActionState(boundAction, null);
+  /**
+   * UAT-HF P05.05 — DEF-077. The form now tells the server what it expected to
+   * find (`__expectedUpdatedAt`) and what it was showing when it loaded
+   * (`__original_*`). Without both, a save is either blind or writes the whole
+   * stale record back over somebody else's committed change.
+   */
+  const boundAction = updateMemberProfileAction.bind(null, member.id);
+  const [state, action, pending] = useActionState<MutationResult<ProfileUpdated> | null, FormData>(
+    boundAction,
+    null,
+  );
+  const failure = state && !state.ok ? state : null;
 
   return (
     <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-6">
-      {state?.error && (
-        <div className="mb-5 flex items-start gap-2 bg-[#DC3545]/5 border border-[#DC3545]/30 text-[#DC3545] rounded-lg px-4 py-3 text-sm">
-          <AlertCircle size={16} className="shrink-0 mt-0.5" />
-          <span>{state.error}</span>
-        </div>
-      )}
+      <ErrorSummary failure={failure} />
+
+      {/* Both operators' values, side by side — a rejected save must not be a
+          second act of destruction. */}
+      <ConflictNotice conflict={failure?.conflict} />
+
+      <div className="mb-5">
+        <MutationOutcome result={state} nextHref={`/members/${member.id}`} />
+      </div>
 
       <form action={action} className="space-y-6">
+        {/* The precondition, and the copy this browser loaded. */}
+        <input type="hidden" name={EXPECTED_UPDATED_AT_FIELD} value={member.updatedAt} />
+        <input type="hidden" name="__original_firstName" value={member.firstName} />
+        <input type="hidden" name="__original_lastName" value={member.lastName} />
+        <input type="hidden" name="__original_otherNames" value={member.otherNames ?? ""} />
+        <input type="hidden" name="__original_idNumber" value={member.idNumber ?? ""} />
+        <input type="hidden" name="__original_dateOfBirth" value={member.dateOfBirth.slice(0, 10)} />
+        <input type="hidden" name="__original_gender" value={member.gender} />
+        <input type="hidden" name="__original_phone" value={member.phone ?? ""} />
+        <input type="hidden" name="__original_email" value={member.email ?? ""} />
+        <input type="hidden" name="__original_relationship" value={member.relationship} />
         {/* Personal */}
         <div>
           <h3 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Personal Information</h3>
@@ -93,7 +126,7 @@ export function MemberEditForm({ member }: { member: MemberSnap }) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Phone Number</label>
-              <input name="phone" type="text" defaultValue={member.phone ?? ""} placeholder="+254 700 000000" className={inputCls} />
+              <input name="phone" type="text" defaultValue={member.phone ?? ""} placeholder={EXAMPLES.phone} className={inputCls} />
             </div>
             <div>
               <label className={labelCls}>Email Address</label>
@@ -117,33 +150,39 @@ export function MemberEditForm({ member }: { member: MemberSnap }) {
               </select>
             </div>
             <div>
-              <label className={labelCls}>Status *</label>
-              {/* WP-3.5G: a terminal member is a governed lifecycle state — the edit
-                  dropdown cannot reinstate or re-terminate it. Show it locked and
-                  submit the unchanged status; reinstatement is a separate flow. */}
-              {isTerminalMemberStatus(member.status) ? (
-                <>
-                  <input type="hidden" name="status" value={member.status} />
-                  <div className={`${inputCls} bg-[#F8F9FA] text-brand-text-muted flex items-center gap-2`}>
-                    <Lock size={13} className="shrink-0" />
-                    {STATUS_LABELS[member.status] ?? member.status}
-                  </div>
-                  <p className="text-[10px] text-brand-text-muted mt-1">
-                    Terminal state — reinstatement is a governed lifecycle flow, not an edit.
-                  </p>
-                </>
-              ) : (
-                <select required name="status" defaultValue={member.status} className={inputCls}>
-                  {editStatusOptions(member.status).map((s) => (
-                    <option key={s} value={s}>{STATUS_LABELS[s] ?? s}</option>
-                  ))}
-                </select>
-              )}
+              <label className={labelCls}>Status</label>
+              {/*
+                UAT-HF P05.05 — DEF-041/DEF-043. Status used to be an ordinary
+                dropdown submitted with the rest of the form, so suspending a
+                member carried exactly the ceremony and audit weight of fixing a
+                typo. It is now READ-ONLY here and changed by its own command,
+                which requires a reason. The action does not read `status` from
+                this form at all, so a forged field has nothing to bind to.
+              */}
+              <div className={`${inputCls} bg-[#F8F9FA] text-brand-text-muted flex items-center gap-2`}>
+                <Lock size={13} className="shrink-0" />
+                {STATUS_LABELS[member.status] ?? member.status}
+              </div>
+              <p className="text-[10px] text-brand-text-muted mt-1">
+                {isTerminalMemberStatus(member.status)
+                  ? "Terminal state — reinstatement is a governed lifecycle flow, not an edit."
+                  : "Changing status is a separate, recorded decision."}{" "}
+                <Link href={`/members/${member.id}`} className="underline">
+                  Member lifecycle actions
+                </Link>
+              </p>
             </div>
           </div>
         </div>
 
-        <div className="flex justify-end pt-2">
+        <div className="flex justify-end gap-3 pt-2">
+          {/* DEF-008's sibling: an edit form needs a labelled way out too. */}
+          <Link
+            href={`/members/${member.id}`}
+            className="rounded-full border border-[#EEEEEE] px-5 py-2 text-sm font-semibold text-brand-text-muted transition-colors hover:bg-[#F8F9FA]"
+          >
+            Cancel
+          </Link>
           <button
             type="submit"
             disabled={pending}

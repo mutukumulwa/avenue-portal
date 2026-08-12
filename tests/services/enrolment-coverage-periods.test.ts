@@ -20,6 +20,8 @@ const db = vi.hoisted(() => {
       findUnique: vi.fn(),
       create: vi.fn(async (a: MockDbArgs) => ({ id: "m1", ...(a.data ?? {}) })),
       update: vi.fn(async (a: MockDbArgs) => ({ id: a.where!.id, ...(a.data ?? {}) })),
+      // P05.05: updateProfile is a conditional updateMany, not an update.
+      updateMany: vi.fn(async () => ({ count: 1 })),
     },
     // WP-3.5F: createMember now auto-assigns the scheme's default benefit tier.
     groupBenefitTier: { findFirst: vi.fn(async () => null) },
@@ -136,17 +138,19 @@ describe("MembersService.createMember — coverage period + effective date + pin
   });
 });
 
-describe("MembersService.updateMember — suspend closes / reinstate reopens coverage", () => {
-  const baseData = {
-    firstName: "A", lastName: "B", dateOfBirth: "1990-01-01",
-    gender: "MALE" as const, relationship: "PRINCIPAL" as const,
-  };
-
+/**
+ * UAT-HF P05.05 moved these effects from `updateMember` — which took status
+ * alongside the demographics and wrote both in one unconditional call — to
+ * `changeStatus`, a separate command that requires a reason. The coverage
+ * behaviour itself is unchanged and is still the point of these tests: a
+ * suspension must leave an uncovered gap so point-in-time eligibility is right.
+ */
+describe("MembersService.changeStatus — suspend closes / reinstate reopens coverage", () => {
   it("ACTIVE → SUSPENDED closes the open coverage period", async () => {
-    db.member.findUnique.mockResolvedValue({ id: "m1", status: "ACTIVE", idNumber: null, phone: null });
+    db.member.findFirst.mockResolvedValue({ id: "m1", status: "ACTIVE" });
     db.memberCoveragePeriod.findMany.mockResolvedValue([{ id: "cp1", startDate: new Date("2026-01-01") }]);
 
-    await MembersService.updateMember("t1", "m1", { ...baseData, status: "SUSPENDED" });
+    await MembersService.changeStatus("t1", "m1", "SUSPENDED");
 
     expect(db.memberCoveragePeriod.update).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: "cp1" }, data: expect.objectContaining({ reason: "SUSPENDED" }) }),
@@ -155,19 +159,30 @@ describe("MembersService.updateMember — suspend closes / reinstate reopens cov
   });
 
   it("SUSPENDED → ACTIVE reopens a coverage period", async () => {
-    db.member.findUnique.mockResolvedValue({ id: "m1", status: "SUSPENDED", idNumber: null, phone: null });
+    db.member.findFirst.mockResolvedValue({ id: "m1", status: "SUSPENDED" });
 
-    await MembersService.updateMember("t1", "m1", { ...baseData, status: "ACTIVE" });
+    await MembersService.changeStatus("t1", "m1", "ACTIVE");
 
     expect(db.memberCoveragePeriod.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ reason: "REINSTATEMENT" }) }),
     );
   });
 
-  it("a plain edit with no status change touches no coverage period", async () => {
-    db.member.findUnique.mockResolvedValue({ id: "m1", status: "ACTIVE", idNumber: null, phone: null });
+  it("a status change to the same status touches no coverage period", async () => {
+    db.member.findFirst.mockResolvedValue({ id: "m1", status: "ACTIVE" });
 
-    await MembersService.updateMember("t1", "m1", { ...baseData, status: "ACTIVE" });
+    await MembersService.changeStatus("t1", "m1", "ACTIVE");
+
+    expect(db.memberCoveragePeriod.update).not.toHaveBeenCalled();
+    expect(db.memberCoveragePeriod.create).not.toHaveBeenCalled();
+  });
+
+  it("a profile edit cannot touch coverage at all — it has no status to change", async () => {
+    // The structural half of DEF-041/DEF-043: the demographics path simply has
+    // no route to a lifecycle effect any more.
+    db.member.updateMany.mockResolvedValue({ count: 1 });
+
+    await MembersService.updateProfile("t1", "m1", { firstName: "Changed" }, { updatedAt: new Date() });
 
     expect(db.memberCoveragePeriod.update).not.toHaveBeenCalled();
     expect(db.memberCoveragePeriod.create).not.toHaveBeenCalled();

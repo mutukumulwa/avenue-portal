@@ -14,6 +14,12 @@ import {
   findIdentityMatches,
 } from "@/server/services/identity-match.service";
 import { canEditTransition } from "@/lib/member-status";
+import type { Prisma } from "@prisma/client";
+import {
+  applyWithPrecondition,
+  type ExpectedState,
+  type PreconditionOutcome,
+} from "@/lib/concurrency";
 
 /** Relationships an enrolment path may assign (SIBLING added in WP-3.5F). */
 export type EnrolmentRelationship = "PRINCIPAL" | "SPOUSE" | "CHILD" | "PARENT" | "SIBLING";
@@ -255,75 +261,115 @@ export class MembersService {
   /**
    * Updates editable fields on an existing member
    */
-  static async updateMember(tenantId: string, memberId: string, data: {
-    firstName: string;
-    lastName: string;
-    otherNames?: string;
-    idNumber?: string;
-    dateOfBirth: string | Date;
-    gender: Gender;
-    phone?: string;
-    email?: string;
-    relationship: MemberRelationship;
-    status: MemberStatus;
-  }) {
-    const member = await prisma.member.findUnique({ where: { id: memberId, tenantId } });
+  /**
+   * UAT-HF P05.05 — a profile edit: demographics only, conditional on the copy
+   * the operator loaded.
+   *
+   * Replaces `updateMember`, which took `status` alongside the demographics and
+   * wrote every field unconditionally. That is DEF-077 (silent lost update) and
+   * DEF-041/DEF-043 (a lifecycle change with the ceremony of a spelling fix) in
+   * one method.
+   *
+   * Returns STALE — having written nothing — when the record moved underneath
+   * the operator. The precondition is in the WHERE clause, so the check and the
+   * write are one statement and there is no window between them.
+   */
+  static async updateProfile(
+    tenantId: string,
+    memberId: string,
+    edits: Partial<{
+      firstName: string;
+      lastName: string;
+      otherNames: string;
+      idNumber: string;
+      dateOfBirth: string;
+      gender: string;
+      phone: string;
+      email: string;
+      relationship: string;
+    }>,
+    expected: ExpectedState,
+  ): Promise<PreconditionOutcome> {
+    if (Object.keys(edits).length === 0) return "APPLIED";
+
+    // P05.04: identity rules are the same in every channel. National ID blocks;
+    // a shared phone does not (DEC-07).
+    if (edits.idNumber !== undefined || edits.phone !== undefined) {
+      const matches = await findIdentityMatches(
+        prisma,
+        tenantId,
+        { nationalId: edits.idNumber, phone: edits.phone },
+        { excludeMemberId: memberId },
+      );
+      const blocking = blockingMatch(matches);
+      if (blocking) throw new DuplicateIdentityError(blockingMessage(blocking));
+    }
+
+    const data: Prisma.MemberUpdateInput = {};
+    if (edits.firstName !== undefined) data.firstName = edits.firstName;
+    if (edits.lastName !== undefined) data.lastName = edits.lastName;
+    if (edits.otherNames !== undefined) data.otherNames = edits.otherNames || null;
+    if (edits.idNumber !== undefined) {
+      data.idNumber = edits.idNumber ? normalizeNationalId(edits.idNumber) : null;
+    }
+    if (edits.dateOfBirth !== undefined) data.dateOfBirth = new Date(edits.dateOfBirth);
+    if (edits.gender !== undefined) data.gender = edits.gender as Gender;
+    if (edits.phone !== undefined) {
+      data.phone = edits.phone ? (normalizePhone(edits.phone) ?? edits.phone) : null;
+    }
+    if (edits.email !== undefined) data.email = edits.email ? normalizeEmail(edits.email) : null;
+    if (edits.relationship !== undefined) {
+      data.relationship = edits.relationship as MemberRelationship;
+    }
+
+    return applyWithPrecondition(
+      async ({ expected: exp }) =>
+        prisma.member.updateMany({
+          // The precondition IS the WHERE clause. Reading the row and then
+          // updating it leaves exactly the race this closes.
+          where: { id: memberId, tenantId, updatedAt: new Date(exp.updatedAt) },
+          data,
+        }),
+      expected,
+    );
+  }
+
+  /**
+   * UAT-HF P05.05 — a lifecycle status change, as its own command.
+   *
+   * Deliberately separate from {@link updateProfile}: the caller supplies a
+   * reason and gets a distinct audit action. Coverage effects are preserved
+   * from the old `updateMember` — suspending closes the open period, and
+   * reinstating from SUSPENDED opens a fresh one, so point-in-time eligibility
+   * stays correct across the gap.
+   *
+   * P07.01 replaces this with the full transition policy table.
+   */
+  static async changeStatus(tenantId: string, memberId: string, next: MemberStatus) {
+    const member = await prisma.member.findFirst({
+      where: { id: memberId, tenantId },
+      select: { id: true, status: true },
+    });
     if (!member) throw new Error("Member not found");
 
-    // ── WP-3.5G: lifecycle state machine ──────────────────────────────────────
-    // The general edit dropdown may only perform governed transitions. It can
-    // NEVER move a terminal member back to ACTIVE (reinstatement is a governed
-    // flow) or re-terminate a terminal member — those must go through the
-    // dedicated lifecycle flows with their own reason + audit.
-    if (!canEditTransition(member.status, data.status)) {
+    if (!canEditTransition(member.status, next)) {
       throw new Error(
-        `Cannot change member status from ${member.status} to ${data.status} from the edit form. ` +
-        `${member.status} is a governed lifecycle state — use the reinstatement / lifecycle flow instead.`,
+        `Cannot change member status from ${member.status} to ${next} from the edit path. ` +
+          `${member.status} is a governed lifecycle state — use the reinstatement / lifecycle flow instead.`,
       );
     }
 
-    // UAT-HF P05.04 — DEF-078. Both probes here named the other member and their
-    // member number, and the phone one blocked a legitimate shared household
-    // line besides (DEC-07). Same service as enrolment, so the two channels
-    // cannot drift: national ID blocks, phone does not.
-    const editMatches = await findIdentityMatches(
-      prisma,
-      tenantId,
-      { nationalId: data.idNumber, phone: data.phone },
-      { excludeMemberId: memberId },
-    );
-    const editBlocking = blockingMatch(editMatches);
-    if (editBlocking) throw new DuplicateIdentityError(blockingMessage(editBlocking));
-
     const updated = await prisma.member.update({
       where: { id: memberId, tenantId },
-      data: {
-        firstName: data.firstName,
-        lastName: data.lastName,
-        otherNames: data.otherNames || null,
-        idNumber: data.idNumber || null,
-        dateOfBirth: new Date(data.dateOfBirth),
-        gender: data.gender,
-        phone: data.phone || null,
-        email: data.email || null,
-        relationship: data.relationship,
-        status: data.status,
-      },
+      data: { status: next },
     });
 
-    // WP-3.5E: keep coverage history correct across a manual suspend / reinstate so
-    // point-in-time eligibility is right. Suspending closes the open period (no
-    // cover during suspension); reinstating from SUSPENDED reopens a fresh one,
-    // leaving the suspension window as an uncovered gap.
-    if (member.status !== "SUSPENDED" && data.status === "SUSPENDED") {
+    if (member.status !== "SUSPENDED" && next === "SUSPENDED") {
       await coverageService.closeOpenPeriods(prisma, memberId, new Date(), "SUSPENDED");
-    } else if (member.status === "SUSPENDED" && data.status === "ACTIVE") {
+    } else if (member.status === "SUSPENDED" && next === "ACTIVE") {
       await coverageService.openPeriod(prisma, tenantId, memberId, new Date(), "REINSTATEMENT");
     }
 
-    // WP-3.5G: hand the caller the prior status so it can emit a DISTINCT audit
-    // action per transition (MEMBER_SUSPENDED / MEMBER_REINSTATED / …) instead of
-    // a generic MEMBER_UPDATED.
     return { member: updated, previousStatus: member.status };
   }
 }

@@ -16,6 +16,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const overrides = vi.hoisted(() => ({
   idDup: null as any,
+  memberById: null as any,
   phoneDup: null as any,
   emailDup: null as any,
   nameDobDup: null as any,
@@ -33,7 +34,7 @@ const db = vi.hoisted(() => {
       findFirst: vi.fn(async (args: MockDbArgs) => {
         const w = args?.where ?? {};
         if (w.relationship === "PRINCIPAL" && w.idNumber !== undefined) return overrides.principalByIdNumber;
-        if (w.id !== undefined) return overrides.principalById;
+        if (w.id !== undefined) return overrides.principalById ?? overrides.memberById;
         if (w.idNumber !== undefined) return overrides.idDup;
         if (w.phone !== undefined) return overrides.phoneDup;
         if (w.email !== undefined) return overrides.emailDup;
@@ -43,6 +44,8 @@ const db = vi.hoisted(() => {
       findUnique: vi.fn(),
       create: vi.fn(async (a: MockDbArgs) => ({ id: "newm", memberNumber: "MVX-2026-00001", ...(a.data ?? {}) })),
       update: vi.fn(async (a: MockDbArgs) => ({ id: a.where!.id, ...(a.data ?? {}) })),
+      // P05.05: updateProfile is a conditional updateMany.
+      updateMany: vi.fn(async () => ({ count: 1 })),
     },
     memberCoveragePeriod: {
       findFirst: vi.fn(async () => null),
@@ -93,6 +96,7 @@ beforeEach(() => {
   db.proRataCalculation.upsert.mockResolvedValue({});
   db.document.count.mockResolvedValue(0);
   overrides.idDup = null;
+  overrides.memberById = null;
   overrides.phoneDup = null;
   overrides.emailDup = null;
   overrides.nameDobDup = null;
@@ -243,25 +247,110 @@ describe("createMember — newborn (CT-033) + SIBLING", () => {
   });
 });
 
-describe("updateMember — lifecycle state machine (WP-3.5G)", () => {
+/**
+ * UAT-HF P05.05 split `updateMember` into `updateProfile` (demographics, with a
+ * precondition) and `changeStatus` (a lifecycle command with a reason). The
+ * state machine is unchanged and still guards the same transitions; only the
+ * entry point moved, so these assertions follow it.
+ */
+describe("changeStatus — lifecycle state machine (WP-3.5G)", () => {
   it("BLOCKS a terminal → active reinstatement from the edit path", async () => {
-    db.member.findUnique.mockResolvedValue({ id: "m1", status: "TERMINATED", idNumber: null, phone: null });
-    await expect(
-      MembersService.updateMember("t1", "m1", {
-        firstName: "A", lastName: "B", dateOfBirth: "1990-01-01",
-        gender: "MALE", relationship: "PRINCIPAL", status: "ACTIVE",
-      }),
-    ).rejects.toThrow(/governed lifecycle state/i);
+    overrides.memberById = { id: "m1", status: "TERMINATED" };
+    await expect(MembersService.changeStatus("t1", "m1", "ACTIVE")).rejects.toThrow(
+      /governed lifecycle state/i,
+    );
     expect(db.member.update).not.toHaveBeenCalled();
   });
 
   it("returns the previous status so the caller can pick a distinct audit action", async () => {
-    db.member.findUnique.mockResolvedValue({ id: "m1", status: "ACTIVE", idNumber: null, phone: null });
-    const res = await MembersService.updateMember("t1", "m1", {
-      firstName: "A", lastName: "B", dateOfBirth: "1990-01-01",
-      gender: "MALE", relationship: "PRINCIPAL", status: "SUSPENDED",
-    });
+    overrides.memberById = { id: "m1", status: "ACTIVE" };
+    const res = await MembersService.changeStatus("t1", "m1", "SUSPENDED");
     expect(res.previousStatus).toBe("ACTIVE");
+  });
+});
+
+describe("updateProfile — P05.05 concurrency and scope", () => {
+  it("writes conditionally on the loaded updatedAt, and reports STALE when it moved", async () => {
+    db.member.updateMany.mockResolvedValue({ count: 0 });
+    const outcome = await MembersService.updateProfile(
+      "t1",
+      "m1",
+      { firstName: "Changed" },
+      { updatedAt: new Date("2026-08-12T09:00:00Z") },
+    );
+    // Nothing was written — DEF-077's silent lost update, now visible.
+    expect(outcome).toBe("STALE");
+    const where = db.member.updateMany.mock.calls.at(-1)![0].where;
+    expect(where).toEqual({
+      id: "m1",
+      tenantId: "t1",
+      updatedAt: new Date("2026-08-12T09:00:00Z"),
+    });
+  });
+
+  it("APPLIED when the precondition held", async () => {
+    db.member.updateMany.mockResolvedValue({ count: 1 });
+    const outcome = await MembersService.updateProfile(
+      "t1",
+      "m1",
+      { firstName: "Changed" },
+      { updatedAt: new Date() },
+    );
+    expect(outcome).toBe("APPLIED");
+  });
+
+  it("writes ONLY the fields it was given, never the whole record", async () => {
+    db.member.updateMany.mockResolvedValue({ count: 1 });
+    await MembersService.updateProfile("t1", "m1", { firstName: "Changed" }, { updatedAt: new Date() });
+    // The other half of DEF-077: a stale whole-record write reverted a field
+    // "neither operator intended to touch".
+    expect(db.member.updateMany.mock.calls.at(-1)![0].data).toEqual({ firstName: "Changed" });
+  });
+
+  it("has no way to change status — the parameter does not exist", async () => {
+    db.member.updateMany.mockResolvedValue({ count: 1 });
+    await MembersService.updateProfile(
+      "t1",
+      "m1",
+      { firstName: "A", status: "TERMINATED" } as never,
+      { updatedAt: new Date() },
+    );
+    // Even passed deliberately, it cannot reach the update.
+    expect(db.member.updateMany.mock.calls.at(-1)![0].data).not.toHaveProperty("status");
+  });
+
+  it("normalises identity fields on the way in", async () => {
+    db.member.updateMany.mockResolvedValue({ count: 1 });
+    await MembersService.updateProfile(
+      "t1",
+      "m1",
+      { idNumber: "ck 12 34", phone: "0700123456", email: "A@B.com" },
+      { updatedAt: new Date() },
+    );
+    const data = db.member.updateMany.mock.calls.at(-1)![0].data;
+    expect(data.idNumber).toBe("CK1234");
+    expect(data.phone).toBe("+256700123456");
+    expect(data.email).toBe("a@b.com");
+  });
+
+  it("still refuses a national ID that belongs to somebody else, naming nobody", async () => {
+    overrides.idDup = { id: "m-other", memberNumber: "MVX-9", firstName: "Zed", lastName: "Other" };
+    db.member.updateMany.mockResolvedValue({ count: 1 });
+    const error = await MembersService.updateProfile(
+      "t1",
+      "m1",
+      { idNumber: "CK1234" },
+      { updatedAt: new Date() },
+    ).catch((e: Error) => e);
+    expect(String(error)).toMatch(/already recorded against another member/i);
+    expect(String(error)).not.toMatch(/Zed|Other|MVX-9/);
+    expect(db.member.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("does nothing at all when there is nothing to change", async () => {
+    const outcome = await MembersService.updateProfile("t1", "m1", {}, { updatedAt: new Date() });
+    expect(outcome).toBe("APPLIED");
+    expect(db.member.updateMany).not.toHaveBeenCalled();
   });
 });
 

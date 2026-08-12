@@ -1105,6 +1105,26 @@ The three-way comparison is also what distinguishes *your* edit from *theirs*: a
 
 **Three existing tests asserted the defect.** They required a duplicate phone and email to be *rejected*, and pinned the disclosing message text verbatim. They were rewritten to the governed behaviour with the reason recorded beside them, not adjusted to pass.
 
+### P05.05 — Remove lifecycle status from generic profile editing
+
+| Field | Value |
+|---|---|
+| **Task** | P05.05 |
+| **Defect IDs** | DEF-077 (S2), DEF-041, DEF-043 |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none — the precondition is `updatedAt` |
+| **Tests added** | `tests/actions/member-profile-edit.test.ts` (14); 8 added and 5 rewritten across `member-enrolment-integrity` and `enrolment-coverage-periods` |
+| **Commands / results** | typecheck 0; lint 0 errors; suite 288 files / 3126 passed; locale baseline 51 → 50. |
+| **Evidence** | `src/app/(admin)/members/[id]/edit/{actions.ts,MemberEditForm.tsx,page.tsx}`, `src/server/services/members.service.ts` |
+| **Feature flags** | none. |
+| **Remaining risks** | **`changeMemberStatusAction` has no UI yet** — the edit form now shows status read-only and links to the member page's existing lifecycle actions, but the suspend/activate control itself is not rebuilt, so *suspending from the admin UI is currently unavailable* until P07.03 builds the confirmation surface. This is a deliberate, recorded trade (see below) and is the one place in this branch where a capability is temporarily narrower than the tested build. The precondition uses `updatedAt`, not the integer `version` P05.01 adds; two saves inside the same millisecond would both pass. No other edit form (client, package, contract) carries a precondition yet. |
+
+**`updateMember` was three defects in one method.** It took `status` alongside the demographics, wrote every field unconditionally, and interpolated another member's name into its uniqueness errors. It is replaced by `updateProfile` (demographics, conditional) and `changeStatus` (a lifecycle command that requires a reason).
+
+**The acceptance is met structurally, not by validation.** "Profile form cannot suspend/lapse/reinstate even with forged form data" — the action iterates a fixed `PROFILE_FIELDS` list that does not contain `status`, so a forged field has nothing to bind to. It is not rejected; it is never read. Two tests submit `status: TERMINATED` and assert it reaches neither the update nor `changeStatus`.
+
+**A capability was deliberately left narrower for now, and this is the trade.** The plan says lifecycle "routes only through P07", but P07 is not built and `lifecycleService` has governed flows for lapse, reinstate, cancel and terminate — and **none for suspend**. Deleting the dropdown therefore removes the only route to suspending a member. `changeMemberStatusAction` exists, is tested, and requires a reason; what is missing is its confirmation UI, which is P07.03's subject. Shipping the action without the surface was chosen over either (a) leaving an ungoverned dropdown that writes lifecycle with the ceremony of a typo fix, or (b) building a throwaway surface that P07.03 immediately replaces. **If suspend-from-UI is needed before P07.03, that is the one thing to raise.**
+
 ---
 
 ## Corrections made to the implementation plan
