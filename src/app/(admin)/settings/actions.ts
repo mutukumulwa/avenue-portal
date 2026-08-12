@@ -410,3 +410,78 @@ export async function upsertIntegrationAction(formData: FormData) {
 
   revalidatePath("/settings/integrations");
 }
+
+/**
+ * UAT-HF P10.02 / DEC-11 — release an account lock, without reissuing credentials.
+ *
+ * DEF-010's collateral: "lockout_test, password_reset_test, medical_officer and
+ * finance_officer were locked, and **no operator-facing unlock path was found in
+ * the product**."
+ *
+ * A path did exist, but only through `resetUserPasswordAction`, which also sets
+ * a temporary password and forces a change at next login. That is the right
+ * recovery when credentials are suspect and the wrong one when a user simply
+ * mistyped five times: it hands out a new password nobody asked for, revokes
+ * their sessions, and adds a change-password step to a problem that was a typo.
+ *
+ * So this releases the throttle and nothing else. It does NOT touch the password
+ * hash or `sessionVersion` — an unlock is not a credential event, and conflating
+ * the two is what made the existing path unusable for the common case.
+ *
+ * DEC-11 requires it to be audited, and it requires a reason: "who cleared this
+ * lock, when, and why" is the whole point of a documented path back.
+ */
+export async function unlockUserAccountAction(
+  _prev: { error?: string; ok?: boolean } | null,
+  formData: FormData,
+): Promise<{ error?: string; ok?: boolean }> {
+  const session = await requireRole(ROLES.ADMIN_ONLY);
+
+  const userId = ((formData.get("userId") as string | null) || "").trim();
+  const reason = ((formData.get("reason") as string | null) || "").trim();
+
+  if (!userId) return { error: "Select the user to unlock." };
+  if (reason.length < 5) {
+    return { error: "Give a reason for the unlock — it is recorded in the audit trail." };
+  }
+
+  // Tenant-scoped, so a hand-crafted POST cannot reach a user in another tenant.
+  const target = await prisma.user.findFirst({
+    where: { id: userId, tenantId: session.user.tenantId },
+    select: {
+      id: true, email: true, role: true, firstName: true, lastName: true,
+      lockedUntil: true, failedLoginCount: true,
+    },
+  });
+  if (!target) return { error: "User not found." };
+
+  const wasLocked =
+    (!!target.lockedUntil && target.lockedUntil > new Date()) || target.failedLoginCount > 0;
+  if (!wasLocked) {
+    // Idempotent and honest: nothing to release, and no audit noise claiming a
+    // lock was cleared when there was none.
+    return { ok: true };
+  }
+
+  await prisma.user.update({
+    where: { id: userId, tenantId: session.user.tenantId },
+    data: { failedLoginCount: 0, lockedUntil: null, lastFailedLoginAt: null },
+  });
+
+  // Written directly rather than via writeAudit so the row carries tenantId and
+  // stays inside the tenant hash chain (WP-3.1 / DEF-005).
+  await prisma.auditLog.create({
+    data: {
+      userId: session.user.id,
+      tenantId: session.user.tenantId,
+      action: "AUTH_ACCOUNT_UNLOCKED",
+      module: "AUTH",
+      description: `Account lock cleared for ${target.firstName} ${target.lastName} (${target.email})`,
+      metadata: { targetUserId: target.id, targetEmail: target.email, reason, credentialsUnchanged: true },
+    },
+  });
+
+  revalidatePath(`/settings/users/${userId}`);
+  revalidatePath("/settings");
+  return { ok: true };
+}

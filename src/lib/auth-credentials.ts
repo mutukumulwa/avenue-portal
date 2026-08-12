@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { measureAsync } from "@/lib/perf";
 import { consumeTotpCounter, verifyTotpCounter, totpEnrolmentRequiredNow } from "@/lib/totp";
+import { LOCK_DURATION_MS as LOCK_MS } from "@/lib/session-policy";
 import { effectivePermissions } from "@/lib/authz/catalog";
 
 /**
@@ -17,7 +18,10 @@ import { effectivePermissions } from "@/lib/authz/catalog";
  * D-14): an attacker can deny a victim for at most the lock window per burst.
  */
 export const MAX_FAILED_ATTEMPTS = 5; // D-8
-export const LOCK_DURATION_MS = 15 * 60_000; // D-10
+// D-10. Defined in session-policy.ts, which is client-safe: the sign-in page
+// renders the cooldown and must not import this module (it pulls in Prisma and
+// bcrypt). Re-exported here so existing callers and tests are unchanged.
+export { LOCK_DURATION_MS, SIGN_IN_RECOVERY_GUIDANCE } from "@/lib/session-policy";
 export const ATTEMPT_WINDOW_MS = 15 * 60_000; // D-9
 
 /**
@@ -128,26 +132,54 @@ export async function authorizeCredentials(credentials: CredentialInput): Promis
     const authOk = isPasswordValid && totpOk;
 
     if (!authOk) {
-      // Rolling window (D-9): if the last failure is stale, this failure starts a
-      // fresh count at 1 rather than extending an old streak.
-      const windowActive =
-        !!user.lastFailedLoginAt &&
-        Date.now() - user.lastFailedLoginAt.getTime() < ATTEMPT_WINDOW_MS;
-      const nextCount = (windowActive ? user.failedLoginCount : 0) + 1;
-      const locking = nextCount >= MAX_FAILED_ATTEMPTS;
-
-      await prisma.user
-        .update({
-          where: { id: user.id },
-          data: {
-            failedLoginCount: locking ? 0 : nextCount,
-            lastFailedLoginAt: new Date(),
-            lockedUntil: locking ? new Date(Date.now() + LOCK_DURATION_MS) : user.lockedUntil ?? null,
-          },
-        })
+      // UAT-HF P10.02 / DEC-11 — "Attempt counters use atomic updates so parallel
+      // bad attempts cannot lose increments."
+      //
+      // This was read-then-write: `user.failedLoginCount` came from a findFirst
+      // several awaits earlier (a bcrypt compare sits between), so N parallel
+      // wrong passwords all read the same count and all wrote the same value.
+      // Five simultaneous guesses counted as one, and the lock never armed —
+      // which is precisely the throttle an attacker would parallelise past.
+      //
+      // One statement, evaluated in the database, preserving the D-9 rolling
+      // window: a stale last-failure restarts the count at 1 rather than
+      // extending an old streak.
+      const windowStart = new Date(Date.now() - ATTEMPT_WINDOW_MS);
+      const lockUntil = new Date(Date.now() + LOCK_MS);
+      let locking = false;
+      try {
+        const rows = await prisma.$queryRaw<{ failedLoginCount: number; locked: boolean }[]>`
+          UPDATE "User"
+             SET "failedLoginCount" = CASE
+                   WHEN "lastFailedLoginAt" IS NOT NULL AND "lastFailedLoginAt" > ${windowStart}
+                     THEN CASE WHEN "failedLoginCount" + 1 >= ${MAX_FAILED_ATTEMPTS} THEN 0 ELSE "failedLoginCount" + 1 END
+                   ELSE CASE WHEN 1 >= ${MAX_FAILED_ATTEMPTS} THEN 0 ELSE 1 END
+                 END,
+                 -- UTC, never CURRENT_TIMESTAMP. These are timestamp-without-
+                 -- time-zone columns holding UTC (what Prisma writes), while
+                 -- CURRENT_TIMESTAMP returns the server's LOCAL time. Measured
+                 -- on a +03 host, that made a freshly applied lock read as
+                 -- already expired: a three-hour hole in the throttle.
+                 "lastFailedLoginAt" = (now() AT TIME ZONE 'UTC'),
+                 "lockedUntil" = CASE
+                   WHEN (CASE
+                           WHEN "lastFailedLoginAt" IS NOT NULL AND "lastFailedLoginAt" > ${windowStart}
+                             THEN "failedLoginCount" + 1
+                           ELSE 1
+                         END) >= ${MAX_FAILED_ATTEMPTS}
+                     THEN ${lockUntil}
+                   ELSE "lockedUntil"
+                 END
+           WHERE "id" = ${user.id}
+          RETURNING "failedLoginCount", ("lockedUntil" IS NOT NULL AND "lockedUntil" > (now() AT TIME ZONE 'UTC')) AS locked
+        `;
+        // The row that actually armed the lock is the one that reports it, so
+        // exactly one audit entry is written however many attempts raced.
+        locking = rows[0]?.locked === true && rows[0]?.failedLoginCount === 0;
+      } catch {
         // Throttling is best-effort-hardened: a transient DB error on the counter
         // must never turn a normal wrong-password into a 500.
-        .catch(() => {});
+      }
 
       if (locking) {
         // G-22: write the audit row directly — writeAudit() calls next/headers,
@@ -168,7 +200,7 @@ export async function authorizeCredentials(credentials: CredentialInput): Promis
               description: "Account temporarily locked after repeated failed sign-ins",
               metadata: {
                 attempts: MAX_FAILED_ATTEMPTS,
-                lockMinutes: LOCK_DURATION_MS / 60_000,
+                lockMinutes: LOCK_MS / 60_000,
               },
             },
           })

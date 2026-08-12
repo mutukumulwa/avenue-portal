@@ -13,8 +13,10 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import {
+  LOCK_DURATION_MS,
   SESSION_ABSOLUTE_MAX_AGE_S,
   SESSION_IDLE_MAX_AGE_S,
+  SIGN_IN_RECOVERY_GUIDANCE,
   mayPerformPrivilegedWrite,
   sessionDecision,
   sessionExpiryMessage,
@@ -226,5 +228,90 @@ describe("P10.04 the server enforces the absolute cap itself", () => {
     // One assignment only. A second would make the cap rolling, which is the
     // exact thing it exists not to be.
     expect(auth.match(/token\.authenticatedAt = /g)?.length).toBe(1);
+  });
+});
+
+/**
+ * UAT-HF P10.02 / DEC-11 — DEF-010.
+ *
+ * "After five or six consecutive failed sign-ins the account is locked, but the
+ * message never changes ... There is no lockout notice, no cooldown duration,
+ * no attempts-remaining warning." The register also records that the security
+ * posture itself is correct: "fail-closed and non-enumerating ... the gap is
+ * entirely in what is communicated."
+ */
+describe("P10.02 lockout guidance is helpful without being enumerable", () => {
+  it("names the cooldown, so a locked user knows to wait rather than keep guessing", () => {
+    expect(SIGN_IN_RECOVERY_GUIDANCE).toMatch(new RegExp(`${LOCK_DURATION_MS / 60_000} minutes`));
+  });
+
+  it("offers the recovery the run could not find anywhere in the product", () => {
+    expect(SIGN_IN_RECOVERY_GUIDANCE).toMatch(/administrator to unlock/i);
+  });
+
+  it("is conditional in its wording — it never asserts the account IS locked", () => {
+    // "may be" and "if". Saying "your account is locked" would confirm the
+    // account exists, which is the enumeration the primary line avoids.
+    expect(SIGN_IN_RECOVERY_GUIDANCE).toMatch(/may be temporarily locked/i);
+    expect(SIGN_IN_RECOVERY_GUIDANCE).not.toMatch(/your account is locked/i);
+  });
+
+  it("depends on nothing, so it cannot vary by account", () => {
+    // A constant cannot leak. This is why the guidance is a constant and not a
+    // function of the user: identical after the first failure and the fifteenth,
+    // for a real account and for one that does not exist.
+    expect(typeof SIGN_IN_RECOVERY_GUIDANCE).toBe("string");
+  });
+
+  it("is rendered by the sign-in page alongside the unchanged primary error", () => {
+    const login = readFileSync("src/app/(auth)/login/page.tsx", "utf8");
+    expect(login).toContain("SIGN_IN_RECOVERY_GUIDANCE");
+    // The enumeration-safe primary line must NOT have been made specific.
+    expect(login).toContain('setError("Invalid email or password. Please try again.")');
+  });
+
+  it("is importable by a client component without dragging in the server", () => {
+    // It lives in session-policy.ts precisely because auth-credentials.ts pulls
+    // in Prisma and bcrypt.
+    const policy = readFileSync("src/lib/session-policy.ts", "utf8");
+    expect(policy).not.toMatch(/from "@\/lib\/prisma"/);
+    expect(policy).not.toMatch(/from "bcrypt/);
+  });
+});
+
+describe("P10.02 the admin unlock path the run could not find", () => {
+  const actions = readFileSync("src/app/(admin)/settings/actions.ts", "utf8");
+
+  it("exists as its own action", () => {
+    expect(actions).toContain("export async function unlockUserAccountAction");
+  });
+
+  it("requires a reason, and records it", () => {
+    expect(actions).toMatch(/Give a reason for the unlock/);
+    expect(actions).toMatch(/metadata: \{ targetUserId: target\.id, targetEmail: target\.email, reason/);
+  });
+
+  it("is admin-gated and tenant-scoped", () => {
+    const fn = actions.slice(actions.indexOf("unlockUserAccountAction"));
+    expect(fn).toContain("requireRole(ROLES.ADMIN_ONLY)");
+    expect(fn).toContain("tenantId: session.user.tenantId");
+  });
+
+  it("does NOT touch credentials — an unlock is not a password event", () => {
+    const fn = actions.slice(
+      actions.indexOf("unlockUserAccountAction"),
+      actions.length,
+    );
+    // The pre-existing path only unlocked as a side effect of a password reset,
+    // which hands a mistyping user a new password they did not ask for.
+    expect(fn).not.toContain("passwordHash");
+    expect(fn).not.toContain("mustChangePassword");
+    expect(fn).not.toContain("sessionVersion");
+  });
+
+  it("writes an audit row inside the tenant hash chain", () => {
+    const fn = actions.slice(actions.indexOf("unlockUserAccountAction"));
+    expect(fn).toContain('action: "AUTH_ACCOUNT_UNLOCKED"');
+    expect(fn).toContain("tenantId: session.user.tenantId");
   });
 });

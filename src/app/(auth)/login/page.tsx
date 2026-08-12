@@ -5,7 +5,7 @@ import { Lock, Mail, AlertCircle } from "lucide-react";
 import { Suspense, useRef, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
-import { SESSION_EXPIRED_REASON } from "@/lib/session-policy";
+import { SESSION_EXPIRED_REASON, SIGN_IN_RECOVERY_GUIDANCE } from "@/lib/session-policy";
 import { DraftPurgeOnSignOut } from "@/components/forms/DraftPurgeOnSignOut";
 
 function safeCallbackUrl(value: string | null) {
@@ -154,7 +154,18 @@ function LoginForm() {
                   className="flex items-center gap-2 bg-[#DC3545]/10 text-[#DC3545] border border-[#DC3545]/20 rounded-lg px-4 py-3 text-sm"
                 >
                   <AlertCircle size={16} className="shrink-0" />
-                  {error}
+                  <span>
+                    {error}
+                    {/*
+                      UAT-HF P10.02 / DEC-11 — DEF-010. The primary line above
+                      stays enumeration-safe and unchanged; this guidance is
+                      shown IDENTICALLY after every failed attempt, so it cannot
+                      reveal whether the account exists or is locked. It exists
+                      because the run found a locked user with no way out and no
+                      unlock path anywhere in the product.
+                    */}
+                    <span className="mt-1 block text-xs opacity-90">{SIGN_IN_RECOVERY_GUIDANCE}</span>
+                  </span>
                 </div>
               )}
 

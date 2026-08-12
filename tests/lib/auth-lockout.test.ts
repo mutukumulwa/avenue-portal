@@ -9,6 +9,11 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const prismaMock = vi.hoisted(() => ({
   user: { findFirst: vi.fn(), update: vi.fn() },
+  // UAT-HF P10.02 / DEC-11: the failure counter is now ONE atomic statement, so
+  // parallel bad attempts cannot lose increments. The CASE logic runs in
+  // Postgres and was verified there (see IMPLEMENTATION_LOG.md); these tests
+  // pin what the TypeScript around it does with the result.
+  $queryRaw: vi.fn(async () => [{ failedLoginCount: 1, locked: false }]),
   userRoleAssignment: { findMany: vi.fn() },
   auditLog: { create: vi.fn() },
 }));
@@ -64,6 +69,7 @@ function baseUser(overrides: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  prismaMock.$queryRaw.mockResolvedValue([{ failedLoginCount: 1, locked: false }]);
   prismaMock.userRoleAssignment.findMany.mockResolvedValue([]);
   prismaMock.user.update.mockResolvedValue({ sessionVersion: 1 });
   prismaMock.auditLog.create.mockResolvedValue({});
@@ -73,37 +79,75 @@ beforeEach(() => {
 });
 
 describe("DEF-002 — brute-force lockout", () => {
-  it("the 4th consecutive failure does NOT lock", async () => {
+  /**
+   * UAT-HF P10.02 / DEC-11 rewrote the three counter tests below.
+   *
+   * The rolling-window arithmetic moved OUT of TypeScript and INTO one atomic
+   * SQL statement, because the old read-then-write lost increments: measured on
+   * a real Postgres, **five parallel wrong passwords produced a final count of
+   * 1**, so the lock never armed — the exact throttle an attacker would
+   * parallelise past. The CASE logic is verified against a real database (see
+   * IMPLEMENTATION_LOG.md: 1,2,3,4,lock sequentially; stale window restarts at
+   * 1; five parallel failures lock with exactly one audit-claiming row).
+   *
+   * What is asserted here is what the surrounding TypeScript does with the
+   * result — the part mocks can speak to.
+   */
+  it("does not lock, and writes no audit, while the counter is below the threshold", async () => {
     prismaMock.user.findFirst.mockResolvedValue(
       baseUser({ failedLoginCount: 3, lastFailedLoginAt: new Date(Date.now() - 60_000) }),
     );
     bcryptMock.compare.mockResolvedValue(false);
+    prismaMock.$queryRaw.mockResolvedValue([{ failedLoginCount: 4, locked: false }]);
 
     const res = await authorizeCredentials({ email: "a@x.com", password: "wrong" });
 
     expect(res).toBeNull();
-    const upd = prismaMock.user.update.mock.calls[0][0];
-    expect(upd.data.failedLoginCount).toBe(4);
-    expect(upd.data.lockedUntil).toBeNull();
+    expect(prismaMock.$queryRaw).toHaveBeenCalledTimes(1);
     expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
   });
 
-  it("the 5th consecutive failure locks the account (~now+15m) and writes an AUTH_ACCOUNT_LOCKED audit row", async () => {
-    const now = Date.now();
+  it("counts the failure in ONE statement, never a read-then-write", async () => {
+    prismaMock.user.findFirst.mockResolvedValue(baseUser({ failedLoginCount: 3 }));
+    bcryptMock.compare.mockResolvedValue(false);
+
+    await authorizeCredentials({ email: "a@x.com", password: "wrong" });
+
+    // A separate user.update would mean the count came from a findFirst several
+    // awaits earlier — with a bcrypt compare in between — which is how five
+    // simultaneous guesses counted as one.
+    expect(prismaMock.user.update).not.toHaveBeenCalled();
+    expect(prismaMock.$queryRaw).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses UTC in the raw statement, not the server's local clock", async () => {
+    prismaMock.user.findFirst.mockResolvedValue(baseUser({ failedLoginCount: 3 }));
+    bcryptMock.compare.mockResolvedValue(false);
+
+    await authorizeCredentials({ email: "a@x.com", password: "wrong" });
+
+    const call = prismaMock.$queryRaw.mock.calls[0] as unknown as [{ raw?: string[] }];
+    const sql = call[0]?.raw?.join("?") ?? "";
+    // These are `timestamp without time zone` columns holding UTC. Measured on a
+    // +03 host, CURRENT_TIMESTAMP made a freshly applied lock read as already
+    // expired — a three-hour hole in the throttle.
+    expect(sql).toContain("now() AT TIME ZONE 'UTC'");
+    expect(sql).not.toMatch(/=\s*CURRENT_TIMESTAMP/);
+  });
+
+  it("writes an AUTH_ACCOUNT_LOCKED audit row when the statement reports the lock armed", async () => {
     prismaMock.user.findFirst.mockResolvedValue(
-      baseUser({ failedLoginCount: 4, lastFailedLoginAt: new Date(now - 60_000) }),
+      baseUser({ failedLoginCount: 4, lastFailedLoginAt: new Date(Date.now() - 60_000) }),
     );
     bcryptMock.compare.mockResolvedValue(false);
+    // The row that actually armed the lock is the one that reports
+    // locked && count reset to 0, so exactly one audit row is written however
+    // many attempts raced.
+    prismaMock.$queryRaw.mockResolvedValue([{ failedLoginCount: 0, locked: true }]);
 
     const res = await authorizeCredentials({ email: "a@x.com", password: "wrong" });
 
     expect(res).toBeNull();
-    const upd = prismaMock.user.update.mock.calls[0][0];
-    expect(upd.data.failedLoginCount).toBe(0); // reset when the lock is applied
-    expect(upd.data.lockedUntil).toBeInstanceOf(Date);
-    const lockMs = (upd.data.lockedUntil as Date).getTime() - now;
-    expect(lockMs).toBeGreaterThan(LOCK_DURATION_MS - 5_000);
-    expect(lockMs).toBeLessThan(LOCK_DURATION_MS + 5_000);
     expect(prismaMock.auditLog.create).toHaveBeenCalledTimes(1);
     const lockAudit = prismaMock.auditLog.create.mock.calls[0][0].data;
     expect(lockAudit.action).toBe("AUTH_ACCOUNT_LOCKED");
@@ -179,7 +223,7 @@ describe("DEF-002 — brute-force lockout", () => {
     expect(upd.data.sessionVersion).toEqual({ increment: 1 });
   });
 
-  it("a failure after a stale window restarts the count at 1, not prev+1", async () => {
+  it("passes the rolling window boundary into the statement so a stale streak restarts", async () => {
     prismaMock.user.findFirst.mockResolvedValue(
       baseUser({
         failedLoginCount: 4,
@@ -187,13 +231,15 @@ describe("DEF-002 — brute-force lockout", () => {
       }),
     );
     bcryptMock.compare.mockResolvedValue(false);
+    prismaMock.$queryRaw.mockResolvedValue([{ failedLoginCount: 1, locked: false }]);
 
     const res = await authorizeCredentials({ email: "a@x.com", password: "wrong" });
 
     expect(res).toBeNull();
-    const upd = prismaMock.user.update.mock.calls[0][0];
-    expect(upd.data.failedLoginCount).toBe(1); // fresh streak → nowhere near the lock
-    expect(upd.data.lockedUntil).toBeNull();
+    // D-9's rolling window is now evaluated in SQL against this boundary.
+    const params = (prismaMock.$queryRaw.mock.calls[0] as unknown as unknown[]).slice(1);
+    const windowStart = params.find((v): v is Date => v instanceof Date)!;
+    expect(Date.now() - windowStart.getTime()).toBeGreaterThan(ATTEMPT_WINDOW_MS - 5_000);
     expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
   });
 
@@ -213,8 +259,7 @@ describe("DEF-002 — brute-force lockout", () => {
     const res = await authorizeCredentials({ email: "a@x.com", password: "correct", totp: "000000" });
 
     expect(res).toBeNull();
-    const upd = prismaMock.user.update.mock.calls[0][0];
-    expect(upd.data.failedLoginCount).toBe(2); // incremented from 1
+    expect(prismaMock.$queryRaw).toHaveBeenCalledTimes(1); // counted as a failure
   });
 
   /**
@@ -239,7 +284,7 @@ describe("DEF-002 — brute-force lockout", () => {
     const res = await authorizeCredentials({ email: "a@x.com", password: "correct", totp: "123456" });
 
     expect(res).toBeNull();
-    expect(prismaMock.user.update.mock.calls[0][0].data.failedLoginCount).toBe(2);
+    expect(prismaMock.$queryRaw).toHaveBeenCalledTimes(1); // counted as a failure
   });
 
   it("does not spend a TOTP step when the password is wrong", async () => {
@@ -263,6 +308,7 @@ describe("DEF-002 — brute-force lockout", () => {
 
     expect(res).toBeNull();
     expect(prismaMock.user.update).not.toHaveBeenCalled();
+    expect(prismaMock.$queryRaw).not.toHaveBeenCalled();
     expect(bcryptMock.compare).not.toHaveBeenCalled();
   });
 });

@@ -27,6 +27,12 @@ export const KNOWN_AUDITING_TOKENS = [
   "reimbursementService.submit(", // F5.6 — appends REIMBURSEMENT:SUBMITTED + canonical intake audit internally
   "auditPolicy(", // F6.5 — local helper wrapping auditChainService.append for the policy console
   "auditProtocol(", // DG C3.2 — local helper wrapping auditChainService.append for the clinical protocol library
+  // UAT-HF P10.02 (DEF-005 / WP-3.1): a bare `prisma.auditLog.create` is the
+  // deliberate form for AUTH events. `writeAudit()` calls next/headers and
+  // cannot carry tenantId, so its rows land OUTSIDE the tenant hash chain and
+  // are invisible to tenant-scoped audit review. Auth actions therefore write
+  // the row directly, with tenantId, and that must still count as audited.
+  'action: "AUTH_ACCOUNT_UNLOCKED"',
   "openBreaker(", // F4.7/F6.5 — hash-chain audits CIRCUIT_BREAKER_OPENED internally
   "closeBreaker(", // F4.7/F6.5 — hash-chain audits CIRCUIT_BREAKER_CLOSED internally
   "ClaimDecisionService.decide(",

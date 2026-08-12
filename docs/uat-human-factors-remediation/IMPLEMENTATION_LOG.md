@@ -1280,6 +1280,37 @@ The session is now read **once, on mount**. That read is user-initiated by defin
 
 **The expiry message says the work survives.** P04.02 keeps the draft in tab storage, and an operator who is not told that will assume the opposite and retype.
 
+### P10.02 — Safe lockout guidance and recovery
+
+| Field | Value |
+|---|---|
+| **Task** | P10.02 |
+| **Defect IDs** | DEF-010; and a lost-update race found alongside it |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none |
+| **Tests added** | 11 in `session-limits.test.ts`; 3 rewritten and 2 added in `auth-lockout.test.ts`; 1 catalogue entry |
+| **Commands / results** | typecheck 0; lint 0 errors; suite 292 files / 3236 passed. **Counter behaviour verified on a real Postgres** (see below). |
+| **Evidence** | `src/lib/auth-credentials.ts`, `src/lib/session-policy.ts`, `src/app/(auth)/login/page.tsx`, `src/app/(admin)/settings/actions.ts` |
+| **Feature flags** | none. |
+| **Remaining risks** | **`unlockUserAccountAction` has no UI** — the action is written, gated, audited and tested, but nothing on `/settings/users/[id]` calls it, so an administrator still cannot unlock from the product without issuing a password reset. That surface is small and is the obvious next step. No progressive delay and no CAPTCHA; the run noted both as absent and the plan does not ask for them. The guidance is on the sign-in page only. |
+
+**The register was clear that this is a communication defect, not a security one**: "Observed behaviour is fail-closed and non-enumerating, which is the correct security posture — the gap is entirely in what is communicated." So the primary line is unchanged, and must be: telling a locked user they are locked tells an attacker the account exists. The guidance is a **second line, identical after every failed attempt** — first or fifteenth, real account or not. It cannot leak anything because it depends on nothing, which is why it is a constant and not a function of the user. A test pins that the primary line was not made specific.
+
+**A dedicated unlock, because the existing one was the wrong instrument.** DEF-010's collateral: "no operator-facing unlock path was found in the product". One did exist — inside `resetUserPasswordAction`, which also issues a temporary password, forces a change at next login and revokes sessions. That is right when credentials are suspect and wrong when someone mistyped five times. `unlockUserAccountAction` releases the throttle and touches nothing else; a test asserts it never mentions `passwordHash`, `mustChangePassword` or `sessionVersion`.
+
+**A lost-update race, found while implementing DEC-11's "atomic updates" line, and measured.** The failure counter was read-then-write: `user.failedLoginCount` came from a `findFirst` several awaits earlier, with a bcrypt compare in between. On a real Postgres, **five parallel wrong passwords produced a final count of 1** — so the lock never armed. That is the exact throttle an attacker would parallelise past. It is now one statement, and five parallel failures lock the account with exactly one row claiming the audit:
+
+| | 5 parallel wrong passwords |
+|---|---|
+| **old** (read-then-write) | final count **1** — never locks |
+| **new** (one statement) | **locked**, 1 audit-claiming row |
+
+Sequentially it still counts 1,2,3,4,lock, and a stale window still restarts at 1 — both verified on the same database.
+
+**And a bug I introduced and caught there.** The first version of that SQL used `CURRENT_TIMESTAMP`. These are `timestamp without time zone` columns holding UTC (what Prisma writes), while `CURRENT_TIMESTAMP` returns the server's **local** time. On the +03 host it was measured on, a freshly applied lock read as already expired — a three-hour hole in the throttle, introduced while fixing the throttle. It is `now() AT TIME ZONE 'UTC'` now, and a test asserts the raw SQL never uses the local clock.
+
+**The audit-coverage harness caught the new action** and was right to: it looks for `writeAudit`/`auditChainService`, and auth events deliberately write `prisma.auditLog.create` directly so the row can carry `tenantId` and stay inside the tenant hash chain (WP-3.1 / DEF-005). The catalogue now recognises that form rather than the action being excused.
+
 ---
 
 ## Corrections made to the implementation plan

@@ -186,3 +186,38 @@ export function sessionExpiryMessage(decision: SessionDecision): string {
 function finite(value: number | null | undefined): number | null {
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
+
+/**
+ * How long an account stays locked after too many failed sign-ins (D-10).
+ *
+ * Lives here, not in `auth-credentials.ts`, because the sign-in page renders the
+ * cooldown and that module pulls in Prisma and bcrypt — importing it from a
+ * client component would drag the server into the browser bundle.
+ */
+export const LOCK_DURATION_MS = 15 * 60_000;
+
+/**
+ * UAT-HF P10.02 / DEC-11 — the recovery guidance shown after a failed sign-in.
+ *
+ * DEF-010: "After five or six consecutive failed sign-ins the account is locked,
+ * but the message never changes. The user is shown 'Invalid email or password.
+ * Please try again.' even when the password they typed is correct. There is no
+ * lockout notice, no cooldown duration, no attempts-remaining warning."
+ *
+ * The register is explicit that the *security* posture is right: "Observed
+ * behaviour is fail-closed and non-enumerating, which is the correct security
+ * posture — the gap is entirely in what is communicated." So the primary line
+ * does not change, and must not: telling a locked user they are locked tells an
+ * attacker the account exists.
+ *
+ * This is the second line, shown **identically** after every failed attempt —
+ * first or fifteenth, real account or not. It cannot leak anything because it
+ * does not depend on anything. What it does is give a genuinely locked user the
+ * one thing the run found missing: a way out.
+ *
+ * The cooldown is stated because it is policy, not a per-account fact, and a
+ * user who knows to wait does not keep guessing and extend their own lock.
+ */
+export const SIGN_IN_RECOVERY_GUIDANCE =
+  `If you have tried several times, your account may be temporarily locked. ` +
+  `Wait ${LOCK_DURATION_MS / 60_000} minutes and try again, or ask an administrator to unlock it for you.`;
