@@ -108,6 +108,11 @@ export function FacilitiesMap() {
   useEffect(() => {
     let mounted = true;
     if (!("geolocation" in navigator)) {
+      // `navigator` does not exist during SSR, so this cannot be a lazy
+      // useState initialiser without a hydration mismatch: the server would
+      // render one location state and the client another. Reading the
+      // capability once after mount is the correct shape here.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLocationState("unsupported");
       return;
     }

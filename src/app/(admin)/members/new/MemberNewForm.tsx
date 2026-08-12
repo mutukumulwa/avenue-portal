@@ -1,10 +1,17 @@
 "use client";
 
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useMutationAction } from "@/components/forms/useMutationAction";
 import { ErrorSummary } from "@/components/forms/ErrorSummary";
 import { MutationOutcome } from "@/components/forms/MutationOutcome";
+import { DraftBanner, DraftSavedIndicator } from "@/components/forms/DraftBanner";
+import { useFormDraft, readFormValues } from "@/components/forms/useFormDraft";
+import { useDirtyFormGuard } from "@/components/forms/useDirtyFormGuard";
+import { MEMBER_ENROLMENT_DRAFT, type DraftScope } from "@/lib/draft-store";
+import { EXAMPLES } from "@/lib/locale-config";
 import { addMemberAction, type MemberCreated } from "./actions";
-import { Save, AlertCircle, AlertTriangle } from "lucide-react";
+import { Save, AlertTriangle } from "lucide-react";
 import { SessionExpiryGuard } from "@/components/layouts/SessionExpiryGuard";
 
 const inputCls = "w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo transition-colors";
@@ -20,9 +27,11 @@ interface Props {
     groupId: string;
     groupName: string;
   } | null;
+  /** UAT-HF P04.02 — scopes the draft to this tenant and this operator. */
+  draftScope?: DraftScope | null;
 }
 
-export function MemberNewForm({ groups, principal }: Props) {
+export function MemberNewForm({ groups, principal, draftScope = null }: Props) {
   /**
    * UAT-HF P04.01 — DEF-034. This form already carried `disabled={pending}` at
    * the tested build and the double-click still lost the enrolment: React's
@@ -35,6 +44,64 @@ export function MemberNewForm({ groups, principal }: Props) {
    */
   const { state, formAction: action, pending, operationId } = useMutationAction<MemberCreated>(addMemberAction);
   const warnings = state?.ok ? (state.data?.warnings ?? []) : [];
+
+  const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
+  // State, not a ref: `useDirtyFormGuard` registers a `beforeunload` listener in
+  // an effect, so it has to re-run when the form first becomes dirty. A ref
+  // would change without re-rendering and the tab-close warning would never
+  // arm — which is the DEF-008 symptom, reintroduced.
+  const [isDirty, setIsDirty] = useState(false);
+
+  /**
+   * UAT-HF P04.02 — DEF-071. Nothing was kept while the operator typed, and a
+   * closed tab produced a blank form with no statement that anything was lost.
+   * The draft is written to tab-scoped storage as they work and offered back
+   * EXPLICITLY; it is never silently poured into the fields.
+   */
+  const draft = useFormDraft(draftScope, MEMBER_ENROLMENT_DRAFT);
+
+  // DEF-008 / DEF-016: no unsaved-change warning on any exit path.
+  const { confirmDiscard } = useDirtyFormGuard(isDirty);
+
+  const onFormInput = useCallback(() => {
+    if (!formRef.current) return;
+    setIsDirty(true);
+    draft.capture(readFormValues(formRef.current));
+  }, [draft]);
+
+  const applyDraft = useCallback(() => {
+    const values = draft.restore();
+    const form = formRef.current;
+    if (!values || !form) return;
+    for (const [name, value] of Object.entries(values)) {
+      const field = form.elements.namedItem(name);
+      if (field instanceof HTMLInputElement || field instanceof HTMLSelectElement) {
+        field.value = value;
+      }
+    }
+    setIsDirty(true);
+  }, [draft]);
+
+  // A successful enrolment is the end of this draft's life — leaving it would
+  // offer the just-enrolled member's details back on the next visit.
+  const submitted = state?.ok === true;
+  useEffect(() => {
+    if (submitted) {
+      setIsDirty(false);
+      draft.clear();
+    }
+    // `draft.clear` is stable per scope; re-running on every draft change would
+    // wipe the live draft mid-typing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [submitted]);
+
+  const onCancel = useCallback(() => {
+    if (!confirmDiscard()) return;
+    draft.clear();
+    setIsDirty(false);
+    router.push(principal ? `/members/${principal.id}` : "/members");
+  }, [confirmDiscard, draft, router, principal]);
 
   return (
     <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-6">
@@ -69,11 +136,16 @@ export function MemberNewForm({ groups, principal }: Props) {
         </div>
       )}
 
+      {/* DEF-071: an explicitly labelled draft, with the time it was kept.
+          Restoring is a decision the operator makes, never something that
+          happens to them. */}
+      <DraftBanner draft={draft.offered} onRestore={applyDraft} onDiscard={draft.discard} />
+
       {/* DEF-010: guard the submit against an expired idle session so the user
           gets a clear re-login instead of native validation bubbles or a silent
           redirect. The server action still fails closed (requireRole). */}
       <SessionExpiryGuard>
-      <form action={action} className="space-y-6">
+      <form ref={formRef} action={action} onInput={onFormInput} onChange={onFormInput} className="space-y-6">
         {/* NW-D02: carry the principal link so the dependant attaches to its family. */}
         {principal && <input type="hidden" name="principalId" value={principal.id} />}
 
@@ -175,7 +247,7 @@ export function MemberNewForm({ groups, principal }: Props) {
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Phone Number</label>
-              <input name="phone" type="text" placeholder="+254 700 000000" className={inputCls} />
+              <input name="phone" type="text" placeholder={EXAMPLES.phone} className={inputCls} />
             </div>
             <div>
               <label className={labelCls}>Email Address</label>
@@ -184,7 +256,20 @@ export function MemberNewForm({ groups, principal }: Props) {
           </div>
         </div>
 
-        <div className="flex justify-end pt-2">
+        {/* DEF-008: the form exposed exactly one action, "Register Member" —
+            no Cancel, Discard or Back control existed anywhere on it, so an
+            operator had no labelled way out and the breadcrumb discarded eight
+            filled fields with no prompt. */}
+        <div className="flex items-center justify-between gap-4 pt-2">
+          <DraftSavedIndicator savedAt={draft.savedAt} />
+          <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-full border border-[#EEEEEE] px-5 py-2 text-sm font-semibold text-brand-text-muted transition-colors hover:bg-[#F8F9FA]"
+          >
+            Cancel
+          </button>
           <button
             type="submit"
             disabled={pending}
@@ -193,6 +278,7 @@ export function MemberNewForm({ groups, principal }: Props) {
             <Save size={16} />
             {pending ? "Registering…" : principal ? "Add Dependent" : "Register Member"}
           </button>
+          </div>
         </div>
       </form>
       </SessionExpiryGuard>

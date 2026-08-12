@@ -64,7 +64,13 @@ export default async function RegisterMemberPage({
           </p>
         </div>
       </div>
-      <MemberNewForm groups={groups.map((g) => ({ id: g.id, name: g.name }))} principal={principal} />
+      {/* UAT-HF P04.02: the draft store keys on tenant + user so a second
+          operator at the same desk cannot be shown the first one's typed PII. */}
+      <MemberNewForm
+        groups={groups.map((g) => ({ id: g.id, name: g.name }))}
+        principal={principal}
+        draftScope={{ tenantId: session.user.tenantId, userId: session.user.id }}
+      />
     </div>
   );
 }

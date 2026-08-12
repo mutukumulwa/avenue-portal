@@ -976,6 +976,30 @@ what plan §1.1 means by "client-side disabled buttons are being used where serv
 and reconciliation are required" — it is recorded here because the register's own recommendation, if
 followed literally, would have shipped the defect a second time.
 
+### P04.02 — Bounded draft persistence for online-only forms
+
+| Field | Value |
+|---|---|
+| **Task** | P04.02 |
+| **Defect IDs** | DEF-008, DEF-016, DEF-071 (and the `+254` placeholder, DEF-049's class) |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none — client-side only |
+| **Tests added** | `tests/lib/draft-store.test.ts` (26), `tests/components/member-new-form-draft.test.tsx` (18) |
+| **Commands / results** | typecheck 0; lint **0 errors**, 217 warnings; suite 284 files / 3030 passed; both guards green. |
+| **Evidence** | `src/lib/draft-store.ts`, `src/components/forms/{useFormDraft.ts,DraftBanner.tsx,DraftPurgeOnSignOut.tsx}`, `src/app/(admin)/members/new/MemberNewForm.tsx` |
+| **Feature flags** | none. |
+| **Remaining risks** | **Only member enrolment is wired.** The client, package, contract and import-metadata forms named in the plan still have no draft and, for the client form, still no unsaved-change warning — so DEF-016 is closed only on the enrolment screen. The dirty guard covers Cancel, tab close and reload, **not a Next `<Link>` click**: intercepting App Router navigation needs a router-level guard that does not exist yet, so the breadcrumb exit DEF-008 recorded still discards without asking. A closed tab still loses the draft, by design. |
+
+**The medium is the security control.** The plan offered "encrypt sensitive drafts or keep session-memory only"; this takes the second option and uses `sessionStorage`. These forms hold national ID, date of birth, phone and email, typed at a shared desk. `localStorage` would outlive the shift that created it; encrypting instead would mean holding the key in the same browser as the ciphertext. `sessionStorage` survives the reload and in-tab navigation the acceptance names and dies with the tab. Keys are scoped `tenant:user:form`, and a draft whose *contents* disagree with its key is refused and deleted rather than returned — the acceptance is explicit that another user on the same browser must not see these fields.
+
+**Restoring is a decision, never an event.** The draft is offered in a labelled banner with its timestamp; the fields stay empty until the operator chooses. Silently repopulating would make remembered input indistinguishable from typed input, and a stale draft would quietly become the next enrolment.
+
+**"Draft saved" is not a phrase this product may use.** DEF-034 and DEF-067 were both punished for wording that let an operator read "captured" as "submitted", so the indicator reads *"Draft kept on this device at … — not submitted."*
+
+**Logout purges from one place.** There are six client sign-out handlers plus `/signout` plus the session-expiry redirect; all land on `/login`, so `DraftPurgeOnSignOut` mounts there. A purge repeated in eight places is eight chances to add a ninth and forget.
+
+**Two things found while in this file.** The phone placeholder was `+254 700 000000` — Kenya's calling code on the enrolment form — now `EXAMPLES.phone`; the P01.05 locale guard confirmed the fix and the baseline was tightened 52 → 51. Separately, `FacilitiesMap.tsx` from P03.04 was carrying the repo's one remaining ESLint **error** (`set-state-in-effect`); it is annotated and lint is back to 0 errors.
+
 ### P04.03 — Make offline authentication state explicit
 
 | Field | Value |

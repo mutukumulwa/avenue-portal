@@ -36,9 +36,6 @@
   "src/app/(admin)/members/[id]/transfer/actions.ts": {
     "ambiguous-date-format": 2
   },
-  "src/app/(admin)/members/new/MemberNewForm.tsx": {
-    "kenyan-calling-code": 1
-  },
   "src/app/(admin)/offline-auth/page.tsx": {
     "kenyan-calling-code": 1
   },

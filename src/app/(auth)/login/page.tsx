@@ -6,6 +6,7 @@ import { Suspense, useRef, useState } from "react";
 import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { SESSION_EXPIRED_REASON } from "@/lib/session-policy";
+import { DraftPurgeOnSignOut } from "@/components/forms/DraftPurgeOnSignOut";
 
 function safeCallbackUrl(value: string | null) {
   if (
@@ -270,6 +271,9 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <Suspense fallback={<div className="min-h-screen bg-brand-bg-alt/50" />}>
+      {/* UAT-HF P04.02: reaching sign-in means nobody holds this tab, so no
+          form draft from the previous session may survive into the next. */}
+      <DraftPurgeOnSignOut />
       <LoginForm />
     </Suspense>
   );
