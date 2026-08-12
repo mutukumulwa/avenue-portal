@@ -301,10 +301,23 @@ describe("updateProfile — P05.05 concurrency and scope", () => {
 
   it("writes ONLY the fields it was given, never the whole record", async () => {
     db.member.updateMany.mockResolvedValue({ count: 1 });
+    // Via the override, not mockResolvedValue: replacing the router's
+    // implementation leaks into every later test in the file.
+    overrides.memberById = { firstName: "Old", lastName: "Name", otherNames: null };
     await MembersService.updateProfile("t1", "m1", { firstName: "Changed" }, { updatedAt: new Date() });
+
     // The other half of DEF-077: a stale whole-record write reverted a field
     // "neither operator intended to touch".
-    expect(db.member.updateMany.mock.calls.at(-1)![0].data).toEqual({ firstName: "Changed" });
+    const data = db.member.updateMany.mock.calls.at(-1)![0].data;
+    expect(data.firstName).toBe("Changed");
+    // Nothing the operator did not touch. The two extras are not "other
+    // fields": searchNameNormalized is DERIVED from the name they just changed
+    // (P05.01 — leaving it stale would un-key the member for search), and
+    // version is the concurrency counter (P04.05).
+    expect(Object.keys(data).sort()).toEqual(["firstName", "searchNameNormalized", "version"]);
+    expect(data.version).toEqual({ increment: 1 });
+    expect(data.lastName).toBeUndefined();
+    expect(data.phone).toBeUndefined();
   });
 
   it("has no way to change status — the parameter does not exist", async () => {

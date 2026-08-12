@@ -105,3 +105,71 @@ export function ugandaPhoneVariants(input: string): string[] {
   }
   return key ? [...variants] : [];
 }
+
+/**
+ * UAT-HF P05.01 — the canonical keys stored on `Member`.
+ *
+ * One function so every writer produces the same keys, and one place for the
+ * migration backfill to be checked against (`tests/lib/normalize-parity.test.ts`
+ * pins the SQL in `20260812000700_member_canonical_identity` to these results —
+ * two definitions of "the same person" is how DEF-030 happened in the first
+ * place, where storage normalised and search did not).
+ */
+export interface MemberIdentityKeys {
+  nationalIdNormalized: string | null;
+  phoneNormalized: string | null;
+  emailNormalized: string | null;
+  memberNumberNormalized: string | null;
+  searchNameNormalized: string | null;
+}
+
+/**
+ * Member number with punctuation stripped and case folded:
+ * `"UX26-2026-00037"` → `"UX26202600037"`.
+ *
+ * DEF-064: "the dash-less form of the same number returns 0 results" — the
+ * dash-less form is what people type when a number is dictated or copied.
+ */
+export function normalizeMemberNumber(input: string): string {
+  return input.toUpperCase().replace(/[^A-Z0-9]/g, "");
+}
+
+/** First + other + last, casefolded, whitespace collapsed. */
+export function normalizeSearchName(parts: {
+  firstName?: string | null;
+  otherNames?: string | null;
+  lastName?: string | null;
+}): string {
+  return [parts.firstName, parts.otherNames, parts.lastName]
+    .map((p) => p ?? "")
+    .join(" ")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Every canonical key for a member, from their raw fields. Blank ⇒ null. */
+export function memberIdentityKeys(input: {
+  idNumber?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  memberNumber?: string | null;
+  firstName?: string | null;
+  otherNames?: string | null;
+  lastName?: string | null;
+}): MemberIdentityKeys {
+  const blankToNull = (v: string) => (v === "" ? null : v);
+  return {
+    nationalIdNormalized: input.idNumber?.trim()
+      ? blankToNull(normalizeNationalId(input.idNumber))
+      : null,
+    // A number we cannot parse is left unkeyed rather than stored wrong: an
+    // unparseable string is not a phone identity.
+    phoneNormalized: input.phone?.trim() ? normalizePhone(input.phone) : null,
+    emailNormalized: input.email?.trim() ? blankToNull(normalizeEmail(input.email)) : null,
+    memberNumberNormalized: input.memberNumber?.trim()
+      ? blankToNull(normalizeMemberNumber(input.memberNumber))
+      : null,
+    searchNameNormalized: blankToNull(normalizeSearchName(input)),
+  };
+}

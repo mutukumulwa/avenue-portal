@@ -1125,6 +1125,30 @@ The three-way comparison is also what distinguishes *your* edit from *theirs*: a
 
 **A capability was deliberately left narrower for now, and this is the trade.** The plan says lifecycle "routes only through P07", but P07 is not built and `lifecycleService` has governed flows for lapse, reinstate, cancel and terminate — and **none for suspend**. Deleting the dropdown therefore removes the only route to suspending a member. `changeMemberStatusAction` exists, is tested, and requires a reason; what is missing is its confirmation UI, which is P07.03's subject. Shipping the action without the surface was chosen over either (a) leaving an ungoverned dropdown that writes lifecycle with the ceremony of a typo fix, or (b) building a throwaway surface that P07.03 immediately replaces. **If suspend-from-UI is needed before P07.03, that is the one thing to raise.**
 
+### P05.01 — Canonical identity and concurrency fields
+
+| Field | Value |
+|---|---|
+| **Task** | P05.01 |
+| **Defect IDs** | DEF-030, DEF-064; supplies the DB constraint P05.04 needs and the `version` P04.05 wants |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | **two.** `20260812000700_member_canonical_identity` (additive: 5 key columns + `version` + backfill + 5 indexes) and `20260812000800_member_national_id_unique` (**gated** — see below) |
+| **Tests added** | `tests/lib/normalize-parity.test.ts` (20); 1 rewritten |
+| **Commands / results** | typecheck 0; lint 0 errors; suite 289 files / 3146 passed. **9 migrations applied from empty on a disposable database with zero drift** (`uathf_p0501_test`, local 5432; `migrate status` clean). |
+| **Evidence** | `prisma/schema.prisma`, both migrations, `src/lib/normalize.ts`, `scripts/reports/member-identity-preflight.ts` |
+| **Feature flags** | none. |
+| **Remaining risks** | **The gated migration has not been run against any real data.** `member-identity-preflight.ts` must reach zero first, and it has never been executed — the same standing caveat as P03.01's readiness report. **No reader uses the new columns yet**: DEF-030 and DEF-064 are not closed until P05.07 rewrites `memberSearchClause` to match on them. The backfill keys only rows that exist at migration time; rows written by any path that does not call `createMember`/`updateProfile` (raw seeds, direct SQL) will be unkeyed. `version` is incremented by `updateProfile` only — every other writer leaves it at 0, so it is not yet a trustworthy precondition anywhere else. |
+
+**DEF-030 is one bug with two definitions of the same value.** The run put it exactly: "Storage normalises the local form; search does not." A member enrolled as `0772555042` was stored `+256772555042` and then could not be found by the number they were enrolled with — "0 of 2772 results", to a service agent holding the number the member reads off their own handset. The fix is not a cleverer query; it is one canonical key, written by every writer and matched by every reader.
+
+**So the SQL backfill and the TypeScript writers are pinned to each other.** `tests/lib/normalize-parity.test.ts` asserts the migration text still contains the expressions its expectations were derived from. Two definitions of "the same person" is precisely how this defect happened, and a silent divergence between the backfill and `memberIdentityKeys` would recreate it for every row written after the migration.
+
+**The unique constraint is a separate migration on purpose.** `20260812000700` is additive and always safe. `20260812000800` depends on the data: if any tenant holds two members with the same normalized national ID it fails, *after* the additive migration has already landed. `member-identity-preflight.ts` reports those collisions and exits non-zero, so it can gate the step. It reports and does not repair — two members sharing an ID is either one person enrolled twice or a mistyped digit, and that is not a script's decision.
+
+**What is deliberately NOT unique.** Phone, email, and name+DOB. DEC-07: "Shared household numbers are legitimate and common — a principal and their dependants routinely share one number." Twins share a name and a birthday. A test asserts the gated migration constrains `nationalIdNormalized` and nothing else.
+
+**NULLs are distinct in a Postgres unique index**, so members enrolled without a national ID — newborns under CT-033, and anyone predating the field — coexist in any number without a partial index. That is the plan's "unique tenant + non-null national ID only", for free.
+
 ---
 
 ## Corrections made to the implementation plan

@@ -308,36 +308,36 @@ enum UserRole {
 }
 
 model User {
-  id             String    @id @default(cuid())
-  tenantId       String
-  tenant         Tenant    @relation(fields: [tenantId], references: [id])
+  id                 String    @id @default(cuid())
+  tenantId           String
+  tenant             Tenant    @relation(fields: [tenantId], references: [id])
   // Client confinement (G2.1). null = operator-level Medvex ops user who spans
   // every client in the tenant; set = user is confined to this one client.
-  clientId       String?
-  client         Client?   @relation(fields: [clientId], references: [id])
-  email          String
-  passwordHash   String
-  firstName      String
-  lastName       String
-  role           UserRole
-  isActive       Boolean   @default(true)
-  lastLoginAt    DateTime?
+  clientId           String?
+  client             Client?   @relation(fields: [clientId], references: [id])
+  email              String
+  passwordHash       String
+  firstName          String
+  lastName           String
+  role               UserRole
+  isActive           Boolean   @default(true)
+  lastLoginAt        DateTime?
   // Single-session control (R25/H-03): bumped on each login; a JWT carrying an
   // older version is invalidated, so only the most recent login stays valid.
-  sessionVersion Int       @default(0)
+  sessionVersion     Int       @default(0)
   // DEF-002: brute-force lockout. failedLoginCount rolls within a 15-min window
   // (see auth.ts); lockedUntil is a temporary, self-expiring lock.
-  failedLoginCount  Int       @default(0)
-  lastFailedLoginAt DateTime?
-  lockedUntil       DateTime?
+  failedLoginCount   Int       @default(0)
+  lastFailedLoginAt  DateTime?
+  lockedUntil        DateTime?
   // Two-factor auth (R81/H-01): base32 TOTP secret + enabled flag.
-  totpSecret     String?
-  totpEnabled    Boolean   @default(false)
+  totpSecret         String?
+  totpEnabled        Boolean   @default(false)
   // ELIG-GAP-006: when an admin sets an initial/temporary password, this is true
   // and requireRole confines the user to /change-password until they replace it.
-  mustChangePassword Boolean @default(false)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  mustChangePassword Boolean   @default(false)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
   // Link to broker or member profile
   brokerId   String?   @unique
@@ -826,11 +826,6 @@ model Group {
   selfFundedAccount  SelfFundedAccount?
   adminFeeAgreements AdminFeeAgreement[]
 
-  @@index([tenantId])
-  @@index([tenantId, status])
-  @@index([tenantId, fundingMode])
-  @@index([brokerId])
-  @@index([clientId])
   // WP-S1 — CLIENT-scoped scheme-name uniqueness (S-002: two clients may each run
   // a "Staff Medical Scheme"; one client may not). DEPLOY-GATED: apply only after
   // scripts/uat/report-group-name-collisions.ts is clean AND
@@ -841,6 +836,11 @@ model Group {
   // tenants' individual IND-NNNNN refs from cross-colliding. DEPLOY-GATED behind
   // scripts/uat/report-group-registration-collisions.ts.
   @@unique([tenantId, registrationNumber])
+  @@index([tenantId])
+  @@index([tenantId, status])
+  @@index([tenantId, fundingMode])
+  @@index([brokerId])
+  @@index([clientId])
 }
 
 // ─── SERVICE REQUESTS (HR MODULE) ───────────────────────
@@ -1000,6 +1000,38 @@ model Member {
   createdAt              DateTime           @default(now())
   updatedAt              DateTime           @updatedAt
 
+  // ── UAT-HF P05.01 — canonical identity and concurrency ─────────────────────
+  // Deterministic keys the identity rules and the search are built on, so a
+  // member is one identity rather than as many identities as there are ways to
+  // type their details.
+  //
+  // DEF-030: a member enrolled as "0772555042" is stored "+256772555042" and
+  // then CANNOT be found by the number they were enrolled with — "storage
+  // normalises the local form; search does not".
+  // DEF-064: a member number resolves with its dashes and not without them.
+  //
+  // Nullable on purpose: a pre-existing row is backfilled by the migration, and
+  // a member legitimately has no national ID (newborns, CT-033).
+  nationalIdNormalized   String?
+  phoneNormalized        String?
+  emailNormalized        String?
+  /**
+   * Member number with punctuation and case stripped: "UX26-2026-00037" -> "UX26202600037".
+   */
+  memberNumberNormalized String?
+  /**
+   * First + last + other names, casefolded and whitespace-collapsed.
+   */
+  searchNameNormalized   String?
+  /**
+   * Monotonic row version for optimistic concurrency (P04.05).
+   * `updatedAt` already serves as a precondition and is what the member edit
+   * path uses today; this is the stronger form, because two writes inside the
+   * same millisecond are indistinguishable by timestamp. Incremented explicitly
+   * by writers — Prisma has no built-in row version.
+   */
+  version                Int     @default(0)
+
   claims                         Claim[]
   preauths                       PreAuthorization[]
   benefitUsages                  BenefitUsage[]
@@ -1033,6 +1065,10 @@ model Member {
   coveragePeriods                MemberCoveragePeriod[]
 
   @@unique([tenantId, memberNumber])
+  // P05.01: the ONE hard identity constraint (DEC-07). NULLs are distinct in a
+  // Postgres unique index, so members with no national ID are unaffected.
+  // Applied by a gated migration — see 20260812000800.
+  @@unique([tenantId, nationalIdNormalized])
   @@index([tenantId])
   @@index([tenantId, status])
   @@index([tenantId, status, enrollmentDate])
@@ -1040,6 +1076,13 @@ model Member {
   @@index([groupId, status, enrollmentDate])
   @@index([principalId])
   @@index([idNumber])
+  // P05.01 canonical search indexes. Phone and name+DOB are deliberately NOT
+  // unique — DEC-07: "Shared household numbers are legitimate and common", and
+  // twins share a name and a birthday.
+  @@index([tenantId, phoneNormalized])
+  @@index([tenantId, emailNormalized])
+  @@index([tenantId, memberNumberNormalized])
+  @@index([tenantId, searchNameNormalized])
 }
 
 // ─── POINT-IN-TIME COVERAGE (FG-C5) ─────────────────────
@@ -2030,11 +2073,11 @@ model PackageVersion {
   pricingConfig   Json? // Structured pricing parameters
   createdAt       DateTime        @default(now())
 
-  currentForPackage Package?                     @relation("CurrentVersion")
-  groups            Group[]
-  members           Member[]
-  sharedLimitGroups SharedLimitGroup[]
-  eligibilityRules  PackageProviderEligibility[]
+  currentForPackage   Package?                     @relation("CurrentVersion")
+  groups              Group[]
+  members             Member[]
+  sharedLimitGroups   SharedLimitGroup[]
+  eligibilityRules    PackageProviderEligibility[]
   // WP-2.3 / WP-2.4 — structured benefit rules carried immutably per version and
   // copied forward on every edit (see updatePackageAction). Adding these back-
   // relations changes NO column on PackageVersion (relation fields are virtual);
@@ -3773,18 +3816,18 @@ model ProviderContract {
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
-  tariffLines        ProviderTariff[]
-  diagnosisTariffs   ProviderDiagnosisTariff[]
-  exclusions         ProviderContractExclusion[]
-  versions           ContractVersion[]           @relation("ContractVersions")
-  applicability      ContractApplicability[]
-  contractBranches   ContractBranch[]
-  sourceDocuments    ContractSourceDocument[]
-  claims             Claim[]
-  pricingRules       PricingRule[]
-  contractPackages   ContractPackage[]
-  preauthRules       PreauthRule[]
-  documentationRules DocumentationRule[]
+  tariffLines         ProviderTariff[]
+  diagnosisTariffs    ProviderDiagnosisTariff[]
+  exclusions          ProviderContractExclusion[]
+  versions            ContractVersion[]           @relation("ContractVersions")
+  applicability       ContractApplicability[]
+  contractBranches    ContractBranch[]
+  sourceDocuments     ContractSourceDocument[]
+  claims              Claim[]
+  pricingRules        PricingRule[]
+  contractPackages    ContractPackage[]
+  preauthRules        PreauthRule[]
+  documentationRules  DocumentationRule[]
   // WP-2.3 / N-012 — structured treatment exclusions may be owned by a provider
   // contract (not only a package version). Distinct from `exclusions`
   // (ProviderContractExclusion), the legacy free-form adjudication list. One
@@ -5301,7 +5344,7 @@ model DomainEvent {
   entityType String
   entityId   String
   /// Quotable business reference, e.g. "UX26-2026-00017". Never PII.
-  entityRef String?
+  entityRef  String?
 
   // Denormalised actor identity. DEF-047 found the endorsement panel showing a raw
   // internal id ("Maker cmsoxn5j0002tbpvqg8gomey4"); an audit trail has to survive
@@ -5380,11 +5423,11 @@ model OperationReceipt {
   actorId  String
 
   /// Stable command name, e.g. "members.create". Part of the idempotency key.
-  operationType String
+  operationType  String
   /// Chosen by the CLIENT before the first attempt and resent on every retry.
   idempotencyKey String
   /// SHA-256 of the canonicalised request. Same key + different hash = conflict.
-  requestHash String
+  requestHash    String
 
   state OperationReceiptState @default(RECEIVED)
 
@@ -5392,10 +5435,10 @@ model OperationReceipt {
   entityType String?
   entityId   String?
   /// Quotable business reference, e.g. "UX26-2026-00017". Never PII.
-  entityRef String?
+  entityRef  String?
 
   /// Safe, non-PII outcome code for support and dashboards, e.g. "CONFLICT".
-  resultCode String?
+  resultCode    String?
   /// The attempt's correlation id, tying this row to the server logs.
   correlationId String?
 

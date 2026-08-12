@@ -5,7 +5,13 @@ import { nextMemberNumber } from "./member-numbering.service";
 import { coverageService } from "./coverage.service";
 import { assertEnrolmentAge } from "./eligibility/enrolment-age";
 import { GroupsService } from "./groups.service";
-import { normalizeNationalId, normalizeEmail, normalizePhone } from "@/lib/normalize";
+import {
+  memberIdentityKeys,
+  normalizeEmail,
+  normalizeNationalId,
+  normalizePhone,
+  normalizeSearchName,
+} from "@/lib/normalize";
 import {
   DuplicateIdentityError,
   blockingMatch,
@@ -246,6 +252,17 @@ export class MembersService {
         coverStartDate: effectiveDate,
         birthNotificationDate,
         status: "ACTIVE", // For milestone simplicity
+        // UAT-HF P05.01: the canonical keys, written at enrolment. Without them
+        // a new member is unkeyed and invisible to the canonical search — the
+        // asymmetry that caused DEF-030 in the first place.
+        ...memberIdentityKeys({
+          idNumber: idKey || null,
+          phone: phoneKey ?? data.phone,
+          email: emailKey || null,
+          memberNumber,
+          firstName: data.firstName,
+          lastName: data.lastName,
+        }),
       },
     });
 
@@ -321,6 +338,33 @@ export class MembersService {
     if (edits.relationship !== undefined) {
       data.relationship = edits.relationship as MemberRelationship;
     }
+
+    // P05.01: keep the canonical keys in step with the fields they derive from,
+    // or an edit silently un-keys the member for search.
+    if (edits.idNumber !== undefined) {
+      data.nationalIdNormalized = edits.idNumber ? normalizeNationalId(edits.idNumber) : null;
+    }
+    if (edits.phone !== undefined) {
+      data.phoneNormalized = edits.phone ? normalizePhone(edits.phone) : null;
+    }
+    if (edits.email !== undefined) {
+      data.emailNormalized = edits.email ? normalizeEmail(edits.email) : null;
+    }
+    if (edits.firstName !== undefined || edits.lastName !== undefined || edits.otherNames !== undefined) {
+      const names = await prisma.member.findFirst({
+        where: { id: memberId, tenantId },
+        select: { firstName: true, lastName: true, otherNames: true },
+      });
+      data.searchNameNormalized = normalizeSearchName({
+        firstName: edits.firstName ?? names?.firstName,
+        lastName: edits.lastName ?? names?.lastName,
+        otherNames: edits.otherNames ?? names?.otherNames,
+      });
+    }
+
+    // P04.05: bump the row version alongside the write, so a future precondition
+    // can use it instead of the millisecond-granular updatedAt.
+    data.version = { increment: 1 };
 
     return applyWithPrecondition(
       async ({ expected: exp }) =>
