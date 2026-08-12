@@ -6,6 +6,7 @@ import { ROLE_GRANTS, effectivePermissions, ALL_PERMISSIONS } from "@/lib/authz/
 import type { UserRole } from "@/lib/authz/roles";
 import { ArrowLeft, ShieldCheck, KeyRound, Building2, CircleAlert } from "lucide-react";
 import { revokeAssignmentAction } from "./actions";
+import { UnlockAccountPanel } from "./UnlockAccountPanel";
 
 /**
  * DEF-002 (S2) — the effective-access detail surface.
@@ -149,6 +150,15 @@ export default async function UserAccessDetailPage({
         <Fact label="Authenticator" value={user.totpEnabled ? "Enrolled" : "Not enrolled"} />
         <Fact label="Sign-in lock" value={lockValue} />
       </section>
+
+      {/* UAT-HF P10.02 — DEF-010: "no operator-facing unlock path was found in
+          the product". Renders only when there is a lock or a failure streak to
+          release. */}
+      <UnlockAccountPanel
+        userId={user.id}
+        lockLive={lockLive}
+        failedAttempts={user.failedLoginCount}
+      />
 
       {/* Effective access — the decision that actually applies */}
       <section className="space-y-3">

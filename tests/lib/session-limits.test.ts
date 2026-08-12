@@ -309,6 +309,29 @@ describe("P10.02 the admin unlock path the run could not find", () => {
     expect(fn).not.toContain("sessionVersion");
   });
 
+  it("has a surface an administrator can actually reach", () => {
+    // The action existing is not the same as a path back. DEF-010's collateral
+    // was four locked accounts and nowhere in the product to clear them.
+    const panel = readFileSync(
+      "src/app/(admin)/settings/users/[id]/UnlockAccountPanel.tsx",
+      "utf8",
+    );
+    expect(panel).toContain("unlockUserAccountAction");
+    expect(panel).toMatch(/name="reason"/);
+    expect(panel).toMatch(/required/);
+
+    const page = readFileSync("src/app/(admin)/settings/users/[id]/page.tsx", "utf8");
+    expect(page).toContain("<UnlockAccountPanel");
+  });
+
+  it("says plainly that an unlock is not a password change", () => {
+    const panel = readFileSync(
+      "src/app/(admin)/settings/users/[id]/UnlockAccountPanel.tsx",
+      "utf8",
+    );
+    expect(panel).toMatch(/does not change their password/i);
+  });
+
   it("writes an audit row inside the tenant hash chain", () => {
     const fn = actions.slice(actions.indexOf("unlockUserAccountAction"));
     expect(fn).toContain('action: "AUTH_ACCOUNT_UNLOCKED"');
