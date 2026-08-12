@@ -24,6 +24,24 @@ function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [totp, setTotp] = useState("");
+
+  /**
+   * UAT-HF P10.01 — DEF-011, the half that can be answered without leaking.
+   *
+   * The run: a malformed code ("ab12") and an expired code both returned
+   * "Invalid email or password. Please try again." — "Nothing tells the user a
+   * code is required, that their code was malformed, or that it had expired."
+   *
+   * Whether a code is REQUIRED cannot be said before the password is verified,
+   * because saying it identifies the account (see the remaining-work note in
+   * IMPLEMENTATION_LOG.md — that needs the two-step challenge). Whether a code
+   * is well FORMED is knowable in the browser, needs no round trip, and leaks
+   * nothing at all: "ab12" is not six digits whoever typed it.
+   */
+  const totpFormatHint =
+    totp.length > 0 && !/^\d{6}$/.test(totp)
+      ? "An authenticator code is exactly 6 digits. Check the code in your app."
+      : null;
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const searchParams = useSearchParams();
@@ -90,6 +108,17 @@ function LoginForm() {
 
     if (result?.error) {
       setError("Invalid email or password. Please try again.");
+      // UAT-HF P10.01 — DEF-012. "After a failed sign-in the Authenticator code
+      // field still contains and displays the full value that was entered ...
+      // On a shared front-desk screen the previously entered code stays visible
+      // after the failure."
+      //
+      // A one-time code is spent once submitted (P10.03), so keeping it serves
+      // nobody: it cannot be retried, and it can be read over a shoulder. The
+      // password is deliberately NOT cleared — that is a value the user may
+      // legitimately be re-checking, and clearing it would be the DEF-071 class
+      // of "lost typed input" all over again.
+      setTotp("");
       return;
     }
 
@@ -250,12 +279,13 @@ function LoginForm() {
                   value={totp}
                   onChange={(e) => setTotp(e.target.value)}
                   aria-describedby="login-totp-hint"
+                  aria-invalid={totpFormatHint ? true : undefined}
                   className="bg-white border border-[#EEEEEE] text-brand-text-heading text-sm rounded-[8px] focus:ring-2 focus:ring-brand-indigo focus:border-brand-indigo block w-full p-2.5 outline-none transition-all"
                   placeholder="6-digit code"
                   autoComplete="one-time-code"
                 />
                 <p id="login-totp-hint" className="text-xs text-brand-text-muted">
-                  Leave blank if you have not set up an authenticator app.
+                  {totpFormatHint ?? "Leave blank if you have not set up an authenticator app."}
                 </p>
               </div>
 

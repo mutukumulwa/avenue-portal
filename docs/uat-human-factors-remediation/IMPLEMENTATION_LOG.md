@@ -1313,6 +1313,39 @@ Sequentially it still counts 1,2,3,4,lock, and a stale window still restarts at 
 
 **The audit-coverage harness caught the new action** and was right to: it looks for `writeAudit`/`auditChainService`, and auth events deliberately write `prisma.auditLog.create` directly so the row can carry `tenantId` and stay inside the tenant hash chain (WP-3.1 / DEF-005). The catalogue now recognises that form rather than the action being excused.
 
+### P10.01 (part) — Sign-in code handling and duplicate-client messages
+
+| Field | Value |
+|---|---|
+| **Task** | P10.01 — **partial**; the two-step challenge is NOT done (see below) |
+| **Defect IDs** | DEF-012 (done), DEF-014 (done), DEF-011 (half) |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/lib/client-duplicate-mapping.test.ts` (10) |
+| **Commands / results** | typecheck 0; lint 0 errors; suite 293 files / 3248 passed. P2002 mapping verified against a real Postgres. |
+| **Evidence** | `src/app/(auth)/login/page.tsx`, `src/app/(admin)/clients/p2002.ts` |
+| **Feature flags** | none. |
+| **Remaining risks** | **The two-step password→challenge→TOTP flow is not built**, so P10.01's headline acceptance — "users without TOTP never see an unexplained optional field; required user cannot bypass step" — is NOT met. The code field is still always visible and still labelled optional, and a user whose account requires a code and who leaves it blank still gets the generic error. That half needs a short-lived opaque challenge issued only after the password verifies, and reworking a live auth flow is not something to leave half-done; it is scoped in the note below. `autocomplete="one-time-code"` was already present. |
+
+**DEF-012 — a spent code left on a shared screen.** "After a failed sign-in the Authenticator code field still contains and displays the full value that was entered ... On a shared front-desk screen the previously entered code stays visible." It is cleared on failure now. That is safe *because* of P10.03: a submitted code is spent, so retaining it helps nobody — it cannot be retried and it can be read over a shoulder. The **password is deliberately not cleared**; that is a value the user may legitimately be re-checking, and clearing it would be the DEF-071 "lost typed input" class all over again.
+
+**DEF-011, the half that can be answered without leaking.** Whether a code is *required* cannot be said before the password verifies — saying it identifies the account. Whether a code is well *formed* is knowable in the browser, needs no round trip, and leaks nothing: `"ab12"` is not six digits whoever typed it. The run recorded exactly that input getting the generic password error; it now gets "An authenticator code is exactly 6 digits."
+
+**DEF-014's field-specific messages already existed — they were unreachable, and this is the interesting part.** `targetString()` read `err.meta.target` only. Under Prisma 7 **with the pg driver adapter** that property is `undefined`; the constraint moved to `meta.driverAdapterError.cause.constraint.fields`. Verified on a real database:
+
+```
+meta.target                                     -> undefined
+meta.driverAdapterError.cause.constraint.fields -> ['"operatorTenantId"', '"nameNormalized"']
+meta.driverAdapterError.cause.originalMessage   -> '... unique constraint
+                                                    "Client_operatorTenantId_nameNormalized_key"'
+```
+
+So the function returned `""`, every branch missed, and all three uniques — name, slug, prefix — fell through to "That client conflicts with an existing record." **The mapping did not regress when it was written; it stopped working when the driver adapter was adopted**, silently, because the fallback is a plausible sentence rather than a crash. All three shapes are read now, and the test fixtures are copied verbatim from the real error so a future adapter move fails a test instead of quietly degrading a message.
+
+Verified end to end against Postgres after the fix: duplicate name → `name` error; duplicate slug → `slug` error; duplicate prefix → `memberNumberPrefix` error.
+
+**What P10.01 still owes, precisely.** A `/api/auth/challenge`-shaped step that verifies the password, returns a short-lived signed challenge carrying only "TOTP required: yes/no", and a login form that renders the code field only when the challenge says so. It is enumeration-safe because the challenge is issued only on a correct password. It was not attempted here because it doubles the bcrypt path and adds a new auth surface, and a half-finished auth flow is worse than a deferred one.
+
 ---
 
 ## Corrections made to the implementation plan
