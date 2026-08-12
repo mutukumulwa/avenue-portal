@@ -139,7 +139,56 @@ and therefore does **not** match build output nested inside git worktrees. Lint 
 
 ### P00.03 — Reconcile and repair the existing eligibility branch
 
-_pending_
+| Field | Value |
+|---|---|
+| **Task** | P00.03 |
+| **Defect IDs** | none — restores a trustworthy, typechecking integration base |
+| **Commit** | _pending_ |
+| **Migrations / backfills** | **none applied.** The `mustChangePassword` migration is deliberately deferred to **P00.04a** — see below. |
+| **Tests added** | none — this task proves existing tests pass; it changes no product code |
+| **Commands / results** | `npx prisma generate` → client regenerated (v7.7.0). `npm run typecheck` → **exit 0, passes**. Targeted: the branch's 15 test files → **15 passed, 122 tests passed / 4 skipped**. Full `npx vitest run` → **259 files passed, 87 skipped; 2583 tests passed, 572 skipped**. |
+| **Routes exercised** | none |
+| **Evidence** | this log; `docs/eligibility-remediation/REMEDIATION_PLAN.md` header table |
+| **Feature flags** | none |
+| **Remaining risks** | Production still lacks the `mustChangePassword` column; the code paths that write it will fail against prod until P00.04a ships the migration. This is pre-existing, not introduced here. |
+
+**Step 2 — the fix was one command, and it confirms the plan's misdiagnosis.**
+
+`npx prisma generate` alone took typecheck from 5 errors to **exit 0**. No source file was edited and
+no caller was removed. This is direct proof of the correction recorded above: the schema always had
+the field, the generated client was simply stale. Had the plan been followed literally — "remove all
+incomplete callers" — it would have deleted the working first-login password-change feature that
+commit `9e7586e` deliberately added.
+
+**Step 2, second half — why no migration was written here.**
+
+`DEC-13` was signed as **option A (adopt real migrations)** after this plan was drafted. P00.04a will
+baseline the current production schema as an initial migration and switch `scripts/db-sync.mjs` from
+`prisma db push` to `prisma migrate deploy`. Writing a `mustChangePassword` migration *now*, against
+the stale 24-migration history that stops at `20260513010000_phase_10_lifecycle`, would produce a
+file P00.04a must immediately discard — and it would be inert in production anyway, because
+migrations are not applied there today.
+
+The correct sequence is: baseline (P00.04a) → then `mustChangePassword` as a migration on top of it,
+since production does **not** have the column. Handed to P00.04a with that ordering stated.
+
+**Step 5 — the older plan claimed "not started" while fully implemented.**
+
+`docs/eligibility-remediation/REMEDIATION_PLAN.md` line 5 read `Status: **not started**`. All 12
+phases (0–11) are in fact implemented across the 12 commits. Phase 10 (hygiene) has no commit but is
+**verified satisfied** — `find src -name '* 2.ts' -o -name '* 2.tsx'` returns 0. The header now
+carries a phase→commit table and states explicitly that *implemented is not retested*: no retest run
+has been executed, so none of that run's 24 findings is closed.
+
+Its rule 3 also pointed at the non-existent `node_modules/next/dist/docs/`; repointed to the
+vendored docs from P00.02.
+
+**Step 6 — merge/cherry-pick manifest.**
+
+Not required. `codex/uat-hf-remediation` branches directly from `ff26e3b`, so all 12 commits are
+inherited in place, unmodified, with **zero conflicts and zero cherry-picks**. No commit was
+rewritten, reordered, or dropped. `git log --oneline 53df0ab..HEAD` shows the 12 originals followed
+only by this programme's own `docs(uat-hf)`/`build(uat-hf)` commits.
 
 ### P00.04 — Make schema deployment reproducible
 
