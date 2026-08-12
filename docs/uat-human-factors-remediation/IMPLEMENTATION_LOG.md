@@ -654,6 +654,98 @@ shrink below its content. That is what produced DEF-009's page-level horizontal 
 also carries `tabIndex={0}`, because a scrollable region a mouse can drag is otherwise unreachable by
 keyboard.
 
+## P02 — Contract date crash containment and repair
+
+### P02.01 — Validate contract dates at every write boundary
+
+| Field | Value |
+|---|---|
+| **Task** | P02.01 |
+| **Defect IDs** | DEF-050 (write half), DEF-051, DEF-020 |
+| **Commit** | `57061e3` |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/lib/provider-contract-validation.test.ts` (21), `tests/actions/contract-dates.actions.test.ts` (9), plus 2 added to `tests/services/contract-draft-edit.test.ts` — **30** |
+| **Commands / results** | Suite 272 files / 2810 passed; typecheck 0; lint 0 errors. |
+| **Evidence** | `src/lib/validation/provider-contract.ts` |
+| **Remaining risks** | The contract forms still signal failure with `?error=` and lose typed input on rejection; migrating them to the P01.01 envelope is P04.01. |
+
+The run's row carried **startDate 60901-02-20 / endDate 70831-02-20**. That input is not exotic —
+a native `<input type="date">` accepts years to 275760 — and `createContractAction` did **no
+validation at all**.
+
+`validateContractTerm` implements DEC-02 and **nothing more**: four-digit ISO dates
+1900-01-01..9999-12-31, `end >= start`. No maximum term, no "review date must sit inside the term".
+DEC-02 forbids inventing those, and doing so would reject legitimate legacy rows during the P02.03
+repair — turning a containment fix into a data-loss one.
+
+Wired into **every** write door: create, renew, draft-header edit, the contract import path, and the
+service layer itself so tRPC and API callers cannot bypass it. The validators accept `Date` **or**
+string, because a form door holds a string and a typed service caller holds a `Date` — making
+callers convert is how the raw `new Date()` got there originally.
+
+**A second crash site found while doing it:** `editDraftHeader` built its audit diff with
+`before.toISOString()` on the **existing stored value**, so editing a damaged row to repair it would
+itself throw.
+
+**One rule deliberately relaxed.** `editDraftHeader` required `end > start`, forbidding a single-day
+term; DEC-02 requires only `end >= start`. The existing test asserting the old message was updated
+for that reason and annotated — not to make a failing test pass.
+
+### P02.02 — Make all contract reads non-crashing
+
+| Field | Value |
+|---|---|
+| **Task** | P02.02 |
+| **Defect IDs** | DEF-050 (read half) |
+| **Commit** | `92eea46` |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/lib/contract-render-guard.test.ts` — **12** |
+| **Commands / results** | Suite 273 files / 2822 passed; typecheck 0; lint 0 errors; guards green. |
+| **Evidence** | `formatStoredDate` / `calendarInputValue` / `isRenderableStoredDate` in `src/lib/calendar-date.ts` |
+| **Remaining risks** | Not exercised against a running server with a seeded bad row — the acceptance's live check needs the P02.03 seed. The source guard covers the six known contract surfaces; a new surface must be added to its list. |
+
+**Two crash sites the run never reached.** It only ever opened `/contracts` and `/contracts/{id}`
+while the bad row existed. `contracts/analytics/page.tsx` and the provider detail view at
+`providers/[id]/page.tsx` render contract term dates the same unguarded way and would have failed
+later, separately, looking like new defects.
+
+**The new source guard then caught four more** in `providers/[id]` that I had missed — the tariff
+`effectiveFrom`/`effectiveTo` serialisation. That is the guard earning its place on its first run.
+
+A damaged row is now quarantined on its own line, its derived status suppressed (never report
+EXPIRED from a date we could not read), and the draft-header edit inputs fall back to empty so **the
+form that exists to repair the row survives the row**.
+
+Provider-facing views used `toLocaleDateString`, which does **not** throw on an Invalid Date — so
+they were never crash sites, but they rendered a bare "Invalid Date" in a hard-coded locale format.
+Converted for one consistent path.
+
+### P02.04 — Remove Kenyan currency defaults from contract creation
+
+| Field | Value |
+|---|---|
+| **Task** | P02.04 |
+| **Defect IDs** | DEF-052 |
+| **Commit** | `8d8d10b` |
+| **Migrations / backfills** | `20260812000500_contract_currency_base` — `ProviderContract.currency` default `KES` → `UGX`. **No backfill**; existing rows untouched. |
+| **Tests added** | `tests/actions/contract-currency.actions.test.ts` — **6** |
+| **Commands / results** | Fresh-DB deploy of all 6 migrations, zero drift, default confirmed `'UGX'`. Suite 274 files / 2828 passed; typecheck 0; lint 0 errors; both guards green. |
+| **Evidence** | `scripts/reports/contract-currency-preflight.ts` |
+| **Remaining risks** | Existing non-base rows are unchanged and unclassified until the preflight is run and signed (P12.02). `ContractPackage`, `CommissionLedgerEntry` and `CommissionPayoutBatch` still carry `@default("KES")` — outside P02's contract-creation scope. |
+
+DEF-052 was **four copies of one wrong assumption**: the form's `defaultValue="KES"`, the action's
+`?? "KES"`, the import path's `|| "KES"`, and the schema's `@default("KES")`.
+
+The tenant's configured currency is now the default, and `getDefaultCurrency` returns `null` when
+none is set so the caller **requires an explicit choice** — money whose denomination was guessed is
+worse than money with none.
+
+The schema default became `UGX` rather than being removed: `provider-contracts.service`'s renewal
+never supplies `currency` at all, so dropping the default would have broken it.
+
+A genuinely foreign currency is still accepted when explicitly selected, and a test pins that — the
+fix is removing the silent default, not banning KES.
+
 ---
 
 ## Corrections made to the implementation plan
