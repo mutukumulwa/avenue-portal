@@ -147,6 +147,15 @@ export const Outbox = {
  * Also registers the Background Sync tag when supported. Call once from a
  * client component in the provider PWA.
  */
+/**
+ * The Background Sync API is not in TypeScript's DOM lib, so `registration.sync`
+ * has no type. Declare the minimum we call rather than casting to `any` — and
+ * keep every member optional, because Safari and Firefox do not implement it.
+ */
+type ServiceWorkerRegistrationWithSync = ServiceWorkerRegistration & {
+  sync?: { register?: (tag: string) => Promise<void> };
+};
+
 export function registerOfflineSync(apiKey?: string): void {
   if (typeof window === "undefined") return;
   const flush = () => Outbox.flush(apiKey).catch(() => {});
@@ -157,7 +166,7 @@ export function registerOfflineSync(apiKey?: string): void {
   });
 
   navigator.serviceWorker?.ready
-    ?.then((reg) => (reg as any).sync?.register?.("medvex-sync"))
+    ?.then((reg) => (reg as ServiceWorkerRegistrationWithSync).sync?.register?.("medvex-sync"))
     .catch(() => {});
 
   if (navigator.onLine) flush();

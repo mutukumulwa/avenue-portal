@@ -9,6 +9,24 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, BriefcaseMedical, Clock, FileCheck2, Ban, Stethoscope, FileSignature, AlertTriangle, Scissors, Layers, CheckCircle2 } from "lucide-react";
 
+/**
+ * Days since admission, for display only.
+ *
+ * Module scope so the reference to `Date.now()` is not an impure call inside a
+ * component render (react-hooks/purity). This page is an async Server Component,
+ * so it evaluates once per request rather than on every client render.
+ *
+ * KNOWN LIMITATION — owned by UAT-HF task P01.05 / DEC-01: this is millisecond
+ * arithmetic on a value that is semantically a calendar date, so it is off by one
+ * across a DST-free but offset timezone boundary near midnight. Length of stay
+ * must become calendar-day math in `Africa/Nairobi`. Behaviour is deliberately
+ * unchanged here; P00.02b only relocated it.
+ */
+function lengthOfStayDays(admissionDate: Date | null): number | null {
+  if (!admissionDate) return null;
+  return Math.max(0, Math.floor((Date.now() - admissionDate.getTime()) / 86_400_000));
+}
+
 const STATUS_BADGE: Record<string, string> = {
   OPEN: "bg-[#17A2B8]/10 text-[#17A2B8]",
   PENDING_CLOSURE: "bg-[#FFC107]/10 text-[#856404]",
@@ -37,9 +55,7 @@ export default async function CaseDetailPage({
   const recon = await CaseService.getCaseReconciliation(tenantId, id);
 
   const editable = c.status === "OPEN" || c.status === "PENDING_CLOSURE";
-  const los = c.admissionDate
-    ? Math.max(0, Math.floor((Date.now() - c.admissionDate.getTime()) / 86_400_000))
-    : null;
+  const los = lengthOfStayDays(c.admissionDate);
 
   // Attachable PAs: member's approved, unattached, same facility.
   const candidatePAs = editable

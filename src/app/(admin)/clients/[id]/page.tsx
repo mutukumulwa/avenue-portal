@@ -4,6 +4,18 @@ import { ArrowLeft, Pencil, Building2, Network } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+// Module scope, not defined inside the page component: a component created during
+// render gets a new identity every render, so React unmounts and remounts it
+// (react-hooks/static-components).
+function Field({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div>
+      <dt className="text-xs uppercase text-brand-text-muted">{label}</dt>
+      <dd className="mt-0.5 text-sm text-brand-text-heading">{value}</dd>
+    </div>
+    );
+}
+
 const TYPE_LABEL: Record<string, string> = {
   INSURER: "Insurer",
   HMO: "HMO",
@@ -35,13 +47,6 @@ export default async function ClientDetailPage({
   const { id } = await params;
   const client = await ClientsService.getById(session.user.tenantId, id, session.user.clientId);
   if (!client) notFound();
-
-  const Field = ({ label, value }: { label: string; value: React.ReactNode }) => (
-    <div>
-      <dt className="text-xs uppercase text-brand-text-muted">{label}</dt>
-      <dd className="mt-0.5 text-sm text-brand-text-heading">{value}</dd>
-    </div>
-  );
 
   return (
     <div className="space-y-6">

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { submitChangeAction } from "../actions";
@@ -29,7 +29,21 @@ export function RequestChangeForm({ policy, branches }: { policy: Record<string,
   const [evidence, setEvidence] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const idem = useMemo(() => (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `mdc-${Date.now()}`), []);
+  // Idempotency key for this draft. Minted lazily on first submit and reused
+  // for every retry of the same draft, so a retried submit is deduplicated
+  // server-side rather than creating a second request.
+  //
+  // Held in a ref and not computed during render: `crypto.randomUUID()` and
+  // `Date.now()` are impure, and calling them in render is both a lint error
+  // (react-hooks/purity) and wrong under React's re-render semantics.
+  const idemRef = useRef<string | null>(null);
+  const takeIdempotencyKey = () => {
+    idemRef.current ??=
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `mdc-${Date.now()}`;
+    return idemRef.current;
+  };
 
   const cat = category ? policy[category] : null;
   const categories = Object.keys(policy).filter((k) => policy[k].allowedFields.length > 0 || k === "OTHER");
@@ -48,7 +62,7 @@ export function RequestChangeForm({ policy, branches }: { policy: Record<string,
       providerBranchId: cat.scope === "BRANCH" ? branchId || undefined : undefined,
       narrative: narrative.trim() || undefined,
       evidenceDocumentIds: evidenceIds,
-      idempotencyKey: idem,
+      idempotencyKey: takeIdempotencyKey(),
     });
     if (res?.error) {
       setError(res.error);

@@ -29,8 +29,8 @@ export async function createPricingModelAction(formData: FormData) {
       },
     });
     newModelId = model.id;
-  } catch (err: any) {
-    if (err.message === "NEXT_REDIRECT") throw err;
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message === "NEXT_REDIRECT") throw err;
     errorMsg = err instanceof Error ? err.message : "Failed to create model";
   }
 

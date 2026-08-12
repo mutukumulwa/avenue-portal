@@ -12,6 +12,18 @@ import { GopButton } from "./GopButton";
 import { buildGopData } from "./gop-artifact";
 import { PROVIDER_CANCELLABLE_STATUSES } from "./constants";
 
+// Module scope, not defined inside the page component: a component created during
+// render gets a new identity every render, so React unmounts and remounts it
+// (react-hooks/static-components).
+function Field({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-[11px] font-bold text-brand-text-muted uppercase">{label}</p>
+      <p className="text-sm text-brand-text-heading font-semibold mt-0.5">{value}</p>
+    </div>
+    );
+}
+
 function money(n: number | null | undefined) {
   return `UGX ${Math.round(Number(n ?? 0)).toLocaleString("en-UG")}`;
 }
@@ -47,13 +59,6 @@ export default async function ProviderPreauthDetail({ params }: { params: Promis
   const events = await listPreauthEvents(pa.id);
   const diagnoses = (pa.diagnoses as Array<{ icdCode?: string; code?: string; description?: string; isPrimary?: boolean }>) ?? [];
   const procedures = (pa.procedures as Array<{ cptCode?: string; description?: string; quantity?: number; unitCost?: number; total?: number }>) ?? [];
-
-  const Field = ({ label, value }: { label: string; value: React.ReactNode }) => (
-    <div>
-      <p className="text-[11px] font-bold text-brand-text-muted uppercase">{label}</p>
-      <p className="text-sm text-brand-text-heading font-semibold mt-0.5">{value}</p>
-    </div>
-  );
 
   return (
     <div className="space-y-6 max-w-4xl">

@@ -12,11 +12,18 @@ export default function ResetPasswordPage() {
   // a network stall keeps the form pending past 12s, re-enable the button and
   // show the generic acknowledgment so it can never appear stuck "Sending…".
   const [reqSlow, setReqSlow] = useState(false);
+
+  // Clear the slow flag as soon as the submit settles. Adjusted during render
+  // rather than in the effect below, which would re-render immediately after
+  // paint (react-hooks/set-state-in-effect).
+  const [prevReqPending, setPrevReqPending] = useState(reqPending);
+  if (prevReqPending !== reqPending) {
+    setPrevReqPending(reqPending);
+    if (!reqPending) setReqSlow(false);
+  }
+
   useEffect(() => {
-    if (!reqPending) {
-      setReqSlow(false);
-      return;
-    }
+    if (!reqPending) return;
     const t = setTimeout(() => setReqSlow(true), 12000);
     return () => clearTimeout(t);
   }, [reqPending]);

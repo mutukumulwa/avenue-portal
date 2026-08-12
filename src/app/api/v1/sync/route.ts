@@ -14,6 +14,20 @@ import { enqueueSyncReconcile } from "@/lib/queue";
  * a reconcile job is enqueued. Returns per-op outcome so the client can mark
  * its local records synced.
  */
+/**
+ * One operation as it arrives on the wire. This is the *unvalidated* shape —
+ * the guard loop below checks clientUuid/opKey/entityType/capturedAt are present
+ * before any of these reach SyncService.
+ */
+type IncomingSyncOperation = {
+  clientUuid: string;
+  opKey: string;
+  entityType: string;
+  payload: unknown;
+  deviceId?: string;
+  capturedAt: string;
+};
+
 async function postSync(req: Request) {
   try {
     const body = await req.json();
@@ -41,7 +55,7 @@ async function postSync(req: Request) {
 
     const results = await SyncService.ingest(
       tenantId,
-      operations.map((o: any) => ({
+      operations.map((o: IncomingSyncOperation) => ({
         clientUuid: o.clientUuid,
         opKey: o.opKey,
         entityType: o.entityType,

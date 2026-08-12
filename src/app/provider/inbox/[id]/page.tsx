@@ -8,6 +8,18 @@ import { PreauthReadService } from "@/server/services/preauth-read.service";
 import { infoRequestItemLabel } from "@/server/services/preauth-info-request/catalog";
 import { RespondForm } from "./RespondForm";
 
+// Module scope, not defined inside the page component: a component created during
+// render gets a new identity every render, so React unmounts and remounts it
+// (react-hooks/static-components).
+function Field({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-[11px] font-bold text-brand-text-muted uppercase">{label}</p>
+      <p className="text-sm text-brand-text-heading font-semibold mt-0.5">{value}</p>
+    </div>
+    );
+}
+
 function fmtDate(v: Date | null) {
   return v ? new Date(v).toLocaleDateString("en-UG", { day: "2-digit", month: "short", year: "numeric" }) : "—";
 }
@@ -32,13 +44,6 @@ export default async function ProviderInfoRequestDetail({ params }: { params: Pr
 
   const pa = await PreauthReadService.getById({ tenantId: ctx.tenantId, providerId: ctx.providerId }, request.preAuthorizationId);
   const canRespond = providerPermits(ctx.permissions, "provider.preauth.respond") && INFO_REQUEST_RESPONDABLE_STATUSES.includes(request.status);
-
-  const Field = ({ label, value }: { label: string; value: React.ReactNode }) => (
-    <div>
-      <p className="text-[11px] font-bold text-brand-text-muted uppercase">{label}</p>
-      <p className="text-sm text-brand-text-heading font-semibold mt-0.5">{value}</p>
-    </div>
-  );
 
   return (
     <div className="space-y-6 max-w-3xl">

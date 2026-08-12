@@ -41,9 +41,13 @@ export function GroupStatusControls({
   const [selected, setSelected] = useState<StatusTransition | null>(null);
 
   // Close the form once a change is accepted (revalidatePath refreshes status).
-  useEffect(() => {
+  // Adjusted during render rather than in an effect, which would leave the form
+  // briefly open after success and then re-render (react-hooks/set-state-in-effect).
+  const [prevState, setPrevState] = useState(state);
+  if (prevState !== state) {
+    setPrevState(state);
     if (state.ok) setSelected(null);
-  }, [state]);
+  }
 
   const fieldErr =
     state && !state.ok ? state.fieldErrors?.targetStatus?.[0] : undefined;

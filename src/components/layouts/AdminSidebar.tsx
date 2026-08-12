@@ -275,10 +275,14 @@ function NavGroupSection({ group, bestMatch }: { group: NavGroup; bestMatch: str
 
   // Navigating into a section always reveals it — a page must never render
   // with its own sidebar hierarchy collapsed. Manual toggles stay respected
-  // otherwise (we only ever auto-open, never auto-close).
-  useEffect(() => {
+  // otherwise (we only ever auto-open, never auto-close). Adjusted during
+  // render, not in an effect: an effect would paint the section collapsed for
+  // one frame on navigation (react-hooks/set-state-in-effect).
+  const [prevAnyActive, setPrevAnyActive] = useState(isAnyActive);
+  if (prevAnyActive !== isAnyActive) {
+    setPrevAnyActive(isAnyActive);
     if (isAnyActive) setOpen(true);
-  }, [isAnyActive]);
+  }
 
   return (
     <div>

@@ -45,8 +45,8 @@ export async function createFxRateAction(formData: FormData) {
       description: `FX rate set: 1 ${quoteCurrency} = ${rate} ${BASE_CURRENCY}`,
       metadata: { quoteCurrency, rate },
     });
-  } catch (err: any) {
-    if (err.message === "NEXT_REDIRECT") throw err;
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message === "NEXT_REDIRECT") throw err;
     errorMsg = err instanceof Error ? err.message : "Failed to set rate";
   }
 

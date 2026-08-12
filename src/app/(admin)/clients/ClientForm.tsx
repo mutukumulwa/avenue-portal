@@ -16,6 +16,20 @@ const CLIENT_STATUSES = ["PROSPECT", "ACTIVE", "SUSPENDED", "TERMINATED"] as con
 // Focus order for the first-invalid-field focus (SP-2).
 const FIELD_ORDER = ["name", "type", "currency", "memberNumberPrefix", "slug", "status", "parentClientId"];
 
+const errCls = "mt-1 text-xs text-brand-error";
+
+// Module scope, not defined inside ClientForm: a component created during render
+// gets a new identity on every render, so React unmounts and remounts it and any
+// state it holds is lost (react-hooks/static-components).
+function Err({ field, message }: { field: string; message?: string }) {
+  if (!message) return null;
+  return (
+    <p id={`${field}-error`} role="alert" className={errCls}>
+      {message}
+    </p>
+  );
+}
+
 export interface ClientFormClient {
   id: string;
   name: string;
@@ -60,15 +74,6 @@ export function ClientForm({
   const roCls =
     "mt-1 w-full rounded-md border border-brand-border bg-brand-bg-alt px-3 py-2 text-sm text-brand-text-muted";
   const labelCls = "text-sm font-medium text-brand-text-heading";
-  const errCls = "mt-1 text-xs text-brand-error";
-
-  const Err = ({ field }: { field: string }) =>
-    err(field) ? (
-      <p id={`${field}-error`} role="alert" className={errCls}>
-        {err(field)}
-      </p>
-    ) : null;
-
   const aria = (field: string) => ({
     "aria-invalid": err(field) ? true : false,
     ...(err(field) ? { "aria-describedby": `${field}-error` } : {}),
@@ -109,7 +114,7 @@ export function ClientForm({
           placeholder="e.g. Jubilee Insurance Uganda"
           {...aria("name")}
         />
-        <Err field="name" />
+        <Err field="name" message={err("name")} />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
@@ -130,7 +135,7 @@ export function ClientForm({
               </option>
             ))}
           </select>
-          <Err field="type" />
+          <Err field="type" message={err("type")} />
         </div>
         <div>
           <label className={labelCls} htmlFor="currency">
@@ -167,7 +172,7 @@ export function ClientForm({
                   </option>
                 ))}
               </select>
-              <Err field="currency" />
+              <Err field="currency" message={err("currency")} />
             </>
           )}
         </div>
@@ -197,7 +202,7 @@ export function ClientForm({
               placeholder="e.g. LMU"
               {...aria("memberNumberPrefix")}
             />
-            <Err field="memberNumberPrefix" />
+            <Err field="memberNumberPrefix" message={err("memberNumberPrefix")} />
             <p className="mt-1 text-xs text-brand-text-muted">
               3–6 chars, an uppercase letter then letters/digits. Must be unique per operator. Defaults to MVX.
             </p>
@@ -227,7 +232,7 @@ export function ClientForm({
               placeholder="auto-generated from name"
               {...aria("slug")}
             />
-            <Err field="slug" />
+            <Err field="slug" message={err("slug")} />
             <p className="mt-1 text-xs text-brand-text-muted">Unique per operator. Leave blank to derive from the name.</p>
           </>
         )}
@@ -245,7 +250,7 @@ export function ClientForm({
               </option>
             ))}
           </select>
-          <Err field="status" />
+          <Err field="status" message={err("status")} />
         </div>
       )}
 
@@ -267,7 +272,7 @@ export function ClientForm({
             </option>
           ))}
         </select>
-        <Err field="parentClientId" />
+        <Err field="parentClientId" message={err("parentClientId")} />
       </div>
 
       <div className="flex justify-end gap-3 pt-2">

@@ -268,7 +268,7 @@ export function CaptureClient() {
                 <tr key={o.opKey}>
                   <td className="px-4 py-2.5 text-brand-text-body">{new Date(o.capturedAt).toLocaleTimeString("en-UG")}</td>
                   <td className="px-4 py-2.5 text-brand-text-body">{o.entityType}</td>
-                  <td className="px-4 py-2.5 font-mono text-brand-text-body">{String((o.payload as any)?.memberNumber ?? "—")}</td>
+                  <td className="px-4 py-2.5 font-mono text-brand-text-body">{String((o.payload as { memberNumber?: unknown } | null | undefined)?.memberNumber ?? "—")}</td>
                   <td className="px-4 py-2.5"><span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${stateBadge[o.state]}`}>{o.state}</span></td>
                 </tr>
               ))}

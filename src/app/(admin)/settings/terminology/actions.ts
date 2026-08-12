@@ -34,8 +34,8 @@ export async function createTermAction(formData: FormData) {
       description: `Drafted term "${key}" → "${displayText}" (${scope})`,
       metadata: { entryId: entry.id, scope },
     });
-  } catch (err: any) {
-    if (err.message === "NEXT_REDIRECT") throw err;
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message === "NEXT_REDIRECT") throw err;
     errorMsg = err instanceof Error ? err.message : "Failed to create term";
   }
   if (errorMsg) redirect(`${PATH}?error=${encodeURIComponent(errorMsg)}`);
@@ -62,8 +62,8 @@ export async function approveTermAction(formData: FormData) {
       description: `Approved terminology entry ${id}`,
       metadata: { entryId: id },
     });
-  } catch (err: any) {
-    if (err.message === "NEXT_REDIRECT") throw err;
+  } catch (err: unknown) {
+    if (err instanceof Error && err.message === "NEXT_REDIRECT") throw err;
     errorMsg = err instanceof Error ? err.message : "Failed to approve";
   }
   if (errorMsg) redirect(`${PATH}?error=${encodeURIComponent(errorMsg)}`);
