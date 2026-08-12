@@ -66,6 +66,12 @@ export const KNOWN_AUDITING_TOKENS = [
 ];
 
 export const AUDIT_EXCLUSIONS: Record<string, string> = {
+  // UAT-HF P03.05 — eligibility is a READ. It writes no business state; the
+  // service records its own ProviderEligibilityCheck evidence row with actor,
+  // provider, member, service date and result, which is the point-in-time
+  // record for this surface.
+  "provider/eligibility/actions.ts:checkEligibilityAction":
+    "READ_ONLY — eligibility is a lookup; the service records its own ProviderEligibilityCheck evidence row (actor, provider, member, service date, result)",
   "(auth)/reset/actions.ts:confirmResetAction": "PRE_EXISTING_GAP — audit wiring pending",
   "(auth)/reset/actions.ts:requestResetAction": "PRE_EXISTING_GAP — audit wiring pending",
   // WP-3.5G: confirmHRImportAction + addMemberEndorsementAction now call writeAudit —
