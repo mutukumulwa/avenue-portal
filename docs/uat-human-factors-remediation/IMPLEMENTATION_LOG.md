@@ -353,6 +353,32 @@ the divergence stays visible to a reviewer.
 
 ## Phase gates
 
-| Phase | `npm run typecheck` | Full `npx vitest run` | Signed off |
-|---|---|---|---|
-| P00 | _pending_ | _pending_ | _pending_ |
+| Phase | `npm run typecheck` | `npm run lint` | Full `npx vitest run` | Signed off |
+|---|---|---|---|---|
+| **P00** | **PASS** — 0 errors (was 5) | **PASS** — 0 errors (was 556), 207 warnings | **PASS** — 260 files / 2611 tests passed, 88 files / 578 skipped | _awaiting owner review_ |
+
+P00 gate run 2026-08-12 on `09662f7`. All three commands green.
+
+**Baseline movement across the phase**
+
+| Measure | At `ff26e3b` | At P00 exit |
+|---|---|---|
+| `npm run typecheck` | 5 errors | **0** |
+| `npm run lint` | never finished | **0 errors, 21s** |
+| Test files / tests passing | 259 / 2583 | **260 / 2611** (+1 file, +28 tests) |
+| Prisma migrations applied in production | none — `db push` at build | 3 reviewed migrations authored; **cutover outstanding** |
+| Blocked steps with a named retest owner | 0 of 31 | **31 of 31** |
+
+**Not done in P00, carried forward**
+
+1. **The production schema cutover** — `SCHEMA_DEPLOYMENT.md` §3. A human ops step;
+   `SCHEMA_DEPLOY_MODE` stays `push` until it is complete.
+2. **P00.04 step 2's preflight reports** for *proposed* constraint changes — owned by
+   P12.02, which enumerates them. The three constraints shipped in P00.04 already exist
+   in production, so none was required.
+3. **An upgrade rehearsal against a production-shaped snapshot** — cannot be done from a
+   fresh database alone.
+4. **The four harness capabilities themselves** — P00.05 gates on their *declaration*;
+   building the mail sink, download interception, exhausted-benefit fixture and
+   cold-offline navigation is work in its own right, and P12.05 cannot reach "zero
+   blocked" without them.
