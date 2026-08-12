@@ -1474,7 +1474,15 @@ the divergence stays visible to a reviewer.
 | **P03** (partial) | **PASS** — 0 errors | **PASS** — 0 errors | **PASS** — 279 files / 2937 tests passed, 88 files / 598 skipped | P03.01 reporting half, 03.02–03.05 done; **03.06 blocked on P09** |
 | **P04** | **PASS** — 0 errors | **PASS** — 0 errors, 217 warnings | **PASS** — 286 files / 3079 tests passed | P04.01–P04.05 **complete** |
 | **P05** (partial) | **PASS** — 0 errors | **PASS** — 0 errors, 217 warnings | **PASS** — 290 files / 3180 tests passed | P05.01–P05.05, P05.07 done; **P05.06 not started** |
-| **P10** (partial) | **PASS** — 0 errors | **PASS** — 0 errors, 217 warnings | **PASS** — 291 files / 3199 tests passed | P10.03 done; **P10.01, P10.02, P10.04 not started** |
+| **P06** (partial) | **PASS** — 0 errors | **PASS** — 0 errors | **PASS** — 295 files / 3275 tests passed | P06.05's DEF-069 half only |
+| **P09** (partial) | **PASS** — 0 errors | **PASS** — 0 errors | **PASS** — 297 files / 3308 tests passed | P09.02 done; P09.06 impact half |
+| **P10** (partial) | **PASS** — 0 errors | **PASS** — 0 errors, 216 warnings | **PASS** — 293 files / 3248 tests passed | P10.02–P10.04 done; **P10.01 partial** |
+| **P11** (partial) | **PASS** — 0 errors | **PASS** — 0 errors | **PASS** — 296 files / 3287 tests passed | P11.02 done |
+
+**Branch exit state, 2026-08-13 on `564478f`:** typecheck 0 · lint **0 errors**, 216 warnings ·
+suite **297 files / 3308 tests passing**, 88 files / 598 skipped · both guards green · locale
+baseline tightened 52 → 50 across the branch · **11 migrations applied from an empty database with
+zero drift**.
 
 P04/P05/P10 gate run 2026-08-12 on `50a2f1f`. Both guards green; locale baseline
 tightened 52 → 50 across the phase. **11 migrations applied from an empty database with
