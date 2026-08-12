@@ -161,7 +161,7 @@ async function ipDef05(c: any) {
   catch (e: any) { unk = /unknown facility/i.test(e.message); }
   detail.push(`unknownFacility=${unk?'ok':'?'}`);
   // (c) valid+unmatched mix conserves the valid row
-  let caseId = ''; let mix = 'n/a';
+  let caseId = ''; let mix = 'n/a'; let mixOk = false;
   try {
     if (c.member) {
       const admit = day(clk, -1);
@@ -176,12 +176,11 @@ async function ipDef05(c: any) {
       const entriesOnCase = await prisma.caseServiceEntry.count({ where: { caseId } });
       const exc = await prisma.exceptionLog.count({ where: { tenantId: c.tenantId, reason: 'HMS_BATCH_UNMATCHED', entityId: { contains: ref } } });
       mix = `applied=${r.applied} unmatched=${r.unmatched} (validOnCase=${entriesOnCase}, unmatched->exceptionLog=${exc})`;
-      var mixOk = r.applied === 1 && r.unmatched === 1 && entriesOnCase === 1 && exc >= 1;
+      mixOk = r.applied === 1 && r.unmatched === 1 && entriesOnCase === 1 && exc >= 1;
     }
   } catch (e: any) { mix = `THREW: ${e.message}`; }
   detail.push(`validPlusUnmatched: ${mix}`);
   if (caseId) { await prisma.caseServiceEntry.deleteMany({ where: { caseId } }).catch(()=>{}); await prisma.exceptionLog.deleteMany({ where: { entityRef: { contains: 'MIX-' }, reason: 'HMS_BATCH_UNMATCHED' } }).catch(()=>{}); await prisma.clinicalCase.deleteMany({ where: { id: caseId } }).catch(()=>{}); }
-  // @ts-ignore
   const ok = a1 && a2 && unk && (c.member ? mixOk : true);
   rec('IP-DEF-05', ok, detail.join(' | '));
 }

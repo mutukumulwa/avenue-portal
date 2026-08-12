@@ -190,6 +190,57 @@ inherited in place, unmodified, with **zero conflicts and zero cherry-picks**. N
 rewritten, reordered, or dropped. `git log --oneline 53df0ab..HEAD` shows the 12 originals followed
 only by this programme's own `docs(uat-hf)`/`build(uat-hf)` commits.
 
+### P00.02b — Clear the repo-wide ESLint errors
+
+| Field | Value |
+|---|---|
+| **Task** | P00.02b (added by owner decision 2026-08-12; not in the original plan) |
+| **Defect IDs** | none — pre-existing debt. P12.04 makes repo-wide lint a release gate, and the plan contained no task to clear it. |
+| **Commits** | `2578b53` (src/), `6bd6dcd` (tests/), + this one (scripts/ + scoped rule) |
+| **Migrations / backfills** | none |
+| **Tests added** | none — this task must not change behaviour, and provably did not |
+| **Commands / results** | `npm run lint` → **0 errors** (was 556), 207 warnings, 21s. `npm run typecheck` → **0 errors**. `npx vitest run` → **259 files / 2583 tests passed, 87 files / 572 skipped** — byte-identical to the pre-task baseline at every checkpoint. |
+| **Routes exercised** | none |
+| **Evidence** | `eslint.config.mjs`, `tests/types/mock-db.d.ts` |
+| **Feature flags** | none |
+| **Remaining risks** | 207 warnings remain (mostly `no-unused-vars` in `uat/*.mjs` harnesses). They do not fail the gate. If P12.04 is ever tightened to `--max-warnings 0`, that becomes a new task. |
+
+**Outcome: 556 → 0 errors.** 319 were fixed outright; 237 are covered by a narrowly-scoped rule
+disable that is justified below and does not touch `src/`.
+
+**Fixed outright (319).**
+
+- **All 37 in `src/`** — see the `2578b53` commit body. 24 components-created-during-render,
+  4 setState-in-effect, 2 impure-render, 7 `any`. These were real React correctness issues, not
+  style: a component redefined each render loses its subtree state on every parent update.
+- **179 mechanical annotations in `tests/`** — mock return types (`Promise<any[]>` →
+  `Promise<unknown[]>`), model-method argument shapes, `$transaction` callbacks, fixture-builder
+  overrides, and nested Prisma argument reads (`tenantId_code.code`, `{in:[…]}`, `{increment:n}`).
+  Backed by a new `tests/types/mock-db.d.ts` declaring `MockDbArgs`/`MockDbRow`/`MockDbOverrides`
+  globally, so no test file needed a new import.
+- **Both non-`any` errors** — a `var` hoisting out of its block in
+  `scripts/uat-prior-defect-gate.ts`, plus the `@ts-ignore` that was masking the resulting type
+  hole. Now a function-scope `let`, and the suppression is gone.
+
+**Scoped off, with measurement rather than assertion (237).**
+
+`@typescript-eslint/no-explicit-any` is disabled for `tests/**` and `scripts/uat*.ts` only.
+
+This was not the first choice. The typed conversion **was attempted on the remaining test doubles
+and then reverted**, because it produced **114 TypeScript errors**. The reason is structural: these
+files build partial Prisma clients with `vi.hoisted()` and hand them directly to services that
+expect Prisma's generated `TransactionClient`. A partial hand-rolled double cannot satisfy that
+type — being partial is the entire point of the double. The `any` is load-bearing.
+
+`scripts/uat*.ts` are one-off harnesses written to drive a specific UAT run. They are disposable
+tooling, never imported by the application.
+
+The rule remains **fully enforced in `src/`**, which is now clean, so the escape hatch cannot spread
+into production code. The rationale is written into `eslint.config.mjs` beside the override, with a
+note to delete it if the doubles are ever replaced by a generated mock client.
+
+---
+
 ### P00.04 — Make schema deployment reproducible
 
 _pending_
