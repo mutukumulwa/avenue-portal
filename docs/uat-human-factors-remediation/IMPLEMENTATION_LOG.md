@@ -292,7 +292,50 @@ consistent with plan P12.03's "rollback disables new entry paths".
 
 ### P00.05 — Close UAT governance gaps
 
-_pending_
+| Field | Value |
+|---|---|
+| **Task** | P00.05 |
+| **Defect IDs** | **DEF-001** |
+| **Commit** | _pending_ |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/uat/run-preflight.test.ts` — **28 cases**, asserting on message *content*, not just `ok === false`, because the acceptance criterion is a *precise* message |
+| **Commands / results** | `npx vitest run tests/uat/run-preflight.test.ts` → **28 passed**. CLI against the blank template → **exit 1**, 21 precise problems. CLI against a complete manifest → **exit 0**, "The run may start." Full suite → **260 files / 2611 tests passed**, 88 files / 578 skipped. typecheck 0; lint 0 errors. |
+| **Routes exercised** | none — this gates a run, it does not touch the product |
+| **Evidence** | `scripts/uat/run-preflight.ts`, `uat/templates/run-manifest.template.json`, `uat/templates/RETEST_PLAN.template.md` |
+| **Feature flags** | none |
+| **Remaining risks** | The preflight can only check that an owner is *named*, not that the named person has actually agreed. Someone must still commission the run. The four harness capabilities are declared by the run lead on their honour; the gate catches an *undeclared* or *contradicted* capability, not a dishonest one. |
+
+**What DEF-001 actually was.** UAT-HF-20260811-01 executed all 456 steps and can never
+be signed off, because no accountable Business, Network-fault, Data-reset or Privacy
+owner was ever assigned. Three steps (R-001 s2, R-003 s2, Z-004 s4) were Blocked on it
+and the verdict is permanently unsigned. The failure was in how the run was
+commissioned, so the fix is a gate that runs **before step 1**.
+
+`scripts/uat/run-preflight.ts` validates a run manifest and exits non-zero with one
+precise line per problem. It rejects:
+
+- any of the **seven** required owners missing — and rejects `TBD`, `N/A`, `—`, `<name>`,
+  `???`, `TODO` and blanks as placeholders rather than accepting them as signatures;
+- zero oracles, or an oracle with no **independent** source ("an oracle read from the
+  system under test proves nothing");
+- a `buildSha` that is not a git SHA, and an invalid IANA timezone (timestamp drift
+  invalidated 93 cells in the source run);
+- an unprovisioned actor, or a declared fixture that is not present — the ordering trap
+  that Blocked N-006 s1;
+- an undeclared feature-flag state.
+
+**It also gates the harness capabilities, which is the part the plan did not ask for.**
+P00.01 found that **7 of the 31 blocked steps could not be unblocked by any product
+fix** — they needed a mail sink (A-005 s4), download interception (F-006 s4, Q-003 s4),
+an exhausted-benefit fixture (E-003), or cold-offline navigation (O-006 s4). P12.05's
+"zero blocked" GO criterion is unreachable without them. The manifest must now declare
+each capability, and **a scenario that requires one the harness does not have is a
+preflight failure** rather than a Blocked row discovered mid-run.
+
+**The shipped template is deliberately invalid.** `uat/templates/run-manifest.template.json`
+fails its own preflight until every placeholder is replaced, and a test asserts that.
+A copied-but-unfilled manifest therefore cannot start a run — which is precisely how
+DEF-001 happened.
 
 ---
 

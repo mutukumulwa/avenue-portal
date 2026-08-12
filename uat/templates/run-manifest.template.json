@@ -1,0 +1,75 @@
+{
+  "_README": [
+    "UAT run manifest. Copy this file to the NEW run's directory, fill every field,",
+    "then gate the run on it:  npx tsx scripts/uat/run-preflight.ts <path-to-this-file>",
+    "",
+    "Every angle-bracket value below is a placeholder and is REJECTED by the preflight.",
+    "That is deliberate: UAT-HF-20260811-01 executed all 456 steps and could never be",
+    "signed off, because no accountable owner had been assigned (DEF-001).",
+    "",
+    "Never edit a closed run. A retest gets a new runId and a new directory."
+  ],
+
+  "runId": "<UAT-XX-YYYYMMDD-NN>",
+  "buildSha": "<full or short git SHA of the exact commit under test>",
+  "target": "<https://... or the environment name under test>",
+  "timezone": "Africa/Nairobi",
+
+  "owners": {
+    "business": "<name — re-rates severity and accepts residual risk at sign-off>",
+    "security": "<name — accepts privacy/authorization findings>",
+    "operations": "<name — owns environment, flags and the deploy under test>",
+    "accessibility": "<name — accepts a11y findings and any expiry attached to them>",
+    "networkFault": "<name — authorises fault injection and confirms blast radius>",
+    "dataReset": "<name — owns the controlled data lanes and their cleanup>",
+    "privacy": "<name — approves what member data may be seen, revealed and captured>"
+  },
+
+  "oracles": [
+    {
+      "id": "<ORACLE-01>",
+      "description": "<what expected value this supplies>",
+      "source": "<where it comes from — MUST be independent of the system under test>"
+    }
+  ],
+
+  "actors": [
+    {
+      "persona": "<e.g. UL — UAT Lead>",
+      "role": "<application role>",
+      "provisioned": false
+    }
+  ],
+
+  "fixtures": [
+    {
+      "id": "<e.g. TD-002 controlled scheme>",
+      "description": "<what it is and which scenario creates it>",
+      "present": false
+    }
+  ],
+
+  "flags": {
+    "_comment": "Record the feature-flag state the run executes against. Empty object is valid; absent is not.",
+    "SCHEMA_DEPLOY_MODE": "push"
+  },
+
+  "harnessCapabilities": {
+    "_comment": [
+      "Declare true/false honestly. Each one silently Blocked steps in UAT-HF-20260811-01,",
+      "and none of those could be unblocked by any product fix.",
+      "Declaring a scenario that needs a capability set to false is a preflight FAILURE."
+    ],
+    "mailSink": false,
+    "downloadInterception": false,
+    "coldOfflineNavigation": false,
+    "exhaustedBenefitFixture": false
+  },
+
+  "scenarios": [
+    {
+      "id": "<e.g. A-005>",
+      "requiresCapabilities": ["mailSink"]
+    }
+  ]
+}
