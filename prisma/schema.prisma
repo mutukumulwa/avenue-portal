@@ -121,6 +121,7 @@ model Tenant {
   intakeReceipts                 ClaimIntakeReceipt[]
   processingRuns                 ClaimProcessingRun[]
   autopilotBreakers              ClaimAutopilotBreaker[]
+  memberNumberSequences          MemberNumberSequence[]
 }
 
 // ── Multi-client TPA tenancy (Medvex spec §2.1 / gap G2.1) ──────────────
@@ -8801,4 +8802,34 @@ model ImportBatch {
   @@unique([tenantId, idempotencyKey])
   @@index([tenantId, groupId])
   @@index([tenantId, createdAt])
+}
+
+/// UAT-HF P05.02 — the atomic allocator behind member numbers.
+///
+/// `nextMemberNumber` was max-plus-one: read the highest number, add one, write
+/// it. Two enrolments running at once read the same maximum and mint the same
+/// number, and the `@@unique([tenantId, memberNumber])` turns that into a P2002
+/// in the operator's face — a defect wearing a constraint as a costume.
+///
+/// One row per (tenant, prefix, year). Allocation is a single
+/// `INSERT ... ON CONFLICT DO UPDATE ... RETURNING`, so it is atomic without a
+/// transaction, without a lock the caller has to remember to take, and without a
+/// retry loop. Seeded from the existing maximum during backfill so it never
+/// re-mints a live number.
+model MemberNumberSequence {
+  id        String   @id @default(cuid())
+  tenantId  String
+  /// Client member-number prefix, e.g. "NWSC". PREFIX_RE-validated upstream.
+  prefix    String
+  /// Calendar year the series belongs to; the series restarts each year.
+  year      Int
+  /// Highest suffix allocated so far. The next allocation is this + 1.
+  lastValue Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, prefix, year])
+  @@index([tenantId])
 }

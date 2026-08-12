@@ -15,6 +15,8 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const db = vi.hoisted(() => ({
   client: { findFirst: vi.fn() },
   member: { findMany: vi.fn(async () => [] as { memberNumber: string }[]) },
+  // P05.02: allocation is a single raw INSERT ... ON CONFLICT ... RETURNING.
+  $queryRaw: vi.fn(async () => [{ lastValue: 1 }]),
 }));
 
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
@@ -22,6 +24,7 @@ vi.mock("@/lib/prisma", () => ({ prisma: db }));
 import {
   DEFAULT_MEMBER_PREFIX,
   nextMemberNumber,
+  peekMemberNumber,
   resolveMemberPrefix,
 } from "@/server/services/member-numbering.service";
 
@@ -65,7 +68,18 @@ describe("resolveMemberPrefix — defensive prefix-format assert (WP-3.5C)", () 
   });
 });
 
-describe("nextMemberNumber — numeric suffix ordering past 99999 (WP-3.5C)", () => {
+/**
+ * UAT-HF P05.02 moved ALLOCATION off max-plus-one onto an atomic counter, and
+ * the numeric-suffix property moved with the max-scanning code into
+ * `peekMemberNumber` (previews only — a peek carries no reservation).
+ *
+ * The property is still worth pinning: `peekMemberNumber` is what an operator
+ * is shown before enrolling, and a preview that collapses past 99999 would show
+ * a number that is already in use. Allocation itself is covered by
+ * `member-numbering-atomic.test.ts` and by the 50-way concurrency run recorded
+ * in IMPLEMENTATION_LOG.md.
+ */
+describe("peekMemberNumber — numeric suffix ordering past 99999 (WP-3.5C)", () => {
   it("picks the true MAX by integer suffix across mixed 5- and 6-digit numbers", async () => {
     db.client.findFirst.mockResolvedValue({ memberNumberPrefix: "LMU" });
     // Lexical desc would pick "…-99999" (→ 100000, which ALREADY EXISTS = collision).
@@ -76,19 +90,19 @@ describe("nextMemberNumber — numeric suffix ordering past 99999 (WP-3.5C)", ()
       { memberNumber: `LMU-${YEAR}-100000` },
       { memberNumber: `LMU-${YEAR}-100001` },
     ]);
-    expect(await nextMemberNumber("t1", "c1")).toBe(`LMU-${YEAR}-100002`);
+    expect(await peekMemberNumber("t1", "c1")).toBe(`LMU-${YEAR}-100002`);
   });
 
   it("keeps 5-digit zero-padding stable below 100000", async () => {
     db.client.findFirst.mockResolvedValue({ memberNumberPrefix: "LMU" });
     db.member.findMany.mockResolvedValue([{ memberNumber: `LMU-${YEAR}-00099` }]);
-    expect(await nextMemberNumber("t1", "c1")).toBe(`LMU-${YEAR}-00100`);
+    expect(await peekMemberNumber("t1", "c1")).toBe(`LMU-${YEAR}-00100`);
   });
 
   it("seeds 00001 for a fresh client-year series", async () => {
     db.client.findFirst.mockResolvedValue({ memberNumberPrefix: "LMU" });
     db.member.findMany.mockResolvedValue([]);
-    expect(await nextMemberNumber("t1", "c1")).toBe(`LMU-${YEAR}-00001`);
+    expect(await peekMemberNumber("t1", "c1")).toBe(`LMU-${YEAR}-00001`);
   });
 
   it("propagates the prefix assert — a bad client prefix mints nothing (no series read)", async () => {

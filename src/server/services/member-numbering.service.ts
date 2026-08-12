@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import type { PrismaClient } from "@prisma/client";
 import { maxByNumericSuffix, peekNextDocumentNumber } from "@/lib/document-number";
 import { PREFIX_RE } from "@/lib/normalize";
 
@@ -44,19 +45,76 @@ export async function resolveMemberPrefix(
   return assertValidPrefix(DEFAULT_MEMBER_PREFIX);
 }
 
-/** Next member number for a tenant (optionally scoped to a client's prefix). */
+/**
+ * UAT-HF P05.02 — allocate the next member number atomically.
+ *
+ * The previous implementation was max-plus-one: read the highest number, add
+ * one, then write. Two enrolments running at once read the SAME maximum, mint
+ * the same number, and `@@unique([tenantId, memberNumber])` turns the race into
+ * a P2002 in the operator's face. The constraint was holding the line; it was
+ * not preventing the bug. This is the race the plan names as "adjacent to
+ * DEF-034" — the double-click that produced nothing.
+ *
+ * Allocation is now ONE statement: `INSERT ... ON CONFLICT DO UPDATE ...
+ * RETURNING`. Postgres serialises concurrent writers on the unique index, so N
+ * callers get N distinct consecutive values with no transaction, no advisory
+ * lock, and no retry loop.
+ *
+ * Pass `tx` to allocate inside the enrolment transaction (P05.03), so a rolled
+ * back enrolment does not consume a number.
+ *
+ * ## On gaps
+ *
+ * A number allocated inside a transaction that later rolls back IS consumed —
+ * the counter does not go backwards. That is deliberate and normal for a
+ * sequence: reusing a rolled-back number risks handing a live identifier to a
+ * second person if the first transaction's outcome was ever in doubt. Member
+ * numbers are identifiers, not a count of members.
+ */
 export async function nextMemberNumber(
+  tenantId: string,
+  clientId?: string | null,
+  tx: Pick<PrismaClient, "$queryRaw"> = prisma,
+): Promise<string> {
+  const prefix = await resolveMemberPrefix(tenantId, clientId);
+  // Series is per-prefix AND per-year, so each client/payer gets its own clean
+  // run (NWSC-2026-00001) that restarts in January, independent of every other
+  // client's member count.
+  const year = new Date().getFullYear();
+
+  const rows = await tx.$queryRaw<{ lastValue: number }[]>`
+    INSERT INTO "MemberNumberSequence" ("id", "tenantId", "prefix", "year", "lastValue", "updatedAt")
+    VALUES (gen_random_uuid()::text, ${tenantId}, ${prefix}, ${year}, 1, CURRENT_TIMESTAMP)
+    ON CONFLICT ("tenantId", "prefix", "year")
+    DO UPDATE SET "lastValue" = "MemberNumberSequence"."lastValue" + 1,
+                  "updatedAt" = CURRENT_TIMESTAMP
+    RETURNING "lastValue"
+  `;
+
+  const value = rows[0]?.lastValue;
+  if (!value || value < 1) {
+    // Never fall back to max-plus-one here: a silent downgrade to the racy path
+    // is worse than a loud failure, because it only shows up under load.
+    throw new Error(
+      `Member number allocation returned no value for ${prefix}-${year}. No member was created.`,
+    );
+  }
+
+  return `${prefix}-${year}-${String(value).padStart(5, "0")}`;
+}
+
+/**
+ * What `nextMemberNumber` WOULD return, without consuming it.
+ *
+ * For previews only. Anything that actually creates a member must call
+ * `nextMemberNumber`, because a peek carries no reservation and two peeks
+ * return the same value.
+ */
+export async function peekMemberNumber(
   tenantId: string,
   clientId?: string | null,
 ): Promise<string> {
   const prefix = await resolveMemberPrefix(tenantId, clientId);
-  // Sequence is per-prefix so each client/payer gets its own clean series
-  // (e.g. NWSC-2026-00001), independent of other clients' member counts.
-  // B4-WIDE: seed from max+1 (not count()+1) so a purge/gap can't collide.
-  // WP-3.5C: pick the max by NUMERIC suffix (maxByNumericSuffix), not the DB's
-  // lexical order — past 99999 the zero-pad widens and "…-100000" < "…-99999"
-  // lexically, so an `orderBy … desc` findFirst would collapse the max and
-  // re-mint a live number.
   return peekNextDocumentNumber(prefix, (yp) =>
     prisma.member
       .findMany({ where: { tenantId, memberNumber: { startsWith: yp } }, select: { memberNumber: true } })

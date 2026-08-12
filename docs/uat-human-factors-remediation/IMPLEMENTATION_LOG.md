@@ -1171,6 +1171,37 @@ The three-way comparison is also what distinguishes *your* edit from *theirs*: a
 
 **The clause carries no scope of its own, and a test asserts it.** It never contains `tenantId`, `clientId` or `providerId`; the caller composes those. A search helper that quietly widened scope would be a far worse defect than the one being fixed.
 
+### P05.02 — Replace max-plus-one member numbering
+
+| Field | Value |
+|---|---|
+| **Task** | P05.02 |
+| **Defect IDs** | the race the plan names as adjacent to DEF-034 and DEF-057 |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | `20260812000900_member_number_sequence` — new table + seed from the existing maximum per (tenant, prefix, year) |
+| **Tests added** | `tests/services/member-numbering-atomic.test.ts` (13); 3 rewritten |
+| **Commands / results** | typecheck 0; lint 0 errors; suite 290 files / 3177 passed. **10 migrations applied from empty with zero drift.** |
+| **Evidence** | `src/server/services/member-numbering.service.ts`, the migration, and the measurement below |
+| **Feature flags** | none. |
+| **Remaining risks** | **`createMember` does not yet pass a transaction client**, so a number is allocated before the member row is written and a failed enrolment consumes it. P05.03 threads the `tx` through — the parameter exists and is tested. The backfill only seeds series from member numbers matching `PREFIX-YYYY-NNNNN`; a tenant holding numbers in some other shape gets no seed row and would restart at 1, so the preflight for this is "do any member numbers not match that pattern?" — **not yet checked against real data**. |
+
+**The acceptance was measured, not argued.** "50 parallel enrollments receive 50 unique monotonic numbers with no P2002" cannot be proved with mocks, so both algorithms were run 50-ways-concurrent against a disposable Postgres:
+
+| | 50 concurrent allocations |
+|---|---|
+| **old** (max-plus-one) | **1 unique number** — all 50 got `OLD-2026-00001` |
+| **new** (atomic counter) | **50 unique**, contiguous `1..50`, correct format, no P2002 |
+
+The old path was not "occasionally racy under load". Fifty simultaneous readers all saw the same maximum, so fifty enrolments would have fought over one number and forty-nine would have surfaced a P2002 to an operator. **The unique constraint was holding the line, not preventing the bug** — a defect wearing a constraint as a costume.
+
+**Allocation is one statement.** `INSERT ... ON CONFLICT DO UPDATE ... RETURNING`: Postgres serialises concurrent writers on the unique index, so there is no transaction to forget, no advisory lock to take, and no retry loop to get subtly wrong.
+
+**The backfill takes the maximum numerically.** Past 99999 the zero-pad widens and `'…-100000'` sorts *before* `'…-99999'` as text; a lexical seed would collapse the maximum and re-mint numbers already in use. This is the same trap `maxByNumericSuffix` exists to avoid on the read path, and it is now avoided in two places for the same reason.
+
+**Gaps are documented, as the acceptance allows.** A number allocated in a transaction that later rolls back stays consumed. Reusing it risks handing a live identifier to a second person if the first transaction's outcome was ever in doubt — and "was the outcome in doubt?" is precisely the question P01.02 exists because we could not answer. Member numbers are identifiers, not a count of members.
+
+**`peekMemberNumber` keeps the old max-scan** for previews only, and the three tests that covered numeric-suffix ordering moved onto it: a preview that collapses past 99999 would show an operator a number that is already in use.
+
 ---
 
 ## Corrections made to the implementation plan
