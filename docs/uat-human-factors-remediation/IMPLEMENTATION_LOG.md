@@ -1077,6 +1077,20 @@ the divergence stays visible to a reviewer.
 | **P01** | **PASS** — 0 errors | **PASS** — 0 errors, 207 warnings | **PASS** — 270 files / 2778 tests passed, 88 files / 598 skipped | _awaiting owner review_ |
 | **P02** | **PASS** — 0 errors | **PASS** — 0 errors, 210 warnings | **PASS** — 275 files / 2842 tests passed, 88 files / 598 skipped | _awaiting owner review_ |
 | **P03** (partial) | **PASS** — 0 errors | **PASS** — 0 errors | **PASS** — 279 files / 2937 tests passed, 88 files / 598 skipped | P03.01 reporting half, 03.02–03.05 done; **03.06 blocked on P09** |
+| **P04** (partial) | **PASS** — 0 errors | **PASS** — 0 errors, 217 warnings | **PASS** — 284 files / 3030 tests passed, 88 files / 598 skipped | P04.01–P04.04 done; **P04.05 not started** |
+
+P04 gate run 2026-08-12 on `e68e1a9`; both guards green, locale baseline tightened 52 → 51.
+
+**This completes the plan's §4 first S1 release blockers** — P02, P03.01–P03.04, P04.01–P04.04.
+What that phrase does *not* mean: P04's adoption is deliberately narrow. The mutation envelope,
+the receipt and the draft store are live on **member enrolment only**; the import confirm, member
+lifecycle, package, endorsement and contract forms still submit without a receipt and keep no
+draft, so DEF-016's client form remains unwarned. Freshness labelling exists as a tested function
+that **no screen calls yet**. Three things outside the code also remain: the production schema
+cutover (`SCHEMA_DEPLOYMENT.md` §3, now 7 migrations behind), running
+`provider-entitlement-readiness.ts` to zero before fail-closed enforcement, and a job that
+actually calls `DomainEventService.projectPending`.
+
 
 P00 gate run 2026-08-12 on `09662f7`. P01 gate run 2026-08-12 on `ffa2ffd`; both guards
 (`currency:guard`, `locale:guard`) also green. All commands green at both gates.
