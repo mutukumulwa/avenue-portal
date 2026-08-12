@@ -98,28 +98,59 @@ export const coContributionRuleBaseSchema = z.object({
 /**
  * Cross-field: a FIXED_AMOUNT rule needs a fixed amount; a PERCENTAGE/HYBRID
  * rule needs a percentage. Mirrors the two engines' expectations so neither door
- * can persist a rule that charges nothing (or nonsense).
+ * can persist a rule that charges nonsense.
+ *
+ * ── UAT-HF P09.02 — DEF-021 ────────────────────────────────────────────────
+ *
+ * "The percentage input declares min='0' and max='100' and the browser treats 0
+ * as valid, but attempting to save a 0% rule is refused server-side with
+ * 'Percentage is required for a percentage or hybrid rule.' Zero is conflated
+ * with empty. The effective accepted range is therefore greater-than-0 to 100
+ * while the advertised range is 0 to 100 ... the message points the underwriter
+ * at the wrong cause — it says a value is required when one was supplied."
+ *
+ * The check was `== null || <= 0`. Zero is a **supplied value**, and a 0%
+ * co-contribution is a real configuration: the plan covers everything for that
+ * category and network tier. It is now a nullish check only, so the accepted
+ * range is the advertised range.
+ *
+ * A negative value is still refused — but as a *negative*, not as a missing
+ * one. Telling somebody a value is required when they gave you one is what sent
+ * the run's underwriter looking in the wrong place.
  */
 export const coContributionRuleRefinement = (
   data: { type: string; fixedAmount?: number | null; percentage?: number | null },
   ctx: z.RefinementCtx,
 ): void => {
-  if (data.type === "FIXED_AMOUNT" && (data.fixedAmount == null || data.fixedAmount <= 0)) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["fixedAmount"],
-      message: `${RULE_FIELD_LABELS.fixedAmount} is required for a fixed-amount rule.`,
-    });
+  if (data.type === "FIXED_AMOUNT") {
+    if (data.fixedAmount == null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["fixedAmount"],
+        message: `${RULE_FIELD_LABELS.fixedAmount} is required for a fixed-amount rule.`,
+      });
+    } else if (data.fixedAmount < 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["fixedAmount"],
+        message: `${RULE_FIELD_LABELS.fixedAmount} cannot be negative. Use 0 if the member pays nothing.`,
+      });
+    }
   }
-  if (
-    (data.type === "PERCENTAGE" || data.type === "HYBRID") &&
-    (data.percentage == null || data.percentage <= 0)
-  ) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["percentage"],
-      message: `${RULE_FIELD_LABELS.percentage} is required for a percentage or hybrid rule.`,
-    });
+  if (data.type === "PERCENTAGE" || data.type === "HYBRID") {
+    if (data.percentage == null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["percentage"],
+        message: `${RULE_FIELD_LABELS.percentage} is required for a percentage or hybrid rule. Enter 0 if the member pays nothing.`,
+      });
+    } else if (data.percentage < 0) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["percentage"],
+        message: `${RULE_FIELD_LABELS.percentage} cannot be negative.`,
+      });
+    }
   }
 };
 

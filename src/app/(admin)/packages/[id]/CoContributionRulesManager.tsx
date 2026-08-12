@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Plus, Trash2, ToggleLeft, ToggleRight, ChevronDown, ChevronUp } from "lucide-react";
+import { PercentField } from "@/components/forms/MoneyField";
 import {
   createCoContributionRuleAction,
   toggleCoContributionRuleAction,
@@ -291,13 +292,11 @@ export function CoContributionRulesManager({ packageId, rules, annualCap }: Prop
 
           {(selectedType === "PERCENTAGE" || selectedType === "HYBRID") && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-brand-text-muted uppercase">Percentage (%)</label>
-                <input name="percentage" type="number" step="0.01" min="0" max="100"
-                  required
-                  placeholder="e.g. 20 = 20%"
-                  className="w-full border border-[#EEEEEE] rounded-md px-3 py-2 text-sm outline-none focus:border-brand-indigo bg-white" />
-              </div>
+              {/* UAT-HF P09.02 — DEF-021. The field advertised 0–100 and the
+                  server refused 0 as if it were missing, so the real range was
+                  >0–100 and nothing said so. The server check is a nullish one
+                  now, and the hint states that 0 is allowed. */}
+              <PercentField name="percentage" label="Percentage" required />
             </div>
           )}
 

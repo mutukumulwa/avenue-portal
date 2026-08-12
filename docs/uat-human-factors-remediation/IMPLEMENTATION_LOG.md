@@ -1348,6 +1348,32 @@ Verified end to end against Postgres after the fix: duplicate name → `name` er
 
 ---
 
+## P09 — Package and policy governance
+
+### P09.02 — Safe money and percentage inputs
+
+| Field | Value |
+|---|---|
+| **Task** | P09.02 |
+| **Defect IDs** | DEF-018, DEF-021 |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/components/money-field.test.tsx` (17) |
+| **Commands / results** | typecheck 0; lint 0 errors; suite 294 files / 3265 passed. |
+| **Evidence** | `src/components/forms/MoneyField.tsx`, `src/lib/validation/co-contribution.ts`, package builder, co-contribution manager |
+| **Feature flags** | none. |
+| **Remaining risks** | **Only two screens are migrated** — the package builder's two money fields and the co-contribution percentage. Every other `<input type="number">` holding money in the product has the same silent-truncation behaviour; a sweep of them is P11-shaped work and has not been done. The **server** still accepts whatever the form posts: `parseMoney` runs in the field, not in the package action, so a hand-crafted POST of `"300k"` is not protected by this change — the Zod schemas coerce and would reject it, but that is a different message and was not re-verified here. |
+
+**`type="number"` is the defect.** The browser parses the leading digits out of `"300k"`, reports the field valid, and leaves `300` behind — "the input reports itself valid, the browser validation message is empty, and no inline error, hint or warning is shown". So `MoneyField` is a **text** input parsed by `parseMoney` (P01.05), which names `MAGNITUDE_SUFFIX` as its own failure precisely because that is the mistake that actually happened.
+
+**Rejecting the suffix is only half of it.** The run's sharpest observation is that `"300,000"` and `"UGX 300000"` both worked, "which makes the failure worse: the user has just been trained that the field tolerates human formatting". A field that quietly accepts three human formats and silently mangles a fourth is worse than a strict one. So the field **reads back what it understood** — `UGX 300,000` — and a magnitude error is visible before the package is saved rather than after a benefit is capped at UGX 300.
+
+**DEF-021 was one operator: `<= 0`.** The check was `data.percentage == null || data.percentage <= 0`, so zero — a supplied value, and a real configuration — was reported as missing. It is a nullish check now, and the accepted range is the advertised range.
+
+A negative is still refused, but **as a negative**: the run's complaint was that "the message points the underwriter at the wrong cause — it says a value is required when one was supplied". The missing-value message now also says `Enter 0 if the member pays nothing`, so the legitimate configuration is discoverable from the error itself. The same correction is applied to `fixedAmount`, which had the identical operator.
+
+---
+
 ## Corrections made to the implementation plan
 
 The plan is treated as authoritative but not infallible. Where a plan statement was checked against

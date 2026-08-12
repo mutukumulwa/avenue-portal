@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createPackageAction } from "./actions";
 import type { ActionResult } from "@/lib/action-result";
 import { BASE_CURRENCY } from "@/lib/utils";
+import { MoneyField } from "@/components/forms/MoneyField";
 
 const inputCls =
   "w-full border border-[#EEEEEE] rounded-md px-4 py-2 outline-none focus:border-[#0B1437] transition-colors";
@@ -64,18 +65,31 @@ export default function PackageBuilder() {
           </div>
 
           <div className="border-t border-[#EEEEEE] pt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* UAT-HF P09.02 — DEF-018. These were <input type="number">, which
+                is what silently swallowed the "k" in "300k" and left the field
+                holding 300, valid, with no warning. MoneyField parses the text
+                itself, names a magnitude suffix as its own error, and reads the
+                understood value back before anything is saved. */}
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-brand-text-heading">Overall Annual Limit ({BASE_CURRENCY})</label>
-              <input required name="annualLimit" type="number" min="0" step="0.01" defaultValue="500000" className={inputCls}
-                aria-invalid={err("annualLimit") ? true : undefined} />
-              {err("annualLimit") && <p role="alert" className="text-xs text-[#DC3545]">{err("annualLimit")}</p>}
+              <MoneyField
+                name="annualLimit"
+                label="Overall Annual Limit"
+                currency={BASE_CURRENCY}
+                defaultValue="500000"
+                required
+                error={err("annualLimit")}
+              />
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-semibold text-brand-text-heading">Annual Premium Contribution ({BASE_CURRENCY})</label>
-              <input required name="contributionAmount" type="number" min="0" step="0.01" defaultValue="25000" className={inputCls}
-                aria-invalid={err("contributionAmount") ? true : undefined} />
-              {err("contributionAmount") && <p role="alert" className="text-xs text-[#DC3545]">{err("contributionAmount")}</p>}
+              <MoneyField
+                name="contributionAmount"
+                label="Annual Premium Contribution"
+                currency={BASE_CURRENCY}
+                defaultValue="25000"
+                required
+                error={err("contributionAmount")}
+              />
             </div>
 
             <div className="space-y-2">
