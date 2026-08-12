@@ -814,6 +814,75 @@ It also states the ordering rule plainly: **do not enable fail-closed enforcemen
 remains.** Over incomplete data that converts a wrong answer into a denied one, which is worse at the
 point of care.
 
+### P03.02 — One eligibility decision contract
+
+| Field | Value |
+|---|---|
+| **Task** | P03.02 |
+| **Defect IDs** | DEF-053, DEF-058, DEF-060, DEF-061, DEF-062 |
+| **Commit** | `c73c4a3` |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/services/eligibility/decision-contract.test.ts` — **59** |
+| **Commands / results** | typecheck 0; lint clean; suite green. |
+| **Evidence** | `src/server/services/eligibility/decision-contract.ts` |
+| **Remaining risks** | **The contract is defined but not yet produced by the evaluator** — `EligibilityDecisionV2` has no builder wired into `ProviderEligibilityService` yet. That is P03.03. Until then the provider surface still returns the older, narrower `EligibilitySafeResult`. |
+
+**Not a new evaluator.** `evaluator-core.ts` already decides member-life status against a published
+oracle (EO-001..024) with a closed reason enum, and remains the authority. This wraps its output,
+adds the network/benefit/freshness dimensions it does not model, and defines how each reason is
+*spoken* to each audience.
+
+**The decisive addition is `SYSTEM_UNAVAILABLE` → verdict `NOT_DETERMINED`.** The existing conclusion
+set had no way to say "we could not tell", so an outage was reported in the same words as a genuine
+ineligibility. DEF-053 named exactly this: *"out-of-network, not-yet-active and does-not-exist are
+indistinguishable from each other and from an outage. That indistinguishability is itself part of the
+defect."*
+
+`PROVIDER_NOT_ENTITLED` exists for the DEF-053 mechanism itself, and its operator guidance says the
+fault is the **facility**, not the card — the old message blamed the card for a provider-data gap.
+
+Member status and benefit outcome are separated (DEF-058): `LIMIT_EXHAUSTED`, `WAITING_PERIOD`,
+`MISSING_REFERRAL` and the exclusions all carry `memberStillCovered: true`. E-003 was Blocked
+precisely because the copy could not distinguish "exhausted" from "not a member".
+
+**Privacy collapse is preserved deliberately, not worked around.** `NOT_FOUND`, `OUT_OF_NETWORK` and
+`PROVIDER_NOT_ENTITLED` all present one indistinguishable member-facing string, because confirming a
+card number exists is itself disclosure — the run recorded that as the one property worth keeping
+about the old message. Operator guidance still differs, and the internal reason is always retained.
+
+One test asserts all fifteen states produce **different** operator guidance, where the run got one
+string for nine probes.
+
+### P03.05 — Member identifiers out of URLs and examples
+
+| Field | Value |
+|---|---|
+| **Task** | P03.05 |
+| **Defect IDs** | DEF-057, DEF-079 |
+| **Commit** | `6164f19` |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/actions/eligibility-check.actions.test.ts` — **14** |
+| **Commands / results** | Suite **277 files / 2915 tests passed**; typecheck 0; lint 0 errors; guards green. |
+| **Evidence** | `src/app/provider/eligibility/{page,actions,EligibilityCheckForm}.tsx` |
+| **Remaining risks** | Only the provider eligibility surface was moved off GET. Other surfaces that may carry identifiers in query strings are not audited — a sweep belongs with P11.05. The example is a constant; making it tenant-configurable is still open. |
+
+The check was `<form method="GET">`, so every member number typed went into the query string — and
+so into the history of a **shared front-desk machine**, the access log, and the `Referer` of every
+link the page rendered. It now posts through a Server Action. All input safety moved with it,
+because an action can be invoked directly whatever the form allows.
+
+The not-found message no longer echoes the raw input; the run noted the old one *"echoes the raw
+input unnormalised"*, which both reflects unvalidated text and confirms on a shared screen what was
+tried.
+
+**A note on one test.** Its control-character case already contained a literal `U+0001`, which
+renders invisibly and reads as the harmless word "badchar". The assertion was genuine — I suspected
+it was vacuous and checked, which cost time but confirmed it. It is now an explicit escape sequence,
+because a test nobody can read is a test nobody can trust.
+
+The pre-existing audit-coverage harness correctly caught the new action and it is registered
+`READ_ONLY`.
+
 ---
 
 ## Corrections made to the implementation plan
