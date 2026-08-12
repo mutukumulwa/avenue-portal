@@ -746,6 +746,41 @@ never supplies `currency` at all, so dropping the default would have broken it.
 A genuinely foreign currency is still accepted when explicitly selected, and a test pins that — the
 fix is removing the silent default, not banning KES.
 
+### P02.03 — Governed repair path for legacy contract data
+
+| Field | Value |
+|---|---|
+| **Task** | P02.03 |
+| **Defect IDs** | DEF-050 (recovery half), DEF-051 |
+| **Commit** | `71f51f5` |
+| **Migrations / backfills** | `20260812000600_contract_date_repair_override` — adds `OverrideType.CONTRACT_DATE_REPAIR`. No backfill. |
+| **Tests added** | `tests/services/contract-date-repair.test.ts` — **14** |
+| **Commands / results** | Fresh-DB deploy of 7 migrations (`ALTER TYPE ... ADD VALUE` applies cleanly), zero drift, enum value confirmed. Suite 275 files / 2842 passed; typecheck 0; lint 0 errors. |
+| **Evidence** | `scripts/reports/contract-date-preflight.ts`, `DateRepairPanel.tsx` |
+| **Remaining risks** | Approval still happens on the generic Overrides console; the checker sees the proposal in `preState` rather than in a purpose-built review screen. Not exercised end-to-end in a browser — that needs a seeded damaged row, which is P12.05's retest. Role checks go through `rbacService.hasRole` with a SUPER_ADMIN fallback; **production has zero Role/UserRoleAssignment rows**, so in practice only a SUPER_ADMIN can approve until RBAC is seeded. |
+
+From the run: *"The record cannot be reached to be fixed: `/contracts/{id}/edit` returns 'Page Not
+Found', so there is no UI action that can void, delete or correct the offending row."* It was
+ultimately fixed by **deleting the row against the database**, out of band.
+
+This is that missing route, and it is deliberately governed rather than a quick edit — a contract
+term is a signed agreement. P02.02 already stopped the damage spreading, which is precisely what
+makes a slower, approved repair acceptable.
+
+**`CONTRACT_DATE_REPAIR` is its own override type, not a reuse of `CUSTOM`.** `CUSTOM` already
+authorises unsigned-contract activation; one approval must never silently authorise a different act
+on the same contract. A single approver (`SENIOR_UNDERWRITER`) is deliberate: requiring dual control
+to fix a date the product itself wrote would make recovery slower than the outage.
+
+**Three guards make it safe.** The proposal captures the contract's `updatedAt`, so a repair approved
+against one state is rejected if anything touched the contract since; the update is *conditional* on
+that same `updatedAt`, so a concurrent write loses rather than being overwritten; and an applied
+override is marked consumed so it cannot authorise a second edit.
+
+**The contract is never deleted** — a test asserts no delete of the contract, its tariffs or its
+applicability. The immutable event carries before, after, source document, reason **and the
+checker's id**; DEF-047's complaint was an audit trail showing only a raw internal maker id.
+
 ---
 
 ## Corrections made to the implementation plan
@@ -767,6 +802,7 @@ the divergence stays visible to a reviewer.
 | **P00** | **PASS** — 0 errors (was 5) | **PASS** — 0 errors (was 556), 207 warnings | **PASS** — 260 files / 2611 tests passed, 88 files / 578 skipped | _awaiting owner review_ |
 
 | **P01** | **PASS** — 0 errors | **PASS** — 0 errors, 207 warnings | **PASS** — 270 files / 2778 tests passed, 88 files / 598 skipped | _awaiting owner review_ |
+| **P02** | **PASS** — 0 errors | **PASS** — 0 errors, 210 warnings | **PASS** — 275 files / 2842 tests passed, 88 files / 598 skipped | _awaiting owner review_ |
 
 P00 gate run 2026-08-12 on `09662f7`. P01 gate run 2026-08-12 on `ffa2ffd`; both guards
 (`currency:guard`, `locale:guard`) also green. All commands green at both gates.
