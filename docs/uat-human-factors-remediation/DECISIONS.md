@@ -194,7 +194,42 @@ named against it starts.
 
 | ID | Question | Raised by | Blocks |
 |---|---|---|---|
-| *(none yet)* | | | |
+| **DEC-13** | **Schema deployment mechanism.** See below. | P00.01 | **P00.04**, and P12.02 step 1 / P12.03 |
+
+### DEC-13 — Schema deployment mechanism
+
+**Status: OPEN. P00.04 cannot start until this is signed.**
+
+P00.04 tells the implementer to reconcile Prisma migrations with the schema so that
+`migrate deploy` + seed + drift check agree, and to "add a database XOR check **in the migration**".
+That describes a deployment model this repository does not use.
+
+What it actually does, verified in P00.01:
+
+- `npm run build` runs `scripts/db-sync.mjs`, which executes **`prisma db push`** on Vercel
+  production deploys. Migrations are never applied in production.
+- The migration head is `20260513010000_phase_10_lifecycle`, dated 2026-05-13 — about three months
+  behind `schema.prisma`, which is the real authority.
+- CHECK constraints cannot be expressed in the Prisma schema and are therefore invisible to
+  `db push`. All three live in `prisma/sql/2026-08-10_onboarding_invariants.sql`, applied by hand
+  over the direct 5432 connection: `caps_family_gte_individual`, `caps_positive`,
+  `exclusion_owner_xor`.
+
+So a migration written for `mustChangePassword` (P00.03) or for the XOR fix (P00.04) would be
+**correct hygiene but inert in production**.
+
+**Options:**
+
+| | Option | Consequence |
+|---|---|---|
+| **A** *(recommended)* | Adopt real migrations. Baseline the current production schema as an initial migration, switch `db-sync.mjs` to `prisma migrate deploy`, and fold the three CHECK constraints into versioned migrations. | Highest effort now, but P00.04's acceptance criterion becomes achievable and P12.02's ordered migration/backfill/constraint sequence becomes real rather than aspirational. Removes the hand-applied DDL step that already needs a non-pooler connection. |
+| **B** | Keep `db push` and formalise the SQL-invariant files: a numbered, idempotent, checked-in `prisma/sql/**` sequence with a runner and a drift check, and delete the stale `prisma/migrations/**`. | Less work, matches current practice, but P00.04 and P12.02 must be rewritten, and constraint application stays a manual deploy step that can be forgotten. |
+| **C** | Do nothing structural; add the XOR fix as another hand-applied SQL file. | Cheapest. Leaves the contradiction between the `SET NULL` referential action and the CHECK constraint managed only by convention, and leaves P12.02 unexecutable as written. |
+
+**Recommendation: A.** The plan's whole migration/backfill/constraint discipline (P12.02) assumes
+it, and P00.04 exists precisely to make schema deployment reproducible. B is a defensible
+lower-cost answer if the timeline will not carry A. C should be rejected — it is the status quo
+that produced the finding.
 
 ---
 

@@ -40,7 +40,34 @@ Surgical staging is the mitigation.
 
 ### P00.01 — Freeze evidence and choose the integration base
 
-_pending_
+| Field | Value |
+|---|---|
+| **Task** | P00.01 |
+| **Defect IDs** | none directly; protects all 81 findings and assigns a retest owner to all 31 blocked steps |
+| **Commit** | _pending_ |
+| **Migrations / backfills** | none |
+| **Tests added** | none — measurement only, no product code touched |
+| **Commands / results** | `npm run typecheck` → **5 errors**, all `mustChangePassword` (reproduced exactly as reported). Evidence re-hash → **190/190 match, 0 mismatched, 0 missing**. `git diff --name-status 53df0ab ff26e3b` → 75 files, +3004/−331. |
+| **Routes exercised** | none |
+| **Evidence** | `docs/uat-human-factors-remediation/BASELINE.md` |
+| **Feature flags** | none — **no feature-flag surface exists in the codebase**, which P12.03 will have to build |
+| **Remaining risks** | `DEC-13` is open and blocks P00.04. Seven of the 31 blocked steps cannot be unblocked by any product fix (harness/fixture capability), so P12.05's "zero blocked" GO criterion is unreachable until P00.05 delivers a mail sink, download interception, an exhausted-benefit fixture, cold-offline navigation, and a scenario reorder. |
+
+**Findings that change downstream work.**
+
+1. **The evidence freeze holds.** All 190 registered items were independently re-hashed and match;
+   134 unregistered supplementary captures match the pack's own count. The run is authoritative.
+2. **Schema deployment is `prisma db push` at build time, not migrations** (`scripts/db-sync.mjs`).
+   The migration head is ~3 months stale and CHECK constraints live in a hand-applied SQL file.
+   P00.04's acceptance criterion assumes a model the repo does not use → raised as `DEC-13`.
+3. **The `TreatmentExclusionRule` XOR contradiction is confirmed with a precise mechanism:**
+   `db push` owns the `SET NULL` referential action, while `exclusion_owner_xor` lives only in
+   `prisma/sql/2026-08-10_onboarding_invariants.sql`. They contradict each other.
+4. **Five HF tasks overlap work already done** in the 12 eligibility commits — most importantly the
+   P03.01 seed/backfill/fixture scripts already exist, and `src/lib/dates.ts` already exists, so
+   P01.05 must extend it rather than create a rival module.
+5. **No feature-flag surface and no timezone constant exist anywhere**, so P12.03 and P01.05 both
+   start from zero rather than from an existing primitive.
 
 ### P00.02 — Restore the mandated Next documentation and align dependencies
 
