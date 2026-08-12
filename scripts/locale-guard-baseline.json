@@ -91,9 +91,6 @@
   "src/app/member/check-in/MemberCheckInCard.tsx": {
     "ambiguous-date-format": 2
   },
-  "src/app/member/facilities/FacilitiesMap.tsx": {
-    "nairobi-coordinates": 2
-  },
   "src/app/member/profile/ProfileForm.tsx": {
     "kenyan-calling-code": 1
   },

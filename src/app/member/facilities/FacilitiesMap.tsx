@@ -5,6 +5,9 @@ import dynamic from "next/dynamic";
 import { BadgeCheck, CircleDollarSign, MapPin, Navigation, Phone, SlidersHorizontal } from "lucide-react";
 import { getNearbyProvidersAction } from "./actions";
 import type { ProviderLocation } from "./MemberMap";
+import { ADMIN_UNIT_LABEL, isWithinCountryBounds } from "@/lib/locale-config";
+import { districtsByRegion, findDistrict } from "@/lib/uganda-districts";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 const PROCEDURES = [
   { label: "General consultation", cptCode: "99213", serviceHint: "Outpatient" },
@@ -32,8 +35,60 @@ function tierLabel(tier: string) {
   return "Panel facility";
 }
 
+type LocationState = "pending" | "device" | "manual" | "denied" | "unavailable" | "unsupported" | "outside-country";
+
+const LOCATION_TITLES: Record<Exclude<LocationState, "pending" | "device" | "manual">, string> = {
+  denied: "We do not have your location",
+  unavailable: "We could not get your location",
+  unsupported: "This device cannot share a location",
+  "outside-country": "Your location appears to be outside Uganda",
+};
+
+const LOCATION_REASONS: Record<Exclude<LocationState, "pending" | "device" | "manual">, string> = {
+  denied: "You declined the location request, so we cannot sort facilities by distance from you. Choose your district instead.",
+  unavailable: "Your device could not provide a location just now. Choose your district instead.",
+  unsupported: "This browser does not support location sharing. Choose your district instead.",
+  "outside-country":
+    "We will not search from a position outside Uganda, because the results would be wrong rather than empty. Choose your district instead.",
+};
+
+/** The manual alternative — Uganda's own administrative unit (DEF-049). */
+function DistrictPicker({ value, onChange }: { value: string | null; onChange: (name: string) => void }) {
+  const grouped = districtsByRegion();
+  return (
+    <label className="block space-y-1">
+      <span className="text-[13px] font-bold uppercase text-brand-text-muted">
+        Search from a {ADMIN_UNIT_LABEL.toLowerCase()}
+      </span>
+      <select
+        value={value ?? ""}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-full rounded-[8px] border border-[#EEEEEE] bg-white px-3 py-2 text-sm outline-none focus:border-brand-indigo"
+      >
+        <option value="">Choose a {ADMIN_UNIT_LABEL.toLowerCase()}…</option>
+        {Object.entries(grouped).map(([region, districts]) => (
+          <optgroup key={region} label={`${region} Region`}>
+            {districts.map((d) => (
+              <option key={d.name} value={d.name}>
+                {d.name}
+              </option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 export function FacilitiesMap() {
   const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null);
+  /**
+   * Why we do or do not have a position. DEF-007's screen could not distinguish
+   * "no facility near you" from "we don't know where you are" from "none of
+   * these are in your network" — so it said nothing useful for any of them.
+   */
+  const [locationState, setLocationState] = useState<LocationState>("pending");
+  const [districtName, setDistrictName] = useState<string | null>(null);
   const [providers, setProviders] = useState<ProviderLocation[]>([]);
   const [loading, setLoading] = useState(false);
   const [radius, setRadius] = useState(20);
@@ -41,24 +96,50 @@ export function FacilitiesMap() {
   const [providerTier, setProviderTier] = useState<"ALL" | "OWN" | "PARTNER" | "PANEL">("ALL");
   const procedure = PROCEDURES.find((item) => item.cptCode === procedureCode) ?? PROCEDURES[0];
 
+  // UAT-HF P03.04 — DEF-007/DEF-033. This effect used to fall back to
+  // `{ lat: -1.2921, lng: 36.8219 }` — Nairobi — whenever geolocation was denied
+  // or unsupported, silently moving a Ugandan member to another country. The
+  // search then returned no covered facility at any radius from a register of
+  // 195 providers, and the member was shown an empty result with no reason.
+  //
+  // There is no fallback position now. A denied or unavailable location is an
+  // explicit state the member is told about and can resolve by choosing a
+  // district.
   useEffect(() => {
     let mounted = true;
-    if ("geolocation" in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          if (mounted) setPosition({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        },
-        () => {
-          if (mounted) setPosition({ lat: -1.2921, lng: 36.8219 });
-        },
-      );
-    } else {
-      setTimeout(() => {
-        if (mounted) setPosition({ lat: -1.2921, lng: 36.8219 });
-      }, 0);
+    if (!("geolocation" in navigator)) {
+      setLocationState("unsupported");
+      return;
     }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        if (!mounted) return;
+        const { latitude, longitude } = pos.coords;
+        // A coordinate outside Uganda is not usable here, and quietly searching
+        // from it is precisely the defect. Ask instead.
+        if (!isWithinCountryBounds(latitude, longitude)) {
+          setLocationState("outside-country");
+          return;
+        }
+        setPosition({ lat: latitude, lng: longitude });
+        setLocationState("device");
+      },
+      (err) => {
+        if (!mounted) return;
+        setLocationState(err.code === err.PERMISSION_DENIED ? "denied" : "unavailable");
+      },
+      { timeout: 10_000 },
+    );
     return () => { mounted = false; };
   }, []);
+
+  const chooseDistrict = (name: string) => {
+    const district = findDistrict(name);
+    if (!district) return;
+    setPosition({ lat: district.latitude, lng: district.longitude });
+    setDistrictName(district.name);
+    setLocationState("manual");
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -77,7 +158,31 @@ export function FacilitiesMap() {
   }, [position, radius, procedureCode, providerTier, procedure.serviceHint]);
 
   if (!position) {
-    return <div className="flex h-96 items-center justify-center rounded-[8px] bg-slate-100 text-brand-text-muted">Locating you...</div>;
+    if (locationState === "pending") {
+      return (
+        <div className="flex h-96 items-center justify-center rounded-[8px] bg-slate-100 text-brand-text-muted">
+          Finding your location…
+        </div>
+      );
+    }
+    // "device"/"manual" cannot occur with a null position, but the compiler
+    // cannot know that; treat any such state as unavailable rather than widening
+    // the lookup tables.
+    const reason: Exclude<LocationState, "pending" | "device" | "manual"> =
+      locationState === "device" || locationState === "manual" ? "unavailable" : locationState;
+
+    // Explicit, named, and recoverable — never a silent jump to another country.
+    return (
+      <div className="space-y-4">
+        <EmptyState
+          icon={<MapPin size={28} />}
+          title={LOCATION_TITLES[reason]}
+          reason={LOCATION_REASONS[reason]}
+          ownerHint="Your location is only used to sort facilities by distance. It is never saved."
+        />
+        <DistrictPicker value={districtName} onChange={chooseDistrict} />
+      </div>
+    );
   }
 
   return (
