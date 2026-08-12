@@ -1275,7 +1275,13 @@ the divergence stays visible to a reviewer.
 | **P01** | **PASS** — 0 errors | **PASS** — 0 errors, 207 warnings | **PASS** — 270 files / 2778 tests passed, 88 files / 598 skipped | _awaiting owner review_ |
 | **P02** | **PASS** — 0 errors | **PASS** — 0 errors, 210 warnings | **PASS** — 275 files / 2842 tests passed, 88 files / 598 skipped | _awaiting owner review_ |
 | **P03** (partial) | **PASS** — 0 errors | **PASS** — 0 errors | **PASS** — 279 files / 2937 tests passed, 88 files / 598 skipped | P03.01 reporting half, 03.02–03.05 done; **03.06 blocked on P09** |
-| **P04** (partial) | **PASS** — 0 errors | **PASS** — 0 errors, 217 warnings | **PASS** — 284 files / 3030 tests passed, 88 files / 598 skipped | P04.01–P04.04 done; **P04.05 not started** |
+| **P04** | **PASS** — 0 errors | **PASS** — 0 errors, 217 warnings | **PASS** — 286 files / 3079 tests passed | P04.01–P04.05 **complete** |
+| **P05** (partial) | **PASS** — 0 errors | **PASS** — 0 errors, 217 warnings | **PASS** — 290 files / 3180 tests passed | P05.01–P05.05, P05.07 done; **P05.06 not started** |
+| **P10** (partial) | **PASS** — 0 errors | **PASS** — 0 errors, 217 warnings | **PASS** — 291 files / 3199 tests passed | P10.03 done; **P10.01, P10.02, P10.04 not started** |
+
+P04/P05/P10 gate run 2026-08-12 on `50a2f1f`. Both guards green; locale baseline
+tightened 52 → 50 across the phase. **11 migrations applied from an empty database with
+zero drift** and `migrate status` clean.
 
 P04 gate run 2026-08-12 on `e68e1a9`; both guards green, locale baseline tightened 52 → 51.
 
