@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>No internet connection — Medvex</title>
+    <!--
+      UAT-HF P04.03 — the page the service worker serves when a navigation fails
+      offline.
+
+      DEF-003: offline navigation used to fall back to the CACHED SIGN-IN PAGE.
+      The run's evidence records the offline capture as byte-identical to the
+      online one, so a user at a provider desk could type credentials into a page
+      that could not possibly authenticate them, with nothing on screen to say so.
+
+      This page is deliberately plain HTML with inline styles and no script
+      dependencies: it must render when the network is gone and when the app's
+      own JavaScript and CSS may not be in cache.
+    -->
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+        background: #ffffff;
+        color: #0b1437;
+      }
+      main { max-width: 30rem; padding: 2rem; text-align: center; }
+      h1 { font-size: 1.375rem; margin: 0 0 0.5rem; }
+      p { margin: 0 0 1rem; line-height: 1.55; }
+      .badge {
+        display: inline-block;
+        border-radius: 9999px;
+        background: #fff3cd;
+        color: #856404;
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        padding: 0.25rem 0.75rem;
+        margin-bottom: 1rem;
+        text-transform: uppercase;
+      }
+      ul { text-align: left; margin: 0 0 1.5rem; padding-left: 1.25rem; line-height: 1.6; }
+      button {
+        background: #0b1437;
+        color: #fff;
+        border: 0;
+        border-radius: 9999px;
+        padding: 0.55rem 1.5rem;
+        font-size: 0.875rem;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      @media (prefers-color-scheme: dark) {
+        body { background: #0b1437; color: #f4f6fb; }
+        .badge { background: #4a3a08; color: #ffe9a8; }
+        button { background: #f4f6fb; color: #0b1437; }
+      }
+    </style>
+  </head>
+  <body>
+    <main role="alert">
+      <p class="badge">Offline</p>
+      <h1>You are not connected to the internet</h1>
+
+      <p id="offline-lede">
+        Medvex could not load this page because the device is offline. This is <strong>not</strong> the page you asked
+        for.
+      </p>
+
+      <!--
+        Default copy assumes NOTHING works offline. The script below only ever
+        relaxes this for the portal scopes that genuinely hold downloaded data.
+        With JavaScript unavailable the user is under-promised, never over-.
+      -->
+      <ul id="offline-capabilities">
+        <li>Nothing on this screen is saved, and nothing is sent.</li>
+        <li>This part of Medvex needs a live connection. Reconnect and try again.</li>
+      </ul>
+
+      <button type="button" onclick="location.reload()">Try again</button>
+    </main>
+
+    <script>
+      // Kept in step with OFFLINE_SCOPES in /sw.js. The browser leaves the
+      // address bar on the route the user asked for, so the shell can tell an
+      // admin route (no offline pack, no outbox) from a portal one.
+      var OFFLINE_SCOPES = ["/member/", "/provider/", "/fund/"];
+      var path = location.pathname;
+      var inPortal = OFFLINE_SCOPES.some(function (scope) {
+        return path.indexOf(scope) === 0;
+      });
+
+      // The sign-in route gets the acceptance's exact promise: the run's tester
+      // was shown a working-looking Sign In form in airplane mode, so the one
+      // thing this page must say there is that signing in is impossible offline.
+      var isSignIn = path === "/login" || path.indexOf("/login/") === 0;
+
+      if (isSignIn) {
+        document.getElementById("offline-lede").innerHTML =
+          "<strong>Internet required to sign in.</strong> Signing in has to reach the server, so no sign-in form is " +
+          "shown here — anything typed into one while offline could not have signed you in.";
+        document.getElementById("offline-capabilities").innerHTML =
+          "<li>Your existing session, if you had one, is untouched.</li>" +
+          "<li>Reconnect, then reload this page to sign in.</li>";
+      } else if (inPortal) {
+        document.getElementById("offline-capabilities").innerHTML =
+          "<li>Anything already downloaded to this device may still be readable, and is labelled with when it was last updated.</li>" +
+          "<li>Work you capture offline stays on this device until it is sent. It is not submitted, and not counted, until then.</li>" +
+          "<li>Nothing you do on <em>this</em> screen is saved.</li>";
+      }
+    </script>
+  </body>
+</html>

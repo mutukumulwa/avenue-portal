@@ -946,6 +946,92 @@ ratchet works in both directions, as designed.
 
 ---
 
+## P04 — Submission integrity and offline honesty
+
+### P04.01 — Member enrolment on the mutation envelope
+
+| Field | Value |
+|---|---|
+| **Task** | P04.01 — adopt the P01.01/P01.02 envelope on the first production form |
+| **Defect IDs** | DEF-034, DEF-075 |
+| **Commit** | `74b2105` |
+| **Migrations / backfills** | none — `OperationReceipt` shipped in P01.02 (`20260812000300_operation_receipt`) |
+| **Tests added** | `tests/actions/member-enrolment-idempotency.test.ts` — 11 tests |
+| **Commands / results** | typecheck 0; lint 0 errors; suite 280 files / 2952 passed. |
+| **Evidence** | `src/app/(admin)/members/new/actions.ts` |
+| **Feature flags** | none. |
+| **Remaining risks** | Only enrolment is migrated. Import confirm, member lifecycle, package, endorsement and contract forms still submit without a receipt and remain exposed to the same race. |
+
+**The plan's recommended fix for DEF-034 does not work, and the run proves it.** The register's
+remedy was to disable the primary action while the submission is in flight. `disabled={pending}` was
+**already present in the tested build** (`53df0ab`) and the defect happened anyway — the run measured
+`disabled=false` 120 ms after the first click. `useActionState`'s `pending` only flips once React
+begins the transition, so a fast second click lands on a still-live control and aborts the first
+submission, which is exactly how the operator ended up with no member, no error and no message.
+
+A client-side disable cannot close this race at all. The fix is a durable `OperationReceipt` keyed on
+an id the **client** mints once per draft: the first submit reserves it and writes; a second submit
+of the same draft either replays the stored result or reports the first is still running. This is
+what plan §1.1 means by "client-side disabled buttons are being used where server-side idempotency
+and reconciliation are required" — it is recorded here because the register's own recommendation, if
+followed literally, would have shipped the defect a second time.
+
+### P04.03 — Make offline authentication state explicit
+
+| Field | Value |
+|---|---|
+| **Task** | P04.03 |
+| **Defect IDs** | DEF-003, DEF-066 |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/lib/connection-state.test.ts` (27), `tests/components/connection-status.test.tsx` (7) |
+| **Commands / results** | typecheck 0; lint 0 errors; suite 282 files / 2986 passed. |
+| **Evidence** | `public/offline.html`, `public/sw.js`, `src/lib/connection-state.ts`, `src/components/ConnectionStatus.tsx` |
+| **Feature flags** | none. |
+| **Remaining risks** | **Not verified in a real browser under airplane mode** — the acceptance's cold-offline navigation is one of the four harness capabilities P00.05 declared and P12.05 still owes. Freshness labelling exists as a tested function but **no screen calls `describeFreshness` yet**; the member/provider read surfaces adopt it in P05/P11, so DEF-066's "cached data marked with as-of time" is preventable, not yet closed. Devices still running the v2 worker only purge their cached `/login` once the v3 worker activates. |
+
+**The DEF-003 mechanism, located exactly.** `public/sw.js` listed `"/login"` in `SHELL_ASSETS` and
+its navigation handler answered every offline navigation inside `/member/`, `/provider/` and `/fund/`
+with `caches.match("/login")`. That is why the run recorded the offline capture of the sign-in page
+as *byte-identical* to the online one: it **was** the online one, served from cache. A user at a
+provider desk in airplane mode could type credentials into a page that could not possibly
+authenticate them, with nothing on screen to say so.
+
+Serving a real screen the user cannot tell is a corpse is worse than serving nothing. `/login` is now
+never cached, and every failed navigation — portal **and** admin, including `/login` itself — falls
+back to a dedicated `offline.html` that announces itself and offers no form to type into. `VERSION`
+was bumped to `v3` specifically so `activate` deletes `medvex-shell-v2` and with it every
+already-installed copy of `/login`; without the bump, existing devices keep the defect.
+
+The three offline scope lists (`sw.js`, `offline.html`, `connection-state.ts`) cannot import from one
+another, so a test asserts they agree — drift between them is the next bug in this area.
+
+**Admin is excluded on purpose.** It holds no offline pack and no outbox, so the banner there says
+only that nothing can be saved, and never that work is queued to send later. Claiming otherwise is
+the same class of lie as the cached login page.
+
+### P04.04 — Stop acknowledging offline work that was never applied
+
+| Field | Value |
+|---|---|
+| **Task** | P04.04 |
+| **Defect IDs** | DEF-067 |
+| **Commit** | `92d35a3`, typing follow-up `4b69119` |
+| **Migrations / backfills** | none — `REJECTED` already existed in `SyncOperationState`; `finalise()` simply could not emit it |
+| **Tests added** | extended `tests/services/sync-service.test.ts` |
+| **Commands / results** | typecheck 0; lint 0 errors; suite 280 files / 2952 passed. |
+| **Evidence** | `src/server/services/sync.service.ts`, `src/app/api/v1/sync/route.ts` |
+| **Feature flags** | none. |
+| **Remaining risks** | `PreAuth`, `CheckIn` and `Image` are accepted at the ingest door but rejected at apply, because no server-side apply exists for them yet. That is now honest and visible rather than silent, but it is not *support* — building it is out of P04's scope. |
+
+**`default: outcome = { state: "SYNCED" }`** marked every non-`Claim` operation synchronised without
+applying it. The device then deletes its local copy believing the work landed, so the capture is gone
+from both sides. The existing test asserted this defect as intended behaviour ("marks a well-formed
+PENDING op SYNCED", with a fixture that had no `entityType` at all); it was inverted, with the reason
+recorded beside it.
+
+---
+
 ## Corrections made to the implementation plan
 
 The plan is treated as authoritative but not infallible. Where a plan statement was checked against

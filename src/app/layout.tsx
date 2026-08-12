@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Sora, Hanken_Grotesk } from "next/font/google";
 import { PWARegister } from "@/components/PWARegister";
+import { ConnectionStatus } from "@/components/ConnectionStatus";
 import "./globals.css";
 
 const sora = Sora({
@@ -57,6 +58,9 @@ export default function RootLayout({
       <body className="antialiased min-h-screen bg-brand-bg text-brand-text-body font-body">
         {children}
         <PWARegister />
+        {/* UAT-HF P04.03 (DEF-003/DEF-066): mounted at the root so no route can
+            lose the connection state. Silent while online with nothing queued. */}
+        <ConnectionStatus />
       </body>
     </html>
   );

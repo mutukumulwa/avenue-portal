@@ -8,19 +8,34 @@
 // served document, crashing every page (admin included) with a client-side
 // "Application error" until the SW was manually unregistered. Network-first
 // guarantees an online client always gets the current build.
-const VERSION = "v2";
+//
+// ⚠️ Honesty rule (UAT-HF P04.03 / DEF-003): an offline navigation must never be
+// answered with a cached page that is indistinguishable from the live one. v2
+// precached "/login" and served it as the offline fallback, so a user in
+// airplane mode saw a Sign In form byte-identical to the online capture and
+// could type credentials into a page that could not possibly authenticate them.
+// The fallback is now a dedicated offline shell that says so, and "/login" is
+// never cached at all. VERSION was bumped to v3 specifically so `activate`
+// deletes medvex-shell-v2 and with it every already-installed copy of /login.
+const VERSION = "v3";
 const SHELL_CACHE = `medvex-shell-${VERSION}`;
 const RUNTIME_CACHE = `medvex-runtime-${VERSION}`;
 
-// The offline navigation fallback is scoped to the PWA portals only. Admin, API
-// and auth always go to the network with no cached fallback.
+// The page served for any navigation that fails offline. It is plain HTML with
+// inline styles: it has to render when the app's own JS and CSS are absent.
+const OFFLINE_SHELL = "/offline.html";
+
+// Where *previously downloaded data* may still be readable offline. This scopes
+// what the offline shell is allowed to promise — it does NOT decide whether the
+// shell is shown. Admin is excluded: it holds no offline pack and queues no
+// work, so it must not claim either.
 const OFFLINE_SCOPES = ["/member/", "/provider/", "/fund/"];
 
 const SHELL_ASSETS = [
   "/manifest.webmanifest",
   "/icons/medvex-icon.svg",
   "/icons/medvex-maskable.svg",
-  "/login",
+  OFFLINE_SHELL,
 ];
 
 self.addEventListener("install", (event) => {
@@ -65,14 +80,22 @@ self.addEventListener("fetch", (event) => {
   // API and auth are always live — never intercept.
   if (url.pathname.startsWith("/api/") || url.pathname.includes("/auth/")) return;
 
-  // Navigations: network-first. Offline, fall back to the cached shell only for
-  // the PWA portals; elsewhere let the network error surface normally.
+  // Navigations: network-first. Offline, every route falls back to the SAME
+  // dedicated offline shell — including /login and including admin.
+  //
+  // DEF-003: the fallback used to be the cached /login page, which is why the
+  // run recorded the offline capture as identical to the online one. Serving a
+  // real screen that the user cannot tell is a corpse is worse than serving
+  // nothing, so the shell announces itself and offers no form to fill in.
+  //
+  // The shell tailors its own copy from `location.pathname` (the browser keeps
+  // the ORIGINAL navigation URL when a fallback is served, so it can tell an
+  // admin route from a portal route itself — see isOfflineScope in offline.html,
+  // which must be kept in step with OFFLINE_SCOPES above).
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request).catch(() =>
-        isOfflineScope(url.pathname)
-          ? caches.match("/login").then((r) => r || Response.error())
-          : Response.error(),
+        caches.match(OFFLINE_SHELL).then((r) => r || Response.error()),
       ),
     );
     return;
