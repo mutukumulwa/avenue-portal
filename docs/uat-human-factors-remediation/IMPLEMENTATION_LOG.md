@@ -241,9 +241,54 @@ note to delete it if the doubles are ever replaced by a generated mock client.
 
 ---
 
-### P00.04 — Make schema deployment reproducible
+### P00.04 + P00.04a — Make schema deployment reproducible
 
-_pending_
+Executed together: P00.04's acceptance ("fresh and upgraded disposable databases
+converge with zero drift" via `migrate deploy`) is unreachable without P00.04a, the DEC-13
+option A cutover, so they are one unit of work.
+
+| Field | Value |
+|---|---|
+| **Task** | P00.04, P00.04a (DEC-13 option A) |
+| **Defect IDs** | none numbered — the adjacent finding in plan §1.2 (PackageVersion deletion strands a zero-owner `TreatmentExclusionRule`) and the run's own "Schema observation surfaced by the cleanup" |
+| **Commit** | _pending_ |
+| **Migrations / backfills** | 3 new migrations authored and **applied only to a disposable DB**. 23 stale migrations retired to `prisma/migrations-legacy/` (preserved, not deleted). **No production change has been made.** |
+| **Tests added** | `tests/db/exclusion-owner-xor.test.ts` — 6 cases: constraint exists; both-owners rejected; neither-owner rejected; both FKs are CASCADE not SET NULL (regression guard); **PackageVersion deletion cascades**; **ProviderContract deletion cascades**. |
+| **Commands / results** | `prisma migrate deploy` on a fresh DB → 3/3 applied. `migrate status` → "Database schema is up to date!". Drift `--from-config-datasource --to-schema` → **"No difference detected"** (exit 0). `tests/db/` with DB env → **9 passed**. Default suite → **259 files / 2583 tests passed, 88 files / 578 skipped** (new file self-skips). `npm run typecheck` → 0. `npm run lint` → 0 errors. |
+| **Routes exercised** | none |
+| **Evidence** | `docs/uat-human-factors-remediation/SCHEMA_DEPLOYMENT.md` |
+| **Feature flags** | **`SCHEMA_DEPLOY_MODE`** — new. Defaults to `push`, so this commit changes nothing about how production deploys today. `migrate` selects `prisma migrate deploy`. |
+| **Remaining risks** | **The production cutover is outstanding and is a human ops step** — §3 of `SCHEMA_DEPLOYMENT.md`. Until `prisma migrate resolve --applied` is run against production, `SCHEMA_DEPLOY_MODE` must stay `push`; flipping it first would fail the build by trying to CREATE existing tables. Production still lacks `User.mustChangePassword`, so the first-login code path added by `9e7586e` will error there until the cutover completes. |
+
+**The XOR contradiction, and why `Cascade` is the right resolution.**
+
+Both owner relations are optional, so Prisma's default referential action is
+`SET NULL`. Deleting a `PackageVersion` therefore nulled `packageVersionId` and
+produced a zero-owner row, which `exclusion_owner_xor` immediately rejected — so the
+delete failed. The referential action and the constraint were enforcing opposite
+things.
+
+The plan offered explicit owner tables or "restrictive/cascading referential actions".
+`onDelete: Cascade` on both relations is chosen: an exclusion rule has no meaning
+without its owner, so it does not survive it. `Restrict` was rejected because it would
+have preserved the original symptom — a package version that cannot be deleted until
+someone hand-deletes its rules — which is the exact failure the run hit.
+
+Verified behaviourally, not just structurally: `confdeltype` is now `c` on both FKs,
+**and** both deletions were executed against a real database with a rule attached, and
+the rule went with the owner.
+
+**Baseline strategy.** The baseline is generated from `53df0ab:prisma/schema.prisma`
+— the schema production is actually running — not from the branch tip. That matters:
+the branch adds `mustChangePassword`, which production does **not** have. Baselining
+from the tip would have marked production as having a column it lacks. The one-field
+delta is therefore carried by the third migration, where it can actually run.
+
+**Why the deploy switch defaults to off.** `migrate deploy` against a never-baselined
+database tries to CREATE tables that already exist and fails the build. The one-time
+`migrate resolve --applied` must come first. Shipping the switch defaulted to `push`
+makes this commit inert in production and the cutover a deliberate, reversible act —
+consistent with plan P12.03's "rollback disables new entry paths".
 
 ### P00.05 — Close UAT governance gaps
 

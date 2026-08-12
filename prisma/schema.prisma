@@ -4347,10 +4347,20 @@ enum TreatmentExclusionCategory {
 model TreatmentExclusionRule {
   id                 String            @id @default(cuid())
   tenantId           String
+  // Owner is an XOR: exactly one of packageVersionId / providerContractId is set,
+  // enforced in the database by the `exclusion_owner_xor` CHECK constraint.
+  //
+  // onDelete: Cascade is load-bearing, not a convenience. Both relations are
+  // optional, so Prisma's default action is SET NULL — which nulls the owner and
+  // leaves a zero-owner row that immediately violates that CHECK. The two rules
+  // contradicted each other, so deleting any PackageVersion failed unless its
+  // exclusion rules were removed by hand first (UAT-HF, found while restoring
+  // production state after the run). A rule has no meaning without its owner, so
+  // it is deleted with it. (UAT-HF P00.04)
   packageVersionId   String?
-  packageVersion     PackageVersion?   @relation(fields: [packageVersionId], references: [id])
+  packageVersion     PackageVersion?   @relation(fields: [packageVersionId], references: [id], onDelete: Cascade)
   providerContractId String?
-  providerContract   ProviderContract? @relation(fields: [providerContractId], references: [id])
+  providerContract   ProviderContract? @relation(fields: [providerContractId], references: [id], onDelete: Cascade)
 
   ruleCategory  TreatmentExclusionCategory
   exclusionType TreatmentExclusionType     @default(ABSOLUTE)
