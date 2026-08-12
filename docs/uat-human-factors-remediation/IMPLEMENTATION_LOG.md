@@ -883,6 +883,67 @@ because a test nobody can read is a test nobody can trust.
 The pre-existing audit-coverage harness correctly caught the new action and it is registered
 `READ_ONLY`.
 
+### P03.03 — Every eligibility consumer on the canonical evaluator
+
+| Field | Value |
+|---|---|
+| **Task** | P03.03 |
+| **Defect IDs** | DEF-053, DEF-058, DEF-060, DEF-061 |
+| **Commit** | `d5dda8a` |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/services/eligibility-decision-parity.test.ts` — **12** |
+| **Commands / results** | Suite 278 files / 2927 passed; typecheck 0; lint 0 errors. |
+| **Remaining risks** | Only the **provider** door emits `EligibilityDecisionV2`. The member benefits surface, the claim/preauth gates and the B2B API still read their own shapes — full convergence is the rest of P03.03's intent and is not finished. `packageVersionId`, `remainingLimit`, `networkTier` and `waitingEligibleFrom` are still `null` placeholders on the decision; populating them needs P09's versioned rules. |
+
+**The bug found while wiring it.** `memberVerdict()` computed the **full** evaluator decision and then
+**threw its `reasonCode` away**, returning a binary verdict plus one of two hard-coded sentences. The
+evaluator already knew whether the member was `SUSPENDED`, `LAPSED`, in a `WAITING_PERIOD` or past an
+`AGE_BOUNDARY`. Meanwhile `/api/v1/eligibility` returned `reason: decision.reasonCode` all along — so
+the two doors genuinely disagreed, which is exactly the "two divergent eligibility implementations"
+the plan warned about.
+
+**`hasEffectiveEntitlement`** now separates the two situations DEF-053 reported identically: *the
+facility is entitled but this number isn't its member* (a card problem) versus *the facility is
+entitled to nobody* (a facility-data problem). Both still show one indistinguishable member-facing
+string; only the operator guidance differs.
+
+**Two test failures were my fixture, not the code** — the evaluator correctly answers
+`NOT_YET_ENROLLED` before considering status when there is no coverage period, and **fails closed**
+on an unpinned package version (`F-PIN-2`). Stricter and more correct than the surface was letting
+through.
+
+### P03.04 — Find Care geolocation and network filtering
+
+| Field | Value |
+|---|---|
+| **Task** | P03.04 |
+| **Defect IDs** | DEF-007, DEF-033, DEF-049 (partial) |
+| **Commit** | `c1f67cb` |
+| **Migrations / backfills** | none. Locale-guard baseline tightened **54 → 52**. |
+| **Tests added** | `tests/lib/uganda-districts.test.ts` — **10** |
+| **Commands / results** | Suite **279 files / 2937 passed**; typecheck 0; lint 0 errors; guards green. |
+| **Remaining risks** | **The network filtering half is not done.** Nearby results are not yet filtered through the member's effective package/provider rules, and distance/network tier are not shown — the acceptance's "an equally nearby excluded provider is absent" is therefore **not** met. That needs P09's versioned rules. The district list is 23 entries, not the full gazetteer; a tenant with facilities elsewhere must extend it. |
+
+The code said, literally:
+
+```
+navigator.geolocation.getCurrentPosition(
+  (pos) => setPosition({ lat: pos.coords.latitude, ... }),
+  () => setPosition({ lat: -1.2921, lng: 36.8219 }),   // Nairobi
+);
+```
+
+A denied permission — or a browser without geolocation — silently moved a Ugandan member to another
+country, after which no covered facility was found at any radius from a register of 195 providers.
+
+There is **no fallback position** now. Denied, unavailable, unsupported and "outside Uganda" are four
+named states, each explained and each recoverable via a district picker. A device position outside
+the country bounds is **refused rather than used**: searching from it produces *wrong* results rather
+than empty ones, which is harder to notice and worse.
+
+**The P01.05 locale guard caught this fix landing**, reporting 2 baselined violations fixed. The
+ratchet works in both directions, as designed.
+
 ---
 
 ## Corrections made to the implementation plan
@@ -905,6 +966,7 @@ the divergence stays visible to a reviewer.
 
 | **P01** | **PASS** — 0 errors | **PASS** — 0 errors, 207 warnings | **PASS** — 270 files / 2778 tests passed, 88 files / 598 skipped | _awaiting owner review_ |
 | **P02** | **PASS** — 0 errors | **PASS** — 0 errors, 210 warnings | **PASS** — 275 files / 2842 tests passed, 88 files / 598 skipped | _awaiting owner review_ |
+| **P03** (partial) | **PASS** — 0 errors | **PASS** — 0 errors | **PASS** — 279 files / 2937 tests passed, 88 files / 598 skipped | P03.01 reporting half, 03.02–03.05 done; **03.06 blocked on P09** |
 
 P00 gate run 2026-08-12 on `09662f7`. P01 gate run 2026-08-12 on `ffa2ffd`; both guards
 (`currency:guard`, `locale:guard`) also green. All commands green at both gates.
