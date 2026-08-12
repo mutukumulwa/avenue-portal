@@ -611,6 +611,49 @@ because changing a column default is a migration with data consequences, and P02
 preflight that classifies "legitimate multi-currency" against "mistaken default" **before** any
 backfill. Recording it so it is not rediscovered.
 
+### P01.06 — Accessible form, table, dialog and empty-state primitives
+
+| Field | Value |
+|---|---|
+| **Task** | P01.06 |
+| **Defect IDs** | DEF-008, DEF-009, DEF-016, DEF-019, DEF-025, DEF-040, DEF-056, DEF-073, DEF-074, DEF-076, DEF-081, DEF-082 |
+| **Commit** | _pending_ |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/components/a11y-primitives.test.tsx` — **30** |
+| **Commands / results** | Primitive tests → **30 passed**. Full suite → **270 files / 2778 tests passed**, 88 files / 598 skipped. typecheck 0; lint 0 errors; both guards green. |
+| **Routes exercised** | none — the task explicitly forbids mass-rewriting screens; P11.01/P11.02/P11.06 adopt these |
+| **Evidence** | `src/components/forms/Field.tsx`, `useDirtyFormGuard.ts`, `src/components/ui/{IconButton,ConfirmDialog,DataTable,EmptyState}.tsx` |
+| **Feature flags** | none |
+| **Remaining risks** | **No screen uses these yet**, so none of the listed defects is closed — only preventable. Assertions are testing-library accessible-name queries, not axe: no axe dependency exists in this repo, and adding one is P11's call. Real 360 px / 200%-zoom behaviour needs a browser; only the mechanism (`min-w-0` + an `overflow-x-auto` port) is unit-tested. `useDirtyFormGuard` covers tab-exit and explicit in-app cancel, but cannot intercept a Next `<Link>` click — P04.02 needs a router-level guard for that. |
+
+**Each primitive exists because a hand-rolled version failed in the run.**
+
+| Primitive | The finding it prevents |
+|---|---|
+| `Field` / `TextField` | DEF-019 package builder money and age fields had **no accessible names**; DEF-074 a form that "produces no in-DOM error elements at all" |
+| `IconButton` | DEF-056 bare icon controls on package rules, one of which deleted a rule; DEF-081 the same on lifecycle micro-forms |
+| `ConfirmDialog` | DEF-040 "Standard Cancel" terminating a member on one unconfirmed click; DEF-025 archive with no confirmation |
+| `DataTable` | DEF-009 admin tables not reflowing at 200% zoom and 360 px; DEF-072/076 |
+| `EmptyState` | DEF-082 empty states that state only emptiness |
+| `useDirtyFormGuard` | DEF-008 typed data discarded with no warning; DEF-016 no warning on any exit path |
+
+**Requiredness is enforced by the type system where it matters.** `Field.label`,
+`IconButton.label`, `DataTable.caption` and `EmptyState.reason` are all **required, non-defaulted**
+props. The omission that caused each defect is now a compile error rather than a silent regression —
+which is the only reason a primitive helps more than a code-review checklist.
+
+**`ConfirmDialog` deliberately does not focus its confirm button.** DEF-040 was discovered because
+the action fired while the tester was trying to *read* its copy before entering a date. Focus lands
+on the dialog itself, Cancel comes first in DOM order, Escape cancels, and for irreversible actions
+the user must type the object's reference. That is the P07.03 requirement — "Enter in a reason/date
+field cannot trigger the transition" — implemented at the primitive rather than per screen.
+
+**`DataTable`'s `min-w-0` is the actual fix, not styling.** A wide table inside a flex or grid child
+scrolls the *page* rather than itself, because the child defaults to `min-width: auto` and will not
+shrink below its content. That is what produced DEF-009's page-level horizontal trap. The scroll port
+also carries `tabIndex={0}`, because a scrollable region a mouse can drag is otherwise unreachable by
+keyboard.
+
 ---
 
 ## Corrections made to the implementation plan
