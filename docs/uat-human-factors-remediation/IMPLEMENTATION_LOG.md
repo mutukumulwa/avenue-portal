@@ -1374,6 +1374,31 @@ A negative is still refused, but **as a negative**: the run's complaint was that
 
 ---
 
+## P06 — Durable bulk import
+
+### P06.05 (part) — Restore native and accessible form validation
+
+| Field | Value |
+|---|---|
+| **Task** | P06.05 — the DEF-069 half; DEF-074's wider form audit is P11.01 |
+| **Defect IDs** | DEF-069 |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/components/member-import-validation.test.tsx` (10) |
+| **Commands / results** | typecheck 0; lint 0 errors; suite 295 files / 3275 passed. |
+| **Evidence** | `src/app/(admin)/members/import/MemberImportClient.tsx` |
+| **Feature flags** | none. |
+| **Remaining risks** | **Not confirmed in a real browser**, which matters more than usual here: jsdom does not implement form submission, so the tests fire `submit` on the form directly and cannot prove the native bubble now appears. What they do prove is that the product's own summary renders and the parse is blocked — which is the part that does not depend on the browser. File type/size are still validated only by `accept=".csv"` and server-side; the plan asks for an explicit pre-parse check and that is not done. DEF-074's "four interactive controls have no accessible name" is a wider audit (P11.01), not this form. |
+
+**The browser knew, and nothing surfaced it.** "The select reported required = true, validationMessage 'Please select an item in the list.' and form.checkValidity() = false" — and the operator saw nothing at all. Two things can suppress that, and rather than guess between them both are fixed:
+
+1. **The file input was `required` *and* `className="hidden"`.** A required control that cannot be focused makes the browser abandon validation for the *whole* form, silently — so the visible select's message never appeared either. It is `sr-only` now: focusable and reportable, still visually hidden. It also gained a real `<label>` association and shows the chosen filename back.
+2. **A React `action` submit can bypass the native bubble**, so the form renders **its own** `role="alert"` summary naming every incomplete field and focuses the first one. That works whatever the browser decides to do.
+
+**The summary appears only after a submit attempt.** A form that scolds before the user has done anything is its own defect, and the run's complaint was silence *at the point of action*, not a missing permanent warning.
+
+---
+
 ## Corrections made to the implementation plan
 
 The plan is treated as authoritative but not infallible. Where a plan statement was checked against

@@ -24,7 +24,55 @@ export function MemberImportClient({ groups }: { groups: Group[] }) {
   const [parseResult, parseAction, parsePending] = useActionState<ParseResult | null, FormData>(parseImportAction, null);
   const [importResult, importAction, importPending] = useActionState<ImportResult | null, FormData>(confirmImportAction, null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
   const [selectedGroup, setSelectedGroup] = useState("");
+  const [fileName, setFileName] = useState<string | null>(null);
+
+  /**
+   * UAT-HF P06.05 — DEF-069.
+   *
+   * "With a valid CSV attached and Target Group left at 'Select group…',
+   * clicking 'Parse & Validate' produced nothing at all — no message, no
+   * highlight, no alert ... The underlying state shows the browser was ready to
+   * explain it: the select reported required = true, validationMessage 'Please
+   * select an item in the list.' and form.checkValidity() = false. The operator
+   * is left with a button that appears broken."
+   *
+   * The browser knew. Nothing surfaced it. Two things could suppress it and both
+   * are fixed here rather than guessing between them:
+   *
+   *   * the file input carried `required` AND `className="hidden"`, and a
+   *     required control that cannot be focused makes the browser abandon
+   *     validation for the WHOLE form — silently. It is `sr-only` now, so it is
+   *     focusable and reportable while staying visually hidden;
+   *   * a React `action` submit can bypass the native bubble, so this renders
+   *     its OWN summary and focuses the first invalid control, which works
+   *     whatever the browser decides to do.
+   */
+  const [invalidFields, setInvalidFields] = useState<string[]>([]);
+
+  const FIELD_LABELS: Record<string, string> = {
+    groupId: "Target Group",
+    file: "CSV file",
+  };
+
+  const validateBeforeSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    const form = formRef.current;
+    if (!form) return;
+    const invalid = Array.from(form.elements).filter(
+      (el): el is HTMLInputElement | HTMLSelectElement =>
+        (el instanceof HTMLInputElement || el instanceof HTMLSelectElement) && !el.checkValidity(),
+    );
+    if (invalid.length === 0) {
+      setInvalidFields([]);
+      return;
+    }
+    e.preventDefault();
+    setInvalidFields(invalid.map((el) => el.name));
+    // Ask the browser to say it too, then put the caret where the work is.
+    form.reportValidity();
+    invalid[0]?.focus();
+  };
 
   const validRows  = parseResult?.rows.filter(r => !r.error) ?? [];
   const errorRows  = parseResult?.rows.filter(r =>  r.error) ?? [];
@@ -42,12 +90,29 @@ export function MemberImportClient({ groups }: { groups: Group[] }) {
             </code>
           </p>
 
-          <form action={parseAction} className="space-y-4">
+          <form ref={formRef} action={parseAction} onSubmit={validateBeforeSubmit} className="space-y-4">
+            {/* DEF-069: the summary the run found missing entirely. */}
+            {invalidFields.length > 0 && (
+              <div
+                role="alert"
+                aria-live="assertive"
+                className="rounded-lg border border-[#DC3545]/30 bg-[#DC3545]/10 px-4 py-3 text-sm text-[#DC3545]"
+              >
+                <p className="font-semibold">Nothing was parsed — this form is not complete yet.</p>
+                <ul className="mt-1 list-disc pl-5">
+                  {invalidFields.map((f) => (
+                    <li key={f}>{FIELD_LABELS[f] ?? f} is required.</li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <div>
-              <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Target Group</label>
+              <label htmlFor="import-group" className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Target Group</label>
               <select
+                id="import-group"
                 name="groupId"
                 required
+                aria-invalid={invalidFields.includes("groupId") ? true : undefined}
                 value={selectedGroup}
                 onChange={e => setSelectedGroup(e.target.value)}
                 className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo bg-white"
@@ -62,8 +127,26 @@ export function MemberImportClient({ groups }: { groups: Group[] }) {
               onClick={() => fileRef.current?.click()}
             >
               <Upload size={28} className="mx-auto mb-2 text-brand-text-muted" />
-              <p className="text-sm text-brand-text-body">Click to select a CSV file</p>
-              <input ref={fileRef} name="file" type="file" accept=".csv" className="hidden" required />
+              <label htmlFor="import-file" className="cursor-pointer text-sm text-brand-text-body">
+                {fileName ?? "Click to select a CSV file"}
+              </label>
+              {/*
+                `sr-only`, NOT `hidden`. A required control with display:none
+                cannot be focused, and the browser then abandons validation for
+                the entire form without saying anything — which is one of the two
+                ways DEF-069's button could appear broken.
+              */}
+              <input
+                ref={fileRef}
+                id="import-file"
+                name="file"
+                type="file"
+                accept=".csv"
+                required
+                aria-invalid={invalidFields.includes("file") ? true : undefined}
+                onChange={(e) => setFileName(e.target.files?.[0]?.name ?? null)}
+                className="sr-only"
+              />
             </div>
 
             {parseResult?.error && (
