@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft, BarChart3, AlertTriangle } from "lucide-react";
 import { ContractAnalyticsService } from "@/server/services/contract-analytics.service";
 import { ContractReconciliationService } from "@/server/services/contract-reconciliation.service";
+import { formatStoredDate } from "@/lib/calendar-date";
 
 export const dynamic = "force-dynamic";
 
@@ -132,7 +133,7 @@ export default async function ContractAnalyticsPage() {
                 <li key={c.id} className="flex items-center justify-between">
                   <Link href={`/contracts/${c.id}`} className="text-[#06B9AB]">{c.contractNumber}</Link>
                   <span className="text-[#6C757D] inline-flex items-center gap-1">
-                    <AlertTriangle className="w-3 h-3" /> ends {c.endDate.toISOString().slice(0, 10)}
+                    <AlertTriangle className="w-3 h-3" /> ends {formatStoredDate(c.endDate)}
                   </span>
                 </li>
               ))}

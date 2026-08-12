@@ -9,6 +9,7 @@ import { ProviderDiagnosisTariffsCard } from "./ProviderDiagnosisTariffsCard";
 import { ProviderPractitionersCard } from "./ProviderPractitionersCard";
 import { ProviderAdminCard } from "./ProviderAdminCard";
 import { ProviderBranchesCard } from "./ProviderBranchesCard";
+import { calendarInputValue } from "@/lib/calendar-date";
 
 export default async function ProviderDetailPage({
   params,
@@ -100,8 +101,11 @@ export default async function ProviderDetailPage({
     contractNumber: c.contractNumber,
     title: c.title,
     status: c.status,
-    startDate: c.startDate.toISOString(),
-    endDate: c.endDate.toISOString(),
+    // DEF-050 reached here too: the provider view serialises contract term dates
+    // the same unguarded way, so one damaged contract would have taken this page
+    // down as well. The run never opened it while the bad row existed.
+    startDate: calendarInputValue(c.startDate),
+    endDate: calendarInputValue(c.endDate),
     unlistedServiceRule: c.unlistedServiceRule,
     tariffCount: c._count.tariffLines,
     exclusionCount: c._count.exclusions,
@@ -120,8 +124,8 @@ export default async function ProviderDetailPage({
     currency:     t.currency,
     clientId:     t.clientId,
     clientName:   t.client?.name ?? null,
-    effectiveFrom:t.effectiveFrom.toISOString(),
-    effectiveTo:  t.effectiveTo?.toISOString() ?? null,
+    effectiveFrom: calendarInputValue(t.effectiveFrom),
+    effectiveTo: t.effectiveTo ? calendarInputValue(t.effectiveTo) : null,
   }));
 
   const diagnosisTariffs = standaloneDiagTariffs.map(t => ({
@@ -131,8 +135,8 @@ export default async function ProviderDetailPage({
     bundledRate:   t.bundledRate != null ? Number(t.bundledRate) : null,
     perDayRate:    t.perDayRate  != null ? Number(t.perDayRate)  : null,
     notes:         t.notes,
-    effectiveFrom: t.effectiveFrom.toISOString(),
-    effectiveTo:   t.effectiveTo?.toISOString() ?? null,
+    effectiveFrom: calendarInputValue(t.effectiveFrom),
+    effectiveTo: t.effectiveTo ? calendarInputValue(t.effectiveTo) : null,
   }));
 
   return (

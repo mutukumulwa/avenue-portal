@@ -214,6 +214,39 @@ export function formatInstant(
   return options.showZone === false ? formatted : `${formatted} EAT`;
 }
 
+/** Copy shown wherever a stored date cannot be rendered (P02.02). */
+export const INVALID_DATE_LABEL = "Invalid date — repair required";
+
+/**
+ * Display a date that came out of the database.
+ *
+ * This is the DEF-050 guard. `someDate.toISOString().slice(0, 10)` on a damaged
+ * row threw inside the contract register's `Array.map`, so ONE bad row stopped
+ * the whole list rendering for every user. Rendering must degrade to a label,
+ * never throw.
+ */
+export function formatStoredDate(value: Date | null | undefined, emptyLabel = "—"): string {
+  if (value == null) return emptyLabel;
+  const day = calendarDateFromUtcDate(value);
+  return day ? formatCalendarDate(day) : INVALID_DATE_LABEL;
+}
+
+/**
+ * The `YYYY-MM-DD` value for an `<input type="date">`, or "" when the stored
+ * value cannot be represented. An unrenderable date must leave the field EMPTY
+ * rather than crash the form that exists to correct it.
+ */
+export function calendarInputValue(value: Date | null | undefined): string {
+  if (value == null) return "";
+  return calendarDateFromUtcDate(value) ?? "";
+}
+
+/** True when a stored date can be rendered and used in date arithmetic. */
+export function isRenderableStoredDate(value: Date | null | undefined): boolean {
+  if (value == null) return true;
+  return calendarDateFromUtcDate(value) !== null;
+}
+
 /** The hint every date input needs, so nobody has to guess DD/MM vs MM/DD. */
 export const CALENDAR_DATE_INPUT_HINT = "DD/MM/YYYY";
 

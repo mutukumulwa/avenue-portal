@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Pagination } from "@/components/ui/Pagination";
 import { FileSignature, Plus, AlertTriangle, FileUp, BarChart3, LayoutGrid } from "lucide-react";
 import type { Prisma, ProviderContractStatus } from "@prisma/client";
+import { INVALID_DATE_LABEL, formatStoredDate, isRenderableStoredDate } from "@/lib/calendar-date";
 
 export const dynamic = "force-dynamic";
 
@@ -161,9 +162,15 @@ export default async function ContractsListPage({
               </tr>
             )}
             {contracts.map(c => {
+              // DEF-050: ONE unrenderable row threw inside this map and stopped
+              // the whole register rendering for every user. A damaged row now
+              // degrades to a labelled, quarantined line and the rest still list.
+              const datesRenderable = isRenderableStoredDate(c.startDate) && isRenderableStoredDate(c.endDate);
               const isPastEnd = c.endDate < now;
-              const display = c.status === "ACTIVE" && isPastEnd ? "EXPIRED" : c.status;
-              const reviewDue = c.reviewDueDate && c.reviewDueDate <= now && c.status === "ACTIVE";
+              // Never derive a status from a date we could not read.
+              const display = datesRenderable && c.status === "ACTIVE" && isPastEnd ? "EXPIRED" : c.status;
+              const reviewDue =
+                isRenderableStoredDate(c.reviewDueDate) && c.reviewDueDate && c.reviewDueDate <= now && c.status === "ACTIVE";
               return (
                 <tr key={c.id} className="hover:bg-gray-50">
                   <td className="px-4 py-3">
@@ -185,7 +192,15 @@ export default async function ContractsListPage({
                     )}
                   </td>
                   <td className="px-4 py-3 text-xs text-[#6C757D]">
-                    {c.startDate.toISOString().slice(0, 10)} → {c.endDate.toISOString().slice(0, 10)}
+                    {datesRenderable ? (
+                      <>
+                        {formatStoredDate(c.startDate)} → {formatStoredDate(c.endDate)}
+                      </>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-[#FD7E14]/10 px-2 py-0.5 font-medium text-[#9a4b06]">
+                        <AlertTriangle className="w-3 h-3" /> {INVALID_DATE_LABEL}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-right text-[#6C757D]">{c._count.tariffLines}</td>
                 </tr>

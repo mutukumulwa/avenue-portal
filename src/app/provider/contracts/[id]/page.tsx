@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { ProviderAccessService, isProviderAccessError } from "@/server/services/provider-access.service";
 import { ProviderAccessSettingsService } from "@/server/services/provider-access-settings.service";
 import { ProviderContractViewService, CONTRACT_VIEW_PERMISSION } from "@/server/services/provider-contract-view/service";
+import { formatStoredDate } from "@/lib/calendar-date";
 
 /**
  * PNOS F7.3 — provider contract detail + effective rate schedule.
@@ -65,8 +66,10 @@ export default async function ProviderContractDetail({
   const groupName = new Map(groups.map((g) => [g.id, g.name]));
   const packageName = new Map(packages.map((p) => [p.id, p.name]));
 
-  const fmtDate = (v: Date | string | null) =>
-    v ? new Date(v).toLocaleDateString("en-UG", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+  // P02.02: `toLocaleDateString` does not throw on an Invalid Date, so this was
+  // never a crash site — but it rendered a bare "Invalid Date" and hard-coded a
+  // locale format outside the P01.05 helpers. Both now go through one path.
+  const fmtDate = (v: Date | string | null) => formatStoredDate(v == null ? null : new Date(v));
   const dateInput = serviceDate.toISOString().slice(0, 10);
   const canExport = ProviderAccessService.hasPermission(ctx, CONTRACT_VIEW_PERMISSION);
   const cond = header.conditional;

@@ -9,7 +9,16 @@ import { ManagePanel } from "./ManagePanel";
 import { FeeSchedule } from "./FeeSchedule";
 import { CapitationPanel } from "./CapitationPanel";
 import { ContractExclusionsManager } from "./ContractExclusionsManager";
-import { MAX_CALENDAR_DATE, MIN_CALENDAR_DATE } from "@/lib/calendar-date";
+import {
+  INVALID_DATE_LABEL,
+  MAX_CALENDAR_DATE,
+  MIN_CALENDAR_DATE,
+  addCalendarDays,
+  calendarDateFromUtcDate,
+  calendarInputValue,
+  formatStoredDate,
+  isRenderableStoredDate,
+} from "@/lib/calendar-date";
 import {
   submitForReviewAction,
   approveContractAction,
@@ -115,8 +124,8 @@ export default async function ContractDetailPage({
     diagnosisCodes: r.diagnosisCodes,
     procedureCodes: r.procedureCodes,
     exceptionType: ((r.exceptionLogic as { type?: string } | null)?.type) ?? null,
-    effectiveFrom: r.effectiveFrom.toISOString(),
-    effectiveTo: r.effectiveTo ? r.effectiveTo.toISOString() : null,
+    effectiveFrom: calendarInputValue(r.effectiveFrom),
+    effectiveTo: r.effectiveTo ? calendarInputValue(r.effectiveTo) : null,
     memberSafeExplanation: r.memberSafeExplanation,
   }));
 
@@ -142,8 +151,12 @@ export default async function ContractDetailPage({
 
   // Renewal is offered once a contract is in force or past its window (§4.4).
   const renewEligible = ["ACTIVE", "EXPIRED", "TERMINATED"].includes(c.status) || display === "EXPIRED";
-  const renewStart = new Date(c.endDate.getTime() + 86_400_000).toISOString().slice(0, 10);
-  const renewEnd = new Date(new Date(c.endDate).setFullYear(c.endDate.getFullYear() + 1) + 86_400_000).toISOString().slice(0, 10);
+  // DEF-050: these defaults are computed FROM the stored end date, so an
+  // unreadable one threw here before the page could render at all. A damaged
+  // contract now simply offers no prefilled renewal window.
+  const datesRenderable = isRenderableStoredDate(c.startDate) && isRenderableStoredDate(c.endDate);
+  const renewStart = datesRenderable ? (addCalendarDays(calendarDateFromUtcDate(c.endDate)!, 1) ?? "") : "";
+  const renewEnd = datesRenderable ? (addCalendarDays(calendarDateFromUtcDate(c.endDate)!, 366) ?? "") : "";
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -233,7 +246,14 @@ export default async function ContractDetailPage({
                 {c.provider.name}
               </Link>
               {c.provider.legalName && c.provider.legalName !== c.provider.name ? ` (${c.provider.legalName})` : ""}
-              {" · "}{c.startDate.toISOString().slice(0, 10)} → {c.endDate.toISOString().slice(0, 10)}
+              {" · "}
+              {datesRenderable ? (
+                <>
+                  {formatStoredDate(c.startDate)} → {formatStoredDate(c.endDate)}
+                </>
+              ) : (
+                <span className="font-medium text-[#9a4b06]">{INVALID_DATE_LABEL}</span>
+              )}
             </p>
           </div>
         </div>
@@ -338,10 +358,10 @@ export default async function ContractDetailPage({
               <input name="title" defaultValue={c.title} className="block w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm" />
             </label>
             <label className="text-xs text-[#6C757D]">Start date
-              <input type="date" name="startDate" defaultValue={c.startDate.toISOString().slice(0, 10)} className="block w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm" />
+              <input type="date" name="startDate" defaultValue={calendarInputValue(c.startDate)} className="block w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm" />
             </label>
             <label className="text-xs text-[#6C757D]">End date
-              <input type="date" name="endDate" defaultValue={c.endDate.toISOString().slice(0, 10)} className="block w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm" />
+              <input type="date" name="endDate" defaultValue={calendarInputValue(c.endDate)} className="block w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm" />
             </label>
             <label className="text-xs text-[#6C757D]">Contract type
               <select name="contractType" defaultValue={c.contractType} className="block w-full rounded-lg border border-gray-200 px-2 py-1.5 text-sm">
@@ -420,7 +440,7 @@ export default async function ContractDetailPage({
               <Term k="Tax" v={c.taxInclusive} />
               <Term k="Reconciliation" v={c.reconciliationCadence} />
               <Term k="Unlisted rule" v={c.unlistedServiceRule.replace(/_/g, " ")} />
-              <Term k="Review due" v={c.reviewDueDate?.toISOString().slice(0, 10)} />
+              <Term k="Review due" v={c.reviewDueDate ? formatStoredDate(c.reviewDueDate) : undefined} />
             </dl>
             {c.notes && <p className="mt-4 text-sm text-[#6C757D] whitespace-pre-wrap">{c.notes}</p>}
           </section>
@@ -506,7 +526,7 @@ export default async function ContractDetailPage({
                 {c.versions.map(v => (
                   <li key={v.id} className="flex justify-between">
                     <span>v{v.versionNumber} · {v.status}</span>
-                    <span className="text-[#6C757D]">{v.effectiveFrom.toISOString().slice(0, 10)}</span>
+                    <span className="text-[#6C757D]">{formatStoredDate(v.effectiveFrom)}</span>
                   </li>
                 ))}
               </ul>
