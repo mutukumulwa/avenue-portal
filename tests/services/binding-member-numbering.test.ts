@@ -20,7 +20,7 @@ const db = vi.hoisted(() => {
     },
     group: {
       count: vi.fn(async () => 0),
-      create: vi.fn(async (a: any) => ({ id: "grp1", ...a.data })),
+      create: vi.fn(async (a: MockDbArgs) => ({ id: "grp1", ...(a.data ?? {}) })),
       delete: vi.fn(async () => ({})),
       findUnique: vi.fn(async () => ({ clientId: "clientLMU" })),
     },
@@ -31,14 +31,14 @@ const db = vi.hoisted(() => {
     member: {
       count: vi.fn(async () => 0),
       findMany: vi.fn(async () => [] as { memberNumber: string }[]),
-      create: vi.fn(async (a: any) => ({ id: `m-${a.data.memberNumber}`, ...a.data })),
+      create: vi.fn(async (a: MockDbArgs) => ({ id: `m-${a.data!.memberNumber}`, ...(a.data ?? {}) })),
     },
     membershipExclusion: { create: vi.fn(async () => ({})) },
     waitingPeriodApplication: { create: vi.fn(async () => ({})) },
     memberCoveragePeriod: { findFirst: vi.fn(async () => null), create: vi.fn(async () => ({})) },
     // F-PIN-2 / WP-3.5D: binding resolves the package's current version (pin) + age caps.
     package: { findUnique: vi.fn(async () => ({ currentVersionId: "pv1", maxAge: 65, dependentMaxAge: 24 })) },
-    $transaction: vi.fn(async (fn: any) => fn(state)),
+    $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(state)),
   };
   return state;
 });
@@ -56,7 +56,7 @@ import { bindingService } from "@/server/services/binding.service";
 
 const YEAR = new Date().getFullYear();
 
-const acceptedQuote = (over: any = {}) => ({
+const acceptedQuote = (over: MockDbOverrides = {}) => ({
   id: "q1",
   tenantId: "t1",
   quoteNumber: "QUO-2026-00001",
@@ -109,12 +109,12 @@ beforeEach(() => {
   vi.clearAllMocks();
   db.quotation.updateMany.mockResolvedValue({ count: 1 });
   db.group.count.mockResolvedValue(0);
-  db.group.create.mockImplementation(async (a: any) => ({ id: "grp1", ...a.data }));
+  db.group.create.mockImplementation(async (a: MockDbArgs) => ({ id: "grp1", ...(a.data ?? {}) }));
   db.group.findUnique.mockResolvedValue({ clientId: "clientLMU" });
   db.client.findFirst.mockResolvedValue({ memberNumberPrefix: "LMU" });
   db.member.count.mockResolvedValue(0);
   db.member.findMany.mockResolvedValue([]);
-  db.member.create.mockImplementation(async (a: any) => ({ id: `m-${a.data.memberNumber}`, ...a.data }));
+  db.member.create.mockImplementation(async (a: MockDbArgs) => ({ id: `m-${a.data!.memberNumber}`, ...(a.data ?? {}) }));
 });
 
 const mintedNumbers = () => db.member.create.mock.calls.map((c: any) => c[0].data.memberNumber);

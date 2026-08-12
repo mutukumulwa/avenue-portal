@@ -2,12 +2,12 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const h = vi.hoisted(() => ({
   db: {
-    tenant: { findMany: vi.fn(async (): Promise<any[]> => [{ id: "t1" }]) },
+    tenant: { findMany: vi.fn(async (): Promise<unknown[]> => [{ id: "t1" }]) },
     providerContract: {
-      findMany: vi.fn(async (): Promise<any[]> => []),
-      updateMany: vi.fn(async (): Promise<any> => ({ count: 0 })),
+      findMany: vi.fn(async (): Promise<unknown[]> => []),
+      updateMany: vi.fn(async (): Promise<unknown> => ({ count: 0 })),
     },
-    claim: { findMany: vi.fn(async (): Promise<any[]> => []) },
+    claim: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
   },
   activate: vi.fn(async () => ({})),
   persist: vi.fn(async () => ({ result: { matched: true } })),

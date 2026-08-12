@@ -75,9 +75,9 @@ async function runExpectingRedirect(promise: Promise<unknown>): Promise<string> 
 /** tenant.findUnique dispatcher: session-tenant gate lookup vs slug pre-check vs target tenant. */
 function primeTenantFindUnique(opts?: { sessionSlug?: string; slugTaken?: boolean; target?: { id: string; name: string; slug: string } | null }) {
   mockPrisma.tenant.findUnique.mockImplementation(async (args: { where: { id?: string; slug?: string } }) => {
-    if (args.where.id === "t1") return { slug: opts?.sessionSlug ?? "medvex" };
-    if (args.where.id) return opts?.target !== undefined ? opts.target : null;
-    if (args.where.slug) return opts?.slugTaken ? { id: "existing" } : null;
+    if (args.where!.id === "t1") return { slug: opts?.sessionSlug ?? "medvex" };
+    if (args.where!.id) return opts?.target !== undefined ? opts.target : null;
+    if (args.where!.slug) return opts?.slugTaken ? { id: "existing" } : null;
     return null;
   });
 }

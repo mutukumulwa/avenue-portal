@@ -2,14 +2,14 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
   consentRecord: {
-    create: vi.fn(async (a: any) => ({ id: "c1", ...a.data })),
+    create: vi.fn(async (a: MockDbArgs) => ({ id: "c1", ...(a.data ?? {}) })),
     updateMany: vi.fn(async () => ({ count: 1 })),
-    findFirst: vi.fn(async (): Promise<any> => null),
+    findFirst: vi.fn(async (): Promise<unknown> => null),
   },
   dataSubjectRequest: {
-    create: vi.fn(async (a: any) => ({ id: "d1", ...a.data })),
-    findFirst: vi.fn(async (): Promise<any> => ({ id: "d1" })),
-    update: vi.fn(async (a: any) => ({ id: "d1", ...a.data })),
+    create: vi.fn(async (a: MockDbArgs) => ({ id: "d1", ...(a.data ?? {}) })),
+    findFirst: vi.fn(async (): Promise<unknown> => ({ id: "d1" })),
+    update: vi.fn(async (a: MockDbArgs) => ({ id: "d1", ...(a.data ?? {}) })),
   },
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));

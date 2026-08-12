@@ -37,11 +37,11 @@ describe("contract-analytics pure helpers (spec §15)", () => {
 
 // ── Reconciliation maker-checker ──
 const db = vi.hoisted(() => ({
-  claim: { aggregate: vi.fn(async (): Promise<any> => ({ _count: { _all: 10 }, _sum: { billedAmount: 50000 } })) },
+  claim: { aggregate: vi.fn(async (): Promise<unknown> => ({ _count: { _all: 10 }, _sum: { billedAmount: 50000 } })) },
   contractReconciliation: {
-    create: vi.fn(async (a: any): Promise<any> => ({ id: "rec1", status: "COMPUTED", ...a.data })),
-    findUnique: vi.fn(async (): Promise<any> => null),
-    update: vi.fn(async (a: any): Promise<any> => ({ id: "rec1", ...a.data })),
+    create: vi.fn(async (a: MockDbArgs): Promise<unknown> => ({ id: "rec1", status: "COMPUTED", ...(a.data ?? {}) })),
+    findUnique: vi.fn(async (): Promise<unknown> => null),
+    update: vi.fn(async (a: MockDbArgs): Promise<unknown> => ({ id: "rec1", ...(a.data ?? {}) })),
   },
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));

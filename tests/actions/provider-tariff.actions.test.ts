@@ -10,7 +10,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const mockPrisma = vi.hoisted(() => ({
   provider: { findUnique: vi.fn() },
   client: { findFirst: vi.fn() },
-  providerTariff: { findMany: vi.fn(async (): Promise<any[]> => []), create: vi.fn(async (_a?: any) => ({ id: "t-new" })), update: vi.fn(async () => ({})), delete: vi.fn(), findUnique: vi.fn() },
+  providerTariff: { findMany: vi.fn(async (): Promise<unknown[]> => []), create: vi.fn(async (_a?: any) => ({ id: "t-new" })), update: vi.fn(async () => ({})), delete: vi.fn(), findUnique: vi.fn() },
   providerDiagnosisTariff: { findUnique: vi.fn(), create: vi.fn(async () => ({ id: "d-new" })), update: vi.fn(async () => ({})), delete: vi.fn() },
   serviceMappingMemory: { count: vi.fn(async () => 0) },
   pricingRule: { count: vi.fn(async () => 0) },

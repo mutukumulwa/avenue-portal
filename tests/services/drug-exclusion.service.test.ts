@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
-  drugExclusion: { findMany: vi.fn(async (): Promise<any[]> => []) },
-  claim: { findUnique: vi.fn(async (): Promise<any> => null) },
+  drugExclusion: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
+  claim: { findUnique: vi.fn(async (): Promise<unknown> => null) },
   claimLine: { update: vi.fn(async () => ({})) },
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));

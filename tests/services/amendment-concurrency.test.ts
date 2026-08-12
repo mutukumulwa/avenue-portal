@@ -11,7 +11,7 @@ const db = vi.hoisted(() => ({
   endorsement: {
     findUnique: vi.fn(),
     updateMany: vi.fn(async () => ({ count: 1 })),
-    update: vi.fn(async (a: any) => a.data),
+    update: vi.fn(async (a: MockDbArgs) => a.data),
   },
   groupBenefitTier: { findUnique: vi.fn(async () => ({ packageId: "pkg1" })) },
   // F-PIN-3: a tier/package change re-pins packageVersionId to the target package's current version.
@@ -32,7 +32,7 @@ vi.mock("@/server/services/rbac.service", () => ({ rbacService: rbac }));
 
 import { amendmentService } from "@/server/services/amendment.service";
 
-const endo = (over: any = {}) => ({
+const endo = (over: MockDbOverrides = {}) => ({
   id: "e1", tenantId: "t1", endorsementNumber: "END-2026-00001",
   type: "CORRECTION", status: "DRAFT", makerId: "maker1", groupId: "g1",
   backDated: false, overrideRecordId: null, changeDetails: {},

@@ -2,8 +2,8 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
   adminFeeLedgerEntry: { aggregate: vi.fn(async () => ({ _sum: { amount: 0 } })) },
-  complianceLevyComputation: { upsert: vi.fn(async (a: any) => ({ id: "lv1", ...a.create, ...a.update })) },
-  directorRegister: { findMany: vi.fn(async (): Promise<any[]> => []) },
+  complianceLevyComputation: { upsert: vi.fn(async (a: MockDbArgs) => ({ id: "lv1", ...(a.create as MockDbRow), ...(a.update as MockDbRow) })) },
+  directorRegister: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
 

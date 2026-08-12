@@ -13,16 +13,16 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
-  approvalMatrix: { findMany: vi.fn(async (): Promise<any[]> => []) },
+  approvalMatrix: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
   approvalRequest: {
-    findFirst: vi.fn(async (): Promise<any> => null),
-    findUnique: vi.fn(async (): Promise<any> => ({ id: "ar1", status: "APPROVED" })),
-    create: vi.fn(async (a: any) => ({ id: "ar1", ...a.data })),
-    update: vi.fn(async (a: any) => a.data),
+    findFirst: vi.fn(async (): Promise<unknown> => null),
+    findUnique: vi.fn(async (): Promise<unknown> => ({ id: "ar1", status: "APPROVED" })),
+    create: vi.fn(async (a: MockDbArgs) => ({ id: "ar1", ...(a.data ?? {}) })),
+    update: vi.fn(async (a: MockDbArgs) => a.data),
   },
   approvalDecision: { create: vi.fn(async () => ({})) },
-  fxRate: { findFirst: vi.fn(async (): Promise<any> => null) },
-  $transaction: vi.fn(async (ops: any[]) => Promise.all(ops)),
+  fxRate: { findFirst: vi.fn(async (): Promise<unknown> => null) },
+  $transaction: vi.fn(async (ops: unknown[]) => Promise.all(ops)),
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
 
@@ -102,7 +102,7 @@ describe("PR-023 — approval matrix fails CLOSED", () => {
 });
 
 describe("PR-025 — a completed chain applies the gated decision", () => {
-  const pendingReq = (over: any = {}) => ({
+  const pendingReq = (over: MockDbOverrides = {}) => ({
     id: "ar1", tenantId: T, status: "PENDING", currentLevel: 2, makerId: "maker1",
     entityType: "Claim", entityId: "clm1", actionType: "CLAIM_PAYMENT",
     matrix: { id: "r3", requiredRole: "UNDERWRITER", requiresDual: true, steps: [], slaMinutes: null, escalationTargetRole: null },
@@ -146,7 +146,7 @@ describe("F76-GAP-02 — a completed AUTO_ADJ_POLICY_CHANGE chain activates the 
   // Single-level rule: FINANCE_OFFICER checker, no dual. The maker is the
   // SUPER_ADMIN who submitted the policy (held in makerId); SoD forbids
   // self-approval, so a distinct finance officer must complete the chain.
-  const policyReq = (over: any = {}) => ({
+  const policyReq = (over: MockDbOverrides = {}) => ({
     id: "ar2", tenantId: T, status: "PENDING", currentLevel: 1, makerId: "admin1",
     entityType: "AutoAdjudicationPolicy", entityId: "pol1", actionType: "AUTO_ADJ_POLICY_CHANGE",
     matrix: { id: "auto", requiredRole: "FINANCE_OFFICER", requiresDual: false, steps: [], slaMinutes: null, escalationTargetRole: null },

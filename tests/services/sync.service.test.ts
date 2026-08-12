@@ -3,20 +3,20 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const db = vi.hoisted(() => ({
   syncOperation: {
     findUnique: vi.fn(),
-    create: vi.fn(async (a: any) => ({ id: "op_" + a.data.opKey })),
+    create: vi.fn(async (a: MockDbArgs) => ({ id: "op_" + a.data!.opKey })),
     update: vi.fn(async () => ({ tenantId: "t1", opKey: "k1", entityType: "Claim" })),
   },
-  member: { findFirst: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(async (): Promise<any[]> => []) },
+  member: { findFirst: vi.fn(), findUnique: vi.fn(), findMany: vi.fn(async (): Promise<unknown[]> => []) },
   provider: { findFirst: vi.fn() },
-  benefitConfig: { findFirst: vi.fn(async (): Promise<any> => null) },
-  benefitUsage: { findMany: vi.fn(async (): Promise<any[]> => []), findUnique: vi.fn(async (): Promise<any> => null) },
-  benefitConfigSharedLimit: { findMany: vi.fn(async (): Promise<any[]> => []) },
-  benefitHold: { findMany: vi.fn(async (): Promise<any[]> => []) },
-  claim: { findFirst: vi.fn(async (): Promise<any> => null), count: vi.fn(async () => 0), create: vi.fn(async () => ({ id: "clm1" })) },
+  benefitConfig: { findFirst: vi.fn(async (): Promise<unknown> => null) },
+  benefitUsage: { findMany: vi.fn(async (): Promise<unknown[]> => []), findUnique: vi.fn(async (): Promise<unknown> => null) },
+  benefitConfigSharedLimit: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
+  benefitHold: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
+  claim: { findFirst: vi.fn(async (): Promise<unknown> => null), count: vi.fn(async () => 0), create: vi.fn(async () => ({ id: "clm1" })) },
   // PR-036: CONFLICT ops land in the Exception Register; work-code path
   // resolves the provider from the issuing authorization.
   exceptionLog: { create: vi.fn(async () => ({})) },
-  offlineWorkAuthorization: { findUnique: vi.fn(async (): Promise<any> => null) },
+  offlineWorkAuthorization: { findUnique: vi.fn(async (): Promise<unknown> => null) },
 }));
 
 const submitMock = vi.hoisted(() => vi.fn());
@@ -30,7 +30,7 @@ vi.mock("@/server/services/claim-intake", () => ({ processAcceptedRunInline: inl
 import { SyncService } from "@/server/services/sync.service";
 import { IntakeError } from "@/server/services/claim-intake/errors";
 
-const op = (over: any = {}) => ({
+const op = (over: MockDbOverrides = {}) => ({
   clientUuid: "uuid1",
   opKey: "k1",
   entityType: "Claim",
@@ -83,7 +83,7 @@ describe("SyncService — store-and-forward (G4)", () => {
   });
 
   describe("reconcile — Claim via canonical intake (F5.5)", () => {
-    const fullPayload = (over: any = {}) => ({
+    const fullPayload = (over: MockDbOverrides = {}) => ({
       memberNumber: "MVX-2026-00001", providerCode: "SLD-001", serviceType: "OUTPATIENT",
       lineItems: [{ description: "Consult", quantity: 1, unitCost: 50000 }], ...over,
     });

@@ -28,7 +28,7 @@ const db = vi.hoisted(() => {
     member: {
       findFirst: vi.fn(async () => null),
       findUnique: vi.fn(async () => null),
-      create: vi.fn(async (a: any) => ({ id: "newm", memberNumber: "MVX-2026-00001", ...a.data })),
+      create: vi.fn(async (a: MockDbArgs) => ({ id: "newm", memberNumber: "MVX-2026-00001", ...(a.data ?? {}) })),
       update: vi.fn(async () => ({ id: "delm" })),
     },
     memberCoveragePeriod: {
@@ -69,14 +69,14 @@ const PERIOD_END = () => new Date(Date.now() + 265 * 86400000);
 // A back-date override that satisfies E-007.
 const approvedOverride = { id: "ovr1", tenantId: "t1", overrideType: "BACK_DATED_AMENDMENT", status: "APPROVED" };
 
-const submittedDeletion = (over: any = {}) => ({
+const submittedDeletion = (over: MockDbOverrides = {}) => ({
   id: "e1", tenantId: "t1", status: "SUBMITTED", requestedBy: "maker", type: "MEMBER_DELETION",
   changeDetails: { memberId: "delm", sourceReference: "HR-LTR-2026-0007" },
   effectiveDate: FUTURE(), proratedAmount: 0, groupId: "g1", overrideRecordId: null,
   endorsementNumber: "END-2026-00001", ...over,
 });
 
-const submittedAddition = (over: any = {}) => ({
+const submittedAddition = (over: MockDbOverrides = {}) => ({
   id: "e1", tenantId: "t1", status: "SUBMITTED", requestedBy: "maker", type: "MEMBER_ADDITION",
   changeDetails: {
     firstName: "Ann", lastName: "New", dateOfBirth: "1995-05-05", gender: "FEMALE",
@@ -94,7 +94,7 @@ beforeEach(() => {
   db.member.findUnique.mockResolvedValue(null);
   db.member.findFirst.mockResolvedValue(null);
   db.member.update.mockResolvedValue({ id: "delm" });
-  db.member.create.mockImplementation(async (a: any) => ({ id: "newm", memberNumber: "MVX-2026-00001", ...a.data }));
+  db.member.create.mockImplementation(async (a: MockDbArgs) => ({ id: "newm", memberNumber: "MVX-2026-00001", ...(a.data ?? {}) }));
   db.memberCoveragePeriod.findMany.mockResolvedValue([]);
   db.memberCoveragePeriod.create.mockResolvedValue({});
   db.memberCoveragePeriod.update.mockResolvedValue({});

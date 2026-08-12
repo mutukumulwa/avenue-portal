@@ -9,7 +9,7 @@ const db = vi.hoisted(() => ({
     findFirst: vi.fn(),
     update: vi.fn(async () => ({})),
   },
-  $transaction: vi.fn(async (ops: any[]) => Promise.all(ops)),
+  $transaction: vi.fn(async (ops: unknown[]) => Promise.all(ops)),
 }));
 // DEF-003 (R4.2 / D-15): delivery moved from the BullMQ/Redis queue
 // (enqueueEmail) to the bounded direct send (sendEmailNowBounded).

@@ -19,7 +19,7 @@ const matrix = {
   escalationTargetRole: null,
 };
 
-const req = (over: any = {}) => ({
+const req = (over: MockDbOverrides = {}) => ({
   id: "r1",
   tenantId: "t1",
   status: "PENDING",

@@ -86,15 +86,15 @@ describe("resetUserPasswordAction", () => {
     expect(Object.keys(arg.data).sort()).toEqual(
       ["failedLoginCount", "lastFailedLoginAt", "lockedUntil", "mustChangePassword", "passwordHash", "sessionVersion"],
     );
-    expect(arg.data.mustChangePassword).toBe(true);
-    expect(arg.data.sessionVersion).toEqual({ increment: 1 });
-    expect(arg.data.failedLoginCount).toBe(0);
-    expect(arg.data.lockedUntil).toBeNull();
-    expect(arg.data.lastFailedLoginAt).toBeNull();
-    expect(arg.data.role).toBeUndefined();
+    expect(arg.data!.mustChangePassword).toBe(true);
+    expect(arg.data!.sessionVersion).toEqual({ increment: 1 });
+    expect(arg.data!.failedLoginCount).toBe(0);
+    expect(arg.data!.lockedUntil).toBeNull();
+    expect(arg.data!.lastFailedLoginAt).toBeNull();
+    expect(arg.data!.role).toBeUndefined();
     // Stored as a verifying bcrypt hash, never plaintext.
-    expect(arg.data.passwordHash).not.toContain("N3wPassword!");
-    expect(await bcrypt.compare("N3wPassword!", arg.data.passwordHash)).toBe(true);
+    expect(arg.data!.passwordHash).not.toContain("N3wPassword!");
+    expect(await bcrypt.compare("N3wPassword!", arg.data!.passwordHash)).toBe(true);
   });
 
   it("WP-3.1 (DEF-005): resetting a LOCKED account clears the lock and writes an AUTH_ACCOUNT_UNLOCKED audit with tenantId", async () => {
@@ -109,8 +109,8 @@ describe("resetUserPasswordAction", () => {
 
     expect(res).toEqual({ ok: true });
     const arg = mockPrisma.user.update.mock.calls[0][0];
-    expect(arg.data.lockedUntil).toBeNull();
-    expect(arg.data.failedLoginCount).toBe(0);
+    expect(arg.data!.lockedUntil).toBeNull();
+    expect(arg.data!.failedLoginCount).toBe(0);
 
     // The reset audit records that a lock was released…
     const resetAudit = writeAudit.mock.calls[0][0];
@@ -146,9 +146,9 @@ describe("resetUserPasswordAction", () => {
 
     expect(res).toEqual({ ok: true });
     const arg = mockPrisma.user.update.mock.calls[0][0];
-    expect(arg.data.role).toBeUndefined();
-    expect(arg.data.providerId).toBeUndefined();
-    expect(arg.data.isActive).toBeUndefined();
+    expect(arg.data!.role).toBeUndefined();
+    expect(arg.data!.providerId).toBeUndefined();
+    expect(arg.data!.isActive).toBeUndefined();
   });
 
   it("audits the reset without leaking the password", async () => {

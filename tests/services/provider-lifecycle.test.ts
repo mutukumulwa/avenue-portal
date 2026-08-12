@@ -8,9 +8,9 @@ const db = vi.hoisted(() => ({
   provider: {
     findFirst: vi.fn(async (_a?: any): Promise<unknown> => null),
     findUnique: vi.fn(),
-    create: vi.fn(async (a: any) => ({ id: "prov-new", ...a.data })),
-    update: vi.fn(async (a: any) => ({ id: a.where.id, ...a.data })),
-    findMany: vi.fn(async (): Promise<any[]> => []),
+    create: vi.fn(async (a: MockDbArgs) => ({ id: "prov-new", ...(a.data ?? {}) })),
+    update: vi.fn(async (a: MockDbArgs) => ({ id: a.where!.id, ...(a.data ?? {}) })),
+    findMany: vi.fn(async (): Promise<unknown[]> => []),
   },
 }));
 

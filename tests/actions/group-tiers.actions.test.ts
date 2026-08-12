@@ -13,7 +13,7 @@ const db = vi.hoisted(() => {
       delete: vi.fn(),
       updateMany: vi.fn(),
     },
-    $transaction: vi.fn(async (fn: any) => fn(state)),
+    $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(state)),
   };
   return state;
 });
@@ -41,7 +41,7 @@ function fd(entries: Record<string, string>, isDefaultChecked = false): FormData
 
 beforeEach(() => {
   vi.clearAllMocks();
-  db.$transaction.mockImplementation(async (fn: any) => fn(db));
+  db.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn(db));
   db.group.findFirst.mockResolvedValue({ id: "g1" });
   db.package.findFirst.mockResolvedValue({ id: "pkgA" });
   db.groupBenefitTier.create.mockResolvedValue({ id: "t-new" });

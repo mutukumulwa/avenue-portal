@@ -5,20 +5,20 @@ const claimLineUpdate = vi.fn(async (_arg: any) => ({}));
 const claimUpdate = vi.fn(async (_arg: any) => ({}));
 
 const db = vi.hoisted(() => ({
-  claim: { findUnique: vi.fn(async (): Promise<any> => null), update: vi.fn(async () => ({})) },
-  group: { findUnique: vi.fn(async (): Promise<any> => ({ clientId: "cli1" })) },
-  providerContract: { findMany: vi.fn(async (): Promise<any[]> => []), findUnique: vi.fn(async (): Promise<any> => null) },
-  providerTariff: { findMany: vi.fn(async (): Promise<any[]> => []) },
-  serviceMappingMemory: { findMany: vi.fn(async (): Promise<any[]> => []) },
-  contractPackage: { findMany: vi.fn(async (): Promise<any[]> => []) },
-  pricingRule: { findMany: vi.fn(async (): Promise<any[]> => []) },
-  providerContractExclusion: { findMany: vi.fn(async (): Promise<any[]> => []) },
-  preauthRule: { findMany: vi.fn(async (): Promise<any[]> => []) },
-  documentationRule: { findMany: vi.fn(async (): Promise<any[]> => []) },
-  externalTariffTable: { findMany: vi.fn(async (): Promise<any[]> => []) },
-  adjudicationReasonCode: { findMany: vi.fn(async (): Promise<any[]> => []) },
-  claimLine: { findMany: vi.fn(async (): Promise<any[]> => []) },
-  $transaction: vi.fn(async (fn: any) => fn({ claimLine: { update: claimLineUpdate }, claim: { update: claimUpdate } })),
+  claim: { findUnique: vi.fn(async (): Promise<unknown> => null), update: vi.fn(async () => ({})) },
+  group: { findUnique: vi.fn(async (): Promise<unknown> => ({ clientId: "cli1" })) },
+  providerContract: { findMany: vi.fn(async (): Promise<unknown[]> => []), findUnique: vi.fn(async (): Promise<unknown> => null) },
+  providerTariff: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
+  serviceMappingMemory: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
+  contractPackage: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
+  pricingRule: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
+  providerContractExclusion: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
+  preauthRule: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
+  documentationRule: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
+  externalTariffTable: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
+  adjudicationReasonCode: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
+  claimLine: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
+  $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn({ claimLine: { update: claimLineUpdate }, claim: { update: claimUpdate } })),
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
 
@@ -59,22 +59,22 @@ describe("ContractEngineIntegration.evaluateAndPersist (spec §8.3)", () => {
     expect(claimLineUpdate).toHaveBeenCalledTimes(1);
     const arg = claimLineUpdate.mock.calls[0][0] as any;
     expect(arg.where).toEqual({ id: "CL1" });
-    expect(arg.data.contractId).toBe("con-cic");
-    expect(arg.data.contractVersionId).toBe("ver-1");
-    expect(arg.data.matchedRuleType).toBe("CONTRACT_TARIFF");
-    expect(arg.data.reasonCodeId).toBe("rc-prc001"); // PRC-001 resolved
-    expect(Number(arg.data.shortfallAmount)).toBe(500);
-    expect(Number(arg.data.providerWriteOff)).toBe(500);
-    expect(arg.data.ruleTrace).toBeTruthy();
+    expect(arg.data!.contractId).toBe("con-cic");
+    expect(arg.data!.contractVersionId).toBe("ver-1");
+    expect(arg.data!.matchedRuleType).toBe("CONTRACT_TARIFF");
+    expect(arg.data!.reasonCodeId).toBe("rc-prc001"); // PRC-001 resolved
+    expect(Number(arg.data!.shortfallAmount)).toBe(500);
+    expect(Number(arg.data!.providerWriteOff)).toBe(500);
+    expect(arg.data!.ruleTrace).toBeTruthy();
   });
 
   it("stamps the claim-level contract match", async () => {
     await ContractEngineIntegration.evaluateAndPersist("t", "clm1");
     const arg = claimUpdate.mock.calls[0][0] as any;
     expect(arg.where).toEqual({ id: "clm1" });
-    expect(arg.data.contractId).toBe("con-cic");
-    expect(arg.data.contractFamilyIds).toEqual(["con-cic"]);
-    expect(arg.data.assignedQueue).toBeNull(); // clean shortfall, no pend
+    expect(arg.data!.contractId).toBe("con-cic");
+    expect(arg.data!.contractFamilyIds).toEqual(["con-cic"]);
+    expect(arg.data!.assignedQueue).toBeNull(); // clean shortfall, no pend
   });
 
   it("swallows errors by default (never loses a claim)", async () => {

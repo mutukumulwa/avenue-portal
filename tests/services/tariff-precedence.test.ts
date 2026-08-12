@@ -9,17 +9,17 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 // ── mock prisma for the engine determinism case (engine.test.ts convention) ──
 const db = vi.hoisted(() => ({
   providerContract: {
-    findMany: vi.fn(async (): Promise<any[]> => []),
-    findUnique: vi.fn(async (): Promise<any> => null),
+    findMany: vi.fn(async (): Promise<unknown[]> => []),
+    findUnique: vi.fn(async (): Promise<unknown> => null),
   },
-  providerTariff: { findMany: vi.fn(async (): Promise<any[]> => []) },
-  serviceMappingMemory: { findMany: vi.fn(async (): Promise<any[]> => []) },
-  contractPackage: { findMany: vi.fn(async (): Promise<any[]> => []) },
-  pricingRule: { findMany: vi.fn(async (): Promise<any[]> => []) },
-  providerContractExclusion: { findMany: vi.fn(async (): Promise<any[]> => []) },
-  preauthRule: { findMany: vi.fn(async (): Promise<any[]> => []) },
-  documentationRule: { findMany: vi.fn(async (): Promise<any[]> => []) },
-  externalTariffTable: { findMany: vi.fn(async (): Promise<any[]> => []) },
+  providerTariff: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
+  serviceMappingMemory: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
+  contractPackage: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
+  pricingRule: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
+  providerContractExclusion: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
+  preauthRule: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
+  documentationRule: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
+  externalTariffTable: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
 

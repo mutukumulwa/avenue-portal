@@ -4,12 +4,12 @@ const db = vi.hoisted(() => ({
   terminologyEntry: {
     findFirst: vi.fn(),
     findUnique: vi.fn(async () => ({ id: "e1", status: "APPROVED" })),
-    update: vi.fn(async (a: any) => ({ id: a.where.id })),
+    update: vi.fn(async (a: MockDbArgs) => ({ id: a.where!.id })),
     updateMany: vi.fn(async () => ({ count: 1 })),
-    create: vi.fn(async (a: any) => ({ id: "new", ...a.data })),
+    create: vi.fn(async (a: MockDbArgs) => ({ id: "new", ...(a.data ?? {}) })),
   },
   terminologyApproval: { create: vi.fn(async () => ({ id: "ap1" })) },
-  $transaction: vi.fn(async (ops: any[]) => Promise.all(ops)),
+  $transaction: vi.fn(async (ops: unknown[]) => Promise.all(ops)),
 }));
 
 vi.mock("@/lib/prisma", () => ({ prisma: db }));

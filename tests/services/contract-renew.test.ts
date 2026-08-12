@@ -2,21 +2,21 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const h = vi.hoisted(() => {
   const tx = {
-    providerContract: { create: vi.fn(async (a: any) => ({ id: "new1", contractNumber: "PC-2027-001", ...a.data })), update: vi.fn(async (a: any) => ({ a })) },
-    providerTariff: { createMany: vi.fn(async (a: any) => ({ a, count: 0 })) },
-    contractApplicability: { createMany: vi.fn(async (a: any) => ({ a, count: 0 })) },
-    contractBranch: { createMany: vi.fn(async (a: any) => ({ a, count: 0 })) },
-    pricingRule: { createMany: vi.fn(async (a: any) => ({ a, count: 0 })) },
-    contractPackage: { create: vi.fn(async (a: any) => ({ a, id: "pkgN" })) },
-    preauthRule: { createMany: vi.fn(async (a: any) => ({ a, count: 0 })) },
-    documentationRule: { createMany: vi.fn(async (a: any) => ({ a, count: 0 })) },
-    providerContractExclusion: { createMany: vi.fn(async (a: any) => ({ a, count: 0 })) },
+    providerContract: { create: vi.fn(async (a: MockDbArgs) => ({ id: "new1", contractNumber: "PC-2027-001", ...(a.data ?? {}) })), update: vi.fn(async (a: MockDbArgs) => ({ a })) },
+    providerTariff: { createMany: vi.fn(async (a: MockDbArgs) => ({ a, count: 0 })) },
+    contractApplicability: { createMany: vi.fn(async (a: MockDbArgs) => ({ a, count: 0 })) },
+    contractBranch: { createMany: vi.fn(async (a: MockDbArgs) => ({ a, count: 0 })) },
+    pricingRule: { createMany: vi.fn(async (a: MockDbArgs) => ({ a, count: 0 })) },
+    contractPackage: { create: vi.fn(async (a: MockDbArgs) => ({ a, id: "pkgN" })) },
+    preauthRule: { createMany: vi.fn(async (a: MockDbArgs) => ({ a, count: 0 })) },
+    documentationRule: { createMany: vi.fn(async (a: MockDbArgs) => ({ a, count: 0 })) },
+    providerContractExclusion: { createMany: vi.fn(async (a: MockDbArgs) => ({ a, count: 0 })) },
   };
   return {
     tx,
     db: {
-      providerContract: { findUnique: vi.fn(async (): Promise<any> => null) },
-      $transaction: vi.fn(async (fn: any) => fn(tx)),
+      providerContract: { findUnique: vi.fn(async (): Promise<unknown> => null) },
+      $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(tx)),
     },
   };
 });
@@ -57,20 +57,20 @@ describe("ContractLifecycleService.renew (spec §4.4)", () => {
     });
     expect(renewed.contractNumber).toBe("PC-2027-001");
 
-    const created = h.tx.providerContract.create.mock.calls[0][0].data;
+    const created = h.tx.providerContract.create.mock.calls[0][0].data as MockDbRow;
     expect(created.status).toBe("DRAFT");
     expect(created.executionStatus).toBe("UNSIGNED"); // must be re-signed
     expect(created.submissionWindowDays).toBe(7); // operational terms carried forward
 
     // 10% uplift on tariff rate + cap.
-    const tariffs = h.tx.providerTariff.createMany.mock.calls[0][0].data;
+    const tariffs = h.tx.providerTariff.createMany.mock.calls[0][0].data as unknown as MockDbRow[];
     expect(tariffs[0].agreedRate).toBe(1100);
     expect(tariffs[0].maxPayableAmount).toBe(2200);
     expect(tariffs[0].rateType).toBe("FIXED"); // new field carried forward
 
     // Pricing-rule params.rate uplifted.
-    const rules = h.tx.pricingRule.createMany.mock.calls[0][0].data;
-    expect(rules[0].params.rate).toBe(3960); // 3600 × 1.1
+    const rules = h.tx.pricingRule.createMany.mock.calls[0][0].data as unknown as MockDbRow[];
+    expect((rules[0].params as MockDbRow).rate).toBe(3960); // 3600 × 1.1
 
     // Applicability carried forward.
     expect(h.tx.contractApplicability.createMany).toHaveBeenCalled();

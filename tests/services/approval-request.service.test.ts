@@ -6,10 +6,10 @@ const db = vi.hoisted(() => ({
     findFirst: vi.fn(),
     update: vi.fn(async () => ({})),
     findUnique: vi.fn(async () => ({ id: "req1" })),
-    create: vi.fn(async (a: any) => ({ id: "req1", ...a.data })),
+    create: vi.fn(async (a: MockDbArgs) => ({ id: "req1", ...(a.data ?? {}) })),
   },
   approvalDecision: { create: vi.fn(async () => ({})) },
-  $transaction: vi.fn(async (ops: any[]) => Promise.all(ops)),
+  $transaction: vi.fn(async (ops: unknown[]) => Promise.all(ops)),
 }));
 
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
@@ -28,7 +28,7 @@ const twoLevelMatrix = {
   escalationTargetRole: null,
 };
 
-const request = (over: any = {}) => ({
+const request = (over: MockDbOverrides = {}) => ({
   id: "req1",
   tenantId: "t1",
   status: "PENDING",

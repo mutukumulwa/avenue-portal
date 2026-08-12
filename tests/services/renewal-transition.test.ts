@@ -23,17 +23,17 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const h = vi.hoisted(() => {
   const tx = {
-    member: { findMany: vi.fn(async (_a?: any): Promise<any[]> => []), updateMany: vi.fn(async (_a?: any) => ({ count: 0 })) },
+    member: { findMany: vi.fn(async (_a?: any): Promise<unknown[]> => []), updateMany: vi.fn(async (_a?: any) => ({ count: 0 })) },
     group: { update: vi.fn(async (_a?: any) => ({})) },
   };
   return {
     tx,
     audit: vi.fn(async (_e?: any) => ({})),
     db: {
-      group: { findUnique: vi.fn(async (_a?: any): Promise<any> => null) },
-      member: { findMany: vi.fn(async (_a?: any): Promise<any[]> => []) },
-      benefitHold: { findMany: vi.fn(async (_a?: any): Promise<any[]> => []) },
-      $transaction: vi.fn(async (fn: any) => fn(tx)),
+      group: { findUnique: vi.fn(async (_a?: any): Promise<unknown> => null) },
+      member: { findMany: vi.fn(async (_a?: any): Promise<unknown[]> => []) },
+      benefitHold: { findMany: vi.fn(async (_a?: any): Promise<unknown[]> => []) },
+      $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(tx)),
     },
   };
 });

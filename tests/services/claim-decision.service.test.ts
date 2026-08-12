@@ -12,37 +12,37 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const db = vi.hoisted(() => {
-  const claimUpdate = vi.fn(async (args: any) => ({ id: "clm1", ...args.data }));
+  const claimUpdate = vi.fn(async (args: MockDbArgs) => ({ id: "clm1", ...(args.data ?? {}) }));
   const state: any = {
     claim: {
       findUnique: vi.fn(),
       update: claimUpdate,
     },
-    claimLine: { findMany: vi.fn(async (): Promise<any[]> => []), update: vi.fn(async () => ({})) },
+    claimLine: { findMany: vi.fn(async (): Promise<unknown[]> => []), update: vi.fn(async () => ({})) },
     practitioner: { findFirst: vi.fn(async () => null) },
-    member: { findUnique: vi.fn(), findMany: vi.fn(async (): Promise<any[]> => []) },
+    member: { findUnique: vi.fn(), findMany: vi.fn(async (): Promise<unknown[]> => []) },
     benefitConfig: { findFirst: vi.fn() },
-    benefitUsage: { findUnique: vi.fn(async () => null), findMany: vi.fn(async (): Promise<any[]> => []), create: vi.fn(async (a: any) => a.data), update: vi.fn(async (a: any) => a.data) },
-    benefitConfigSharedLimit: { findMany: vi.fn(async (): Promise<any[]> => []) },
-    benefitHold: { findUnique: vi.fn(async () => null), findMany: vi.fn(async (): Promise<any[]> => []), update: vi.fn(async (a: any) => a.data), upsert: vi.fn(async () => ({})) },
-    preAuthorization: { findMany: vi.fn(async (): Promise<any[]> => []), count: vi.fn(async () => 0), updateMany: vi.fn(async () => ({ count: 1 })), update: vi.fn(async (a: any) => a.data) },
-    approvalMatrix: { findMany: vi.fn(async (): Promise<any[]> => []) },
-    approvalRequest: { findFirst: vi.fn(async () => null), create: vi.fn(async () => ({ id: "ar1" })), update: vi.fn(async (a: any) => a.data) },
+    benefitUsage: { findUnique: vi.fn(async () => null), findMany: vi.fn(async (): Promise<unknown[]> => []), create: vi.fn(async (a: MockDbArgs) => a.data), update: vi.fn(async (a: MockDbArgs) => a.data) },
+    benefitConfigSharedLimit: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
+    benefitHold: { findUnique: vi.fn(async () => null), findMany: vi.fn(async (): Promise<unknown[]> => []), update: vi.fn(async (a: MockDbArgs) => a.data), upsert: vi.fn(async () => ({})) },
+    preAuthorization: { findMany: vi.fn(async (): Promise<unknown[]> => []), count: vi.fn(async () => 0), updateMany: vi.fn(async () => ({ count: 1 })), update: vi.fn(async (a: MockDbArgs) => a.data) },
+    approvalMatrix: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
+    approvalRequest: { findFirst: vi.fn(async () => null), create: vi.fn(async () => ({ id: "ar1" })), update: vi.fn(async (a: MockDbArgs) => a.data) },
     // OBS-7 fraud gate: default tenant config leaves the gate OFF, and no
     // unresolved fraud alerts, so decide() proceeds exactly as before.
     tenant: { findUnique: vi.fn(async () => ({ config: {} })) },
-    claimFraudAlert: { findMany: vi.fn(async (): Promise<any[]> => []) },
+    claimFraudAlert: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
     fxRate: { findFirst: vi.fn(async () => null) },
     overrideRecord: { findFirst: vi.fn(async () => null) },
     coContributionTransaction: { findUnique: vi.fn(async () => null) },
-    chartOfAccount: { findUnique: vi.fn(async (a: any) => ({ id: `acc-${a.where.tenantId_code.code}`, code: a.where.tenantId_code.code })) },
-    journalEntry: { count: vi.fn(async () => 0), findFirst: vi.fn(async () => null), create: vi.fn(async (a: any) => ({ id: "je1", ...a.data })) },
+    chartOfAccount: { findUnique: vi.fn(async (a: MockDbArgs) => ({ id: `acc-${(a.where as { tenantId_code: { code: string } }).tenantId_code.code}`, code: (a.where as { tenantId_code: { code: string } }).tenantId_code.code })) },
+    journalEntry: { count: vi.fn(async () => 0), findFirst: vi.fn(async () => null), create: vi.fn(async (a: MockDbArgs) => ({ id: "je1", ...(a.data ?? {}) })) },
     selfFundedAccount: { update: vi.fn(async () => ({})) },
     fundTransaction: { create: vi.fn(async () => ({})) },
     exceptionLog: { create: vi.fn(async () => ({})) },
     adjudicationLog: { create: vi.fn(async () => ({})) },
     auditLog: { findFirst: vi.fn(async () => null), create: vi.fn(async () => ({})) },
-    $transaction: vi.fn(async (fn: any) => fn(state)),
+    $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(state)),
   };
   return state;
 });
@@ -51,11 +51,11 @@ vi.mock("@/lib/prisma", () => ({ prisma: db }));
 
 // Contract engine + FFS resolution are exercised via their own suites; here we
 // stub the ceiling inputs per scenario.
-const engine = vi.hoisted(() => ({ evaluateClaimById: vi.fn(async (): Promise<any> => null) }));
+const engine = vi.hoisted(() => ({ evaluateClaimById: vi.fn(async (): Promise<unknown> => null) }));
 vi.mock("@/server/services/contract-engine/engine", () => ({ ContractEngine: engine }));
 
 const claimsSvc = vi.hoisted(() => ({
-  resolveClaimContractRates: vi.fn(async (): Promise<any> => ({ contract: null, lines: [] })),
+  resolveClaimContractRates: vi.fn(async (): Promise<unknown> => ({ contract: null, lines: [] })),
   // IPL-PA-01: faithful copy of the real resolver (union of claim- and
   // case-attached PAs). The findMany it feeds is mocked, so only its shape
   // matters, but we mirror the branch so a caseId scenario is exercised.
@@ -114,9 +114,9 @@ function memberWithConfig() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  db.chartOfAccount.findUnique.mockImplementation(async (a: any) => ({
-    id: `acc-${a.where.tenantId_code.code}`,
-    code: a.where.tenantId_code.code,
+  db.chartOfAccount.findUnique.mockImplementation(async (a: MockDbArgs) => ({
+    id: `acc-${(a.where as { tenantId_code: { code: string } }).tenantId_code.code}`,
+    code: (a.where as { tenantId_code: { code: string } }).tenantId_code.code,
   }));
   db.claim.findUnique.mockResolvedValue(baseClaim());
   // IPL-PA-01: decide() reads securing PAs via preAuthorization.findMany (case
@@ -765,17 +765,20 @@ describe("P1.3 — benefit availability gate (IP-DEF-06)", () => {
       preauths: [{ id: "pa1", preauthNumber: "PA-2026-00001", approvedAmount: 200000, estimatedCost: 200000, utilisedAmount: 0, status: "ATTACHED" }],
     }));
     db.benefitUsage.findUnique.mockImplementation(async () => ({ ...usageRow }));
-    db.benefitUsage.update.mockImplementation(async (a: any) => {
-      if (a.data?.amountUsed?.increment) usageRow.amountUsed += a.data.amountUsed.increment;
-      if (a.data?.activeHoldAmount?.increment) usageRow.activeHoldAmount += a.data.activeHoldAmount.increment;
+    db.benefitUsage.update.mockImplementation(async (a: MockDbArgs) => {
+      const data = a.data as
+        | { amountUsed?: { increment?: number }; activeHoldAmount?: { increment?: number } }
+        | undefined;
+      if (data?.amountUsed?.increment) usageRow.amountUsed += data.amountUsed.increment;
+      if (data?.activeHoldAmount?.increment) usageRow.activeHoldAmount += data.activeHoldAmount.increment;
       return { ...usageRow };
     });
     db.benefitHold.findUnique.mockImplementation(async () => ({ ...holdRow }));
-    db.benefitHold.update.mockImplementation(async (a: any) => {
+    db.benefitHold.update.mockImplementation(async (a: MockDbArgs) => {
       Object.assign(holdRow, a.data);
       return { ...holdRow };
     });
-    db.benefitHold.findMany.mockImplementation(async (a: any) => {
+    db.benefitHold.findMany.mockImplementation(async (a: MockDbArgs) => {
       if (a?.where?.preAuthId) return holdRow.status === "ACTIVE" ? [{ ...holdRow }] : [];
       return holdRow.status === "ACTIVE" ? [{ ...holdRow }] : [];
     });
@@ -790,7 +793,7 @@ describe("P1.3 — benefit availability gate (IP-DEF-06)", () => {
   it("P1-C: a dependant beyond the FAMILY pool remainder is blocked with BENEFIT_FAMILY_LIMIT_EXHAUSTED", async () => {
     // Reset implementations the P1-B test installed on shared mocks.
     db.benefitHold.findMany.mockResolvedValue([]);
-    db.benefitUsage.update.mockImplementation(async (a: any) => a.data);
+    db.benefitUsage.update.mockImplementation(async (a: MockDbArgs) => a.data);
     db.member.findUnique.mockResolvedValue({
       id: "m1", relationship: "CHILD", principalId: "m0",
       packageVersionId: "pv1", enrollmentDate: new Date("2026-01-15"),
@@ -800,9 +803,9 @@ describe("P1.3 — benefit availability gate (IP-DEF-06)", () => {
     db.benefitConfigSharedLimit.findMany.mockResolvedValue([
       { sharedLimitGroup: { id: "slg1", name: "Family inpatient pool", limitAmount: 500000, appliesTo: "FAMILY", benefitConfigs: [{ benefitConfigId: "cfg-inpatient" }] } },
     ]);
-    db.benefitUsage.findMany.mockImplementation(async (a: any) => {
+    db.benefitUsage.findMany.mockImplementation(async (a: MockDbArgs) => {
       const m = a?.where?.memberId;
-      if (m && typeof m === "object" && Array.isArray(m.in)) {
+      if (m && typeof m === "object" && Array.isArray((m as { in?: unknown }).in)) {
         return [
           { memberId: "m0", amountUsed: 200000, activeHoldAmount: 0, benefitConfig: { category: "INPATIENT" } },
           { memberId: "sib", amountUsed: 250000, activeHoldAmount: 0, benefitConfig: { category: "INPATIENT" } },

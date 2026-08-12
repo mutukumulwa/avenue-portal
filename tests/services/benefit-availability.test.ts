@@ -16,18 +16,18 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const db = vi.hoisted(() => {
   const state: any = {
-    member: { findUnique: vi.fn(), findMany: vi.fn(async (): Promise<any[]> => []) },
-    benefitConfig: { findFirst: vi.fn(), findMany: vi.fn(async (): Promise<any[]> => []) },
+    member: { findUnique: vi.fn(), findMany: vi.fn(async (): Promise<unknown[]> => []) },
+    benefitConfig: { findFirst: vi.fn(), findMany: vi.fn(async (): Promise<unknown[]> => []) },
     benefitUsage: {
-      findUnique: vi.fn(async (): Promise<any> => null),
-      findMany: vi.fn(async (): Promise<any[]> => []),
-      create: vi.fn(async (a: any) => a.data),
-      update: vi.fn(async (a: any) => a.data),
+      findUnique: vi.fn(async (): Promise<unknown> => null),
+      findMany: vi.fn(async (): Promise<unknown[]> => []),
+      create: vi.fn(async (a: MockDbArgs) => a.data),
+      update: vi.fn(async (a: MockDbArgs) => a.data),
     },
-    benefitConfigSharedLimit: { findMany: vi.fn(async (): Promise<any[]> => []) },
-    benefitHold: { findMany: vi.fn(async (): Promise<any[]> => []) },
+    benefitConfigSharedLimit: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
+    benefitHold: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
     exceptionLog: { create: vi.fn(async () => ({})) },
-    $transaction: vi.fn(async (fn: any) => fn(state)),
+    $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(state)),
   };
   return state;
 });
@@ -137,7 +137,7 @@ describe("P1.1 computeAvailability — one result, minimum across constraints", 
   it("OVERALL (Package.annualLimit, DEC-03) binds when other categories consumed it", async () => {
     baseline({ annualLimit: 100_000 });
     // Overall query: this member's rows across categories in the period.
-    db.benefitUsage.findMany.mockImplementation(async (args: any) => {
+    db.benefitUsage.findMany.mockImplementation(async (args: MockDbArgs) => {
       if (args?.where?.memberId === "m1" && !args?.where?.benefitConfigId) {
         return [
           { memberId: "m1", amountUsed: 80_000, activeHoldAmount: 0, benefitConfig: { category: "DENTAL" } },
@@ -159,7 +159,7 @@ describe("P1.1 computeAvailability — one result, minimum across constraints", 
   it("P1-B: an attached PA hold being converted by this claim is credited exactly once", async () => {
     // Category row: 0 used, 200k held (the PA's own hold).
     db.benefitUsage.findUnique.mockResolvedValue({ amountUsed: 0, activeHoldAmount: 200_000 });
-    db.benefitHold.findMany.mockImplementation(async (args: any) => {
+    db.benefitHold.findMany.mockImplementation(async (args: MockDbArgs) => {
       if (args?.where?.preAuthId) {
         return [{ memberId: "m1", benefitCategory: "OUTPATIENT", heldAmount: 200_000, status: "ACTIVE" }];
       }
@@ -194,9 +194,9 @@ describe("P1.1 computeAvailability — one result, minimum across constraints", 
         },
       },
     ]);
-    db.benefitUsage.findMany.mockImplementation(async (args: any) => {
+    db.benefitUsage.findMany.mockImplementation(async (args: MockDbArgs) => {
       const m = args?.where?.memberId;
-      if (m && typeof m === "object" && Array.isArray(m.in)) {
+      if (m && typeof m === "object" && Array.isArray((m as { in?: unknown }).in)) {
         return [
           { memberId: "m1", amountUsed: 200_000, activeHoldAmount: 0, benefitConfig: { category: "OUTPATIENT" } },
           { memberId: "child1", amountUsed: 250_000, activeHoldAmount: 0, benefitConfig: { category: "OUTPATIENT" } },
@@ -225,7 +225,7 @@ describe("P1.1 computeAvailability — one result, minimum across constraints", 
         },
       },
     ]);
-    db.benefitUsage.findMany.mockImplementation(async (args: any) => {
+    db.benefitUsage.findMany.mockImplementation(async (args: MockDbArgs) => {
       const m = args?.where?.memberId;
       if (m === "m1" && args?.where?.benefitConfigId) {
         return [{ memberId: "m1", amountUsed: 120_000, activeHoldAmount: 0, benefitConfig: { category: "DENTAL" } }];

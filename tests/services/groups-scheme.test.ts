@@ -8,7 +8,7 @@ const db = vi.hoisted(() => {
     group: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
     member: { findMany: vi.fn(), updateMany: vi.fn() },
     groupBenefitTier: { findFirst: vi.fn() },
-    $transaction: vi.fn(async (fn: any) => fn(state)),
+    $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(state)),
   };
   return state;
 });
@@ -59,7 +59,7 @@ function loadedGroup(overrides: Record<string, unknown> = {}) {
 beforeEach(() => {
   vi.clearAllMocks();
   resolveSchemeClientId.mockResolvedValue("client-1");
-  db.$transaction.mockImplementation(async (fn: any) => fn(db));
+  db.$transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn(db));
   db.group.create.mockResolvedValue({ id: "g-new" });
   db.member.findMany.mockResolvedValue([]);
   db.member.updateMany.mockResolvedValue({ count: 0 });

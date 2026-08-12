@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
-  claim: { findUnique: vi.fn(), update: vi.fn(async (a: any) => a.data) },
+  claim: { findUnique: vi.fn(), update: vi.fn(async (a: MockDbArgs) => a.data) },
   benefitConfig: { findFirst: vi.fn() },
-  serviceCategory: { findMany: vi.fn(async (): Promise<any[]> => []) },
+  serviceCategory: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
   claimLine: { updateMany: vi.fn(async () => ({ count: 1 })) },
-  $transaction: vi.fn(async (ops: any[]) => Promise.all(ops)),
+  $transaction: vi.fn(async (ops: unknown[]) => Promise.all(ops)),
 }));
 
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
@@ -19,7 +19,7 @@ const categories = [
   { id: "pharm", parentId: null, tier: "PHARMACY" },
 ];
 
-const claimRow = (over: any = {}) => ({
+const claimRow = (over: MockDbOverrides = {}) => ({
   benefitCategory: "OUTPATIENT",
   member: { packageVersionId: "pv1" },
   claimLines: [

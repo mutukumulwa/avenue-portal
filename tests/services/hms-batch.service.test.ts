@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const db = vi.hoisted(() => ({
   provider: { findFirst: vi.fn(async (): Promise<{ id: string; name: string; smartProviderId?: string | null } | null> => ({ id: "p1", name: "Aga Khan" })) },
   caseServiceEntry: { findFirst: vi.fn(async (): Promise<{ id: string } | null> => null) },
-  clinicalCase: { findFirst: vi.fn(), findMany: vi.fn(async (): Promise<any[]> => []) },
+  clinicalCase: { findFirst: vi.fn(), findMany: vi.fn(async (): Promise<unknown[]> => []) },
   exceptionLog: { create: vi.fn(async () => ({})) },
 }));
 const caseSvc = vi.hoisted(() => ({ addServiceEntry: vi.fn(async () => ({ id: "e1" })) }));

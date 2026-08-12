@@ -8,7 +8,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
-  tenant: { findUnique: vi.fn(), update: vi.fn(async (a: any) => a) },
+  tenant: { findUnique: vi.fn(), update: vi.fn(async (a: MockDbArgs) => a) },
   auditLog: { create: vi.fn(async () => ({})) },
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
@@ -91,9 +91,10 @@ describe("updateClaimControls", () => {
     expect(after.fraudApprovalSeverityThreshold).toBe("LOW");
 
     const writeArg = db.tenant.update.mock.calls[0][0];
+    const writtenConfig = (writeArg.data as { config: MockDbRow }).config;
     // Unrelated config namespace survives the write.
-    expect(writeArg.data.config.branding).toEqual({ logo: "x" });
-    expect(writeArg.data.config.claims.requireFraudClearanceBeforeApproval).toBe(true);
+    expect(writtenConfig.branding).toEqual({ logo: "x" });
+    expect((writtenConfig.claims as MockDbRow).requireFraudClearanceBeforeApproval).toBe(true);
 
     expect(db.auditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({

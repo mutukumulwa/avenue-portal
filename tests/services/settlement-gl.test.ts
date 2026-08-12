@@ -9,35 +9,35 @@ const db = vi.hoisted(() => {
   const state: any = {
     providerSettlementBatch: {
       findUnique: vi.fn(),
-      findMany: vi.fn(async (): Promise<any[]> => []),
-      create: vi.fn(async (a: any) => ({ id: "batchNew", ...a.data })),
-      update: vi.fn(async (a: any) => ({ id: a.where.id, ...a.data })),
+      findMany: vi.fn(async (): Promise<unknown[]> => []),
+      create: vi.fn(async (a: MockDbArgs) => ({ id: "batchNew", ...(a.data ?? {}) })),
+      update: vi.fn(async (a: MockDbArgs) => ({ id: a.where!.id, ...(a.data ?? {}) })),
       // FG-C7: atomic settlement claim — winner gets count 1.
       updateMany: vi.fn(async () => ({ count: 1 })),
     },
     claim: {
-      findMany: vi.fn(async (): Promise<any[]> => []),
-      update: vi.fn(async (a: any) => ({ id: a.where.id, ...a.data })),
+      findMany: vi.fn(async (): Promise<unknown[]> => []),
+      update: vi.fn(async (a: MockDbArgs) => ({ id: a.where!.id, ...(a.data ?? {}) })),
       updateMany: vi.fn(async () => ({ count: 2 })),
     },
     paymentVoucher: {
       count: vi.fn(async () => 0),
       findFirst: vi.fn(async () => null),
-      create: vi.fn(async (a: any) => ({ id: "pv1", ...a.data })),
+      create: vi.fn(async (a: MockDbArgs) => ({ id: "pv1", ...(a.data ?? {}) })),
     },
     chartOfAccount: {
-      findUnique: vi.fn(async (a: any) => ({ id: `acc-${a.where.tenantId_code.code}`, code: a.where.tenantId_code.code })),
+      findUnique: vi.fn(async (a: MockDbArgs) => ({ id: `acc-${(a.where as { tenantId_code: { code: string } }).tenantId_code.code}`, code: (a.where as { tenantId_code: { code: string } }).tenantId_code.code })),
     },
-    journalEntry: { count: vi.fn(async () => 0), findFirst: vi.fn(async () => null), create: vi.fn(async (a: any) => ({ id: "je1", ...a.data })) },
+    journalEntry: { count: vi.fn(async () => 0), findFirst: vi.fn(async () => null), create: vi.fn(async (a: MockDbArgs) => ({ id: "je1", ...(a.data ?? {}) })) },
     auditLog: { findFirst: vi.fn(async () => null), create: vi.fn(async () => ({})) },
     // OBS-H1: settlement now reads the fraud-gate setting (config null → gate off,
     // behaviour unchanged) and checks for unresolved fraud alerts.
     tenant: { findUnique: vi.fn(async () => ({ config: null })) },
-    claimFraudAlert: { findMany: vi.fn(async (): Promise<any[]> => []) },
+    claimFraudAlert: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
     // PR-V02: settle now writes set-based (updateMany + one raw UPDATE) instead
     // of a per-claim loop, so the transaction cannot time out on large batches.
     $executeRaw: vi.fn(async () => 2),
-    $transaction: vi.fn(async (fn: any) => fn(state)),
+    $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(state)),
   };
   return state;
 });

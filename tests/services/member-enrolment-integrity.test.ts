@@ -30,7 +30,7 @@ const db = vi.hoisted(() => {
     groupBenefitTier: { findFirst: vi.fn(async () => null) },
     member: {
       // Route findFirst by its where-shape so a single mock serves every probe.
-      findFirst: vi.fn(async (args: any) => {
+      findFirst: vi.fn(async (args: MockDbArgs) => {
         const w = args?.where ?? {};
         if (w.relationship === "PRINCIPAL" && w.idNumber !== undefined) return overrides.principalByIdNumber;
         if (w.id !== undefined) return overrides.principalById;
@@ -41,8 +41,8 @@ const db = vi.hoisted(() => {
         return null;
       }),
       findUnique: vi.fn(),
-      create: vi.fn(async (a: any) => ({ id: "newm", memberNumber: "MVX-2026-00001", ...a.data })),
-      update: vi.fn(async (a: any) => ({ id: a.where.id, ...a.data })),
+      create: vi.fn(async (a: MockDbArgs) => ({ id: "newm", memberNumber: "MVX-2026-00001", ...(a.data ?? {}) })),
+      update: vi.fn(async (a: MockDbArgs) => ({ id: a.where!.id, ...(a.data ?? {}) })),
     },
     memberCoveragePeriod: {
       findFirst: vi.fn(async () => null),
@@ -100,7 +100,7 @@ beforeEach(() => {
   overrides.principalByIdNumber = null;
   db.package.findUnique.mockResolvedValue({ maxAge: 65, dependentMaxAge: 24 });
   db.groupBenefitTier.findFirst.mockResolvedValue(null);
-  db.member.create.mockImplementation(async (a: any) => ({ id: "newm", memberNumber: "MVX-2026-00001", ...a.data }));
+  db.member.create.mockImplementation(async (a: MockDbArgs) => ({ id: "newm", memberNumber: "MVX-2026-00001", ...(a.data ?? {}) }));
   db.memberCoveragePeriod.findFirst.mockResolvedValue(null);
   db.group.findUnique.mockResolvedValue({ id: "g1", packageId: "pkg1", packageVersionId: "pv1", clientId: "c1" });
 });

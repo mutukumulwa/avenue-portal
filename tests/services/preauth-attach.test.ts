@@ -2,17 +2,17 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
   claim: { findUnique: vi.fn() },
-  preAuthorization: { findUnique: vi.fn(), findMany: vi.fn(async (): Promise<any[]> => []), update: vi.fn(async (a: any) => a.data) },
+  preAuthorization: { findUnique: vi.fn(), findMany: vi.fn(async (): Promise<unknown[]> => []), update: vi.fn(async (a: MockDbArgs) => a.data) },
 }));
 
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
 
 import { ClaimsService } from "@/server/services/claims.service";
 
-const baseClaim = (over: any = {}) => ({
+const baseClaim = (over: MockDbOverrides = {}) => ({
   id: "clm1", memberId: "m1", providerId: "p1", status: "RECEIVED", ...over,
 });
-const basePA = (over: any = {}) => ({
+const basePA = (over: MockDbOverrides = {}) => ({
   id: "pa1", memberId: "m1", providerId: "p1", status: "APPROVED",
   claimId: null, validUntil: new Date(Date.now() + 86_400_000),
   preauthNumber: "PA-2026-00001", ...over,

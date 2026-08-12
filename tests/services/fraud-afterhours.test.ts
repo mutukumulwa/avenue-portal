@@ -2,11 +2,11 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
   claim: {
-    findUnique: vi.fn(async (): Promise<any> => null),
-    findMany: vi.fn(async (): Promise<any[]> => []),
+    findUnique: vi.fn(async (): Promise<unknown> => null),
+    findMany: vi.fn(async (): Promise<unknown[]> => []),
     count: vi.fn(async () => 0),
   },
-  providerTariff: { findFirst: vi.fn(async (): Promise<any> => null) },
+  providerTariff: { findFirst: vi.fn(async (): Promise<unknown> => null) },
   claimFraudAlert: { createMany: vi.fn(async (_a?: unknown) => ({ count: 0 })) },
   // IPL-PA-01 (A5): RULE-GATE-001 now counts securing PAs case-inclusively.
   preAuthorization: { count: vi.fn(async () => 1) },

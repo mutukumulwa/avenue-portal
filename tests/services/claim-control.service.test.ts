@@ -11,10 +11,10 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
   tenant: { findUnique: vi.fn() },
-  claimFraudAlert: { findMany: vi.fn(async (): Promise<any[]> => []) },
+  claimFraudAlert: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
   approvalRequest: {
-    findFirst: vi.fn(async (): Promise<any> => null),
-    update: vi.fn(async (a: any) => a.data),
+    findFirst: vi.fn(async (): Promise<unknown> => null),
+    update: vi.fn(async (a: MockDbArgs) => a.data),
   },
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));

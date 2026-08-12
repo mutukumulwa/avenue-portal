@@ -71,7 +71,7 @@ describe("updateUserAccessAction (BD-01)", () => {
 
     const arg = mockPrisma.user.update.mock.calls[0][0];
     expect(arg.data).toEqual({ role: "CLAIMS_OFFICER", isActive: true });
-    expect(arg.data.sessionVersion).toBeUndefined();
+    expect(arg.data!.sessionVersion).toBeUndefined();
   });
 
   it("invalidates the session when a staff role changes", async () => {
@@ -83,7 +83,7 @@ describe("updateUserAccessAction (BD-01)", () => {
     await updateUserAccessAction(fd({ userId: "u1", role: "CUSTOMER_SERVICE", isActive: "true" }));
 
     const arg = mockPrisma.user.update.mock.calls[0][0];
-    expect(arg.data.sessionVersion).toEqual({ increment: 1 });
+    expect(arg.data!.sessionVersion).toEqual({ increment: 1 });
   });
 
   it("rejects converting a staff user INTO a portal role inline", async () => {

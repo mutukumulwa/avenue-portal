@@ -2,20 +2,20 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
   wellnessProgram: {
-    findFirst: vi.fn(async (): Promise<any> => null),
-    findMany: vi.fn(async (): Promise<any[]> => []),
-    create: vi.fn(async (a: any) => ({ id: "p1", ...a.data })),
-    update: vi.fn(async (a: any) => ({ id: a.where.id, ...a.data })),
+    findFirst: vi.fn(async (): Promise<unknown> => null),
+    findMany: vi.fn(async (): Promise<unknown[]> => []),
+    create: vi.fn(async (a: MockDbArgs) => ({ id: "p1", ...(a.data ?? {}) })),
+    update: vi.fn(async (a: MockDbArgs) => ({ id: a.where!.id, ...(a.data ?? {}) })),
   },
   wellnessEnrollment: {
-    findFirst: vi.fn(async (): Promise<any> => null),
-    findMany: vi.fn(async (): Promise<any[]> => []),
-    create: vi.fn(async (a: any) => ({ id: "e1", ...a.data })),
-    update: vi.fn(async (a: any) => ({ id: a.where.id, ...a.data })),
+    findFirst: vi.fn(async (): Promise<unknown> => null),
+    findMany: vi.fn(async (): Promise<unknown[]> => []),
+    create: vi.fn(async (a: MockDbArgs) => ({ id: "e1", ...(a.data ?? {}) })),
+    update: vi.fn(async (a: MockDbArgs) => ({ id: a.where!.id, ...(a.data ?? {}) })),
   },
-  wellnessActivity: { create: vi.fn(async (a: any) => ({ id: "a1", ...a.data })) },
-  member: { findFirst: vi.fn(async (): Promise<any> => null) },
-  $transaction: vi.fn(async (fn: any) => fn(db)),
+  wellnessActivity: { create: vi.fn(async (a: MockDbArgs) => ({ id: "a1", ...(a.data ?? {}) })) },
+  member: { findFirst: vi.fn(async (): Promise<unknown> => null) },
+  $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(db)),
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
 

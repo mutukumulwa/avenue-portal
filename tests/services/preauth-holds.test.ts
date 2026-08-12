@@ -9,13 +9,13 @@ const db = vi.hoisted(() => {
     preAuthorization: {
       findUnique: vi.fn(),
       findFirst: vi.fn(async () => null),
-      update: vi.fn(async (a: any) => ({ id: a.where.id, ...a.data })),
+      update: vi.fn(async (a: MockDbArgs) => ({ id: a.where!.id, ...(a.data ?? {}) })),
       updateMany: vi.fn(async () => ({ count: 1 })),
       count: vi.fn(async () => 4),
     },
     benefitHold: {
       findUnique: vi.fn(async () => null),
-      findMany: vi.fn(async (): Promise<any[]> => []),
+      findMany: vi.fn(async (): Promise<unknown[]> => []),
       upsert: vi.fn(async () => ({})),
       update: vi.fn(async () => ({})),
     },
@@ -23,13 +23,13 @@ const db = vi.hoisted(() => {
     benefitConfig: { findFirst: vi.fn() },
     benefitUsage: {
       findUnique: vi.fn(async () => null),
-      findMany: vi.fn(async (): Promise<any[]> => []),
-      create: vi.fn(async (a: any) => a.data),
-      update: vi.fn(async (a: any) => a.data),
+      findMany: vi.fn(async (): Promise<unknown[]> => []),
+      create: vi.fn(async (a: MockDbArgs) => a.data),
+      update: vi.fn(async (a: MockDbArgs) => a.data),
     },
-    benefitConfigSharedLimit: { findMany: vi.fn(async (): Promise<any[]> => []) },
+    benefitConfigSharedLimit: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
     auditLog: { findFirst: vi.fn(async () => null), create: vi.fn(async () => ({})) },
-    $transaction: vi.fn(async (fn: any) => fn(state)),
+    $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(state)),
   };
   return state;
 });

@@ -12,7 +12,7 @@ import { evaluateExclusions, type ExclusionRuleView } from "@/server/services/el
 const mockPrisma = vi.hoisted(() => ({
   providerContract: { findFirst: vi.fn() },
   packageVersion: { findUnique: vi.fn() },
-  treatmentExclusionRule: { findMany: vi.fn(async (): Promise<any[]> => []), create: vi.fn(async (_a?: any) => ({ id: "ex-new" })) },
+  treatmentExclusionRule: { findMany: vi.fn(async (): Promise<unknown[]> => []), create: vi.fn(async (_a?: any) => ({ id: "ex-new" })) },
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma }));
 

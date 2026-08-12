@@ -9,11 +9,11 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
   journalEntry: {
-    findFirst: vi.fn(async (): Promise<any> => null),
-    findMany: vi.fn(async (): Promise<any[]> => []),
+    findFirst: vi.fn(async (): Promise<unknown> => null),
+    findMany: vi.fn(async (): Promise<unknown[]> => []),
   },
-  claim: { findMany: vi.fn(async (): Promise<any[]> => []) },
-  providerSettlementBatch: { findMany: vi.fn(async (): Promise<any[]> => []) },
+  claim: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
+  providerSettlementBatch: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
 

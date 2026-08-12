@@ -4,13 +4,13 @@ import { TRPCError } from "@trpc/server";
 const db = vi.hoisted(() => ({
   approvalMatrix: { findMany: vi.fn() },
   fxRate: { findFirst: vi.fn(async () => null) },
-  approvalRequest: { findFirst: vi.fn(async (): Promise<any> => null), create: vi.fn(async () => ({ id: "req1" })) },
+  approvalRequest: { findFirst: vi.fn(async (): Promise<unknown> => null), create: vi.fn(async () => ({ id: "req1" })) },
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
 
 import { ApprovalRequestService } from "@/server/services/approval-request.service";
 
-const rule = (over: any = {}) => ({
+const rule = (over: MockDbOverrides = {}) => ({
   id: "r", clientId: null, actionType: "FUND_TOPUP", claimValueMin: null, claimValueMax: null,
   currency: "UGX", serviceType: null, benefitCategory: null, requiredRole: "FINANCE_OFFICER",
   requiresDual: false, slaMinutes: null, escalationTargetRole: null,

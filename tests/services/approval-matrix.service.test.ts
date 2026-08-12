@@ -151,10 +151,10 @@ describe("ApprovalMatrixService — engine (G3.1)", () => {
         rule({ id: "band", claimValueMin: 2_000_000, claimValueMax: null, requiredRole: "FINANCE_OFFICER" }),
       ]);
       const asOf = new Date("2026-03-01");
-      db.fxRate.findFirst.mockImplementation(async (args: any) => {
+      db.fxRate.findFirst.mockImplementation(async (args: MockDbArgs) => {
         // The query must constrain effectiveFrom ≤ atDate — assert and answer
         // with the rate that was in force then (25, not today's 29).
-        expect(args.where.effectiveFrom.lte).toEqual(asOf);
+        expect((args.where as { effectiveFrom: { lte: Date } }).effectiveFrom.lte).toEqual(asOf);
         return { rate: 25 };
       });
       const r = await ApprovalMatrixService.resolve(T, {

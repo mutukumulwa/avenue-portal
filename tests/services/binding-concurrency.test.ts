@@ -14,24 +14,24 @@ const db = vi.hoisted(() => {
       findUnique: vi.fn(),
       updateMany: vi.fn(async () => ({ count: 1 })),
     },
-    quotationAcceptance: { create: vi.fn(async (a: any) => ({ id: "acc1", ...a.data })) },
+    quotationAcceptance: { create: vi.fn(async (a: MockDbArgs) => ({ id: "acc1", ...(a.data ?? {}) })) },
     group: {
       count: vi.fn(async () => 0),
-      create: vi.fn(async (a: any) => ({ id: "grp1", ...a.data })),
+      create: vi.fn(async (a: MockDbArgs) => ({ id: "grp1", ...(a.data ?? {}) })),
       delete: vi.fn(async () => ({})),
     },
     member: {
       count: vi.fn(async () => 0),
       findFirst: vi.fn(async () => null),
       findMany: vi.fn(async () => []),
-      create: vi.fn(async (a: any) => ({ id: "m1", ...a.data })),
+      create: vi.fn(async (a: MockDbArgs) => ({ id: "m1", ...(a.data ?? {}) })),
     },
     membershipExclusion: { create: vi.fn(async () => ({})) },
     waitingPeriodApplication: { create: vi.fn(async () => ({})) },
     memberCoveragePeriod: { findFirst: vi.fn(async () => null), create: vi.fn(async () => ({})) },
     // F-PIN-2 / WP-3.5D: binding resolves the package's current version (pin) + age caps.
     package: { findUnique: vi.fn(async () => ({ currentVersionId: "pv1", maxAge: 65, dependentMaxAge: 24 })) },
-    $transaction: vi.fn(async (fn: any) => fn(state)),
+    $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(state)),
   };
   return state;
 });
@@ -43,13 +43,13 @@ vi.mock("@/server/services/member-numbering.service", () => ({ resolveMemberPref
 
 import { bindingService } from "@/server/services/binding.service";
 
-const sentQuote = (over: any = {}) => ({
+const sentQuote = (over: MockDbOverrides = {}) => ({
   id: "q1", tenantId: "t1", quoteNumber: "QUO-2026-00001",
   status: "SENT", requestedCoverStart: new Date("2026-08-01"),
   ...over,
 });
 
-const acceptedQuote = (over: any = {}) => ({
+const acceptedQuote = (over: MockDbOverrides = {}) => ({
   id: "q1", tenantId: "t1", quoteNumber: "QUO-2026-00001",
   status: "ACCEPTED", groupId: null, packageId: "pkg1",
   requestedCoverStart: new Date("2026-08-01"),

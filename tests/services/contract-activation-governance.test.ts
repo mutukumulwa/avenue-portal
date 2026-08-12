@@ -11,7 +11,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const prisma = vi.hoisted(() => ({
   providerContract: { findUnique: vi.fn() },
-  overrideRecord: { findFirst: vi.fn(async (_args?: any): Promise<any> => null) },
+  overrideRecord: { findFirst: vi.fn(async (_args?: any): Promise<unknown> => null) },
   $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(txMock)),
 }));
 vi.mock("@/lib/prisma", () => ({ prisma }));

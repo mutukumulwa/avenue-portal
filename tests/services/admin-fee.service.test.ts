@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
-  adminFeeAgreement: { findMany: vi.fn(async (): Promise<any[]> => []), findFirst: vi.fn() },
+  adminFeeAgreement: { findMany: vi.fn(async (): Promise<unknown[]> => []), findFirst: vi.fn() },
   member: { count: vi.fn(async () => 0) },
-  claim: { aggregate: vi.fn(async (): Promise<any> => ({ _sum: { approvedAmount: 0 } })) },
+  claim: { aggregate: vi.fn(async (): Promise<unknown> => ({ _sum: { approvedAmount: 0 } })) },
   adminFeeLedgerEntry: {
-    findFirst: vi.fn(async (): Promise<any> => null),
-    findMany: vi.fn(async (): Promise<any[]> => []),
+    findFirst: vi.fn(async (): Promise<unknown> => null),
+    findMany: vi.fn(async (): Promise<unknown[]> => []),
     count: vi.fn(async () => 0),
-    create: vi.fn(async (a: any) => ({ id: "le1", ...a.data })),
+    create: vi.fn(async (a: MockDbArgs) => ({ id: "le1", ...(a.data ?? {}) })),
     update: vi.fn(),
     updateMany: vi.fn(),
   },

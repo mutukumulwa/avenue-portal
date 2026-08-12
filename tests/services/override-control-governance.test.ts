@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
-  overrideControl: { findUnique: vi.fn(async (): Promise<any> => null) },
-  overrideRecord: { create: vi.fn(async (a: any): Promise<any> => ({ id: "ovr1", ...a.data })) },
+  overrideControl: { findUnique: vi.fn(async (): Promise<unknown> => null) },
+  overrideRecord: { create: vi.fn(async (a: MockDbArgs): Promise<unknown> => ({ id: "ovr1", ...(a.data ?? {}) })) },
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
 vi.mock("@/server/services/rbac.service", () => ({ rbacService: { requirePermission: vi.fn(async () => true) } }));

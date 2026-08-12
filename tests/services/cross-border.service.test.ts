@@ -2,29 +2,29 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
   crossBorderFacility: {
-    findFirst: vi.fn(async (): Promise<any> => null),
-    findMany: vi.fn(async (): Promise<any[]> => []),
-    create: vi.fn(async (a: any) => ({ id: "f1", ...a.data })),
-    update: vi.fn(async (a: any) => ({ id: a.where.id, ...a.data })),
+    findFirst: vi.fn(async (): Promise<unknown> => null),
+    findMany: vi.fn(async (): Promise<unknown[]> => []),
+    create: vi.fn(async (a: MockDbArgs) => ({ id: "f1", ...(a.data ?? {}) })),
+    update: vi.fn(async (a: MockDbArgs) => ({ id: a.where!.id, ...(a.data ?? {}) })),
   },
   crossBorderCase: {
-    findFirst: vi.fn(async (_args?: any): Promise<any> => null),
-    findMany: vi.fn(async (): Promise<any[]> => []),
-    create: vi.fn(async (a: any) => ({ id: "case1", ...a.data })),
-    update: vi.fn(async (a: any) => ({ id: a.where.id, ...a.data })),
+    findFirst: vi.fn(async (_args?: any): Promise<unknown> => null),
+    findMany: vi.fn(async (): Promise<unknown[]> => []),
+    create: vi.fn(async (a: MockDbArgs) => ({ id: "case1", ...(a.data ?? {}) })),
+    update: vi.fn(async (a: MockDbArgs) => ({ id: a.where!.id, ...(a.data ?? {}) })),
     count: vi.fn(async () => 0),
   },
   crossBorderLineItem: {
-    findMany: vi.fn(async (): Promise<any[]> => []),
-    create: vi.fn(async (a: any) => ({ id: "li1", ...a.data })),
+    findMany: vi.fn(async (): Promise<unknown[]> => []),
+    create: vi.fn(async (a: MockDbArgs) => ({ id: "li1", ...(a.data ?? {}) })),
     createMany: vi.fn(async () => ({ count: 0 })),
     deleteMany: vi.fn(async () => ({ count: 0 })),
   },
-  member: { findFirst: vi.fn(async (): Promise<any> => null) },
-  adminFeeAgreement: { findFirst: vi.fn(async (): Promise<any> => null) },
-  adminFeeLedgerEntry: { create: vi.fn(async (a: any) => ({ id: "le1", ...a.data })) },
-  fxRate: { findFirst: vi.fn(async (): Promise<any> => null) },
-  $transaction: vi.fn(async (fn: any) => fn(db)),
+  member: { findFirst: vi.fn(async (): Promise<unknown> => null) },
+  adminFeeAgreement: { findFirst: vi.fn(async (): Promise<unknown> => null) },
+  adminFeeLedgerEntry: { create: vi.fn(async (a: MockDbArgs) => ({ id: "le1", ...(a.data ?? {}) })) },
+  fxRate: { findFirst: vi.fn(async (): Promise<unknown> => null) },
+  $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(db)),
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
 
@@ -117,8 +117,8 @@ describe("CrossBorderService.issueGop (GOP within limits)", () => {
 
 describe("CrossBorderService.consolidateInvoice", () => {
   it("sums INVOICE lines into a single UGX total + reference", async () => {
-    db.crossBorderCase.findFirst.mockImplementation(async (args: any) =>
-      args?.where?.invoiceReference?.startsWith
+    db.crossBorderCase.findFirst.mockImplementation(async (args: MockDbArgs) =>
+      (args?.where?.invoiceReference as { startsWith?: unknown } | undefined)?.startsWith
         ? { invoiceReference: `CBI-${new Date().getFullYear()}-00002` } // latest → next is 00003
         : { id: "case1", status: "IN_TREATMENT", invoiceReference: null },
     );

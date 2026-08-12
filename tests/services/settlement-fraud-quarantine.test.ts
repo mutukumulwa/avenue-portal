@@ -15,20 +15,20 @@ const db = vi.hoisted(() => {
   const state: any = {
     providerSettlementBatch: {
       findUnique: vi.fn(),
-      findMany: vi.fn(async (): Promise<any[]> => []),
-      create: vi.fn(async (a: any) => ({ id: "batchNew", ...a.data })),
-      update: vi.fn(async (a: any) => ({ id: a.where.id, ...a.data })),
+      findMany: vi.fn(async (): Promise<unknown[]> => []),
+      create: vi.fn(async (a: MockDbArgs) => ({ id: "batchNew", ...(a.data ?? {}) })),
+      update: vi.fn(async (a: MockDbArgs) => ({ id: a.where!.id, ...(a.data ?? {}) })),
       updateMany: vi.fn(async () => ({ count: 1 })),
     },
     claim: {
-      findMany: vi.fn(async (): Promise<any[]> => []),
-      update: vi.fn(async (a: any) => ({ id: a.where.id, ...a.data })),
+      findMany: vi.fn(async (): Promise<unknown[]> => []),
+      update: vi.fn(async (a: MockDbArgs) => ({ id: a.where!.id, ...(a.data ?? {}) })),
       updateMany: vi.fn(async () => ({ count: 1 })),
     },
-    claimFraudAlert: { findMany: vi.fn(async (): Promise<any[]> => []) },
+    claimFraudAlert: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
     tenant: { findUnique: vi.fn(async () => ({ config: null })) },
     auditLog: { findFirst: vi.fn(async () => null), create: vi.fn(async () => ({})) },
-    $transaction: vi.fn(async (fn: any) => fn(state)),
+    $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(state)),
   };
   return state;
 });

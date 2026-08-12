@@ -1,16 +1,16 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
-  fraudRule: { findMany: vi.fn(async (): Promise<any[]> => []) },
+  fraudRule: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
   fraudInvestigation: {
-    create: vi.fn(async (a: any) => ({ id: "inv1", ...a.data })),
-    findFirst: vi.fn(async (): Promise<any> => ({ id: "inv1" })),
-    update: vi.fn(async (a: any) => ({ id: "inv1", ...a.data })),
+    create: vi.fn(async (a: MockDbArgs) => ({ id: "inv1", ...(a.data ?? {}) })),
+    findFirst: vi.fn(async (): Promise<unknown> => ({ id: "inv1" })),
+    update: vi.fn(async (a: MockDbArgs) => ({ id: "inv1", ...(a.data ?? {}) })),
   },
-  claim: { findMany: vi.fn(async (): Promise<any[]> => []), count: vi.fn(async () => 0) },
+  claim: { findMany: vi.fn(async (): Promise<unknown[]> => []), count: vi.fn(async () => 0) },
   claimFraudAlert: {
-    findFirst: vi.fn(async (): Promise<any> => null),
-    create: vi.fn(async (a: any) => ({ id: "fa1", ...a.data })),
+    findFirst: vi.fn(async (): Promise<unknown> => null),
+    create: vi.fn(async (a: MockDbArgs) => ({ id: "fa1", ...(a.data ?? {}) })),
   },
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: db }));
@@ -34,7 +34,7 @@ describe("FraudEngineService.getActiveRules (G5.11)", () => {
 });
 
 describe("FraudEngineService.scanRecentClaims — configurable scan (G5.11)", () => {
-  const scanClaim = (over: any = {}) => ({
+  const scanClaim = (over: MockDbOverrides = {}) => ({
     id: "clm1",
     memberId: "m1",
     providerId: "p1",

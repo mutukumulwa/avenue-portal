@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const db = vi.hoisted(() => ({
   providerContract: {
     findUnique: vi.fn(),
-    update: vi.fn(async (a: any) => ({ id: a.where.id, ...a.data })),
+    update: vi.fn(async (a: MockDbArgs) => ({ id: a.where!.id, ...(a.data ?? {}) })),
   },
   auditLog: { findFirst: vi.fn(async () => null), create: vi.fn(async () => ({})) },
 }));

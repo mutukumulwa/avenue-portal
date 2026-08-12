@@ -10,9 +10,9 @@ const db = vi.hoisted(() => {
   const state: any = {
     claim: {
       findUnique: vi.fn(),
-      update: vi.fn(async (a: any) => ({ id: a.where.id, ...a.data })),
+      update: vi.fn(async (a: MockDbArgs) => ({ id: a.where!.id, ...(a.data ?? {}) })),
     },
-    claimFraudAlert: { create: vi.fn(async (a: any) => ({ id: "fa1", ...a.data })) },
+    claimFraudAlert: { create: vi.fn(async (a: MockDbArgs) => ({ id: "fa1", ...(a.data ?? {}) })) },
   };
   return state;
 });

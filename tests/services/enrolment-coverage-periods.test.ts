@@ -18,8 +18,8 @@ const db = vi.hoisted(() => {
     member: {
       findFirst: vi.fn(async () => null),
       findUnique: vi.fn(),
-      create: vi.fn(async (a: any) => ({ id: "m1", ...a.data })),
-      update: vi.fn(async (a: any) => ({ id: a.where.id, ...a.data })),
+      create: vi.fn(async (a: MockDbArgs) => ({ id: "m1", ...(a.data ?? {}) })),
+      update: vi.fn(async (a: MockDbArgs) => ({ id: a.where!.id, ...(a.data ?? {}) })),
     },
     // WP-3.5F: createMember now auto-assigns the scheme's default benefit tier.
     groupBenefitTier: { findFirst: vi.fn(async () => null) },
@@ -74,8 +74,8 @@ beforeEach(() => {
   rbac.hasRole.mockResolvedValue(true);
   db.package.findUnique.mockResolvedValue({ maxAge: 65, dependentMaxAge: 24 });
   db.member.findFirst.mockResolvedValue(null);
-  db.member.create.mockImplementation(async (a: any) => ({ id: "m1", ...a.data }));
-  db.member.update.mockImplementation(async (a: any) => ({ id: a.where.id, ...a.data }));
+  db.member.create.mockImplementation(async (a: MockDbArgs) => ({ id: "m1", ...(a.data ?? {}) }));
+  db.member.update.mockImplementation(async (a: MockDbArgs) => ({ id: a.where!.id, ...(a.data ?? {}) }));
   db.memberCoveragePeriod.findFirst.mockResolvedValue(null);
   db.memberCoveragePeriod.findMany.mockResolvedValue([]);
   db.memberCoveragePeriod.create.mockResolvedValue({});

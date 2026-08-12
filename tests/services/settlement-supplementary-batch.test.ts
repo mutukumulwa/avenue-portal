@@ -9,19 +9,19 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 const db = vi.hoisted(() => {
   const state: any = {
     providerSettlementBatch: {
-      findMany: vi.fn(async (): Promise<any[]> => []),
-      create: vi.fn(async (a: any) => ({ id: "batchNew", ...a.data })),
+      findMany: vi.fn(async (): Promise<unknown[]> => []),
+      create: vi.fn(async (a: MockDbArgs) => ({ id: "batchNew", ...(a.data ?? {}) })),
     },
     claim: {
-      findMany: vi.fn(async (): Promise<any[]> => []),
+      findMany: vi.fn(async (): Promise<unknown[]> => []),
       updateMany: vi.fn(async () => ({ count: 1 })),
     },
     auditLog: { findFirst: vi.fn(async () => null), create: vi.fn(async () => ({})) },
     // OBS-H1: createSettlementBatch now reads the fraud-gate setting (config null
     // → gate off, behaviour unchanged) and checks for unresolved fraud alerts.
     tenant: { findUnique: vi.fn(async () => ({ config: null })) },
-    claimFraudAlert: { findMany: vi.fn(async (): Promise<any[]> => []) },
-    $transaction: vi.fn(async (fn: any) => fn(state)),
+    claimFraudAlert: { findMany: vi.fn(async (): Promise<unknown[]> => []) },
+    $transaction: vi.fn(async (fn: (tx: unknown) => unknown) => fn(state)),
   };
   return state;
 });
