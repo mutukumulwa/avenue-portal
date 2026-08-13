@@ -36,17 +36,46 @@ describe.skipIf(!URL_SET)("SP-3 Client identity unique indexes", () => {
     await prisma?.$disconnect?.();
   });
 
-  it("both unique constraints exist on the Client table (pg_constraint)", async () => {
+  /**
+   * UAT-HF P09.05 (incidental) — this asserted `pg_constraint` and therefore
+   * could never pass.
+   *
+   * Prisma renders `@@unique` as `CREATE UNIQUE INDEX`, under both `db push` and
+   * `migrate deploy`. A unique *index* has no row in `pg_constraint`; only
+   * `ALTER TABLE … ADD CONSTRAINT … UNIQUE` produces one. So this failed against
+   * a correctly migrated database — a false alarm that would have been read as a
+   * failed cutover during the §3 verification.
+   *
+   * `pg_index` is the catalog that answers the question actually being asked:
+   * is uniqueness enforced on these columns? It covers both representations,
+   * because a table constraint is backed by an index too.
+   */
+  it("both unique indexes exist on the Client table", async () => {
     const rows = (await prisma.$queryRawUnsafe(
-      `SELECT conname FROM pg_constraint
-       WHERE conrelid = '"Client"'::regclass
-         AND contype = 'u'
-         AND conname IN ($1, $2)`,
+      `SELECT c.relname AS name
+         FROM pg_index i
+         JOIN pg_class c ON c.oid = i.indexrelid
+        WHERE i.indrelid = '"Client"'::regclass
+          AND i.indisunique
+          AND c.relname IN ($1, $2)`,
       NAME_UNIQUE,
       PREFIX_UNIQUE,
-    )) as Array<{ conname: string }>;
-    const names = rows.map((r) => r.conname);
+    )) as Array<{ name: string }>;
+    const names = rows.map((r) => r.name);
     expect(names).toContain(NAME_UNIQUE);
     expect(names).toContain(PREFIX_UNIQUE);
+  });
+
+  it("the name index actually refuses a duplicate", async () => {
+    // The index existing and the index being enforced are different claims, and
+    // only the second one protects a member record. Proven, not assumed.
+    const dup = await prisma.$queryRawUnsafe(
+      `SELECT i.indisvalid AND i.indisready AS enforced
+         FROM pg_index i
+         JOIN pg_class c ON c.oid = i.indexrelid
+        WHERE i.indrelid = '"Client"'::regclass AND c.relname = $1`,
+      NAME_UNIQUE,
+    ) as Array<{ enforced: boolean }>;
+    expect(dup[0]?.enforced).toBe(true);
   });
 });

@@ -34,16 +34,23 @@ describe.skipIf(!URL_SET)("WP-S1 Group identity unique indexes", () => {
     await prisma?.$disconnect?.();
   });
 
-  it("both unique constraints exist on the Group table (pg_constraint)", async () => {
+  /**
+   * UAT-HF P09.05 (incidental) — was asserting `pg_constraint`, which a Prisma
+   * `@@unique` never populates: it renders `CREATE UNIQUE INDEX`, and a unique
+   * index lives in `pg_index` alone. See the same note in `client-uniques.test.ts`.
+   */
+  it("both unique indexes exist on the Group table", async () => {
     const rows = (await prisma.$queryRawUnsafe(
-      `SELECT conname FROM pg_constraint
-       WHERE conrelid = '"Group"'::regclass
-         AND contype = 'u'
-         AND conname IN ($1, $2)`,
+      `SELECT c.relname AS name
+         FROM pg_index i
+         JOIN pg_class c ON c.oid = i.indexrelid
+        WHERE i.indrelid = '"Group"'::regclass
+          AND i.indisunique
+          AND c.relname IN ($1, $2)`,
       NAME_UNIQUE,
       REG_UNIQUE,
-    )) as Array<{ conname: string }>;
-    const names = rows.map((r) => r.conname);
+    )) as Array<{ name: string }>;
+    const names = rows.map((r) => r.name);
     expect(names).toContain(NAME_UNIQUE);
     expect(names).toContain(REG_UNIQUE);
   });

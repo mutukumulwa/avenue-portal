@@ -163,16 +163,27 @@ additive and the `_prisma_migrations` rows are harmless under `db push`.
 
 ## 5. Verification already performed
 
-On a disposable database (`uathf_migrations_test`, local Postgres 5432):
+On a disposable database (`uathf_migrations_test`, local Postgres 5432). **Re-run 2026-08-13**
+after `20260813001500_provider_rule_precedence`; the table below is that run, not the original
+three-migration one.
 
 | Check | Result |
 |---|---|
-| `prisma migrate deploy` from empty | All 3 migrations applied cleanly |
+| `prisma migrate deploy` from empty | **All 16 migrations applied cleanly** |
 | `prisma migrate status` | "Database schema is up to date!" |
-| Drift: live DB vs `schema.prisma` | **"No difference detected"** |
 | `caps_family_gte_individual`, `caps_positive`, `exclusion_owner_xor` | All 3 present |
 | `TreatmentExclusionRule` FK delete actions | Both `c` (CASCADE), previously `n` (SET NULL) |
-| `tests/db/exclusion-owner-xor.test.ts` + `tests/db/constraints.test.ts` | **9 passed** |
+| `Client_operatorTenantId_nameNormalized_key`, `Group_clientId_nameNormalized_key` | Present as unique indexes |
+| `PackageProviderEligibility` new columns | `priority` default 0, `isActive` default true, both dates nullable |
+| **All of `tests/db/`** | **18 passed, 23 skipped, 0 failed** |
+
+> **Two of those tests were broken and would have failed your cutover for no reason.**
+> `client-uniques.test.ts` and `group-uniques.test.ts` asserted the uniques existed in
+> `pg_constraint`. Prisma renders `@@unique` as `CREATE UNIQUE INDEX` under *both* `db push` and
+> `migrate deploy`, and a unique index has no `pg_constraint` row — only
+> `ALTER TABLE … ADD CONSTRAINT … UNIQUE` produces one. Both now query `pg_index`, which answers
+> the question actually being asked. Fixed 2026-08-13 under P09.05. If you ran §3 and saw those two
+> fail, that was the test, not your database — but re-pull before you rely on it.
 
 Reproduce with:
 
