@@ -1976,6 +1976,65 @@ failed**.
 
 ---
 
+### P08.03 — Endorsements can be approved again
+
+**Commit** `32056ce` · **Defect** DEF-046 (S2)
+
+The run raised three endorsements and could not approve one of them. Every attempt hit E-015, and
+"a full enumeration of the endorsement detail found exactly one input on the whole page: a text box
+placeholdered 'Rejection reason'". Four HR requests and three controlled endorsements were left at
+SUBMITTED with nowhere to go.
+
+**The mechanism, which is sharper than "a field was missing".** `assertMaterialEvidence` reads
+`changeDetails.sourceReference` / `.documentReference` / `.docRef`. The admin creation form wrote
+neither. It wrote `notes` — a key the gate has never accepted — and `docRef`, but **only on
+`CORRECTION`, which is not a material type and so never needed evidence at all**. The one type with
+a document-reference field did not require one; the eleven that require one had no field. Every
+material endorsement raised through the admin UI was therefore born unapprovable.
+
+And the form actively caused the run's confusion: the Notes placeholder read *"Any context, HR
+approval references, or special instructions…"*. The operator was invited to put the reference in
+the single field the gate ignores, watched it render on the detail page, and was still refused.
+
+**Fixed at creation, not at approval.** P08.03 asks that an "incomplete request cannot enter an
+unapprovable state", and that is the right place: an operator told now can fix it now, whereas one
+told at approval has already handed the request to a checker who cannot act on it and must not
+supply the evidence themselves.
+
+**One contract, because the rule has four readers.** `src/lib/endorsement-evidence.ts` holds the
+material-type list, the accepted keys, the validator and the copy. The form, the creation action,
+the review page and the service gate all read it, and a test pins the list against
+`isMaterialAmendment` for *every* type in `AMENDMENT_RULES`. Four private copies of "which types are
+material" would be four chances to drift silently back into exactly this defect — the form letting
+through what the gate later refuses.
+
+**Two approve controls, not one.** The review page carries the amendment-engine `Approve` *and* a
+header `Approve & Apply` on the legacy engine. The run pressed the header one. Both are now hidden
+when the gate must refuse, and the checker is told why — including that they may not supply the
+evidence themselves, because "supplying the evidence and then approving on it is not a review".
+
+**A route out for the seven already stuck.** `amendmentService.supplyMaterialEvidence` lets the
+**maker** record the reference on an endorsement raised before the form asked for one. Without it
+the only way to clear them would be rejecting work that was substantively correct. It is maker-only,
+refuses to overwrite an existing reference, refuses once a decision has been made, and audits as
+`AMENDMENT:EVIDENCE_SUPPLIED`.
+
+**Adjacent defect, found while editing.** The `BENEFIT_MODIFICATION` block contained a *second*
+input named `notes`. `formData.get("notes")` returns the first match, so for that type the
+operator's Additional Notes textarea was silently discarded. Renamed to `modificationNotes`.
+
+**Verified.** `next build` compiles; `tsc --noEmit` clean; `eslint` clean on all changed files
+(three pre-existing warnings in `amendment.service.ts`); 33 new tests; full suite **3633 passed, 0
+failed**. The audit-coverage harness flagged the new action and was answered with a justified
+catalogue entry rather than an exclusion — the audit genuinely lives in the service, and adding a
+second one in the action would double-log.
+
+**Not done here.** DEF-004 (HR has no leaver action at all) is P08.01 and remains open. The two are
+the same rail at opposite ends: DEF-046 was the reason a leaver endorsement could not have been
+approved even once HR could raise one, so this is the prerequisite rather than the whole fix.
+
+---
+
 ## Corrections made to the implementation plan
 
 The plan is treated as authoritative but not infallible. Where a plan statement was checked against
