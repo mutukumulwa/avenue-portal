@@ -2253,6 +2253,70 @@ in the measurement, not in the intention.
 
 ---
 
+### DEF-005, DEF-047, DEF-074 — the last three open S3s
+
+**Commit** `f385932` · **Tasks** P08.02, P08.06, P11.01
+
+**DEF-005 — insurer vocabulary in the employer portal.** HR files requests about their staff; they
+are not filing endorsements. The navigation item, list heading, column header, form subtitle and
+confirmation now say so. The route, the Prisma model and every variable keep the internal term:
+renaming those is churn with real regression risk and no benefit to an HR user, who never sees them.
+The duplicate-form half — "Add Member" and "+ New Endorsement" both landing on one addition form —
+was already split by P08.01.
+
+**DEF-047 — the approval panel.** "Five overlapping action controls with no stated difference."
+The header pair is gone; every transition now has exactly one control, on the governed amendment
+engine. A checker choosing between two identical-looking buttons has not been told what they are
+doing. The maker no longer falls back to a raw id when the user cannot be resolved — "Maker
+cmsoxn5j0002tbpvqg8gomey4" is an identifier, not a counterparty. The panel states what is being
+approved, its reference and when it was raised. Money renders through `formatMoney`, so
+"+UGX 1,130,958.904" loses three decimals a currency with no minor unit in practice should never
+have had.
+
+**DEF-074 — and the measurement lesson, which is the useful part.**
+
+The enrolment form the register actually analysed was already wired by P05.06. What remained was the
+wider audit my own log deferred to P11.01.
+
+**A source scan reported 220 unnamed controls and was wrong.** It cannot see an id injected through
+a wrapper, and `Field` binds its label by cloning the child with a generated id — so a grep for `id=`
+on the `<select>` reports a correctly-labelled control as unnamed. Acting on that number would have
+produced a large, mostly-false backlog *and* hidden the real ones inside it.
+
+The register reached its finding through the accessibility tree, so this does too:
+`tests/components/form-accessible-names.test.tsx` **renders** the form and computes each control's
+accessible name the way an assistive technology would. That found **three genuinely unnamed
+controls** — including the `sourceReference` input I added myself in P08.03, whose `<h2>` looked like
+a label and announced as nothing.
+
+It also found the class **DEF-056 missed entirely: icon-only links.** My button sweep never looked at
+`<Link>`/`<a>`, and **67 back-arrows** across admin, HR, broker, fund, member and provider announced
+as "link" and nothing else — on a detail page, the primary way out. All 67 now name their
+destination ("Back to claims"), not just the direction, for the same reason DEF-056's names had to
+say *what* they delete. The sweep test covers links as well as buttons now.
+
+`Field` also binds by construction, so the next field added to that form is named without anyone
+remembering.
+
+**Twice now a static scan has misled me** — the cross-run DEF-number collision last time, the wrapper
+blindness this time. Both were caught by checking the measurement against reality rather than
+trusting the count. That is the habit worth keeping, not the specific fix.
+
+**A mistake worth recording.** I initially staged the parallel session's untracked
+`member-import-job.service.ts` — my exclusion filter matched modified paths but not new files. Caught
+before pushing and removed by amend; the file is untracked again. `git status` is not a substitute
+for checking what is actually in the commit.
+
+**Verified.** `next build` compiles; `tsc --noEmit` clean; `eslint` 0 errors across 73 changed files;
+26 new tests; full suite **3739 passed, 0 failed**. One P08.03 test asserted *two* gated approve
+controls; removing the duplicate makes one the correct state, and it was updated to say so rather
+than relaxed.
+
+**Every S3 in the register now has real work behind it**, on the stricter definition — a task's
+*Defect IDs* row, not a passing mention.
+
+---
+
 ## Corrections made to the implementation plan
 
 The plan is treated as authoritative but not infallible. Where a plan statement was checked against
