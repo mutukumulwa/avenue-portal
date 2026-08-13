@@ -2152,6 +2152,67 @@ intact.
 
 ---
 
+### S3 sweep — the four with no work behind them
+
+**Commit** `5196a4e` · **Defects** DEF-022, DEF-026, DEF-028, DEF-044
+
+Of the register's 45 S3 defects, 41 already had work recorded against them. These four did not. One
+turned out to have been fixed under another task and only needed pinning; three needed code.
+
+**DEF-022 — "when does cover begin?" had no answer on the maker's screen.** The entire maker-facing
+disclosure of a 270-day maternity wait was the fragment `270d wait`. The run's complaint is precise:
+"cover start, enrolment date, policy inception and member join date are all plausible and none is
+named", and the eligible date was "never calculated or displayed on any maker-facing surface".
+
+The basis was never actually ambiguous *in the code* — `waitingPeriodStatus` has measured from the
+member's cover start since P09.07, and the member's app has said so. What was missing is that the
+authoring surface never said it out loud, so a maker had to guess which of four dates the product
+meant. It now reads "270 days from the member's cover start date" and does the arithmetic: *"A member
+whose cover starts 11 Aug 2026 is covered for this from 8 May 2027."* The helpers sit beside
+`waitingPeriodStatus` in the same module, and a test asserts the two audiences produce the identical
+date — otherwise a maker tells an employer one thing and the member's app shows another.
+
+*Not done:* the plan's P09.03 also asks for a **configurable** basis event
+(`COVER_START`/`DEPENDANT_JOIN`/`REINSTATEMENT`/`OTHER_APPROVED`) stored per benefit. Today the basis
+is cover start everywhere, stated in one constant. Making it configurable is a schema change and a
+policy decision, and inventing four options nobody has asked for would be worse than naming the one
+that is real.
+
+**DEF-026 — already fixed, now pinned.** P05.04 removed phone from the blocking set because DEC-07 is
+explicit that "a principal and their dependants routinely share one number". It was never logged
+under this defect number. Tests now hold it: a duplicate phone warns and never blocks, a duplicate
+national ID still blocks, and no message names the other member.
+
+**DEF-028 — the two enrolment paths disagreed, in both directions.** The phone half was closed by
+relaxing the *admin* side (above). This closes the other half, which was the more serious one: the HR
+path ran **no identity probe at all**. An employer could submit a joiner whose national ID already
+existed, be told the request was "successfully submitted to Medvex for processing", and discover the
+clash only when the TPA's checker hit the block days later. The HR action now calls the same
+`findIdentityMatches`, blocks a hard conflict at submission without naming the other member
+(DEF-078's rule), and returns candidate matches as warnings the employer can see. A test asserts the
+HR path does *not* re-implement normalisation, since a second copy is how the paths would diverge
+again by a different route.
+
+**DEF-044 — renewal was unreachable, not unbuilt.** The register's own conclusion was "the gap is
+routing and coverage, not capability", and it was exactly right: a full preview-and-bind workflow
+already existed at `/analytics/renewals/<groupId>`, filed under analytics where nobody looking for a
+scheme renewal would think to look. The scheme's *Renewal Date* — previously inert text beside Edit,
+Suspend, Mark Lapsed and Terminate — now links to it, and **Renewals** is in the sidebar, gated to
+`UNDERWRITING`: the persona the run says could not reach it. No new workflow was written, which is
+the point.
+
+**Verified.** `next build` compiles; `tsc --noEmit` clean; `eslint` clean on all changed files; 19 new
+tests; full suite **3711 passed, 0 failed**. Two P05.06 tests failed on the first run because their
+Prisma mock had no `member` delegate for the new identity probe; the mock was extended and their
+assertions left untouched.
+
+**What this does not settle.** DEF-044's retest note asks a business owner to confirm whether scheme
+renewal is in scope for launch at all. Routing to the workflow does not answer that question, and the
+workflow itself has never been exercised end to end against a scheme at its renewal boundary with a
+terminated and an opted-out member present — which is what the register asks for.
+
+---
+
 ## Corrections made to the implementation plan
 
 The plan is treated as authoritative but not infallible. Where a plan statement was checked against
