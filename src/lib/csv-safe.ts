@@ -5,8 +5,23 @@
  * leading Tab / CR) as a FORMULA the moment the file is opened. So a member name
  * smuggled through a bulk import as `=HYPERLINK("http://evil","click")` or
  * `+cmd|'/c calc'!A1` becomes live code in whoever later opens the exported CSV.
- * The fix is symmetric: neutralize on the way IN (bulk import) and on the way OUT
- * (every CSV export) so no instance of the class survives either boundary.
+ *
+ * ## Defend on the way OUT only (UAT-HF P06.07 / DEF-038)
+ *
+ * This was originally symmetric — neutralize on import AND on export. The import
+ * half was removed. A stored name is data; the risk lives in the spreadsheet
+ * that opens an export, so the export is the boundary that matters, and
+ * `csvSafeCell` covers every cell of every export regardless of how the value
+ * got into the database.
+ *
+ * Neutralizing on import bought nothing extra and cost the truth of the record:
+ * "the committed roster preserves the source text exactly" was violated for
+ * every value beginning `= + @ -`. A name stored as `=2+2` is still exported as
+ * `'=2+2`; it is simply no longer *stored* that way.
+ *
+ * `neutralizeFormula` therefore has exactly one caller in anger — `csvSafeCell`.
+ * It stays exported for a caller that writes a spreadsheet by some other route,
+ * but a new call on a WRITE path is almost certainly this defect returning.
  *
  * Neutralization prefixes the value with a single quote — every spreadsheet
  * renders `'` as literal text and never evaluates the cell. It is idempotent: a
@@ -30,8 +45,10 @@ const PLAIN_NUMBER = /^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/;
 
 /**
  * Defang a single value against CSV formula injection WITHOUT any CSV quoting.
- * Use this when the value is stored/rendered as data (e.g. a member name on
- * import). Returns the value unchanged when it cannot trigger a formula.
+ * Returns the value unchanged when it cannot trigger a formula.
+ *
+ * For SPREADSHEET OUTPUT only. Do not use this on a value being stored — see the
+ * module note above (DEF-038); `csvSafeCell` applies it at the export boundary.
  */
 export function neutralizeFormula(value: string): string {
   if (!value) return value;

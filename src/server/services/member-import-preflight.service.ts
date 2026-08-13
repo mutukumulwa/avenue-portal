@@ -8,7 +8,6 @@
  */
 import type { MemberStatus, Prisma } from "@prisma/client";
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { neutralizeFormula } from "@/lib/csv-safe";
 import {
   normalizeEmail,
   normalizeLegalName,
@@ -125,11 +124,25 @@ function canonicalRow(
     return "";
   };
 
-  // P06.07 will separate display-name storage from export escaping. Preserve
-  // the existing safe import behaviour in this extraction so P06.01 changes
-  // validation ownership without reopening spreadsheet-formula execution.
-  const firstName = neutralizeFormula(get("firstName"));
-  const lastName = neutralizeFormula(get("lastName"));
+  // ── UAT-HF P06.07 — DEF-038 ──────────────────────────────────────────────
+  //
+  // "Values beginning with =, +, @ or - are rendered and stored with a leading
+  // apostrophe: '=2+2' becomes \"'=2+2\" ... The committed roster preserves the
+  // source text exactly." The register is careful to call the old behaviour "a
+  // deliberate CSV/spreadsheet formula-injection defence, and a good one" — the
+  // objection is not to the defence but to where it was applied.
+  //
+  // A stored name is data. The injection risk lives in the spreadsheet that
+  // later OPENS an export, so that is the boundary to defend, and `csvSafeCell`
+  // already does it on every cell of every export — independently of this. The
+  // import-side call therefore protected nothing that was not already protected
+  // and silently altered the source text on the way through.
+  //
+  // Removing it loses no defence: a name stored as `=2+2` is still exported as
+  // `'=2+2`, so no spreadsheet ever evaluates it. What changes is that the
+  // member's record now says what the employer sent.
+  const firstName = get("firstName");
+  const lastName = get("lastName");
   const gender = get("gender").toUpperCase();
   const relationship = get("relationship").toUpperCase();
   const demographics = validateMemberDemographics({

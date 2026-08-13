@@ -26,6 +26,16 @@ vi.mock("@/server/services/members.service", () => ({
 const checkEnrolmentAge = vi.hoisted(() => vi.fn());
 vi.mock("@/server/services/eligibility/enrolment-age", () => ({ checkEnrolmentAge }));
 
+const job = vi.hoisted(() => ({
+  reserve: vi.fn(),
+  claim: vi.fn(),
+  finishRow: vi.fn(),
+  finalize: vi.fn(),
+}));
+vi.mock("@/server/services/member-import-job.service", () => ({
+  MemberImportJobService: job,
+}));
+
 import { parseImportAction, confirmImportAction } from "@/app/(admin)/members/import/actions";
 import { parseHRImportAction, confirmHRImportAction } from "@/app/(hr)/hr/roster/import/actions";
 import { createMemberImportPreviewToken } from "@/server/services/member-import-preflight.service";
@@ -98,6 +108,24 @@ beforeEach(() => {
   mockPrisma.endorsement.create.mockResolvedValue({});
   createMember.mockResolvedValue({ member: { id: "created-1" }, warnings: [] });
   checkEnrolmentAge.mockReturnValue({ ok: true });
+  job.reserve.mockResolvedValue({
+    created: true,
+    job: { id: "batch1", batchRef: "IMP-TEST", status: "QUEUED", imported: 0, failed: [], terminal: false },
+  });
+  job.claim.mockResolvedValue(true);
+  job.finishRow.mockResolvedValue(undefined);
+  job.finalize.mockImplementation(async () => {
+    const reserved = job.reserve.mock.calls.at(-1)?.[1]?.rows ?? [];
+    const preflightFailed = reserved.filter((item: Row) => item.error).map((item: Row) => ({
+      row: item.row, name: `${item.firstName} ${item.lastName}`.trim(), error: item.error!,
+    }));
+    const runtimeFailed = job.finishRow.mock.calls
+      .filter((call) => call[3]?.status !== "ACCEPTED")
+      .map((call) => ({ row: call[2], name: "", error: call[3]?.message ?? "failed" }));
+    const imported = job.finishRow.mock.calls.filter((call) => call[3]?.status === "ACCEPTED").length;
+    return { id: "batch1", batchRef: "IMP-TEST", status: preflightFailed.length || runtimeFailed.length ? "PARTIAL" : "SUCCEEDED",
+      imported, failed: [...preflightFailed, ...runtimeFailed], terminal: true };
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -163,10 +191,26 @@ describe("parseImportAction — parser safety (WP-B2)", () => {
     expect(res.rows[0].error).toMatch(/valid gender/i);
   });
 
-  it("neutralizes a CSV formula-injection name on ingest", async () => {
+  // UAT-HF P06.07 (DEF-038) — this asserted the DEFECT: that ingest rewrote the
+  // source text. "The committed roster preserves the source text exactly."
+  //
+  // The formula defence was not removed, it moved to the boundary where the risk
+  // actually lives. A stored name is data; a spreadsheet only evaluates a cell
+  // when it OPENS an export, and `csvSafeCell` neutralizes every exported cell
+  // regardless of how the value was stored. Both halves are asserted below,
+  // because dropping the import call would be wrong if the export did not hold.
+  it("preserves a formula-shaped name EXACTLY on ingest", async () => {
     const csv = "firstName,lastName,dateOfBirth,gender,relationship\n=HYPERLINK(\"http://x\"),Doe,1990-01-01,MALE,PRINCIPAL\n";
     const res = await parseImportAction(null, parseFd(csvFile(csv)));
-    expect(res.rows[0].firstName.startsWith("'=")).toBe(true);
+    expect(res.rows[0].firstName).toBe('=HYPERLINK("http://x")');
+    expect(res.rows[0].firstName.startsWith("'")).toBe(false);
+  });
+
+  it("and that name is still neutralized when it reaches a spreadsheet", async () => {
+    const { csvSafeCell } = await import("@/lib/csv-safe");
+    // Quoted because it contains a comma-free but quote-bearing value; the
+    // leading apostrophe is what stops evaluation.
+    expect(csvSafeCell('=HYPERLINK("http://x")')).toContain("'=HYPERLINK");
   });
 
   it("uses strict calendar dates in preview, so an impossible day cannot look valid", async () => {
@@ -269,7 +313,8 @@ describe("confirmImportAction — server re-validation (WP-B1)", () => {
     expect(res.imported).toBe(0);
     expect(res.error).toMatch(/preview no longer matches/i);
     expect(createMember).not.toHaveBeenCalled();
-    expect(mockPrisma.importBatch.create).not.toHaveBeenCalled();
+    expect(job.reserve).not.toHaveBeenCalled();
+    expect(job.claim).not.toHaveBeenCalled();
     expect(writeAudit).not.toHaveBeenCalled(); // no success audit on a refused import
   });
 
@@ -292,40 +337,48 @@ describe("confirmImportAction — server re-validation (WP-B1)", () => {
     const res = await confirmImportAction(null, confirmFd([row({ gender: "X" }), row({ row: 3, firstName: "" })]));
     expect(res.error).toMatch(/no valid rows/i);
     expect(writeAudit).not.toHaveBeenCalled();
-    expect(mockPrisma.importBatch.create).not.toHaveBeenCalled();
+    expect(job.reserve).toHaveBeenCalledTimes(1);
+    expect(job.claim).not.toHaveBeenCalled();
   });
 
   it("imports a valid principal and records a batch + success audit", async () => {
     const res = await confirmImportAction(null, confirmFd([row({ idNumber: "ID1" })]));
     expect(res.imported).toBe(1);
     expect(createMember).toHaveBeenCalledTimes(1);
-    expect(mockPrisma.importBatch.create).toHaveBeenCalledTimes(1);
-    expect(mockPrisma.importBatch.update).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ importedCount: 1 }) }),
-    );
+    expect(job.reserve).toHaveBeenCalledTimes(1);
+    expect(job.finalize).toHaveBeenCalledWith(mockPrisma, "batch1");
     expect(writeAudit).toHaveBeenCalledTimes(1);
   });
 });
 
 describe("confirmImportAction — idempotency (WP-B1 / B-011)", () => {
   it("same file re-import is a deterministic no-op", async () => {
-    mockPrisma.importBatch.findUnique.mockResolvedValue({ id: "b0", importedCount: 4, rejects: [{ row: 9, name: "X Y", error: "dupe" }] });
+    job.reserve.mockResolvedValue({ created: false, job: { id: "b0", batchRef: "IMP-OLD", status: "PARTIAL", imported: 4, failed: [{ row: 9, name: "X Y", error: "dupe" }], terminal: true } });
     const res = await confirmImportAction(null, confirmFd([row({ idNumber: "ID1" })]));
     expect(res.alreadyImported).toBe(true);
     expect(res.imported).toBe(4);
     expect(res.failed).toHaveLength(1);
     expect(createMember).not.toHaveBeenCalled();
-    expect(mockPrisma.importBatch.create).not.toHaveBeenCalled();
+    expect(job.claim).not.toHaveBeenCalled();
   });
 
   it("a concurrent identical confirm loses the reservation race and returns the winner's result", async () => {
-    mockPrisma.importBatch.create.mockRejectedValue({ code: "P2002" });
-    mockPrisma.importBatch.findUnique
-      .mockResolvedValueOnce(null) // initial check: not yet present
-      .mockResolvedValueOnce({ id: "bWin", importedCount: 2, rejects: [] }); // after P2002
+    job.reserve.mockResolvedValue({ created: false, job: { id: "bWin", batchRef: "IMP-WIN", status: "SUCCEEDED", imported: 2, failed: [], terminal: true } });
     const res = await confirmImportAction(null, confirmFd([row({ idNumber: "ID1" })]));
     expect(res.alreadyImported).toBe(true);
     expect(res.imported).toBe(2);
+    expect(createMember).not.toHaveBeenCalled();
+  });
+
+  it("never reports a nonterminal reservation as already imported", async () => {
+    job.reserve.mockResolvedValue({ created: false, job: {
+      id: "bLive", batchRef: "IMP-LIVE", status: "PROCESSING",
+      imported: 0, failed: [], terminal: false,
+    } });
+    const res = await confirmImportAction(null, confirmFd([row({ idNumber: "ID1" })]));
+    expect(res.alreadyImported).toBeUndefined();
+    expect(res).toMatchObject({ batchRef: "IMP-LIVE", status: "PROCESSING" });
+    expect(res.error).toMatch(/outcome is not being replayed as complete/i);
     expect(createMember).not.toHaveBeenCalled();
   });
 
@@ -340,11 +393,7 @@ describe("confirmImportAction — idempotency (WP-B1 / B-011)", () => {
         dateOfBirth: new Date("1990-01-01T00:00:00Z"),
       },
     ]);
-    mockPrisma.importBatch.findUnique.mockResolvedValue({
-      id: "b0",
-      importedCount: 1,
-      rejects: [],
-    });
+    job.reserve.mockResolvedValue({ created: false, job: { id: "b0", batchRef: "IMP-OLD", status: "SUCCEEDED", imported: 1, failed: [], terminal: true } });
     const res = await confirmImportAction(null, confirmFd([row({ idNumber: "ID1" })]));
     expect(res).toMatchObject({ alreadyImported: true, imported: 1, batchId: "b0" });
     expect(createMember).not.toHaveBeenCalled();
@@ -518,7 +567,7 @@ describe("confirmHRImportAction — endorsement numbering (WP-B4)", () => {
   });
 
   it("is idempotent — resubmitting the same file is a no-op", async () => {
-    mockPrisma.importBatch.findUnique.mockResolvedValue({ id: "b0", importedCount: 7, rejects: [] });
+    job.reserve.mockResolvedValue({ created: false, job: { id: "b0", batchRef: "IMP-OLD", status: "SUCCEEDED", imported: 7, failed: [], terminal: true } });
     const res = await confirmHRImportAction(null, hrFd([row({ idNumber: "A1" })]));
     expect(res.alreadyImported).toBe(true);
     expect(res.imported).toBe(7);
