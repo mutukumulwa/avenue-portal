@@ -48,11 +48,68 @@ The default is deliberate: `migrate deploy` on a database that has never been
 baselined would try to `CREATE TABLE` over existing tables and fail the build.
 §3 must happen first.
 
+## 2b. Why the cutover became urgent — the failed deploy of 2026-08-13
+
+Merging the branch to `main` produced an **ERROR** production deployment
+(`dpl_3HaseH2129ZcL3uG1QpWgBr1wJPj`). The build failed at `db-sync`, not at
+`next build`:
+
+```
+⚠️  There might be data loss when applying the changes:
+  • A unique constraint covering [domainEventId] on ActivityLog will be added.
+  • A unique constraint covering [tenantId,nationalIdNormalized] on Member will be added.
+Error: Use the --accept-data-loss flag ...
+[db-sync] `prisma db push` failed.
+```
+
+**No outage and no data loss** — Vercel does not promote a failed build, so
+production continued to serve `53df0ab`, and the P00.04 guard refused rather
+than dropping anything.
+
+**Root cause.** P05.01 put the national-ID unique in a *separate, gated*
+migration (`20260812000800`) so it would not apply until the preflight read
+zero. But the build runs `SCHEMA_DEPLOY_MODE=push`, which **ignores
+`prisma/migrations/` entirely** and syncs `prisma/schema.prisma` — where the
+`@@unique` also lives. The gate was designed for the `migrate` world while the
+deploy ran in the `push` world.
+
+**The more serious consequence.** `db push` runs no migration SQL, so the
+**backfills never execute**. Two migrations carry them:
+
+| Migration | Backfill that `push` would skip |
+|---|---|
+| `20260812000700` | member identity keys — every existing member left NULL |
+| `20260812001100` | package version status — every version left `DRAFT` instead of `ACTIVE`/`SUPERSEDED` |
+
+The second is the pointer P09.01 uses to decide which version is live, so a
+"successful" push deploy would have been worse than the failed one. **`push`
+mode cannot correctly deploy this branch at all**, which is what makes the
+cutover below mandatory rather than merely desirable.
+
+---
+
 ## 3. Production cutover — OUTSTANDING, run by a human
 
 Requires the **direct 5432** connection. The pooler on 6543 cannot run DDL.
 
 **3.1 — Back up first.** Take a snapshot you can restore from.
+
+**3.2a — Run the identity preflight FIRST. It must report zero.**
+
+```bash
+DATABASE_URL="<direct 5432 url>" npx tsx scripts/reports/member-identity-preflight.ts
+```
+
+It exits non-zero on any collision. **Do not proceed until it is zero**: step
+3.5 applies `20260812000700` and `20260812000800` in the same pass, so a real
+duplicate fails the unique *after* the columns are added, leaving production
+half-migrated with a failed `_prisma_migrations` row that blocks every later
+deploy.
+
+> The report computes the key from the raw `idNumber` column, so it runs against
+> production's schema **as it is today** — before `nationalIdNormalized` exists.
+> It originally read the normalized column, which made it unrunnable before the
+> migration it was written to gate.
 
 **3.2 — Confirm what production actually has.** Expect `mustChangePassword` to be
 absent and the three constraints to be present.

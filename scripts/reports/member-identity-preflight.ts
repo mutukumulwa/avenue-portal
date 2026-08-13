@@ -32,18 +32,49 @@ interface Unbackfilled {
   rows: number;
 }
 
+/** Whether a column exists yet — this report must run BEFORE its own migration. */
+async function hasColumn(column: string): Promise<boolean> {
+  const rows = await prisma.$queryRaw<{ n: number }[]>`
+    SELECT COUNT(*)::int AS n
+      FROM information_schema.columns
+     WHERE table_name = 'Member' AND column_name = ${column}
+  `;
+  return (rows[0]?.n ?? 0) > 0;
+}
+
 async function main() {
   const asJson = process.argv.includes("--json");
 
-  // 1. The blocker: two members in one tenant holding the same national ID.
+  // ── 1. The blocker: two members in one tenant holding the same national ID ──
+  //
+  // Computed from the RAW `idNumber`, not from `nationalIdNormalized`.
+  //
+  // This is the whole point of the report and it was originally written the
+  // other way round, which made it unrunnable: `nationalIdNormalized` is
+  // created by migration 20260812000700, and this report exists to gate
+  // 20260812000800 — so reading the normalized column meant the gate could only
+  // run after the migration it was supposed to gate. `migrate deploy` applies
+  // both in one pass, so a real collision would have failed 000800 mid-cutover,
+  // leaving production half-migrated with a failed `_prisma_migrations` row
+  // blocking every later deploy.
+  //
+  // The expression matches the backfill in 000700, so the answer is the same
+  // before and after that migration runs.
+  //
+  // NOTE the doubled backslash. Inside a JS template literal `\s` collapses to
+  // a bare `s`, which made Postgres strip the LETTER s instead of whitespace —
+  // so " ck 12 34 " and "CK1234" did not collide and the gate reported zero on
+  // a database that had a real duplicate. A gate that always says yes is worse
+  // than no gate; the migration's own .sql file is raw SQL and was never
+  // affected.
   const collisions = await prisma.$queryRaw<Collision[]>`
     SELECT "tenantId",
-           "nationalIdNormalized",
+           NULLIF(regexp_replace(upper(btrim("idNumber")), '\\s+', '', 'g'), '') AS "nationalIdNormalized",
            COUNT(*)::int              AS members,
            array_agg("memberNumber")  AS "memberNumbers"
       FROM "Member"
-     WHERE "nationalIdNormalized" IS NOT NULL
-     GROUP BY "tenantId", "nationalIdNormalized"
+     WHERE NULLIF(regexp_replace(upper(btrim("idNumber")), '\\s+', '', 'g'), '') IS NOT NULL
+     GROUP BY "tenantId", NULLIF(regexp_replace(upper(btrim("idNumber")), '\\s+', '', 'g'), '')
     HAVING COUNT(*) > 1
      ORDER BY COUNT(*) DESC, "tenantId"
   `;
@@ -52,14 +83,17 @@ async function main() {
   //    non-NULL source means the value did not parse — for phones that is
   //    expected and fine (a non-UG number is not a phone identity), for the
   //    others it is worth a look.
+  // Only meaningful AFTER 20260812000700 has run; skipped before it, so the
+  // report is useful on both sides of the cutover.
   const unbackfilled: Unbackfilled[] = [];
-  for (const [column, source] of [
+  const normalizedColumnsExist = await hasColumn("nationalIdNormalized");
+  for (const [column, source] of (normalizedColumnsExist ? [
     ["nationalIdNormalized", "idNumber"],
     ["phoneNormalized", "phone"],
     ["emailNormalized", "email"],
     ["memberNumberNormalized", "memberNumber"],
     ["searchNameNormalized", "firstName"],
-  ] as const) {
+  ] : []) as ReadonlyArray<readonly [string, string]>) {
     const [row] = await prisma.$queryRawUnsafe<{ rows: number }[]>(
       `SELECT COUNT(*)::int AS rows FROM "Member"
         WHERE "${source}" IS NOT NULL AND "${source}" <> '' AND "${column}" IS NULL`,
