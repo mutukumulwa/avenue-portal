@@ -2093,6 +2093,65 @@ employer-to-TPA lifecycle can be exercised end to end at retest.
 
 ---
 
+### P09.04 — Provider network rules are governed (DEF-055 closed)
+
+**Commit** `d85a4f1` · **Defect** DEF-055 (S2) · completes the half left open by P09.05
+
+DEF-055 is four gaps in one surface. P09.05 closed the precedence question and gave the removal
+control an accessible name; this closes the rest.
+
+**Gap 2 was the load-bearing one.** "Adding two provider rules left the package at Current v5 /
+Total Versions 5, unchanged." The missing record is the lesser problem — the rules were written
+straight onto the **ACTIVE** version, so live member eligibility moved the instant Save was pressed,
+with no approval. That is DEF-024's defect wearing different clothes, and P09.01 had already built
+the answer for benefits. Network rules now land on a DRAFT and reach members only through the same
+approve/activate machinery.
+
+`getOrCreateWorkingDraft` is get-or-create deliberately: an operator configuring a network adds
+several rules in a row, and one version per rule would produce v6, v7 and v8 for a single act of
+configuration, burying the real change history. The first rule opens the draft, the rest join it,
+and the set is reviewed together. A **REJECTED** version is not reused — silently reopening one
+would let a change the checker refused come back without them knowing.
+
+**Gap 1 — dates.** `effectiveFrom`/`effectiveTo` on the form, and `Effective X → Y` on every row,
+matching the sibling managers the run compared against. Both optional: a blank *from* means "in
+force when this version activates", which is the common case and must stay one keystroke. Requiring
+a date would push operators to type today's, which is not the same thing and is wrong the moment
+approval slips a day.
+
+**Gap 3 — the read view.** A read-only *Provider Network Rules* block on the package **detail** page,
+so which hospitals a package pays for is visible to anyone who can read the package rather than only
+to a user with edit rights. It states the precedence as well, so the read view and the edit view
+cannot drift apart. Retired rules remain listed under *Withdrawn* rather than vanishing.
+
+**Gap 4 — removal.** The native browser confirm is gone. Withdrawing names the rule, requires a
+reason, and **retires rather than deletes** — `isActive=false` plus `effectiveTo`. A deleted rule
+cannot explain a claim decided under it, nor answer a member asking why their hospital stopped being
+covered last March. A rule still sitting in an unapproved draft never took effect, so it is
+discarded outright; that is still audited, under a distinct action so the two are
+distinguishable afterwards.
+
+**A bug of mine, found and fixed here.** The copy-forward in `updatePackageAction` did not carry the
+four precedence columns P09.05 added. Every new package version silently reset each rule's
+`priority` to 0, discarded its effective window, and **reactivated any rule that had been retired**.
+I added the columns in P09.05 and did not update the copy that had to carry them. Both copy-forwards
+now do, and a test pins each — the new one by asserting the copied row, the old one by reading the
+source, because it lives inside a long transaction that is awkward to exercise in isolation.
+
+**One piece of deliberate duplication.** The copy-forward now exists twice: in
+`updatePackageAction` and in the new service. Extracting it from that action — the most heavily
+tested path in the package surface — is a refactor with real regression risk this task did not need
+to take. It is called out in the service's own header so the next person meets the decision rather
+than the surprise.
+
+**Verified.** `next build` compiles; `tsc --noEmit` clean; `eslint` clean on all changed files; 18
+new service tests plus 8 rewritten action tests; full suite **3692 passed, 0 failed**. Three of my
+own earlier tests asserted strings this task deliberately changed (`Remove rule` → `Withdraw rule`;
+"already saved" → "already in the draft") and were updated to the new wording with their intent
+intact.
+
+---
+
 ## Corrections made to the implementation plan
 
 The plan is treated as authoritative but not infallible. Where a plan statement was checked against
