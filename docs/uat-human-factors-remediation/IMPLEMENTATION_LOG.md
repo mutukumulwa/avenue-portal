@@ -1780,6 +1780,50 @@ This does not change the fix (a duration was never actionable), but it does chan
 
 ---
 
+### P03.02 (follow-up) — The build gate that was missing
+
+**Commit** `0f0a365` · **Defects** DEF-036, DEF-037 (the fix that broke) · **Found by** the preview
+deployment, not by any check I ran.
+
+`6164f19` put `MAX_MEMBER_LEN`, `BENEFIT_OPTIONS`, `EligibilityCheckState` and
+`EMPTY_ELIGIBILITY_STATE` in `src/app/provider/eligibility/actions.ts`, beside the server action
+that consumes them. Next allows a `"use server"` module to export **async functions and nothing
+else**, so `next build` failed:
+
+```
+Only async functions are allowed to be exported in a "use server" file.
+src/app/provider/eligibility/actions.ts:25
+```
+
+They now live in a plain `contract.ts` alongside. `EligibilityCheckState` moved with them — a
+type-only export would have been legal, since types are erased, but splitting one contract across
+two files to save an import is worse than keeping it whole.
+
+**Why nothing caught it.** `npm run typecheck`, `npx eslint` and `npx vitest run` all pass on the
+broken arrangement, and will continue to: this is an SWC/Next directive rule, not a type rule or a
+lint rule. The three commands in `AGENTS.md` are necessary and **not sufficient**. `next build` is
+the only gate that sees it, and it is now run before a push.
+
+**A second finding, recorded because it will recur.** The first two local builds died with
+`TypeError: Cannot read properties of undefined (reading 'length')` inside webpack's WASM hasher
+(`WasmHash._updateWithBuffer`, `bundle5.js`). This is *not* our code and *not* deterministic —
+`rm -rf .next` and a rerun compiled cleanly. A build failure whose stack is entirely inside
+`node_modules/next/dist/compiled` should be retried against a cleared `.next` before it is
+diagnosed.
+
+**Verified.** `next build` compiles (`✓ Compiled successfully`, full page manifest emitted);
+`tsc --noEmit` clean; 14/14 tests in `tests/actions/eligibility-check.actions.test.ts`. The same
+build was run at `53df0ab` for comparison, which is how the webpack fault was separated from the
+real one.
+
+**Production state at the time of writing.** `origin/main` (`b397244`) contains `6164f19`, so main
+could not build. The production deployment had already failed earlier in the pipeline, at
+`prisma db push` — see `SCHEMA_DEPLOYMENT.md` §2b — so no failed build was ever promoted and
+production continued to serve `53df0ab`. Two independent blockers, one of which is now cleared;
+the schema cutover is the other and remains a human ops step.
+
+---
+
 ## Corrections made to the implementation plan
 
 The plan is treated as authoritative but not infallible. Where a plan statement was checked against

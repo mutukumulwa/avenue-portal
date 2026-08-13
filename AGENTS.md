@@ -37,3 +37,22 @@ npx vitest run <test-files>
 ```bash
 npx eslint <changed-files>
 ```
+
+### Those three are not sufficient. Build before you push.
+
+```bash
+SCHEMA_DEPLOY_MODE=skip npx next build
+```
+
+Some rules exist only in SWC and the Next compiler, so typecheck, lint and tests **all pass on code
+that cannot be built**. The one that shipped a broken `main` on 2026-08-13: a `"use server"` module
+may export async functions and nothing else, and `export const MAX_MEMBER_LEN = 64` beside a server
+action fails with *"Only async functions are allowed to be exported in a `"use server"` file."*
+Nothing but `next build` sees it.
+
+`SCHEMA_DEPLOY_MODE=skip` keeps the build off your database; the deployed build uses `push` or
+`migrate` (see `docs/uat-human-factors-remediation/SCHEMA_DEPLOYMENT.md`).
+
+If a build fails with a stack entirely inside `node_modules/next/dist/compiled/`, clear `.next` and
+run it again before diagnosing — webpack's WASM hasher crashes non-deterministically against a stale
+cache (`WasmHash._updateWithBuffer`, *"Cannot read properties of undefined (reading 'length')"*).
