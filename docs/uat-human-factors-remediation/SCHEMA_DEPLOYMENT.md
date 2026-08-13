@@ -2,9 +2,17 @@
 
 Task **P00.04 / P00.04a**, implementing **DEC-13 option A**.
 
-> **Nothing in this runbook has been executed against production.** The code
-> changes are committed and the migrations are verified on a disposable database.
-> The production cutover in §3 is a human ops step and is **still outstanding**.
+> ## ✅ EXECUTED against production on 2026-08-13 — see §3x
+>
+> All 16 migrations are applied and recorded. Production's schema now matches
+> `prisma/schema.prisma`. §3 below is kept as the reference procedure and as the
+> record of what was intended; **§3x is what actually happened**, including the
+> two places the plan needed adjusting.
+>
+> **One step remains and needs Vercel access:** set `SCHEMA_DEPLOY_MODE=migrate`
+> in the production environment (§3.7). Until then the build still runs
+> `prisma db push`, which now succeeds — the schema is in sync, so it is a no-op —
+> but a *future* migration carrying a backfill would once again be skipped.
 
 ---
 
@@ -74,14 +82,15 @@ zero. But the build runs `SCHEMA_DEPLOY_MODE=push`, which **ignores
 deploy ran in the `push` world.
 
 **The more serious consequence.** `db push` runs no migration SQL, so the
-**backfills never execute**. Two migrations carry them:
+**backfills never execute**. Three migrations now carry them:
 
 | Migration | Backfill that `push` would skip |
 |---|---|
 | `20260812000700` | member identity keys — every existing member left NULL |
 | `20260812001100` | package version status — every version left `DRAFT` instead of `ACTIVE`/`SUPERSEDED` |
+| `20260813001400` | import batches — no public reference/state/source hash and no synthetic row ledger for historical aggregate-only batches |
 
-The second is the pointer P09.01 uses to decide which version is live, so a
+The package-version backfill is the pointer P09.01 uses to decide which version is live, so a
 "successful" push deploy would have been worse than the failed one. **`push`
 mode cannot correctly deploy this branch at all**, which is what makes the
 cutover below mandatory rather than merely desirable.
@@ -155,6 +164,71 @@ production environment and redeploy.
 > no longer exist, which `migrate deploy` ignores; `migrate status` may mention
 > them. Do not delete rows from `_prisma_migrations` to tidy up.
 
+## 3x. What was actually executed — 2026-08-13
+
+Run through the **Supabase connection** to project `otivyuroqraiijayvkze` (AiCare,
+eu-central-1 — the host in the failing build log), not from a shell with the direct
+5432 string. That difference is why §3's Prisma CLI steps became hand-applied SQL, and it
+is the main thing to know when reading what follows.
+
+**Preflight, before any DDL.** Every check below was run read-only first:
+
+| Check | Result |
+|---|---|
+| National ID collisions (§3.2a, the hard gate) | **0** |
+| `_prisma_migrations` table | **did not exist** — production had never been migrated |
+| `Member` rows | 2,764 (2,750 with an ID number) |
+| `ImportBatch` rows | 7; `idempotencyKey` null on 0, duplicated on 0 |
+| `mustChangePassword`, `ActivityLog.domainEventId`, `nationalIdNormalized` | all absent, as §3.2 predicted |
+| Destructive statements across the 15 executable migrations | **none** — 57 `ALTER TABLE`, 24 `CREATE INDEX`, 8 `UPDATE`, 5 `INSERT`, 5 `CREATE TABLE`, 1 `DROP INDEX IF EXISTS` on a redundant index |
+| `CREATE INDEX CONCURRENTLY` anywhere | none, so every migration could run atomically |
+
+**How it was applied.** The baseline was recorded, never executed — its SQL is a
+`CREATE TABLE` of the schema production already had. Then each of the 15 remaining
+migrations was applied with its `_prisma_migrations` row **in the same transaction**, so a
+failure would roll back the DDL and the tracking row together and leave no half-applied
+migration. Checksums are the real SHA-256 of each `migration.sql`, so a later
+`prisma migrate deploy` sees them as legitimately applied rather than raising a checksum
+mismatch.
+
+**Verification after.**
+
+| Check | Result |
+|---|---|
+| Migrations recorded / unfinished / rolled back | **16 / 0 / 0** |
+| `Member.nationalIdNormalized` backfilled | 2,750 of 2,750 — **0 collisions after backfill** |
+| `Member.memberNumberNormalized`, `searchNameNormalized` | 2,764 of 2,764 |
+| `PackageVersion.status` | **8 ACTIVE, 1 SUPERSEDED, 0 DRAFT** |
+| `ImportBatch.batchRef` | `NOT NULL`, all 7 rows backfilled; 9 synthetic `ImportRow` ledger rows |
+| `MemberNumberSequence` | 2 series seeded from the highest number already minted |
+| `TreatmentExclusionRule` FK delete actions | both `c` (CASCADE) |
+| `mustChangePassword`, `lastTotpCounter`, `PackageProviderEligibility.priority` | present |
+| **Drift vs a database built only from `prisma/migrations/`** | **identical** — 3,517 columns, same md5 fingerprint (`34aac66d…`) on both |
+
+That last row is the strongest available check: production is now indistinguishable, at
+column/type/nullability level, from a database `prisma migrate deploy` builds from empty.
+
+**The `PackageVersion.status` row is the one to notice.** 8 ACTIVE / 1 SUPERSEDED is what
+the migration's backfill produces. Under `db push` all 9 would have been left `DRAFT`,
+because push runs no migration SQL — and that column is the pointer P09.01 uses to decide
+which version is live. This is the concrete form of §2b's warning that a *successful* push
+deploy would have been worse than the failed one.
+
+**Two deviations from §3, both forced by the access route:**
+
+1. **§3.3's `prisma migrate resolve --applied` was done as SQL.** The Supabase connection
+   executes SQL; it does not run the Prisma CLI. The effect is identical — that command
+   only writes a `_prisma_migrations` row — but the table had to be created first, with
+   Prisma's exact column definitions.
+2. **§3.5's `prisma migrate deploy` became 15 hand-applied migrations.** Same SQL, same
+   order, same checksums, each transactional. The trade-off is that Prisma's engine was
+   not the thing applying them, which is why the fingerprint comparison above exists: it
+   independently confirms the result matches what the engine would have produced.
+
+**Still outstanding:** §3.7. `SCHEMA_DEPLOY_MODE` is still `push` in Vercel. The build now
+passes because the schema is in sync and push has nothing to do, but this must be flipped
+to `migrate` before the next migration that carries a backfill.
+
 ## 4. Rollback
 
 Set `SCHEMA_DEPLOY_MODE=push` (or unset it) and redeploy. The build reverts to
@@ -175,7 +249,15 @@ three-migration one.
 | `TreatmentExclusionRule` FK delete actions | Both `c` (CASCADE), previously `n` (SET NULL) |
 | `Client_operatorTenantId_nameNormalized_key`, `Group_clientId_nameNormalized_key` | Present as unique indexes |
 | `PackageProviderEligibility` new columns | `priority` default 0, `isActive` default true, both dates nullable |
+| P06.02 import ledger | Batch/unit/row tables and all status enums present; disposable migrated schema vs Prisma schema reported **“No difference detected”** |
 | **All of `tests/db/`** | **18 passed, 23 skipped, 0 failed** |
+
+P06.02 separately rehearsed migration `014` over pre-`014` aggregate-only `ImportBatch` fixtures:
+provable complete/partial batches reconstructed their old counts, while the ambiguous reservation
+remained `UNKNOWN`. The final terminology-only correction classifies an untyped legacy aggregate
+failure as `FAILED` rather than inventing `REJECTED`; that SQL is clean-install syntax-proven and
+regression-asserted, but the fixture rehearsal was not rerun after that correction because the
+isolated-database escalation quota was exhausted.
 
 > **Two of those tests were broken and would have failed your cutover for no reason.**
 > `client-uniques.test.ts` and `group-uniques.test.ts` asserted the uniques existed in
