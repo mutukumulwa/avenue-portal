@@ -225,3 +225,64 @@ export function assertNoInternalLeak(payload: unknown): void {
     );
   }
 }
+
+/**
+ * UAT-HF P09.03 — the maker-facing half of the waiting-period disclosure
+ * (DEF-022).
+ *
+ * The run configured a 270-day maternity wait and found "the entire maker-facing
+ * disclosure is the fragment '270d wait' inside the benefit row ... The product
+ * never states what the 270 days run FROM — cover start, enrolment date, policy
+ * inception and member join date are all plausible and none is named — and it
+ * never calculates or displays the resulting eligible-from date on any
+ * maker-facing surface."
+ *
+ * The basis is not ambiguous in the code: `waitingPeriodStatus` above measures
+ * from the member's **cover start date**, and that is what the member-facing
+ * copy has said since P09.07. What was missing is that the authoring surface
+ * never said it out loud, so a maker had no way to tell an employer when
+ * maternity cover actually begins without guessing which of four dates applied.
+ *
+ * These live beside `waitingPeriodStatus` deliberately: if the basis ever
+ * becomes configurable, both audiences change together or neither does.
+ */
+
+/** The basis every waiting period is measured from today. */
+export const WAITING_PERIOD_BASIS = "the member's cover start date";
+
+/**
+ * The maker-facing sentence for a configured waiting period.
+ *
+ * Returns null when there is no wait, so a caller can render nothing rather than
+ * "0 days from cover start", which reads like a rule where there is none.
+ */
+export function waitingPeriodAuthoringLabel(waitingPeriodDays: number | null | undefined): string | null {
+  const days = waitingPeriodDays ?? 0;
+  if (days <= 0) return null;
+  return `${days} days from ${WAITING_PERIOD_BASIS}`;
+}
+
+/**
+ * A worked eligible-from date for a member whose cover starts on `from`.
+ *
+ * A package is not tied to one member, so no single eligible date exists for it.
+ * What a maker can be given — and what answers the employer's actual question —
+ * is the arithmetic done for them against a concrete start, defaulting to today.
+ */
+export function waitingPeriodWorkedExample(
+  waitingPeriodDays: number | null | undefined,
+  from: Date = new Date(),
+): { eligibleFrom: string; label: string } | null {
+  const days = waitingPeriodDays ?? 0;
+  if (days <= 0) return null;
+
+  const start = calendarDateFromInstant(from);
+  if (!start) return null;
+  const eligibleFrom = addCalendarDays(start, days);
+  if (!eligibleFrom) return null;
+
+  return {
+    eligibleFrom,
+    label: `A member whose cover starts ${formatCalendarDate(start)} is covered for this from ${formatCalendarDate(eligibleFrom)}.`,
+  };
+}

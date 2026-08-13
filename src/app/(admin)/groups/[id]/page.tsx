@@ -212,7 +212,27 @@ export default async function GroupDetailPage({ params }: { params: Promise<{ id
             { label: "Package Version",    value: group.packageVersion ? `v${group.packageVersion.versionNumber} (pinned)` : "—" },
             { label: "Payment Frequency",  value: group.paymentFrequency },
             { label: "Effective Date",     value: new Date(group.effectiveDate).toLocaleDateString("en-UG") },
-            { label: "Renewal Date",       value: new Date(group.renewalDate).toLocaleDateString("en-UG") },
+            {
+              label: "Renewal Date",
+              // UAT-HF P08.05 (DEF-044): "The scheme record displays 'Renewal
+              // Date 11/08/2027' as read-only data; its only actions are Edit,
+              // Suspend, Mark Lapsed, Terminate, Add Tier and Convert to
+              // Self-Funded." The renewal workflow existed the whole time, at
+              // /analytics/renewals/<groupId>, with a preview and a bind — the
+              // run simply had no way to reach it. The register's own conclusion
+              // was "the gap is routing and coverage, not capability".
+              value: (
+                <span className="flex items-center gap-2">
+                  {new Date(group.renewalDate).toLocaleDateString("en-UG")}
+                  <Link
+                    href={`/analytics/renewals/${group.id}`}
+                    className="text-brand-indigo text-xs font-bold hover:underline"
+                  >
+                    Prepare renewal
+                  </Link>
+                </span>
+              ),
+            },
             { label: "Broker",             value: group.broker?.name ?? "Direct" },
           ].map(f => (
             <div key={f.label} className="flex justify-between text-sm">

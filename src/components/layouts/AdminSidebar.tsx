@@ -10,7 +10,7 @@ import {
   ShieldAlert, MessageSquareWarning, Wallet, Fingerprint, Stethoscope,
   BarChart3, TriangleAlert, Landmark, ClipboardCheck, CloudOff,
   ShieldCheck, Lock, FileSignature, Globe2, HeartPulse, KeyRound,
-  UserPlus, Scale, Banknote, Menu, X,
+  UserPlus, Scale, Banknote, Menu, X, RefreshCw,
 } from "lucide-react";
 import { PortalSwitcher } from "./PortalSwitcher";
 import { SignedInIdentity } from "./SignedInIdentity";
@@ -63,6 +63,13 @@ const NAV_GROUPS: NavGroup[] = [
       { label: "Members",      href: "/members",      icon: Users,            roles: OPS          },
       { label: "Onboarding Queue", href: "/onboarding-queue", icon: UserPlus,     roles: OPS          },
       { label: "Endorsements", href: "/endorsements", icon: FileText,         roles: OPS          },
+      // UAT-HF P08.05 (DEF-044): "No renewal control exists on any surface
+      // reachable by the Underwriter persona ... The full navigation contains no
+      // renewal item, and the three plausible candidates are scoped elsewhere."
+      // The workflow was built and routed under /analytics, where nobody looking
+      // for a scheme renewal would think to look. Same page, listed where the
+      // task actually lives. Gated to UNDERWRITING, matching the page itself.
+      { label: "Renewals",     href: "/analytics/renewals", icon: RefreshCw,   roles: UNDERWRITING },
       { label: "Packages",     href: "/packages",     icon: BriefcaseMedical, roles: PACKAGE_READ },
     ],
   },

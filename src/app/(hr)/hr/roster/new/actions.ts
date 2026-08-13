@@ -9,6 +9,12 @@ import { resolveMemberEnrolmentDates } from "@/lib/member-enrolment";
 import { validateMemberAddress } from "@/lib/member-address";
 import { calendarDateToUtcDate } from "@/lib/calendar-date";
 import { validateMemberDemographics } from "@/lib/member-demographics";
+import {
+  blockingMatch,
+  blockingMessage,
+  candidateWarnings,
+  findIdentityMatches,
+} from "@/server/services/identity-match.service";
 
 export async function addMemberEndorsementAction(
   _prev: ActionState,
@@ -76,6 +82,45 @@ export async function addMemberEndorsementAction(
     return { error: "Correct the highlighted member details. Nothing has been submitted.", fieldErrors };
   }
 
+  // ── UAT-HF P05.04 — DEF-028 ──────────────────────────────────────────────
+  //
+  // "A phone number that the admin Register Member form refuses outright was
+  // accepted without complaint by the HR portal Member Addition form, which
+  // queued it ... The two enrolment paths therefore enforce different identity
+  // rules."
+  //
+  // Both halves of that divergence are now closed. The phone half was closed by
+  // relaxing the ADMIN side — DEC-07 says a household legitimately shares a
+  // number, so refusing it was simply wrong (DEF-026). This closes the other
+  // half: the HR path ran no identity probe at all, so an employer could submit
+  // a joiner whose national ID already exists, be told it was "successfully
+  // submitted", and only find out when the TPA's checker hit the block days
+  // later.
+  //
+  // Same module, same rules, same normalisation as the admin path.
+  const identityMatches = await findIdentityMatches(prisma, tenantId, {
+    nationalId: idNumber,
+    phone: demographics.value.phone,
+    email: demographics.value.email,
+    firstName: demographics.value.firstName,
+    lastName: demographics.value.lastName,
+    dateOfBirth: calendarDateToUtcDate(dates.value.dateOfBirth) ?? undefined,
+  });
+
+  const blocking = blockingMatch(identityMatches);
+  if (blocking) {
+    // A national-ID clash would be refused at approval anyway. Refusing it here
+    // costs the employer one correction instead of a round trip through the TPA.
+    // The message never names the other member — the same disclosure rule the
+    // admin path follows (DEF-078).
+    return {
+      error: blockingMessage(blocking),
+      fieldErrors: { idNumber: [blockingMessage(blocking)] },
+    };
+  }
+
+  const warnings = candidateWarnings(identityMatches);
+
   const endorsementNumber = `REQ-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
 
   const endorsement = await prisma.endorsement.create({
@@ -126,5 +171,9 @@ export async function addMemberEndorsementAction(
     success: true,
     endorsementNumber: endorsement.endorsementNumber,
     resultingCoverStart: dates.value.coverStartDate,
+    // Candidate matches do not block — a household sharing a number is normal —
+    // but the employer should know the TPA will see them, so the request is not
+    // a surprise when it is queried.
+    ...(warnings.length > 0 ? { warnings } : {}),
   };
 }

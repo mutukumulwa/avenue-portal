@@ -81,6 +81,25 @@ export function HRAddMemberForm() {
             {calendarDateReadback(state.resultingCoverStart, "Requested eligibility start after approval")}
           </p>
         )}
+
+        {/* UAT-HF P05.04 / DEF-028 — the identity checks the admin path runs are
+            now run here too. A candidate match never blocks (a household sharing
+            a number is normal), but saying nothing would leave the employer
+            surprised when the TPA queries it. */}
+        {state.warnings && state.warnings.length > 0 && (
+          <div className="mb-6 text-left rounded-[8px] border border-[#FFC107]/40 bg-[#FFC107]/10 p-3">
+            <p className="text-xs font-bold text-[#856404] mb-1">Your administrator will also see</p>
+            <ul className="list-disc pl-4 space-y-1">
+              {state.warnings.map((w) => (
+                <li key={w} className="text-xs text-brand-text-body">{w}</li>
+              ))}
+            </ul>
+            <p className="text-[11px] text-brand-text-muted mt-2">
+              None of these stops the request. They are recorded so the check is
+              visible rather than silent.
+            </p>
+          </div>
+        )}
         <Link 
           href="/hr/endorsements" 
           className="inline-block px-6 py-2.5 bg-brand-indigo text-white font-semibold rounded-full hover:bg-brand-secondary transition-colors"

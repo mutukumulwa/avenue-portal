@@ -6,7 +6,16 @@ const requireRole = vi.hoisted(() =>
 vi.mock("@/lib/rbac", () => ({ requireRole, ROLES: { HR: ["HR"] } }));
 
 const endorsementCreate = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/prisma", () => ({ prisma: { endorsement: { create: endorsementCreate } } }));
+// DEF-028: the HR path now runs the same identity probe as the admin path, so
+// the mock needs a member delegate. Returning null = no existing match, which
+// keeps these P05.06 cases on the happy path they were written for.
+const memberFindFirst = vi.hoisted(() => vi.fn(async () => null));
+vi.mock("@/lib/prisma", () => ({
+  prisma: {
+    endorsement: { create: endorsementCreate },
+    member: { findFirst: memberFindFirst },
+  },
+}));
 vi.mock("@/lib/audit", () => ({ writeAudit: vi.fn(async () => undefined) }));
 
 import { addMemberEndorsementAction } from "@/app/(hr)/hr/roster/new/actions";

@@ -6,6 +6,11 @@ import Link from "next/link";
 import { ArrowLeft, CheckCircle, Clock, Shield, Pencil, Percent, Activity, Users } from "lucide-react";
 import { CoContributionRulesManager } from "./CoContributionRulesManager";
 import { formatMoney } from "@/lib/utils";
+import {
+  WAITING_PERIOD_BASIS,
+  waitingPeriodAuthoringLabel,
+  waitingPeriodWorkedExample,
+} from "@/lib/member-policy-copy";
 
 export default async function PackageDetailPage({ params }: { params: Promise<{ id: string }> }) {
   // DEF-004 / D2: READ-ONLY discovery for the Membership Officer; Edit and the
@@ -74,6 +79,8 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
     : null;
 
   const currentBenefits = pkg.currentVersion?.benefits ?? [];
+  // P09.03 (DEF-022): only the benefits that actually carry a wait.
+  const waitingBenefits = currentBenefits.filter((b) => b.waitingPeriodDays > 0);
   const totalSubLimit = currentBenefits.reduce((s, b) => s + Number(b.annualSubLimit), 0);
 
   const categoryLabel = (cat: string) => cat.replace(/_/g, " ");
@@ -182,9 +189,13 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
                         <Activity size={10} /> {formatMoney(b.perVisitLimit)} per visit
                       </span>
                     )}
+                    {/* UAT-HF P09.03 (DEF-022): this read "270d wait" and nothing
+                        else — no basis, no resulting date. "A maker cannot tell
+                        an employer or a member when maternity cover actually
+                        begins without computing it by hand." */}
                     {b.waitingPeriodDays > 0 && (
                       <span className="text-[10px] text-brand-text-muted flex items-center gap-1">
-                        <Clock size={10} /> {b.waitingPeriodDays}d wait
+                        <Clock size={10} /> {waitingPeriodAuthoringLabel(b.waitingPeriodDays)}
                       </span>
                     )}
                   </div>
@@ -194,6 +205,30 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
             ))}
             {currentBenefits.length === 0 && (
               <p className="text-sm text-brand-text-body">No benefits defined for current version.</p>
+            )}
+
+            {/* UAT-HF P09.03 (DEF-022) — the resulting eligible date, which the
+                run found was "never calculated or displayed on any maker-facing
+                surface". A package is not tied to one member, so no single date
+                exists for it; what answers the employer's actual question is the
+                arithmetic done against a concrete start. */}
+            {waitingBenefits.length > 0 && (
+              <div className="mt-4 border-t border-[#EEEEEE] pt-3 space-y-1">
+                <p className="text-[11px] font-bold text-brand-text-muted uppercase">
+                  Waiting periods run from {WAITING_PERIOD_BASIS}
+                </p>
+                {waitingBenefits.map((b) => {
+                  const worked = waitingPeriodWorkedExample(b.waitingPeriodDays);
+                  if (!worked) return null;
+                  return (
+                    <p key={b.id} className="text-xs text-brand-text-body">
+                      <span className="font-semibold">{b.category.replace(/_/g, " ")}</span>
+                      {" — "}
+                      {worked.label}
+                    </p>
+                  );
+                })}
+              </div>
             )}
           </div>
         </div>
