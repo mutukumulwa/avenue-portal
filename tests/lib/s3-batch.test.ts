@@ -171,3 +171,45 @@ describe("DEF-044 renewal is routed, not rebuilt", () => {
     expect(page).toContain("bindRenewalAction");
   });
 });
+
+// ─── DEF-023 — exclusions and referral rules on the package DETAIL page ─────
+
+describe("DEF-023 a reviewer can read a package without editing it", () => {
+  const detail = read("src/app/(admin)/packages/[id]/page.tsx");
+
+  it("the detail page renders treatment exclusions", () => {
+    // "a text search of the whole page finds neither ... The rules render
+    // correctly and in full only inside /packages/<id>/edit — the surface whose
+    // own banner reads 'Editing → new version'."
+    expect(detail).toContain("treatmentExclusionRule.findMany");
+    expect(detail).toMatch(/Treatment exclusions/);
+  });
+
+  it("and referral rules", () => {
+    expect(detail).toContain("referralRule.findMany");
+    expect(detail).toMatch(/Referral rules/);
+  });
+
+  it("shows the member-safe explanation, which is the point of the rule", () => {
+    expect(detail).toMatch(/\{ex\.memberSafeExplanation\}/);
+    expect(detail).toMatch(/\{r\.memberSafeExplanation\}/);
+  });
+
+  it("never FETCHES the internal source clause", () => {
+    // The schema marks sourceClause "never member/provider-facing". Not
+    // selecting it is a stronger guarantee than remembering not to render it —
+    // the same rule P09.07 applied to the member surfaces.
+    const block = detail.slice(detail.indexOf("treatmentExclusionRule.findMany"));
+    expect(block.slice(0, 1200)).not.toMatch(/sourceClause:\s*true/);
+    // Never rendered either. (A bare /sourceClause/ scan would match the comment
+    // that explains why it is absent.)
+    expect(detail).not.toMatch(/\{[^}]*\.sourceClause[^}]*\}/);
+  });
+
+  it("reads the CURRENT version, not a draft", () => {
+    // This page shows what is in force. A draft's rules belong on the edit
+    // screen, where the change-control panel explains their status.
+    const block = detail.slice(detail.indexOf("treatmentExclusionRule.findMany"));
+    expect(block.slice(0, 400)).toContain("pkg.currentVersion.id");
+  });
+});

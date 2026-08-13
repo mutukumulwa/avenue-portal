@@ -52,6 +52,40 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
         orderBy: [{ inclusionType: "asc" }, { createdAt: "asc" }],
       })
     : [];
+  // UAT-HF P09.04 (DEF-023): "the package detail page shows the benefit
+  // schedule, annual caps, co-contribution rules and version history but
+  // contains NO exclusions section and NO referral section ... Anyone reviewing
+  // what a package actually excludes, including a checker assessing a governed
+  // change, must open the editing surface to read it" — a surface whose own
+  // banner says "Editing → new version", so reading required entering an edit.
+  const [treatmentExclusions, referralRules] = pkg.currentVersion
+    ? await Promise.all([
+        prisma.treatmentExclusionRule.findMany({
+          where: { packageVersionId: pkg.currentVersion.id, isActive: true },
+          // sourceClause is deliberately NOT selected: the schema marks it
+          // "never member/provider-facing", and not fetching it is a stronger
+          // guarantee than remembering not to render it.
+          select: {
+            id: true, ruleCategory: true, exclusionType: true,
+            benefitCategories: true, serviceCodes: true, diagnosisCodes: true,
+            procedureCodes: true, memberSafeExplanation: true,
+            effectiveFrom: true, effectiveTo: true,
+          },
+          orderBy: { createdAt: "asc" },
+        }),
+        prisma.referralRule.findMany({
+          where: { packageVersionId: pkg.currentVersion.id, isActive: true },
+          select: {
+            id: true, benefitCategories: true, serviceCodes: true,
+            providerSpecialties: true, requiresReferral: true,
+            emergencyException: true, memberSafeExplanation: true,
+            effectiveFrom: true, effectiveTo: true,
+          },
+          orderBy: { createdAt: "asc" },
+        }),
+      ])
+    : [[], []];
+
   const liveNetworkRules = networkRules.filter((r) => r.isActive);
   const retiredNetworkRules = networkRules.filter((r) => !r.isActive);
   const fmtRuleDate = (d: Date | null) =>
@@ -281,6 +315,72 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
               annualCap={annualCapView}
             />
           </div>
+        </div>
+      )}
+
+      {/* ── Treatment exclusions and referral rules (P09.04 / DEF-023) ───────
+          Read-only, on the surface a reviewer actually reads. Member-safe text
+          only — the internal source clause is not even fetched. */}
+      {pkg.currentVersion && (treatmentExclusions.length > 0 || referralRules.length > 0) && (
+        <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#EEEEEE] flex items-center justify-between">
+            <h2 className="font-bold text-brand-text-heading font-heading">Exclusions &amp; Referral Rules</h2>
+            <span className="text-xs text-brand-text-muted">Version {pkg.currentVersion.versionNumber}</span>
+          </div>
+
+          {treatmentExclusions.length > 0 && (
+            <div className="px-5 py-4 space-y-3">
+              <p className="text-[11px] font-bold text-brand-text-muted uppercase">Treatment exclusions</p>
+              {treatmentExclusions.map((ex) => (
+                <div key={ex.id} className="border-b border-[#EEEEEE]/60 last:border-0 pb-3 last:pb-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-[#DC3545]/10 text-[#DC3545]">
+                      {ex.ruleCategory.replace(/_/g, " ")}
+                    </span>
+                    <span className="text-[10px] font-bold uppercase text-brand-text-muted">{ex.exclusionType}</span>
+                    {ex.benefitCategories.map((c) => (
+                      <span key={c} className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
+                        {c.replace(/_/g, " ")}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-sm text-brand-text-body mt-1">{ex.memberSafeExplanation}</p>
+                  <p className="text-[11px] text-brand-text-muted mt-0.5">
+                    Effective {fmtRuleDate(ex.effectiveFrom) ?? "—"} → {fmtRuleDate(ex.effectiveTo) ?? "—"}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {referralRules.length > 0 && (
+            <div className="px-5 py-4 space-y-3 border-t border-[#EEEEEE]">
+              <p className="text-[11px] font-bold text-brand-text-muted uppercase">Referral rules</p>
+              {referralRules.map((r) => (
+                <div key={r.id} className="border-b border-[#EEEEEE]/60 last:border-0 pb-3 last:pb-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                      r.requiresReferral ? "bg-[#FFC107]/20 text-[#856404]" : "bg-gray-100 text-gray-600"
+                    }`}>
+                      {r.requiresReferral ? "Referral required" : "No referral"}
+                    </span>
+                    {r.emergencyException && (
+                      <span className="text-[10px] font-bold uppercase text-[#28A745]">Emergency exempt</span>
+                    )}
+                    {r.benefitCategories.map((c) => (
+                      <span key={c} className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
+                        {c.replace(/_/g, " ")}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="text-sm text-brand-text-body mt-1">{r.memberSafeExplanation}</p>
+                  <p className="text-[11px] text-brand-text-muted mt-0.5">
+                    Effective {fmtRuleDate(r.effectiveFrom) ?? "—"} → {fmtRuleDate(r.effectiveTo) ?? "—"}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
