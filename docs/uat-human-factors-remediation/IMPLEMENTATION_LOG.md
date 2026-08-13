@@ -2213,6 +2213,46 @@ terminated and an opted-out member present — which is what the register asks f
 
 ---
 
+### DEF-023 closed, and a correction to the S3 coverage claim
+
+**Commit** `6738632` · **Defect** DEF-023 (S3)
+
+**The fix.** Treatment exclusions and referral rules now render on the package **detail** page, using
+the same pattern as the network block added in P09.04. The run's sharpest sentence is the last one:
+"Anyone reviewing what a package actually excludes, **including a checker assessing a governed
+change**, must open the editing surface to read it" — a surface whose own banner announces it is
+about to create a version. A reviewer had to enter an edit screen to see what they were approving.
+
+Reads the **current** version, because this page shows what is in force; a draft's rules belong on
+the edit screen where the change-control panel explains their status. The internal `sourceClause` is
+not fetched at all — the same rule P09.07 applied to the member surfaces, because not selecting a
+field is a stronger guarantee than remembering not to render it.
+
+**The correction.** I reported that all 45 S3 defects had log coverage. That measurement was wrong,
+and wrong in a way worth recording because it will recur.
+
+Counting `DEF-0nn` mentions in this log treats three different things as identical: a defect that was
+actually fixed, a defect mentioned in passing while fixing a different one, and a defect explicitly
+recorded as **not** done. A stricter check — does the mention appear in a task's *Defect IDs* row,
+and does any mention say "not done"? — found five S3s that were not covered at all:
+
+| Defect | Why the count was wrong |
+|---|---|
+| DEF-005 | **Cross-run number collision.** The only mention is `WP-3.1 / DEF-005` from an *earlier run's* numbering, about audit-row shape. This run's DEF-005 is HR terminology. Genuinely untouched. |
+| DEF-023 | The log said, in as many words, "DEF-023 is not done". **Now closed by this commit.** |
+| DEF-027 | Mentioned only as "DEF-027/DEF-078 in miniature". The substantive fix *is* P05.04's privacy-safe duplicate handling, so this one is genuinely closed — but by inheritance, not by its own task. |
+| DEF-047 | Half done. The raw maker id is fixed (`actorName`/`actorRole` denormalised onto the event). The "two Approve and two Reject controls" half is not. |
+| DEF-074 | Explicitly deferred: "DEF-074's wider form audit is P11.01". P01.06 built the primitives and P05.06/P09.04 applied some; the audit itself has not run. |
+
+**Still open after this commit:** DEF-005 (HR terminology), DEF-047 (duplicate approve/reject
+controls), DEF-074 (the P11.01 form audit). Named here so they cannot look covered again.
+
+That my own memory note says *"DEF numbers renumber per run — never match across runs/commits"* and I
+still let a cross-run collision inflate the count is the part worth remembering: the guard has to be
+in the measurement, not in the intention.
+
+---
+
 ## Corrections made to the implementation plan
 
 The plan is treated as authoritative but not infallible. Where a plan statement was checked against
