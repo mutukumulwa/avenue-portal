@@ -1637,6 +1637,63 @@ question later, which is most of what an event log is for.
 pass no event and must not start failing because they have not been updated; the
 parameter is additive.
 
+### P08.04 — atomic endorsement numbering *(row added late — see note)*
+
+| Field | Value |
+|---|---|
+| **Task** | P08.04 |
+| **Defect IDs** | DEF-048, and an adjacent invoice-numbering collision |
+| **Commit** | `a3bc23b` |
+| **Migrations / backfills** | none |
+| **Tests added** | endorsement/document-number suites; `npm run verify` GATE PASSED, 3,799 tests |
+| **Evidence** | admin `endorsements/new`, `members/[id]/transfer` (×2), HR `roster/new`, HR leaver, `endorsement.service`, `amendment.service` |
+| **Feature flags** | none. |
+| **Remaining risks** | **The "outcomes legible" half is only partly met.** Numbering is atomic, but P08.04 also asks for an operation receipt, event/outbox and member/HR notifications on an endorsement, and for approval and application to be *explicit separate states* — none of which was built. The plan's warning that the UI "must not label approval 'Approve & Apply'" was not audited against the current screens. |
+
+> **This row was written after the fact, and that is itself the finding.** The
+> code shipped in `a3bc23b`; the log row did not, and `a3bc23b` touched no
+> documentation at all. The branch's own rule is that a task without a row in
+> this file is not done — so for several commits P08.04 was, by that rule,
+> undone work masquerading as finished. It surfaced only when the plan's task
+> list was diffed against this file rather than read from memory.
+
+**Six paths minted endorsement numbers by read-then-write** — compute `MAX+1`,
+then create — and one used `Math.random`. `Endorsement` is unique on
+`[tenantId, endorsementNumber]`, so the race never produced a *duplicate*: it
+threw a raw P2002 at whichever operator lost. Not theoretical — P05.02 measured
+the identical shape yielding one usable number from fifty parallel allocations.
+
+All six now use `createWithDocumentNumber`, which advances the number and
+retries on a unique violation. The two transactional paths wrap the **whole
+transaction** in the retry, because a P2002 raised inside `$transaction` cannot
+be caught within it.
+
+### P08.05 — governed scheme renewal *(row added late; scope only partly met)*
+
+| Field | Value |
+|---|---|
+| **Task** | P08.05 |
+| **Defect IDs** | DEF-044 (S3) |
+| **Commit** | `5196a4e` (the routing fix, landed under another task's batch) |
+| **Migrations / backfills** | none |
+| **Tests added** | covered by that batch's 19 tests |
+| **Evidence** | `src/app/(admin)/analytics/renewals/[groupId]`, scheme detail link, sidebar entry gated to `UNDERWRITING` |
+| **Feature flags** | none. |
+| **Remaining risks** | **Three of the plan's limbs are NOT built**, and the task must not be read as closed: (1) **no maker/checker approval** — `renewal.service.ts` contains no approval, maker or checker concept at all; (2) **no member exceptions** — it carries *every* ACTIVE member forward, so the acceptance's "distinguishing active, opted-out, terminated and pending members" is unmet, and there is no opt-out to honour; (3) **no notification/outbox** on renewal. What *is* there: a reachable launch, a carry-forward preview, effective dates, and version pinning that fails closed on an unpinned successor (F-PIN-2). The workflow has still never been exercised end to end against a scheme at its renewal boundary with a terminated and an opted-out member present — which is exactly what the register asks for — and **the business owner has not confirmed whether scheme renewal is in launch scope at all**. |
+
+**DEF-044 was routing, not capability**, and the register said so itself: "the
+gap is routing and coverage, not capability". A full preview-and-bind workflow
+already existed under `/analytics/renewals`, filed where nobody looking for a
+scheme renewal would think to look. The scheme's Renewal Date — inert text
+beside Edit, Suspend, Mark Lapsed and Terminate — now links to it, and
+**Renewals** sits in the sidebar gated to the `UNDERWRITING` persona the run
+says could not reach it.
+
+**Closing the defect is not completing the task.** The defect was "no renewal
+control is reachable"; the task is "expose a *governed* renewal path". Routing
+answered the first. Governance — approval, exceptions, notification — is the
+second, and it is not done.
+
 ### P03.06 — the policy parity gate
 
 | Field | Value |
