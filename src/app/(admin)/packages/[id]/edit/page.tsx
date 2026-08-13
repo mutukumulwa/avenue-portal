@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { PackageEditForm } from "./PackageEditForm";
+import { ChangeControlPanel } from "./ChangeControlPanel";
+import type { PackageVersionStatus } from "@/server/services/package-change-control.service";
 import {
   describeArchiveImpact,
   getPackageArchiveImpact,
@@ -67,6 +69,22 @@ export default async function EditPackagePage({ params }: { params: Promise<{ id
 
       {/* Core package form — a self-contained <form> (NOT wrapping the managers,
           which each own their own <form>; nested forms were the DEF-026 bug). */}
+      {/* UAT-HF P09.01 — DEF-024. Where this change is, and what has to happen
+          for it to reach a member. The run found "no approval requested, no
+          Draft/Pending/Approved state, and no feedback message of any kind". */}
+      <ChangeControlPanel
+        packageId={id}
+        viewerId={session.user.id}
+        versions={pkg.versions.map((v) => ({
+          id: v.id,
+          versionNumber: v.versionNumber,
+          status: v.status as PackageVersionStatus,
+          effectiveFrom: v.effectiveFrom.toISOString(),
+          submittedById: v.submittedById,
+          isCurrent: v.id === pkg.currentVersionId,
+        }))}
+      />
+
       <PackageEditForm
         packageId={id}
         impact={{

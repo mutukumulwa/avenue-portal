@@ -226,3 +226,58 @@ describe("P09.01 members are not migrated by an approval", () => {
     expect(service).not.toMatch(/\btx\.group\b/);
   });
 });
+
+/**
+ * UAT-HF P09.01 — the surface, which the engine shipped without.
+ *
+ * The run's complaint was not only that a change went live unreviewed. It was
+ * that nothing said anything: "no approval requested, no Draft/Pending/Approved
+ * state, and no feedback message of any kind — no toast and no role='alert'
+ * element."
+ */
+describe("P09.01 the change-control panel", () => {
+  const panel = readFileSync("src/app/(admin)/packages/[id]/edit/ChangeControlPanel.tsx", "utf8");
+  const page = readFileSync("src/app/(admin)/packages/[id]/edit/page.tsx", "utf8");
+
+  it("is mounted on the package edit page", () => {
+    // Without this, a maker's edit produces a draft nobody can activate.
+    expect(page).toContain("<ChangeControlPanel");
+    expect(page).toContain("versions={pkg.versions.map");
+  });
+
+  it("states the Draft / Pending / Approved position the run found missing", () => {
+    expect(panel).toContain("PACKAGE_VERSION_STATUS_LABEL");
+    for (const status of ["DRAFT", "PENDING_APPROVAL", "APPROVED", "ACTIVE"]) {
+      expect(panel, status).toContain(status);
+    }
+  });
+
+  it("says plainly that editing does not change live cover", () => {
+    expect(panel).toMatch(/does not affect any member until/i);
+    expect(panel).toMatch(/never changes live cover/i);
+  });
+
+  it("gives feedback on SUCCESS as well as failure", () => {
+    // "no toast and no role='alert' element" — and a success that says nothing
+    // is why the operator could not tell the change had gone live.
+    expect(panel).toContain('role="status"');
+    expect(panel).toContain('role="alert"');
+  });
+
+  it("explains WHY a maker cannot approve, instead of a dead button", () => {
+    expect(panel).toMatch(/You cannot approve your own change/i);
+    expect(panel).toMatch(/somebody else has to approve it/i);
+  });
+
+  it("requires a reason to reject, in the UI as well as the action", () => {
+    expect(panel).toMatch(/name="reason"/);
+    expect(panel).toMatch(/minLength=\{5\}/);
+  });
+
+  it("does not decide authorisation client-side", () => {
+    // viewerId only explains why a control is absent; the server decides.
+    // A UI that authorises is a UI that can be bypassed.
+    expect(panel).toContain("never to authorise");
+    expect(panel).not.toMatch(/permissions\.includes|hasPermission/);
+  });
+});

@@ -1598,6 +1598,57 @@ refusal renders in an alert while preserving the operator's entries and re-enabl
 
 **Two newborn tests were asserting the defect.** They enrolled a `CHILD` with no `principalId` and expected success. Nothing in CT-033 says a newborn has no parent — it says a newborn may enrol without a **national ID**. The fixtures now link a principal; the behaviour under test (cover from DOB, no ID required) is unchanged.
 
+### P05.06 — Correct member inputs, address and date semantics
+
+| Field | Value |
+|---|---|
+| **Task** | P05.06 |
+| **Defect IDs** | DEF-006, DEF-008, DEF-029, DEF-032, DEF-033, DEF-039, DEF-074, DEF-075 |
+| **Commit** | _this commit_ (the additive address schema and migration `012` entered the integration parent `df8e7b1` while this shared-worktree slice was in progress; the product wiring and drift cleanup are this commit) |
+| **Migrations / backfills** | `20260813001200_member_structured_address`: 10 nullable member-address columns and four coordinate pair/consent/range constraints; **no backfill** and no invented address for an existing member. `20260813001300_remove_redundant_member_national_id_index`: removes P05.01's duplicate non-unique index while retaining its unique constraint/index. Fresh database: **14 migrations applied**, `migrate status` current, **No difference detected**, all four address constraints present, unique national-ID index present. Disposable database dropped. |
+| **Tests added** | `member-enrolment.test.ts` (5), `member-address.test.ts` (6), `member-profile-date-address-boundary.test.ts` (4), `hr-member-addition-input.test.ts` (5); 3 in `member-enrolment-idempotency.test.ts`, 4 plus one extended in `member-enrolment-integrity.test.ts`, 3 in `member-new-form-draft.test.tsx`, 2 in `member-profile-edit.test.ts` |
+| **Commands / results** | Focused boundary suite: **9 files / 119 tests passed**. Full gate: typecheck 0; lint **0 errors / 214 warnings**; suite **308 files / 3465 tests passed**, 88 files / 598 skipped; currency guard green; locale guard green and baseline tightened **50 → 49**; `git diff --check` clean. |
+| **Routes exercised** | no live browser route. Direct admin enrollment/edit, HR request and endorsement-approval boundaries are rendered/called in component, action and service tests. Browser retest remains P12.05. |
+| **Evidence** | `src/lib/member-enrolment.ts`, `src/lib/member-address.ts`, member create/edit/profile routes, HR member-addition route, `MembersService`, endorsement approval, migrations `012`/`013`, tests listed above |
+| **Feature flags** | none. Address/date validation and exact readback are unconditional. |
+| **Remaining risks** | Production schema cutover remains the human operation in `SCHEMA_DEPLOYMENT.md` §3. Existing members have no address until corrected by an authorized operator. Precise-coordinate consent is an operator attestation and timestamp, not a linked consent document. Find Care does not consume member coordinates yet, so DEF-007's no-results cause remains unproven. The separate admin endorsement UI still exposes its own incomplete member/dependant-addition forms; P08.02 must remove that duplicate engine rather than grow a third enrollment form. No live browser route was exercised. |
+
+**Calendar days stay calendar days through the write.** `resolveMemberEnrolmentDates` validates
+strict `YYYY-MM-DD`, impossible/future dates and before-birth combinations, and applies CT-033 at
+day 30 but not day 31. `MembersService` converts only the resolved day to midnight UTC at the
+database boundary. The create and HR forms show the requested date and resulting exact date before
+submit; the member card and policy details now show `1 Aug 2026`, not merely `Aug 2026`. HR copy
+also states that a back-date needs an approved override, a future date does not activate early, and
+no request changes cover before approval.
+
+**The address is structured, optional and end-to-end.** The direct enrollment and edit forms, the
+HR request JSON, endorsement approval and the final member row all carry the same Uganda hierarchy:
+district; city/municipality/county; subcounty/division; parish/ward; village/zone; and an optional
+building/street/landmark. Starting an address requires a district. One hundred-character locality
+fields and a 200-character line preserve long controlled values without truncation. Existing rows
+remain null rather than being assigned a guessed location.
+
+**Coordinates are a separate consented fact, not another address field.** Latitude and longitude
+must arrive as a pair, within global ranges and at no more precision than the database stores. The
+server refuses them without an explicit consent assertion and writes the timestamp itself; database
+checks enforce pair, consent and ranges if another writer bypasses the service. The protected member
+profile receives formatted address lines and a boolean saying coordinates exist — never the raw
+coordinates.
+
+**Every enrollment rail uses the same rejection grammar.** A malformed phone can no longer fall
+through normalization and be stored verbatim by manual, HR, endorsement-approval or import callers.
+The admin Server Action validates before reserving an operation receipt, so a correctable field
+error cannot leave an uncertain receipt. HR dependants must identify their principal and every HR
+request must carry the source/document reference the approval service requires before the request
+can enter the queue; otherwise approval would later discover an un-linkable family or missing
+evidence and leave a permanently unapprovable endorsement.
+
+**The migration rehearsal corrected an older claim.** Migration `007` created a normal index on
+`(tenantId, nationalIdNormalized)` and migration `008` created a unique index on the same columns.
+The unique index already supplies the same lookup, so the first was redundant — and Prisma reported
+it as drift. Migration `013` removes only the duplicate; the hard national-ID constraint remains.
+The fresh 14-migration database is now genuinely zero-drift.
+
 ### P09.01 (part) — Draft / approve / activate for package versions
 
 | Field | Value |
@@ -1610,7 +1661,7 @@ refusal renders in an alert while preserving the operator's entries and re-enabl
 | **Commands / results** | typecheck 0; lint 0 errors; suite 307 files / 3458 passed; **13 migrations from an empty database with zero drift**. |
 | **Evidence** | `src/server/services/package-change-control.service.ts`, `change-control-actions.ts`, `packages/[id]/edit/actions.ts` |
 | **Feature flags** | none. |
-| **Remaining risks** | **No UI.** Submit, approve and reject are server actions with no controls on the package edit page and no entry in the Approvals console — so today a maker's edit produces a draft that **nobody can activate through the product**. That is the safe direction to fail and it is a real capability gap, exactly like the P05.05→P07.03 suspend gap: the engine landed first, the surface is next. **Scheduled activation is not built**: a version approved with a future effective date stays APPROVED and nothing later activates it — there is no job. Only the package *version* path is governed; co-contribution rules, exclusions and referral rules (the other three ungoverned changes the run recorded as B-004/005/006) still write directly. |
+| **Remaining risks** | **No entry in the Approvals console.** A checker reaches a pending version through the package's own edit page, not the queue the run opened and found empty — so "the Approvals queue ... contains no package or configuration item at all" is only half answered. **Scheduled activation is not built**: a version approved with a future effective date stays APPROVED and nothing later activates it — there is no job. Only the package *version* path is governed; co-contribution rules, exclusions and referral rules (the other three ungoverned changes the run recorded as B-004/005/006) still write directly. |
 
 **The register's diagnosis is the whole design.** "**The approval engine exists and is correctly described on its own page ... and demonstrably works for claim payments — configuration changes are simply not routed into it.**" So nothing new was invented: package versions got an `ApprovalActionType` and a lifecycle state, and joined the queue claim payments already use.
 
@@ -1625,6 +1676,8 @@ refusal renders in an alert while preserving the operator's entries and re-enabl
 **Members are not migrated.** DEC-03: "Schemes and members stay pinned to their current approved version until a governed migration moves them." A test asserts the service touches no member or group row — silently moving live members onto a new version is the thing the approval exists to prevent.
 
 **The backfill reads current-ness.** A plain `DEFAULT 'DRAFT'` would have marked every live version unapproved and every historical one never-shipped; existing rows become ACTIVE or SUPERSEDED by whether the package points at them.
+
+**The surface followed in the same phase, unlike P05.05's.** `ChangeControlPanel` puts submit / approve / reject on the package edit page, so the gap the engine opened lasted one commit rather than a phase. Its job is as much to *state where the change is* as to move it: the run's complaint was not only that a change went live unreviewed but that there was "no Draft/Pending/Approved state, and no feedback message of any kind — no toast and no `role='alert'` element". Success is announced as loudly as failure, and a maker looking at their own pending version is told **why** they cannot approve it rather than shown a dead control. The panel decides nothing: a test asserts it never reads permissions, because a UI that authorises is a UI that can be bypassed.
 
 ---
 
@@ -1650,7 +1703,7 @@ the divergence stays visible to a reviewer.
 | **P02** | **PASS** — 0 errors | **PASS** — 0 errors, 210 warnings | **PASS** — 275 files / 2842 tests passed, 88 files / 598 skipped | _awaiting owner review_ |
 | **P03** (partial) | **PASS** — 0 errors | **PASS** — 0 errors | **PASS** — 279 files / 2937 tests passed, 88 files / 598 skipped | P03.01 reporting half, 03.02–03.05 done; **03.06 blocked on P09** |
 | **P04** | **PASS** — 0 errors | **PASS** — 0 errors, 217 warnings | **PASS** — 286 files / 3079 tests passed | P04.01–P04.05 **complete** |
-| **P05** (partial) | **PASS** — 0 errors | **PASS** — 0 errors, 217 warnings | **PASS** — 290 files / 3180 tests passed | P05.01–P05.05, P05.07 done; **P05.06 not started** |
+| **P05** | **PASS** — 0 errors | **PASS** — 0 errors, 214 warnings | **PASS** — 308 files / 3465 tests passed | P05.01–P05.07 complete; governed alternate endorsement-engine cleanup remains P08.02 |
 | **P06** (partial) | **PASS** — 0 errors | **PASS** — 0 errors | **PASS** — 295 files / 3275 tests passed | P06.05's DEF-069 half only |
 | **P09** (partial) | **PASS** — 0 errors | **PASS** — 0 errors | **PASS** — 297 files / 3308 tests passed | P09.02 done; P09.06 impact half |
 | **P10** (partial) | **PASS** — 0 errors | **PASS** — 0 errors, 216 warnings | **PASS** — 293 files / 3248 tests passed | P10.02–P10.04 done; **P10.01 partial** |
