@@ -138,6 +138,7 @@ export default async function EditPackagePage({ params }: { params: Promise<{ id
           annualSubLimit: Number(b.annualSubLimit),
           copayPercentage: Number(b.copayPercentage),
           waitingPeriodDays: b.waitingPeriodDays,
+          waitingPeriodBasis: b.waitingPeriodBasis,
           perVisitLimit: b.perVisitLimit == null ? null : Number(b.perVisitLimit),
         }))}
       />

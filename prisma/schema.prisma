@@ -2193,25 +2193,36 @@ enum FundingModelType {
 }
 
 model BenefitConfig {
-  id                 String           @id @default(cuid())
+  id                 String             @id @default(cuid())
   packageVersionId   String
-  packageVersion     PackageVersion   @relation(fields: [packageVersionId], references: [id])
+  packageVersion     PackageVersion     @relation(fields: [packageVersionId], references: [id])
   category           BenefitCategory
   customCategoryName String? // If category == CUSTOM
   annualSubLimit     Decimal // KES
   perVisitLimit      Decimal?
-  copayPercentage    Decimal          @default(0) // e.g., 10 = 10%
+  copayPercentage    Decimal            @default(0) // e.g., 10 = 10%
   // Cost-share (G9.1) — distinct from copay: co-insurance is the member's % of
   // the cost AFTER the annual deductible is met. deductibleAmount is the annual
   // member-paid threshold before the plan pays. Both default 0 (off).
-  coInsurancePct     Decimal          @default(0) // e.g. 20 = member pays 20% post-deductible
-  deductibleAmount   Decimal          @default(0) // annual member-paid threshold
+  coInsurancePct     Decimal            @default(0) // e.g. 20 = member pays 20% post-deductible
+  deductibleAmount   Decimal            @default(0) // annual member-paid threshold
   // Funding model (WP-F1/D8): default FFS keeps existing behaviour. HYBRID
   // uses fundingOverrides: [{ tier: ServiceTier, model: FundingModelType }],
   // validated in the service layer.
-  fundingModel       FundingModelType @default(FEE_FOR_SERVICE)
+  fundingModel       FundingModelType   @default(FEE_FOR_SERVICE)
   fundingOverrides   Json?
-  waitingPeriodDays  Int              @default(0)
+  waitingPeriodDays  Int                @default(0)
+  // UAT-HF P09.03 — DEF-022. A duration with no basis is not a rule.
+  //
+  // The run: "The product never states what the 270 days run FROM — cover
+  // start, enrolment date, policy inception and member join date are all
+  // plausible and none is named." The basis is now stored beside the duration
+  // so the same answer is derivable on every surface instead of being an
+  // assumption each reader makes for themselves.
+  //
+  // COVER_START is the default because it is what the code already computed,
+  // so every existing row keeps its current meaning with no backfill.
+  waitingPeriodBasis WaitingPeriodBasis @default(COVER_START)
   notes              String?
   exclusions         String[]
 
@@ -2219,6 +2230,25 @@ model BenefitConfig {
   sharedLimitGroups BenefitConfigSharedLimit[]
 
   @@index([packageVersionId])
+}
+
+/**
+ * UAT-HF P09.03 — what a waiting period is measured FROM (DEF-022).
+ * These are the four the plan names. Each resolves to a real date the platform
+ * already stores, which is the test for whether a basis belongs here at all:
+ * COVER_START ......... the principal's cover start — the family's policy date
+ * DEPENDANT_JOIN ...... this member's OWN cover start, later for a dependant
+ * added mid-year
+ * REINSTATEMENT ....... the start of the current coverage period after a lapse
+ * OTHER_APPROVED ...... an explicitly approved date held elsewhere; the
+ * evaluator refuses to guess and reports that it cannot
+ * answer rather than silently falling back
+ */
+enum WaitingPeriodBasis {
+  COVER_START
+  DEPENDANT_JOIN
+  REINSTATEMENT
+  OTHER_APPROVED
 }
 
 enum LimitScope {

@@ -1425,6 +1425,50 @@ That is a flex item's default `min-width: auto`. The wrapper cannot shrink below
 
 **34 wrappers, and a ratchet.** Every `overflow-x-auto` in `src/` now carries `min-w-0`, and a test walks the tree and fails on any that does not. One bare wrapper is one more table with unreachable columns, and the two classes only work as a pair.
 
+### P09.03 (completion) — the waiting-period basis is stored, not assumed
+
+| Field | Value |
+|---|---|
+| **Task** | P09.03 — the basis-event half |
+| **Defect IDs** | DEF-022 (S3) |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | `20260813001600_waiting_period_basis` — **additive, no backfill**: new enum + `BenefitConfig.waitingPeriodBasis NOT NULL DEFAULT 'COVER_START'` |
+| **Tests added** | `tests/lib/member-policy-copy.test.ts` +10 |
+| **Evidence** | `prisma/schema.prisma`, `src/lib/member-policy-copy.ts`, package detail + edit surfaces |
+| **Feature flags** | none. |
+| **Remaining risks** | **No caller passes the new anchors yet.** `waitingPeriodStatus` accepts `dependantJoinDate`, `reinstatementDate` and `approvedBasisDate`, but the member and provider read paths still supply only `coverStartDate` — so a benefit configured as DEPENDANT_JOIN or REINSTATEMENT today resolves as `unresolved` on those surfaces rather than computing a date. That is the safe direction (it says it cannot answer instead of answering wrongly) but it means **the acceptance — "same rule/date yields identical eligible date in package, member, provider, and claim/preauth tests" — is not yet demonstrable for the three non-default bases**. Wiring `MemberCoveragePeriod` and the member's own `coverStartDate` into those callers is the remaining work. `OTHER_APPROVED` has no field to hold the approved date at all; it is accepted, stored, and always reports unresolved until one exists. |
+
+**A duration with no basis is not a rule.** The run's words: "The product never
+states what the 270 days run FROM — cover start, enrolment date, policy
+inception and member join date are all plausible and none is named."
+
+The first pass answered that in *copy*, by naming a basis the code had assumed
+all along. This makes it a decision. A maternity wait measured from a family's
+policy start and one measured from a dependant's own join date are different
+rules — in the worked example above, five months apart — and they were
+previously written identically, with the product silently applying one of them.
+
+**Refusing to answer beats answering confidently and wrongly.** When a basis is
+configured but its date is not on record, `waitingPeriodStatus` returns
+`unresolved: true` with a sentence saying so. Folding that into `waiting: false`
+would tell a member their maternity cover is live when nobody knows, and
+falling back to cover start would produce a confident wrong date — which is the
+same failure as DEF-022 in a different costume. `resolveWaitingPeriodAnchor` has
+no default case that substitutes one basis for another, and a test asserts it.
+
+**COVER_START is the default because it is what the code already did.** Every
+existing row keeps its exact current meaning, so the migration is additive with
+no backfill — there is no data-fix step to get wrong.
+
+**A tampered or stale form cannot re-base an existing rule.** The submitted
+select is checked against the enum values and anything unrecognised falls back
+to COVER_START rather than being written through.
+
+**The package detail page names each benefit's own basis.** A single "waiting
+periods run from X" heading was correct only while the basis was hard-coded;
+now that it varies per benefit, one line for the card would be wrong for any
+benefit configured differently from the first.
+
 ### P09.06 (completion) — migration control on archive
 
 | Field | Value |

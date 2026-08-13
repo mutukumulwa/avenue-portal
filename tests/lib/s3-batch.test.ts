@@ -22,7 +22,12 @@ const read = (p: string) => readFileSync(p, "utf8");
 describe("DEF-022 the maker can answer 'when does cover begin?'", () => {
   it("states the number of days AND what they run from", () => {
     // The whole maker-facing disclosure was the fragment "270d wait".
-    expect(waitingPeriodAuthoringLabel(270)).toBe("270 days from the member's cover start date");
+    //
+    // P09.03 made the basis a stored per-benefit choice, so the default is now
+    // named as "the policy cover start date" — distinguishable from a wait
+    // measured from a late dependant's own join date, which is a different
+    // rule that used to be written the same way.
+    expect(waitingPeriodAuthoringLabel(270)).toBe("270 days from the policy cover start date");
   });
 
   it("says nothing when there is no wait", () => {
@@ -62,7 +67,12 @@ describe("DEF-022 the maker can answer 'when does cover begin?'", () => {
     const page = read("src/app/(admin)/packages/[id]/page.tsx");
     expect(page).toContain("waitingPeriodAuthoringLabel");
     expect(page).toContain("waitingPeriodWorkedExample");
-    expect(page).toMatch(/Waiting periods run from/);
+    // P09.03: each benefit names its OWN basis. A single "Waiting periods run
+    // from X" heading was right only while the basis was hard-coded; now that
+    // it is per-benefit, one line for the whole card would be wrong for any
+    // benefit configured differently from the first.
+    expect(page).toContain("WAITING_PERIOD_BASIS_LABEL[b.waitingPeriodBasis]");
+    expect(page).toContain("waitingPeriodAuthoringLabel(b.waitingPeriodDays, b.waitingPeriodBasis)");
     // And the bare fragment the run quoted is gone.
     expect(page).not.toMatch(/\{b\.waitingPeriodDays\}d wait/);
   });

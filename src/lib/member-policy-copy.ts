@@ -29,6 +29,40 @@
 
 import { formatCalendarDate, calendarDateFromInstant, addCalendarDays } from "@/lib/calendar-date";
 
+/**
+ * UAT-HF P09.03 — what a waiting period is measured from (DEF-022).
+ *
+ * Mirrors the `WaitingPeriodBasis` enum. Declared here rather than imported
+ * from `@prisma/client` so this module stays usable by callers that hold a
+ * plain string — the point of one read model is that every audience can reach
+ * it, including ones that never touch the database.
+ */
+export type WaitingPeriodBasisValue =
+  | "COVER_START"
+  | "DEPENDANT_JOIN"
+  | "REINSTATEMENT"
+  | "OTHER_APPROVED";
+
+/** The dates a basis can resolve against. Each is one the platform stores. */
+export interface WaitingPeriodAnchors {
+  /** The principal's cover start — the family's policy date. */
+  coverStartDate?: Date | string | null;
+  /** This member's own cover start; later than the above for a late dependant. */
+  dependantJoinDate?: Date | string | null;
+  /** Start of the current coverage period after a lapse. */
+  reinstatementDate?: Date | string | null;
+  /** An explicitly approved date held outside the standard fields. */
+  approvedBasisDate?: Date | string | null;
+}
+
+/** Human-readable name of each basis, for maker and member copy alike. */
+export const WAITING_PERIOD_BASIS_LABEL: Record<WaitingPeriodBasisValue, string> = {
+  COVER_START: "the policy cover start date",
+  DEPENDANT_JOIN: "the date this member joined the policy",
+  REINSTATEMENT: "the date cover was reinstated",
+  OTHER_APPROVED: "a separately approved start date",
+};
+
 export interface WaitingPeriodStatus {
   /** True when the member cannot use this benefit yet. */
   waiting: boolean;
@@ -38,6 +72,37 @@ export interface WaitingPeriodStatus {
   label: string;
   /** Whole days still to wait. 0 once available. */
   daysRemaining: number;
+  /**
+   * True when a wait IS configured but its basis date is unknown, so no
+   * eligible date could be computed.
+   *
+   * This is deliberately not folded into `waiting: false`. A rule that cannot
+   * be evaluated is not a rule that does not apply, and reporting it as "no
+   * wait" would tell a member their maternity cover is live when nobody knows.
+   */
+  unresolved: boolean;
+}
+
+/** Pick the date a basis measures from. Returns null when it is not known. */
+export function resolveWaitingPeriodAnchor(
+  basis: WaitingPeriodBasisValue,
+  anchors: WaitingPeriodAnchors,
+): Date | string | null {
+  switch (basis) {
+    case "DEPENDANT_JOIN":
+      return anchors.dependantJoinDate ?? null;
+    case "REINSTATEMENT":
+      return anchors.reinstatementDate ?? null;
+    case "OTHER_APPROVED":
+      // No silent fallback to cover start. An approved basis that was never
+      // recorded is a gap in the configuration, and answering from a different
+      // date would give a confident wrong answer — the failure mode DEF-022 is
+      // about in the first place.
+      return anchors.approvedBasisDate ?? null;
+    case "COVER_START":
+    default:
+      return anchors.coverStartDate ?? null;
+  }
 }
 
 /**
@@ -52,15 +117,41 @@ export interface WaitingPeriodStatus {
  */
 export function waitingPeriodStatus(input: {
   waitingPeriodDays: number | null | undefined;
-  /** When this member's cover began. */
+  /** When this member's cover began. Also the COVER_START anchor. */
   coverStartDate: Date | string | null | undefined;
+  /** P09.03 — which date the wait runs from. Defaults to the historic behaviour. */
+  waitingPeriodBasis?: WaitingPeriodBasisValue;
+  /** The other dates a non-default basis may need. */
+  anchors?: WaitingPeriodAnchors;
   now?: Date;
 }): WaitingPeriodStatus {
   const days = input.waitingPeriodDays ?? 0;
-  const none: WaitingPeriodStatus = { waiting: false, eligibleFrom: null, label: "", daysRemaining: 0 };
-  if (days <= 0 || !input.coverStartDate) return none;
+  const none: WaitingPeriodStatus = {
+    waiting: false,
+    eligibleFrom: null,
+    label: "",
+    daysRemaining: 0,
+    unresolved: false,
+  };
+  if (days <= 0) return none;
 
-  const start = calendarDateFromInstant(new Date(input.coverStartDate));
+  const basis = input.waitingPeriodBasis ?? "COVER_START";
+  const anchor = resolveWaitingPeriodAnchor(basis, {
+    coverStartDate: input.coverStartDate,
+    ...input.anchors,
+  });
+
+  if (!anchor) {
+    // A configured wait whose basis date is missing. Say so rather than
+    // reporting "no wait" — see `unresolved`.
+    return {
+      ...none,
+      unresolved: true,
+      label: `A ${days}-day waiting period applies to this benefit, measured from ${WAITING_PERIOD_BASIS_LABEL[basis]}. We do not have that date on record, so we cannot yet tell you when it ends — please contact your administrator.`,
+    };
+  }
+
+  const start = calendarDateFromInstant(new Date(anchor));
   if (!start) return none;
 
   const eligibleFrom = addCalendarDays(start, days);
@@ -70,7 +161,7 @@ export function waitingPeriodStatus(input: {
   if (!today) return none;
 
   if (today >= eligibleFrom) {
-    return { waiting: false, eligibleFrom, label: "", daysRemaining: 0 };
+    return { waiting: false, eligibleFrom, label: "", daysRemaining: 0, unresolved: false };
   }
 
   const remaining = Math.max(
@@ -85,6 +176,7 @@ export function waitingPeriodStatus(input: {
     waiting: true,
     eligibleFrom,
     daysRemaining: remaining,
+    unresolved: false,
     // Says what is true now, when it changes, and that the rest of the cover is
     // unaffected — the third clause is the one that stops a member assuming the
     // whole policy is dormant.
@@ -256,10 +348,16 @@ export const WAITING_PERIOD_BASIS = "the member's cover start date";
  * Returns null when there is no wait, so a caller can render nothing rather than
  * "0 days from cover start", which reads like a rule where there is none.
  */
-export function waitingPeriodAuthoringLabel(waitingPeriodDays: number | null | undefined): string | null {
+export function waitingPeriodAuthoringLabel(
+  waitingPeriodDays: number | null | undefined,
+  basis: WaitingPeriodBasisValue = "COVER_START",
+): string | null {
   const days = waitingPeriodDays ?? 0;
   if (days <= 0) return null;
-  return `${days} days from ${WAITING_PERIOD_BASIS}`;
+  // P09.03: the basis is named, not assumed. "270d wait" was the entire
+  // maker-facing disclosure the run found, and four different start dates were
+  // all plausible readings of it.
+  return `${days} days from ${WAITING_PERIOD_BASIS_LABEL[basis]}`;
 }
 
 /**

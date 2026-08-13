@@ -11,6 +11,16 @@ import {
   MIGRATION_MOVE_MEMBERS_FIELD,
   type MigrationOutcome,
 } from "@/server/services/package-migration.service";
+import type { WaitingPeriodBasis } from "@prisma/client";
+
+/** P09.03 — the accepted basis values, for validating the submitted select. */
+const WAITING_PERIOD_BASIS_VALUES: WaitingPeriodBasis[] = [
+  "COVER_START",
+  "DEPENDANT_JOIN",
+  "REINSTATEMENT",
+  "OTHER_APPROVED",
+];
+
 import { writeAudit } from "@/lib/audit";
 import { ok, fail, type ActionResult } from "@/lib/action-result";
 import {
@@ -103,6 +113,8 @@ export async function updatePackageAction(
     annualSubLimit: number;
     copayPercentage: number;
     waitingPeriodDays: number;
+    /** UAT-HF P09.03 — what the wait is measured from (DEF-022). */
+    waitingPeriodBasis: WaitingPeriodBasis;
     perVisitLimit: number | null;
   }[] = [];
   for (const cat of enabledCats) {
@@ -134,6 +146,15 @@ export async function updatePackageAction(
       annualSubLimit: rowParsed.data.annualSubLimit,
       copayPercentage: rowParsed.data.copayPercentage ?? 0,
       waitingPeriodDays: rowParsed.data.waitingPeriodDays ?? 0,
+      // P09.03: an unrecognised value falls back to COVER_START, which is what
+      // the evaluator computed before the column existed — so a tampered or
+      // stale form cannot silently re-base an existing rule onto a date the
+      // maker never chose.
+      waitingPeriodBasis: WAITING_PERIOD_BASIS_VALUES.includes(
+        String(formData.get(`benefit_basis_${cat}`)) as WaitingPeriodBasis,
+      )
+        ? (String(formData.get(`benefit_basis_${cat}`)) as WaitingPeriodBasis)
+        : "COVER_START",
       perVisitLimit: rowParsed.data.perVisitLimit ?? null,
     });
   }
@@ -248,6 +269,7 @@ export async function updatePackageAction(
       perVisitLimit: b.perVisitLimit,
       copayPercentage: b.copayPercentage,
       waitingPeriodDays: b.waitingPeriodDays,
+      waitingPeriodBasis: b.waitingPeriodBasis,
       customCategoryName: prev?.customCategoryName ?? null,
       coInsurancePct: prev?.coInsurancePct ?? 0,
       deductibleAmount: prev?.deductibleAmount ?? 0,

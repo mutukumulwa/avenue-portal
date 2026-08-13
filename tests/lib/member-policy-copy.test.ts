@@ -23,7 +23,10 @@ import {
   referralNotesFor,
   referralWarningForProcedure,
   waitingPeriodStatus,
+  resolveWaitingPeriodAnchor,
+  waitingPeriodAuthoringLabel,
 } from "@/lib/member-policy-copy";
+import type { WaitingPeriodBasisValue } from "@/lib/member-policy-copy";
 
 const MEMBER_SAFE =
   "Specialist outpatient visits require a referral from your primary provider, except in an emergency.";
@@ -302,5 +305,107 @@ describe("P09.07 the surfaces that were silent", () => {
       // The clause must never appear inside a select block.
       expect(src, p).not.toMatch(/sourceClause:\s*true/);
     }
+  });
+});
+
+/**
+ * UAT-HF P09.03 — the configurable basis (DEF-022).
+ *
+ * "The product never states what the 270 days run FROM — cover start,
+ * enrolment date, policy inception and member join date are all plausible and
+ * none is named."
+ *
+ * Naming it in copy was the first half. Making it a stored, per-benefit
+ * decision is this half: a maternity wait measured from a late dependant's join
+ * date and one measured from the family's policy start are different rules that
+ * were previously indistinguishable, and the product silently applied one of
+ * them.
+ */
+describe("P09.03 waiting-period basis", () => {
+  const COVER = "2026-01-01T00:00:00Z";
+  const JOIN = "2026-06-01T00:00:00Z";
+  const REINSTATED = "2026-08-01T00:00:00Z";
+  const NOW = new Date("2026-08-13T00:00:00Z");
+
+  const status = (basis: WaitingPeriodBasisValue, anchors = {}) =>
+    waitingPeriodStatus({
+      waitingPeriodDays: 90,
+      coverStartDate: COVER,
+      waitingPeriodBasis: basis,
+      anchors,
+      now: NOW,
+    });
+
+  it("COVER_START measures from the policy start, as it always did", () => {
+    expect(status("COVER_START").eligibleFrom).toBe("2026-04-01");
+  });
+
+  it("DEPENDANT_JOIN measures from the member's own join date", () => {
+    // The difference is five months of cover. Guessing between them is exactly
+    // what DEF-022 objects to.
+    const r = status("DEPENDANT_JOIN", { dependantJoinDate: JOIN });
+    expect(r.eligibleFrom).toBe("2026-08-30");
+    expect(r.waiting).toBe(true);
+  });
+
+  it("REINSTATEMENT measures from the reinstatement date", () => {
+    expect(status("REINSTATEMENT", { reinstatementDate: REINSTATED }).eligibleFrom).toBe("2026-10-30");
+  });
+
+  it("OTHER_APPROVED uses the approved date and nothing else", () => {
+    expect(status("OTHER_APPROVED", { approvedBasisDate: "2026-07-01T00:00:00Z" }).eligibleFrom).toBe(
+      "2026-09-29",
+    );
+  });
+
+  it("reports UNRESOLVED rather than falling back when the basis date is missing", () => {
+    // The dangerous answer is "no wait": it tells a member their maternity
+    // cover is live when in fact nobody knows. Silently using cover start
+    // instead would give a confident wrong date, which is the same failure in
+    // a different costume.
+    const r = status("OTHER_APPROVED");
+    expect(r.unresolved).toBe(true);
+    expect(r.waiting).toBe(false);
+    expect(r.eligibleFrom).toBeNull();
+    expect(r.label).toMatch(/do not have that date|contact your administrator/i);
+    expect(r.label).not.toMatch(/2026-04-01|1 Apr/);
+  });
+
+  it("a missing dependant join date does not quietly become the policy start", () => {
+    expect(status("DEPENDANT_JOIN").unresolved).toBe(true);
+  });
+
+  it("no wait at all stays no wait, whatever the basis", () => {
+    const r = waitingPeriodStatus({
+      waitingPeriodDays: 0,
+      coverStartDate: COVER,
+      waitingPeriodBasis: "OTHER_APPROVED",
+      now: NOW,
+    });
+    expect(r).toMatchObject({ waiting: false, unresolved: false, label: "" });
+  });
+
+  it("defaults to COVER_START when no basis is supplied", () => {
+    // Every row that predates the column keeps its current meaning, which is
+    // why the migration needs no backfill.
+    expect(
+      waitingPeriodStatus({ waitingPeriodDays: 90, coverStartDate: COVER, now: NOW }).eligibleFrom,
+    ).toBe("2026-04-01");
+  });
+
+  it("the maker-facing label names the basis instead of implying one", () => {
+    expect(waitingPeriodAuthoringLabel(270, "DEPENDANT_JOIN")).toBe(
+      "270 days from the date this member joined the policy",
+    );
+    // The run's entire maker-facing disclosure was the fragment "270d wait".
+    expect(waitingPeriodAuthoringLabel(270, "COVER_START")).toMatch(/from the policy cover start date/);
+  });
+
+  it("resolveWaitingPeriodAnchor never substitutes one basis for another", () => {
+    const anchors = { coverStartDate: COVER, dependantJoinDate: JOIN, reinstatementDate: REINSTATED };
+    expect(resolveWaitingPeriodAnchor("COVER_START", anchors)).toBe(COVER);
+    expect(resolveWaitingPeriodAnchor("DEPENDANT_JOIN", anchors)).toBe(JOIN);
+    expect(resolveWaitingPeriodAnchor("REINSTATEMENT", anchors)).toBe(REINSTATED);
+    expect(resolveWaitingPeriodAnchor("OTHER_APPROVED", anchors)).toBeNull();
   });
 });

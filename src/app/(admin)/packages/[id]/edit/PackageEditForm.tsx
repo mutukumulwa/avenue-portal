@@ -17,6 +17,7 @@ type BenefitRow = {
   annualSubLimit: number;
   copayPercentage: number;
   waitingPeriodDays: number;
+  waitingPeriodBasis: "COVER_START" | "DEPENDANT_JOIN" | "REINSTATEMENT" | "OTHER_APPROVED";
   perVisitLimit: number | null;
 };
 
@@ -375,6 +376,21 @@ export function PackageEditForm({
                       {err(`benefit_wait_${cat}`) && (
                         <p role="alert" className="text-[11px] text-[#DC3545] mt-1">{err(`benefit_wait_${cat}`)}</p>
                       )}
+                      {/* UAT-HF P09.03 — DEF-022. "The product never states what
+                          the 270 days run FROM — cover start, enrolment date,
+                          policy inception and member join date are all plausible
+                          and none is named." Now it is chosen, not assumed. */}
+                      <select
+                        name={`benefit_basis_${cat}`}
+                        defaultValue={existing ? existing.waitingPeriodBasis : "COVER_START"}
+                        aria-label={`What the ${cat.replace(/_/g, " ").toLowerCase()} waiting period is measured from`}
+                        className="mt-1 w-40 border border-[#EEEEEE] rounded-[8px] px-2 py-1 text-[11px] focus:ring-2 focus:ring-brand-indigo outline-none"
+                      >
+                        <option value="COVER_START">from policy cover start</option>
+                        <option value="DEPENDANT_JOIN">from the member&rsquo;s join date</option>
+                        <option value="REINSTATEMENT">from reinstatement</option>
+                        <option value="OTHER_APPROVED">from an approved date</option>
+                      </select>
                     </td>
                   </tr>
                 );

@@ -7,7 +7,7 @@ import { ArrowLeft, CheckCircle, Clock, Shield, Pencil, Percent, Activity, Users
 import { CoContributionRulesManager } from "./CoContributionRulesManager";
 import { formatMoney } from "@/lib/utils";
 import {
-  WAITING_PERIOD_BASIS,
+  WAITING_PERIOD_BASIS_LABEL,
   waitingPeriodAuthoringLabel,
   waitingPeriodWorkedExample,
 } from "@/lib/member-policy-copy";
@@ -229,7 +229,7 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
                         begins without computing it by hand." */}
                     {b.waitingPeriodDays > 0 && (
                       <span className="text-[10px] text-brand-text-muted flex items-center gap-1">
-                        <Clock size={10} /> {waitingPeriodAuthoringLabel(b.waitingPeriodDays)}
+                        <Clock size={10} /> {waitingPeriodAuthoringLabel(b.waitingPeriodDays, b.waitingPeriodBasis)}
                       </span>
                     )}
                   </div>
@@ -249,7 +249,7 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
             {waitingBenefits.length > 0 && (
               <div className="mt-4 border-t border-[#EEEEEE] pt-3 space-y-1">
                 <p className="text-[11px] font-bold text-brand-text-muted uppercase">
-                  Waiting periods run from {WAITING_PERIOD_BASIS}
+                  Waiting periods
                 </p>
                 {waitingBenefits.map((b) => {
                   const worked = waitingPeriodWorkedExample(b.waitingPeriodDays);
@@ -258,6 +258,14 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
                     <p key={b.id} className="text-xs text-brand-text-body">
                       <span className="font-semibold">{b.category.replace(/_/g, " ")}</span>
                       {" — "}
+                      {/* P09.03: each benefit names its OWN basis. A single
+                          heading was correct only while the basis was hard-coded;
+                          now that it is configurable per benefit, one line for
+                          the whole card would be wrong for any benefit that
+                          differs from the first. */}
+                      <span className="text-brand-text-muted">
+                        measured from {WAITING_PERIOD_BASIS_LABEL[b.waitingPeriodBasis]}.{" "}
+                      </span>
                       {worked.label}
                     </p>
                   );
