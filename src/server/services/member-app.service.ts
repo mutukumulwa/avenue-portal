@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { policyNotesForCategory } from "@/lib/member-policy-copy";
 import { BenefitUsageService } from "./benefit-usage.service";
 
 const SENSITIVE_FAMILY_CATEGORIES = new Set(["MATERNITY", "MENTAL_HEALTH"]);
@@ -64,16 +65,37 @@ function isSensitiveFamilyCategory(category: string) {
   return SENSITIVE_FAMILY_CATEGORIES.has(category);
 }
 
+/** UAT-HF P09.07 — the member-facing half of a referral rule. */
+type ReferralRuleLike = {
+  benefitCategories: readonly string[];
+  serviceCodes: readonly string[];
+  requiresReferral: boolean;
+  emergencyException: boolean;
+  /** The ONLY field that may reach a member; `sourceClause` never does. */
+  memberSafeExplanation: string;
+  isActive: boolean;
+  effectiveFrom: Date;
+  effectiveTo: Date | null;
+};
+
 function buildBenefitStates(
   member: {
     id: string;
     enrollmentDate: Date;
+    /** P09.07: waiting periods run from cover start, falling back to enrolment. */
+    coverStartDate?: Date | null;
     package: {
       annualLimit: unknown;
-      currentVersion: { benefits: Array<BenefitConfigLike> } | null;
+      currentVersion: {
+        benefits: Array<BenefitConfigLike>;
+        referralRules?: Array<ReferralRuleLike>;
+      } | null;
     };
     /** SP-6 / F-PIN-1: the member's PINNED version — the terms adjudication uses. */
-    packageVersion?: { benefits: Array<BenefitConfigLike> } | null;
+    packageVersion?: {
+      benefits: Array<BenefitConfigLike>;
+      referralRules?: Array<ReferralRuleLike>;
+    } | null;
     benefitUsages: Array<{
       benefitConfigId: string;
       periodStart: Date;
@@ -93,6 +115,9 @@ function buildBenefitStates(
   // member's usage rows (silently showing 0 used). Fall back to currentVersion only
   // when the pin is absent.
   const benefits = member.packageVersion?.benefits ?? member.package.currentVersion?.benefits ?? [];
+  // Same version as the benefits above, for the same reason.
+  const referralRules =
+    member.packageVersion?.referralRules ?? member.package.currentVersion?.referralRules ?? [];
   const period = benefitPeriod(member.enrollmentDate);
   const usageMap = new Map(
     member.benefitUsages
@@ -128,6 +153,30 @@ function buildBenefitStates(
       perVisitLimit: benefit.perVisitLimit ? toMoney(benefit.perVisitLimit) : null,
       copayPercentage: toMoney(benefit.copayPercentage),
       waitingPeriodDays: benefit.waitingPeriodDays,
+      // ── UAT-HF P09.07 — DEF-060 / DEF-061 ────────────────────────────────
+      // The member view carried a waiting-period DURATION and no referral text
+      // at all, though the referral rule's `memberSafeExplanation` was already
+      // authored and populated. A duration is not actionable: it asks the
+      // member to know when their cover started and do arithmetic. These carry
+      // the date, and the policy sentences somebody already wrote for them.
+      //
+      // Only `memberSafeExplanation` crosses this boundary — `sourceClause` is
+      // the internal contract reference and never reaches a member.
+      policy: policyNotesForCategory({
+        category: String(benefit.category),
+        waitingPeriodDays: benefit.waitingPeriodDays,
+        coverStartDate: member.coverStartDate ?? member.enrollmentDate,
+        referralRules: referralRules.map((r) => ({
+          benefitCategories: r.benefitCategories.map(String),
+          serviceCodes: [...r.serviceCodes],
+          requiresReferral: r.requiresReferral,
+          emergencyException: r.emergencyException,
+          memberSafeExplanation: r.memberSafeExplanation,
+          isActive: r.isActive,
+          effectiveFrom: r.effectiveFrom,
+          effectiveTo: r.effectiveTo,
+        })),
+      }),
       notes: benefit.notes,
       exclusions: benefit.exclusions,
       claimCount: usage?.claimCount ?? 0,
@@ -178,12 +227,49 @@ export class MemberAppService {
         package: {
           include: {
             currentVersion: {
-              include: { benefits: { orderBy: { category: "asc" } } },
+              include: {
+            benefits: { orderBy: { category: "asc" } },
+            // P09.07: the member-safe columns ONLY. `sourceClause` is the
+            // internal contract reference and is not fetched, so it cannot
+            // reach a member payload by a later mistake.
+            referralRules: {
+              select: {
+                benefitCategories: true,
+                serviceCodes: true,
+                requiresReferral: true,
+                emergencyException: true,
+                memberSafeExplanation: true,
+                isActive: true,
+                effectiveFrom: true,
+                effectiveTo: true,
+              },
+          },
+          },
             },
           },
         },
         packageVersion: {
-          include: { benefits: { orderBy: { category: "asc" } } },
+          // P09.07: referralRules ride with the version so the member's policy
+          // copy comes from the SAME version their benefits do — a rule read
+          // from a different version is a rule that does not apply to them.
+          include: {
+            benefits: { orderBy: { category: "asc" } },
+            // P09.07: the member-safe columns ONLY. `sourceClause` is the
+            // internal contract reference and is not fetched, so it cannot
+            // reach a member payload by a later mistake.
+            referralRules: {
+              select: {
+                benefitCategories: true,
+                serviceCodes: true,
+                requiresReferral: true,
+                emergencyException: true,
+                memberSafeExplanation: true,
+                isActive: true,
+                effectiveFrom: true,
+                effectiveTo: true,
+              },
+          },
+          },
         },
         benefitUsages: {
           include: { benefitConfig: { select: { category: true, customCategoryName: true } } },
@@ -445,12 +531,49 @@ export class MemberAppService {
         package: {
           include: {
             currentVersion: {
-              include: { benefits: { orderBy: { category: "asc" } } },
+              include: {
+            benefits: { orderBy: { category: "asc" } },
+            // P09.07: the member-safe columns ONLY. `sourceClause` is the
+            // internal contract reference and is not fetched, so it cannot
+            // reach a member payload by a later mistake.
+            referralRules: {
+              select: {
+                benefitCategories: true,
+                serviceCodes: true,
+                requiresReferral: true,
+                emergencyException: true,
+                memberSafeExplanation: true,
+                isActive: true,
+                effectiveFrom: true,
+                effectiveTo: true,
+              },
+          },
+          },
             },
           },
         },
         packageVersion: {
-          include: { benefits: { orderBy: { category: "asc" } } },
+          // P09.07: referralRules ride with the version so the member's policy
+          // copy comes from the SAME version their benefits do — a rule read
+          // from a different version is a rule that does not apply to them.
+          include: {
+            benefits: { orderBy: { category: "asc" } },
+            // P09.07: the member-safe columns ONLY. `sourceClause` is the
+            // internal contract reference and is not fetched, so it cannot
+            // reach a member payload by a later mistake.
+            referralRules: {
+              select: {
+                benefitCategories: true,
+                serviceCodes: true,
+                requiresReferral: true,
+                emergencyException: true,
+                memberSafeExplanation: true,
+                isActive: true,
+                effectiveFrom: true,
+                effectiveTo: true,
+              },
+          },
+          },
         },
         benefitUsages: {
           include: { benefitConfig: { select: { category: true } } },
@@ -492,7 +615,24 @@ export class MemberAppService {
         package: {
           include: {
             currentVersion: {
-              include: { benefits: { orderBy: { category: "asc" } } },
+              include: {
+            benefits: { orderBy: { category: "asc" } },
+            // P09.07: the member-safe columns ONLY. `sourceClause` is the
+            // internal contract reference and is not fetched, so it cannot
+            // reach a member payload by a later mistake.
+            referralRules: {
+              select: {
+                benefitCategories: true,
+                serviceCodes: true,
+                requiresReferral: true,
+                emergencyException: true,
+                memberSafeExplanation: true,
+                isActive: true,
+                effectiveFrom: true,
+                effectiveTo: true,
+              },
+          },
+          },
             },
           },
         },

@@ -1,6 +1,7 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { MemberAppService } from "@/server/services/member-app.service";
-import { Activity, CalendarClock, CheckCircle2, Shield, TrendingUp } from "lucide-react";
+import { Activity, CalendarClock, CheckCircle2, Info, Shield, TrendingUp } from "lucide-react";
+import { formatCalendarDate } from "@/lib/calendar-date";
 import { redirect } from "next/navigation";
 
 function formatMoney(value: number | null) {
@@ -143,17 +144,53 @@ export default async function MemberBenefitsPage() {
                     <TrendingUp className="h-3.5 w-3.5" /> {benefit.copayPercentage}% member share
                   </span>
                 )}
-                {benefit.waitingPeriodDays > 0 && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[#F8F9FA] px-2 py-1">
-                    <CalendarClock className="h-3.5 w-3.5" /> {benefit.waitingPeriodDays} day waiting period
+                {/*
+                  UAT-HF P09.07 — DEF-061. This chip stated a DURATION, which
+                  asks the member to know when their cover started and do
+                  arithmetic. It also rendered only when a waiting period was
+                  configured, which is consistent with the run scanning and
+                  finding "nothing" on the tested member. It now states whether
+                  the benefit is usable TODAY and from what date.
+                */}
+                {benefit.policy.waiting.waiting ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[#FFC107]/15 px-2 py-1 font-semibold text-[#856404]">
+                    <CalendarClock className="h-3.5 w-3.5" /> Not available until{" "}
+                    {benefit.policy.waiting.eligibleFrom
+                      ? formatCalendarDate(benefit.policy.waiting.eligibleFrom)
+                      : "—"}
                   </span>
-                )}
+                ) : benefit.waitingPeriodDays > 0 ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[#28A745]/10 px-2 py-1 text-[#28A745]">
+                    <CalendarClock className="h-3.5 w-3.5" /> Waiting period served
+                  </span>
+                ) : null}
                 {benefit.exclusions.length === 0 && (
                   <span className="inline-flex items-center gap-1 rounded-full bg-[#28A745]/10 px-2 py-1 text-[#28A745]">
                     <CheckCircle2 className="h-3.5 w-3.5" /> No listed exclusions
                   </span>
                 )}
               </div>
+
+              {/*
+                DEF-060: the referral rule's member-safe explanation was already
+                authored — "Specialist outpatient visits require a referral from
+                your primary provider, except in an emergency." — and scanning
+                this page for referral language "returns nothing". It reaches
+                the member here, in the words somebody wrote for them.
+              */}
+              {benefit.policy.notes.length > 0 && (
+                <ul className="mt-3 space-y-1.5 border-t border-[#EEEEEE] pt-3">
+                  {benefit.policy.notes.map((note, i) => (
+                    <li
+                      key={`${note.kind}-${i}`}
+                      className="flex items-start gap-2 text-xs text-brand-text-body"
+                    >
+                      <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-brand-indigo" />
+                      <span>{note.text}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           );
         })}

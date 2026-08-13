@@ -9,7 +9,11 @@ import { ADMIN_UNIT_LABEL, isWithinCountryBounds } from "@/lib/locale-config";
 import { districtsByRegion, findDistrict } from "@/lib/uganda-districts";
 import { EmptyState } from "@/components/ui/EmptyState";
 
-const PROCEDURES = [
+/**
+ * UAT-HF P09.07 — exported so the server page can resolve a referral warning
+ * per procedure BEFORE this component prices any of them (DEF-060).
+ */
+export const PROCEDURES = [
   { label: "General consultation", cptCode: "99213", serviceHint: "Outpatient" },
   { label: "Specialist consultation", cptCode: "99214", serviceHint: "Outpatient" },
   { label: "Full blood count", cptCode: "85025", serviceHint: "Laboratory" },
@@ -80,7 +84,18 @@ function DistrictPicker({ value, onChange }: { value: string | null; onChange: (
   );
 }
 
-export function FacilitiesMap() {
+export function FacilitiesMap({
+  /**
+   * UAT-HF P09.07 — DEF-060. Keyed by CPT code, resolved server-side from the
+   * member's own package version.
+   *
+   * The run: Find Care "offers a Procedure picker including 'Specialist
+   * consultation' with a cost preview and no referral note, so the product
+   * leads the member to plan and price exactly the visit that will be refused".
+   * A cost estimate that omits the precondition is worse than no estimate.
+   */
+  referralWarnings = {},
+}: { referralWarnings?: Record<string, string> } = {}) {
   const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null);
   /**
    * Why we do or do not have a position. DEF-007's screen could not distinguish
@@ -95,6 +110,11 @@ export function FacilitiesMap() {
   const [procedureCode, setProcedureCode] = useState("99213");
   const [providerTier, setProviderTier] = useState<"ALL" | "OWN" | "PARTNER" | "PANEL">("ALL");
   const procedure = PROCEDURES.find((item) => item.cptCode === procedureCode) ?? PROCEDURES[0];
+  /**
+   * DEF-060. Shown BESIDE the picker and ABOVE the results, so the member reads
+   * the precondition before the price rather than after the refusal.
+   */
+  const referralWarning = referralWarnings[procedureCode] ?? null;
 
   // UAT-HF P03.04 — DEF-007/DEF-033. This effect used to fall back to
   // `{ lat: -1.2921, lng: 36.8219 }` — Nairobi — whenever geolocation was denied
@@ -197,6 +217,17 @@ export function FacilitiesMap() {
           <SlidersHorizontal className="h-5 w-5 text-brand-indigo" />
           <h2 className="font-heading text-lg font-bold text-brand-text-heading">Find care with cost preview</h2>
         </div>
+        {referralWarning && (
+          <p
+            role="status"
+            className="mb-3 flex items-start gap-2 rounded-lg border border-[#FFC107]/50 bg-[#FFC107]/10 px-3 py-2 text-xs text-[#856404]"
+          >
+            <BadgeCheck className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              <strong>You need a referral for this.</strong> {referralWarning}
+            </span>
+          </p>
+        )}
         <div className="grid gap-3 md:grid-cols-3">
           <label className="space-y-1">
             <span className="text-[13px] font-bold uppercase text-brand-text-muted">Procedure</span>

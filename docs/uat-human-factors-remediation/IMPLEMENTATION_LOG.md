@@ -1690,6 +1690,36 @@ The fresh 14-migration database is now genuinely zero-drift.
 
 **The surface followed in the same phase, unlike P05.05's.** `ChangeControlPanel` puts submit / approve / reject on the package edit page, so the gap the engine opened lasted one commit rather than a phase. Its job is as much to *state where the change is* as to move it: the run's complaint was not only that a change went live unreviewed but that there was "no Draft/Pending/Approved state, and no feedback message of any kind — no toast and no `role='alert'` element". Success is announced as loudly as failure, and a maker looking at their own pending version is told **why** they cannot approve it rather than shown a dead control. The panel decides nothing: a test asserts it never reads permissions, because a UI that authorises is a UI that can be bypassed.
 
+### P09.07 (part) — Policy copy reaches the member
+
+| Field | Value |
+|---|---|
+| **Task** | P09.07 — member benefits and Find Care; the package detail and provider-decision audiences are not done |
+| **Defect IDs** | DEF-060 (S2), DEF-061 (S2) |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none — the copy was already authored and stored |
+| **Tests added** | `tests/lib/member-policy-copy.test.ts` (29) |
+| **Commands / results** | typecheck 0; lint 0 errors; suite 310 files / 3520 passed. |
+| **Evidence** | `src/lib/member-policy-copy.ts`, `member-app.service.ts`, `/member/benefits`, `/member/facilities` |
+| **Feature flags** | none. |
+| **Remaining risks** | **`/member/preauth` is still silent** — the run scanned three surfaces and this fixes two. **DEF-023 is not done**: exclusions and referral rules remain invisible on the *package detail* (the authoring audience), so P09.07's "appears consistently on authoring detail, member benefits, provider decision, and enforcement trace" is a quarter met. Exclusion notes are plumbed through `policyNotesForCategory` but no caller passes `exclusionRules` yet, so only waiting and referral copy actually renders. **DEF-061 needs a retest with a member who has a waiting period configured** — see the correction below. |
+
+**The copy already existed. Nothing read it.** `ReferralRule.memberSafeExplanation` was populated with the exact sentence the run quotes — "Specialist outpatient visits require a referral from your primary provider, except in an emergency." — and three member surfaces rendered none of it. So this is a read model, not new policy, which is why it can be one module: P09.07 asks for "one effective policy read model" precisely so the audiences cannot disagree, and three separate fixes would have been three chances to stay silent.
+
+**A duration is not an answer.** DEF-061's benefit view has to say *when*, not *how long*: "270 days" asks a member to know their cover start date and do arithmetic. It now reads "Not available until 8 May 2027" — and adds that their other benefits are unaffected, because one dormant category otherwise reads as a dormant policy.
+
+**The Find Care warning renders above the price, not beside it.** The sharpest line in DEF-060 is that the picker "offers ... 'Specialist consultation' with a cost preview and no referral note, so the product leads the member to plan and price exactly the visit that will be refused". A cost estimate that omits the precondition is worse than no estimate, so the warning is resolved server-side and rendered before the results.
+
+**Rules are read from the member's PINNED version, not the package's latest.** A rule from a newer version is a rule that may not apply to them — the same F-PIN-1 trap the benefit configs already avoid.
+
+**The internal clause is not fetched at all.** `sourceClause` is marked in the schema as "never member/provider-facing"; both queries now select the member-safe columns explicitly. Not fetching it is a stronger guarantee than remembering not to render it — and writing that test is what surfaced that both queries had been pulling every column.
+
+### Correction — DEF-061's mechanism
+
+The register states that scanning `/member/benefits` for waiting-period language "returns nothing". A waiting-period chip **did exist at the tested build** `53df0ab` (`{n} day waiting period`, added in `82b0756`), but it renders only `when waitingPeriodDays > 0`. The observation is therefore consistent with the tested member having no waiting period configured on any category — the register itself notes the 270-day wait it found was on *an admin package*, not necessarily that member's.
+
+This does not change the fix (a duration was never actionable), but it does change the retest: **DEF-061 must be re-verified with a member who actually has a waiting period**, or the retest will pass vacuously exactly as the original scan did.
+
 ---
 
 ## Corrections made to the implementation plan
