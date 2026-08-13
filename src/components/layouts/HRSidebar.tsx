@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { SidebarDrawer } from "./SidebarDrawer";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
 import {
@@ -95,7 +96,7 @@ export function HRSidebar({ groupName, userRole, userName }: { groupName: string
   const pathname = usePathname();
 
   return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-60 border-r border-[#EEEEEE] bg-white">
+    <SidebarDrawer id="hr-sidebar" label="HR menu" width="w-60">
       <div className="flex h-full flex-col overflow-y-auto px-3 py-4">
         {/* Logo */}
         <Link href="/hr/dashboard" className="mb-4 flex items-center pl-1 space-x-2">
@@ -131,6 +132,6 @@ export function HRSidebar({ groupName, userRole, userName }: { groupName: string
           </button>
         </div>
       </div>
-    </aside>
+    </SidebarDrawer>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { SidebarDrawer } from "./SidebarDrawer";
 import { usePathname } from "next/navigation";
 import { LayoutDashboard, Wallet, FileText, BarChart2, LogOut } from "lucide-react";
 import { signOut } from "next-auth/react";
@@ -24,7 +25,7 @@ export function FundSidebar({ schemes, userRole, userName }: Props) {
   const pathname = usePathname();
 
   return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-[#EEEEEE] bg-white">
+    <SidebarDrawer id="fund-sidebar" label="fund menu" width="w-64">
       <div className="flex h-full flex-col overflow-y-auto px-3 py-4">
         {/* Brand */}
         <Link href="/fund/dashboard" className="mb-6 flex items-center pl-2.5 space-x-2">
@@ -116,6 +117,6 @@ export function FundSidebar({ schemes, userRole, userName }: Props) {
           </button>
         </div>
       </div>
-    </aside>
+    </SidebarDrawer>
   );
 }

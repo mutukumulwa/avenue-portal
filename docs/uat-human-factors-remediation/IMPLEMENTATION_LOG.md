@@ -1425,6 +1425,44 @@ That is a flex item's default `min-width: auto`. The wrapper cannot shrink below
 
 **34 wrappers, and a ratchet.** Every `overflow-x-auto` in `src/` now carries `min-w-0`, and a test walks the tree and fails on any that does not. One bare wrapper is one more table with unreachable columns, and the two classes only work as a pair.
 
+### P11.02 (completion) — the other three portals get the drawer
+
+| Field | Value |
+|---|---|
+| **Task** | P11.02 — closes the gap the first pass recorded |
+| **Defect IDs** | DEF-072 (S2); refines DEF-009 |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/components/responsive-layout.test.tsx` +9 (three portals × three assertions) |
+| **Evidence** | `src/components/layouts/SidebarDrawer.tsx` (new), HR/Fund/Broker sidebars, three layouts |
+| **Feature flags** | none. |
+| **Remaining risks** | Still **not measured in a real browser** — jsdom has no layout engine, so these assert the classes that produce the behaviour. Sticky identity columns and card layouts remain unimplemented; this is the scroll-container route only. The member portal uses `MemberNav`, a different component with a different layout, and was not audited here. |
+
+**The first pass fixed one surface out of four.** Its own recorded risk: "Only the
+admin shell got the drawer: the HR, fund and broker portals have the same
+unconditional `ml-60`/`ml-64` and each needs its own sidebar converting, which is
+three more components and was not done."
+
+So on the 360 px viewport the run tested, an HR manager, a fund administrator and
+a broker each still lost 240–256 px of a 360 px screen before their content
+began. That is exactly the measurement behind DEF-009, on three portals that had
+been reported fixed.
+
+**One `SidebarDrawer`, not three copies.** The admin implementation carried two
+pieces of behaviour worth not re-deriving by hand: it stores *which route* it was
+opened for rather than a boolean, so navigation closes it with no effect to
+mis-wire; and `md:translate-x-0` makes it permanent from tablet up so no portal
+loses its always-visible navigation. Three hand-written copies would have been
+three chances to reintroduce the boolean-plus-effect version — which leaves the
+destination page behind an opaque drawer, so tapping a link appears to do
+nothing. A test asserts the three sidebars do **not** carry `md:translate-x-0`
+themselves, which is what pins them to the shared component rather than to a
+copy that has drifted.
+
+**The offset had to move in the same commit.** Freeing the width with a drawer
+and then taking it straight back with `ml-64` fixes nothing, so each layout's
+offset is now `md:`-conditional and small screens get `p-4` instead of `p-8`.
+
 ### P09.06 (part) — Archive through dependency impact
 
 | Field | Value |

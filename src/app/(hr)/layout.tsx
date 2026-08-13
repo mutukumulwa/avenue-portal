@@ -52,7 +52,9 @@ export default async function HRLayout({
         )}
         <div className="flex min-h-screen bg-brand-bg-alt/30">
           <HRSidebar groupName={groupName} userRole={session.user.role as string} userName={session.user.name ?? null} />
-          <div className="min-w-0 flex-1 ml-60 p-8">
+          {/* P11.02 (DEF-072): the offset is conditional, or the drawer
+              would free the width and this would take it straight back. */}
+          <div className="min-w-0 flex-1 p-4 md:ml-60 md:p-8">
             <Breadcrumbs />
             {children}
           </div>

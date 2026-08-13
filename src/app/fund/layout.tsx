@@ -48,7 +48,9 @@ export default async function FundLayout({ children }: { children: React.ReactNo
     return (
       <div className="flex min-h-screen bg-[#F8F9FA]">
         <FundSidebar schemes={schemes} userRole={session.user.role as string} userName={session.user.name ?? null} />
-        <div className="min-w-0 flex-1 ml-64 p-8">
+        {/* P11.02 (DEF-072): the offset is conditional, or the drawer
+              would free the width and this would take it straight back. */}
+          <div className="min-w-0 flex-1 p-4 md:ml-64 md:p-8">
           {children}
         </div>
       </div>

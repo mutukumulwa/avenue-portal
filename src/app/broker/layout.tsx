@@ -12,7 +12,9 @@ export default async function BrokerLayout({ children }: { children: React.React
     return (
       <div className="flex min-h-screen bg-brand-bg-alt/30">
         <BrokerSidebar userRole={session.user.role as string} userName={session.user.name ?? null} />
-        <div className="min-w-0 flex-1 ml-64 p-8">
+        {/* P11.02 (DEF-072): the offset is conditional, or the drawer
+              would free the width and this would take it straight back. */}
+          <div className="min-w-0 flex-1 p-4 md:ml-64 md:p-8">
           {children}
         </div>
       </div>

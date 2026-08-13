@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { SidebarDrawer } from "./SidebarDrawer";
 import {
   LayoutDashboard,
   Building2,
@@ -27,7 +28,7 @@ const NAV_ITEMS = [
 
 export function BrokerSidebar({ userRole, userName }: { userRole: string; userName?: string | null }) {
   return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-[#EEEEEE] bg-white transition-transform">
+    <SidebarDrawer id="broker-sidebar" label="broker menu" width="w-64">
       <div className="flex h-full flex-col overflow-y-auto px-3 py-4">
         <Link href="/broker/dashboard" className="mb-4 flex items-center pl-2.5 space-x-2">
           <div className="h-8 w-8 bg-brand-indigo rounded-full" />
@@ -67,6 +68,6 @@ export function BrokerSidebar({ userRole, userName }: { userRole: string; userNa
           </button>
         </div>
       </div>
-    </aside>
+    </SidebarDrawer>
   );
 }

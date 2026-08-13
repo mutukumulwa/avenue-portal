@@ -108,6 +108,46 @@ describe("P11.02 the admin shell gives a phone its screen", () => {
   });
 });
 
+describe("P11.02 the HR, fund and broker portals get the same treatment", () => {
+  /**
+   * The task's own recorded gap: "Only the admin shell got the drawer: the HR,
+   * fund and broker portals have the same unconditional `ml-60`/`ml-64` and
+   * each needs its own sidebar converting."
+   *
+   * Those three portals were still reserving 240–256 px of a 360 px viewport,
+   * which is the measurement behind DEF-009 — so DEF-072 was fixed on one
+   * surface out of four.
+   */
+  const PORTALS = [
+    { name: "HR", layout: "src/app/(hr)/layout.tsx", sidebar: "src/components/layouts/HRSidebar.tsx", offset: "md:ml-60", id: "hr-sidebar" },
+    { name: "fund", layout: "src/app/fund/layout.tsx", sidebar: "src/components/layouts/FundSidebar.tsx", offset: "md:ml-64", id: "fund-sidebar" },
+    { name: "broker", layout: "src/app/broker/layout.tsx", sidebar: "src/components/layouts/BrokerSidebar.tsx", offset: "md:ml-64", id: "broker-sidebar" },
+  ];
+
+  for (const portal of PORTALS) {
+    it(`${portal.name}: the sidebar offset is conditional, not unconditional`, () => {
+      const layout = read(portal.layout);
+      expect(layout).toContain(portal.offset);
+      // The bare form is what caused the defect. Freeing the width with a
+      // drawer and then taking it straight back with `ml-64` would fix nothing.
+      expect(layout).not.toMatch(/className="[^"]*\sml-6[04]\b/);
+    });
+
+    it(`${portal.name}: small screens get smaller padding`, () => {
+      expect(read(portal.layout)).toMatch(/className="[^"]*\bp-4\b[^"]*\bmd:p-8\b/);
+    });
+
+    it(`${portal.name}: the sidebar is a drawer, sharing one implementation`, () => {
+      const sidebar = read(portal.sidebar);
+      expect(sidebar).toContain("SidebarDrawer");
+      expect(sidebar).toContain(`id="${portal.id}"`);
+      // Three hand-rolled copies would be three chances to reintroduce the
+      // boolean-plus-effect drawer that leaves the destination page covered.
+      expect(sidebar).not.toContain("md:translate-x-0");
+    });
+  }
+});
+
 function walk(dir: string): string[] {
   const out: string[] = [];
   for (const entry of readdirSync(dir)) {
