@@ -58,11 +58,12 @@ describe("P03.06 the audiences that do not", () => {
   const { results, mismatches, passed } = runPolicyParity();
   const by = (name: string) => results.find((r) => r.audience === name)!;
 
-  it("reports the provider decision as NOT CONSULTED, not as agreeing", () => {
-    // A surface that never asks the question cannot be counted as agreeing
-    // with the answer. Silence is not consensus.
-    expect(by("provider decision").verdict).toBe("NOT_CONSULTED");
-    expect(by("provider decision").note).toMatch(/no waiting-period evaluation/i);
+  it("the provider decision now answers, and answers the same as the member", () => {
+    // Was NOT_CONSULTED: the service performed no waiting-period evaluation at
+    // all, so a provider was told cover was active for a benefit the member
+    // could not yet use — they treat, and the claim is declined afterwards.
+    expect(by("provider decision").verdict).toBe("AGREES");
+    expect(by("provider decision").answers).toEqual(by("member display").answers);
   });
 
   it("reports claim/preauth enforcement as NOT CONSULTED", () => {
@@ -75,7 +76,7 @@ describe("P03.06 the audiences that do not", () => {
 
   it("does NOT pass while any audience is unconsulted", () => {
     expect(passed).toBe(false);
-    expect(mismatches.length).toBeGreaterThanOrEqual(2);
+    expect(mismatches.length).toBeGreaterThanOrEqual(1);
   });
 
   it("names all four audiences, so none can be quietly dropped", () => {
@@ -107,8 +108,9 @@ describe("P03.06 the gate actually detects a disagreement", () => {
     ];
 
     const { results, mismatches } = runPolicyParity(sabotaged);
-    expect(results.find((r) => r.audience === "authoring projection")!.verdict).toBe("DISAGREES");
-    expect(results.find((r) => r.audience === "member display")!.verdict).toBe("DISAGREES");
+    for (const a of ["authoring projection", "member display", "provider decision"]) {
+      expect(results.find((r) => r.audience === a)!.verdict, a).toBe("DISAGREES");
+    }
     expect(mismatches.some((m) => m.includes("2026-01-31"))).toBe(true);
   });
 
@@ -125,7 +127,7 @@ describe("P03.06 the gate actually detects a disagreement", () => {
     ];
     const { passed, mismatches } = runPolicyParity(trivial);
     // Every evaluable audience agrees here, and the gate is still red — which
-    // is the correct answer while two of four never ask.
+    // is the correct answer while claim/preauth still never asks.
     expect(passed).toBe(false);
     expect(mismatches.every((m) => m.includes("NOT CONSULTED"))).toBe(true);
   });

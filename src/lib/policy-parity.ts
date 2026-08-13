@@ -19,24 +19,29 @@
  *
  * ## What this found
  *
- * Three different sources of truth for one policy question:
+ * It found three different sources of truth for one policy question. Two have
+ * since been reconciled; one has not.
  *
  *   authoring projection ... `BenefitConfig.waitingPeriodDays` + basis, via
  *                            `waitingPeriodWorkedExample`
  *   member display ......... the same two fields, via `waitingPeriodStatus` —
- *                            deliberately the same module, so these two cannot
- *                            drift
- *   provider decision ...... **nothing**. `provider-eligibility.service.ts`
- *                            contains no waiting-period evaluation at all, so a
- *                            provider is told cover is active for a benefit the
- *                            member cannot yet use
- *   claim/preauth .......... `WaitingPeriodApplication.endDate` — a *stored*
- *                            date on a different table, written by a different
- *                            path, never reconciled against the benefit's
- *                            configured duration
+ *                            deliberately the same module, so these cannot drift
+ *   provider decision ...... **was nothing at all**, so a provider was told
+ *                            cover was active for a benefit the member could not
+ *                            yet use. Now runs `waitingPeriodStatus` on the same
+ *                            anchors, from the member's pinned version
+ *   claim/preauth .......... still `WaitingPeriodApplication.endDate` — a
+ *                            *stored* date on a different table, written by a
+ *                            different path, never reconciled against the
+ *                            benefit's configured duration
  *
- * The gate does not attempt to fix that. It states it, in a form a release
- * process can act on, which is what P03.06 asks for.
+ * **What the provider column here does and does not prove.** It reuses the
+ * member column because both audiences now call the same function — that is
+ * parity by construction, not an independent measurement, and this gate never
+ * invokes the service. The evidence that the service is actually wired to it is
+ * `tests/services/provider-eligibility-waiting-period.test.ts`, which drives
+ * the real code path. Both are needed: this one catches the module diverging,
+ * that one catches the caller opting out.
  */
 
 import {
@@ -204,13 +209,18 @@ export function runPolicyParity(cases: PolicyCase[] = CANONICAL_POLICY_CASES): {
   //
   // Reported, not omitted. A gate that compared only the surfaces sharing a
   // module would go green while these two disagreed.
+  // The provider desk now runs the SAME `waitingPeriodStatus` as the member
+  // app, on the same anchors, from the member's pinned version — so its answers
+  // are the member column's by construction rather than by coincidence.
   results.push({
     audience: "provider decision",
-    verdict: "NOT_CONSULTED",
-    answers: [],
+    verdict: member.every((a, i) => a === cases[i].expectedEligibleFrom) ? "AGREES" : "DISAGREES",
+    answers: member,
     note:
-      "provider-eligibility.service.ts performs no waiting-period evaluation, so a provider " +
-      "is told cover is active for a benefit the member cannot yet use.",
+      "Evaluated only when the caller names a benefit category; a general 'is this member " +
+      "covered' question is not about one benefit. An UNRESOLVED wait is deliberately not " +
+      "treated as blocked — refusing care on our own missing configuration would be the " +
+      "mirror error.",
   });
   results.push({
     audience: "claim/preauth enforcement",
@@ -226,6 +236,11 @@ export function runPolicyParity(cases: PolicyCase[] = CANONICAL_POLICY_CASES): {
     ...results
       .filter((r) => r.verdict === "NOT_CONSULTED")
       .map((r) => `${r.audience}: NOT CONSULTED — ${r.note}`),
+  );
+  mismatches.push(
+    ...results
+      .filter((r) => r.verdict === "DISAGREES")
+      .map((r) => `${r.audience}: DISAGREES with the canonical table`),
   );
 
   return { results, mismatches, passed: mismatches.length === 0 };

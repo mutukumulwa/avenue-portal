@@ -7,6 +7,7 @@ import { ProviderEntitlementShadowService } from "./provider-entitlement-shadow.
 import { ProviderAccessSettingsService } from "./provider-access-settings.service";
 import { ProvidersService } from "./providers.service";
 import { decideEligibility } from "./eligibility/evaluator-core";
+import { waitingPeriodStatus } from "@/lib/member-policy-copy";
 import {
   ELIGIBILITY_REASON_CATALOGUE,
   memberSafeText,
@@ -179,7 +180,7 @@ export const ProviderEligibilityService = {
       // SP-6: the verdict is the single evaluator's member-level decision as of the
       // service date (policy window, pinned version, group/client status, coverage
       // periods, age) — not a bare status===ACTIVE check.
-      const verdict = await memberVerdict(db, m, serviceDate);
+      const verdict = await memberVerdict(db, m, serviceDate, input.benefitCategory);
       return finish(verdict.resultCode, verdict.reasonCode, {
         id: m.id, firstName: m.firstName, lastName: m.lastName, memberNumber: m.memberNumber, clientId: m.group?.clientId ?? null, groupId: m.groupId, packageId: m.packageId, schemeName: m.group?.name ?? null, packageName: m.package?.name ?? null,
       });
@@ -210,7 +211,7 @@ export const ProviderEligibilityService = {
       const entitled = await ProviderEntitlementService.hasEffectiveEntitlement(ctx.providerId, serviceDate);
       return finish("NOT_ELIGIBLE", entitled ? "NOT_FOUND" : "PROVIDER_NOT_ENTITLED");
     }
-    const verdict = await memberVerdict(db, m, serviceDate);
+    const verdict = await memberVerdict(db, m, serviceDate, input.benefitCategory);
     return finish(verdict.resultCode, verdict.reasonCode, {
       id: m.id, firstName: m.firstName, lastName: m.lastName, memberNumber: m.memberNumber, clientId: m.group?.clientId ?? null, groupId: m.groupId, packageId: m.packageId, schemeName: m.group?.name ?? null, packageName: m.package?.name ?? null,
     });
@@ -231,6 +232,17 @@ const VERDICT_MEMBER_SELECT = {
   packageVersionId: true,
   groupId: true,
   packageId: true,
+  // UAT-HF P03.06 — the anchors a waiting period is measured from (DEF-022).
+  coverStartDate: true,
+  principal: { select: { coverStartDate: true } },
+  coveragePeriods: { select: { startDate: true, reason: true }, orderBy: { startDate: "desc" } },
+  // The benefit configs the wait is configured on, from the member's PINNED
+  // version — the same F-PIN-1 rule the member surface follows.
+  packageVersion: {
+    select: {
+      benefits: { select: { category: true, waitingPeriodDays: true, waitingPeriodBasis: true } },
+    },
+  },
   group: { select: { name: true, status: true, clientId: true, effectiveDate: true, renewalDate: true, client: { select: { status: true } } } },
   package: { select: { name: true, maxAge: true, dependentMaxAge: true } },
 } satisfies Prisma.MemberSelect;
@@ -245,6 +257,19 @@ type VerdictMember = {
   packageVersionId: string | null;
   group: { status: string; effectiveDate: Date | null; renewalDate: Date | null; client: { status: string } | null } | null;
   package: { maxAge: number; dependentMaxAge: number } | null;
+  // UAT-HF P03.06 — what a waiting period is measured from, and where it is
+  // configured. Optional so a caller selecting the older shape still compiles;
+  // an absent benefit list simply means no wait is evaluated.
+  coverStartDate?: Date | null;
+  principal?: { coverStartDate: Date | null } | null;
+  coveragePeriods?: { startDate: Date; reason: string | null }[];
+  packageVersion?: {
+    benefits: {
+      category: string;
+      waitingPeriodDays: number;
+      waitingPeriodBasis: "COVER_START" | "DEPENDANT_JOIN" | "REINSTATEMENT" | "OTHER_APPROVED";
+    }[];
+  } | null;
 };
 
 /**
@@ -259,6 +284,7 @@ async function memberVerdict(
   db: Db,
   m: VerdictMember,
   serviceDate: Date,
+  benefitCategory?: string | null,
 ): Promise<{
   resultCode: EligibilityResultCode;
   reasonCode: EligibilityDecisionReason;
@@ -285,6 +311,51 @@ async function memberVerdict(
     coveragePeriods,
     ageRules: m.package ? { maxAge: m.package.maxAge, dependentMaxAge: m.package.dependentMaxAge } : null,
   });
+  // ── UAT-HF P03.06 — the waiting period the provider was never told about ──
+  //
+  // The parity gate's finding: this service performed NO waiting-period
+  // evaluation at all, so a provider was told "cover is active" for a benefit
+  // the member cannot yet use — they treat, and the claim is declined
+  // afterwards. Authoring and the member app both answered from
+  // `waitingPeriodStatus`; the provider desk answered from nothing.
+  //
+  // Evaluated only when the caller names a benefit category, because a general
+  // "is this member covered" question is not about one benefit — and answering
+  // WAITING_PERIOD to it would be the mirror error, telling a desk to refuse a
+  // member whose cover is fine.
+  if (decision.conclusion === "ELIGIBLE" && benefitCategory) {
+    const benefit = m.packageVersion?.benefits.find((b) => b.category === benefitCategory);
+    if (benefit && benefit.waitingPeriodDays > 0) {
+      const wait = waitingPeriodStatus({
+        waitingPeriodDays: benefit.waitingPeriodDays,
+        waitingPeriodBasis: benefit.waitingPeriodBasis,
+        coverStartDate: m.coverStartDate ?? m.enrollmentDate,
+        anchors: {
+          coverStartDate: m.principal?.coverStartDate ?? m.coverStartDate ?? m.enrollmentDate,
+          dependantJoinDate: m.coverStartDate ?? m.enrollmentDate,
+          reinstatementDate:
+            m.coveragePeriods?.find((cp) => cp.reason === "REINSTATEMENT")?.startDate ?? null,
+          approvedBasisDate: null,
+        },
+        now: serviceDate,
+      });
+      // `unresolved` is deliberately NOT treated as blocked. A wait whose basis
+      // date is unknown is a configuration gap, and refusing care on it would
+      // turn our own missing data into a refused patient.
+      if (wait.waiting) {
+        return {
+          resultCode: "NOT_ELIGIBLE",
+          reasonCode: "WAITING_PERIOD",
+          // The catalogue already carries member-safe words for this and marks
+          // `memberStillCovered: true` — the member's cover is fine, this one
+          // benefit is not yet usable.
+          safeExplanation: memberSafeText("WAITING_PERIOD"),
+          operatorGuidance: `${operatorGuidanceText("WAITING_PERIOD")} Eligible from ${wait.eligibleFrom}.`,
+        };
+      }
+    }
+  }
+
   const eligible = decision.conclusion === "ELIGIBLE";
   // UAT-HF P03.03. This function used to compute the full evaluator decision and
   // then THROW THE REASON AWAY, returning a binary verdict and one of two generic

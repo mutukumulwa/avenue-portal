@@ -1694,6 +1694,45 @@ control is reachable"; the task is "expose a *governed* renewal path". Routing
 answered the first. Governance — approval, exceptions, notification — is the
 second, and it is not done.
 
+### P03.06 (follow-up) — the provider desk evaluates the waiting period
+
+| Field | Value |
+|---|---|
+| **Task** | P03.06 — closing the provider half of the parity finding |
+| **Defect IDs** | DEF-022, DEF-058, DEF-061 |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/services/provider-eligibility-waiting-period.test.ts` (10) |
+| **Evidence** | `src/server/services/provider-eligibility.service.ts`, `src/lib/policy-parity.ts` |
+| **Feature flags** | none. |
+| **Remaining risks** | **Claim/preauth is still the odd one out** — `preauth-adjudication.service.ts` reads `WaitingPeriodApplication.endDate`, a stored date on a different table written by a different path. Nothing reconciles it against the benefit's configured duration and basis, so a package edited after that row was written produces two answers. That is the remaining parity gap and it is a bigger piece than this. This evaluates the wait **only when the caller names a benefit category**; a general eligibility check still answers at member level, which is correct but means the desk only gets the warning if it asks about a specific service. |
+
+**A provider was told cover was active for a benefit the member could not use.**
+They treat, and the claim is declined afterwards — the cost landing on whoever
+was least able to predict it. The service performed no waiting-period evaluation
+at all; authoring and the member app both answered from `waitingPeriodStatus`,
+and the provider desk answered from nothing.
+
+**It calls the same function, not a second implementation.** A second copy is
+how these audiences diverged in the first place. The anchors, the pinned-version
+rule (F-PIN-1) and the basis all come across, so a benefit configured
+DEPENDANT_JOIN resolves the same way it does on the member's own screen.
+
+**Evaluated as of the SERVICE date, not today.** A provider checking cover for a
+visit next week must get next week's answer.
+
+**An unresolved wait does not block.** A wait whose basis date is missing is
+*our* configuration gap; refusing care on it would turn our missing data into a
+refused patient. It blocks only on `wait.waiting`.
+
+**The gate's own provider column is parity by construction, and the log should
+say so.** It reuses the member column because both audiences now call the same
+function — the gate never invokes the service. The evidence the service is
+actually wired is the new test, which drives the real code path. The two catch
+different failures: the gate catches the module diverging, the test catches the
+caller opting out. That distinction is exactly what the three
+`transaction-client` bugs on this branch turned on.
+
 ### P07.02 (follow-up 3) — the LIVE path, not the dead one
 
 | Field | Value |
@@ -1746,7 +1785,7 @@ the click. The form collected a date it did not use.
 | **Tests added** | `tests/lib/policy-parity.test.ts` (10) |
 | **Evidence** | `src/lib/policy-parity.ts`, `scripts/policy-parity-gate.ts`, `scripts/verification-gate.mjs` step 5b |
 | **Feature flags** | none. |
-| **Remaining risks** | **The gate is RED and is supposed to be.** It exits non-zero in `--release` because two of the four audiences never ask the question. Closing it means making the provider decision path evaluate waiting periods, and reconciling `WaitingPeriodApplication` against the benefit's configured duration and basis — neither is done, and both are larger than the gate. The table covers **waiting periods only**; exclusions and referral rules are the other two policy families P03.06's "full canonical eligibility table" implies, and they are not in it. Parity is computed from the code paths' pure logic, not from a live database, so it proves the *rules* agree, not that the *data* reaching them does. |
+| **Remaining risks** | **The gate is still RED, and is supposed to be.** The provider half is now closed (see the follow-up below); `WaitingPeriodApplication` is still a second, unreconciled source of truth for claim/preauth, which is the larger of the two and is not done. The table covers **waiting periods only**; exclusions and referral rules are the other two policy families P03.06's "full canonical eligibility table" implies, and they are not in it. Parity is computed from the code paths' pure logic, not from a live database, so it proves the *rules* agree, not that the *data* reaching them does. |
 
 **The gate found three sources of truth for one question.** *When does this
 benefit become usable for this member?*
