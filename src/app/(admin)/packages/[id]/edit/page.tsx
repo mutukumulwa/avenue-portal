@@ -30,15 +30,27 @@ export default async function EditPackagePage({ params }: { params: Promise<{ id
   // being refused after the fact.
   const archiveImpact = await getPackageArchiveImpact(prisma, session.user.tenantId, id);
 
+  // UAT-HF P09.04 (DEF-055): network rules now live on the DRAFT being edited,
+  // so this screen must read the draft's rules — otherwise an operator adds a
+  // rule and the list still shows the live version's set, which is exactly the
+  // "nothing changed" the run reported.
+  const workingDraft = await prisma.packageVersion.findFirst({
+    where: { packageId: id, status: "DRAFT" },
+    orderBy: { versionNumber: "desc" },
+    select: { id: true, versionNumber: true },
+  });
+
   const versionId = pkg.currentVersion?.id ?? "";
+  const ruleVersionId = workingDraft?.id ?? versionId;
   const [sharedLimits, eligibilityRules, allProviders, treatmentExclusions, referralRules] = await Promise.all([
     prisma.sharedLimitGroup.findMany({
       where: { packageVersionId: versionId },
       include: { benefitConfigs: { include: { benefitConfig: true } } },
     }),
     prisma.packageProviderEligibility.findMany({
-      where: { packageVersionId: versionId },
+      where: { packageVersionId: ruleVersionId },
       include: { provider: { select: { name: true } } },
+      orderBy: { createdAt: "asc" },
     }),
     prisma.provider.findMany({
       where: { tenantId: session.user.tenantId, contractStatus: "ACTIVE" },
@@ -119,7 +131,9 @@ export default async function EditPackagePage({ params }: { params: Promise<{ id
 
       {pkg.currentVersion && (
         <ProviderEligibilityManager
-          packageVersionId={pkg.currentVersion.id}
+          packageId={id}
+          draftVersionNumber={workingDraft?.versionNumber ?? null}
+          liveVersionNumber={pkg.currentVersion.versionNumber ?? null}
           initialRules={eligibilityRules.map((r) => ({
             id: r.id,
             inclusionType: r.inclusionType as "INCLUDE" | "EXCLUDE",

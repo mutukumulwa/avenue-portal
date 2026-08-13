@@ -2,17 +2,24 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // ── Mocks ─────────────────────────────────────────────────────────────────
 const mockPrisma = vi.hoisted(() => ({
-  package: { findUnique: vi.fn(), update: vi.fn() },
+  package: { findUnique: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
   packageVersion: { findUnique: vi.fn(), aggregate: vi.fn(), create: vi.fn() },
   sharedLimitGroup: { create: vi.fn(), findFirst: vi.fn(), findUnique: vi.fn(), delete: vi.fn() },
   benefitConfigSharedLimit: { createMany: vi.fn(), deleteMany: vi.fn() },
-  packageProviderEligibility: { create: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), delete: vi.fn() },
+  packageProviderEligibility: { create: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn(), delete: vi.fn() },
   benefitConfig: { findMany: vi.fn() },
   provider: { findFirst: vi.fn() },
   auditLog: { create: vi.fn() },
   $transaction: vi.fn(),
 }));
 vi.mock("@/lib/prisma", () => ({ prisma: mockPrisma }));
+
+// P09.04: the working-draft resolver has its own suite; here it is a stub so
+// these tests assert the ACTION's behaviour, not the copy-forward's.
+const getOrCreateWorkingDraft = vi.hoisted(() =>
+  vi.fn(async () => ({ id: "draft-v4", versionNumber: 4, created: true })),
+);
+vi.mock("@/server/services/package-working-draft.service", () => ({ getOrCreateWorkingDraft }));
 
 vi.mock("@/lib/rbac", () => ({
   requireRole: vi.fn().mockResolvedValue({ user: { id: "user-1", tenantId: "tenant-1" } }),
@@ -35,7 +42,7 @@ import {
   createSharedLimitAction,
   deleteSharedLimitAction,
   createProviderEligibilityAction,
-  deleteProviderEligibilityAction,
+  retireProviderEligibilityAction,
 } from "@/app/(admin)/packages/[id]/edit/actions";
 
 function fd(entries: Record<string, string>): FormData {
@@ -108,6 +115,10 @@ beforeEach(() => {
   // refuse a save that would create an unresolvable precedence tie. Default to
   // an empty set so the existing cases still exercise the happy path.
   mockPrisma.packageProviderEligibility.findMany.mockResolvedValue([]);
+  mockPrisma.packageProviderEligibility.update.mockResolvedValue({});
+  mockPrisma.packageProviderEligibility.delete.mockResolvedValue({});
+  mockPrisma.package.findFirst.mockResolvedValue({ id: "pkg1" });
+  getOrCreateWorkingDraft.mockResolvedValue({ id: "draft-v4", versionNumber: 4, created: true });
 });
 
 // ─── updatePackageAction — validation ─────────────────────────────────────
@@ -335,74 +346,173 @@ describe("deleteSharedLimitAction — tenant scope", () => {
 });
 
 describe("provider eligibility actions", () => {
-  it("createProviderEligibilityAction rejects a version owned by another tenant", async () => {
-    mockPrisma.packageVersion.findUnique.mockResolvedValue({ packageId: "pkg1", package: { tenantId: "other" } });
-    const res = await createProviderEligibilityAction({ ok: true }, fd({ packageVersionId: "pv1", inclusionType: "INCLUDE", providerTier: "OWN" }));
+  // UAT-HF P09.04 (DEF-055): rules now land on a DRAFT version resolved by
+  // getOrCreateWorkingDraft, so the action takes a packageId rather than a
+  // version id. The draft service is mocked; its own behaviour is covered by
+  // tests/services/package-working-draft.test.ts.
+  it("createProviderEligibilityAction rejects a package owned by another tenant", async () => {
+    mockPrisma.package.findFirst.mockResolvedValue(null);
+    const res = await createProviderEligibilityAction({ ok: true }, fd({ packageId: "pkg1", inclusionType: "INCLUDE", providerTier: "OWN" }));
     expect(res.ok).toBe(false);
     expect(mockPrisma.packageProviderEligibility.create).not.toHaveBeenCalled();
   });
 
   it("createProviderEligibilityAction requires a provider or tier", async () => {
-    const res = await createProviderEligibilityAction({ ok: true }, fd({ packageVersionId: "pv1", inclusionType: "INCLUDE" }));
+    const res = await createProviderEligibilityAction({ ok: true }, fd({ packageId: "pkg1", inclusionType: "INCLUDE" }));
     expect(res.ok).toBe(false);
     expect(mockPrisma.packageProviderEligibility.create).not.toHaveBeenCalled();
   });
 
-  it("createProviderEligibilityAction creates a tier rule and audits it", async () => {
-    mockPrisma.packageVersion.findUnique.mockResolvedValue({ packageId: "pkg1", package: { tenantId: "tenant-1" } });
-    mockPrisma.packageProviderEligibility.create.mockResolvedValue({ id: "er-new" });
-    const res = await createProviderEligibilityAction({ ok: true }, fd({ packageVersionId: "pv1", inclusionType: "EXCLUDE", providerTier: "PARTNER" }));
+  it("createProviderEligibilityAction writes to the DRAFT, not the live version", async () => {
+    // The heart of DEF-055 gap 2: the run's rules went onto the ACTIVE version,
+    // so live eligibility moved with no version bump and no approval.
+    mockPrisma.package.findFirst.mockResolvedValue({ id: "pkg1" });
+    const res = await createProviderEligibilityAction({ ok: true }, fd({ packageId: "pkg1", inclusionType: "EXCLUDE", providerTier: "PARTNER" }));
     expect(res.ok).toBe(true);
+    expect(mockPrisma.packageProviderEligibility.create.mock.calls[0][0].data.packageVersionId).toBe("draft-v4");
     expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ action: "PACKAGE_PROVIDER_ELIGIBILITY_CREATE" }) }),
     );
   });
 
-  // UAT-HF P09.05 (DEF-054) — the write-time half of the precedence work. The
-  // ladder resolves most disagreements; what it cannot resolve must never be
-  // saved, because then the answer would depend on database return order.
+  it("createProviderEligibilityAction stores the effective window", async () => {
+    // DEF-055 gap 1: "The provider rule form has no date control at all."
+    mockPrisma.package.findFirst.mockResolvedValue({ id: "pkg1" });
+    const res = await createProviderEligibilityAction(
+      { ok: true },
+      fd({ packageId: "pkg1", inclusionType: "EXCLUDE", providerTier: "PANEL", effectiveFrom: "2026-09-01", effectiveTo: "2026-12-31" }),
+    );
+    expect(res.ok).toBe(true);
+    const data = mockPrisma.packageProviderEligibility.create.mock.calls[0][0].data;
+    expect(new Date(data.effectiveFrom).toISOString().slice(0, 10)).toBe("2026-09-01");
+    expect(new Date(data.effectiveTo).toISOString().slice(0, 10)).toBe("2026-12-31");
+  });
+
+  it("createProviderEligibilityAction refuses an end date before the start", async () => {
+    mockPrisma.package.findFirst.mockResolvedValue({ id: "pkg1" });
+    const res = await createProviderEligibilityAction(
+      { ok: true },
+      fd({ packageId: "pkg1", inclusionType: "EXCLUDE", providerTier: "PANEL", effectiveFrom: "2026-12-31", effectiveTo: "2026-09-01" }),
+    );
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error("unreachable");
+    expect(res.fieldErrors?.effectiveTo?.[0]).toMatch(/cannot be before/i);
+    expect(mockPrisma.packageProviderEligibility.create).not.toHaveBeenCalled();
+  });
+
+  it("createProviderEligibilityAction treats blank dates as an open window", async () => {
+    mockPrisma.package.findFirst.mockResolvedValue({ id: "pkg1" });
+    const res = await createProviderEligibilityAction({ ok: true }, fd({ packageId: "pkg1", inclusionType: "EXCLUDE", providerTier: "PANEL" }));
+    expect(res.ok).toBe(true);
+    const data = mockPrisma.packageProviderEligibility.create.mock.calls[0][0].data;
+    expect(data.effectiveFrom).toBeNull();
+    expect(data.effectiveTo).toBeNull();
+  });
+
+  // UAT-HF P09.05 (DEF-054) — the write-time half of the precedence work.
   it("createProviderEligibilityAction REFUSES a rule that would tie with an existing one", async () => {
-    mockPrisma.packageVersion.findUnique.mockResolvedValue({ packageId: "pkg1", package: { tenantId: "tenant-1" } });
+    mockPrisma.package.findFirst.mockResolvedValue({ id: "pkg1" });
     mockPrisma.packageProviderEligibility.findMany.mockResolvedValue([
       { id: "er-1", inclusionType: "EXCLUDE", providerId: null, providerTier: "PARTNER", priority: 0, effectiveFrom: null, effectiveTo: null, isActive: true },
     ]);
 
     const res = await createProviderEligibilityAction(
       { ok: true },
-      fd({ packageVersionId: "pv1", inclusionType: "INCLUDE", providerTier: "PARTNER" }),
+      fd({ packageId: "pkg1", inclusionType: "INCLUDE", providerTier: "PARTNER" }),
     );
 
     expect(res.ok).toBe(false);
     if (res.ok) throw new Error("unreachable");
-    expect(res.formError).toMatch(/contradicts one already saved/i);
-    // Nothing written, and no audit claiming something was.
+    expect(res.formError).toMatch(/contradicts one already in the draft/i);
     expect(mockPrisma.packageProviderEligibility.create).not.toHaveBeenCalled();
     expect(mockPrisma.auditLog.create).not.toHaveBeenCalled();
   });
 
   it("createProviderEligibilityAction ALLOWS a rule the ladder can resolve", async () => {
-    // A named provider against a tier rule has an answer: the specific one wins.
-    mockPrisma.packageVersion.findUnique.mockResolvedValue({ packageId: "pkg1", package: { tenantId: "tenant-1" } });
+    mockPrisma.package.findFirst.mockResolvedValue({ id: "pkg1" });
     mockPrisma.provider.findFirst.mockResolvedValue({ id: "prov-agape" });
     mockPrisma.packageProviderEligibility.findMany.mockResolvedValue([
       { id: "er-1", inclusionType: "EXCLUDE", providerId: null, providerTier: "PANEL", priority: 0, effectiveFrom: null, effectiveTo: null, isActive: true },
     ]);
-    mockPrisma.packageProviderEligibility.create.mockResolvedValue({ id: "er-new" });
 
     const res = await createProviderEligibilityAction(
       { ok: true },
-      fd({ packageVersionId: "pv1", inclusionType: "INCLUDE", providerId: "prov-agape" }),
+      fd({ packageId: "pkg1", inclusionType: "INCLUDE", providerId: "prov-agape" }),
     );
 
     expect(res.ok).toBe(true);
     expect(mockPrisma.packageProviderEligibility.create).toHaveBeenCalled();
   });
+});
 
-  it("deleteProviderEligibilityAction no-ops for another tenant", async () => {
-    mockPrisma.packageProviderEligibility.findUnique.mockResolvedValue({
-      inclusionType: "INCLUDE", packageVersion: { packageId: "pkg1", package: { tenantId: "other" } },
-    });
-    await deleteProviderEligibilityAction("er-x");
+// ─── P09.04 (DEF-055) — retire, never hard-delete ──────────────────────────
+
+describe("retireProviderEligibilityAction", () => {
+  const rule = (over: Record<string, unknown> = {}) => ({
+    id: "er-x",
+    inclusionType: "INCLUDE",
+    providerId: "p1",
+    providerTier: null,
+    isActive: true,
+    packageVersion: {
+      id: "pv1", status: "ACTIVE", versionNumber: 5,
+      packageId: "pkg1", package: { tenantId: "tenant-1" },
+    },
+    ...over,
+  });
+
+  it("requires a reason", async () => {
+    // "the rule is gone with no reason captured, no approval and no audit entry"
+    const res = await retireProviderEligibilityAction({ ok: true }, fd({ ruleId: "er-x", reason: "" }));
+    expect(res.ok).toBe(false);
+    expect(mockPrisma.packageProviderEligibility.update).not.toHaveBeenCalled();
     expect(mockPrisma.packageProviderEligibility.delete).not.toHaveBeenCalled();
+  });
+
+  it("no-ops for another tenant", async () => {
+    mockPrisma.packageProviderEligibility.findUnique.mockResolvedValue(
+      rule({ packageVersion: { id: "pv1", status: "ACTIVE", versionNumber: 5, packageId: "pkg1", package: { tenantId: "other" } } }),
+    );
+    const res = await retireProviderEligibilityAction({ ok: true }, fd({ ruleId: "er-x", reason: "contract ended" }));
+    expect(res.ok).toBe(false);
+    expect(mockPrisma.packageProviderEligibility.delete).not.toHaveBeenCalled();
+  });
+
+  it("RETIRES a rule that has taken effect — it is not deleted", async () => {
+    // A deleted rule cannot explain a claim decided under it.
+    mockPrisma.packageProviderEligibility.findUnique.mockResolvedValue(rule());
+    const res = await retireProviderEligibilityAction({ ok: true }, fd({ ruleId: "er-x", reason: "Contract with this facility ended" }));
+    expect(res.ok).toBe(true);
+    expect(mockPrisma.packageProviderEligibility.delete).not.toHaveBeenCalled();
+    const upd = mockPrisma.packageProviderEligibility.update.mock.calls[0][0];
+    expect(upd.data.isActive).toBe(false);
+    expect(upd.data.effectiveTo).toBeInstanceOf(Date);
+  });
+
+  it("audits the retirement WITH the reason", async () => {
+    mockPrisma.packageProviderEligibility.findUnique.mockResolvedValue(rule());
+    await retireProviderEligibilityAction({ ok: true }, fd({ ruleId: "er-x", reason: "Contract ended 2026-08" }));
+    const audit = mockPrisma.auditLog.create.mock.calls[0][0].data;
+    expect(audit.action).toBe("PACKAGE_PROVIDER_ELIGIBILITY_RETIRE");
+    expect(JSON.stringify(audit)).toContain("Contract ended 2026-08");
+  });
+
+  it("DISCARDS a rule still in an unapproved draft", async () => {
+    // It never took effect, so there is no history worth preserving — but the
+    // discard is still audited.
+    mockPrisma.packageProviderEligibility.findUnique.mockResolvedValue(
+      rule({ packageVersion: { id: "pv9", status: "DRAFT", versionNumber: 6, packageId: "pkg1", package: { tenantId: "tenant-1" } } }),
+    );
+    const res = await retireProviderEligibilityAction({ ok: true }, fd({ ruleId: "er-x", reason: "added by mistake" }));
+    expect(res.ok).toBe(true);
+    expect(mockPrisma.packageProviderEligibility.delete).toHaveBeenCalledWith({ where: { id: "er-x" } });
+    expect(mockPrisma.auditLog.create.mock.calls[0][0].data.action).toBe("PACKAGE_PROVIDER_ELIGIBILITY_DISCARD");
+  });
+
+  it("refuses a rule already withdrawn", async () => {
+    mockPrisma.packageProviderEligibility.findUnique.mockResolvedValue(rule({ isActive: false }));
+    const res = await retireProviderEligibilityAction({ ok: true }, fd({ ruleId: "er-x", reason: "again" }));
+    expect(res.ok).toBe(false);
+    expect(mockPrisma.packageProviderEligibility.update).not.toHaveBeenCalled();
   });
 });

@@ -131,8 +131,9 @@ describe("DEF-056 — every icon-only button has an accessible name", () => {
 
 describe("DEF-056 — the two controls the run actually inspected", () => {
   it("Provider Eligibility names what it removes", () => {
+    // P09.04 renamed Remove to Withdraw when removal became a retirement.
     const src = readFileSync("src/app/(admin)/packages/[id]/edit/ProviderEligibilityManager.tsx", "utf8");
-    expect(src).toMatch(/aria-label=\{`Remove rule:/);
+    expect(src).toMatch(/aria-label=\{`Withdraw rule:/);
   });
 
   it("Treatment Exclusions names what it removes", () => {

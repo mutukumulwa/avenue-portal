@@ -20,6 +20,7 @@ import {
 } from "@/lib/validation/exclusion";
 import { referralRuleSchema, detectReferralOverlap } from "@/lib/validation/referral";
 import { conflictIfAdded } from "@/lib/provider-precedence";
+import { getOrCreateWorkingDraft } from "@/server/services/package-working-draft.service";
 import {
   ARCHIVE_ACKNOWLEDGEMENT_FIELD,
   describeArchiveImpact,
@@ -269,6 +270,12 @@ export async function updatePackageAction(
       }
 
       // Copy-forward provider eligibility rules (keyed only to the version).
+      //
+      // P09.04 fix: this dropped `priority`, `effectiveFrom`, `effectiveTo` and
+      // `isActive` — the precedence columns P09.05 added. Every new version
+      // silently reset each rule's priority to 0, discarded its effective
+      // window, and REACTIVATED any rule that had been retired. The columns
+      // arrived with the precedence work and this copy was not updated with them.
       for (const rule of oldVersion?.eligibilityRules ?? []) {
         await tx.packageProviderEligibility.create({
           data: {
@@ -276,6 +283,10 @@ export async function updatePackageAction(
             providerId: rule.providerId,
             providerTier: rule.providerTier,
             inclusionType: rule.inclusionType,
+            priority: rule.priority,
+            effectiveFrom: rule.effectiveFrom,
+            effectiveTo: rule.effectiveTo,
+            isActive: rule.isActive,
           },
         });
       }
@@ -488,13 +499,63 @@ export async function deleteSharedLimitAction(id: string): Promise<void> {
 
 // ── Provider Eligibility ────────────────────────────────────────────────────
 
+
+/**
+ * UAT-HF P09.04 — the effective window on a provider rule (DEF-055 gap 1).
+ *
+ * "The provider rule form has no date control at all, while sibling Treatment
+ * Exclusions and Referral Rules both display 'Effective 11/08/2026 -> —'."
+ *
+ * An empty `from` means "in force as soon as this version activates", which is
+ * the common case and must stay one keystroke — requiring a date would push
+ * operators to type today's date, which is not the same thing and would be wrong
+ * the moment approval slipped a day.
+ */
+function validateRuleWindow(input: { effectiveFrom: string; effectiveTo: string }):
+  | { ok: true; effectiveFrom: Date | null; effectiveTo: Date | null }
+  | { ok: false; fieldErrors: Record<string, string[]> } {
+  const parse = (v: string): Date | null | undefined => {
+    if (!v.trim()) return null;
+    const d = new Date(`${v}T00:00:00.000Z`);
+    return Number.isNaN(d.getTime()) ? undefined : d;
+  };
+
+  const from = parse(input.effectiveFrom);
+  const to = parse(input.effectiveTo);
+  const fieldErrors: Record<string, string[]> = {};
+
+  if (from === undefined) fieldErrors.effectiveFrom = ["Enter a real date, or leave it blank."];
+  if (to === undefined) fieldErrors.effectiveTo = ["Enter a real date, or leave it blank."];
+
+  if (from && to && to < from) {
+    fieldErrors.effectiveTo = ["The end date cannot be before the start date."];
+  }
+
+  if (Object.keys(fieldErrors).length > 0) return { ok: false, fieldErrors };
+  return { ok: true, effectiveFrom: from ?? null, effectiveTo: to ?? null };
+}
+
+// ── Provider Eligibility ────────────────────────────────────────────────────
+
+/**
+ * UAT-HF P09.04 (DEF-055) — a network rule is a coverage change, so it lands on
+ * a DRAFT version and waits for a checker.
+ *
+ * The run added two rules and the package stayed "Current v5 / Total Versions 5,
+ * unchanged". Worse than the missing record: the rules were written onto the
+ * ACTIVE version, so live member eligibility moved the instant Save was pressed
+ * — with no approval, exactly the shape DEF-024 described for benefits.
+ *
+ * `getOrCreateWorkingDraft` reuses an open draft, so configuring a network in
+ * one sitting produces one reviewable version rather than one per rule.
+ */
 export async function createProviderEligibilityAction(
   _prev: unknown,
   formData: FormData,
 ): Promise<ActionResult> {
   const session = await requireRole(ROLES.UNDERWRITING);
   const tenantId = session.user.tenantId;
-  const packageVersionId = formData.get("packageVersionId") as string;
+  const packageId = formData.get("packageId") as string;
   const inclusionType = formData.get("inclusionType") as "INCLUDE" | "EXCLUDE";
   const providerId = (formData.get("providerId") as string) || null;
   const providerTier = (formData.get("providerTier") as string) || null;
@@ -503,14 +564,11 @@ export async function createProviderEligibilityAction(
     return fail({ providerId: ["Select a specific provider or a provider tier."] });
   }
 
-  const version = await prisma.packageVersion.findUnique({
-    where: { id: packageVersionId },
-    select: { packageId: true, package: { select: { tenantId: true } } },
+  const pkg = await prisma.package.findFirst({
+    where: { id: packageId, tenantId },
+    select: { id: true },
   });
-  if (!version || version.package.tenantId !== tenantId) {
-    return fail(undefined, "Package version not found.");
-  }
-  const packageId = version.packageId;
+  if (!pkg) return fail(undefined, "Package not found.");
 
   if (providerId) {
     const prov = await prisma.provider.findFirst({
@@ -520,58 +578,76 @@ export async function createProviderEligibilityAction(
     if (!prov) return fail({ providerId: ["Provider not found."] });
   }
 
-  // P09.05 / DEC-04 (DEF-054): refuse a rule that would make the answer depend
-  // on database return order. The ladder resolves a specific rule against a tier
-  // rule on its own; what it cannot resolve is two rules of the SAME standing
-  // pointing opposite ways, and saving that would leave an operator unable to
-  // tell whether a hospital is payable — the exact complaint in the run.
-  const siblings = await prisma.packageProviderEligibility.findMany({
-    where: { packageVersionId },
-    select: {
-      id: true,
-      providerId: true,
-      providerTier: true,
-      inclusionType: true,
-      priority: true,
-      effectiveFrom: true,
-      effectiveTo: true,
-      isActive: true,
-    },
+  // P09.04: the effective window the run found missing — "The provider rule form
+  // has no date control at all, while sibling Treatment Exclusions and Referral
+  // Rules both display 'Effective 11/08/2026 -> —'."
+  const dates = validateRuleWindow({
+    effectiveFrom: (formData.get("effectiveFrom") as string) || "",
+    effectiveTo: (formData.get("effectiveTo") as string) || "",
   });
-  const clash = conflictIfAdded(siblings, {
-    id: "__candidate__",
-    inclusionType,
-    providerId: providerId || null,
-    providerTier: providerTier || null,
-  });
-  if (clash) {
-    return fail(
-      undefined,
-      `This rule contradicts one already saved and neither would win. ${clash.message}`,
-    );
-  }
+  if (!dates.ok) return fail(dates.fieldErrors);
 
-  const rule = await prisma.packageProviderEligibility.create({
-    data: {
-      packageVersionId,
+  const result = await prisma.$transaction(async (tx) => {
+    const draft = await getOrCreateWorkingDraft(tx, {
+      tenantId,
+      packageId,
+      userId: session.user.id,
+    });
+
+    // P09.05: refuse a rule that would make the answer depend on row order.
+    // Read from the DRAFT, which is where this rule is about to live.
+    const siblings = await tx.packageProviderEligibility.findMany({
+      where: { packageVersionId: draft.id },
+      select: {
+        id: true, providerId: true, providerTier: true, inclusionType: true,
+        priority: true, effectiveFrom: true, effectiveTo: true, isActive: true,
+      },
+    });
+    const clash = conflictIfAdded(siblings, {
+      id: "__candidate__",
       inclusionType,
       providerId: providerId || null,
-      providerTier: (providerTier as never) || null,
-    },
+      providerTier: providerTier || null,
+      effectiveFrom: dates.effectiveFrom,
+      effectiveTo: dates.effectiveTo,
+    });
+    if (clash) return { clash: clash.message, draft: null, rule: null };
+
+    const rule = await tx.packageProviderEligibility.create({
+      data: {
+        packageVersionId: draft.id,
+        inclusionType,
+        providerId: providerId || null,
+        providerTier: (providerTier as never) || null,
+        effectiveFrom: dates.effectiveFrom,
+        effectiveTo: dates.effectiveTo,
+      },
+      select: { id: true },
+    });
+
+    return { clash: null, draft, rule };
   });
+
+  if (result.clash) {
+    return fail(undefined, `This rule contradicts one already in the draft and neither would win. ${result.clash}`);
+  }
 
   await writeAudit({
     userId: session.user.id,
     action: "PACKAGE_PROVIDER_ELIGIBILITY_CREATE",
     module: "PACKAGES",
-    description: `Provider eligibility rule (${inclusionType}) added to package ${packageId}`,
+    description: `Provider eligibility rule (${inclusionType}) added to package ${packageId} draft v${result.draft!.versionNumber}`,
     metadata: {
       packageId,
-      packageVersionId,
-      ruleId: rule.id,
+      packageVersionId: result.draft!.id,
+      versionNumber: result.draft!.versionNumber,
+      draftCreated: result.draft!.created,
+      ruleId: result.rule!.id,
       inclusionType,
       providerId: providerId ?? null,
       providerTier: providerTier ?? null,
+      effectiveFrom: dates.effectiveFrom?.toISOString() ?? null,
+      effectiveTo: dates.effectiveTo?.toISOString() ?? null,
     },
   });
 
@@ -580,32 +656,97 @@ export async function createProviderEligibilityAction(
   return ok();
 }
 
-export async function deleteProviderEligibilityAction(id: string): Promise<void> {
+/**
+ * UAT-HF P09.04 (DEF-055) — RETIRE a network rule; never hard-delete it.
+ *
+ * The run found removal was "a single unlabelled trash icon followed by a NATIVE
+ * browser confirm ... after which the rule is gone with no reason captured, no
+ * approval and no audit entry."
+ *
+ * The plan is explicit: "no hard delete — retire with reason/effectiveTo". A
+ * deleted rule cannot be shown to a member who asks why their hospital stopped
+ * being covered last March, and cannot be produced when a claim decided under it
+ * is disputed. Retiring closes the window and keeps the row.
+ *
+ * A rule still in an unapproved DRAFT is the exception: it never took effect, so
+ * removing it outright leaves no history worth keeping. It is still audited.
+ */
+export async function retireProviderEligibilityAction(
+  _prev: unknown,
+  formData: FormData,
+): Promise<ActionResult> {
   const session = await requireRole(ROLES.UNDERWRITING);
   const tenantId = session.user.tenantId;
+  const id = (formData.get("ruleId") as string) ?? "";
+  const reason = ((formData.get("reason") as string) ?? "").trim();
+
+  if (reason.length < 5) {
+    return fail({ reason: ["Say why this rule is being withdrawn (at least 5 characters)."] });
+  }
 
   const rule = await prisma.packageProviderEligibility.findUnique({
     where: { id },
     select: {
+      id: true,
       inclusionType: true,
-      packageVersion: { select: { packageId: true, package: { select: { tenantId: true } } } },
+      providerId: true,
+      providerTier: true,
+      isActive: true,
+      packageVersion: {
+        select: {
+          id: true,
+          status: true,
+          versionNumber: true,
+          packageId: true,
+          package: { select: { tenantId: true } },
+        },
+      },
     },
   });
-  if (!rule || rule.packageVersion.package.tenantId !== tenantId) return; // tenant-scoped no-op
+  if (!rule || rule.packageVersion.package.tenantId !== tenantId) {
+    return fail(undefined, "That rule is no longer available.");
+  }
   const packageId = rule.packageVersion.packageId;
 
-  await prisma.packageProviderEligibility.delete({ where: { id } });
+  if (!rule.isActive) {
+    return fail(undefined, "That rule has already been withdrawn.");
+  }
+
+  const neverTookEffect = rule.packageVersion.status === "DRAFT";
+
+  if (neverTookEffect) {
+    await prisma.packageProviderEligibility.delete({ where: { id } });
+  } else {
+    await prisma.packageProviderEligibility.update({
+      where: { id },
+      data: { isActive: false, effectiveTo: new Date() },
+    });
+  }
 
   await writeAudit({
     userId: session.user.id,
-    action: "PACKAGE_PROVIDER_ELIGIBILITY_DELETE",
+    action: neverTookEffect
+      ? "PACKAGE_PROVIDER_ELIGIBILITY_DISCARD"
+      : "PACKAGE_PROVIDER_ELIGIBILITY_RETIRE",
     module: "PACKAGES",
-    description: `Provider eligibility rule (${rule.inclusionType}) removed from package ${packageId}`,
-    metadata: { packageId, ruleId: id },
+    description: neverTookEffect
+      ? `Provider eligibility rule (${rule.inclusionType}) discarded from unapproved draft v${rule.packageVersion.versionNumber}: ${reason}`
+      : `Provider eligibility rule (${rule.inclusionType}) retired on package ${packageId}: ${reason}`,
+    metadata: {
+      packageId,
+      packageVersionId: rule.packageVersion.id,
+      ruleId: id,
+      inclusionType: rule.inclusionType,
+      providerId: rule.providerId,
+      providerTier: rule.providerTier,
+      reason,
+      retiredNotDeleted: !neverTookEffect,
+    },
   });
 
   revalidatePath(`/packages/${packageId}/edit`);
   revalidatePath(`/packages/${packageId}`);
+  return ok();
 }
 
 // ── Treatment Exclusions (WP-2.3 / DEF-023) ──────────────────────────────────
@@ -632,6 +773,7 @@ function parseExceptionLogic(formData: FormData): unknown {
   }
   return null;
 }
+
 
 export async function createTreatmentExclusionAction(
   _prev: unknown,

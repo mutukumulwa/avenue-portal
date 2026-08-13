@@ -3,7 +3,7 @@
 import { useState, useActionState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2, ShieldCheck, ShieldOff, X, AlertTriangle } from "lucide-react";
-import { createProviderEligibilityAction, deleteProviderEligibilityAction } from "./actions";
+import { createProviderEligibilityAction, retireProviderEligibilityAction } from "./actions";
 import type { ActionResult } from "@/lib/action-result";
 import {
   PROVIDER_RULE_RANK,
@@ -29,17 +29,24 @@ type ProviderRef = { id: string; name: string; tier: string };
 const TIERS = ["OWN", "PARTNER", "PANEL"] as const;
 
 export function ProviderEligibilityManager({
-  packageVersionId,
+  packageId,
+  draftVersionNumber,
+  liveVersionNumber,
   initialRules,
   availableProviders,
 }: {
-  packageVersionId: string;
+  packageId: string;
+  /** The open DRAFT's number, when one exists. */
+  draftVersionNumber: number | null;
+  /** The version members are actually on right now. */
+  liveVersionNumber: number | null;
   initialRules: EligibilityRule[];
   availableProviders: ProviderRef[];
 }) {
   const router = useRouter();
   const [adding, setAdding] = useState(false);
   const [ruleType, setRuleType] = useState<"provider" | "tier">("provider");
+  const [retiring, setRetiring] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const [state, formAction, creating] = useActionState<ActionResult, FormData>(
@@ -57,13 +64,22 @@ export function ProviderEligibilityManager({
   const formError = state.ok ? undefined : state.formError;
   const providerErr = state.ok ? undefined : state.fieldErrors?.providerId?.[0];
 
-  const handleDelete = (id: string) => {
-    if (!confirm("Remove this eligibility rule?")) return;
-    startTransition(async () => {
-      await deleteProviderEligibilityAction(id);
-      router.refresh();
-    });
-  };
+  // P09.04 (DEF-055): the native browser confirm is gone. It could not name what
+  // it was removing, could not take a reason, and appeared AFTER activation —
+  // "the only disclosure of intent is the native browser confirm that appears
+  // after activation". An in-page form can do all three.
+  const [retireState, retireAction, retiringNow] = useActionState<ActionResult, FormData>(
+    async (_prev, fd) => {
+      const result = await retireProviderEligibilityAction(_prev, fd);
+      if (result.ok) {
+        setRetiring(null);
+        startTransition(() => router.refresh());
+      }
+      return result;
+    },
+    { ok: true },
+  );
+  const retireError = retireState.ok ? undefined : (retireState.formError ?? retireState.fieldErrors?.reason?.[0]);
 
   const includes = initialRules.filter(r => r.inclusionType === "INCLUDE");
   const excludes = initialRules.filter(r => r.inclusionType === "EXCLUDE");
@@ -75,6 +91,9 @@ export function ProviderEligibilityManager({
   // The run scanned this screen for "wins / takes precedence / overrides /
   // priority / order" and found nothing. Everything below answers that, using
   // the SAME module the evaluator uses — not a second implementation.
+
+  const fmtDate = (d: Date | string) =>
+    new Date(d).toLocaleDateString("en-UG", { day: "2-digit", month: "2-digit", year: "numeric" });
 
   const conflicts = detectProviderRuleConflicts(initialRules);
 
@@ -166,15 +185,71 @@ export function ProviderEligibilityManager({
           </div>
           <button
             type="button"
-            onClick={() => handleDelete(r.id)}
-            disabled={isPending}
-            aria-label={`Remove rule: ${r.inclusionType} ${ruleLabel(r)}`}
+            onClick={() => setRetiring(retiring === r.id ? null : r.id)}
+            disabled={isPending || retiringNow}
+            aria-expanded={retiring === r.id}
+            aria-label={`Withdraw rule: ${r.inclusionType} ${ruleLabel(r)}`}
             className="shrink-0 text-red-400 hover:bg-red-50 p-1.5 rounded disabled:opacity-40"
           >
             <Trash2 size={14} />
           </button>
         </div>
+
+        {/* Sibling managers show "Effective 11/08/2026 -> —"; this one showed
+            nothing at all, so a dated rule was indistinguishable from a
+            permanent one (DEF-055 gap 1). */}
+        <p className="text-[11px] text-brand-text-muted mt-1 pl-6">
+          Effective {r.effectiveFrom ? fmtDate(r.effectiveFrom) : "when this version goes live"} →{" "}
+          {r.effectiveTo ? fmtDate(r.effectiveTo) : "—"}
+          {r.isActive === false && <span className="ml-2 font-semibold text-gray-500">Withdrawn</span>}
+        </p>
+
         {effect && <p className="text-[11px] text-brand-text-muted mt-1 pl-6">{effect}</p>}
+
+        {/* P09.04 (DEF-055 gap 4): a named, reasoned withdrawal in place of an
+            unlabelled icon and a native confirm that said only "Remove this
+            eligibility rule?" and captured nothing. */}
+        {retiring === r.id && (
+          <form action={retireAction} className="mt-3 border-t border-gray-200 pt-3 space-y-2">
+            <input type="hidden" name="ruleId" value={r.id} />
+            <label htmlFor={`retire-${r.id}`} className="block text-[11px] font-bold text-brand-text-heading">
+              Withdraw “{ruleLabel(r)}” — why?
+            </label>
+            <p className="text-[11px] text-brand-text-muted">
+              The rule is kept and its end date set, so a claim decided under it can
+              still be explained. It stops applying once this draft is approved.
+            </p>
+            <div className="flex gap-2">
+              <input
+                id={`retire-${r.id}`}
+                name="reason"
+                type="text"
+                required
+                minLength={5}
+                maxLength={200}
+                placeholder="e.g. Contract with this facility ended"
+                className="flex-1 border border-gray-300 px-2 py-1.5 rounded text-xs focus:outline-none focus:ring-1 focus:ring-brand-indigo"
+              />
+              <button
+                type="button"
+                onClick={() => setRetiring(null)}
+                className="px-3 py-1.5 text-xs text-gray-500 hover:bg-gray-100 rounded"
+              >
+                Keep it
+              </button>
+              <button
+                type="submit"
+                disabled={retiringNow}
+                className="px-3 py-1.5 text-xs font-bold text-white bg-[#DC3545] rounded hover:bg-[#c82333] disabled:opacity-60"
+              >
+                {retiringNow ? "Withdrawing…" : "Withdraw"}
+              </button>
+            </div>
+            {retireError && (
+              <p role="alert" className="text-[11px] text-[#DC3545] font-semibold">{retireError}</p>
+            )}
+          </form>
+        )}
       </div>
     );
   };
@@ -191,6 +266,29 @@ export function ProviderEligibilityManager({
         >
           <Plus size={14} /> Add Rule
         </button>
+      </div>
+
+      {/* P09.04 (DEF-055 gap 2): the run added two rules and the package stayed
+          "Current v5 / Total Versions 5, unchanged". Network changes are now
+          versioned like every other coverage change, and the screen says which
+          version it is editing and which one members are actually on. */}
+      <div className={`rounded p-3 text-xs border ${draftVersionNumber ? "bg-[#17A2B8]/5 border-[#17A2B8]/30" : "bg-[#F8F9FA] border-[#EEEEEE]"}`}>
+        {draftVersionNumber ? (
+          <>
+            <p className="font-semibold text-brand-text-heading">
+              Editing draft v{draftVersionNumber}
+              {liveVersionNumber !== null && <> · members are on v{liveVersionNumber}</>}
+            </p>
+            <p className="text-brand-text-muted mt-0.5">
+              Nothing here reaches a member until this draft is approved and activated.
+            </p>
+          </>
+        ) : (
+          <p className="text-brand-text-muted">
+            The first rule you add opens a new draft version.
+            {liveVersionNumber !== null && <> Members stay on v{liveVersionNumber} until it is approved.</>}
+          </p>
+        )}
       </div>
 
       <div className="text-xs text-brand-text-muted space-y-1">
@@ -225,7 +323,7 @@ export function ProviderEligibilityManager({
 
       {adding && (
         <form action={formAction} className="bg-gray-50 border border-gray-200 rounded p-4 space-y-4">
-          <input type="hidden" name="packageVersionId" value={packageVersionId} />
+          <input type="hidden" name="packageId" value={packageId} />
 
           {formError && <p role="alert" className="text-xs text-red-600 font-semibold">{formError}</p>}
           {providerErr && <p role="alert" className="text-xs text-red-600 font-semibold">{providerErr}</p>}
@@ -271,6 +369,28 @@ export function ProviderEligibilityManager({
               </select>
             </div>
           )}
+
+          {/* P09.04 (DEF-055 gap 1): "The provider rule form has no date control at
+              all, while sibling Treatment Exclusions and Referral Rules both
+              display 'Effective 11/08/2026 -> —'." Both optional: blank "from"
+              means in force as soon as this version activates, which is the
+              common case and should stay one keystroke. */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="rule-effectiveFrom" className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                Effective from
+              </label>
+              <input id="rule-effectiveFrom" name="effectiveFrom" type="date" className="w-full border p-2 rounded text-sm" />
+              <p className="text-[10px] text-brand-text-muted mt-1">Blank = as soon as this version goes live.</p>
+            </div>
+            <div>
+              <label htmlFor="rule-effectiveTo" className="block text-[10px] font-bold text-gray-500 uppercase mb-1">
+                Effective to
+              </label>
+              <input id="rule-effectiveTo" name="effectiveTo" type="date" className="w-full border p-2 rounded text-sm" />
+              <p className="text-[10px] text-brand-text-muted mt-1">Blank = no end date.</p>
+            </div>
+          </div>
 
           <div className="flex justify-end gap-2 pt-1">
             <button type="button" onClick={() => setAdding(false)} className="px-3 py-1.5 text-sm text-gray-500 hover:bg-gray-200 rounded flex items-center gap-1">

@@ -33,6 +33,27 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
       })
     : [];
 
+  // UAT-HF P09.04 (DEF-055 gap 3): "The rules do not appear anywhere on the
+  // package DETAIL page (Package Details, Benefit Schedule, Co-Contribution
+  // Rules, Version History only), so only a user with edit rights can see the
+  // network restrictions."
+  //
+  // Read from the CURRENT version, because this page shows what is in force —
+  // not what is being drafted. A draft's rules belong on the edit screen.
+  const networkRules = pkg.currentVersion
+    ? await prisma.packageProviderEligibility.findMany({
+        where: { packageVersionId: pkg.currentVersion.id },
+        include: { provider: { select: { name: true } } },
+        orderBy: [{ inclusionType: "asc" }, { createdAt: "asc" }],
+      })
+    : [];
+  const liveNetworkRules = networkRules.filter((r) => r.isActive);
+  const retiredNetworkRules = networkRules.filter((r) => !r.isActive);
+  const fmtRuleDate = (d: Date | null) =>
+    d ? new Date(d).toLocaleDateString("en-UG", { day: "2-digit", month: "2-digit", year: "numeric" }) : null;
+  const ruleScope = (r: (typeof networkRules)[number]) =>
+    r.provider?.name ?? (r.providerTier ? `All ${r.providerTier} tier providers` : "—");
+
   // Prisma Decimal fields don't survive the RSC boundary — hand the client
   // manager plain numbers.
   const ruleViews = coRules.map((r) => ({
@@ -225,6 +246,74 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
               annualCap={annualCapView}
             />
           </div>
+        </div>
+      )}
+
+      {/* ── Provider network (UAT-HF P09.04 / DEF-055 gap 3) ─────────────────
+          Read-only, and present for anyone who can read the package — the whole
+          complaint was that only a user with EDIT rights could see which
+          hospitals the package pays for. */}
+      {pkg.currentVersion && (
+        <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#EEEEEE] flex items-center justify-between">
+            <h2 className="font-bold text-brand-text-heading font-heading">Provider Network Rules</h2>
+            <span className="text-xs text-brand-text-muted">Version {pkg.currentVersion.versionNumber}</span>
+          </div>
+
+          {liveNetworkRules.length === 0 ? (
+            <p className="px-5 py-4 text-sm text-brand-text-muted">
+              No network restrictions — every active contracted provider is in network
+              for this package.
+            </p>
+          ) : (
+            <>
+              <p className="px-5 pt-4 text-xs text-brand-text-muted">
+                When rules disagree, the more specific one wins: a rule excluding a
+                named provider, then one including a named provider, then any tier rule.
+              </p>
+              <table className="w-full text-left text-sm mt-2">
+                <thead>
+                  <tr className="bg-[#E6E7E8] text-[#6C757D] font-semibold border-b border-[#EEEEEE]">
+                    <th className="px-5 py-3">Rule</th>
+                    <th className="px-5 py-3">Applies to</th>
+                    <th className="px-5 py-3">Effective</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {liveNetworkRules.map((r) => (
+                    <tr key={r.id} className="border-b border-[#EEEEEE] last:border-0">
+                      <td className="px-5 py-3">
+                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                          r.inclusionType === "INCLUDE"
+                            ? "bg-[#28A745]/10 text-[#28A745]"
+                            : "bg-[#DC3545]/10 text-[#DC3545]"
+                        }`}>
+                          {r.inclusionType}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-brand-text-heading font-semibold">{ruleScope(r)}</td>
+                      <td className="px-5 py-3 text-brand-text-muted text-xs">
+                        {fmtRuleDate(r.effectiveFrom) ?? "From activation"} → {fmtRuleDate(r.effectiveTo) ?? "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+
+          {/* Retired rules are kept, not deleted, so a claim decided under one
+              can still be explained. Shown quietly rather than hidden. */}
+          {retiredNetworkRules.length > 0 && (
+            <div className="px-5 py-3 border-t border-[#EEEEEE] bg-[#F8F9FA]">
+              <p className="text-xs font-bold text-brand-text-muted uppercase mb-1">Withdrawn</p>
+              {retiredNetworkRules.map((r) => (
+                <p key={r.id} className="text-xs text-brand-text-muted">
+                  {r.inclusionType} {ruleScope(r)} — ended {fmtRuleDate(r.effectiveTo) ?? "unknown"}
+                </p>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

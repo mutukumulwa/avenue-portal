@@ -413,9 +413,11 @@ describe("P09.05 the screen finally states the precedence", () => {
     expect(manager).toMatch(/is payable/);
   });
 
-  it("gives the delete control an accessible name", () => {
-    // "Removal is a single unlabelled trash icon" (DEF-055).
-    expect(manager).toMatch(/aria-label=\{`Remove rule:/);
+  it("gives the removal control an accessible name", () => {
+    // "Removal is a single unlabelled trash icon" (DEF-055). P09.04 renamed the
+    // action from Remove to Withdraw, because the rule is now retired rather
+    // than deleted — the label has to match what actually happens.
+    expect(manager).toMatch(/aria-label=\{`Withdraw rule:/);
   });
 
   it("does not reimplement the ranking — it imports it", () => {
@@ -449,6 +451,6 @@ describe("P09.05 the three engine copies converged on one", () => {
   it("the authoring action refuses a conflicting rule before it is written", () => {
     const actions = readFileSync("src/app/(admin)/packages/[id]/edit/actions.ts", "utf8");
     expect(actions).toContain("conflictIfAdded");
-    expect(actions).toMatch(/contradicts one already saved/i);
+    expect(actions).toMatch(/contradicts one already in the draft/i);
   });
 });
