@@ -14,8 +14,15 @@ import { render, screen, fireEvent } from "@testing-library/react";
 const parseImportAction = vi.hoisted(() => vi.fn());
 const confirmImportAction = vi.hoisted(() => vi.fn());
 vi.mock("@/app/(admin)/members/import/actions", () => ({ parseImportAction, confirmImportAction }));
+const parseHRImportAction = vi.hoisted(() => vi.fn());
+const confirmHRImportAction = vi.hoisted(() => vi.fn());
+vi.mock("@/app/(hr)/hr/roster/import/actions", () => ({
+  parseHRImportAction,
+  confirmHRImportAction,
+}));
 
 import { MemberImportClient } from "@/app/(admin)/members/import/MemberImportClient";
+import { HRMemberImportClient } from "@/app/(hr)/hr/roster/import/HRMemberImportClient";
 
 const GROUPS = [{ id: "g1", name: "Staff" }];
 
@@ -103,5 +110,24 @@ describe("P06.05 the required file input is focusable", () => {
   it("the Target Group select is labelled", () => {
     render(<MemberImportClient groups={GROUPS} />);
     expect(screen.getByLabelText(/Target Group/i).tagName).toBe("SELECT");
+  });
+});
+
+describe("P06.05 the HR import uses the same focusable file control", () => {
+  it("has a real label and is visually hidden without display:none", () => {
+    render(<HRMemberImportClient />);
+    const file = screen.getByLabelText(/select a CSV file/i);
+    expect(file).toHaveAttribute("type", "file");
+    expect(file).toHaveClass("sr-only");
+    expect(file).not.toHaveClass("hidden");
+  });
+
+  it("shows the chosen HR file name", () => {
+    render(<HRMemberImportClient />);
+    const file = screen.getByLabelText(/select a CSV file/i) as HTMLInputElement;
+    fireEvent.change(file, {
+      target: { files: [new File(["a,b\n1,2"], "hr-roster.csv", { type: "text/csv" })] },
+    });
+    expect(screen.getByText("hr-roster.csv")).toBeInTheDocument();
   });
 });

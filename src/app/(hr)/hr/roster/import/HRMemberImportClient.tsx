@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef } from "react";
+import { useActionState, useRef, useState } from "react";
 import { parseHRImportAction, confirmHRImportAction } from "./actions";
 import type { ParseResult, ImportResult } from "./actions";
 import { buildCsv } from "@/lib/csv-safe";
@@ -23,6 +23,7 @@ export function HRMemberImportClient() {
   const [parseResult, parseAction, parsePending] = useActionState<ParseResult | null, FormData>(parseHRImportAction, null);
   const [importResult, importAction, importPending] = useActionState<ImportResult | null, FormData>(confirmHRImportAction, null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [fileName, setFileName] = useState<string | null>(null);
 
   const validRows  = parseResult?.rows.filter(r => !r.error) ?? [];
   const errorRows  = parseResult?.rows.filter(r =>  r.error) ?? [];
@@ -36,7 +37,7 @@ export function HRMemberImportClient() {
           <p className="text-sm text-brand-text-body">
             File must have headers:{" "}
             <code className="bg-[#F8F9FA] px-1 rounded text-xs">
-              firstName, lastName, dateOfBirth, gender, relationship, principalIdNumber, idNumber, phone, email, isExample
+              firstName, lastName, dateOfBirth, gender, relationship, principalIdNumber, idNumber, phone, email, sourceReference, isExample
             </code>
           </p>
 
@@ -46,8 +47,19 @@ export function HRMemberImportClient() {
               onClick={() => fileRef.current?.click()}
             >
               <Upload size={28} className="mx-auto mb-2 text-brand-text-muted" />
-              <p className="text-sm text-brand-text-body">Click to select a CSV file</p>
-              <input ref={fileRef} name="file" type="file" accept=".csv" className="hidden" required />
+              <label htmlFor="hr-import-file" className="cursor-pointer text-sm text-brand-text-body">
+                {fileName ?? "Click to select a CSV file"}
+              </label>
+              <input
+                ref={fileRef}
+                id="hr-import-file"
+                name="file"
+                type="file"
+                accept=".csv"
+                className="sr-only"
+                required
+                onChange={(event) => setFileName(event.target.files?.[0]?.name ?? null)}
+              />
             </div>
 
             {parseResult?.error && (
@@ -139,16 +151,25 @@ export function HRMemberImportClient() {
                        <th className="px-4 py-2 text-left">ID No.</th>
                        <th className="px-4 py-2 text-left">DOB</th>
                        <th className="px-4 py-2 text-left">Relationship</th>
+                       <th className="px-4 py-2 text-left">Source</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-[#EEEEEE]">
                     {validRows.map(r => (
                       <tr key={r.row} className="hover:bg-[#F8F9FA]">
                          <td className="px-4 py-2 font-mono">{r.row}</td>
-                         <td className="px-4 py-2 font-semibold">{r.firstName} {r.lastName}</td>
+                         <td className="px-4 py-2 font-semibold">
+                           {r.firstName} {r.lastName}
+                           {r.warnings?.map((warning) => (
+                             <p key={warning} className="mt-1 max-w-md font-normal text-[#8A6D3B]">
+                               Check: {warning}
+                             </p>
+                           ))}
+                         </td>
                          <td className="px-4 py-2">{r.idNumber || "—"}</td>
                          <td className="px-4 py-2">{r.dateOfBirth}</td>
                          <td className="px-4 py-2">{r.relationship}</td>
+                         <td className="px-4 py-2">{r.sourceReference}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -161,6 +182,8 @@ export function HRMemberImportClient() {
             <form action={importAction}>
               <input type="hidden" name="rows" value={JSON.stringify(parseResult.rows)} />
               <input type="hidden" name="fileName" value={parseResult.fileName ?? ""} />
+              <input type="hidden" name="preflightDate" value={parseResult.preflightDate ?? ""} />
+              <input type="hidden" name="preflightToken" value={parseResult.preflightToken ?? ""} />
               <button
                 type="submit"
                 disabled={importPending}

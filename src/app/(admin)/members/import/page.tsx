@@ -65,6 +65,7 @@ export default async function MemberImportPage() {
                     ["idNumber",           "No",  "Member's own National ID"],
                     ["phone",              "No",  ""],
                     ["email",              "No",  ""],
+                    ["sourceReference",    "HR only", "Leave blank for a direct admin import"],
                     ["isExample",          "—",   "Delete all rows where this is \"true\""],
                   ].map(([col, req, note]) => (
                     <tr key={col} className="bg-white">
@@ -103,8 +104,8 @@ export default async function MemberImportPage() {
 
             <div className="bg-[#FFF3CD] border border-[#FFC107]/40 rounded-lg p-3 text-xs text-[#856404] space-y-1">
               <p className="font-bold">Linking dependants to their principal</p>
-              <p>Put the principal&apos;s <strong>National ID</strong> in the <code className="bg-[#FFC107]/20 px-1 rounded">principalIdNumber</code> column of every dependant row. The principal must appear <strong>before</strong> their dependants in the file, or already exist in the system.</p>
-              <p className="mt-1">If a principal has no National ID, add them first using the single-member form, then import their dependants separately with the assigned member number — or contact support.</p>
+              <p>Put the principal&apos;s <strong>National ID</strong> in the <code className="bg-[#FFC107]/20 px-1 rounded">principalIdNumber</code> column of every dependant row. The principal may appear anywhere in the same file or already exist in the selected group.</p>
+              <p className="mt-1">If a principal has no National ID, add their dependants from the principal&apos;s profile instead, or contact support. This import does not resolve a principal by member number.</p>
             </div>
 
             <div className="bg-[#DC3545]/5 border border-[#DC3545]/20 rounded-lg p-3 text-xs text-[#DC3545]">

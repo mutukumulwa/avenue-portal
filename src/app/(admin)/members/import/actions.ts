@@ -7,28 +7,19 @@ import { writeAudit } from "@/lib/audit";
 import { Prisma } from "@prisma/client";
 import { createHash } from "crypto";
 import Papa from "papaparse";
-import { neutralizeFormula } from "@/lib/csv-safe";
+import { normalizeNationalId } from "@/lib/normalize";
 import {
-  normalizeNationalId,
-  normalizeEmail,
-  normalizePhone,
-  normalizeLegalName,
-} from "@/lib/normalize";
+  canonicalMemberImportContent,
+  createMemberImportPreviewToken,
+  memberImportHeaderNotes,
+  preflightMemberImport,
+  todayMemberImportEffectiveDate,
+  verifyMemberImportPreviewToken,
+  type MemberImportRow,
+} from "@/server/services/member-import-preflight.service";
+import { calendarDateFromUtcDate, parseCalendarDate } from "@/lib/calendar-date";
 
-export type ParsedRow = {
-  row: number;
-  firstName: string;
-  lastName: string;
-  idNumber: string;
-  dateOfBirth: string;
-  gender: string;
-  phone: string;
-  email: string;
-  relationship: string;
-  /** National ID of this person's principal — blank for PRINCIPAL rows */
-  principalIdNumber: string;
-  error?: string;
-};
+export type ParsedRow = MemberImportRow;
 
 export type ParseResult = {
   rows: ParsedRow[];
@@ -38,167 +29,23 @@ export type ParseResult = {
   notes?: string[];
   /** Original file name (carried to the confirm step for the batch ledger). */
   fileName?: string;
+  /** Server-authenticated canonical rows + preview verdict mask. */
+  preflightToken?: string;
+  /** Signed preview calendar day; commit revalidates against the current day. */
+  preflightDate?: string;
   error?: string;
 };
-
-const VALID_GENDERS = ["MALE", "FEMALE", "OTHER"];
-const VALID_RELATIONSHIPS = ["PRINCIPAL", "SPOUSE", "CHILD", "PARENT", "SIBLING"];
-
-/** canonical header → accepted aliases (matched case-insensitively). */
-const HEADER_ALIASES: Record<string, string[]> = {
-  firstName: ["firstName", "first_name"],
-  lastName: ["lastName", "last_name"],
-  idNumber: ["idNumber", "id_number", "national_id"],
-  dateOfBirth: ["dateOfBirth", "date_of_birth", "dob"],
-  gender: ["gender"],
-  phone: ["phone"],
-  email: ["email"],
-  relationship: ["relationship"],
-  principalIdNumber: ["principalIdNumber", "principal_id", "principal_id_number"],
-};
-const REQUIRED_CANONICAL = ["firstName", "lastName", "dateOfBirth", "gender", "relationship"];
-const KNOWN_HEADERS_LC = new Set(
-  [...Object.values(HEADER_ALIASES).flat(), "isExample"].map((h) => h.toLowerCase()),
-);
 
 /** True when a P2002 unique-constraint violation bubbled up (any driver shape). */
 function isP2002(e: unknown): boolean {
   return (e as { code?: string })?.code === "P2002";
 }
 
-/**
- * Validate ONE raw row against every field rule, returning a fresh verdict. This
- * is the single source of truth run at BOTH parse time and (re-)run server-side
- * at confirm time — the client's own `error` flag is never trusted. Header lookup
- * is case-insensitive and reorder-safe (keyed by header name, never position), so
- * a shuffled or differently-cased column can never shift data into the wrong field.
- */
-function validateRow(raw: Record<string, unknown>, rowNum: number): ParsedRow {
-  // Case-insensitive, whitespace-trimmed view of the row keyed by lowercased header.
-  const lc: Record<string, string> = {};
-  for (const [k, v] of Object.entries(raw)) {
-    lc[k.trim().toLowerCase()] = v == null ? "" : String(v);
-  }
-  const get = (...keys: string[]) => {
-    for (const k of keys) {
-      const v = lc[k.toLowerCase()]?.trim();
-      if (v) return v;
-    }
-    return "";
-  };
-
-  // WP-B2: neutralize CSV formula injection on the free-text name fields as they
-  // are ingested, so a smuggled `=HYPERLINK(...)` / `+cmd|…` name is defanged
-  // before it is ever stored or later exported. (Signed numbers are preserved by
-  // neutralizeFormula, so phone/id columns are unaffected.)
-  const firstName = neutralizeFormula(get("firstName", "first_name"));
-  const lastName = neutralizeFormula(get("lastName", "last_name"));
-  const idNumber = get("idNumber", "id_number", "national_id");
-  const dateOfBirth = get("dateOfBirth", "date_of_birth", "dob");
-  const gender = get("gender").toUpperCase();
-  const phone = get("phone");
-  const email = get("email");
-  const relationship = get("relationship").toUpperCase();
-  const principalIdNumber = get("principalIdNumber", "principal_id", "principal_id_number");
-
-  const errors: string[] = [];
-  if (!firstName) errors.push("firstName is required");
-  if (!lastName) errors.push("lastName is required");
-  if (!dateOfBirth) errors.push("dateOfBirth is required");
-  if (!gender || !VALID_GENDERS.includes(gender))
-    errors.push(`gender must be MALE, FEMALE, or OTHER (got "${gender || "blank"}")`);
-  if (!relationship || !VALID_RELATIONSHIPS.includes(relationship))
-    errors.push(`relationship must be PRINCIPAL, SPOUSE, CHILD, PARENT, or SIBLING (got "${relationship || "blank"}")`);
-  if (dateOfBirth && isNaN(Date.parse(dateOfBirth)))
-    errors.push(`dateOfBirth "${dateOfBirth}" is not a valid date (use YYYY-MM-DD)`);
-  if (relationship !== "PRINCIPAL" && !principalIdNumber && VALID_RELATIONSHIPS.includes(relationship))
-    errors.push(`principalIdNumber is required for ${relationship} rows — enter the National ID of the principal`);
-
-  return {
-    row: rowNum,
-    firstName, lastName, idNumber, dateOfBirth,
-    gender, phone, email, relationship, principalIdNumber,
-    ...(errors.length ? { error: errors.join("; ") } : {}),
-  };
-}
-
-/** Re-run field validation against a posted row's OWN values (ignores client verdict). */
-function revalidateRow(r: ParsedRow): ParsedRow {
-  return validateRow(
-    {
-      firstName: r.firstName, lastName: r.lastName, idNumber: r.idNumber,
-      dateOfBirth: r.dateOfBirth, gender: r.gender, phone: r.phone,
-      email: r.email, relationship: r.relationship, principalIdNumber: r.principalIdNumber,
-    },
-    r.row,
-  );
-}
-
-/** Header-level notes: unknown (ignored) columns + entirely-missing required headers. */
-function headerNotes(fields: string[] | undefined): string[] {
-  const notes: string[] = [];
-  const present = new Set((fields ?? []).map((f) => f.trim().toLowerCase()));
-  const unknown = (fields ?? []).filter((f) => f.trim() && !KNOWN_HEADERS_LC.has(f.trim().toLowerCase()));
-  if (unknown.length) notes.push(`Ignored unrecognised column(s): ${unknown.join(", ")}.`);
-  for (const canonical of REQUIRED_CANONICAL) {
-    const anyPresent = HEADER_ALIASES[canonical].some((a) => present.has(a.toLowerCase()));
-    if (!anyPresent) notes.push(`Missing required column "${canonical}" — every row will fail on this field.`);
-  }
-  return notes;
-}
-
-/** Deterministic content fingerprint of the submitted rows (idempotency basis). */
-function canonicalContent(rows: ParsedRow[]): string {
-  return JSON.stringify(
-    rows.map((r) => [r.firstName, r.lastName, r.idNumber, r.dateOfBirth, r.gender, r.phone, r.email, r.relationship, r.principalIdNumber]),
-  );
-}
-
-/**
- * WP-B3: reject rows that duplicate an EARLIER row in the same file (by normalized
- * national ID / phone / email / name+DOB). Within-file dupes must be caught here
- * because two brand-new rows are not yet in the DB when createMember probes run.
- */
-function dedupeWithinFile(rows: ParsedRow[], failed: ImportResult["failed"]): ParsedRow[] {
-  const seenId = new Set<string>();
-  const seenPhone = new Set<string>();
-  const seenEmail = new Set<string>();
-  const seenNameDob = new Set<string>();
-  const kept: ParsedRow[] = [];
-  for (const r of rows) {
-    const idKey = r.idNumber?.trim() ? normalizeNationalId(r.idNumber) : "";
-    const phoneKey = r.phone?.trim() ? normalizePhone(r.phone) : null;
-    const emailKey = r.email?.trim() ? normalizeEmail(r.email) : "";
-    const nameDobKey = `${normalizeLegalName(r.firstName)}|${normalizeLegalName(r.lastName)}|${r.dateOfBirth.trim()}`;
-
-    let dupField = "";
-    if (idKey && seenId.has(idKey)) dupField = `National ID "${r.idNumber}"`;
-    else if (phoneKey && seenPhone.has(phoneKey)) dupField = `phone "${r.phone}"`;
-    else if (emailKey && seenEmail.has(emailKey)) dupField = `email "${r.email}"`;
-    else if (seenNameDob.has(nameDobKey)) dupField = "name + date of birth";
-
-    if (dupField) {
-      failed.push({
-        row: r.row,
-        name: `${r.firstName} ${r.lastName}`.trim(),
-        error: `Duplicate of an earlier row in this file (same ${dupField}) — not imported.`,
-      });
-      continue;
-    }
-    if (idKey) seenId.add(idKey);
-    if (phoneKey) seenPhone.add(phoneKey);
-    if (emailKey) seenEmail.add(emailKey);
-    seenNameDob.add(nameDobKey);
-    kept.push(r);
-  }
-  return kept;
-}
-
 export async function parseImportAction(
   _prev: ParseResult | null,
   formData: FormData
 ): Promise<ParseResult> {
-  await requireRole(ROLES.MEMBER_OPS);
+  const session = await requireRole(ROLES.MEMBER_OPS);
 
   const file = formData.get("file") as File | null;
   if (!file || file.size === 0) {
@@ -234,8 +81,8 @@ export async function parseImportAction(
     return { rows: [], validCount: 0, errorCount: 0, error: "Could not read the CSV file. Make sure it is a valid comma-separated file with a header row." };
   }
 
-  if (parseErrorCount && data.length === 0) {
-    return { rows: [], validCount: 0, errorCount: 0, error: "Could not parse the CSV file. Make sure it is a valid comma-separated file with a header row." };
+  if (parseErrorCount > 0) {
+    return { rows: [], validCount: 0, errorCount: 0, error: "Could not parse every CSV row safely. Correct the file structure and upload it again; no partial preview was accepted." };
   }
 
   // Reject if example rows are still present (aborts the WHOLE parse).
@@ -253,12 +100,40 @@ export async function parseImportAction(
     return { rows: [], validCount: 0, errorCount: 0, error: "The file has no data rows." };
   }
 
-  const rows = data.map((raw, i) => validateRow(raw, i + 2)); // row 1 = header
-  const validCount = rows.filter((r) => !r.error).length;
-  const errorCount = rows.filter((r) => r.error).length;
-  const notes = headerNotes(fields);
+  const groupId = String(formData.get("groupId") ?? "").trim();
+  if (!groupId) {
+    return { rows: [], validCount: 0, errorCount: 0, error: "Select a target group before validating the file." };
+  }
+  const effectiveDate = todayMemberImportEffectiveDate();
+  const preflightDate = calendarDateFromUtcDate(effectiveDate)!;
+  const preflight = await preflightMemberImport({
+    db: prisma,
+    tenantId: session.user.tenantId,
+    groupId,
+    lane: "MEMBERS_ADMIN",
+    rawRows: data,
+    effectiveDate,
+  });
+  if (preflight.error) {
+    return { rows: [], validCount: 0, errorCount: 0, error: preflight.error };
+  }
+  const notes = memberImportHeaderNotes(fields, "MEMBERS_ADMIN");
 
-  return { rows, validCount, errorCount, notes: notes.length ? notes : undefined, fileName: file.name || undefined };
+  return {
+    rows: preflight.rows,
+    validCount: preflight.validCount,
+    errorCount: preflight.errorCount,
+    notes: notes.length ? notes : undefined,
+    fileName: file.name || undefined,
+    preflightDate,
+    preflightToken: createMemberImportPreviewToken({
+      lane: "MEMBERS_ADMIN",
+      tenantId: session.user.tenantId,
+      groupId,
+      effectiveDate: preflightDate,
+      rows: preflight.rows,
+    }),
+  };
 }
 
 export type ImportResult = {
@@ -281,44 +156,89 @@ export async function confirmImportAction(
   const groupId = formData.get("groupId") as string;
   const rowsJson = formData.get("rows") as string;
   const fileName = (formData.get("fileName") as string) || null;
+  const preflightToken = String(formData.get("preflightToken") ?? "");
+  const preflightDate = parseCalendarDate(String(formData.get("preflightDate") ?? ""));
 
   if (!groupId || !rowsJson) return { imported: 0, failed: [], error: "Missing data." };
 
   // WP-B1: never 500 on a malformed / tampered payload.
-  let posted: ParsedRow[];
+  let posted: Record<string, unknown>[];
   try {
     const parsed: unknown = JSON.parse(rowsJson);
     if (!Array.isArray(parsed)) throw new Error("not an array");
-    posted = parsed as ParsedRow[];
+    posted = parsed.map((item) =>
+      item && typeof item === "object" && !Array.isArray(item)
+        ? (item as Record<string, unknown>)
+        : {},
+    );
   } catch {
     return { imported: 0, failed: [], error: "The submitted data could not be read. Please re-upload the file." };
   }
 
-  // Tenant-scope the target group (a forged groupId cannot reach another tenant).
-  const group = await prisma.group.findFirst({ where: { id: groupId, tenantId }, select: { id: true, name: true } });
-  if (!group) return { imported: 0, failed: [], error: "Target group not found for your organisation." };
-
-  // ── WP-B1: RE-VALIDATE every row server-side. The client-posted `error`/valid
-  // classification is discarded entirely — a stale or tampered payload cannot slip
-  // an invalid row past the server. ──
-  const failed: ImportResult["failed"] = [];
-  const revalidated = posted.map(revalidateRow);
-  for (const r of revalidated) {
-    if (r.error) failed.push({ row: r.row, name: `${r.firstName} ${r.lastName}`.trim(), error: r.error });
+  if (!preflightToken || !preflightDate) {
+    return { imported: 0, failed: [], error: "The validated preview is missing. Re-upload the file before confirming." };
   }
-  // WP-B3: drop within-file duplicates (row-level reasons pushed onto `failed`).
-  const serverValid = dedupeWithinFile(revalidated.filter((r) => !r.error), failed);
 
-  // WP-B2: empty / header-only / all-invalid → refuse with a clear message and NO
-  // success audit (the success writeAudit below is never reached on this path).
-  if (serverValid.length === 0) {
-    return { imported: 0, failed, error: "No valid rows to import — nothing was created." };
+  const previewRows = posted as unknown as MemberImportRow[];
+  if (!verifyMemberImportPreviewToken({
+    lane: "MEMBERS_ADMIN",
+    tenantId,
+    groupId,
+    effectiveDate: preflightDate,
+    rows: previewRows,
+  }, preflightToken)) {
+    return {
+      imported: 0,
+      failed: [],
+      error: "The validated preview no longer matches the submitted rows. Re-upload the file; nothing was created.",
+    };
+  }
+
+  // P06.01: preview and confirm call the SAME database-aware preflight. The
+  // posted verdict is discarded; current group/package/principal/identity state
+  // is read again immediately before any batch reservation or member write.
+  const preflight = await preflightMemberImport({
+    db: prisma,
+    tenantId,
+    groupId,
+    lane: "MEMBERS_ADMIN",
+    rawRows: posted,
+    effectiveDate: todayMemberImportEffectiveDate(),
+  });
+  if (preflight.error) {
+    return {
+      imported: 0,
+      failed: [],
+      error: `Current preflight could not be confirmed — ${preflight.error}`,
+    };
+  }
+  const failed: ImportResult["failed"] = [];
+  const serverValid: MemberImportRow[] = [];
+  for (const [index, r] of preflight.rows.entries()) {
+    const wasRejectedAtPreview = Boolean(previewRows[index]?.error);
+    if (r.error) {
+      failed.push({
+        row: r.row,
+        name: `${r.firstName} ${r.lastName}`.trim(),
+        error: wasRejectedAtPreview
+          ? r.error
+          : `Preflight changed since preview — ${r.error}`,
+      });
+    } else if (wasRejectedAtPreview) {
+      failed.push({
+        row: r.row,
+        name: `${r.firstName} ${r.lastName}`.trim(),
+        error: "Preflight changed since preview — this row now appears valid. Re-upload and review it before committing.",
+      });
+    } else {
+      serverValid.push(r);
+    }
   }
 
   // ── WP-B1: idempotency. Key = sha256(lane + tenant + group + canonical content).
   // Re-confirming the same file for the same group is a deterministic no-op. ──
   const idempotencyKey = createHash("sha256")
-    .update(`MEMBERS_ADMIN ${tenantId} ${groupId} ${canonicalContent(posted)}`)
+    .update(`MEMBERS_ADMIN\u0000${tenantId}\u0000${groupId}\u0000${canonicalMemberImportContent(preflight.rows, "MEMBERS_ADMIN")}`)
     .digest("hex");
 
   const existing = await prisma.importBatch.findUnique({
@@ -334,12 +254,19 @@ export async function confirmImportAction(
     };
   }
 
+  // Check replay BEFORE refusing the now-conflicting rows: after a successful
+  // first import, those national IDs correctly exist in the database. That is
+  // evidence of the prior result, not a reason to hide it on repeat confirm.
+  if (serverValid.length === 0) {
+    return { imported: 0, failed, error: "No valid rows to import — nothing was created." };
+  }
+
   // Reserve the batch (claims the idempotency key). A concurrent identical confirm
   // loses the race on the unique and returns the winner's recorded result.
   let batchId: string;
   try {
     const batch = await prisma.importBatch.create({
-      data: { tenantId, groupId, lane: "MEMBERS_ADMIN", idempotencyKey, fileName, totalRows: posted.length, createdBy: session.user.id },
+      data: { tenantId, groupId, lane: "MEMBERS_ADMIN", idempotencyKey, fileName, totalRows: preflight.rows.length, createdBy: session.user.id },
       select: { id: true },
     });
     batchId = batch.id;
@@ -395,7 +322,7 @@ export async function confirmImportAction(
     // dependant could bind to a principal in a different scheme).
     if (!principalId && refKey) {
       const existingPrincipal = await prisma.member.findFirst({
-        where: { tenantId, groupId, relationship: "PRINCIPAL", idNumber: { equals: refKey, mode: "insensitive" } },
+        where: { tenantId, groupId, relationship: "PRINCIPAL", nationalIdNormalized: refKey },
         select: { id: true },
       });
       if (existingPrincipal) principalId = existingPrincipal.id;
@@ -444,7 +371,7 @@ export async function confirmImportAction(
     userId: session.user.id,
     action: "MEMBERS_BULK_IMPORTED",
     module: "MEMBERS",
-    description: `Bulk import: ${imported} members added to ${group.name}. ${failed.length} failed.`,
+    description: `Bulk import: ${imported} members added to ${preflight.groupName}. ${failed.length} failed.`,
     metadata: { groupId, imported, failed: failed.length, batchId },
   });
 

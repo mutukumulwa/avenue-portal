@@ -56,10 +56,11 @@ export default async function HRMemberImportPage() {
                     ["gender",             "Yes", "MALE, FEMALE, or OTHER"],
                     ["relationship",       "Yes", "See below"],
                     ["principalIdNumber",  "Dependants only", "National ID of the principal"],
-                    ["idNumber",           "No",  "Member&apos;s own National ID"],
+                    ["idNumber",           "No",  "Member's own National ID"],
                     ["phone",              "No",  ""],
                     ["email",              "No",  ""],
-                    ["isExample",          "—",   "Delete all rows where this is &quot;true&quot;"],
+                    ["sourceReference",    "Yes", "HR letter, payroll instruction, or approved document reference"],
+                    ["isExample",          "—",   "Delete all rows where this is \"true\""],
                   ].map(([col, req, note]) => (
                     <tr key={col} className="bg-white">
                       <td className="px-3 py-1.5 font-mono text-brand-indigo">{col}</td>
@@ -82,8 +83,8 @@ export default async function HRMemberImportPage() {
                 <tbody className="divide-y divide-[#EEEEEE]">
                   {[
                     ["PRINCIPAL", "The main member — the employee or named policyholder."],
-                    ["SPOUSE",    "The principal&apos;s partner. Leave principalIdNumber = the principal&apos;s National ID."],
-                    ["CHILD",     "A child of the principal. Same — set principalIdNumber to the principal&apos;s ID."],
+                    ["SPOUSE",    "The principal's partner. Set principalIdNumber to the principal's National ID."],
+                    ["CHILD",     "A child of the principal. Set principalIdNumber to the principal's National ID."],
                     ["PARENT",    "A parent of the principal covered under the policy."],
                   ].map(([val, desc]) => (
                     <tr key={val} className="bg-white border border-[#EEEEEE]">
@@ -97,8 +98,8 @@ export default async function HRMemberImportPage() {
 
             <div className="bg-[#FFF3CD] border border-[#FFC107]/40 rounded-lg p-3 text-xs text-[#856404] space-y-1">
               <p className="font-bold">Linking dependants to their principal</p>
-              <p>Put the principal&apos;s <strong>National ID</strong> in the <code className="bg-[#FFC107]/20 px-1 rounded">principalIdNumber</code> column of every dependant row. The principal must appear <strong>before</strong> their dependants in the file, or already exist in the system.</p>
-              <p className="mt-1">If a principal has no National ID, please request their addition individually.</p>
+              <p>Put the principal&apos;s <strong>National ID</strong> in the <code className="bg-[#FFC107]/20 px-1 rounded">principalIdNumber</code> column of every dependant row. The principal may appear anywhere in the same file or already exist in your group.</p>
+              <p className="mt-1">If a principal has no National ID, request the dependant addition individually. This import does not resolve a principal by member number.</p>
             </div>
 
             <div className="bg-[#DC3545]/5 border border-[#DC3545]/20 rounded-lg p-3 text-xs text-[#DC3545]">

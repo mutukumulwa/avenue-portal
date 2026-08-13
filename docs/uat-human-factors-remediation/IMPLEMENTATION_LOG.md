@@ -1660,6 +1660,64 @@ The unique index already supplies the same lookup, so the first was redundant �
 it as drift. Migration `013` removes only the duplicate; the hard national-ID constraint remains.
 The fresh 14-migration database is now genuinely zero-drift.
 
+### P06.01 — One shared member-import preflight
+
+| Field | Value |
+|---|---|
+| **Task** | P06.01 |
+| **Defect IDs** | DEF-035 (S3); adjacent completion of the HR half of P06.05's accessible file control |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none — P05.01's canonical identity columns and hard national-ID constraint are reused |
+| **Tests added** | `tests/services/member-import-preflight.test.ts` (12); 16 import action cases added/extended; 2 HR file-control component cases |
+| **Commands / results** | Focused: **3 files / 61 tests passed**; targeted lint 0 errors. Full gate: typecheck 0; lint **0 errors / 214 warnings**; suite **311 files / 3538 tests passed**, 88 files / 598 skipped; brand, currency and locale guards green; `git diff --check` clean. |
+| **Routes exercised** | no live browser route. Both admin and HR parse/confirm Server Actions and both Client Component file/preview boundaries were exercised directly. Browser retest remains P12.05. |
+| **Evidence** | `src/server/services/member-import-preflight.service.ts`; admin and HR import actions/clients/pages; `public/member-import-template.csv`; the tests listed above |
+| **Feature flags** | none. The canonical preflight and signed-preview verification are unconditional. They reuse the application's existing auth signing secret and fail closed if it is unavailable. |
+| **Remaining risks** | **P06.02 is still required:** `ImportBatch` has no processing/terminal state or row ledger, so a process death after reservation can still look like a completed replay and there is no history/status recovery surface. **P06.03 is still required:** admin writes one member transaction at a time, not one family unit, and group/package state is not locked from final preflight through every write. P06.04 must expose history/reject recovery; P06.05 still needs an explicit file-byte/row ceiling; P06.06 must add XLSX parity; P06.07 must stop mutating legitimate formula-shaped display names on ingest. Candidate warnings are preview-only until the row ledger persists them. No live browser or response-loss retest was run. |
+
+**Preview and commit now ask one function the same question.** Both admin and HR actions pass
+untrusted rows through `preflightMemberImport` at parse and again immediately before reservation.
+It owns strict calendar dates, age caps, Uganda phone/email/name normalization, exact national-ID
+conflicts, candidate phone/email/name+DOB warnings, same-file duplicates, group tenancy and status,
+active package and approved pinned version, and principal resolution. A dependant may reference a
+principal anywhere in the file or an existing ACTIVE principal in the same group; a missing,
+cross-group or inactive principal is a row error before the confirmation count is shown.
+
+**The browser cannot manufacture the preview it claims the operator reviewed.** Parse signs the
+lane, tenant, group, calendar day, canonical business values and accepted/rejected mask with an
+HMAC. Confirm verifies that claim before a database read or write, then derives a fresh verdict. A
+changed value or verdict flag invalidates the claim. A row that was valid and is now invalid is
+reported as `Preflight changed since preview`; a row that was rejected and has become valid remains
+rejected until the operator uploads and reviews it again. This closes the less-obvious inverse of
+DEF-035: without an authenticated mask, confirm could import more rows than its own button named.
+
+**Replay is checked against business content, not a mutable browser verdict.** The hash covers lane,
+tenant, group and canonical row content; the admin lane excludes the HR-only evidence column because
+it does not persist it. A response-loss retry checks the existing result before treating the members
+created by that result as new identity conflicts. Concurrent identical confirms still meet the
+unique reservation key and return the winner. This is deterministic for completed batches; it does
+not pretend that batch existence proves terminal completion, which is the P06.02 state-machine gap.
+
+**Identity classification follows signed DEC-07.** Exact normalized national ID is the only hard
+identity conflict. Shared phone, email and name+DOB are privacy-safe visible warnings and remain
+eligible, including within one household file. Invalid source rows cannot poison the verdict of a
+valid row that shares an identifier. Database probes are tenant-scoped and return no existing name,
+member number or opaque ID to the ordinary operator.
+
+**HR bulk rows now reach approval with evidence.** `sourceReference` is required per HR row, signed,
+included in the idempotency content and persisted in the addition endorsement's change details.
+The shared template and both instruction pages state its lane-specific meaning, and the HR preview
+shows it. The file input is focusable and labelled rather than `display:none`, with chosen filename
+readback. This prevents the bulk rail from creating the permanently unapprovable, evidence-free
+endorsements that E-015 would later reject.
+
+**The extraction deliberately does not disguise the remaining durability work.** A structural CSV
+parse error rejects the entire preview rather than accepting partial parser output, but source rows
+still live in browser state until confirm. The existing batch row stores aggregate counts only; it
+cannot distinguish RESERVED, PROCESSING and terminal outcomes or reconstruct a family after a
+process kill. Those are not small follow-ups to hide in this service: P06.02 and P06.03 own the
+persistent row/family ledger, lease/retry semantics and transaction boundary.
+
 ### P09.01 (part) — Draft / approve / activate for package versions
 
 | Field | Value |
@@ -1745,7 +1803,7 @@ the divergence stays visible to a reviewer.
 | **P03** (partial) | **PASS** — 0 errors | **PASS** — 0 errors | **PASS** — 279 files / 2937 tests passed, 88 files / 598 skipped | P03.01 reporting half, 03.02–03.05 done; **03.06 blocked on P09** |
 | **P04** | **PASS** — 0 errors | **PASS** — 0 errors, 217 warnings | **PASS** — 286 files / 3079 tests passed | P04.01–P04.05 **complete** |
 | **P05** | **PASS** — 0 errors | **PASS** — 0 errors, 214 warnings | **PASS** — 308 files / 3465 tests passed | P05.01–P05.07 complete; governed alternate endorsement-engine cleanup remains P08.02 |
-| **P06** (partial) | **PASS** — 0 errors | **PASS** — 0 errors | **PASS** — 295 files / 3275 tests passed | P06.05's DEF-069 half only |
+| **P06** (partial) | **PASS** — 0 errors | **PASS** — 0 errors, 214 warnings | **PASS** — 311 files / 3538 tests passed | P06.01 complete; P06.05's DEF-069 half complete; durable job/row ledger, family-unit commit, history, XLSX and storage/export separation remain P06.02–P06.07 |
 | **P09** (partial) | **PASS** — 0 errors | **PASS** — 0 errors | **PASS** — 297 files / 3308 tests passed | P09.02 done; P09.06 impact half |
 | **P10** (partial) | **PASS** — 0 errors | **PASS** — 0 errors, 216 warnings | **PASS** — 293 files / 3248 tests passed | P10.02–P10.04 done; **P10.01 partial** |
 | **P11** (partial) | **PASS** — 0 errors | **PASS** — 0 errors | **PASS** — 296 files / 3287 tests passed | P11.02 done |

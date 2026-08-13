@@ -86,7 +86,7 @@ export function MemberImportClient({ groups }: { groups: Group[] }) {
           <p className="text-sm text-brand-text-body">
             File must have headers:{" "}
             <code className="bg-[#F8F9FA] px-1 rounded text-xs">
-              firstName, lastName, dateOfBirth, gender, relationship, principalIdNumber, idNumber, phone, email, isExample
+              firstName, lastName, dateOfBirth, gender, relationship, principalIdNumber, idNumber, phone, email, sourceReference, isExample
             </code>
           </p>
 
@@ -249,7 +249,14 @@ export function MemberImportClient({ groups }: { groups: Group[] }) {
                     {validRows.map(r => (
                       <tr key={r.row} className="hover:bg-[#F8F9FA]">
                         <td className="px-4 py-2 font-mono">{r.row}</td>
-                        <td className="px-4 py-2 font-semibold">{r.firstName} {r.lastName}</td>
+                        <td className="px-4 py-2 font-semibold">
+                          {r.firstName} {r.lastName}
+                          {r.warnings?.map((warning) => (
+                            <p key={warning} className="mt-1 max-w-md font-normal text-[#8A6D3B]">
+                              Check: {warning}
+                            </p>
+                          ))}
+                        </td>
                         <td className="px-4 py-2">{r.idNumber || "—"}</td>
                         <td className="px-4 py-2">{r.dateOfBirth}</td>
                         <td className="px-4 py-2">{r.gender}</td>
@@ -269,6 +276,8 @@ export function MemberImportClient({ groups }: { groups: Group[] }) {
               <input type="hidden" name="groupId" value={selectedGroup} />
               <input type="hidden" name="rows" value={JSON.stringify(parseResult.rows)} />
               <input type="hidden" name="fileName" value={parseResult.fileName ?? ""} />
+              <input type="hidden" name="preflightDate" value={parseResult.preflightDate ?? ""} />
+              <input type="hidden" name="preflightToken" value={parseResult.preflightToken ?? ""} />
               <button
                 type="submit"
                 disabled={importPending}

@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // ── Mocks ─────────────────────────────────────────────────────────────────
 const mockPrisma = vi.hoisted(() => ({
   group: { findFirst: vi.fn(), findUnique: vi.fn() },
-  member: { findFirst: vi.fn() },
+  member: { findFirst: vi.fn(), findMany: vi.fn() },
   package: { findUnique: vi.fn() },
   importBatch: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
   endorsement: { findMany: vi.fn(), create: vi.fn() },
@@ -28,19 +28,24 @@ vi.mock("@/server/services/eligibility/enrolment-age", () => ({ checkEnrolmentAg
 
 import { parseImportAction, confirmImportAction } from "@/app/(admin)/members/import/actions";
 import { parseHRImportAction, confirmHRImportAction } from "@/app/(hr)/hr/roster/import/actions";
+import { createMemberImportPreviewToken } from "@/server/services/member-import-preflight.service";
 
 const YEAR = new Date().getFullYear();
+const PREFLIGHT_DATE = "2026-08-13";
+process.env.NEXTAUTH_SECRET ??= "member-import-tests-use-a-32-byte-secret";
 
 type Row = {
   row: number; firstName: string; lastName: string; idNumber: string;
   dateOfBirth: string; gender: string; phone: string; email: string;
-  relationship: string; principalIdNumber: string; error?: string;
+  relationship: string; principalIdNumber: string; sourceReference: string;
+  error?: string; warnings?: string[];
 };
 
 function row(partial: Partial<Row> = {}): Row {
   return {
     row: 2, firstName: "John", lastName: "Doe", idNumber: "", dateOfBirth: "1990-01-01",
     gender: "MALE", phone: "", email: "", relationship: "PRINCIPAL", principalIdNumber: "",
+    sourceReference: "HR-BULK-2026-001",
     ...partial,
   };
 }
@@ -49,6 +54,14 @@ function confirmFd(rows: Row[], extra: Record<string, string> = {}): FormData {
   const f = new FormData();
   f.set("groupId", "g1");
   f.set("rows", JSON.stringify(rows));
+  f.set("preflightDate", PREFLIGHT_DATE);
+  f.set("preflightToken", createMemberImportPreviewToken({
+    lane: "MEMBERS_ADMIN",
+    tenantId: "t1",
+    groupId: "g1",
+    effectiveDate: PREFLIGHT_DATE,
+    rows,
+  }));
   Object.entries(extra).forEach(([k, v]) => f.set(k, v));
   return f;
 }
@@ -59,15 +72,25 @@ function csvFile(content: string, name = "members.csv", type = "text/csv"): File
 function parseFd(file: File): FormData {
   const f = new FormData();
   f.set("file", file);
+  f.set("groupId", "g1");
   return f;
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockPrisma.group.findFirst.mockResolvedValue({ id: "g1", name: "Test Group" });
+  mockPrisma.group.findFirst.mockResolvedValue({
+    id: "g1",
+    name: "Test Group",
+    status: "ACTIVE",
+    packageId: "pkg1",
+    packageVersionId: "pv1",
+    package: { tenantId: "t1", status: "ACTIVE", maxAge: null, dependentMaxAge: null },
+    packageVersion: { packageId: "pkg1", status: "ACTIVE" },
+  });
   mockPrisma.group.findUnique.mockResolvedValue({ packageId: "pkg1" });
   mockPrisma.package.findUnique.mockResolvedValue({ maxAge: null, dependentMaxAge: null });
   mockPrisma.member.findFirst.mockResolvedValue(null);
+  mockPrisma.member.findMany.mockResolvedValue([]);
   mockPrisma.importBatch.findUnique.mockResolvedValue(null);
   mockPrisma.importBatch.create.mockResolvedValue({ id: "batch1" });
   mockPrisma.importBatch.update.mockResolvedValue({});
@@ -110,6 +133,13 @@ describe("parseImportAction — parser safety (WP-B2)", () => {
     expect(res.error).toMatch(/does not look like a text csv/i);
   });
 
+  it("rejects the whole file when Papa reports a structural row error", async () => {
+    const csv = 'firstName,lastName,dateOfBirth,gender,relationship\n"Jane,Doe,1990-01-01,FEMALE,PRINCIPAL\n';
+    const res = await parseImportAction(null, parseFd(csvFile(csv)));
+    expect(res.rows).toEqual([]);
+    expect(res.error).toMatch(/no partial preview was accepted/i);
+  });
+
   it("maps aliased + reordered headers by NAME (no column shift)", async () => {
     // Columns deliberately reordered and snake_cased.
     const csv = "relationship,dob,last_name,first_name,gender\nPRINCIPAL,1990-05-05,Nakato,Grace,FEMALE\n";
@@ -130,13 +160,98 @@ describe("parseImportAction — parser safety (WP-B2)", () => {
     const csv = "firstName,lastName,dateOfBirth,relationship\nJane,Doe,1990-01-01,PRINCIPAL\n";
     const res = await parseImportAction(null, parseFd(csvFile(csv)));
     expect(res.notes?.join(" ")).toMatch(/missing required column "gender"/i);
-    expect(res.rows[0].error).toMatch(/gender must be/i);
+    expect(res.rows[0].error).toMatch(/valid gender/i);
   });
 
   it("neutralizes a CSV formula-injection name on ingest", async () => {
     const csv = "firstName,lastName,dateOfBirth,gender,relationship\n=HYPERLINK(\"http://x\"),Doe,1990-01-01,MALE,PRINCIPAL\n";
     const res = await parseImportAction(null, parseFd(csvFile(csv)));
     expect(res.rows[0].firstName.startsWith("'=")).toBe(true);
+  });
+
+  it("uses strict calendar dates in preview, so an impossible day cannot look valid", async () => {
+    const csv = "firstName,lastName,dateOfBirth,gender,relationship\nJane,Doe,2026-02-30,FEMALE,PRINCIPAL\n";
+    const preview = await parseImportAction(null, parseFd(csvFile(csv)));
+    expect(preview.validCount).toBe(0);
+    expect(preview.rows[0].error).toMatch(/real date of birth/i);
+
+    const confirm = await confirmImportAction(
+      null,
+      confirmFd(preview.rows),
+    );
+    expect(confirm.failed[0].error).toBe(preview.rows[0].error);
+    expect(createMember).not.toHaveBeenCalled();
+  });
+
+  it("rejects malformed phone and email in preview rather than deferring them to commit", async () => {
+    const csv = "firstName,lastName,dateOfBirth,gender,relationship,phone,email\nJane,Doe,1990-01-01,FEMALE,PRINCIPAL,+254700123456,bad\n";
+    const result = await parseImportAction(null, parseFd(csvFile(csv)));
+    expect(result.validCount).toBe(0);
+    expect(result.rows[0].error).toMatch(/Ugandan phone/i);
+    expect(result.rows[0].error).toMatch(/valid email/i);
+  });
+
+  it("marks a current database national-ID conflict during preview", async () => {
+    mockPrisma.member.findMany.mockResolvedValue([
+      {
+        nationalIdNormalized: "ID1",
+        phoneNormalized: null,
+        emailNormalized: null,
+        firstName: "Existing",
+        lastName: "Member",
+        dateOfBirth: new Date("1980-01-01T00:00:00Z"),
+      },
+    ]);
+    const csv = "firstName,lastName,idNumber,dateOfBirth,gender,relationship\nJane,Doe,ID1,1990-01-01,FEMALE,PRINCIPAL\n";
+    const result = await parseImportAction(null, parseFd(csvFile(csv)));
+    expect(result.validCount).toBe(0);
+    expect(result.rows[0].error).toMatch(/national ID is already recorded/i);
+    expect(result.rows[0].error).not.toMatch(/Existing|Member/);
+  });
+
+  it("keeps shared phones as visible candidate warnings, never hard conflicts", async () => {
+    mockPrisma.member.findMany.mockResolvedValue([
+      {
+        nationalIdNormalized: null,
+        phoneNormalized: "+256772555042",
+        emailNormalized: null,
+        firstName: "Other",
+        lastName: "Household",
+        dateOfBirth: new Date("1980-01-01T00:00:00Z"),
+      },
+    ]);
+    const csv = "firstName,lastName,dateOfBirth,gender,relationship,phone\nJane,Doe,1990-01-01,FEMALE,PRINCIPAL,0772555042\n";
+    const result = await parseImportAction(null, parseFd(csvFile(csv)));
+    expect(result.validCount).toBe(1);
+    expect(result.rows[0].error).toBeUndefined();
+    expect(result.rows[0].warnings?.join(" ")).toMatch(/households often share/i);
+  });
+
+  it("refuses preview against an inactive scheme or unapproved package pin", async () => {
+    mockPrisma.group.findFirst.mockResolvedValueOnce({
+      id: "g1",
+      name: "Test Group",
+      status: "SUSPENDED",
+      packageId: "pkg1",
+      packageVersionId: "pv1",
+      package: { tenantId: "t1", status: "ACTIVE", maxAge: null, dependentMaxAge: null },
+      packageVersion: { packageId: "pkg1", status: "ACTIVE" },
+    });
+    const csv = "firstName,lastName,dateOfBirth,gender,relationship\nJane,Doe,1990-01-01,FEMALE,PRINCIPAL\n";
+    const inactive = await parseImportAction(null, parseFd(csvFile(csv)));
+    expect(inactive.error).toMatch(/group is suspended/i);
+
+    mockPrisma.group.findFirst.mockResolvedValueOnce({
+      id: "g1",
+      name: "Test Group",
+      status: "ACTIVE",
+      packageId: "pkg1",
+      packageVersionId: null,
+      package: { tenantId: "t1", status: "ACTIVE", maxAge: null, dependentMaxAge: null },
+      packageVersion: null,
+    });
+    const unpinned = await parseImportAction(null, parseFd(csvFile(csv)));
+    expect(unpinned.error).toMatch(/not pinned to an approved package version/i);
   });
 });
 
@@ -145,10 +260,14 @@ describe("parseImportAction — parser safety (WP-B2)", () => {
 // ─────────────────────────────────────────────────────────────────────────
 describe("confirmImportAction — server re-validation (WP-B1)", () => {
   it("REJECTS a tampered payload whose invalid row was posted without an error flag", async () => {
-    // gender is invalid but the client stripped `error` — the server must re-derive it.
-    const res = await confirmImportAction(null, confirmFd([row({ gender: "HACKED" })]));
+    const previewRows = [row()];
+    const request = confirmFd(previewRows);
+    // The token authenticates the valid preview. Changing a field afterwards
+    // must fail before the server even considers the browser's verdict flag.
+    request.set("rows", JSON.stringify([row({ gender: "HACKED" })]));
+    const res = await confirmImportAction(null, request);
     expect(res.imported).toBe(0);
-    expect(res.failed).toHaveLength(1);
+    expect(res.error).toMatch(/preview no longer matches/i);
     expect(createMember).not.toHaveBeenCalled();
     expect(mockPrisma.importBatch.create).not.toHaveBeenCalled();
     expect(writeAudit).not.toHaveBeenCalled(); // no success audit on a refused import
@@ -209,6 +328,59 @@ describe("confirmImportAction — idempotency (WP-B1 / B-011)", () => {
     expect(res.imported).toBe(2);
     expect(createMember).not.toHaveBeenCalled();
   });
+
+  it("replays the first result even though that import's national ID now exists", async () => {
+    mockPrisma.member.findMany.mockResolvedValue([
+      {
+        nationalIdNormalized: "ID1",
+        phoneNormalized: null,
+        emailNormalized: null,
+        firstName: "John",
+        lastName: "Doe",
+        dateOfBirth: new Date("1990-01-01T00:00:00Z"),
+      },
+    ]);
+    mockPrisma.importBatch.findUnique.mockResolvedValue({
+      id: "b0",
+      importedCount: 1,
+      rejects: [],
+    });
+    const res = await confirmImportAction(null, confirmFd([row({ idNumber: "ID1" })]));
+    expect(res).toMatchObject({ alreadyImported: true, imported: 1, batchId: "b0" });
+    expect(createMember).not.toHaveBeenCalled();
+  });
+
+  it("labels a new database rejection as a stale preflight conflict", async () => {
+    const csv = "firstName,lastName,idNumber,dateOfBirth,gender,relationship\nJane,Doe,ID1,1990-01-01,FEMALE,PRINCIPAL\n";
+    const preview = await parseImportAction(null, parseFd(csvFile(csv)));
+    expect(preview.validCount).toBe(1);
+
+    mockPrisma.member.findMany.mockResolvedValue([
+      {
+        nationalIdNormalized: "ID1",
+        phoneNormalized: null,
+        emailNormalized: null,
+        firstName: "Existing",
+        lastName: "Member",
+        dateOfBirth: new Date("1980-01-01T00:00:00Z"),
+      },
+    ]);
+    const result = await confirmImportAction(null, confirmFd(preview.rows));
+    expect(result.imported).toBe(0);
+    expect(result.failed[0].error).toMatch(/preflight changed since preview/i);
+    expect(result.failed[0].error).toMatch(/national ID is already recorded/i);
+    expect(createMember).not.toHaveBeenCalled();
+  });
+
+  it("never imports a row that was rejected by the signed preview even if it is valid now", async () => {
+    const previewRows = [
+      row({ error: "This national ID was already recorded at preview." }),
+    ];
+    const result = await confirmImportAction(null, confirmFd(previewRows));
+    expect(result.imported).toBe(0);
+    expect(result.failed[0].error).toMatch(/now appears valid.*re-upload/i);
+    expect(createMember).not.toHaveBeenCalled();
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -231,6 +403,11 @@ describe("confirmImportAction — dependant linkage + dedup (WP-B3)", () => {
   });
 
   it("scopes the DB principal fallback lookup to the import's GROUP", async () => {
+    mockPrisma.member.findMany.mockImplementation(async (args: MockDbArgs) =>
+      args?.where?.relationship === "PRINCIPAL"
+        ? [{ nationalIdNormalized: "DBPRIN", status: "ACTIVE" }]
+        : [],
+    );
     mockPrisma.member.findFirst.mockResolvedValue({ id: "db-prin" });
     const rows = [row({ firstName: "Kid", relationship: "CHILD", principalIdNumber: "DBPRIN", dateOfBirth: "2015-01-01" })];
     const res = await confirmImportAction(null, confirmFd(rows));
@@ -246,7 +423,7 @@ describe("confirmImportAction — dependant linkage + dedup (WP-B3)", () => {
     const rows = [row({ firstName: "Kid", relationship: "CHILD", principalIdNumber: "GHOST", dateOfBirth: "2015-01-01" })];
     const res = await confirmImportAction(null, confirmFd(rows));
     expect(res.imported).toBe(0);
-    expect(res.failed[0].error).toMatch(/principal with national id "GHOST" was not found in this group/i);
+    expect(res.failed[0].error).toMatch(/principal national id was not found in this group/i);
     expect(createMember).not.toHaveBeenCalled();
   });
 
@@ -269,6 +446,14 @@ describe("confirmHRImportAction — endorsement numbering (WP-B4)", () => {
   function hrFd(rows: Row[], extra: Record<string, string> = {}): FormData {
     const f = new FormData();
     f.set("rows", JSON.stringify(rows));
+    f.set("preflightDate", PREFLIGHT_DATE);
+    f.set("preflightToken", createMemberImportPreviewToken({
+      lane: "HR_ENDORSEMENT",
+      tenantId: "t1",
+      groupId: "g-hr",
+      effectiveDate: PREFLIGHT_DATE,
+      rows,
+    }));
     Object.entries(extra).forEach(([k, v]) => f.set(k, v));
     return f;
   }
@@ -285,6 +470,9 @@ describe("confirmHRImportAction — endorsement numbering (WP-B4)", () => {
     expect(numbers).toEqual([`END-${YEAR}-00001`, `END-${YEAR}-00002`, `END-${YEAR}-00003`]);
     expect(numbers.every(n => n.startsWith("END-"))).toBe(true);
     expect(numbers.some(n => n.startsWith("REQ-"))).toBe(false);
+    expect(mockPrisma.endorsement.create.mock.calls[0][0].data.changeDetails.sourceReference).toBe(
+      "HR-BULK-2026-001",
+    );
   });
 
   it("continues the sequence past the existing numeric maximum", async () => {
@@ -309,6 +497,16 @@ describe("confirmHRImportAction — endorsement numbering (WP-B4)", () => {
     expect(res.imported).toBe(0);
     expect(mockPrisma.endorsement.create).not.toHaveBeenCalled();
     expect(writeAudit).not.toHaveBeenCalled();
+  });
+
+  it("refuses a row with no source evidence before creating an unapprovable endorsement", async () => {
+    const res = await confirmHRImportAction(
+      null,
+      hrFd([row({ sourceReference: "" })]),
+    );
+    expect(res.imported).toBe(0);
+    expect(res.failed[0].error).toMatch(/source.*reference is required/i);
+    expect(mockPrisma.endorsement.create).not.toHaveBeenCalled();
   });
 
   it("fails an over-age row without creating an endorsement", async () => {
