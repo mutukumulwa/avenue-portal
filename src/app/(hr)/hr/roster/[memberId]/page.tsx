@@ -78,7 +78,7 @@ export default async function HRMemberDetailPage(
   return (
     <div className="space-y-6">
       <div className="flex items-center space-x-4">
-        <Link href="/hr/roster" className="text-brand-text-muted hover:text-brand-text-heading transition-colors">
+        <Link href="/hr/roster" className="text-brand-text-muted hover:text-brand-text-heading transition-colors" aria-label="Back to roster">
           <ArrowLeft size={24} />
         </Link>
         <div>
@@ -288,7 +288,7 @@ export default async function HRMemberDetailPage(
           <div className="bg-white border border-[#EEEEEE] rounded-2xl shadow-sm overflow-hidden">
             <div className="border-b border-[#EEEEEE] px-5 py-4 flex items-center">
                <FileText className="w-4 h-4 text-brand-indigo mr-2" />
-               <h2 className="font-bold text-brand-text-heading font-heading">Endorsement History</h2>
+               <h2 className="font-bold text-brand-text-heading font-heading">Request History</h2>
             </div>
             {member.endorsements.length === 0 ? (
                <div className="p-5 text-sm text-brand-text-body text-center">No history.</div>
@@ -306,7 +306,7 @@ export default async function HRMemberDetailPage(
                </ul>
             )}
             <div className="bg-[#F8F9FA] p-3 text-center border-t border-[#EEEEEE]">
-               <Link href="/hr/endorsements" className="text-xs font-bold text-brand-indigo hover:text-brand-secondary transition-colors">View All Endorsements</Link>
+               <Link href="/hr/endorsements" className="text-xs font-bold text-brand-indigo hover:text-brand-secondary transition-colors">View all requests</Link>
             </div>
           </div>
         </div>

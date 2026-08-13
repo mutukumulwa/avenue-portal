@@ -106,7 +106,7 @@ export default async function RepricingWorkbenchPage({
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <Link href={`/groups/${id}`} className="text-brand-text-muted hover:text-brand-indigo transition-colors">
+        <Link href={`/groups/${id}`} className="text-brand-text-muted hover:text-brand-indigo transition-colors" aria-label="Back to groups">
           <ArrowLeft size={20} />
         </Link>
         <div>

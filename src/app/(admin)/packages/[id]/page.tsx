@@ -133,7 +133,7 @@ export default async function PackageDetailPage({ params }: { params: Promise<{ 
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/packages" className="text-brand-text-muted hover:text-brand-indigo transition-colors">
+          <Link href="/packages" className="text-brand-text-muted hover:text-brand-indigo transition-colors" aria-label="Back to packages">
             <ArrowLeft size={20} />
           </Link>
           <div>

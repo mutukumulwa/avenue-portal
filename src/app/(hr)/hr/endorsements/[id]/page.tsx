@@ -75,7 +75,7 @@ export default async function HREndorsementDetailPage({
       )}
 
       <div className="flex items-center gap-3">
-        <Link href="/hr/endorsements" className="text-brand-text-muted hover:text-brand-indigo transition-colors">
+        <Link href="/hr/endorsements" className="text-brand-text-muted hover:text-brand-indigo transition-colors" aria-label="Back to endorsements">
           <ArrowLeft size={20} />
         </Link>
         <div className="flex-1">

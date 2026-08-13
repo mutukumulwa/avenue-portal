@@ -100,7 +100,7 @@ export default async function HRDashboard() {
   const kpis = [
     { label: "Total Active Members", value: totalActiveMembers, icon: Users },
     { label: "Added This Month", value: membersAddedThisMonth, icon: CheckCircle },
-    { label: "Pending Endorsements", value: pendingEndorsements, icon: FileText },
+    { label: "Requests Awaiting Review", value: pendingEndorsements, icon: FileText },
     { label: "Outstanding Balance", value: `UGX ${outstandingBalance.toLocaleString()}`, icon: Receipt },
   ];
 

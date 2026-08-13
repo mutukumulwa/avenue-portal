@@ -24,7 +24,7 @@ export default async function BrokerSubmissionDetailPage({ params }: { params: P
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <Link href="/broker/submissions" className="text-brand-text-muted hover:text-brand-indigo transition-colors"><ArrowLeft size={20} /></Link>
+        <Link href="/broker/submissions" className="text-brand-text-muted hover:text-brand-indigo transition-colors" aria-label="Back to submissions"><ArrowLeft size={20} /></Link>
         <div>
           <h1 className="text-2xl font-bold font-heading text-brand-text-heading">{endorsement.endorsementNumber}</h1>
           <p className="text-sm text-brand-text-muted mt-1">{endorsement.group.name} · {endorsement.type.replace(/_/g, " ")}</p>

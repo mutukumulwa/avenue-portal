@@ -40,7 +40,7 @@ export default async function GroupEnrollmentHero({
       )}
 
       <div className="flex items-center space-x-4">
-        <Link href="/groups" className="text-[#848E9F] hover:text-brand-text-heading transition-colors">
+        <Link href="/groups" className="text-[#848E9F] hover:text-brand-text-heading transition-colors" aria-label="Back to groups">
           <ArrowLeft size={24} />
         </Link>
         <div>

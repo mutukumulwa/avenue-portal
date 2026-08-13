@@ -40,7 +40,7 @@ export default async function MemberReinstatementPage() {
   return (
     <div className="max-w-2xl mx-auto p-6 space-y-6">
       <div className="flex items-center gap-3">
-        <Link href="/member/dashboard" className="text-brand-text-muted hover:text-brand-indigo transition-colors">
+        <Link href="/member/dashboard" className="text-brand-text-muted hover:text-brand-indigo transition-colors" aria-label="Back to dashboard">
           <ArrowLeft size={20} />
         </Link>
         <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Membership Reinstatement</h1>

@@ -64,7 +64,7 @@ export default async function QuotationDetailPage({ params }: { params: Promise<
       {/* Header */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm flex flex-wrap justify-between items-center gap-4">
         <div className="flex items-center gap-3">
-          <Link href="/quotations" className="text-brand-text-muted hover:text-brand-indigo transition-colors">
+          <Link href="/quotations" className="text-brand-text-muted hover:text-brand-indigo transition-colors" aria-label="Back to quotations">
             <ArrowLeft size={20} />
           </Link>
           <div>

@@ -1708,7 +1708,7 @@ export default async function ReportDetailPage({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/reports" className="text-brand-text-muted hover:text-brand-indigo transition-colors">
+          <Link href="/reports" className="text-brand-text-muted hover:text-brand-indigo transition-colors" aria-label="Back to reports">
             <ArrowLeft size={20} />
           </Link>
           <div>

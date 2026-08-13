@@ -10,12 +10,12 @@ export default async function HRAddMemberPage() {
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div className="flex items-center space-x-4">
-        <Link href="/hr/roster" className="text-brand-text-muted hover:text-brand-text-heading transition-colors">
+        <Link href="/hr/roster" className="text-brand-text-muted hover:text-brand-text-heading transition-colors" aria-label="Back to roster">
           <ArrowLeft size={20} />
         </Link>
         <div>
           <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Request Member Addition</h1>
-          <p className="text-brand-text-body mt-1 text-sm">Submit an endorsement to enqueue a new member or dependent.</p>
+          <p className="text-brand-text-body mt-1 text-sm">Add an employee or a dependant to your scheme. Your administrator reviews it before cover starts.</p>
         </div>
       </div>
 

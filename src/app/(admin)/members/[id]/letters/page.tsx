@@ -58,7 +58,7 @@ export default async function MemberLettersPage({ params }: { params: Promise<{ 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <Link href={`/members/${id}`} className="text-brand-text-muted hover:text-brand-indigo transition-colors">
+        <Link href={`/members/${id}`} className="text-brand-text-muted hover:text-brand-indigo transition-colors" aria-label="Back to members">
           <ArrowLeft size={20} />
         </Link>
         <div>

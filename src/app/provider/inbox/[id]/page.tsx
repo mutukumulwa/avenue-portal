@@ -48,7 +48,7 @@ export default async function ProviderInfoRequestDetail({ params }: { params: Pr
   return (
     <div className="space-y-6 max-w-3xl">
       <div className="flex items-center gap-3">
-        <Link href="/provider/inbox" className="text-brand-text-muted hover:text-brand-text-heading"><ArrowLeft size={20} /></Link>
+        <Link href="/provider/inbox" className="text-brand-text-muted hover:text-brand-text-heading" aria-label="Back to inbox"><ArrowLeft size={20} /></Link>
         <div className="flex-1">
           <h1 className="text-xl font-bold text-brand-text-heading font-heading">Information request</h1>
           {pa && <p className="text-brand-text-muted text-sm">{pa.preauthNumber} · {pa.member.firstName} {pa.member.lastName} ({pa.member.memberNumber})</p>}

@@ -19,7 +19,7 @@ export default async function EditBrokerPage({ params }: { params: Promise<{ id:
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <Link href={`/brokers/${id}`} className="text-brand-text-muted hover:text-brand-indigo transition-colors">
+        <Link href={`/brokers/${id}`} className="text-brand-text-muted hover:text-brand-indigo transition-colors" aria-label="Back to brokers">
           <ArrowLeft size={20} />
         </Link>
         <div>

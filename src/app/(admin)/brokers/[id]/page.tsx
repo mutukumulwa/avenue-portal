@@ -168,7 +168,7 @@ export default async function BrokerDetailPage({
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <Link href="/brokers" className="text-brand-text-muted hover:text-brand-indigo transition-colors mt-1">
+          <Link href="/brokers" className="text-brand-text-muted hover:text-brand-indigo transition-colors mt-1" aria-label="Back to brokers">
             <ArrowLeft size={20} />
           </Link>
           <div>

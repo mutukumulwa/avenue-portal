@@ -12,7 +12,7 @@ export default async function HRMemberImportPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/hr/roster" className="text-brand-text-muted hover:text-brand-indigo transition-colors">
+          <Link href="/hr/roster" className="text-brand-text-muted hover:text-brand-indigo transition-colors" aria-label="Back to roster">
             <ArrowLeft size={20} />
           </Link>
           <div>

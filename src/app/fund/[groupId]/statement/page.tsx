@@ -67,7 +67,7 @@ export default async function FundStatementPage({ params }: { params: Promise<{ 
     <div className="space-y-6 max-w-4xl">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href={`/fund/${groupId}`} className="text-brand-text-muted hover:text-brand-indigo">
+          <Link href={`/fund/${groupId}`} className="text-brand-text-muted hover:text-brand-indigo" aria-label="Back to the fund">
             <ArrowLeft size={20} />
           </Link>
           <div>

@@ -48,7 +48,7 @@ export default async function NewClaimPage({
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <Link href="/claims" className="text-brand-text-muted hover:text-brand-indigo transition-colors">
+        <Link href="/claims" className="text-brand-text-muted hover:text-brand-indigo transition-colors" aria-label="Back to claims">
           <ArrowLeft size={20} />
         </Link>
         <div>

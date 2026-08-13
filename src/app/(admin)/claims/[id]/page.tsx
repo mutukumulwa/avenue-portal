@@ -211,7 +211,7 @@ export default async function ClaimDetailPage({
       )}
 
       <div className="flex items-center space-x-4">
-        <Link href="/claims" className="text-brand-text-body hover:text-brand-text-heading transition-colors">
+        <Link href="/claims" className="text-brand-text-body hover:text-brand-text-heading transition-colors" aria-label="Back to claims">
           <ArrowLeft size={24} />
         </Link>
         <div className="flex-1">

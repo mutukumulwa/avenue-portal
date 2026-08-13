@@ -63,7 +63,7 @@ export default async function BuildQuotePage({ params }: { params: Promise<{ id:
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href={`/quotations/${id}`} className="text-brand-text-muted hover:text-brand-indigo transition-colors">
+          <Link href={`/quotations/${id}`} className="text-brand-text-muted hover:text-brand-indigo transition-colors" aria-label="Back to quotations">
             <ArrowLeft size={20} />
           </Link>
           <div>

@@ -1,6 +1,5 @@
 import { ArrowLeft, CheckCircle, Calculator, Building, XCircle, AlertTriangle, GitCompareArrows, PlayCircle } from "lucide-react";
 import Link from "next/link";
-import { approveEndorsementAction, rejectEndorsementAction } from "./actions";
 import { amendmentService } from "@/server/services/amendment.service";
 import {
   computeProRataAction, approveAmendmentAction, applyAmendmentAction,
@@ -12,6 +11,9 @@ import {
 import { EndorsementsService } from "@/server/services/endorsement.service";
 import { requireRole, ROLES } from "@/lib/rbac";
 import { notFound } from "next/navigation";
+// DEF-047: the run saw "+UGX 1,130,958.904" — three decimals on a currency
+// with no minor unit in practice. formatMoney rounds to whole units by default.
+import { formatMoney } from "@/lib/utils";
 
 const STATUS_STYLE: Record<string, string> = {
   DRAFT:        "bg-[#6C757D]/10 text-[#6C757D]",
@@ -93,7 +95,7 @@ export default async function EndorsementReviewPage({
       {/* Header */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm flex flex-wrap justify-between items-center gap-4">
         <div className="flex items-center gap-3">
-          <Link href="/endorsements" className="text-brand-text-muted hover:text-brand-indigo transition-colors">
+          <Link href="/endorsements" className="text-brand-text-muted hover:text-brand-indigo transition-colors" aria-label="Back to endorsements">
             <ArrowLeft size={20} />
           </Link>
           <div>
@@ -116,29 +118,21 @@ export default async function EndorsementReviewPage({
           </div>
         </div>
 
+        {/* UAT-HF P08.02 (DEF-047) — this header carried a SECOND pair of
+            Approve/Reject controls. "One endorsement screen presents five
+            overlapping action controls with no stated difference ... 'Approve'
+            and the header's apply variant were never distinguished, so a checker could not
+            tell which one applies the change."
+
+            The duplicates are gone. Every transition now has exactly one
+            control, in the Workflow Actions block below, on the governed
+            amendment engine. A checker who has to choose between two buttons
+            that look equivalent is a checker who has not been told what they
+            are doing. */}
         {canAction && (
-          <div className="flex gap-2">
-            <form action={rejectEndorsementAction}>
-              <input type="hidden" name="endorsementId" value={endorsement.id} />
-              <button type="submit"
-                className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold border border-[#DC3545] text-[#DC3545] hover:bg-[#DC3545]/10 transition-colors">
-                <XCircle size={15} /> Reject
-              </button>
-            </form>
-            {/* P08.03 (DEF-046): the SECOND route to the same refusal. The run
-                pressed this one. Gating only the amendment-engine Approve below
-                would have left this button still promising an action E-015 was
-                always going to reject. */}
-            {!evidenceMissing && (
-              <form action={approveEndorsementAction}>
-                <input type="hidden" name="endorsementId" value={endorsement.id} />
-                <button type="submit"
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold bg-[#28A745] hover:bg-[#218838] text-white transition-colors">
-                  <CheckCircle size={15} /> Approve & Apply
-                </button>
-              </form>
-            )}
-          </div>
+          <p className="text-xs text-brand-text-muted max-w-xs text-right">
+            Review the change below, then approve or reject it in Workflow Actions.
+          </p>
         )}
       </div>
 
@@ -173,7 +167,7 @@ export default async function EndorsementReviewPage({
             <div className="bg-black/20 rounded-[8px] p-4 relative z-10">
               <p className="text-xs uppercase font-bold text-white/70 mb-1">Calculated Adjustment</p>
               <p className="text-3xl font-mono font-bold">
-                {isCredit ? "−" : "+"}UGX {Math.abs(amount).toLocaleString("en-UG")}
+                {isCredit ? "−" : "+"}{formatMoney(Math.abs(amount))}
               </p>
               <p className="text-xs text-white/70 mt-1">
                 {isCredit ? "Credit — reduces next invoice" : "Debit — added to next invoice"}
@@ -266,10 +260,10 @@ export default async function EndorsementReviewPage({
               { label: "Days remaining", value: proRata.daysRemaining.toString() },
               { label: "Total days in period", value: proRata.totalDaysInPeriod.toString() },
               { label: "Pro-rata factor", value: `${(Number(proRata.prorataFactor) * 100).toFixed(2)}%` },
-              { label: "Prev contribution", value: `UGX ${Number(proRata.previousContribution).toLocaleString("en-UG")}` },
-              { label: "New contribution",  value: `UGX ${Number(proRata.newContribution).toLocaleString("en-UG")}` },
+              { label: "Prev contribution", value: formatMoney(Number(proRata.previousContribution)) },
+              { label: "New contribution",  value: formatMoney(Number(proRata.newContribution)) },
               { label: "Adjustment",        value: <strong className={proRata.adjustmentType === "CREDIT" ? "text-[#28A745]" : "text-[#C4500A]"}>
-                {proRata.adjustmentType === "CREDIT" ? "−" : "+"} UGX {Math.abs(Number(proRata.adjustmentAmount)).toLocaleString("en-UG")}
+                {proRata.adjustmentType === "CREDIT" ? "−" : "+"} {formatMoney(Math.abs(Number(proRata.adjustmentAmount)))}
               </strong> },
             ].map(({ label, value }) => (
               <div key={label}>
@@ -320,11 +314,41 @@ export default async function EndorsementReviewPage({
           Workflow Actions
         </h2>
 
+        {/* UAT-HF P08.02 (DEF-047): "No version of the affected object is
+            identified anywhere." A checker was asked to approve a change to
+            something the screen never named. State the object, its reference and
+            the version the change was raised against. */}
+        <div className="rounded-[6px] border border-[#EEEEEE] bg-[#F8F9FA] px-3 py-2 text-xs">
+          <span className="text-brand-text-muted">You are approving </span>
+          <span className="font-semibold text-brand-text-heading">
+            {endorsement.type.replace(/_/g, " ").toLowerCase()}
+          </span>
+          <span className="text-brand-text-muted"> on </span>
+          <span className="font-semibold text-brand-text-heading">{endorsement.group.name}</span>
+          {richEndorsement?.member && (
+            <>
+              <span className="text-brand-text-muted"> for </span>
+              <span className="font-semibold text-brand-text-heading">
+                {richEndorsement.member.firstName} {richEndorsement.member.lastName} ({richEndorsement.member.memberNumber})
+              </span>
+            </>
+          )}
+          <span className="text-brand-text-muted">, reference </span>
+          <span className="font-mono font-semibold text-brand-text-heading">{endorsement.endorsementNumber}</span>
+          <span className="text-brand-text-muted">, raised {new Date(endorsement.createdAt).toLocaleDateString("en-UG")}.</span>
+        </div>
+
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
             <p className="text-xs text-brand-text-muted">Maker</p>
             <p className="font-semibold text-brand-text-heading mt-0.5">
-              {richEndorsement?.maker ? `${richEndorsement.maker.firstName} ${richEndorsement.maker.lastName}` : (endorsement.requestedBy ?? "—")}
+              {/* DEF-047: this fell back to the raw id, which is how the run
+                  saw "Maker cmsoxn5j0002tbpvqg8gomey4". An internal identifier
+                  is not a counterparty; when the user cannot be resolved, say
+                  so in words. */}
+              {richEndorsement?.maker
+                ? `${richEndorsement.maker.firstName} ${richEndorsement.maker.lastName}`
+                : "No longer a user"}
             </p>
           </div>
           <div>

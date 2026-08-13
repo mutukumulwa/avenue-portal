@@ -47,7 +47,7 @@ export default async function HREndorsementsPage(
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Endorsement Requests</h1>
+          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Membership Requests</h1>
           <p className="text-brand-text-body font-body mt-1">Track the status of your reported additions, terminations, and group changes.</p>
         </div>
         {/* UAT-HF P08.01 (DEF-004). "+ New Endorsement" went to /hr/roster/new,
@@ -75,7 +75,7 @@ export default async function HREndorsementsPage(
           <table className="w-full text-left text-sm whitespace-nowrap">
             <thead>
               <tr className="bg-white border-b border-[#EEEEEE] text-brand-text-muted font-heading text-xs uppercase tracking-wider">
-                <th className="px-6 py-4 font-bold">Endorsement No.</th>
+                <th className="px-6 py-4 font-bold">Reference</th>
                 <th className="px-6 py-4 font-bold">Type</th>
                 <th className="px-6 py-4 font-bold">Subject</th>
                 <th className="px-6 py-4 font-bold">Effective Date</th>
@@ -125,7 +125,7 @@ export default async function HREndorsementsPage(
               {endorsements.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-6 py-12 text-center text-brand-text-body">
-                     No endorsement requests found matching your criteria.
+                     No requests found matching your criteria.
                   </td>
                 </tr>
               )}

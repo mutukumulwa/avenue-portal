@@ -213,3 +213,91 @@ describe("DEF-023 a reviewer can read a package without editing it", () => {
     expect(block.slice(0, 400)).toContain("pkg.currentVersion.id");
   });
 });
+
+// ─── DEF-005 — the employer portal speaks the employer's language ───────────
+
+describe("DEF-005 insurer vocabulary is out of the HR portal", () => {
+  const nav = read("src/components/layouts/HRSidebar.tsx");
+  const list = read("src/app/(hr)/hr/endorsements/page.tsx");
+  const newPage = read("src/app/(hr)/hr/roster/new/page.tsx");
+  const form = read("src/app/(hr)/hr/roster/new/HRAddMemberForm.tsx");
+
+  it("the navigation no longer says Endorsement", () => {
+    // "The HR navigation item is 'Endorsement Requests'."
+    expect(nav).not.toMatch(/label: "Endorsement Requests"/);
+    expect(nav).toMatch(/label: "Membership Requests"/);
+  });
+
+  it("the list heading and its column say what HR filed, not what the insurer calls it", () => {
+    expect(list).toMatch(/>Membership Requests</);
+    expect(list).not.toMatch(/>Endorsement No\.</);
+    expect(list).toMatch(/>Reference</);
+  });
+
+  it("the form subtitle describes the outcome, not the mechanism", () => {
+    // "Submit an endorsement to enqueue a new member or dependent."
+    expect(newPage).not.toMatch(/Submit an endorsement/);
+    expect(newPage).toMatch(/Add an employee or a dependant/);
+  });
+
+  it("the confirmation drops the internal term", () => {
+    expect(form).not.toMatch(/Your endorsement request/);
+    expect(form).toMatch(/Your request <strong>/);
+  });
+
+  it("the two differently-labelled actions no longer lead to one form", () => {
+    // "'Add Member' and '+ New Endorsement' both land on the identical form at
+    // /hr/roster/new, so a user reasonably expecting a choice of request type
+    // gets an addition form either way." P08.01 split them.
+    expect(list).toMatch(/^\s*Add a member\s*$/m);
+    expect(list).toMatch(/^\s*Report a leaver\s*$/m);
+  });
+
+  it("keeps the route and the model name — only the copy changed", () => {
+    // Renaming the route or the Prisma model would be churn with real
+    // regression risk and no benefit to an HR user, who never sees either.
+    expect(nav).toContain('href: "/hr/endorsements"');
+  });
+});
+
+// ─── DEF-047 — one unambiguous control, a legible counterparty ──────────────
+
+describe("DEF-047 the approval panel", () => {
+  const page = read("src/app/(admin)/endorsements/[id]/page.tsx");
+
+  it("no longer carries a second Approve in the header", () => {
+    // "One endorsement screen presents five overlapping action controls with no
+    // stated difference ... 'Approve' and 'Approve & Apply' are never
+    // distinguished, so a checker cannot tell which one applies the change."
+    // Match the JSX text node, not the comment recording what was removed.
+    expect(page).not.toMatch(/^\s*<CheckCircle size=\{15\} \/> Approve & Apply\s*$/m);
+    expect(page).toMatch(/approve or reject it in Workflow Actions/i);
+  });
+
+  it("exactly one Approve control remains", () => {
+    expect(page.match(/approveAmendmentAction/g)?.length).toBe(2); // import + one form
+    // The legacy engine's actions are no longer reachable from this page at all.
+    expect(page).not.toContain("approveEndorsementAction");
+    expect(page).not.toContain("rejectEndorsementAction");
+  });
+
+  it("never renders a raw internal id as a person", () => {
+    // The run saw "Maker cmsoxn5j0002tbpvqg8gomey4".
+    expect(page).not.toMatch(/endorsement\.requestedBy \?\? "—"/);
+    expect(page).toMatch(/No longer a user/);
+  });
+
+  it("states the object being approved, its reference and when it was raised", () => {
+    // "No version of the affected object is identified anywhere."
+    expect(page).toMatch(/You are approving/);
+    expect(page).toContain("endorsement.endorsementNumber");
+    expect(page).toContain("endorsement.group.name");
+  });
+
+  it("renders money without a phantom minor unit", () => {
+    // "+UGX 1,130,958.904" — three decimals on a currency with no minor unit
+    // in practice. formatMoney rounds to whole units.
+    expect(page).not.toMatch(/toLocaleString\("en-UG"\)/);
+    expect(page).toContain("formatMoney");
+  });
+});

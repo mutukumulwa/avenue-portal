@@ -50,7 +50,7 @@ export default async function RegisterMemberPage({
         <Link
           href={principal ? `/members/${principal.id}` : "/members"}
           className="text-brand-text-muted hover:text-brand-text-heading transition-colors"
-        >
+         aria-label="Back to principal">
           <ArrowLeft size={20} />
         </Link>
         <div>

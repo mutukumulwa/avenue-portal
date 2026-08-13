@@ -56,7 +56,7 @@ export default async function ComplaintDetailPage({
     <div className="max-w-4xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-start gap-3">
-        <Link href="/complaints" className="text-brand-text-muted hover:text-brand-indigo transition-colors mt-1">
+        <Link href="/complaints" className="text-brand-text-muted hover:text-brand-indigo transition-colors mt-1" aria-label="Back to complaints">
           <ArrowLeft size={20} />
         </Link>
         <div className="flex-1">

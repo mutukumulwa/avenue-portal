@@ -152,3 +152,60 @@ describe("DEF-056 — the two controls the run actually inspected", () => {
     }
   });
 });
+
+/**
+ * UAT-HF P11.01 (DEF-074) — the same rule for icon-only LINKS.
+ *
+ * The button sweep above missed them, and DEF-074's accessibility-tree analysis
+ * caught what the sweep did not: "4 interactive controls with no accessible name
+ * — **one link** and three comboboxes". A back arrow rendered as
+ * `<Link><ArrowLeft/></Link>` announces as "link" and nothing else, which on a
+ * detail page is the primary way out.
+ */
+const LINK_OPEN = /<(Link|a)\b((?:[^>"'{]|"[^"]*"|'[^']*'|\{(?:[^{}]|\{[^{}]*\})*\})*)>/g;
+
+function findNamelessIconLinks(): Nameless[] {
+  const found: Nameless[] = [];
+  for (const file of tsxFiles("src")) {
+    const src = readFileSync(file, "utf8");
+    LINK_OPEN.lastIndex = 0;
+    for (let m = LINK_OPEN.exec(src); m; m = LINK_OPEN.exec(src)) {
+      const [, tag, attrs] = m;
+      const close = src.indexOf(`</${tag}>`, m.index + m[0].length);
+      if (close === -1) continue;
+      const body = src.slice(m.index + m[0].length, close);
+      if (body.includes(`<${tag}`)) continue;
+      if (body.replace(SELF_CLOSING_COMPONENT, "").trim() !== "") continue;
+      const icon = /<([A-Z]\w+)/.exec(body);
+      if (!icon) continue;
+      if (/aria-label|aria-labelledby|title=/.test(attrs)) continue;
+      found.push({ file, line: src.slice(0, m.index).split("\n").length, icon: icon[1] });
+    }
+  }
+  return found;
+}
+
+describe("DEF-074 icon-only links are named too", () => {
+  it("finds none anywhere under src/", () => {
+    const nameless = findNamelessIconLinks();
+    const report = nameless.map((n) => `  ${n.file}:${n.line}  <${n.icon}/>`).join("\n");
+    expect(nameless, `Icon-only links with no accessible name:\n${report}`).toEqual([]);
+  });
+
+  it("names the destination, not just the direction", () => {
+    // "Back" alone tells a screen-reader user the shape of the control, not
+    // where it goes — the same reason DEF-056's names had to say WHAT they
+    // delete rather than just "Delete".
+    const src = readFileSync("src/app/(admin)/endorsements/[id]/page.tsx", "utf8");
+    expect(src).toMatch(/aria-label="Back to endorsements"/);
+  });
+
+  it("the scanner detects a nameless one when it exists", () => {
+    const sample = `<Link href="/x" className="c"><ArrowLeft size={20} /></Link>`;
+    LINK_OPEN.lastIndex = 0;
+    const m = LINK_OPEN.exec(sample)!;
+    expect(/aria-label/.test(m[2])).toBe(false);
+    const body = sample.slice(m.index + m[0].length, sample.indexOf("</Link>"));
+    expect(body.replace(SELF_CLOSING_COMPONENT, "").trim()).toBe("");
+  });
+});

@@ -26,7 +26,11 @@ const NAV_GROUPS: NavGroup[] = [
     label: "My Group",
     items: [
       { label: "Roster", href: "/hr/roster", icon: Users },
-      { label: "Endorsement Requests", href: "/hr/endorsements", icon: FileText },
+      // DEF-005: "endorsement" is insurer-internal vocabulary surfaced directly in
+      // the employer portal. The route stays; the label speaks the employer's
+      // language. HR files requests about their staff — they are not filing
+      // endorsements.
+      { label: "Membership Requests", href: "/hr/endorsements", icon: FileText },
     ],
   },
   {

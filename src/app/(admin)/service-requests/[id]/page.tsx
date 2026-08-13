@@ -24,7 +24,7 @@ export default async function ResolveServiceRequestPage({ params }: { params: Pr
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <Link href="/service-requests" className="text-brand-text-muted hover:text-brand-indigo transition-colors shrink-0">
+        <Link href="/service-requests" className="text-brand-text-muted hover:text-brand-indigo transition-colors shrink-0" aria-label="Back to service requests">
           <ArrowLeft size={20} />
         </Link>
         <div>

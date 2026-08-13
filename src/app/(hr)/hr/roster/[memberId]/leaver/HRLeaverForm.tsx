@@ -74,7 +74,7 @@ export function HRLeaverForm({
   return (
     <div className="space-y-6 max-w-2xl">
       <div className="flex items-center gap-3">
-        <Link href={`/hr/roster/${memberId}`} className="text-brand-text-muted hover:text-brand-text-heading transition-colors">
+        <Link href={`/hr/roster/${memberId}`} className="text-brand-text-muted hover:text-brand-text-heading transition-colors" aria-label="Back to roster">
           <ArrowLeft size={22} />
         </Link>
         <div>

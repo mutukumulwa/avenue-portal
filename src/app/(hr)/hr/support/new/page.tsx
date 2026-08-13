@@ -9,7 +9,7 @@ export default async function NewServiceRequestPage() {
   return (
     <div className="p-6 max-w-3xl mx-auto space-y-6">
       <div className="flex items-center gap-3 mb-6">
-        <Link href="/hr/support" className="text-brand-text-muted hover:text-brand-indigo transition-colors shrink-0">
+        <Link href="/hr/support" className="text-brand-text-muted hover:text-brand-indigo transition-colors shrink-0" aria-label="Back to support">
           <ArrowLeft size={20} />
         </Link>
         <div>

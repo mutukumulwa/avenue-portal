@@ -91,7 +91,7 @@ export default async function RateMatrixDetailPage({ params }: { params: Promise
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/packages/rate-matrix" className="text-brand-text-muted hover:text-brand-indigo transition-colors">
+          <Link href="/packages/rate-matrix" className="text-brand-text-muted hover:text-brand-indigo transition-colors" aria-label="Back to the rate matrix">
             <ArrowLeft size={20} />
           </Link>
           <div>

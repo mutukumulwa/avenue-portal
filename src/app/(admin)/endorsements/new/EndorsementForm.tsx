@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import React, { useState, useMemo, useId } from "react";
 import Link from "next/link";
 import { ArrowLeft, Save, Calculator, AlertCircle } from "lucide-react";
 import { submitEndorsementAction } from "./actions";
@@ -51,8 +51,26 @@ function inputCls() {
   return "w-full border border-[#EEEEEE] rounded-[8px] px-3 py-2 text-sm text-brand-text-heading focus:ring-2 focus:ring-brand-indigo focus:border-brand-indigo outline-none transition-all bg-white";
 }
 function labelCls() { return "block text-xs font-bold text-brand-text-muted uppercase mb-1"; }
+/**
+ * UAT-HF P11.01 (DEF-074) — a label that is programmatically bound, not merely
+ * adjacent.
+ *
+ * "Labels are visually associated but not programmatically bound on some
+ * selects", so an accessibility tree reported controls "announced only as
+ * 'combobox' with no indication of what they select".
+ *
+ * Binding it in the wrapper rather than at each call site fixes every field in
+ * this form at once — and, more usefully, means the next field added here is
+ * named by construction instead of by remembering. `useId` keeps ids unique if
+ * the same field name is rendered twice (this form does render `memberId` in
+ * four different type branches).
+ */
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div><label className={labelCls()}>{label}</label>{children}</div>;
+  const uid = useId();
+  const child = React.isValidElement(children)
+    ? React.cloneElement(children as React.ReactElement<{ id?: string }>, { id: uid })
+    : children;
+  return <div><label htmlFor={uid} className={labelCls()}>{label}</label>{child}</div>;
 }
 
 export function EndorsementForm({
@@ -118,7 +136,11 @@ export function EndorsementForm({
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
-        <Link href="/endorsements" className="text-brand-text-muted hover:text-brand-indigo transition-colors">
+        <Link
+          href="/endorsements"
+          aria-label="Back to endorsements"
+          className="text-brand-text-muted hover:text-brand-indigo transition-colors"
+        >
           <ArrowLeft size={20} />
         </Link>
         <div>
@@ -528,9 +550,12 @@ export function EndorsementForm({
             wrote one. The Notes box below invited approval references and
             the gate never read it — which is exactly how the run was misled. */}
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-3">
-          <h2 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2">
+          <label
+            htmlFor="sourceReference"
+            className="block font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2"
+          >
             {EVIDENCE_LABEL}{needsEvidence && <span className="text-[#DC3545]"> *</span>}
-          </h2>
+          </label>
           <p className="text-xs text-brand-text-muted">{EVIDENCE_HELP}</p>
           <input
             id="sourceReference"
@@ -551,10 +576,14 @@ export function EndorsementForm({
 
         {/* ── Notes ────────────────────────────────────── */}
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-3">
-          <h2 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2">
+          <label
+            htmlFor="endorsement-notes"
+            className="block font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2"
+          >
             Additional Notes
-          </h2>
+          </label>
           <textarea
+            id="endorsement-notes"
             name="notes"
             rows={3}
             placeholder="Any extra context or special instructions…"

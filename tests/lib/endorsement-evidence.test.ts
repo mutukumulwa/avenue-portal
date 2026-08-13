@@ -176,12 +176,15 @@ describe("P08.03 the review page stops promising an approval it cannot deliver",
     expect(page).toMatch(/Authorising document recorded/);
   });
 
-  it("hides BOTH approve controls when the gate must refuse", () => {
-    // There are two: the header "Approve & Apply" on the legacy engine, and the
-    // amendment-engine "Approve". The run pressed the header one. Gating only
-    // one would leave the dead end in place.
+  it("hides the approve control when the gate must refuse", () => {
+    // P08.03 gated BOTH approve controls, because there were two: the header
+    // "Approve & Apply" on the legacy engine and the amendment-engine
+    // "Approve". P08.02 (DEF-047) then removed the duplicate — a checker who
+    // cannot tell two identical-looking buttons apart has not been told what
+    // they are doing. So one gated control is now the correct state.
     const gated = page.match(/!evidenceMissing/g) ?? [];
-    expect(gated.length).toBeGreaterThanOrEqual(2);
+    expect(gated.length).toBe(1);
+    expect(page).toContain("approveAmendmentAction");
   });
 
   it("tells the checker why, and that they may not supply it themselves", () => {

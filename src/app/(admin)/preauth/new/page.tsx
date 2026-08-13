@@ -34,7 +34,7 @@ export default async function NewPreAuthPage({
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div className="flex items-center space-x-4">
-        <Link href="/preauth" className="text-brand-text-body hover:text-brand-text-heading transition-colors">
+        <Link href="/preauth" className="text-brand-text-body hover:text-brand-text-heading transition-colors" aria-label="Back to pre-authorisations">
           <ArrowLeft size={24} />
         </Link>
         <div>

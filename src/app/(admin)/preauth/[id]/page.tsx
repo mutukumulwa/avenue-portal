@@ -80,7 +80,7 @@ export default async function PreAuthDetailPage({ params }: { params: Promise<{ 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
       <div className="flex items-center space-x-4">
-        <Link href="/preauth" className="text-brand-text-body hover:text-brand-text-heading transition-colors">
+        <Link href="/preauth" className="text-brand-text-body hover:text-brand-text-heading transition-colors" aria-label="Back to pre-authorisations">
           <ArrowLeft size={24} />
         </Link>
         <div className="flex-1">

@@ -73,7 +73,7 @@ export default async function FraudCasePage({
     <div className="max-w-5xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-start gap-3">
-        <Link href="/fraud" className="text-brand-text-muted hover:text-brand-indigo transition-colors mt-1">
+        <Link href="/fraud" className="text-brand-text-muted hover:text-brand-indigo transition-colors mt-1" aria-label="Back to fraud">
           <ArrowLeft size={20} />
         </Link>
         <div className="flex-1">

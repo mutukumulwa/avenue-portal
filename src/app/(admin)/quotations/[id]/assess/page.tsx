@@ -57,7 +57,7 @@ export default async function AssessPage({ params }: { params: Promise<{ id: str
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/quotations" className="text-brand-text-muted hover:text-brand-indigo transition-colors">
+          <Link href="/quotations" className="text-brand-text-muted hover:text-brand-indigo transition-colors" aria-label="Back to quotations">
             <ArrowLeft size={20} />
           </Link>
           <div>

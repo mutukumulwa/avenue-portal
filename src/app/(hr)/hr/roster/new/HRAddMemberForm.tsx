@@ -74,7 +74,7 @@ export function HRAddMemberForm() {
         </div>
         <h2 className="text-xl font-bold text-brand-text-heading font-heading mb-2">Request Submitted</h2>
         <p className="text-sm text-brand-text-body mb-6">
-          Your endorsement request <strong>{state.endorsementNumber}</strong> has been successfully submitted to Medvex for processing.
+          Your request <strong>{state.endorsementNumber}</strong> has been sent to your scheme administrator for review.
         </p>
         {state.resultingCoverStart && (
           <p className="mb-6 text-sm font-semibold text-brand-text-heading">

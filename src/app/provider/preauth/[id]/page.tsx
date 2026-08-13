@@ -63,7 +63,7 @@ export default async function ProviderPreauthDetail({ params }: { params: Promis
   return (
     <div className="space-y-6 max-w-4xl">
       <div className="flex items-center gap-3">
-        <Link href="/provider/preauth" className="text-brand-text-muted hover:text-brand-text-heading"><ArrowLeft size={20} /></Link>
+        <Link href="/provider/preauth" className="text-brand-text-muted hover:text-brand-text-heading" aria-label="Back to pre-authorisations"><ArrowLeft size={20} /></Link>
         <div className="flex-1">
           <h1 className="text-2xl font-bold text-brand-text-heading font-heading font-mono">{pa.preauthNumber}</h1>
           <p className="text-brand-text-muted text-sm">{pa.member.firstName} {pa.member.lastName} · {pa.member.memberNumber}</p>

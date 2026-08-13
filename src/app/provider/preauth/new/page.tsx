@@ -28,7 +28,7 @@ export default async function ProviderNewPreauth({
   return (
     <div className="space-y-6 max-w-4xl">
       <div className="flex items-center gap-3">
-        <Link href="/provider/preauth" className="text-brand-text-muted hover:text-brand-text-heading"><ArrowLeft size={20} /></Link>
+        <Link href="/provider/preauth" className="text-brand-text-muted hover:text-brand-text-heading" aria-label="Back to pre-authorisations"><ArrowLeft size={20} /></Link>
         <div>
           <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Request pre-authorization</h1>
           <p className="text-brand-text-muted text-sm">Submit a pre-authorization request for review by the TPA.</p>

@@ -23,7 +23,7 @@ export default function PackageBuilder() {
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div className="flex items-center space-x-4">
-        <Link href="/packages" className="text-[#848E9F] hover:text-brand-text-heading transition-colors">
+        <Link href="/packages" className="text-[#848E9F] hover:text-brand-text-heading transition-colors" aria-label="Back to packages">
           <ArrowLeft size={24} />
         </Link>
         <div>

@@ -308,7 +308,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
       {/* Page header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <Link href="/members" className="text-brand-text-muted hover:text-brand-indigo transition-colors shrink-0">
+          <Link href="/members" className="text-brand-text-muted hover:text-brand-indigo transition-colors shrink-0" aria-label="Back to members">
             <ArrowLeft size={20} />
           </Link>
           <div className="bg-white p-1.5 rounded-lg border border-[#EEEEEE] shadow-sm shrink-0 hidden md:block">

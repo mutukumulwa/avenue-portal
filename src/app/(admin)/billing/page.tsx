@@ -159,7 +159,7 @@ export default async function BillingPage() {
                         dueDate: new Date(inv.dueDate).toLocaleDateString("en-UG"),
                         issuedDate: new Date(inv.createdAt).toLocaleDateString("en-UG"),
                       }} />
-                      <Link href={`/billing/gl/ledger?account=1100`} className="text-brand-indigo hover:text-brand-secondary font-semibold inline-flex items-center gap-1 text-sm">
+                      <Link href={`/billing/gl/ledger?account=1100`} className="text-brand-indigo hover:text-brand-secondary font-semibold inline-flex items-center gap-1 text-sm" aria-label="Back to the general ledger">
                         <ArrowRight size={14} />
                       </Link>
                     </div>
