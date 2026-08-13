@@ -8,7 +8,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const requireRole = vi.hoisted(() =>
-  vi.fn(async () => ({ user: { id: "mo-1", tenantId: "t1" } })),
+  // UAT-HF P07.02: a real session always carries a role, and the lifecycle
+  // policy now decides on it. Omitting it here made the fixture fail closed —
+  // correct behaviour, incomplete fixture.
+  vi.fn(async () => ({ user: { id: "mo-1", tenantId: "t1", role: "MEMBER_OPS" } })),
 );
 vi.mock("@/lib/rbac", () => ({ requireRole, ROLES: { MEMBER_OPS: ["MEMBER_OPS"] } }));
 vi.mock("@/lib/audit", () => ({ writeAudit: vi.fn(async () => undefined) }));
@@ -226,18 +229,52 @@ describe("P05.05 a status change is its own command, with a reason", () => {
   });
 
   it("applies with a reason", async () => {
-    findFirst.mockResolvedValue({ status: "ACTIVE", firstName: "A", lastName: "B" });
+    findFirst.mockResolvedValue({ status: "ACTIVE", version: 2, firstName: "A", lastName: "B" });
     const result = await changeMemberStatusAction(
       "m1",
       null,
       statusForm({ status: "SUSPENDED", reason: "Non-payment, per finance ticket 4821" }),
     );
     expect(result.ok).toBe(true);
-    expect(changeStatus).toHaveBeenCalledWith("t1", "m1", "SUSPENDED");
+    // P07.02: the version travels to the service as an optimistic precondition,
+    // and suspension ends no cover so it needs no effective date.
+    expect(changeStatus).toHaveBeenCalledWith("t1", "m1", "SUSPENDED", {
+      effectiveAt: undefined,
+      expectedVersion: 2,
+    });
+  });
+
+  it("P07.02: refuses a role the lifecycle policy does not name", async () => {
+    // Fail closed. A session whose role matches no policy entry cannot act,
+    // rather than falling through to a permissive default.
+    requireRole.mockResolvedValueOnce({ user: { id: "mo-1", tenantId: "t1", role: "BROKER" } });
+    findFirst.mockResolvedValue({ status: "ACTIVE", version: 2, firstName: "A", lastName: "B" });
+    const result = await changeMemberStatusAction(
+      "m1",
+      null,
+      statusForm({ status: "SUSPENDED", reason: "Non-payment, per finance ticket 4821" }),
+    );
+    expect(result.ok).toBe(false);
+    expect(changeStatus).not.toHaveBeenCalled();
+  });
+
+  it("P07.02: refuses termination with no checker", async () => {
+    // The policy requires a second person. There is no UI for this yet
+    // (P07.03), which is precisely why enforcing it now costs nothing.
+    findFirst.mockResolvedValue({ status: "ACTIVE", version: 2, firstName: "A", lastName: "B" });
+    const result = await changeMemberStatusAction(
+      "m1",
+      null,
+      statusForm({ status: "TERMINATED", reason: "Left the scheme on 31 August" }),
+    );
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unreachable");
+    expect(result.message).toMatch(/second person/i);
+    expect(changeStatus).not.toHaveBeenCalled();
   });
 
   it("refuses a governed terminal state with an explanation, not a crash", async () => {
-    findFirst.mockResolvedValue({ status: "TERMINATED", firstName: "A", lastName: "B" });
+    findFirst.mockResolvedValue({ status: "TERMINATED", version: 2, firstName: "A", lastName: "B" });
     const result = await changeMemberStatusAction(
       "m1",
       null,
@@ -246,12 +283,14 @@ describe("P05.05 a status change is its own command, with a reason", () => {
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error("unreachable");
     expect(result.kind).toBe("FORBIDDEN");
-    expect(result.message).toMatch(/governed lifecycle state/i);
+    // P07.02 reworded this: the policy table answers with what the operator can
+    // do about it rather than naming the internal state category.
+    expect(result.message).toMatch(/already ended|separate governed process/i);
     expect(changeStatus).not.toHaveBeenCalled();
   });
 
   it("is a no-op when the status is already what was asked for", async () => {
-    findFirst.mockResolvedValue({ status: "ACTIVE", firstName: "A", lastName: "B" });
+    findFirst.mockResolvedValue({ status: "ACTIVE", version: 2, firstName: "A", lastName: "B" });
     const result = await changeMemberStatusAction(
       "m1",
       null,

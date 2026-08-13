@@ -32,7 +32,8 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { StaleMemberTransitionError, MembersService } from "@/server/services/members.service";
 import { writeAudit } from "@/lib/audit";
-import { memberTransitionAuditAction, canEditTransition } from "@/lib/member-status";
+import { memberTransitionAuditAction } from "@/lib/member-status";
+import { evaluateTransition, type MemberStatusValue } from "@/lib/member-lifecycle-policy";
 import {
   mutationConflict,
   mutationFail,
@@ -300,6 +301,12 @@ export async function changeMemberStatusAction(
 
   const nextStatus = String(formData.get("status") ?? "").trim() as MemberStatus;
   const reason = String(formData.get("reason") ?? "").trim();
+  // UAT-HF P07.02: the fields the P07.01 command specifies. This action has no
+  // UI caller yet (P07.03 builds the confirmation surface), so enforcing the
+  // full policy now costs nothing and means that surface gets built against the
+  // real contract rather than against a laxer one it would then have to tighten.
+  const lastCoveredDay = String(formData.get("lastCoveredDay") ?? "").trim();
+  const checkerId = String(formData.get("checkerId") ?? "").trim();
 
   if (!nextStatus) {
     return mutationFail("VALIDATION", { correlationId, message: "Choose the new status." });
@@ -317,7 +324,7 @@ export async function changeMemberStatusAction(
   try {
     const member = await prisma.member.findFirst({
       where: { id: memberId, tenantId },
-      select: { status: true, firstName: true, lastName: true },
+      select: { status: true, version: true, firstName: true, lastName: true },
     });
     if (!member) {
       return mutationFail("VALIDATION", { correlationId, message: "That member no longer exists." });
@@ -325,10 +332,43 @@ export async function changeMemberStatusAction(
     if (member.status === nextStatus) {
       return mutationOk(memberId, { data: { from: member.status, to: nextStatus } });
     }
-    if (!canEditTransition(member.status, nextStatus)) {
-      return mutationFail("FORBIDDEN", {
+
+    // UAT-HF P07.02 — the P07.01 policy table decides, not `canEditTransition`.
+    //
+    // `canEditTransition` models what the EDIT DROPDOWN may do. It cannot say
+    // who may act, whether a checker is required, or that a cover-ending change
+    // needs a last covered day — the three questions that let each screen grow
+    // its own ruleset, which is the shape behind all eight P07.01 defects.
+    const decision = evaluateTransition(
+      {
+        memberId,
+        fromStatus: member.status as MemberStatusValue,
+        fromVersion: member.version,
+        toStatus: nextStatus as MemberStatusValue,
+        reasonNote: reason,
+        lastCoveredDay: lastCoveredDay || undefined,
+        requestedAt: new Date(),
+        makerId: session.user.id,
+        // An absent role can match no policy entry, so it refuses rather than
+        // falling through to a permissive default.
+        makerRole: session.user.role ?? "",
+        checkerId: checkerId || undefined,
+        idempotencyKey: correlationId,
+      },
+      {
+        // This action IS the governed command — it is not the profile form.
+        channel: "GOVERNED_FLOW",
+        currentStatus: member.status as MemberStatusValue,
+        currentVersion: member.version,
+      },
+    );
+
+    if (!decision.allowed) {
+      // Staleness is a CONFLICT the operator can resolve by reloading;
+      // everything else is a refusal of the request as made.
+      return mutationFail(decision.refusal === "STALE" ? "CONFLICT" : "FORBIDDEN", {
         correlationId,
-        message: `${member.status} is a governed lifecycle state. Use the dedicated reinstatement or termination flow instead of a status change.`,
+        message: decision.message,
       });
     }
 
@@ -336,7 +376,12 @@ export async function changeMemberStatusAction(
     // update. A lost race raises StaleMemberTransitionError rather than
     // silently overwriting somebody else's change.
     try {
-      await MembersService.changeStatus(tenantId, memberId, nextStatus);
+      await MembersService.changeStatus(tenantId, memberId, nextStatus, {
+        // DEC-12: the operator's date is the last covered day, and the coverage
+        // period must close on it rather than on the click.
+        effectiveAt: lastCoveredDay ? new Date(`${lastCoveredDay}T00:00:00Z`) : undefined,
+        expectedVersion: member.version,
+      });
     } catch (err) {
       if (err instanceof StaleMemberTransitionError) {
         return mutationFail("CONFLICT", { correlationId, message: err.message });

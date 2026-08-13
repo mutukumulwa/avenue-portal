@@ -1534,7 +1534,7 @@ is exactly the field users get wrong and off-by-one is a day of claims.
 | **Tests added** | `tests/services/member-status-atomicity.test.ts` (14) |
 | **Evidence** | `src/server/services/members.service.ts`, member edit action |
 | **Feature flags** | none. |
-| **Remaining risks** | **P07.01's policy table is still not the decision-maker.** `changeStatus` continues to validate with `canEditTransition`, so roles, checkers and the DEC-12 date requirement are *not* enforced on the write path — a `MEMBER_OPS` user can still terminate with no checker. Wiring `evaluateTransition` in is the rest of P07.02 and is not done. **No `DomainEvent`, outbox row or operation receipt is written inside the transaction**, so P07.02's "persist event/outbox/receipt" limb is unmet; the audit row is still written by the action *after* the transaction commits, which means a crash in between loses the trail for a change that happened. `effectiveAt` is plumbed but **no caller passes it yet** — the edit action has no date field — so back-dating is possible in the service and not yet reachable from the UI. Only the member-status path was made atomic; contract, package and endorsement transitions were not audited for the same shape. |
+| **Remaining risks** | ~~P07.01's policy table is still not the decision-maker.~~ *Closed in the follow-up commit below.* **No `DomainEvent`, outbox row or operation receipt is written inside the transaction**, so P07.02's "persist event/outbox/receipt" limb is unmet; the audit row is still written by the action *after* the transaction commits, which means a crash in between loses the trail for a change that happened. `effectiveAt` is plumbed but **no caller passes it yet** — the edit action has no date field — so back-dating is possible in the service and not yet reachable from the UI. Only the member-status path was made atomic; contract, package and endorsement transitions were not audited for the same shape. |
 
 **Three faults, and the middle one is a money bug.**
 
@@ -1567,6 +1567,43 @@ updated row, which broke two existing suites whose transaction mocks did not
 carry that method. The right answer was not to widen the mocks: the conditional
 update had just succeeded, so the row's status is known without asking, and the
 query was a round trip inside a transaction to learn something already in hand.
+
+### P07.02 (follow-up) — the policy table becomes the decision-maker
+
+| Field | Value |
+|---|---|
+| **Task** | P07.02 — wiring P07.01's table into the write path |
+| **Defect IDs** | DEF-040, DEF-041, DEF-042, DEF-043, DEF-059, DEF-081 |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/actions/member-profile-edit.test.ts` +2 |
+| **Evidence** | `src/app/(admin)/members/[id]/edit/actions.ts` |
+| **Feature flags** | none. |
+| **Remaining risks** | **`changeMemberStatusAction` still has no UI caller** — that is P07.03, and it now has to supply a checker and a last covered day for any cover-ending transition, which is the point. Until it exists, lifecycle changes remain unavailable from the admin UI (the trade P05.05 recorded). The event/outbox/receipt limb is still unmet. `MembersService.changeStatus` retains its own `canEditTransition` guard as a second line — belt and braces, but it means the service alone would still permit a termination the policy refuses if a *different* caller reached it. |
+
+**Enforcing the policy cost nothing, because nothing calls this action yet.**
+`changeMemberStatusAction` has no UI caller — P05.05 recorded exactly that, and
+it is why P07.03 exists. So the strict contract can go in now, and P07.03's
+confirmation surface gets built against the real one rather than against a laxer
+version it would later have to tighten. Tightening a contract people already use
+is how capabilities get removed by surprise.
+
+**`canEditTransition` was never able to answer the questions that mattered.** It
+models what the edit dropdown may do. It cannot say who may act, whether a
+checker is required, or that a cover-ending change needs a last covered day —
+the three unanswered questions that let each screen grow its own ruleset, which
+is the shape behind all eight P07.01 defects.
+
+**A missing role fails closed, and a test proved it before I wrote one.** The
+existing action test's session fixture carried `{ id, tenantId }` and no role.
+With the policy wired in, `makerRole` fell back to `""`, matched no entry, and
+the transition was refused — the suite went red for the right reason. The
+fixture was incomplete (a real session always has a role); the behaviour was
+correct, and there is now an explicit test for a role the table does not name.
+
+**Termination without a checker is refused end to end.** Asserted at the action
+rather than only in the policy unit test, because the gap between "the table
+says so" and "the write path asks the table" is exactly what this commit closes.
 
 ### P03.06 — the policy parity gate
 
