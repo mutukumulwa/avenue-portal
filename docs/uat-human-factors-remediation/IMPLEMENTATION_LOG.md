@@ -1436,7 +1436,7 @@ That is a flex item's default `min-width: auto`. The wrapper cannot shrink below
 | **Tests added** | `tests/lib/member-policy-copy.test.ts` +10 |
 | **Evidence** | `prisma/schema.prisma`, `src/lib/member-policy-copy.ts`, package detail + edit surfaces |
 | **Feature flags** | none. |
-| **Remaining risks** | **No caller passes the new anchors yet.** `waitingPeriodStatus` accepts `dependantJoinDate`, `reinstatementDate` and `approvedBasisDate`, but the member and provider read paths still supply only `coverStartDate` — so a benefit configured as DEPENDANT_JOIN or REINSTATEMENT today resolves as `unresolved` on those surfaces rather than computing a date. That is the safe direction (it says it cannot answer instead of answering wrongly) but it means **the acceptance — "same rule/date yields identical eligible date in package, member, provider, and claim/preauth tests" — is not yet demonstrable for the three non-default bases**. Wiring `MemberCoveragePeriod` and the member's own `coverStartDate` into those callers is the remaining work. `OTHER_APPROVED` has no field to hold the approved date at all; it is accepted, stored, and always reports unresolved until one exists. |
+| **Remaining risks** | ~~No caller passes the new anchors yet.~~ *Closed in the follow-up commit below.* **`OTHER_APPROVED` has no field to hold the approved date**, so it is accepted, stored, and always reports unresolved — it is a placeholder for a decision nobody has made, not a working basis. The **provider** and **claim/preauth** paths still evaluate waits without the basis, so P09.03's acceptance — "same rule/date yields identical eligible date in package, member, provider, and claim/preauth tests" — is demonstrable for package and member only. |
 
 **A duration with no basis is not a rule.** The run's words: "The product never
 states what the 270 days run FROM — cover start, enrolment date, policy
@@ -1468,6 +1468,37 @@ to COVER_START rather than being written through.
 periods run from X" heading was correct only while the basis was hard-coded;
 now that it varies per benefit, one line for the card would be wrong for any
 benefit configured differently from the first.
+
+### P09.03 (follow-up) — the member read path supplies the anchors
+
+| Field | Value |
+|---|---|
+| **Task** | P09.03 — closing the gap the previous commit recorded |
+| **Defect IDs** | DEF-022 (S3), DEF-061 (S2) |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/lib/member-policy-copy.test.ts` +5 |
+| **Evidence** | `src/server/services/member-app.service.ts` (4 query sites), `src/lib/member-policy-copy.ts` |
+| **Feature flags** | none. |
+| **Remaining risks** | Provider and claim/preauth evaluation still ignore the basis. `OTHER_APPROVED` still has nowhere to read an approved date from. The four joins were added to every query feeding `buildBenefitStates`, and a **count assertion** pins that — a fifth read path added later without the join would degrade silently to the single-date behaviour, and only that test would notice. |
+
+**A basis nobody passes is a label, not a rule.** The previous commit shipped the
+column, the evaluator and the authoring control, and left every caller supplying
+`coverStartDate` alone — so a benefit configured DEPENDANT_JOIN resolved as
+`unresolved` on the member's own benefit view. Safe, but not finished.
+
+**The distinction is a join, and it is the whole point.** COVER_START means the
+*policy's* start; for a dependant added mid-year their own start is later. Both
+now travel to the evaluator, from `principal.coverStartDate` and the member's
+own `coverStartDate` respectively. Where the principal is not loaded the code
+falls back to the member's own date — exactly the pre-P09.03 behaviour — so a
+read path without the join cannot regress, it merely cannot tell the two apart.
+
+**An unresolved wait now produces a note.** `policyNotesForCategory` previously
+pushed a WAITING note only when `waiting.waiting` was true, which meant a
+configured wait with a missing basis date rendered *nothing at all* — putting
+the member back exactly where DEF-061 found them, looking at a benefit that
+appears immediately usable when nobody knows.
 
 ### P09.06 (completion) — migration control on archive
 

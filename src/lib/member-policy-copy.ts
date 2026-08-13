@@ -258,6 +258,10 @@ export function exclusionNotesFor(
 export function policyNotesForCategory(input: {
   category: string;
   waitingPeriodDays?: number | null;
+  /** P09.03 — which date the wait runs from (DEF-022). */
+  waitingPeriodBasis?: WaitingPeriodBasisValue;
+  /** P09.03 — the other dates a non-default basis needs. */
+  anchors?: WaitingPeriodAnchors;
   coverStartDate?: Date | string | null;
   referralRules?: readonly ReferralRuleLike[];
   exclusionRules?: readonly ExclusionRuleLike[];
@@ -266,12 +270,18 @@ export function policyNotesForCategory(input: {
   const now = input.now ?? new Date();
   const waiting = waitingPeriodStatus({
     waitingPeriodDays: input.waitingPeriodDays,
+    waitingPeriodBasis: input.waitingPeriodBasis,
+    anchors: input.anchors,
     coverStartDate: input.coverStartDate,
     now,
   });
 
   const notes: PolicyNote[] = [];
-  if (waiting.waiting) notes.push({ kind: "WAITING", text: waiting.label });
+  // P09.03: an UNRESOLVED wait must be said out loud too. A configured wait
+  // whose basis date is missing produces no eligible date, and rendering
+  // nothing would put the member back where DEF-061 found them — a benefit
+  // that looks immediately usable when in fact nobody knows.
+  if (waiting.waiting || waiting.unresolved) notes.push({ kind: "WAITING", text: waiting.label });
   notes.push(...referralNotesFor(input.referralRules ?? [], input.category, now));
   notes.push(...exclusionNotesFor(input.exclusionRules ?? [], input.category, now));
 

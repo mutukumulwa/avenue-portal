@@ -409,3 +409,51 @@ describe("P09.03 waiting-period basis", () => {
     expect(resolveWaitingPeriodAnchor("OTHER_APPROVED", anchors)).toBeNull();
   });
 });
+
+/**
+ * UAT-HF P09.03 — the member read path actually supplies the anchors.
+ *
+ * The first P09.03 commit added the basis and the evaluator but left every
+ * caller passing `coverStartDate` alone, so a DEPENDANT_JOIN or REINSTATEMENT
+ * benefit resolved as `unresolved` on the surfaces that matter. That is the
+ * safe direction, not a finished one.
+ */
+describe("P09.03 the member benefit view carries the basis", () => {
+  const service = readFileSync("src/server/services/member-app.service.ts", "utf8");
+
+  it("passes the benefit's own basis, not one assumed for the member", () => {
+    expect(service).toContain("waitingPeriodBasis: benefit.waitingPeriodBasis");
+  });
+
+  it("distinguishes the policy start from the member's own", () => {
+    // A dependant added mid-year has a later start than the family policy.
+    // Collapsing the two would make DEPENDANT_JOIN a label rather than a rule.
+    expect(service).toContain("member.principal?.coverStartDate ?? member.coverStartDate");
+    expect(service).toContain("dependantJoinDate: member.coverStartDate");
+  });
+
+  it("joins the principal and the coverage periods on every benefit read", () => {
+    // Four call sites feed buildBenefitStates; a query that omits the join
+    // silently degrades to the old single-date behaviour.
+    expect(service.split("principal: { select: { coverStartDate: true } }").length - 1).toBe(4);
+    expect(service.split('coveragePeriods: { select: { startDate: true, reason: true }').length - 1).toBe(4);
+  });
+
+  it("does not invent an approved basis date", () => {
+    expect(service).toContain("approvedBasisDate: null");
+  });
+
+  it("an unresolved wait still produces a member-facing note", () => {
+    // Rendering nothing would put the member back where DEF-061 found them:
+    // a benefit that looks immediately usable when nobody knows.
+    const { notes, waiting } = policyNotesForCategory({
+      category: "MATERNITY",
+      waitingPeriodDays: 270,
+      waitingPeriodBasis: "OTHER_APPROVED",
+      coverStartDate: "2026-01-01T00:00:00Z",
+      now: new Date("2026-08-13T00:00:00Z"),
+    });
+    expect(waiting.unresolved).toBe(true);
+    expect(notes.some((n) => n.kind === "WAITING")).toBe(true);
+  });
+});

@@ -17,6 +17,8 @@ type BenefitConfigLike = {
   perVisitLimit: unknown | null;
   copayPercentage: unknown;
   waitingPeriodDays: number;
+  /** UAT-HF P09.03 — what the wait is measured from (DEF-022). */
+  waitingPeriodBasis?: "COVER_START" | "DEPENDANT_JOIN" | "REINSTATEMENT" | "OTHER_APPROVED";
   notes: string | null;
   exclusions: string[];
 };
@@ -84,6 +86,21 @@ function buildBenefitStates(
     enrollmentDate: Date;
     /** P09.07: waiting periods run from cover start, falling back to enrolment. */
     coverStartDate?: Date | null;
+    /**
+     * UAT-HF P09.03 — the non-default waiting-period anchors (DEF-022).
+     *
+     * `principalCoverStartDate` is the family policy's start; this member's own
+     * `coverStartDate` is later when they were added mid-year, and a benefit
+     * configured DEPENDANT_JOIN must measure from the latter. Supplying both is
+     * what makes the two configurations actually different rather than a label.
+     */
+    principal?: { coverStartDate?: Date | null } | null;
+    /**
+     * Start of the current coverage period after a lapse (REINSTATEMENT).
+     * Absent on most reads; a REINSTATEMENT-based wait then reports that it
+     * cannot answer rather than measuring from the wrong date.
+     */
+    coveragePeriods?: Array<{ startDate: Date; reason: string | null }>;
     package: {
       annualLimit: unknown;
       currentVersion: {
@@ -165,6 +182,26 @@ function buildBenefitStates(
       policy: policyNotesForCategory({
         category: String(benefit.category),
         waitingPeriodDays: benefit.waitingPeriodDays,
+        // P09.03 (DEF-022): the basis is per-benefit now, so it travels with
+        // the benefit rather than being assumed once for the whole member.
+        waitingPeriodBasis: benefit.waitingPeriodBasis,
+        anchors: {
+          // COVER_START means the POLICY's start. For a principal the two are
+          // the same; for a dependant added mid-year they are not, and that
+          // difference is the entire point of the DEPENDANT_JOIN basis.
+          // Falls back to the member's own date when the principal is not
+          // loaded, which is exactly the pre-P09.03 behaviour — so a read path
+          // that has not been given the join cannot regress, it just cannot
+          // distinguish the two.
+          coverStartDate:
+            member.principal?.coverStartDate ?? member.coverStartDate ?? member.enrollmentDate,
+          dependantJoinDate: member.coverStartDate ?? member.enrollmentDate,
+          reinstatementDate:
+            member.coveragePeriods?.find((cp) => cp.reason === "REINSTATEMENT")?.startDate ?? null,
+          // No field holds a separately approved basis date yet, so
+          // OTHER_APPROVED reports that it cannot answer rather than guessing.
+          approvedBasisDate: null,
+        },
         coverStartDate: member.coverStartDate ?? member.enrollmentDate,
         referralRules: referralRules.map((r) => ({
           benefitCategories: r.benefitCategories.map(String),
@@ -271,6 +308,12 @@ export class MemberAppService {
           },
           },
         },
+        // UAT-HF P09.03 (DEF-022): the anchors a non-default waiting-period basis
+        // measures from. The principal's cover start is the POLICY date, distinct
+        // from a mid-year dependant's own; the reinstatement period is the anchor
+        // after a lapse. Absent joins fall back to the pre-P09.03 behaviour.
+        principal: { select: { coverStartDate: true } },
+        coveragePeriods: { select: { startDate: true, reason: true }, orderBy: { startDate: "desc" } },
         benefitUsages: {
           include: { benefitConfig: { select: { category: true, customCategoryName: true } } },
         },
@@ -383,6 +426,12 @@ export class MemberAppService {
             packageVersion: {
               include: { benefits: { orderBy: { category: "asc" } } },
             },
+            // UAT-HF P09.03 (DEF-022): the anchors a non-default waiting-period basis
+            // measures from. The principal's cover start is the POLICY date, distinct
+            // from a mid-year dependant's own; the reinstatement period is the anchor
+            // after a lapse. Absent joins fall back to the pre-P09.03 behaviour.
+            principal: { select: { coverStartDate: true } },
+            coveragePeriods: { select: { startDate: true, reason: true }, orderBy: { startDate: "desc" } },
             benefitUsages: {
               include: { benefitConfig: { select: { id: true, category: true, customCategoryName: true, annualSubLimit: true } } },
             },
@@ -575,6 +624,12 @@ export class MemberAppService {
           },
           },
         },
+        // UAT-HF P09.03 (DEF-022): the anchors a non-default waiting-period basis
+        // measures from. The principal's cover start is the POLICY date, distinct
+        // from a mid-year dependant's own; the reinstatement period is the anchor
+        // after a lapse. Absent joins fall back to the pre-P09.03 behaviour.
+        principal: { select: { coverStartDate: true } },
+        coveragePeriods: { select: { startDate: true, reason: true }, orderBy: { startDate: "desc" } },
         benefitUsages: {
           include: { benefitConfig: { select: { category: true } } },
         },
@@ -639,6 +694,12 @@ export class MemberAppService {
         packageVersion: {
           include: { benefits: { orderBy: { category: "asc" } } },
         },
+        // UAT-HF P09.03 (DEF-022): the anchors a non-default waiting-period basis
+        // measures from. The principal's cover start is the POLICY date, distinct
+        // from a mid-year dependant's own; the reinstatement period is the anchor
+        // after a lapse. Absent joins fall back to the pre-P09.03 behaviour.
+        principal: { select: { coverStartDate: true } },
+        coveragePeriods: { select: { startDate: true, reason: true }, orderBy: { startDate: "desc" } },
         benefitUsages: true,
         claims: {
           orderBy: { dateOfService: "desc" },
