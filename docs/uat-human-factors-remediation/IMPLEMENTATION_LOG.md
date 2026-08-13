@@ -1425,6 +1425,36 @@ That is a flex item's default `min-width: auto`. The wrapper cannot shrink below
 
 **34 wrappers, and a ratchet.** Every `overflow-x-auto` in `src/` now carries `min-w-0`, and a test walks the tree and fails on any that does not. One bare wrapper is one more table with unreachable columns, and the two classes only work as a pair.
 
+### P05.01 (completion) — the precondition reads the row version
+
+| Field | Value |
+|---|---|
+| **Task** | P05.01 — the `version` half |
+| **Defect IDs** | DEF-077 (S2) |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none — the column and its increment already shipped |
+| **Tests added** | `tests/lib/concurrency-version.test.ts` |
+| **Evidence** | `src/server/services/members.service.ts`, member edit form + page |
+| **Feature flags** | none. |
+| **Remaining risks** | Only the **member** edit path carries a version precondition. Client, package and contract edit forms still send `updatedAt` alone, so the same-millisecond window is open on those three. `matchesExpectedState` already compares versions when both sides supply one, so extending each is a two-line change per form — but it was not done here and must not be assumed. |
+
+**The column was being written and nothing read it.** `updateProfile` has
+incremented `version` since P04.05 — the comment there says so explicitly, "so a
+future precondition can use it instead of the millisecond-granular updatedAt" —
+but the `WHERE` clause matched on `updatedAt` only. The recorded risk was exact:
+"two saves inside the same millisecond would both pass".
+
+That is not a theoretical window. Two operators clicking Save on the same member
+from a queue, or one double-submit that beats React's own guard, land in the
+same millisecond often enough to matter — and the outcome is precisely DEF-077's
+complaint, a field reverted that neither operator intended to touch.
+
+**Both are compared, not one instead of the other.** A row last written by a
+code path that bumps `updatedAt` without touching `version` would otherwise slip
+through a version-only check. The version is applied only when the client sent
+one, so a form that has not been updated yet degrades to the previous behaviour
+rather than failing every save.
+
 ### P09.07 (completion) — the third member surface
 
 | Field | Value |

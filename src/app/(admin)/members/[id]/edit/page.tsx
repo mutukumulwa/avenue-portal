@@ -40,6 +40,7 @@ export default async function MemberEditPage({ params }: { params: Promise<{ id:
     // UAT-HF P05.05: the precondition travels with the copy the browser gets,
     // so the save can be rejected if the record moves in the meantime.
     updatedAt: member.updatedAt.toISOString(),
+    version: member.version,
   };
 
   return (

@@ -9,7 +9,7 @@ import { isTerminalMemberStatus } from "@/lib/member-status";
 import { ErrorSummary } from "@/components/forms/ErrorSummary";
 import { MutationOutcome } from "@/components/forms/MutationOutcome";
 import { ConflictNotice } from "@/components/forms/ConflictNotice";
-import { EXPECTED_UPDATED_AT_FIELD } from "@/lib/concurrency";
+import { EXPECTED_UPDATED_AT_FIELD, EXPECTED_VERSION_FIELD } from "@/lib/concurrency";
 import { EXAMPLES } from "@/lib/locale-config";
 import type { MutationResult } from "@/lib/mutation-contract";
 import { useDirtyFormGuard } from "@/components/forms/useDirtyFormGuard";
@@ -37,6 +37,8 @@ interface MemberSnap {
   id: string;
   /** UAT-HF P05.05 — the precondition. What this copy of the record looked like. */
   updatedAt: string; // ISO
+  /** P05.01 — monotonic row version, so same-millisecond saves still conflict. */
+  version: number;
   firstName: string;
   lastName: string;
   otherNames: string | null;
@@ -128,6 +130,9 @@ export function MemberEditForm({ member }: { member: MemberSnap }) {
       <form ref={formRef} action={action} onInput={onInput} onChange={onInput} className="space-y-6">
         {/* The precondition, and the copy this browser loaded. */}
         <input type="hidden" name={EXPECTED_UPDATED_AT_FIELD} value={member.updatedAt} />
+        {/* P05.01: `updatedAt` alone is millisecond-granular, so two saves
+            inside one millisecond both pass it. The row version is monotonic. */}
+        <input type="hidden" name={EXPECTED_VERSION_FIELD} value={member.version} />
         <input type="hidden" name="__original_firstName" value={member.firstName} />
         <input type="hidden" name="__original_lastName" value={member.lastName} />
         <input type="hidden" name="__original_otherNames" value={member.otherNames ?? ""} />

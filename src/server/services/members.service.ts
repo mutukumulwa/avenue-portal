@@ -570,7 +570,20 @@ export class MembersService {
         prisma.member.updateMany({
           // The precondition IS the WHERE clause. Reading the row and then
           // updating it leaves exactly the race this closes.
-          where: { id: memberId, tenantId, updatedAt: new Date(exp.updatedAt) },
+          //
+          // UAT-HF P05.01 completion: `version` is included when the client
+          // sent one. `updatedAt` is millisecond-granular, so two saves inside
+          // the same millisecond both matched it and the second silently
+          // overwrote the first — the exact DEF-077 failure the precondition
+          // exists to stop. The version column was already being incremented
+          // below; nothing read it. Both are compared, so a row written by an
+          // older code path that bumps only `updatedAt` is still caught.
+          where: {
+            id: memberId,
+            tenantId,
+            updatedAt: new Date(exp.updatedAt),
+            ...(exp.version !== undefined ? { version: exp.version } : {}),
+          },
           data,
         }),
       expected,
