@@ -19,6 +19,7 @@ import {
   detectExclusionOverlap,
 } from "@/lib/validation/exclusion";
 import { referralRuleSchema, detectReferralOverlap } from "@/lib/validation/referral";
+import { conflictIfAdded } from "@/lib/provider-precedence";
 import {
   ARCHIVE_ACKNOWLEDGEMENT_FIELD,
   describeArchiveImpact,
@@ -517,6 +518,37 @@ export async function createProviderEligibilityAction(
       select: { id: true },
     });
     if (!prov) return fail({ providerId: ["Provider not found."] });
+  }
+
+  // P09.05 / DEC-04 (DEF-054): refuse a rule that would make the answer depend
+  // on database return order. The ladder resolves a specific rule against a tier
+  // rule on its own; what it cannot resolve is two rules of the SAME standing
+  // pointing opposite ways, and saving that would leave an operator unable to
+  // tell whether a hospital is payable — the exact complaint in the run.
+  const siblings = await prisma.packageProviderEligibility.findMany({
+    where: { packageVersionId },
+    select: {
+      id: true,
+      providerId: true,
+      providerTier: true,
+      inclusionType: true,
+      priority: true,
+      effectiveFrom: true,
+      effectiveTo: true,
+      isActive: true,
+    },
+  });
+  const clash = conflictIfAdded(siblings, {
+    id: "__candidate__",
+    inclusionType,
+    providerId: providerId || null,
+    providerTier: providerTier || null,
+  });
+  if (clash) {
+    return fail(
+      undefined,
+      `This rule contradicts one already saved and neither would win. ${clash.message}`,
+    );
   }
 
   const rule = await prisma.packageProviderEligibility.create({

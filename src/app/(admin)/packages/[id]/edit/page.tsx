@@ -126,6 +126,13 @@ export default async function EditPackagePage({ params }: { params: Promise<{ id
             providerId: r.providerId,
             providerTier: r.providerTier,
             providerName: r.provider?.name ?? null,
+            // P09.05 — the manager applies the SAME precedence the evaluator
+            // does, so it needs the same inputs. A second ranking implemented in
+            // the UI is a second chance to disagree, which is DEF-054.
+            priority: r.priority,
+            effectiveFrom: r.effectiveFrom,
+            effectiveTo: r.effectiveTo,
+            isActive: r.isActive,
           }))}
           availableProviders={allProviders.map((p) => ({
             id: p.id,

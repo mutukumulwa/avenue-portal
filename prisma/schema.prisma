@@ -955,21 +955,21 @@ enum Gender {
 }
 
 model Member {
-  id                     String             @id @default(cuid())
-  tenantId               String
-  tenant                 Tenant             @relation(fields: [tenantId], references: [id])
-  memberNumber           String // e.g., AVH-2024-00001
-  groupId                String
-  group                  Group              @relation(fields: [groupId], references: [id])
-  firstName              String
-  lastName               String
-  otherNames             String?
-  idNumber               String? // National ID / Passport
-  dateOfBirth            DateTime
-  gender                 Gender
-  phone                  String?
-  email                  String?
-  photoUrl               String?
+  id                         String             @id @default(cuid())
+  tenantId                   String
+  tenant                     Tenant             @relation(fields: [tenantId], references: [id])
+  memberNumber               String // e.g., AVH-2024-00001
+  groupId                    String
+  group                      Group              @relation(fields: [groupId], references: [id])
+  firstName                  String
+  lastName                   String
+  otherNames                 String?
+  idNumber                   String? // National ID / Passport
+  dateOfBirth                DateTime
+  gender                     Gender
+  phone                      String?
+  email                      String?
+  photoUrl                   String?
   // ── UAT-HF P05.06 — structured Uganda member address (DEF-033) ────────────
   // Nullable and additive so existing members remain valid. The hierarchy uses
   // Uganda-facing labels in the UI: district; city/municipality/county;
@@ -982,23 +982,23 @@ model Member {
   addressParish              String?
   addressVillage             String?
   addressLine                String?
-  addressLatitude            Decimal? @db.Decimal(9, 6)
-  addressLongitude           Decimal? @db.Decimal(9, 6)
+  addressLatitude            Decimal?           @db.Decimal(9, 6)
+  addressLongitude           Decimal?           @db.Decimal(9, 6)
   addressCoordinateConsentAt DateTime?
-  relationship           MemberRelationship @default(PRINCIPAL)
-  principalId            String? // If dependent, links to principal member
-  principal              Member?            @relation("Dependents", fields: [principalId], references: [id])
-  dependents             Member[]           @relation("Dependents")
-  packageId              String // Inherited from group tier or set directly
-  package                Package            @relation(fields: [packageId], references: [id])
-  packageVersionId       String?
-  packageVersion         PackageVersion?    @relation(fields: [packageVersionId], references: [id])
-  benefitTierId          String? // Optional: links to a GroupBenefitTier
-  benefitTier            GroupBenefitTier?  @relation(fields: [benefitTierId], references: [id])
-  enrollmentDate         DateTime
-  activationDate         DateTime?
-  coverStartDate         DateTime? // set during binding (may differ from activationDate)
-  coverEndDate           DateTime?
+  relationship               MemberRelationship @default(PRINCIPAL)
+  principalId                String? // If dependent, links to principal member
+  principal                  Member?            @relation("Dependents", fields: [principalId], references: [id])
+  dependents                 Member[]           @relation("Dependents")
+  packageId                  String // Inherited from group tier or set directly
+  package                    Package            @relation(fields: [packageId], references: [id])
+  packageVersionId           String?
+  packageVersion             PackageVersion?    @relation(fields: [packageVersionId], references: [id])
+  benefitTierId              String? // Optional: links to a GroupBenefitTier
+  benefitTier                GroupBenefitTier?  @relation(fields: [benefitTierId], references: [id])
+  enrollmentDate             DateTime
+  activationDate             DateTime?
+  coverStartDate             DateTime? // set during binding (may differ from activationDate)
+  coverEndDate               DateTime?
   // ── WP-V1 (renewal transition, V-007) ─────────────────────
   // Benefit-period anchor. NULL (every pre-renewal member) → the usage math
   // anchors the annual period to the member's `enrollmentDate` anniversary
@@ -1008,23 +1008,23 @@ model Member {
   // rows (keyed by their own `periodStart`) stay intact as history. Additive,
   // nullable, forward-safe: `benefit-usage.service.ts` reads
   // `benefitPeriodAnchor ?? enrollmentDate`, so existing rows are unaffected.
-  benefitPeriodAnchor    DateTime?
+  benefitPeriodAnchor        DateTime?
   // WP-3.5F newborn (CT-033): date the birth was notified to the operator. A
   // newborn may be enrolled without a national ID and, when the birth is notified
   // within 30 days, is covered from the date of birth (coverStart = DOB). Additive
   // nullable column — pre-existing members are unaffected.
-  birthNotificationDate  DateTime?
-  status                 MemberStatus       @default(PENDING_ACTIVATION)
-  waitingPeriodEnd       DateTime? // General waiting period end
-  smartCardNumber        String? // SMART card number if integrated
-  slade360MemberId       String? // Slade360 member ID if integrated
+  birthNotificationDate      DateTime?
+  status                     MemberStatus       @default(PENDING_ACTIVATION)
+  waitingPeriodEnd           DateTime? // General waiting period end
+  smartCardNumber            String? // SMART card number if integrated
+  slade360MemberId           String? // Slade360 member ID if integrated
   // Binding provenance
-  underwritingDecisionId String? // links to UnderwritingDecision applied to this member
-  bindingMakerId         String?
-  bindingCheckerId       String?
-  quotationId            String? // source quotation
-  createdAt              DateTime           @default(now())
-  updatedAt              DateTime           @updatedAt
+  underwritingDecisionId     String? // links to UnderwritingDecision applied to this member
+  bindingMakerId             String?
+  bindingCheckerId           String?
+  quotationId                String? // source quotation
+  createdAt                  DateTime           @default(now())
+  updatedAt                  DateTime           @updatedAt
 
   // ── UAT-HF P05.01 — canonical identity and concurrency ─────────────────────
   // Deterministic keys the identity rules and the search are built on, so a
@@ -4416,6 +4416,20 @@ model PackageProviderEligibility {
   providerTier     ProviderTier?
   inclusionType    EligibilityRule
   createdAt        DateTime        @default(now())
+
+  // UAT-HF P09.05 / DEC-04 — deterministic precedence (DEF-054).
+  //
+  // Specificity is derived, not stored: a rule naming a provider outranks a tier
+  // rule. `priority` breaks ties WITHIN a rank; two rules at the same rank and
+  // priority with overlapping effective windows are rejected at authoring time
+  // rather than letting database return order decide the answer.
+  //
+  // All four columns are additive with defaults, so an existing row keeps its
+  // current meaning: priority 0, always active, no window.
+  priority      Int       @default(0)
+  effectiveFrom DateTime?
+  effectiveTo   DateTime?
+  isActive      Boolean   @default(true)
 
   @@index([packageVersionId])
   @@index([providerId])
@@ -8834,41 +8848,133 @@ model ClinicalShadowVerdict {
   @@index([tenantId, createdAt])
 }
 
-/// WP-B1 — bulk-import safety ledger. One row per CONFIRMED member/roster import
-/// run (admin `MEMBERS_ADMIN` lane and HR `HR_ENDORSEMENT` lane).
+enum ImportBatchStatus {
+  UPLOADED
+  PREFLIGHTED
+  QUEUED
+  PROCESSING
+  SUCCEEDED
+  PARTIAL
+  FAILED
+  UNKNOWN
+}
+
+enum ImportUnitStatus {
+  QUEUED
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  CONFLICT
+  UNKNOWN
+}
+
+enum ImportRowStatus {
+  REJECTED
+  QUEUED
+  PROCESSING
+  ACCEPTED
+  FAILED
+  CONFLICT
+  UNKNOWN
+}
+
+/// UAT-HF P06.02 — durable member-import job.
 ///
-/// Two guarantees hang off this table:
-///   1. IDEMPOTENCY (B-011). `idempotencyKey` = sha256 of (lane + tenant + group +
-///      the canonical content of the submitted rows). The `@@unique([tenantId,
-///      idempotencyKey])` makes re-uploading the SAME file for the SAME group a
-///      deterministic no-op — the confirm action reserves this row first, so a
-///      concurrent duplicate submit loses the race on the unique and returns the
-///      winner's recorded result instead of importing everything twice.
-///   2. DURABLE REJECT LIST. `rejects` persists the failed-row list (row, name,
-///      reason) that used to live only in ephemeral React state and vanished on
-///      navigation; it is downloadable after the fact.
-///
-/// Relation-free by design: this is a purely ADDITIVE model that touches no
-/// existing model (no back-relations added elsewhere). `tenantId`/`groupId`/
-/// `createdBy` are plain scalar scope keys.
+/// A batch row is no longer treated as proof of completion. Status is explicit,
+/// every source row has a durable verdict/result, and counts are projections that
+/// can be rebuilt from the row ledger. `rejects` remains temporarily for callers
+/// being moved to the normalized ledger in P06.04.
 model ImportBatch {
-  id             String   @id @default(cuid())
+  id             String            @id @default(cuid())
+  batchRef       String            @unique
   tenantId       String
   groupId        String
   lane           String // "MEMBERS_ADMIN" | "HR_ENDORSEMENT"
   idempotencyKey String // sha256(lane + tenant + group + canonical row content)
+  sourceHash     String
+  status         ImportBatchStatus @default(UPLOADED)
   fileName       String?
-  totalRows      Int      @default(0)
-  importedCount  Int      @default(0)
-  failedCount    Int      @default(0)
-  rejects        Json     @default("[]") // [{ row, name, error }] — durable reject list
+  totalRows      Int               @default(0)
+  importedCount  Int               @default(0)
+  failedCount    Int               @default(0)
+  acceptedCount  Int               @default(0)
+  rejectedCount  Int               @default(0)
+  conflictCount  Int               @default(0)
+  rejects        Json              @default("[]") // [{ row, name, error }] — durable reject list
   createdBy      String? // acting user id
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  preflightedAt  DateTime?
+  queuedAt       DateTime?
+  processingAt   DateTime?
+  completedAt    DateTime?
+  failureCode    String?
+  failureMessage String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  units ImportUnit[]
+  rows  ImportRow[]
 
   @@unique([tenantId, idempotencyKey])
   @@index([tenantId, groupId])
+  @@index([tenantId, status, createdAt])
   @@index([tenantId, createdAt])
+}
+
+/// One atomic family-work item. P06.03 executes each unit transactionally; P06.02
+/// persists the boundary now so a worker can resume without rebuilding it from a
+/// browser payload.
+model ImportUnit {
+  id             String           @id @default(cuid())
+  batchId        String
+  batch          ImportBatch      @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  unitKey        String
+  principalKey   String?
+  status         ImportUnitStatus @default(QUEUED)
+  attempts       Int              @default(0)
+  leaseOwner     String?
+  leaseExpiresAt DateTime?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  failureCode    String?
+  failureMessage String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  rows ImportRow[]
+
+  @@unique([batchId, unitKey])
+  @@index([batchId, status])
+  @@index([status, leaseExpiresAt])
+}
+
+/// Immutable-enough source/provenance plus the current processing result for one
+/// input row. `normalizedInput` is exactly what P06.01 approved; `sourceInput`
+/// currently preserves that signed preview payload too. P06.07 replaces it with
+/// restricted raw-cell provenance when storage/export escaping is separated.
+model ImportRow {
+  id                String          @id @default(cuid())
+  batchId           String
+  batch             ImportBatch     @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  unitId            String?
+  unit              ImportUnit?     @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  rowNumber         Int
+  recordCount       Int             @default(1)
+  sourceInput       Json
+  normalizedInput   Json
+  preflightError    String?
+  preflightWarnings Json            @default("[]")
+  status            ImportRowStatus
+  resultEntityType  String?
+  resultEntityId    String?
+  failureCode       String?
+  failureMessage    String?
+  terminalAt        DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@unique([batchId, rowNumber])
+  @@index([batchId, status])
+  @@index([unitId, status])
 }
 
 /// UAT-HF P05.02 — the atomic allocator behind member numbers.

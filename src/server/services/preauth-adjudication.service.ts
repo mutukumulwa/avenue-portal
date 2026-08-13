@@ -24,6 +24,7 @@ import {
   evaluateReferral,
   type ExclusionExceptionLogic,
 } from "./eligibility/rules";
+import { resolveProviderRule } from "@/lib/provider-precedence";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
@@ -128,32 +129,37 @@ export const preauthAdjudicationService = {
     if (member?.packageVersionId) {
       const eligibilityRules = await prisma.packageProviderEligibility.findMany({
         where: { packageVersionId: member.packageVersionId },
-        select: { providerId: true, providerTier: true, inclusionType: true },
+        select: {
+          id: true,
+          providerId: true,
+          providerTier: true,
+          inclusionType: true,
+          priority: true,
+          effectiveFrom: true,
+          effectiveTo: true,
+          isActive: true,
+        },
       });
-      if (eligibilityRules.length > 0) {
-        // Separate INCLUDE and EXCLUDE rules
-        const includeRules = eligibilityRules.filter((r) => r.inclusionType === "INCLUDE");
-        const excludeRules = eligibilityRules.filter((r) => r.inclusionType === "EXCLUDE");
 
-        // Hard exclusion: provider explicitly excluded by ID or tier
-        const isExcluded = excludeRules.some(
-          (r) => r.providerId === pa.providerId ||
-                 (r.providerTier && r.providerTier === pa.provider.tier),
-        );
-        if (isExcluded) {
-          return failGate("PROVIDER_ELIGIBILITY", `Provider is excluded under this package's eligibility rules`);
-        }
+      // P09.05 (DEF-054): one shared precedence resolver. This gate used to
+      // reimplement "any EXCLUDE wins" inline, which disagreed with DEC-04 at the
+      // edge — a tier EXCLUDE beat a specific INCLUDE, so naming one hospital as
+      // a carve-out did nothing. The verdict now names the rule that decided it.
+      const verdict = resolveProviderRule(
+        eligibilityRules,
+        { id: pa.providerId, tier: String(pa.provider.tier) },
+      );
 
-        // Whitelist mode: include rules present — provider must be in the list
-        if (includeRules.length > 0) {
-          const isIncluded = includeRules.some(
-            (r) => r.providerId === pa.providerId ||
-                   (r.providerTier && r.providerTier === pa.provider.tier),
-          );
-          if (!isIncluded) {
-            return routeHuman("PROVIDER_ELIGIBILITY", `Provider not in package's approved provider list — routing for manual review`);
-          }
-        }
+      if (verdict.decision === "EXCLUDED") {
+        return failGate("PROVIDER_ELIGIBILITY", `Provider is excluded under this package's eligibility rules. ${verdict.trace}`);
+      }
+      if (verdict.decision === "NOT_LISTED") {
+        return routeHuman("PROVIDER_ELIGIBILITY", `Provider not in package's approved provider list — routing for manual review. ${verdict.trace}`);
+      }
+      if (verdict.decision === "AMBIGUOUS") {
+        // Two rules of equal standing disagree. Deciding it here would mean
+        // picking whichever the database returned first; a human decides instead.
+        return routeHuman("PROVIDER_ELIGIBILITY", `Provider eligibility rules conflict — routing for manual review. ${verdict.trace}`);
       }
     }
     pass("PROCEDURE_COVERED");

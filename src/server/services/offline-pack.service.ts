@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { createCipheriv, createDecipheriv, hkdfSync, randomBytes } from "node:crypto";
 import { BenefitUsageService } from "./benefit-usage.service";
+import { resolveProviderRule } from "@/lib/provider-precedence";
 
 // ─── FACILITY OFFLINE DATA PACK (WP-B3, TPA_FEEDBACK_WORKPLAN.md §B / D3) ────
 // The MINIMUM data a facility needs to run its day offline (TPA-confirmed):
@@ -99,14 +100,13 @@ export class OfflinePackService {
       list.push(r);
       rulesByVersion.set(r.packageVersionId, list);
     }
+    // P09.05 (DEF-054): the third copy of the provider-network rule, now routed
+    // through the shared resolver so an offline pack cannot disagree with the
+    // online decision the same member would get at the same counter.
     const eligible = members.filter((m) => {
       const vr = m.packageVersionId ? rulesByVersion.get(m.packageVersionId) : undefined;
       if (!vr || vr.length === 0) return true;
-      const matches = (r: (typeof rules)[number]) =>
-        r.providerId === providerId || (r.providerTier !== null && r.providerTier === provider.tier);
-      if (vr.some((r) => r.inclusionType === "EXCLUDE" && matches(r))) return false;
-      const includes = vr.filter((r) => r.inclusionType === "INCLUDE");
-      return includes.length === 0 || includes.some(matches);
+      return resolveProviderRule(vr, { id: providerId, tier: String(provider.tier) }).payable;
     });
 
     // Balances: per member, per benefit category on their package version.

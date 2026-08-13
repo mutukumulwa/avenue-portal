@@ -2,9 +2,15 @@
 
 import { useState, useActionState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, ShieldCheck, ShieldOff, X } from "lucide-react";
+import { Plus, Trash2, ShieldCheck, ShieldOff, X, AlertTriangle } from "lucide-react";
 import { createProviderEligibilityAction, deleteProviderEligibilityAction } from "./actions";
 import type { ActionResult } from "@/lib/action-result";
+import {
+  PROVIDER_RULE_RANK,
+  detectProviderRuleConflicts,
+  rankOf,
+  resolveProviderRule,
+} from "@/lib/provider-precedence";
 
 type EligibilityRule = {
   id: string;
@@ -12,6 +18,10 @@ type EligibilityRule = {
   providerId: string | null;
   providerTier: string | null;
   providerName?: string | null;
+  priority?: number | null;
+  effectiveFrom?: Date | string | null;
+  effectiveTo?: Date | string | null;
+  isActive?: boolean | null;
 };
 
 type ProviderRef = { id: string; name: string; tier: string };
@@ -61,6 +71,114 @@ export function ProviderEligibilityManager({
   const ruleLabel = (r: EligibilityRule) =>
     r.providerName ?? (r.providerTier ? `All ${r.providerTier} tier providers` : r.providerId ?? "—");
 
+  // ── P09.05 / DEC-04 (DEF-054) ──────────────────────────────────────────────
+  // The run scanned this screen for "wins / takes precedence / overrides /
+  // priority / order" and found nothing. Everything below answers that, using
+  // the SAME module the evaluator uses — not a second implementation.
+
+  const conflicts = detectProviderRuleConflicts(initialRules);
+
+  const RANK_LABEL: Record<number, string> = {
+    [PROVIDER_RULE_RANK.SPECIFIC_EXCLUDE]: "1st — beats everything",
+    [PROVIDER_RULE_RANK.SPECIFIC_INCLUDE]: "2nd — beats tier rules",
+    [PROVIDER_RULE_RANK.TIER]: "3rd — lowest",
+  };
+
+  const tierOf = new Map(availableProviders.map(p => [p.id, p.tier]));
+
+  /**
+   * What this rule actually does once precedence is applied.
+   *
+   * A tier rule that is overridden for a named provider is the case the run hit,
+   * and saying so on the row is the difference between a list of rules and an
+   * answer to "is that hospital payable".
+   */
+  const effectOf = (r: EligibilityRule): string | null => {
+    if (r.providerId) {
+      const tier = tierOf.get(r.providerId);
+      const tierRule = tier
+        ? initialRules.find(o => o.providerTier === tier && o.inclusionType !== r.inclusionType)
+        : undefined;
+      if (tierRule) {
+        return `Overrides "${ruleLabel(tierRule)}" for this provider — naming a provider beats a tier rule.`;
+      }
+      return null;
+    }
+
+    // A tier rule: list the named providers that escape it.
+    const overridden = initialRules.filter(
+      o => o.providerId && o.inclusionType !== r.inclusionType && tierOf.get(o.providerId) === r.providerTier,
+    );
+    if (overridden.length === 0) return null;
+    return `Does not apply to ${overridden.map(ruleLabel).join(", ")} — a rule naming a provider wins.`;
+  };
+
+  /**
+   * The verdict for every provider a rule names, plus every provider in a tier a
+   * rule names. Computed by `resolveProviderRule` — the same function the
+   * adjudication engine calls — so the screen cannot say one thing and the claim
+   * decide another.
+   */
+  const namedProviderIds = new Set(initialRules.map(r => r.providerId).filter((id): id is string => !!id));
+  const namedTiers = new Set(initialRules.map(r => r.providerTier).filter((t): t is string => !!t));
+  const effectiveVerdicts = availableProviders
+    .filter(p => namedProviderIds.has(p.id) || namedTiers.has(p.tier))
+    .map(p => {
+      const verdict = resolveProviderRule(initialRules, { id: p.id, tier: p.tier });
+      const winner = verdict.winningRuleId
+        ? initialRules.find(r => r.id === verdict.winningRuleId)
+        : undefined;
+      const why =
+        verdict.decision === "AMBIGUOUS"
+          ? "two rules of equal precedence disagree, so this goes to manual review"
+          : verdict.decision === "NOT_LISTED"
+            ? "not named by any INCLUDE rule, and this package uses a whitelist"
+            : winner
+              ? `${winner.inclusionType === "EXCLUDE" ? "excluded" : "included"} by "${ruleLabel(winner)}"`
+              : "no rule applies";
+      return { id: p.id, name: p.name, payable: verdict.payable, why };
+    });
+
+  const RuleRow = ({ r, tone }: { r: EligibilityRule; tone: "include" | "exclude" }) => {
+    const rank = rankOf(r);
+    const effect = effectOf(r);
+    const inConflict = conflicts.some(c => c.ruleIds.includes(r.id));
+    const border = tone === "include" ? "bg-[#28A745]/5 border-[#28A745]/20" : "bg-[#DC3545]/5 border-[#DC3545]/20";
+    const Icon = tone === "include" ? ShieldCheck : ShieldOff;
+    const iconColour = tone === "include" ? "text-[#28A745]" : "text-[#DC3545]";
+
+    return (
+      <div className={`rounded px-3 py-2 border ${inConflict ? "bg-amber-50 border-amber-400" : border}`}>
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-sm min-w-0">
+            <Icon size={14} className={iconColour} />
+            <span className="font-semibold text-brand-text-heading truncate">{ruleLabel(r)}</span>
+            {rank !== null && (
+              <span className="shrink-0 text-[10px] font-bold uppercase text-gray-500 bg-gray-100 border border-gray-200 rounded px-1.5 py-0.5">
+                Precedence {RANK_LABEL[rank]}
+              </span>
+            )}
+            {(r.priority ?? 0) !== 0 && (
+              <span className="shrink-0 text-[10px] font-bold uppercase text-gray-500">
+                Priority {r.priority}
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => handleDelete(r.id)}
+            disabled={isPending}
+            aria-label={`Remove rule: ${r.inclusionType} ${ruleLabel(r)}`}
+            className="shrink-0 text-red-400 hover:bg-red-50 p-1.5 rounded disabled:opacity-40"
+          >
+            <Trash2 size={14} />
+          </button>
+        </div>
+        {effect && <p className="text-[11px] text-brand-text-muted mt-1 pl-6">{effect}</p>}
+      </div>
+    );
+  };
+
   return (
     <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-4 mt-6">
       <div className="flex items-center justify-between border-b border-[#EEEEEE] pb-2">
@@ -75,9 +193,35 @@ export function ProviderEligibilityManager({
         </button>
       </div>
 
-      <p className="text-xs text-brand-text-muted">
-        INCLUDE rules whitelist specific providers or tiers. EXCLUDE rules block them. If no INCLUDE rules exist, all active providers are allowed (subject to EXCLUDE rules).
-      </p>
+      <div className="text-xs text-brand-text-muted space-y-1">
+        <p>
+          INCLUDE rules whitelist specific providers or tiers. EXCLUDE rules block them. If no INCLUDE rules exist, all active providers are allowed (subject to EXCLUDE rules).
+        </p>
+        <p>
+          <strong className="text-brand-text-heading">When rules disagree, the more specific one wins.</strong>{" "}
+          Highest precedence first: a rule that <em>excludes a named provider</em>, then one that{" "}
+          <em>includes a named provider</em>, then any <em>tier</em> rule. So excluding one hospital
+          from an included tier blocks it, and including one hospital from an excluded tier admits
+          it. Two rules of the same kind on the same target cannot both be saved.
+        </p>
+      </div>
+
+      {conflicts.length > 0 && (
+        <div role="alert" className="border border-amber-400 bg-amber-50 rounded p-3 space-y-1">
+          <p className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+            <AlertTriangle size={14} /> {conflicts.length === 1 ? "A rule conflict has no winner" : `${conflicts.length} rule conflicts have no winner`}
+          </p>
+          {conflicts.map((c) => (
+            <p key={c.ruleIds.join("-")} className="text-[11px] text-amber-900">
+              {c.message}
+            </p>
+          ))}
+          <p className="text-[11px] text-amber-900">
+            Until this is resolved, care at the affected providers is sent for manual review rather
+            than decided automatically.
+          </p>
+        </div>
+      )}
 
       {adding && (
         <form action={formAction} className="bg-gray-50 border border-gray-200 rounded p-4 space-y-4">
@@ -140,38 +284,35 @@ export function ProviderEligibilityManager({
         </form>
       )}
 
-      {includes.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-[10px] font-bold uppercase text-[#28A745]">Included (whitelist)</p>
-          {includes.map(r => (
-            <div key={r.id} className="flex items-center justify-between bg-[#28A745]/5 border border-[#28A745]/20 rounded px-3 py-2">
-              <div className="flex items-center gap-2 text-sm">
-                <ShieldCheck size={14} className="text-[#28A745]" />
-                <span className="font-semibold text-brand-text-heading">{ruleLabel(r)}</span>
-              </div>
-              <button type="button" onClick={() => handleDelete(r.id)} disabled={isPending}
-                className="text-red-400 hover:bg-red-50 p-1.5 rounded disabled:opacity-40">
-                <Trash2 size={14} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
+      {/* Excludes render FIRST because they outrank includes at the same
+          specificity — the reading order now matches the deciding order. */}
       {excludes.length > 0 && (
         <div className="space-y-2">
           <p className="text-[10px] font-bold uppercase text-[#DC3545]">Excluded (blocklist)</p>
-          {excludes.map(r => (
-            <div key={r.id} className="flex items-center justify-between bg-[#DC3545]/5 border border-[#DC3545]/20 rounded px-3 py-2">
-              <div className="flex items-center gap-2 text-sm">
-                <ShieldOff size={14} className="text-[#DC3545]" />
-                <span className="font-semibold text-brand-text-heading">{ruleLabel(r)}</span>
-              </div>
-              <button type="button" onClick={() => handleDelete(r.id)} disabled={isPending}
-                className="text-red-400 hover:bg-red-50 p-1.5 rounded disabled:opacity-40">
-                <Trash2 size={14} />
-              </button>
-            </div>
+          {excludes.map(r => <RuleRow key={r.id} r={r} tone="exclude" />)}
+        </div>
+      )}
+
+      {includes.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-[10px] font-bold uppercase text-[#28A745]">Included (whitelist)</p>
+          {includes.map(r => <RuleRow key={r.id} r={r} tone="include" />)}
+        </div>
+      )}
+
+      {/* The answer the operator actually came for: for every provider named by
+          a rule, is it payable? Resolved by the evaluator's own module. */}
+      {initialRules.length > 0 && effectiveVerdicts.length > 0 && (
+        <div className="border-t border-[#EEEEEE] pt-3 space-y-1">
+          <p className="text-[10px] font-bold uppercase text-gray-500">Effective outcome</p>
+          {effectiveVerdicts.map(v => (
+            <p key={v.id} className="text-xs">
+              <span className="font-semibold text-brand-text-heading">{v.name}</span>{" "}
+              <span className={v.payable ? "text-[#28A745]" : "text-[#DC3545]"}>
+                {v.payable ? "is payable" : "is not payable"}
+              </span>
+              <span className="text-brand-text-muted"> — {v.why}</span>
+            </p>
           ))}
         </div>
       )}

@@ -196,7 +196,18 @@ export async function evaluateEligibility(input: EligibilityInput, db: Db = pris
       pinned
         ? db.packageProviderEligibility.findMany({
             where: { packageVersionId: pinned },
-            select: { providerId: true, providerTier: true, inclusionType: true },
+            // P09.05: precedence needs the rule's identity, rank tie-break and
+            // effective window, not just its direction.
+            select: {
+              id: true,
+              providerId: true,
+              providerTier: true,
+              inclusionType: true,
+              priority: true,
+              effectiveFrom: true,
+              effectiveTo: true,
+              isActive: true,
+            },
           })
         : Promise.resolve([]),
     ]);
