@@ -28,7 +28,15 @@ export function MemberSearchPicker({ name = "memberId" }: { name?: string }) {
   const runSearch = useCallback(async (q: string) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/members/search?q=${encodeURIComponent(q)}`);
+      // UAT-HF P03.05 (DEF-057/DEF-079): the search term is very often a
+      // member number — that is what this picker is for. In a query string it
+      // would be written to the access log on every keystroke of a debounced
+      // search. It goes in the body instead.
+      const res = await fetch("/api/admin/members/search", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ q }),
+      });
       if (!res.ok) {
         setResults([]);
         return;

@@ -1469,6 +1469,42 @@ periods run from X" heading was correct only while the basis was hard-coded;
 now that it varies per benefit, one line for the card would be wrong for any
 benefit configured differently from the first.
 
+### P03.05 (completion) — the identifier-in-URL sweep
+
+| Field | Value |
+|---|---|
+| **Task** | P03.05 — the sweep the first pass deferred |
+| **Defect IDs** | DEF-057 (S2), DEF-079 (S2) |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/lib/identifier-in-url.test.ts` (6), including a repo-wide ratchet |
+| **Evidence** | `src/app/api/admin/members/search/route.ts`, `src/components/ui/MemberSearchPicker.tsx` |
+| **Feature flags** | none. |
+| **Remaining risks** | **Two findings are recorded, not fixed**, and both have their own test so they cannot be mistaken for clean. (1) The **partner API v1** still takes `memberNumber` as a query parameter on `/eligibility` and `/benefits` — it is a published contract with external integrators, so changing it is a breaking API change and a partner-notice exercise rather than a code fix, but it genuinely writes member numbers to the access log. (2) The **audit-log free-text filter** round-trips `q` through the URL, and audit descriptions contain member names and numbers, so an operator can put an identifier into browser history there. Moving it off the URL converts a server-rendered filtered page into an action-driven one — a refactor needing browser verification this session could not perform, so it was left whole rather than half-applied. **Analytics events and the `Referer` header were not instrumented or observed**; the acceptance names them and this sweep reasons about the code that would populate them, not about captured traffic. |
+
+**The picker whose whole purpose is member numbers was sending them by GET.**
+`MemberSearchPicker` fetched `/api/admin/members/search?q=…`, and what an
+operator types into it is very often a member number — that is what it is for.
+The search is debounced, so a partial member number was written to the server
+access log on *every keystroke*. P03.05's acceptance names the access log
+explicitly.
+
+The term now travels in a POST body. Nothing here is cached or bookmarked — it
+is a type-ahead behind an admin session — so the usual argument for GET does not
+apply. **The `GET` handler was removed rather than left unused**: leaving it
+would keep the leaking path reachable by anything that still remembers the URL.
+
+**A query string is not a private channel**, which is the reason this class of
+defect keeps recurring. It is written to the access log, kept in browser
+history, and sent in the `Referer` header to any third party the page later
+loads — three stores nobody thinks of as stores, none covered by the audit
+trail.
+
+**The ratchet was checked against the code it replaced.** A guard test that
+cannot fail is worse than none, so the two patterns were run against the
+original leaking `fetch` and against a `router.push` form: both match, and the
+POST form does not.
+
 ### P09.03 (follow-up) — the member read path supplies the anchors
 
 | Field | Value |
