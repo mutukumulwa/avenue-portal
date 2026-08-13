@@ -1585,10 +1585,19 @@ the divergence stays visible to a reviewer.
 | **P10** (partial) | **PASS** — 0 errors | **PASS** — 0 errors, 216 warnings | **PASS** — 293 files / 3248 tests passed | P10.02–P10.04 done; **P10.01 partial** |
 | **P11** (partial) | **PASS** — 0 errors | **PASS** — 0 errors | **PASS** — 296 files / 3287 tests passed | P11.02 done |
 
-**Branch exit state, 2026-08-13 on `564478f`:** typecheck 0 · lint **0 errors**, 216 warnings ·
-suite **297 files / 3308 tests passing**, 88 files / 598 skipped · both guards green · locale
+| **P07** (partial) | **PASS** — 0 errors | **PASS** — 0 errors | **PASS** — 300 files / 3387 tests passed | P07.03 and P07.06 partial |
+
+**Branch exit state, 2026-08-13 on `8a467b7`:** typecheck 0 · lint **0 errors**, 216 warnings ·
+suite **300 files / 3387 tests passing**, 88 files / 598 skipped · both guards green · locale
 baseline tightened 52 → 50 across the branch · **11 migrations applied from an empty database with
 zero drift**.
+
+**Standing ops grants this branch now needs.** Three permissions are referenced by shipped code and
+granted to no role, so each feature currently fails closed: `member.duplicate.review` (P05.04),
+`member.sensitive.reveal` (P11.05) and `network.analytics.read` (pre-existing). Failing closed is
+the right direction, but `member.sensitive.reveal` in particular means **nobody can reveal a masked
+national ID or phone today** — that one is operationally blocking and should be granted before this
+reaches a desk.
 
 P04/P05/P10 gate run 2026-08-12 on `50a2f1f`. Both guards green; locale baseline
 tightened 52 → 50 across the phase. **11 migrations applied from an empty database with
