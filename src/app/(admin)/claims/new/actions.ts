@@ -4,6 +4,10 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { redirect } from "next/navigation";
 import { runClaimIntake } from "@/server/services/claim-intake";
 import { reimbursementService } from "@/server/services/reimbursement.service";
+import {
+  MemberActionGuardService,
+  memberActionRefusal,
+} from "@/server/services/member-action-guard.service";
 import type { ServiceType, BenefitCategory, ClaimLineCategory } from "@prisma/client";
 
 interface LineItemInput {
@@ -39,6 +43,15 @@ export async function submitClaimAction(data: {
 }) {
   const session = await requireRole(ROLES.CLAIMS_OPS);
 
+  const verdict = await MemberActionGuardService.evaluate({
+    tenantId: session.user.tenantId,
+    memberId: data.memberId,
+    action: "CLAIM",
+  });
+  if (!verdict.allowed) {
+    return { ok: false as const, error: memberActionRefusal(verdict) };
+  }
+
   // Canonical intake (F5.1): the operator selects the provider; the same schema,
   // scope, staged evaluation and durable receipt as every other rail apply.
   // Structural rejections (bad amount, future date, out-of-scope provider/member)
@@ -72,6 +85,15 @@ export async function submitReimbursementClaimAction(data: {
   mpesaConfirmationCode?: string;
 }) {
   const session = await requireRole(ROLES.CLAIMS_OPS);
+
+  const verdict = await MemberActionGuardService.evaluate({
+    tenantId: session.user.tenantId,
+    memberId: data.memberId,
+    action: "CLAIM",
+  });
+  if (!verdict.allowed) {
+    return { ok: false as const, error: memberActionRefusal(verdict) };
+  }
 
   if (!data.reimbursementBankName && !data.reimbursementMpesaPhone) {
     return { ok: false as const, error: "Provide either bank account details or a mobile-money phone number for the reimbursement payment." };

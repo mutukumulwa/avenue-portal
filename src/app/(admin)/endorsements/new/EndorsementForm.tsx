@@ -60,6 +60,7 @@ export function EndorsementForm({
   const [type, setType]         = useState<EndorsementType>("MEMBER_ADDITION");
   const [effectiveDate, setEffectiveDate] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const selectedGroup = useMemo(() => groups.find(g => g.id === groupId), [groups, groupId]);
   const groupMemberList = useMemo(() => members.filter(m => m.groupId === groupId), [members, groupId]);
@@ -79,9 +80,17 @@ export function EndorsementForm({
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    setSubmitError(null);
     setSubmitting(true);
-    const fd = new FormData(e.currentTarget);
-    await submitEndorsementAction(fd);
+    try {
+      const fd = new FormData(e.currentTarget);
+      const result = await submitEndorsementAction(fd);
+      if (result?.ok === false) setSubmitError(result.error);
+    } catch {
+      setSubmitError("The endorsement could not be submitted. Your entries are still on this page; try again when the connection is stable.");
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const statusColors: Record<string, string> = {
@@ -120,6 +129,13 @@ export function EndorsementForm({
           DRAFT → SUBMITTED → UNDER REVIEW → APPROVED → APPLIED &nbsp;|&nbsp; Can be REJECTED or CANCELLED at any point.
         </p>
       </div>
+
+      {submitError && (
+        <div role="alert" className="flex items-start gap-2 rounded-[8px] border border-[#DC3545]/30 bg-[#DC3545]/5 px-4 py-3 text-sm text-[#DC3545]">
+          <AlertCircle size={16} className="mt-0.5 shrink-0" />
+          <span>{submitError}</span>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* ── Scope ─────────────────────────────────────── */}

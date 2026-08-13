@@ -24,7 +24,11 @@ export default async function NewEndorsementPage({
 
   // For member-level endorsements, load members per group on client — pass group→members map
   const groupMembers = await prisma.member.findMany({
-    where: { tenantId, status: { in: ["ACTIVE", "SUSPENDED"] } },
+    where: {
+      tenantId,
+      groupId: { in: groups.map((group) => group.id) },
+      status: "ACTIVE",
+    },
     select: {
       id: true, firstName: true, lastName: true,
       memberNumber: true, relationship: true, groupId: true,

@@ -1533,6 +1533,49 @@ Nothing new is invented here. The four ungoverned actions — Lapse, Reinstate, 
 
 **The server check sits after the M-013/M-014 guards, deliberately.** When a dependant is linked to a dependant *and* that member is lapsed, "you linked to a dependant" is the more useful message. Four test fixtures were missing `status` and are corrected — real principals always have one, and the guard was right to refuse them.
 
+### P07.06 (completion follow-up) — Enforce status at every mutation boundary
+
+| Field | Value |
+|---|---|
+| **Task** | P07.06 follow-up — close the forged-request gap for claim, reimbursement, pre-auth and member-scoped endorsement mutations |
+| **Defect IDs** | DEF-058 (S2) |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/services/member-action-guard.service.test.ts` (5), `tests/actions/member-action-guard.actions.test.ts` (8), `tests/components/endorsement-member-action-guard.test.tsx` (2), plus one denial case in `tests/actions/admin-preauth-action.test.ts` and source-boundary assertions in `tests/lib/member-action-policy.test.ts` |
+| **Commands / results** | Targeted 5 files / **55 tests passed**. `npm run typecheck` → 0 errors. Targeted lint → 0 errors. Full gate: lint **0 errors / 215 warnings**; suite **303 files / 3406 tests passed**, 88 files / 598 skipped; currency and locale guards green; `git diff --check` clean. |
+| **Routes exercised** | no live browser route. The four Server Action boundaries and the endorsement refusal state were exercised directly; browser retest remains P12.05. |
+| **Evidence** | `src/server/services/member-action-guard.service.ts`; claim, reimbursement, pre-auth and endorsement Server Actions; the pre-auth and endorsement page queries; the tests listed above |
+| **Feature flags** | none. The guard is unconditional and fails closed. |
+| **Remaining risks** | **Current status is intentionally authoritative here.** A legitimate back-dated claim for service delivered while cover was active is refused when the member is lapsed now; no governed override exists yet. P07.04 must provide that explicit compensating path rather than weakening this guard. Provider/member/API claim rails already use canonical service-date eligibility and were not changed. The endorsement engine still needs P08's idempotency, audit and approval unification. No live browser route was exercised in this slice. |
+
+**A Server Action is a public mutation boundary, not a trusted continuation of its page.** The
+version-matched Next 15.5.15 guidance requires authentication, authorization and validation inside
+every action. The earlier P07.06 work made the UI truthful, but a caller could submit the action
+directly and skip every disabled control. `MemberActionGuardService` now reloads the member's
+current status inside the mutation boundary, scoped to the authenticated tenant and, for
+endorsements, the selected group. Missing and out-of-scope IDs receive the same refusal, so the
+guard does not become a member-enumeration oracle.
+
+**The pure policy remains the one source of truth.** UI copy and server enforcement both call
+`canPerformMemberAction`; the server guard adds only the authoritative database read and scope
+checks. Claims check both the direct intake and reimbursement actions, pre-auth checks before its
+intake/audit service, and member-scoped endorsements check before numbering or creation. Tests pin
+those orderings so a refused request cannot consume a number, write an audit row or invoke a
+downstream service.
+
+**The endorsement parent is guarded as well as the member.** The old action trusted `groupId` from
+the form, and group-level endorsements never loaded the group at all. Every endorsement now first
+resolves an actor-visible group in the current tenant; member-scoped types additionally require a
+member in that group. Unknown endorsement types are refused before any read instead of being cast
+into the enum. This closes the adjacent cross-tenant/group plumbing gap rather than attaching a
+member check to an untrusted parent.
+
+**Only minimal, eligible member data reaches the browser.** The pre-auth page previously serialized
+full member records of every status to its Client Component. It now applies the actor's client scope,
+filters ACTIVE members on the server and sends only ID, name and member number. The endorsement
+page now limits its member query to actor-visible groups and ACTIVE status. A returned endorsement
+refusal renders in an alert while preserving the operator's entries and re-enabling submission.
+
 ### P05.03 (follow-up) — The generic form can no longer orphan a dependant
 
 | Field | Value |
@@ -1585,7 +1628,7 @@ the divergence stays visible to a reviewer.
 | **P10** (partial) | **PASS** — 0 errors | **PASS** — 0 errors, 216 warnings | **PASS** — 293 files / 3248 tests passed | P10.02–P10.04 done; **P10.01 partial** |
 | **P11** (partial) | **PASS** — 0 errors | **PASS** — 0 errors | **PASS** — 296 files / 3287 tests passed | P11.02 done |
 
-| **P07** (partial) | **PASS** — 0 errors | **PASS** — 0 errors | **PASS** — 300 files / 3387 tests passed | P07.03 and P07.06 partial |
+| **P07** (partial) | **PASS** — 0 errors | **PASS** — 0 errors, 215 warnings | **PASS** — 303 files / 3406 tests passed | P07.03 partial; P07.06 current-status UI and server-boundary enforcement complete, governed back-dated override remains P07.04 |
 
 **Branch exit state, 2026-08-13 on `8a467b7`:** typecheck 0 · lint **0 errors**, 216 warnings ·
 suite **300 files / 3387 tests passing**, 88 files / 598 skipped · both guards green · locale

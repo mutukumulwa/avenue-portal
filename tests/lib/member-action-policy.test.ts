@@ -99,6 +99,9 @@ describe("P07.06 the refusal fits the status", () => {
 
 describe("P07.06 the server refuses a forged request too", () => {
   const service = readFileSync("src/server/services/members.service.ts", "utf8");
+  const claimAction = readFileSync("src/app/(admin)/claims/new/actions.ts", "utf8");
+  const preauthAction = readFileSync("src/app/(admin)/preauth/new/actions.ts", "utf8");
+  const endorsementAction = readFileSync("src/app/(admin)/endorsements/new/actions.ts", "utf8");
 
   it("checks the principal's status before linking a dependant", () => {
     // "lapsed member cannot invoke protected action through UI OR FORGED
@@ -117,6 +120,15 @@ describe("P07.06 the server refuses a forged request too", () => {
     const statusCheck = service.indexOf('canPerformMemberAction(principal.status');
     expect(m013).toBeGreaterThan(-1);
     expect(statusCheck).toBeGreaterThan(m013);
+  });
+
+  it("checks claim, pre-auth and endorsement action endpoints too", () => {
+    expect(claimAction).toContain('action: "CLAIM"');
+    expect(preauthAction).toContain('action: "PREAUTH"');
+    expect(endorsementAction).toContain('action: "ENDORSEMENT"');
+    for (const source of [claimAction, preauthAction, endorsementAction]) {
+      expect(source).toContain("MemberActionGuardService.evaluate");
+    }
   });
 });
 
@@ -147,5 +159,22 @@ describe("P07.06 the profile stops advertising what it cannot honour", () => {
     for (const source of [tabs, page, readFileSync("src/server/services/members.service.ts", "utf8")]) {
       expect(source).toContain("@/lib/member-action-policy");
     }
+  });
+});
+
+describe("P07.06 the global entry forms do not serialize inactive or out-of-scope members", () => {
+  const preauthPage = readFileSync("src/app/(admin)/preauth/new/page.tsx", "utf8");
+  const endorsementPage = readFileSync("src/app/(admin)/endorsements/new/page.tsx", "utf8");
+
+  it("pre-auth keeps client confinement and passes a minimal ACTIVE-member DTO", () => {
+    expect(preauthPage).toContain("MembersService.getMembers(tenantId, session.user.clientId)");
+    expect(preauthPage).toContain('member.status === "ACTIVE"');
+    expect(preauthPage).toContain(".map(({ id, firstName, lastName, memberNumber })");
+  });
+
+  it("endorsements query only ACTIVE members in groups the operator can see", () => {
+    expect(endorsementPage).toContain("groupId: { in: groups.map((group) => group.id) }");
+    expect(endorsementPage).toContain('status: "ACTIVE"');
+    expect(endorsementPage).not.toContain('status: { in: ["ACTIVE", "SUSPENDED"] }');
   });
 });

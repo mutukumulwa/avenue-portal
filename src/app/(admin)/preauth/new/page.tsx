@@ -15,11 +15,21 @@ export default async function NewPreAuthPage({
   const { memberId } = await searchParams;
 
   const tenantId = session.user.tenantId;
-  const [members, providers] = await Promise.all([
-    MembersService.getMembers(tenantId),
+  const [memberRows, providers] = await Promise.all([
+    MembersService.getMembers(tenantId, session.user.clientId),
     // PR-006: only operational providers are selectable for new encounters.
     ProvidersService.getOperationalProviders(tenantId),
   ]);
+  // A Client Component receives only the fields it renders. Inactive members
+  // are not advertised here; the Server Action independently rechecks status.
+  const members = memberRows
+    .filter((member) => member.status === "ACTIVE")
+    .map(({ id, firstName, lastName, memberNumber }) => ({
+      id,
+      firstName,
+      lastName,
+      memberNumber,
+    }));
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">

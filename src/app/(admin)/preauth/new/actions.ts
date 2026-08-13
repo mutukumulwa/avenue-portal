@@ -6,6 +6,10 @@ import { PreauthIntakeService } from "@/server/services/preauth-intake/service";
 import { preauthAdjudicationService } from "@/server/services/preauth-adjudication.service";
 import { getSystemActorId } from "@/server/services/system-actor.service";
 import { writeAudit } from "@/lib/audit";
+import {
+  MemberActionGuardService,
+  memberActionRefusal,
+} from "@/server/services/member-action-guard.service";
 import type { ServiceType, BenefitCategory } from "@prisma/client";
 
 export async function submitPreAuthAction(
@@ -21,6 +25,13 @@ export async function submitPreAuthAction(
   const memberId        = formData.get("memberId")        as string;
   const benefitCategory = formData.get("benefitCategory") as BenefitCategory;
   const providerId      = formData.get("providerId")      as string;
+
+  const verdict = await MemberActionGuardService.evaluate({
+    tenantId,
+    memberId,
+    action: "PREAUTH",
+  });
+  if (!verdict.allowed) return { error: memberActionRefusal(verdict) };
 
   // F3.5b: converge on the canonical intake + pipeline. This rail submits through
   // PreauthIntakeService (channel ADMIN_PORTAL) — the SAME path the B2B (F3.4) and

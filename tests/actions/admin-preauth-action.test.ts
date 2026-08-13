@@ -25,6 +25,15 @@ vi.mock("@/lib/rbac", () => ({ requireRole, ROLES: { CLINICAL: ["CLINICAL", "ADM
 const writeAudit = vi.hoisted(() => vi.fn(async () => undefined));
 vi.mock("@/lib/audit", () => ({ writeAudit }));
 
+const evaluateMemberAction = vi.hoisted(() =>
+  vi.fn(async () => ({ allowed: true, reason: "", nextAction: "" })),
+);
+vi.mock("@/server/services/member-action-guard.service", () => ({
+  MemberActionGuardService: { evaluate: evaluateMemberAction },
+  memberActionRefusal: (verdict: { reason: string; nextAction: string }) =>
+    [verdict.reason, verdict.nextAction].filter(Boolean).join(" "),
+}));
+
 const redirectMock = vi.hoisted(() =>
   vi.fn((url: string): never => {
     const e = new Error("NEXT_REDIRECT") as Error & { url: string };
@@ -70,12 +79,24 @@ beforeEach(() => {
   requireRole.mockResolvedValue({ user: { id: "admin-1", tenantId: "t1" } });
   cap.submitArgs = null;
   cap.submitResult = { receiptId: "r1", status: "ACCEPTED", replayed: false, preauthId: "pa-1" };
+  evaluateMemberAction.mockResolvedValue({ allowed: true, reason: "", nextAction: "" });
 });
 
 describe("F3.5b admin PA rail → canonical pipeline", () => {
   it("gates on the CLINICAL role before doing anything", async () => {
     await expect(submitPreAuthAction(null, fd(baseForm))).rejects.toThrow("NEXT_REDIRECT");
     expect(requireRole).toHaveBeenCalledWith(["CLINICAL", "ADMIN", "SUPER_ADMIN"]);
+  });
+
+  it("rechecks the current member status before intake", async () => {
+    evaluateMemberAction.mockResolvedValue({
+      allowed: false,
+      reason: "New Pre-Auth is not available while this membership is lapsed.",
+      nextAction: "Reinstate within the catch-up window.",
+    });
+    const result = await submitPreAuthAction(null, fd(baseForm));
+    expect(result.error).toMatch(/lapsed/i);
+    expect(PreauthIntakeService.submit).not.toHaveBeenCalled();
   });
 
   it("submits through the canonical intake with a server-derived ADMIN_PORTAL context and mapped command", async () => {

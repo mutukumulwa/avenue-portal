@@ -4,8 +4,30 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { peekNextDocumentNumber } from "@/lib/document-number";
+import {
+  MemberActionGuardService,
+  memberActionRefusal,
+} from "@/server/services/member-action-guard.service";
 
-export async function submitEndorsementAction(formData: FormData) {
+export type EndorsementSubmitResult = { ok: false; error: string } | undefined;
+
+const ENDORSEMENT_TYPES = new Set([
+  "MEMBER_ADDITION",
+  "MEMBER_DELETION",
+  "DEPENDENT_ADDITION",
+  "DEPENDENT_DELETION",
+  "PACKAGE_UPGRADE",
+  "PACKAGE_DOWNGRADE",
+  "BENEFIT_MODIFICATION",
+  "GROUP_DATA_CHANGE",
+  "SALARY_CHANGE",
+  "CORRECTION",
+]);
+const MEMBER_SCOPED_TYPES = new Set([
+  "MEMBER_DELETION", "DEPENDENT_ADDITION", "DEPENDENT_DELETION", "SALARY_CHANGE",
+]);
+
+export async function submitEndorsementAction(formData: FormData): Promise<EndorsementSubmitResult> {
   const session = await requireRole(ROLES.MEMBER_OPS);
 
   const tenantId = session.user.tenantId;
@@ -14,9 +36,43 @@ export async function submitEndorsementAction(formData: FormData) {
   const effectiveDate = formData.get("effectiveDate") as string;
 
   if (!groupId || !type || !effectiveDate) throw new Error("Missing required fields");
+  if (!ENDORSEMENT_TYPES.has(type)) {
+    return { ok: false, error: "Select a valid endorsement type." };
+  }
+
+  // `groupId` is untrusted form data. Resolve it inside both the tenant and an
+  // optional client confinement before reading a member or creating anything.
+  // This one lookup also supplies the financial preview calculation below.
+  const group = await prisma.group.findFirst({
+    where: {
+      id: groupId,
+      tenantId,
+      ...(session.user.clientId ? { clientId: session.user.clientId } : {}),
+    },
+    select: { renewalDate: true, contributionRate: true },
+  });
+  if (!group) {
+    return { ok: false, error: "The selected group is unavailable. Return to endorsements and choose a group in your organisation." };
+  }
 
   // Build changeDetails based on type
   const get = (k: string) => (formData.get(k) as string | null) ?? "";
+
+  const memberId = get("memberId").trim();
+  if (MEMBER_SCOPED_TYPES.has(type) && !memberId) {
+    return { ok: false, error: "Select the member this endorsement applies to." };
+  }
+  // A correction may be group-level. When it names a member, it is still a
+  // member action and must obey the current status policy.
+  if (memberId) {
+    const verdict = await MemberActionGuardService.evaluate({
+      tenantId,
+      memberId,
+      groupId,
+      action: "ENDORSEMENT",
+    });
+    if (!verdict.allowed) return { ok: false, error: memberActionRefusal(verdict) };
+  }
 
   const changeDetails: Record<string, string> = {};
 
@@ -92,15 +148,12 @@ export async function submitEndorsementAction(formData: FormData) {
   let proratedAmount = 0;
 
   if (FINANCIAL_TYPES.has(type)) {
-    const group = await prisma.group.findUnique({ where: { id: groupId, tenantId } });
-    if (group) {
-      const renewal = new Date(group.renewalDate);
-      const effective = new Date(effectiveDate);
-      const daysRemaining = Math.max(0, Math.ceil((renewal.getTime() - effective.getTime()) / 86400000));
-      const daily = Number(group.contributionRate) / 365;
-      const isCredit = ["MEMBER_DELETION","DEPENDENT_DELETION","PACKAGE_DOWNGRADE"].includes(type);
-      proratedAmount = isCredit ? -(daily * daysRemaining) : daily * daysRemaining;
-    }
+    const renewal = new Date(group.renewalDate);
+    const effective = new Date(effectiveDate);
+    const daysRemaining = Math.max(0, Math.ceil((renewal.getTime() - effective.getTime()) / 86400000));
+    const daily = Number(group.contributionRate) / 365;
+    const isCredit = ["MEMBER_DELETION","DEPENDENT_DELETION","PACKAGE_DOWNGRADE"].includes(type);
+    proratedAmount = isCredit ? -(daily * daysRemaining) : daily * daysRemaining;
   }
 
   const endorsementNumber = await peekNextDocumentNumber("END", (yp) =>
