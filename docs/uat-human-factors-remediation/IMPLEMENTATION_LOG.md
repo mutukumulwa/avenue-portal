@@ -1469,6 +1469,48 @@ periods run from X" heading was correct only while the basis was hard-coded;
 now that it varies per benefit, one line for the card would be wrong for any
 benefit configured differently from the first.
 
+### P03.06 — the policy parity gate
+
+| Field | Value |
+|---|---|
+| **Task** | P03.06 |
+| **Defect IDs** | none directly — it is the gate that catches the DEF-022 / DEF-061 family recurring |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/lib/policy-parity.test.ts` (10) |
+| **Evidence** | `src/lib/policy-parity.ts`, `scripts/policy-parity-gate.ts`, `scripts/verification-gate.mjs` step 5b |
+| **Feature flags** | none. |
+| **Remaining risks** | **The gate is RED and is supposed to be.** It exits non-zero in `--release` because two of the four audiences never ask the question. Closing it means making the provider decision path evaluate waiting periods, and reconciling `WaitingPeriodApplication` against the benefit's configured duration and basis — neither is done, and both are larger than the gate. The table covers **waiting periods only**; exclusions and referral rules are the other two policy families P03.06's "full canonical eligibility table" implies, and they are not in it. Parity is computed from the code paths' pure logic, not from a live database, so it proves the *rules* agree, not that the *data* reaching them does. |
+
+**The gate found three sources of truth for one question.** *When does this
+benefit become usable for this member?*
+
+| audience | source |
+|---|---|
+| authoring projection | `BenefitConfig.waitingPeriodDays` + basis |
+| member display | the same two fields, same module — so these cannot drift |
+| provider decision | **nothing at all** |
+| claim/preauth | `WaitingPeriodApplication.endDate`, a stored date on a different table |
+
+`provider-eligibility.service.ts` contains no waiting-period evaluation, so a
+provider is told cover is active for a benefit the member cannot yet use.
+`preauth-adjudication.service.ts` reads a date somebody wrote earlier, never
+reconciled against the duration the package actually configures.
+
+**Silence is not consensus, and that is the whole design.** The easy way to make
+a parity gate green is to define the audience list as whatever currently agrees.
+So an audience that never asks is reported `NOT_CONSULTED` and **fails** the
+gate, a test asserts all four names are present so none can be quietly dropped,
+and the script prints "do not silence it by narrowing the audience list".
+
+**Checked that it can go red for the right reason.** A gate that cannot fail is
+decoration, so a test feeds it a case whose expected answer is deliberately one
+day out and asserts both evaluable audiences are reported as disagreeing, naming
+the true date in the mismatch.
+
+**Wired into `verification-gate.mjs` as release step 5b.** The plan states this
+as a release condition in its own right; a gate nobody runs is a document.
+
 ### P11.04 — the copy oracle
 
 | Field | Value |

@@ -121,6 +121,20 @@ const STEPS = [
       "but not the browser-to-worker path end to end.",
   },
   {
+    // UAT-HF P03.06. Not in the plan's list of eight, and it belongs here: the
+    // plan states it as a release condition in its own right — "Release fails
+    // if authoring projection, member display, provider decision, and
+    // claim/preauth enforcement disagree." A gate nobody runs is a document.
+    //
+    // It is EXPECTED TO FAIL today, and that is the point: two of the four
+    // audiences do not consult the shared policy read model at all. Do not
+    // silence it by narrowing the audience list.
+    id: "5b",
+    name: "Policy parity — the canonical eligibility table across all four audiences",
+    phase: "release",
+    cmd: "npx tsx scripts/policy-parity-gate.ts --release",
+  },
+  {
     id: "8",
     name: "Accessibility — computed names, keyboard, focus, 360px, 200% zoom, reduced motion",
     phase: "release",
