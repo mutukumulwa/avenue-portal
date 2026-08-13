@@ -1815,7 +1815,7 @@ history/recovery controls instead of requiring database inspection.
 | **Commands / results** | typecheck 0; lint 0 errors; suite 310 files / 3520 passed. |
 | **Evidence** | `src/lib/member-policy-copy.ts`, `member-app.service.ts`, `/member/benefits`, `/member/facilities` |
 | **Feature flags** | none. |
-| **Remaining risks** | **`/member/preauth` is still silent** — the run scanned three surfaces and this fixes two. **DEF-023 is not done**: exclusions and referral rules remain invisible on the *package detail* (the authoring audience), so P09.07's "appears consistently on authoring detail, member benefits, provider decision, and enforcement trace" is a quarter met. Exclusion notes are plumbed through `policyNotesForCategory` but no caller passes `exclusionRules` yet, so only waiting and referral copy actually renders. **DEF-061 needs a retest with a member who has a waiting period configured** — see the correction below. |
+| **Remaining risks** | **`/member/preauth` is still silent** — the run scanned three surfaces and this fixes two. ~~**DEF-023 is not done**~~ — *superseded: closed in `6738632`, see the DEF-023 entry below.* At the time of writing, exclusions and referral rules remained invisible on the *package detail* (the authoring audience), so P09.07's "appears consistently on authoring detail, member benefits, provider decision, and enforcement trace" is a quarter met. Exclusion notes are plumbed through `policyNotesForCategory` but no caller passes `exclusionRules` yet, so only waiting and referral copy actually renders. **DEF-061 needs a retest with a member who has a waiting period configured** — see the correction below. |
 
 **The copy already existed. Nothing read it.** `ReferralRule.memberSafeExplanation` was populated with the exact sentence the run quotes — "Specialist outpatient visits require a referral from your primary provider, except in an emergency." — and three member surfaces rendered none of it. So this is a read model, not new policy, which is why it can be one module: P09.07 asks for "one effective policy read model" precisely so the audiences cannot disagree, and three separate fixes would have been three chances to stay silent.
 
@@ -2314,6 +2314,21 @@ than relaxed.
 
 **Every S3 in the register now has real work behind it**, on the stricter definition — a task's
 *Defect IDs* row, not a passing mention.
+
+### DEF-027 — closed by inheritance, recorded here
+
+**Defects** DEF-027 (S3) · **Fixed by** P05.04 (`privacy-safe duplicate handling`)
+
+"Duplicate-detection refusal names an unrelated member and their member number." This is the same
+mechanism as DEF-078, and P05.04 fixed both when it stopped the enrolment probes naming anybody: the
+refusal now says a conflict exists and names no one, so the form cannot be used as an identifier
+lookup one guess at a time.
+
+It is recorded separately because it had no task entry of its own — only a passing "DEF-027/DEF-078
+in miniature" reference — which is exactly the shape that made the earlier S3 coverage count wrong.
+A defect fixed by inheritance still needs a row, or the next audit re-opens it.
+
+Covered by `tests/lib/s3-batch.test.ts` ("no warning names the other member") and the P05.04 suite.
 
 ---
 
