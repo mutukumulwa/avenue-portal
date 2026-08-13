@@ -1598,6 +1598,34 @@ refusal renders in an alert while preserving the operator's entries and re-enabl
 
 **Two newborn tests were asserting the defect.** They enrolled a `CHILD` with no `principalId` and expected success. Nothing in CT-033 says a newborn has no parent — it says a newborn may enrol without a **national ID**. The fixtures now link a principal; the behaviour under test (cover from DOB, no ID required) is unchanged.
 
+### P09.01 (part) — Draft / approve / activate for package versions
+
+| Field | Value |
+|---|---|
+| **Task** | P09.01 — the change-control engine; the approvals-console surface is not built |
+| **Defect IDs** | DEF-024 (S2) |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | `20260812001100_package_version_change_control` — `PackageVersionStatus`, five lifecycle columns, `PACKAGE_VERSION_ACTIVATION`, **backfilled by current-ness** |
+| **Tests added** | `tests/services/package-change-control.test.ts` (25); 1 rewritten and 2 added in `package-edit.actions.test.ts` |
+| **Commands / results** | typecheck 0; lint 0 errors; suite 307 files / 3458 passed; **13 migrations from an empty database with zero drift**. |
+| **Evidence** | `src/server/services/package-change-control.service.ts`, `change-control-actions.ts`, `packages/[id]/edit/actions.ts` |
+| **Feature flags** | none. |
+| **Remaining risks** | **No UI.** Submit, approve and reject are server actions with no controls on the package edit page and no entry in the Approvals console — so today a maker's edit produces a draft that **nobody can activate through the product**. That is the safe direction to fail and it is a real capability gap, exactly like the P05.05→P07.03 suspend gap: the engine landed first, the surface is next. **Scheduled activation is not built**: a version approved with a future effective date stays APPROVED and nothing later activates it — there is no job. Only the package *version* path is governed; co-contribution rules, exclusions and referral rules (the other three ungoverned changes the run recorded as B-004/005/006) still write directly. |
+
+**The register's diagnosis is the whole design.** "**The approval engine exists and is correctly described on its own page ... and demonstrably works for claim payments — configuration changes are simply not routed into it.**" So nothing new was invented: package versions got an `ApprovalActionType` and a lifecycle state, and joined the queue claim payments already use.
+
+**One line was the defect.** `updatePackageAction` created a version *and* set `Package.currentVersionId` in the same save — and that pointer is what eligibility reads. Creating and activating are two acts now, and only the second is governed. The acceptance — "maker save cannot change live member eligibility" — holds **structurally**: nothing points at a DRAFT, so a maker's save cannot move a member's cover even if every other guard in this file were bypassed.
+
+**Maker ≠ checker is enforced in the action, not only in the matrix.** `ApprovalRequestService.enforce` returns *silently* when no matrix rule is configured — and "no rule configured" must not mean "anyone may self-approve". The run found precisely that shape: a working engine, on an object nobody had routed into it.
+
+**Unknown maker fails closed.** A version with no recorded author cannot be shown to have been reviewed by somebody else, and "we could not tell" must not resolve to "approved".
+
+**Activation is one conditional claim.** `updateMany … WHERE status = 'APPROVED'` decides the winner, so two checkers racing cannot both activate; the previously-live version is superseded only *after* the claim succeeds, and a lost race leaves the pointer untouched.
+
+**Members are not migrated.** DEC-03: "Schemes and members stay pinned to their current approved version until a governed migration moves them." A test asserts the service touches no member or group row — silently moving live members onto a new version is the thing the approval exists to prevent.
+
+**The backfill reads current-ness.** A plain `DEFAULT 'DRAFT'` would have marked every live version unapproved and every historical one never-shipped; existing rows become ACTIVE or SUPERSEDED by whether the package points at them.
+
 ---
 
 ## Corrections made to the implementation plan

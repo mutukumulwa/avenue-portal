@@ -233,6 +233,11 @@ export async function updatePackageAction(
           versionNumber: nextVersion,
           effectiveFrom: new Date(),
           benefits: { create: newBenefitData },
+          // P09.01: born a DRAFT, recording who made it so the checker can be
+          // required to be somebody else (DEC-03).
+          status: "DRAFT",
+          submittedById: session.user.id,
+          submittedAt: new Date(),
         },
         include: { benefits: { select: { id: true, category: true } } },
       });
@@ -320,10 +325,21 @@ export async function updatePackageAction(
         });
       }
 
-      await tx.package.update({
-        where: { id: packageId },
-        data: { currentVersionId: newVersion.id },
-      });
+      // ── UAT-HF P09.01 — DEF-024 ──────────────────────────────────────────
+      // This line was the defect. Creating a version and pointing live
+      // eligibility at it were ONE act, so "a single underwriter changed a live
+      // ACTIVE package ... and the change took effect immediately as version v5
+      // 'Current', with no approval requested".
+      //
+      // They are two acts now, and only the second is governed. The new version
+      // is a DRAFT: `Package.currentVersionId` still points at the approved one,
+      // so no member's eligibility moved. That is the acceptance — "maker save
+      // cannot change live member eligibility" — and it holds structurally,
+      // because nothing points at a draft.
+      //
+      // Activation happens in submitPackageVersionAction → approve, which routes
+      // through the same ApprovalRequestService that already governs claim
+      // payments (the engine the run found working, just never wired to config).
     });
   } catch (err) {
     if (isP2002(err)) {

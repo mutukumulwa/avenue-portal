@@ -181,12 +181,44 @@ describe("updatePackageAction — new version + copy-forward", () => {
     );
   });
 
-  it("repoints the package at the new version and writes a PACKAGE_VERSION_CREATE audit", async () => {
+  /**
+   * UAT-HF P09.01 — DEF-024. This test asserted the defect.
+   *
+   * "A single underwriter changed a live ACTIVE package (enabled DENTAL at UGX
+   * 10,000) and the change took effect immediately as version v5 'Current',
+   * with no approval requested, no Draft/Pending/Approved state."
+   *
+   * Repointing `currentVersionId` in the maker's save IS that behaviour, so the
+   * expectation is inverted: the save creates a DRAFT and touches nothing live.
+   * Activation moved to approvePackageVersionAction, where a different checker
+   * has to say yes (DEC-03).
+   */
+  it("does NOT repoint the package — the maker's save leaves a DRAFT", async () => {
     loadedPackage();
     await expect(updatePackageAction({ ok: true }, editForm())).rejects.toThrow(/NEXT_REDIRECT/);
-    expect(mockPrisma.package.update).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { id: "pkg1" }, data: { currentVersionId: "pv2" } }),
+
+    // The acceptance: "maker save cannot change live member eligibility".
+    // `currentVersionId` is the pointer eligibility reads.
+    const repointed = mockPrisma.package.update.mock.calls.some(
+      (c: unknown[]) => (c[0] as { data?: { currentVersionId?: string } })?.data?.currentVersionId,
     );
+    expect(repointed).toBe(false);
+  });
+
+  it("creates the new version as a DRAFT, recording who made it", async () => {
+    loadedPackage();
+    await expect(updatePackageAction({ ok: true }, editForm())).rejects.toThrow(/NEXT_REDIRECT/);
+    const created = mockPrisma.packageVersion.create.mock.calls.at(-1)![0] as {
+      data: { status?: string; submittedById?: string };
+    };
+    expect(created.data.status).toBe("DRAFT");
+    // Recorded so the checker can be required to be somebody else.
+    expect(created.data.submittedById).toBeTruthy();
+  });
+
+  it("still writes a PACKAGE_VERSION_CREATE audit", async () => {
+    loadedPackage();
+    await expect(updatePackageAction({ ok: true }, editForm())).rejects.toThrow(/NEXT_REDIRECT/);
     expect(mockPrisma.auditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ action: "PACKAGE_VERSION_CREATE" }) }),
     );

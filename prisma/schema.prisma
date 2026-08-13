@@ -970,6 +970,21 @@ model Member {
   phone                  String?
   email                  String?
   photoUrl               String?
+  // ── UAT-HF P05.06 — structured Uganda member address (DEF-033) ────────────
+  // Nullable and additive so existing members remain valid. The hierarchy uses
+  // Uganda-facing labels in the UI: district; city/municipality/county;
+  // subcounty/division; parish/ward; village/zone. Precise coordinates are
+  // optional and may only be written with an accompanying consent timestamp.
+  addressCountry             String?
+  addressDistrict            String?
+  addressLocality            String?
+  addressSubcounty           String?
+  addressParish              String?
+  addressVillage             String?
+  addressLine                String?
+  addressLatitude            Decimal? @db.Decimal(9, 6)
+  addressLongitude           Decimal? @db.Decimal(9, 6)
+  addressCoordinateConsentAt DateTime?
   relationship           MemberRelationship @default(PRINCIPAL)
   principalId            String? // If dependent, links to principal member
   principal              Member?            @relation("Dependents", fields: [principalId], references: [id])
@@ -1656,6 +1671,10 @@ model TaxRate {
 // working: legacy rows are CLAIM_PAYMENT, clientId null (all clients), single
 // step via requiredRole; new rules use actionType + ApprovalStep levels.
 enum ApprovalActionType {
+  /// UAT-HF P09.01 (DEF-024) — activating a package version, i.e. making a
+  /// coverage change live. The engine already governed claim payments and two
+  /// other config types; configuration was simply never routed into it.
+  PACKAGE_VERSION_ACTIVATION
   CLAIM_PAYMENT
   PREAUTH_GOP
   LIMIT_OVERRIDE
@@ -2071,6 +2090,26 @@ model Package {
   @@index([tenantId])
 }
 
+/// UAT-HF P09.01 — where a package version sits in the DEC-03 change-control
+/// lifecycle. Before this, a version was created and made current in the same
+/// save (DEF-024): "A single underwriter changed a live ACTIVE package ... and
+/// the change took effect immediately as version v5 'Current', with no approval
+/// requested, no Draft/Pending/Approved state, and no feedback message."
+enum PackageVersionStatus {
+  /// Being edited. Invisible to eligibility; no member is on it.
+  DRAFT
+  /// Submitted by a maker, awaiting a DIFFERENT checker.
+  PENDING_APPROVAL
+  /// Approved and waiting for its effective date.
+  APPROVED
+  /// The current version. Exactly one per package.
+  ACTIVE
+  /// Was active; a later version replaced it. Kept immutably as history.
+  SUPERSEDED
+  /// A checker refused it. Kept, with the reason.
+  REJECTED
+}
+
 model PackageVersion {
   id              String          @id @default(cuid())
   packageId       String
@@ -2083,6 +2122,23 @@ model PackageVersion {
   pricingModelUrl String? // URL to uploaded pricing model (Excel/Python)
   pricingConfig   Json? // Structured pricing parameters
   createdAt       DateTime        @default(now())
+
+  // ── UAT-HF P09.01 — DEC-03 change control (DEF-024) ────────────────────────
+  // "Every coverage-affecting edit creates a draft version. A different
+  // authorized checker approves it. Activation is effective-dated ... The maker
+  // may not be the checker."
+  //
+  // Existing rows are backfilled to ACTIVE or SUPERSEDED by their current-ness,
+  // so history keeps meaning something.
+  status          PackageVersionStatus @default(DRAFT)
+  /// Who edited this version into existence.
+  submittedById   String?
+  submittedAt     DateTime?
+  /// The DIFFERENT person who approved it. Enforced maker ≠ checker.
+  approvedById    String?
+  approvedAt      DateTime?
+  /// Why a checker refused it. Present only on REJECTED.
+  rejectionReason String?
 
   currentForPackage   Package?                     @relation("CurrentVersion")
   groups              Group[]
@@ -2099,6 +2155,7 @@ model PackageVersion {
   referralRules       ReferralRule[]
 
   @@unique([packageId, versionNumber])
+  @@index([packageId, status])
 }
 
 enum BenefitCategory {
