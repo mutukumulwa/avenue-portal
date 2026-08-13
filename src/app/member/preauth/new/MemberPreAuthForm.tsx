@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { AlertCircle, AlertTriangle, Send } from "lucide-react";
 import { submitMemberPreAuthAction } from "../actions";
 
@@ -8,6 +8,8 @@ type RequestOptions = {
   members: Array<{ id: string; name: string; memberNumber: string; relationship: string; status: string }>;
   providers: Array<{ id: string; name: string; type: string; tier: string; servicesOffered: string[] }>;
   procedures: Array<{ label: string; cptCode: string; benefitCategory: string; fallbackCost: number }>;
+  /** cptCode -> the member-safe referral sentence, when one applies (DEF-060). */
+  referralWarnings: Record<string, string>;
 };
 
 const input = "w-full rounded-[8px] border border-[#EEEEEE] bg-white px-3 py-2 text-sm outline-none focus:border-brand-indigo";
@@ -15,6 +17,16 @@ const label = "text-[13px] font-bold uppercase text-brand-text-muted";
 
 export function MemberPreAuthForm({ options }: { options: RequestOptions }) {
   const [state, action, pending] = useActionState(submitMemberPreAuthAction, null);
+
+  /**
+   * UAT-HF P09.07 — DEF-060, the third surface.
+   *
+   * The select is uncontrolled apart from this: the browser shows the first
+   * option before anyone touches it, so the warning has to start on that same
+   * procedure or a member who submits without changing the field sees nothing.
+   */
+  const [procedureCode, setProcedureCode] = useState(options.procedures[0]?.cptCode ?? "");
+  const referralWarning = options.referralWarnings[procedureCode] ?? null;
 
   return (
     <div className="rounded-[8px] border border-[#EEEEEE] bg-white p-5 shadow-sm font-ui">
@@ -62,7 +74,14 @@ export function MemberPreAuthForm({ options }: { options: RequestOptions }) {
         <div className="grid gap-4 md:grid-cols-2">
           <label className="space-y-1">
             <span className={label}>Planned service</span>
-            <select required name="procedureCode" className={input}>
+            <select
+              required
+              name="procedureCode"
+              className={input}
+              value={procedureCode}
+              onChange={(e) => setProcedureCode(e.target.value)}
+              aria-describedby={referralWarning ? "preauth-referral-warning" : undefined}
+            >
               {options.procedures.map((procedure) => (
                 <option key={procedure.cptCode} value={procedure.cptCode}>
                   {procedure.label} - {procedure.benefitCategory.replace(/_/g, " ")}
@@ -75,6 +94,22 @@ export function MemberPreAuthForm({ options }: { options: RequestOptions }) {
             <input name="expectedDateOfService" type="date" className={input} />
           </label>
         </div>
+
+        {/* Before the submit button, not after the decision. A request that a
+            referral rule will refuse costs the member a wait, not just a look —
+            which is why this surface mattered more than the two already fixed. */}
+        {referralWarning && (
+          <div
+            id="preauth-referral-warning"
+            role="status"
+            className="flex items-start gap-2 rounded-[8px] border border-[#FFC107]/40 bg-[#FFC107]/5 px-4 py-3 text-sm text-[#856404]"
+          >
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              <strong className="font-semibold">Referral needed.</strong> {referralWarning}
+            </span>
+          </div>
+        )}
 
         <label className="block space-y-1">
           <span className={label}>Reason for visit</span>

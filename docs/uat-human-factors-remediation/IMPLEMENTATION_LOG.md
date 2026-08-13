@@ -1425,6 +1425,35 @@ That is a flex item's default `min-width: auto`. The wrapper cannot shrink below
 
 **34 wrappers, and a ratchet.** Every `overflow-x-auto` in `src/` now carries `min-w-0`, and a test walks the tree and fails on any that does not. One bare wrapper is one more table with unreachable columns, and the two classes only work as a pair.
 
+### P09.07 (completion) — the third member surface
+
+| Field | Value |
+|---|---|
+| **Task** | P09.07 — `/member/preauth`, recorded as "still silent" |
+| **Defect IDs** | DEF-060 (S2) |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none — the copy was already authored and stored |
+| **Tests added** | covered by `tests/lib/member-policy-copy.test.ts`; the wiring is asserted in `tests/services/member-preauth-referral.test.ts` |
+| **Evidence** | `src/server/services/member-preauth.service.ts`, `src/app/member/preauth/new/MemberPreAuthForm.tsx` |
+| **Feature flags** | none. |
+| **Remaining risks** | The **authoring** audience (package detail) and the **provider decision** surface are still not covered, so P09.07's "appears consistently on authoring detail, member benefits, provider decision, and enforcement trace" is half met, not whole. Only referral copy renders here; exclusion notes are plumbed through `policyNotesForCategory` but no caller passes `exclusionRules`. |
+
+**The run scanned three member surfaces and found referral copy on none.** Two
+were fixed; this was the one recorded as outstanding — and it is the one where
+silence is most expensive. On Find Care a member *plans* a visit; here they
+*submit* one. A request a referral rule will refuse costs them a wait and a
+rejection, not a wasted look.
+
+**The warning has to start on the first option, not on the first change.** The
+procedure select was uncontrolled, so the browser shows option one before anyone
+touches it. A warning that only appeared `onChange` would be absent for exactly
+the member who accepts the default and submits — which is most of them.
+
+**Read from the member's pinned version, resolving the package's current version
+only as a fallback (F-PIN-1), and `sourceClause` is never selected.** Same two
+rules as the other two surfaces, because the point of one shared read model is
+that the audiences cannot disagree.
+
 ### P10.01 (completion) — the two-step sign-in
 
 | Field | Value |

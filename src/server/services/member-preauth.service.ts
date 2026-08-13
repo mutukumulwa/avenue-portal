@@ -1,3 +1,4 @@
+import { referralWarningForProcedure } from "@/lib/member-policy-copy";
 import { prisma } from "@/lib/prisma";
 import { MemberAppService } from "@/server/services/member-app.service";
 import { MemberNotificationService } from "@/server/services/member-notification.service";
@@ -44,13 +45,65 @@ export class MemberPreAuthService {
       }),
     ]);
 
+    /**
+     * UAT-HF P09.07 — DEF-060's third surface.
+     *
+     * The run scanned three member surfaces for referral copy and found none.
+     * Two were fixed; this one — where the member actually commits to a request
+     * — was recorded as "still silent". It is the surface where silence costs
+     * most: on Find Care a member plans a visit, here they submit one, and a
+     * request that a referral rule will refuse is a wasted wait rather than a
+     * wasted look.
+     *
+     * Read from the member's OWN pinned version, not the package's latest, and
+     * only `memberSafeExplanation` is selected — `sourceClause` is the internal
+     * contract reference and is never fetched.
+     */
+    const procedures = ProvidersService.getMemberProcedureCatalog();
+    // The pinned version when there is one; otherwise the package's current
+    // version, resolved rather than assumed — F-PIN-1.
+    const packageVersionId =
+      context.packageVersionId ??
+      (
+        await prisma.package.findFirst({
+          where: { id: context.packageId, tenantId },
+          select: { currentVersionId: true },
+        })
+      )?.currentVersionId ??
+      null;
+
+    const rules = packageVersionId
+      ? await prisma.referralRule.findMany({
+      where: { packageVersionId },
+      select: {
+        benefitCategories: true,
+        serviceCodes: true,
+        requiresReferral: true,
+        memberSafeExplanation: true,
+        isActive: true,
+        effectiveFrom: true,
+        effectiveTo: true,
+      },
+        })
+      : [];
+
+    const referralWarnings: Record<string, string> = {};
+    for (const procedure of procedures) {
+      const warning = referralWarningForProcedure(rules, {
+        serviceCode: procedure.cptCode,
+        category: procedure.benefitCategory,
+      });
+      if (warning) referralWarnings[procedure.cptCode] = warning;
+    }
+
     return {
       members: members.map((member) => ({
         ...member,
         name: member.id === context.id ? "You" : memberName(member),
       })),
       providers,
-      procedures: ProvidersService.getMemberProcedureCatalog(),
+      procedures,
+      referralWarnings,
     };
   }
 
