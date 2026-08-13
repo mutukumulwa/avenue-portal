@@ -1,3 +1,4 @@
+import { resolveProviderRule } from "@/lib/provider-precedence";
 import { prisma } from "@/lib/prisma";
 import { Prisma, type ProviderType, type ProviderTier } from "@prisma/client";
 
@@ -269,23 +270,38 @@ export class ProvidersService {
       radiusKm: params.radiusKm,
     }) as NearbyProviderRow[];
 
-    const filteredProviders = providers.filter((provider) => {
-      if (params.providerTier && params.providerTier !== "ALL" && provider.tier !== params.providerTier) return false;
-      return providerHasService(provider, params.serviceHint ?? procedure.serviceHint);
-    });
-
     const member = await prisma.member.findUnique({
       where: { id: memberId, tenantId },
       include: {
         package: {
           include: {
-            currentVersion: { include: { benefits: true } },
+            currentVersion: {
+              include: {
+                benefits: true,
+                // DEF-007: the member's own network, not the tenant's. Without
+                // this, Find Care offered facilities the member's package
+                // excludes and priced them as though they were payable.
+                eligibilityRules: true,
+              },
+            },
           },
         },
         benefitUsages: {
           include: { benefitConfig: { select: { category: true } } },
         },
       },
+    });
+
+    const providerRules = member?.package.currentVersion?.eligibilityRules ?? [];
+
+    const filteredProviders = providers.filter((provider) => {
+      if (params.providerTier && params.providerTier !== "ALL" && provider.tier !== params.providerTier) return false;
+      if (!providerHasService(provider, params.serviceHint ?? procedure.serviceHint)) return false;
+
+      // DEC-04's ladder, evaluated the same way the claims path evaluates it.
+      // A facility the package excludes is not "nearby care" — showing it with
+      // an estimate is the false positive that mirrors DEF-007's false negative.
+      return resolveProviderRule(providerRules, { id: provider.id, tier: provider.tier }).payable;
     });
 
     const benefit = member?.package.currentVersion?.benefits.find((item) => item.category === procedure.benefitCategory);

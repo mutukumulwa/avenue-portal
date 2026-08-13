@@ -162,6 +162,8 @@ export const AUDIT_EXCLUSIONS: Record<string, string> = {
   "member/check-in/actions.ts:acknowledgeMemberCheckInAction": "PRE_EXISTING_GAP — audit wiring pending",
   "member/facilities/actions.ts:getNearbyProvidersAction": "READ_ONLY — geo search",
   "member/facilities/actions.ts:getProcedureCatalogAction": "READ_ONLY — catalogue read",
+  "member/facilities/actions.ts:explainEmptyFacilityResultAction":
+    "READ_ONLY — counts geocoded facilities to explain an empty Find Care result (DEF-007); returns the member's own tenant's contracted network, which /member/facilities already shows",
   "member/notifications/actions.ts:markAllMemberNotificationsReadAction": "LOW_RISK — member notification read-marker",
   "member/notifications/actions.ts:markMemberNotificationReadAction": "LOW_RISK — member notification read-marker",
   "member/preauth/actions.ts:submitMemberPreAuthAction": "PRE_EXISTING_GAP — audit wiring pending",

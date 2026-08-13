@@ -2566,3 +2566,69 @@ Until then **no defect in P01's coverage list is closed** — only preventable.
    building the mail sink, download interception, exhausted-benefit fixture and
    cold-offline navigation is work in its own right, and P12.05 cannot reach "zero
    blocked" without them.
+
+---
+
+## P03.03 — Find Care answers honestly, and answers for the member's own network
+
+**Defects:** DEF-007
+**Date:** 2026-08-13
+
+### What the run saw, and what was actually wrong
+
+> "The Find Care page returns 'No facilities found within 20 km' … and still 'No
+> facilities found within 100 km'. The deployed network contains 195 providers."
+
+The run added that the mechanism was "not diagnosed from the front end" — no
+back-end inspection was performed. It was diagnosed here, against production:
+
+```
+providers total                      195
+contractStatus ACTIVE                195
+GEOCODED (geoLatitude+geoLongitude)    0
+```
+
+`getNearbyProviders` filters on `AND "geoLatitude" IS NOT NULL` before applying
+`WHERE distance <= radius`. With zero geocoded providers, **no radius could ever
+have returned a row**. Search was never broken. The network was never mapped.
+
+That makes the defect two separable things, and only one of them is code.
+
+### 1. The empty state stops asserting something it cannot know (code — done)
+
+The register's objection is precise: "the confident empty state tells the member
+there is no covered care near them rather than admitting it could not answer."
+
+`explainEmptyFacilityResultAction` now distinguishes the two before the page says
+either. When facilities are mapped, the message names the count and suggests
+widening the radius. When **none** is mapped, the page says it cannot measure
+distance, says explicitly that this does not mean there is no cover, and lists
+the contracted facilities without distance so the member has somewhere to ring.
+
+An honest message with no list would have been more truthful and no more useful.
+
+### 2. Nearby results are filtered through the member's own package (code — done)
+
+`getNearbyProvidersWithMemberEstimates` filtered on tier and service only. It
+never consulted `PackageProviderEligibility`, so it could offer — and price, with
+a plan-covers figure — a facility the member's package excludes. That is the
+mirror image of DEF-007: a false positive where the reported bug was a false
+negative. It now runs `resolveProviderRule` (DEC-04's ladder, the same one the
+claims path uses). A package with no rules stays UNRESTRICTED; a fail-closed
+default there would have manufactured a second, self-inflicted DEF-007.
+
+### 3. Geocoding the network (data — NOT done, and not ours to do)
+
+195 of 195 production providers have no coordinates. No code change makes a
+distance query work without them. This is an operations task on the same list as
+the outstanding permission grants — recorded here so it is not mistaken for
+closed by the two fixes above.
+
+### Verification
+
+- `tests/services/find-care-empty-result.test.ts` — 7 tests: both empty reasons,
+  tenant scoping on both queries, ACTIVE+geocoded as the mappable definition,
+  and the three provider-rule outcomes.
+- `tests/audit-coverage/catalogue.ts` — the new read-only action is justified
+  rather than left unaudited.
+- tsc clean · eslint clean · `next build` EXIT=0 · full suite green.

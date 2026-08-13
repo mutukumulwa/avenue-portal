@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { BadgeCheck, CircleDollarSign, MapPin, Navigation, Phone, SlidersHorizontal } from "lucide-react";
-import { getNearbyProvidersAction } from "./actions";
+import { getNearbyProvidersAction, explainEmptyFacilityResultAction } from "./actions";
 import type { ProviderLocation } from "./MemberMap";
 import { ADMIN_UNIT_LABEL, isWithinCountryBounds } from "@/lib/locale-config";
 import { districtsByRegion, findDistrict } from "@/lib/uganda-districts";
@@ -105,6 +105,7 @@ export function FacilitiesMap({
   const [locationState, setLocationState] = useState<LocationState>("pending");
   const [districtName, setDistrictName] = useState<string | null>(null);
   const [providers, setProviders] = useState<ProviderLocation[]>([]);
+  const [emptyReason, setEmptyReason] = useState<Awaited<ReturnType<typeof explainEmptyFacilityResultAction>> | null>(null);
   const [loading, setLoading] = useState(false);
   const [radius, setRadius] = useState(20);
   const [procedureCode, setProcedureCode] = useState("99213");
@@ -172,10 +173,19 @@ export function FacilitiesMap({
       const fetchProviders = async () => {
         setLoading(true);
         const data = await getNearbyProvidersAction(position.lat, position.lng, radius, procedureCode, providerTier, procedure.serviceHint);
-        if (mounted) {
-          setProviders(data);
-          setLoading(false);
+        if (!mounted) return;
+        setProviders(data);
+
+        // DEF-007: an empty list is not evidence of an empty network. Ask why
+        // before saying anything, so the member is never told there is no
+        // covered care near them when the truth is that we could not look.
+        if (data.length === 0) {
+          const why = await explainEmptyFacilityResultAction();
+          if (mounted) setEmptyReason(why);
+        } else {
+          setEmptyReason(null);
         }
+        if (mounted) setLoading(false);
       };
       fetchProviders();
     }
@@ -279,9 +289,45 @@ export function FacilitiesMap({
         <div className="h-[520px] space-y-3 overflow-y-auto pr-1">
           {loading ? (
             <div className="rounded-[8px] border border-[#EEEEEE] bg-white py-10 text-center text-brand-text-muted">Searching...</div>
+          ) : providers.length === 0 && emptyReason?.reason === "NO_MAPPED_FACILITIES" ? (
+            // The honest version of DEF-007. None of the contracted facilities
+            // has been mapped yet, so distance genuinely cannot be answered —
+            // and saying "none within 100 km" would be a false negative that
+            // sends a member away from care they are entitled to.
+            <div className="space-y-3">
+              <div role="status" className="rounded-[8px] border border-[#FFEEBA] bg-[#FFF9E6] p-4">
+                <p className="text-sm font-semibold text-brand-text-heading">
+                  We cannot measure distance yet.
+                </p>
+                <p className="mt-1 text-[13px] text-brand-text-body">
+                  None of the facilities on your network has map coordinates
+                  recorded, so this page cannot tell which is nearest.{" "}
+                  <strong>This does not mean there is no cover near you.</strong>{" "}
+                  The contracted facilities are listed below — call ahead to
+                  confirm they offer {procedure.label.toLowerCase()}.
+                </p>
+              </div>
+              {emptyReason.directory.map((facility) => (
+                <div key={facility.id} className="rounded-[8px] border border-[#EEEEEE] bg-white p-4 shadow-sm">
+                  <p className="font-bold text-brand-text-heading">{facility.name}</p>
+                  <p className="mt-1 text-[13px] font-semibold text-brand-indigo">
+                    {tierLabel(facility.tier)} - {facility.type.replace(/_/g, " ")}
+                  </p>
+                  {facility.address && (
+                    <p className="mt-1 text-[13px] text-brand-text-muted">{facility.address}</p>
+                  )}
+                </div>
+              ))}
+            </div>
           ) : providers.length === 0 ? (
             <div className="rounded-[8px] border border-[#EEEEEE] bg-white py-10 text-center text-brand-text-muted">
-              No facilities found within {radius} km for {procedure.label.toLowerCase()}.
+              No mapped facility within {radius} km offers {procedure.label.toLowerCase()}.
+              {emptyReason && emptyReason.mappableCount > 0 && (
+                <span className="mt-1 block text-[13px]">
+                  {emptyReason.mappableCount} facilities are mapped on your network
+                  — widening the radius or changing the facility type may reach one.
+                </span>
+              )}
             </div>
           ) : (
             providers.map((provider) => (
