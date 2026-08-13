@@ -42,12 +42,13 @@ vi.mock("@/server/services/provider-eligibility.service", () => ({
   ProviderEligibilityService: { check },
 }));
 
-import {
-  BENEFIT_OPTIONS,
-  EMPTY_ELIGIBILITY_STATE,
-  NOT_FOUND_MESSAGE,
-  checkEligibilityAction,
-} from "@/app/provider/eligibility/actions";
+import { checkEligibilityAction } from "@/app/provider/eligibility/actions";
+// A "use server" file may export only async functions, so the constants moved
+// to `contract.ts` — the arrangement that broke the production build while
+// tsc, ESLint and Vitest all passed.
+import { BENEFIT_OPTIONS, EMPTY_ELIGIBILITY_STATE } from "@/app/provider/eligibility/contract";
+// The collapsed not-found copy at its source (P03.02).
+import { COLLAPSED_NOT_FOUND_MESSAGE as NOT_FOUND_MESSAGE } from "@/server/services/eligibility/decision-contract";
 import { EXAMPLES } from "@/lib/locale-config";
 
 const form = (fields: Record<string, string>) => {

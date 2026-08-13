@@ -17,13 +17,8 @@ import { useActionState } from "react";
 import Link from "next/link";
 import { AlertCircle, CheckCircle2, Search, ShieldAlert, XCircle } from "lucide-react";
 import { EXAMPLES } from "@/lib/locale-config";
-import {
-  BENEFIT_OPTIONS,
-  EMPTY_ELIGIBILITY_STATE,
-  MAX_MEMBER_LEN,
-  checkEligibilityAction,
-  type EligibilityCheckState,
-} from "./actions";
+import { checkEligibilityAction } from "./actions";
+import { BENEFIT_OPTIONS, EMPTY_ELIGIBILITY_STATE, MAX_MEMBER_LEN, type EligibilityCheckState } from "./contract";
 
 export function EligibilityCheckForm({ memberNumberExample }: { memberNumberExample?: string }) {
   const [state, formAction, pending] = useActionState<EligibilityCheckState, FormData>(

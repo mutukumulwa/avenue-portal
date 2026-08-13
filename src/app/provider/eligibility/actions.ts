@@ -21,38 +21,14 @@ import { providerPermits } from "@/components/layouts/provider-nav-model";
 import { ProviderEligibilityService, type EligibilitySafeResult } from "@/server/services/provider-eligibility.service";
 import { parseValidDate } from "@/lib/dates";
 import { COLLAPSED_NOT_FOUND_MESSAGE } from "@/server/services/eligibility/decision-contract";
-
-export const MAX_MEMBER_LEN = 64;
-
-/** The allow-list the UI offers AND accepts (ELIG-GAP-008). */
-export const BENEFIT_OPTIONS = [
-  "OUTPATIENT",
-  "INPATIENT",
-  "MATERNITY",
-  "DENTAL",
-  "OPTICAL",
-  "MENTAL_HEALTH",
-  "LAST_EXPENSE",
-  "WELLNESS_PREVENTIVE",
-] as const;
-
-export interface EligibilityCheckState {
-  /** Field-level input problem; the lookup did not run. */
-  inputError: string | null;
-  /** Present when the lookup ran. */
-  result: EligibilitySafeResult | null;
-  /** What the operator asked, echoed back so the form can be re-rendered. */
-  submitted: { serviceDate: string; benefit: string } | null;
-  /** Set when the service itself failed — NOT an ineligibility (P03.02). */
-  unavailable: boolean;
-}
-
-export const EMPTY_ELIGIBILITY_STATE: EligibilityCheckState = {
-  inputError: null,
-  result: null,
-  submitted: null,
-  unavailable: false,
-};
+// A "use server" file may export ONLY async functions, so the form's constants
+// and state shape live beside it in `contract.ts` — see the note there.
+import {
+  BENEFIT_OPTIONS,
+  EMPTY_ELIGIBILITY_STATE,
+  MAX_MEMBER_LEN,
+  type EligibilityCheckState,
+} from "./contract";
 
 export async function checkEligibilityAction(
   _previous: EligibilityCheckState | null,
@@ -106,4 +82,3 @@ export async function checkEligibilityAction(
 }
 
 /** Re-exported so the client component and the action agree on one string. */
-export const NOT_FOUND_MESSAGE = COLLAPSED_NOT_FOUND_MESSAGE;
