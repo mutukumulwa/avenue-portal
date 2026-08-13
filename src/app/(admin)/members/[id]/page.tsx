@@ -6,6 +6,7 @@ import { ArrowLeft, Pencil, CreditCard, AlertTriangle, XCircle, Clock } from "lu
 import { lifecycleService } from "@/server/services/lifecycle.service";
 import {
   lapseManuallyAction, reinstateWithinCatchupAction,
+  suspendMemberAction, unsuspendMemberAction,
   initiateCoolingOffCancellationAction, initiateStandardCancellationAction,
   terminateForFraudAction, terminateForBreachAction, recordDeathAction,
 } from "./lifecycle-actions";
@@ -459,6 +460,30 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
           </div>
         )}
 
+        {/* UAT-HF P07.03: a suspended member needs a route back, or suspending
+            becomes a one-way door with no governed exit. */}
+        {member.status === "SUSPENDED" && (
+          <div className="space-y-3">
+            <p className="text-xs font-bold uppercase text-brand-text-muted tracking-wide">Actions</p>
+            <GovernedLifecycleAction
+              action={unsuspendMemberAction}
+              memberId={id}
+              memberLabel={memberLabel}
+              label="Lift suspension"
+              title="Lift this suspension?"
+              confirmLabel="Lift the suspension"
+              tone="default"
+              buttonClassName="bg-[#28A745] text-white px-4 py-1.5 rounded-full text-xs font-semibold hover:bg-[#218838] transition-colors"
+              consequences={
+                <p>
+                  <strong>{memberLabel}</strong> moves from SUSPENDED back to ACTIVE and is covered
+                  again from now. The suspended window remains an uncovered gap in their history.
+                </p>
+              }
+            />
+          </div>
+        )}
+
         {/* Action buttons for ACTIVE members */}
         {member.status === "ACTIVE" && (
           <div className="space-y-3">
@@ -527,6 +552,29 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
                   <p className="mt-1 text-[10px] text-brand-text-muted">Defaults to today if left blank.</p>
                 </div>
               </GovernedLifecycleAction>
+
+              {/* UAT-HF P07.03 — closes the capability gap P05.05 opened and
+                  logged: removing `status` from the profile form left no route
+                  to suspend, because lifecycleService has no suspend flow. This
+                  is that route, with the same ceremony as its neighbours. */}
+              <GovernedLifecycleAction
+                action={suspendMemberAction}
+                memberId={id}
+                memberLabel={memberLabel}
+                label="Suspend"
+                title="Suspend this membership?"
+                confirmLabel="Suspend the membership"
+                buttonClassName="border border-[#FFC107] text-[#856404] px-3 py-1.5 rounded-full text-xs font-semibold hover:bg-[#FFC107]/10 transition-colors"
+                consequences={
+                  <>
+                    <p>
+                      <strong>{memberLabel}</strong> moves from ACTIVE to SUSPENDED. Cover stops
+                      now, and the suspended period becomes an uncovered gap in their history.
+                    </p>
+                    <p>Lifting the suspension later reopens cover from that point, not from today.</p>
+                  </>
+                }
+              />
 
               <GovernedLifecycleAction
                 action={lapseManuallyAction}

@@ -4,6 +4,7 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { lifecycleService } from "@/server/services/lifecycle.service";
 import { revalidatePath } from "next/cache";
 import { writeAudit } from "@/lib/audit";
+import { MembersService } from "@/server/services/members.service";
 
 /**
  * UAT-HF P07.03 — the reason a cover-changing action was taken (DEF-040/059).
@@ -130,5 +131,56 @@ export async function recordDeathAction(formData: FormData) {
   const memberId    = formData.get("memberId") as string;
   const proofDocUrl = formData.get("proofDocUrl") as string;
   await lifecycleService.recordPrincipalDeath(memberId, session.user.tenantId, session.user.id, proofDocUrl, parseEffectiveDate(formData));
+  revalidatePath(`/members/${memberId}`);
+}
+
+/**
+ * UAT-HF P07.03 — suspend and un-suspend, as governed form actions.
+ *
+ * P05.05 removed `status` from the generic profile edit form (DEF-041/DEF-043:
+ * suspending a member had the ceremony and audit weight of fixing a typo) and
+ * recorded a deliberate trade: `lifecycleService` has governed flows for lapse,
+ * reinstate, cancel and terminate but **none for suspend**, so deleting the
+ * dropdown left no route to suspend at all until a confirmation surface existed.
+ *
+ * This is that surface's server half. It reuses `MembersService.changeStatus`,
+ * which carries the coverage effects — suspending closes the open period so the
+ * suspension is an uncovered gap; un-suspending opens a fresh one — and the same
+ * `requireReason` guard as every other cover-changing action here.
+ */
+export async function suspendMemberAction(formData: FormData) {
+  const session = await requireRole(ROLES.MEMBER_OPS);
+  const memberId = formData.get("memberId") as string;
+  const reason = requireReason(formData);
+
+  const { previousStatus } = await MembersService.changeStatus(
+    session.user.tenantId,
+    memberId,
+    "SUSPENDED",
+  );
+
+  await auditLifecycleReason(formData, {
+    memberId,
+    userId: session.user.id,
+    action: "MEMBER_SUSPENDED",
+    description: `Member suspended from ${previousStatus}. Reason: ${reason}`,
+  });
+  revalidatePath(`/members/${memberId}`);
+}
+
+/** Lift a suspension. Cover resumes from now; the suspended window stays a gap. */
+export async function unsuspendMemberAction(formData: FormData) {
+  const session = await requireRole(ROLES.MEMBER_OPS);
+  const memberId = formData.get("memberId") as string;
+  const reason = requireReason(formData);
+
+  await MembersService.changeStatus(session.user.tenantId, memberId, "ACTIVE");
+
+  await auditLifecycleReason(formData, {
+    memberId,
+    userId: session.user.id,
+    action: "MEMBER_REINSTATED",
+    description: `Suspension lifted. Reason: ${reason}`,
+  });
   revalidatePath(`/members/${memberId}`);
 }

@@ -25,6 +25,7 @@ export const KNOWN_AUDITING_TOKENS = [
   "DeliveryRetryService.manualRetry(", // PNOS F9.6/F9.8 — writes INTEGRATION_DELIVERY:MANUAL_RETRY audit internally
   "runClaimIntake(", // shared claim-intake path — chain-audits CLAIM:INTAKE_ACCEPTED internally
   "reimbursementService.submit(", // F5.6 — appends REIMBURSEMENT:SUBMITTED + canonical intake audit internally
+  "auditLifecycleReason(", // UAT-HF P07.03 — local helper wrapping writeAudit; records the REQUIRED reason for every cover-changing member action (DEF-040/DEF-059)
   "auditPolicy(", // F6.5 — local helper wrapping auditChainService.append for the policy console
   "auditProtocol(", // DG C3.2 — local helper wrapping auditChainService.append for the clinical protocol library
   // UAT-HF P10.02 (DEF-005 / WP-3.1): a bare `prisma.auditLog.create` is the

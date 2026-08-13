@@ -170,3 +170,47 @@ describe("P07.03 the server refuses an unreasoned change", () => {
     expect(actions).toMatch(/metadata: \{ memberId: input\.memberId, reason \}/);
   });
 });
+
+/**
+ * UAT-HF P07.03 — the capability gap P05.05 opened, and logged, is closed.
+ *
+ * P05.05 removed `status` from the generic profile edit form (DEF-041/DEF-043:
+ * suspending a member carried the ceremony of fixing a typo) and recorded that
+ * `lifecycleService` has governed flows for lapse, reinstate, cancel and
+ * terminate but NONE for suspend — so deleting the dropdown left no route to
+ * suspend until a confirmation surface existed.
+ */
+describe("P07.03 suspend has a governed route again", () => {
+  const page = readFileSync("src/app/(admin)/members/[id]/page.tsx", "utf8");
+  const actions = readFileSync("src/app/(admin)/members/[id]/lifecycle-actions.ts", "utf8");
+
+  it("an ACTIVE member can be suspended, with the same ceremony as its neighbours", () => {
+    expect(page).toContain("action={suspendMemberAction}");
+    expect(page).toMatch(/label="Suspend"/);
+  });
+
+  it("a SUSPENDED member has a route back", () => {
+    // Otherwise suspending is a one-way door with no governed exit.
+    expect(page).toContain("action={unsuspendMemberAction}");
+    expect(page).toMatch(/member\.status === "SUSPENDED"/);
+  });
+
+  it("both require a reason, like every other cover-changing action", () => {
+    for (const fn of ["suspendMemberAction", "unsuspendMemberAction"]) {
+      const body = actions.slice(actions.indexOf(`export async function ${fn}`));
+      expect(body.slice(0, 700), fn).toContain("requireReason(formData)");
+    }
+  });
+
+  it("goes through changeStatus, so the coverage gap is recorded", () => {
+    // Suspending closes the open coverage period and un-suspending opens a
+    // fresh one, which is what keeps point-in-time eligibility right.
+    expect(actions).toContain("MembersService.changeStatus");
+  });
+
+  it("says the suspended window stays an uncovered gap", () => {
+    // An operator who thinks lifting a suspension backfills cover will make
+    // promises the claims engine will not honour.
+    expect(page).toMatch(/uncovered gap in their history/);
+  });
+});
