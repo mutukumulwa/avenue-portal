@@ -1534,7 +1534,7 @@ is exactly the field users get wrong and off-by-one is a day of claims.
 | **Tests added** | `tests/services/member-status-atomicity.test.ts` (14) |
 | **Evidence** | `src/server/services/members.service.ts`, member edit action |
 | **Feature flags** | none. |
-| **Remaining risks** | ~~P07.01's policy table is still not the decision-maker.~~ *Closed in the follow-up commit below.* **No `DomainEvent`, outbox row or operation receipt is written inside the transaction**, so P07.02's "persist event/outbox/receipt" limb is unmet; the audit row is still written by the action *after* the transaction commits, which means a crash in between loses the trail for a change that happened. `effectiveAt` is plumbed but **no caller passes it yet** — the edit action has no date field — so back-dating is possible in the service and not yet reachable from the UI. Only the member-status path was made atomic; contract, package and endorsement transitions were not audited for the same shape. |
+| **Remaining risks** | ~~P07.01's policy table is still not the decision-maker.~~ ~~No `DomainEvent` is written inside the transaction.~~ *Both closed in the follow-up commits below.* No **operation receipt** is minted for a lifecycle command, so a retried transition is caught by the version precondition (it becomes a CONFLICT) rather than recognised as a replay — safe, but not the P01.02 contract. The action's post-commit `writeAudit` is now redundant with the domain event and was left in place rather than removed in the same commit as the behaviour change. `effectiveAt` is plumbed but **no caller passes it yet** — the edit action has no date field — so back-dating is possible in the service and not yet reachable from the UI. Only the member-status path was made atomic; contract, package and endorsement transitions were not audited for the same shape. |
 
 **Three faults, and the middle one is a money bug.**
 
@@ -1604,6 +1604,38 @@ correct, and there is now an explicit test for a role the table does not name.
 **Termination without a checker is refused end to end.** Asserted at the action
 rather than only in the policy unit test, because the gap between "the table
 says so" and "the write path asks the table" is exactly what this commit closes.
+
+### P07.02 (follow-up 2) — the trail is written inside the transaction
+
+| Field | Value |
+|---|---|
+| **Task** | P07.02 — the "persist event/outbox/receipt" limb |
+| **Defect IDs** | DEF-041, DEF-042, DEF-043 |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/services/member-status-atomicity.test.ts` +5 |
+| **Evidence** | `src/server/services/members.service.ts`, member edit action |
+| **Feature flags** | none. |
+| **Remaining risks** | No **operation receipt** is minted, so a retried transition is caught by the version precondition and reported as a CONFLICT rather than recognised as a replay. That is safe but is not P01.02's contract, and it means a double-submit tells the operator someone else changed the record when in fact they themselves did. No notifications are enqueued — `DomainEventService.record` takes them and this passes none, so nobody is told a member was suspended. The action's post-commit `writeAudit` is now redundant with the event and was deliberately left in place rather than removed alongside a behaviour change. |
+
+**The audit row was written after the commit.** A crash in between produced a
+status change with no trail — the precise inverse of the failure P01.03 was
+built to prevent, sitting in the one path where the record matters most.
+
+**`DomainEventService.record` has taken a transaction client since it was
+written, and says so in its own comment**: "Pass the SAME transaction client as
+the state change — that coupling is the whole point." The lifecycle path never
+passed one. That is the same shape as the coverage-period bug in the previous
+commit, in the same function, found by looking for it once the first one turned
+up: infrastructure built for a guarantee, and a caller that quietly opted out.
+
+**The event is stamped with the effective date, not the click.** An event whose
+`occurredAt` is the moment a button was pressed cannot support a point-in-time
+question later, which is most of what an event log is for.
+
+**It is optional, and a test pins that.** Existing callers of `changeStatus`
+pass no event and must not start failing because they have not been updated; the
+parameter is additive.
 
 ### P03.06 — the policy parity gate
 

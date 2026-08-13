@@ -237,10 +237,16 @@ describe("P05.05 a status change is its own command, with a reason", () => {
     );
     expect(result.ok).toBe(true);
     // P07.02: the version travels to the service as an optimistic precondition,
-    // and suspension ends no cover so it needs no effective date.
+    // suspension ends no cover so it needs no effective date, and the event is
+    // handed down to be written INSIDE the transaction.
     expect(changeStatus).toHaveBeenCalledWith("t1", "m1", "SUSPENDED", {
       effectiveAt: undefined,
       expectedVersion: 2,
+      event: {
+        actor: { id: "mo-1", role: "MEMBER_OPS" },
+        reasonNote: "Non-payment, per finance ticket 4821",
+        correlationId: expect.any(String),
+      },
     });
   });
 

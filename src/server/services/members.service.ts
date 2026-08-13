@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import type { MemberStatus, MemberRelationship, Gender } from "@prisma/client";
 import { FraudService } from "./fraud.service";
 import { nextMemberNumber } from "./member-numbering.service";
+import { DomainEventService } from "@/server/services/domain-event.service";
 import { coverageService } from "./coverage.service";
 import { assertEnrolmentAge } from "./eligibility/enrolment-age";
 import { GroupsService } from "./groups.service";
@@ -652,6 +653,15 @@ export class MembersService {
       effectiveAt?: Date;
       /** Optimistic precondition; omit to fall back to the status check alone. */
       expectedVersion?: number;
+      /**
+       * P07.02 — recorded in the SAME transaction as the state change, so a
+       * crash between the two cannot leave a change with no trail.
+       */
+      event?: {
+        actor?: { id?: string; name?: string; role?: string };
+        reasonNote?: string;
+        correlationId?: string;
+      };
     } = {},
   ) {
     const member = await prisma.member.findFirst({
@@ -694,6 +704,36 @@ export class MembersService {
         await coverageService.closeOpenPeriods(tx, memberId, boundary, "SUSPENDED");
       } else if (member.status === "SUSPENDED" && next === "ACTIVE") {
         await coverageService.openPeriod(tx, tenantId, memberId, boundary, "REINSTATEMENT");
+      }
+
+      // P07.02's last limb: "persist event/outbox/receipt" — in this
+      // transaction, not after it.
+      //
+      // The audit row was written by the action AFTER the commit, so a crash in
+      // between produced a status change with no trail. DomainEventService.record
+      // has taken a transaction client from the start and says so in its own
+      // comment ("Pass the SAME transaction client as the state change — that
+      // coupling is the whole point"); the lifecycle path simply never did.
+      if (options.event) {
+        await DomainEventService.record(
+          {
+            tenantId,
+            eventType: `member.lifecycle.${next.toLowerCase()}`,
+            entityType: "MEMBER",
+            entityId: memberId,
+            description: `Member status ${member.status} → ${next}`,
+            actor: options.event.actor,
+            occurredAt: boundary,
+            payload: {
+              previousStatus: member.status,
+              newStatus: next,
+              effectiveAt: boundary.toISOString(),
+            },
+            reasonNote: options.event.reasonNote,
+            correlationId: options.event.correlationId,
+          },
+          tx,
+        );
       }
 
       // No re-read. The conditional update above succeeded, so the row's status

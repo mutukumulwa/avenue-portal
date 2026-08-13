@@ -381,6 +381,14 @@ export async function changeMemberStatusAction(
         // period must close on it rather than on the click.
         effectiveAt: lastCoveredDay ? new Date(`${lastCoveredDay}T00:00:00Z`) : undefined,
         expectedVersion: member.version,
+        // P07.02: the trail is written INSIDE the transaction. The writeAudit
+        // below still runs and is still useful, but it happens after the commit
+        // — so on its own it loses the record of a change that did happen.
+        event: {
+          actor: { id: session.user.id, role: session.user.role ?? undefined },
+          reasonNote: reason,
+          correlationId,
+        },
       });
     } catch (err) {
       if (err instanceof StaleMemberTransitionError) {

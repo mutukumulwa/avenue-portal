@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => ({
   transaction: vi.fn(),
   closeOpenPeriods: vi.fn(),
   openPeriod: vi.fn(),
+  recordEvent: vi.fn(),
 }));
 
 vi.mock("@/lib/prisma", () => ({
@@ -38,6 +39,9 @@ vi.mock("@/lib/prisma", () => ({
 }));
 vi.mock("@/server/services/coverage.service", () => ({
   coverageService: { closeOpenPeriods: mocks.closeOpenPeriods, openPeriod: mocks.openPeriod },
+}));
+vi.mock("@/server/services/domain-event.service", () => ({
+  DomainEventService: { record: mocks.recordEvent },
 }));
 
 import { MembersService, StaleMemberTransitionError } from "@/server/services/members.service";
@@ -50,6 +54,7 @@ beforeEach(() => {
   // roll-back test installs would leak into every test after it.
   vi.resetAllMocks();
   mocks.closeOpenPeriods.mockResolvedValue(undefined);
+  mocks.recordEvent.mockResolvedValue({ id: "evt_1" });
   mocks.openPeriod.mockResolvedValue(undefined);
   mocks.findFirst.mockResolvedValue({ id: "m1", status: "ACTIVE", version: 7 });
   mocks.updateMany.mockResolvedValue({ count: 1 });
@@ -161,5 +166,45 @@ describe("P07.02 DEC-12 — the coverage boundary is the operator's date", () =>
     await MembersService.changeStatus("t1", "m1", "SUSPENDED", { effectiveAt: backDated });
     const used = mocks.closeOpenPeriods.mock.calls[0][2] as Date;
     expect(used.toISOString()).toBe("2026-07-01T00:00:00.000Z");
+  });
+});
+
+describe("P07.02 the trail is written inside the transaction", () => {
+  const EVENT = { actor: { id: "u1", role: "MEMBER_OPS" }, reasonNote: "Arrears", correlationId: "c1" };
+
+  it("records the domain event through the SAME client", async () => {
+    await MembersService.changeStatus("t1", "m1", "SUSPENDED", { event: EVENT });
+    // The audit row the action writes happens AFTER the commit, so on its own it
+    // loses the record of a change that did happen. This one cannot.
+    expect(mocks.recordEvent.mock.calls[0][1]).toMatchObject({ marker: "TX" });
+  });
+
+  it("names both statuses, so the trail is readable without the code", async () => {
+    await MembersService.changeStatus("t1", "m1", "SUSPENDED", { event: EVENT });
+    const input = mocks.recordEvent.mock.calls[0][0];
+    expect(input.eventType).toBe("member.lifecycle.suspended");
+    expect(input.payload).toMatchObject({ previousStatus: "ACTIVE", newStatus: "SUSPENDED" });
+    expect(input.reasonNote).toBe("Arrears");
+    expect(input.correlationId).toBe("c1");
+  });
+
+  it("stamps the event with the effective date, not the click", async () => {
+    const effectiveAt = new Date("2026-07-01T00:00:00Z");
+    await MembersService.changeStatus("t1", "m1", "SUSPENDED", { event: EVENT, effectiveAt });
+    expect(mocks.recordEvent.mock.calls[0][0].occurredAt).toBe(effectiveAt);
+  });
+
+  it("writes no event when it loses the staleness race", async () => {
+    mocks.updateMany.mockResolvedValue({ count: 0 });
+    await MembersService.changeStatus("t1", "m1", "SUSPENDED", { event: EVENT }).catch(() => {});
+    expect(mocks.recordEvent).not.toHaveBeenCalled();
+  });
+
+  it("is optional — a caller that supplies no event still transitions", async () => {
+    // Existing callers must not start failing because they have not been
+    // updated yet; the event is additive.
+    await MembersService.changeStatus("t1", "m1", "SUSPENDED");
+    expect(mocks.recordEvent).not.toHaveBeenCalled();
+    expect(mocks.updateMany).toHaveBeenCalled();
   });
 });
