@@ -214,9 +214,22 @@ describe("createMember — dependant guards (M-013 / M-014) + default tier", () 
 });
 
 describe("createMember — newborn (CT-033) + SIBLING", () => {
+  /**
+   * UAT-HF (DEF-031) — these two newborn fixtures enrolled a CHILD with NO
+   * principalId, which is exactly the orphan the run recorded: "Submitting
+   * creates a live ACTIVE dependant with no principal, no family unit and its
+   * own full Annual Limit of UGX 25,000,000 ... Three such orphaned CHILD
+   * members were created during this run."
+   *
+   * Nothing in CT-033 says a newborn has no parent — it says a newborn may
+   * enrol without a NATIONAL ID. The fixtures now link a principal, which is
+   * what a newborn actually has. The behaviour under test (cover from DOB, no
+   * ID required) is unchanged.
+   */
   it("accepts a newborn with NO national ID and covers from the DOB when notified within 30 days", async () => {
+    overrides.principalById = { id: "p1", relationship: "PRINCIPAL", status: "ACTIVE", groupId: "g1", group: { id: "g1", packageId: "pkg1", packageVersionId: "pv1", clientId: "c1" } };
     await MembersService.createMember("t1", {
-      groupId: "g1", firstName: "Baby", lastName: "Doe",
+      groupId: "g1", firstName: "Baby", lastName: "Doe", principalId: "p1",
       dateOfBirth: "2026-08-01", gender: "FEMALE", relationship: "CHILD",
       effectiveDate: "2026-08-20", birthNotificationDate: "2026-08-10", // 9 days after birth
     });
@@ -232,12 +245,42 @@ describe("createMember — newborn (CT-033) + SIBLING", () => {
   });
 
   it("a LATE birth notification (>30 days) keeps the supplied effective date", async () => {
+    overrides.principalById = { id: "p1", relationship: "PRINCIPAL", status: "ACTIVE", groupId: "g1", group: { id: "g1", packageId: "pkg1", packageVersionId: "pv1", clientId: "c1" } };
     await MembersService.createMember("t1", {
-      groupId: "g1", firstName: "Late", lastName: "Notice",
+      groupId: "g1", firstName: "Late", lastName: "Notice", principalId: "p1",
       dateOfBirth: "2026-01-01", gender: "MALE", relationship: "CHILD",
       effectiveDate: "2026-08-10", birthNotificationDate: "2026-08-10",
     });
     expect(lastCreate().coverStartDate).toEqual(new Date("2026-08-10"));
+  });
+
+  it("REFUSES a dependant with no principal — DEF-031's orphan", async () => {
+    // "Three such orphaned CHILD members were created during this run
+    // (UX26-2026-00010, -00011, -00012), including the two controlled twins."
+    await expect(
+      MembersService.createMember("t1", {
+        groupId: "g1", firstName: "Orphan", lastName: "Child",
+        dateOfBirth: "2018-01-01", gender: "FEMALE", relationship: "CHILD",
+      }),
+    ).rejects.toThrow(/must be linked to a principal member/i);
+    expect(db.member.create).not.toHaveBeenCalled();
+  });
+
+  it("points at the route that does it correctly", async () => {
+    const error = await MembersService.createMember("t1", {
+      groupId: "g1", firstName: "Orphan", lastName: "Child",
+      dateOfBirth: "2018-01-01", gender: "FEMALE", relationship: "SPOUSE",
+    }).catch((e: Error) => e);
+    // A refusal with no way forward is only half an answer.
+    expect(String(error)).toMatch(/Add Dependent/);
+  });
+
+  it("still allows a PRINCIPAL with no principalId, which is the normal case", async () => {
+    await MembersService.createMember("t1", {
+      groupId: "g1", firstName: "Solo", lastName: "Principal",
+      dateOfBirth: "1990-01-01", gender: "MALE", relationship: "PRINCIPAL",
+    });
+    expect(db.member.create).toHaveBeenCalled();
   });
 
   it("enrols a SIBLING dependant (new relationship)", async () => {

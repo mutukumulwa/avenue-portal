@@ -1533,6 +1533,26 @@ Nothing new is invented here. The four ungoverned actions — Lapse, Reinstate, 
 
 **The server check sits after the M-013/M-014 guards, deliberately.** When a dependant is linked to a dependant *and* that member is lapsed, "you linked to a dependant" is the more useful message. Four test fixtures were missing `status` and are corrected — real principals always have one, and the guard was right to refuse them.
 
+### P05.03 (follow-up) — The generic form can no longer orphan a dependant
+
+| Field | Value |
+|---|---|
+| **Task** | P05.03 follow-up (the plan lists DEF-031 under P05.03 and P06.03) |
+| **Defect IDs** | DEF-031 (S2) |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none — but see the risk below |
+| **Tests added** | 3 in `member-new-form-draft.test.tsx`, 3 in `member-enrolment-integrity.test.ts`; 2 fixtures corrected |
+| **Commands / results** | typecheck 0; lint 0 errors; suite 300 files / 3387 passed. |
+| **Evidence** | `src/server/services/members.service.ts`, `src/app/(admin)/members/new/MemberNewForm.tsx` |
+| **Feature flags** | none. |
+| **Remaining risks** | **The orphans the run created still exist.** "Three such orphaned CHILD members were created during this run (UX26-2026-00010, -00011, -00012), including the two controlled twins" — and any others predating this fix. Nothing here finds or repairs them; a report listing dependants with no `principalId` is the obvious next step and is not written. The **import channel** is not covered: a CSV with a dependant row and no `principalIdNumber` reaches `createMember` and will now be refused, which is correct, but it will surface as a row error rather than a preflight warning (P06.01). |
+
+**A dependant with no principal is not a member of anything.** It has no family unit to draw a shared limit against — so, as the run recorded, it "creates a live ACTIVE dependant with no principal, no family unit and **its own full Annual Limit of UGX 25,000,000**". The orphan is not a tidiness problem; it is a member holding a principal's entire benefit ceiling.
+
+**The acceptance allowed either fix; refusing is the better one.** "The enrolment surface either requires a principal or refuses the relationship." A principal *selector* would be a second route to the same link — and the correct route already exists on the principal's own profile, carrying `principalId`. So the generic form offers only PRINCIPAL, and says where dependants are added. The server refuses independently, because a removed `<option>` is not a control.
+
+**Two newborn tests were asserting the defect.** They enrolled a `CHILD` with no `principalId` and expected success. Nothing in CT-033 says a newborn has no parent — it says a newborn may enrol without a **national ID**. The fixtures now link a principal; the behaviour under test (cover from DOB, no ID required) is unchanged.
+
 ---
 
 ## Corrections made to the implementation plan

@@ -262,3 +262,52 @@ describe("P04.02 a select restores too, not only text inputs", () => {
     expect(DraftStore.load(SCOPE, MEMBER_ENROLMENT_DRAFT)?.values.gender).toBe("OTHER");
   });
 });
+
+/**
+ * UAT-HF P05.03 — DEF-031 (S2).
+ *
+ * "Selecting Relationship 'Child' (or Spouse/Parent/Sibling) presents no
+ * principal selector at all — the fields are identical to a principal
+ * enrolment. Submitting creates a live ACTIVE dependant with no principal, no
+ * family unit and its own full Annual Limit of UGX 25,000,000, with no warning
+ * at any point. Three such orphaned CHILD members were created during this run."
+ */
+describe("P05.03 DEF-031 — the generic form cannot orphan a dependant", () => {
+  const relationshipSelect = () =>
+    screen.getAllByRole("combobox").find((s) => (s as HTMLSelectElement).name === "relationship") as
+      | HTMLSelectElement
+      | undefined;
+
+  it("offers only Principal when no principal is in context", () => {
+    renderForm();
+    const options = Array.from(relationshipSelect()!.options).map((o) => o.value);
+    // The four that silently created orphans.
+    expect(options).toEqual(["PRINCIPAL"]);
+  });
+
+  it("says where dependants are actually added", () => {
+    // A removed option with no explanation is its own defect.
+    renderForm();
+    expect(screen.getByText(/Add Dependent/)).toBeInTheDocument();
+    expect(screen.getByText(/share its limits/i)).toBeInTheDocument();
+  });
+
+  it("offers the dependant relationships when a principal IS in context", () => {
+    render(
+      <MemberNewForm
+        groups={GROUPS}
+        draftScope={SCOPE}
+        principal={{
+          id: "p1",
+          name: "Valid Principal",
+          memberNumber: "UX26-2026-00030",
+          groupId: "g1",
+          groupName: "Staff",
+        }}
+      />,
+    );
+    const options = Array.from(relationshipSelect()!.options).map((o) => o.value);
+    expect(options).toEqual(["SPOUSE", "CHILD", "PARENT", "SIBLING"]);
+    expect(options).not.toContain("PRINCIPAL");
+  });
+});

@@ -128,6 +128,26 @@ export class MembersService {
       // NW-D02: when a dependant is linked to a principal, validate the principal
       // and enrol the dependant into the principal's own scheme (a dependant must
       // never land in a different group than the family they belong to).
+      // ── UAT-HF P05.03 / P07.06 — DEF-031 (S2) ────────────────────────────
+      // "Selecting Relationship 'Child' (or Spouse/Parent/Sibling) presents no
+      // principal selector at all ... Submitting creates a live ACTIVE
+      // dependant with no principal, no family unit and its own full Annual
+      // Limit of UGX 25,000,000, with no warning at any point. Three such
+      // orphaned CHILD members were created during this run."
+      //
+      // A dependant without a principal is not a member of anything: it has no
+      // family unit to draw a shared limit against, so it silently got a
+      // principal's entire limit. The relationship is refused rather than a
+      // principal being guessed — the correct route (a principal's "Add
+      // Dependent") already exists and carries the link.
+      const relationship = data.relationship || "PRINCIPAL";
+      if (relationship !== "PRINCIPAL" && !data.principalId) {
+        throw new Error(
+          `A ${relationship.toLowerCase()} must be linked to a principal member. ` +
+            `Open the principal's profile and use "Add Dependent" so the dependant joins their family unit and shares their limits.`,
+        );
+      }
+
       let effectiveGroup = group;
       if (data.principalId) {
         const principal = await tx.member.findFirst({

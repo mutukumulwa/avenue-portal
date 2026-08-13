@@ -182,13 +182,38 @@ export function MemberNewForm({ groups, principal, draftScope = null }: Props) {
             </div>
             <div>
               <label className={labelCls}>Relationship *</label>
+              {/*
+                UAT-HF P05.03 — DEF-031 (S2). "Selecting Relationship 'Child'
+                (or Spouse/Parent/Sibling) presents no principal selector at all
+                ... Submitting creates a live ACTIVE dependant with no principal,
+                no family unit and its own full Annual Limit of UGX 25,000,000,
+                with no warning at any point."
+
+                The acceptance allows either requiring a principal or refusing
+                the relationship. This refuses: the correct route already exists
+                and carries the link, so offering a second route that silently
+                orphans is the whole defect. The dependant options are gone from
+                the generic form, and the note says where they live.
+              */}
               <select required name="relationship" defaultValue={principal ? "SPOUSE" : "PRINCIPAL"} className={inputCls}>
-                {!principal && <option value="PRINCIPAL">Principal</option>}
-                <option value="SPOUSE">Spouse</option>
-                <option value="CHILD">Child</option>
-                <option value="PARENT">Parent</option>
-                <option value="SIBLING">Sibling</option>
+                {principal ? (
+                  <>
+                    <option value="SPOUSE">Spouse</option>
+                    <option value="CHILD">Child</option>
+                    <option value="PARENT">Parent</option>
+                    <option value="SIBLING">Sibling</option>
+                  </>
+                ) : (
+                  <option value="PRINCIPAL">Principal</option>
+                )}
               </select>
+              {!principal && (
+                <p className="text-[10px] text-brand-text-muted mt-1">
+                  This form enrols a principal. To add a spouse, child, parent or sibling, open the
+                  principal&rsquo;s profile and use <strong>Add Dependent</strong> — that links them
+                  to the family unit so they share its limits.
+                </p>
+              )}
             </div>
             <div>
               <label className={labelCls}>Effective Date *</label>
