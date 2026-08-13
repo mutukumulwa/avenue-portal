@@ -12,6 +12,7 @@ import {
 import { BenefitUsageService } from "@/server/services/benefit-usage.service";
 import { MemberProfileTabs } from "@/components/members/MemberProfileTabs";
 import { HouseholdPanel } from "@/components/members/HouseholdPanel";
+import { GovernedLifecycleAction } from "@/components/members/GovernedLifecycleAction";
 import {
   maskEmail,
   maskNationalId,
@@ -186,6 +187,10 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
 
   // Build a plain-JSON-safe object with only the fields the client component needs.
   // All Decimal → number, all Date → ISO string — no Prisma objects cross the boundary.
+  // UAT-HF P07.03: every destructive confirmation names its target, so the
+  // operator is never asked "are you sure?" about an unnamed thing.
+  const memberLabel = `${member.memberNumber} — ${member.firstName} ${member.lastName}`;
+
   const safeMember = {
     id: member.id,
     firstName: member.firstName,
@@ -402,13 +407,26 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
               </div>
             </div>
             {!lapseRecord.catchupExpired ? (
-              <form action={reinstateWithinCatchupAction}>
-                <input type="hidden" name="memberId" value={id} />
-                <button type="submit"
-                  className="bg-[#28A745] text-white px-4 py-1.5 rounded-full text-xs font-semibold hover:bg-[#218838] transition-colors">
-                  Reinstate (within catch-up window)
-                </button>
-              </form>
+              /* P07.03 — DEF-059: this restored live cover on a single click,
+                 with no confirmation and no reason. Reinstating is not
+                 destructive, but it IS a change to whether somebody is
+                 covered, which is the line the register draws. */
+              <GovernedLifecycleAction
+                action={reinstateWithinCatchupAction}
+                memberId={id}
+                memberLabel={memberLabel}
+                label="Reinstate (within catch-up window)"
+                title="Reinstate this membership?"
+                confirmLabel="Reinstate the membership"
+                tone="default"
+                buttonClassName="bg-[#28A745] text-white px-4 py-1.5 rounded-full text-xs font-semibold hover:bg-[#218838] transition-colors"
+                consequences={
+                  <p>
+                    <strong>{memberLabel}</strong> moves from LAPSED back to ACTIVE and is covered
+                    again from now. The lapsed period remains an uncovered gap in their history.
+                  </p>
+                }
+              />
             ) : (
               <Link href={`/quotations/new?groupId=${member.group.id}`}
                 className="inline-block bg-brand-indigo text-white px-4 py-1.5 rounded-full text-xs font-semibold hover:bg-brand-secondary transition-colors">
@@ -445,33 +463,92 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
         {member.status === "ACTIVE" && (
           <div className="space-y-3">
             <p className="text-xs font-bold uppercase text-brand-text-muted tracking-wide">Actions</p>
+            {/*
+              UAT-HF P07.03 — DEF-040 / DEF-059. These three changed live cover
+              on a SINGLE CLICK: "no browser dialog fired, no in-product
+              confirmation appeared, no reason was captured." The register's own
+              diagnosis is that "the governance exists in the product and is
+              simply not applied to the two reversible actions that change live
+              cover — the ones an operator is most likely to click by accident",
+              because Terminate (Breach) two blocks below already has a required
+              reason code and a senior-approval heading.
+
+              So nothing new is invented: the pattern already on this screen is
+              extended to the actions that skipped it.
+            */}
             <div className="flex flex-wrap gap-2">
-              {/* Cooling-off cancellation */}
-              <form action={initiateCoolingOffCancellationAction}>
-                <input type="hidden" name="memberId" value={id} />
-                <button type="submit"
-                  className="border border-[#6C757D] text-[#6C757D] px-3 py-1.5 rounded-full text-xs font-semibold hover:bg-[#6C757D]/10 transition-colors">
-                  Cooling-Off Cancel
-                </button>
-              </form>
-              {/* Standard cancellation */}
-              <form action={initiateStandardCancellationAction} className="flex items-center gap-1">
-                <input type="hidden" name="memberId" value={id} />
-                <input name="effectiveDate" type="date" title="Effective (last covered) day — defaults to today"
-                  className="border border-[#EEEEEE] rounded-[6px] px-2 py-1.5 text-xs" />
-                <button type="submit"
-                  className="border border-[#6C757D] text-[#6C757D] px-3 py-1.5 rounded-full text-xs font-semibold hover:bg-[#6C757D]/10 transition-colors">
-                  Standard Cancel
-                </button>
-              </form>
-              {/* Manual lapse */}
-              <form action={lapseManuallyAction}>
-                <input type="hidden" name="memberId" value={id} />
-                <button type="submit"
-                  className="border border-[#FFC107] text-[#856404] px-3 py-1.5 rounded-full text-xs font-semibold hover:bg-[#FFC107]/10 transition-colors">
-                  Lapse Manually
-                </button>
-              </form>
+              <GovernedLifecycleAction
+                action={initiateCoolingOffCancellationAction}
+                memberId={id}
+                memberLabel={memberLabel}
+                label="Cooling-Off Cancel"
+                title="Cancel this membership within the cooling-off period?"
+                confirmLabel="Cancel the membership"
+                consequences={
+                  <>
+                    <p>
+                      <strong>{memberLabel}</strong> moves from ACTIVE to CANCELLED (cooling-off).
+                      Cover ends and any cooling-off refund is computed by the lifecycle service.
+                    </p>
+                    <p>Dependants on this membership lose cover with the principal.</p>
+                  </>
+                }
+              />
+
+              <GovernedLifecycleAction
+                action={initiateStandardCancellationAction}
+                memberId={id}
+                memberLabel={memberLabel}
+                label="Standard Cancel"
+                title="Cancel this membership?"
+                confirmLabel="Cancel the membership"
+                requiredPhrase={member.memberNumber}
+                consequences={
+                  <>
+                    <p>
+                      <strong>{memberLabel}</strong> moves from ACTIVE to CANCELLED. Cover ends on
+                      the last covered day below, and a cancellation fee is applied by the
+                      lifecycle service.
+                    </p>
+                    <p>Dependants on this membership lose cover with the principal.</p>
+                  </>
+                }
+              >
+                <div>
+                  <label className="block text-xs font-bold uppercase text-brand-text-muted mb-1" htmlFor="cancel-effective">
+                    Last covered day
+                  </label>
+                  <input
+                    id="cancel-effective"
+                    name="effectiveDate"
+                    type="date"
+                    className="w-full rounded-lg border border-[#EEEEEE] px-3 py-2 text-sm focus:border-brand-indigo focus:outline-none"
+                  />
+                  <p className="mt-1 text-[10px] text-brand-text-muted">Defaults to today if left blank.</p>
+                </div>
+              </GovernedLifecycleAction>
+
+              <GovernedLifecycleAction
+                action={lapseManuallyAction}
+                memberId={id}
+                memberLabel={memberLabel}
+                label="Lapse Manually"
+                title="Lapse this membership?"
+                confirmLabel="Lapse the membership"
+                tone="destructive"
+                buttonClassName="border border-[#FFC107] text-[#856404] px-3 py-1.5 rounded-full text-xs font-semibold hover:bg-[#FFC107]/10 transition-colors"
+                consequences={
+                  <>
+                    <p>
+                      <strong>{memberLabel}</strong> moves from ACTIVE to LAPSED. Cover stops now.
+                    </p>
+                    <p>
+                      This is reversible within the catch-up window — but the member is uncovered
+                      until it is reversed.
+                    </p>
+                  </>
+                }
+              />
             </div>
 
             {/* Death recording */}

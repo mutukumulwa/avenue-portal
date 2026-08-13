@@ -1477,6 +1477,38 @@ That is a flex item's default `min-width: auto`. The wrapper cannot shrink below
 
 ---
 
+## P07 — Governed member lifecycle
+
+### P07.03 (part) — Named confirmation for cover-changing actions
+
+| Field | Value |
+|---|---|
+| **Task** | P07.03 — the confirmation half; the preview of holds/refund amounts is not built |
+| **Defect IDs** | DEF-040 (S2), DEF-059 (S2) |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/components/governed-lifecycle-action.test.tsx` (16) |
+| **Commands / results** | typecheck 0; lint 0 errors; suite 299 files / 3347 passed. |
+| **Evidence** | `src/components/members/GovernedLifecycleAction.tsx`, `src/app/(admin)/members/[id]/{page.tsx,lifecycle-actions.ts}` |
+| **Feature flags** | none. |
+| **Remaining risks** | **The preview does not compute money.** The plan asks the dialog to show "holds/refund consequences"; it currently states *that* a cancellation fee or cooling-off refund applies and leaves the amount to the lifecycle service. Showing a figure the service might not produce would be worse than not showing one, but it is not what the plan asked for. **No operation receipt or reference is shown after confirming** — "confirm creates one event and clear receipt" is half met: the audit row is written, the operator is not handed a reference. `changeMemberStatusAction` (P05.05's suspend bridge) still has no surface; this component is the obvious host for it and that wiring was not done. DEF-048 and DEF-081, also listed under P07.03, are untouched. |
+
+**The register diagnosed this one itself, and the diagnosis is the design.**
+
+> "On the same screen, Terminate (Breach) sits under a 'TERMINATION (REQUIRES SENIOR APPROVAL)' heading with a required reason code ... **So the governance exists in the product and is simply not applied to the two reversible actions that change live cover — the ones an operator is most likely to click by accident.**"
+
+Nothing new is invented here. The four ungoverned actions — Lapse, Reinstate, Standard Cancel, Cooling-Off Cancel — now get the ceremony their neighbours already had.
+
+**"Enter cannot trigger the transition" is the hardest clause, and it is structural.** The form is submitted only by `requestSubmit()` from the confirm button; there is no default submit target for a keypress in the reason or date field to reach. A test fires both `keyDown` and `submit` on the reason input and asserts nothing happens.
+
+**The server refuses an unreasoned change too.** A dialog that asks for a reason and then discards it is worse than not asking — and a forged POST would skip the dialog entirely. `requireReason` throws rather than substituting a placeholder: a lifecycle change with an invented reason is an audit trail that reads as complete and is not.
+
+**Reinstate is guarded even though it is not destructive.** It is still a change to whether somebody is covered, which is the line the register draws — and it was equally one click.
+
+**The irreversible one asks for the member number to be typed.** Standard Cancel applies a fee and ends cover; `requiredPhrase` makes it an act rather than a reflex.
+
+---
+
 ## Corrections made to the implementation plan
 
 The plan is treated as authoritative but not infallible. Where a plan statement was checked against
