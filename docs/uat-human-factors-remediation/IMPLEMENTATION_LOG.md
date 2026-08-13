@@ -1469,6 +1469,46 @@ periods run from X" heading was correct only while the basis was hard-coded;
 now that it varies per benefit, one line for the card would be wrong for any
 benefit configured differently from the first.
 
+### P11.04 — the copy oracle
+
+| Field | Value |
+|---|---|
+| **Task** | P11.04 |
+| **Defect IDs** | DEF-003, DEF-010, DEF-011, DEF-045, DEF-060, DEF-061, DEF-066, DEF-068, DEF-070, DEF-075, DEF-082 — **the oracle, not the individual copy**, which the owning tasks fixed |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/lib/copy-oracle.test.ts` (95) |
+| **Evidence** | `src/lib/mutation-contract.ts`, `src/server/services/eligibility/decision-contract.ts` |
+| **Feature flags** | none. |
+| **Remaining risks** | The oracle covers the two **catalogues** — every `MutationFailureKind` and every `EligibilityDecisionReason`. It does **not** cover ad-hoc strings written inline at call sites, which is where most copy actually lives; a caller passing `message: err.message` would still leak, and only a per-surface test would catch it. `assertUserSafe` is a denylist of shapes, so it catches the leaks that have actually occurred (Prisma codes, stack frames, member numbers, phone, email, NIN) and cannot prove the absence of others. Freshness — the fifth limb of the copy rule — is **not** asserted: it lives on the surfaces that render a timestamp, not in either catalogue. |
+
+**Eleven defects, and none of them was the point.** Every defect P11.04 lists was
+closed by the task that owned its surface. What none of those provides is a rule
+the *next* entry has to satisfy — and every copy defect in this run was one
+entry somebody added without a rule to measure it against: "no member" for a
+system outage, a duration with no date, a raw exception in a banner.
+
+**So the deliverable is the oracle.** It enumerates both catalogues and holds
+every entry to the same checks, which means a new failure kind or a new
+eligibility reason cannot ship with copy nobody read.
+
+**The two claims that must never blur.** `UNAVAILABLE` says *nothing was saved*
+and retrying is safe; `UNKNOWN_OUTCOME` says *we cannot tell* and must warn
+against resubmitting. Asserted in both directions, because the failure mode is
+not a missing sentence — it is the wrong one of the two, which turns a
+recoverable outage into a duplicate write.
+
+**One assertion I wrote was wrong and the copy was right.** I first forbade the
+phrase "not covered" in any reason where the member is still covered. But "This
+treatment is not covered under the member's package" is exactly correct — the
+*thing* is excluded, the *person* is not. The check now targets claims about the
+member's cover specifically, which is the distinction DEF-061 actually turns on.
+
+**Checked against copy that should fail.** A denylist that never fires is
+decoration, so the markers were run against eight realistic leaks — a raw Prisma
+invocation error, a P2002 code, a stack frame, an `undefined` message, a member
+number, a phone, an email and a NIN. All eight are rejected; clean copy passes.
+
 ### P03.05 (completion) — the identifier-in-URL sweep
 
 | Field | Value |
