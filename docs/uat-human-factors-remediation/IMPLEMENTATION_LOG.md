@@ -2384,6 +2384,89 @@ was believed, and the correction was published rather than quietly dropped.
 
 ---
 
+### P12.01–P12.04 — observability, flags, migration readiness, verification gate
+
+**Commit** `d71bdd3` · **Defects** DEF-065, DEF-068, DEF-070 (via P12.01)
+
+Four of the five P12 tasks. **P12.05 is untouched** — see the entry below it.
+
+**P12.04 — the gate.** `npm run verify` and `npm run verify:release`, plus a CI workflow. The
+acceptance sentence that shaped the whole design is *"zero unexplained failure; flaky or **skipped**
+critical test is a release failure."* A gate that silently omits a check is worse than no gate,
+because green then means something other than what the reader assumes. So each of the plan's eight
+steps is either RUN or printed as **NOT COVERED**, and `--release` exits non-zero on a gap. Three
+steps genuinely have no automation in this repository — browser (no Playwright at all), network-fault,
+and full keyboard/zoom accessibility — and the gate says so at every invocation.
+
+It adds a step the plan's list omits: **`next build`**. The `"use server"` export rule that shipped a
+broken `main` passed typecheck, ESLint and Vitest. Nothing else in the list can see that class.
+
+Node is pinned **in the workflow, not in `.nvmrc`** — Vercel reads `.nvmrc`, so adding one would
+silently change the runtime production builds on, and a production change should not be a side effect
+of adding CI. The Postgres service container is 17, matching production (verified by querying it).
+
+**P12.03 — the flag surface, which did not exist.** Six flags, per *"do not use one global flag"*.
+The API is `canStart()` and there is deliberately **no** `canFinish`/`isProcessingEnabled`: a flag
+gates *starting* work, never *finishing* it. A worker that stopped draining because a flag flipped
+would turn a rollback into DEF-068 — an interrupted import presented as a crash. An unrecognised env
+value falls back to the documented default rather than "off", so a typo in a Vercel variable cannot
+quietly disable a control. Defaults point the safe way, and safe is not always off: `PRIVACY_REVEAL`
+defaults **on**, because off reproduces the live blocker where nobody can reveal a masked national ID.
+
+**P12.01 — support lookup and metrics.** P01.02 built the endpoint a *user* can call for their own
+operation; this is the tenant-scoped one a *support operator* can call for somebody else's, behind
+`support.operation.lookup`. It answers "did my save commit?" as a sentence rather than a state enum,
+and warns specifically on `UNKNOWN` — the state where a retry is what duplicates.
+
+It never selects `requestHash` or a domain event's `payload`, and the result carries no
+member-identifying field. The privacy rules DEF-057/078/079 established apply harder here, because
+the caller is looking at another person's activity.
+
+The metrics **list what cannot be instrumented** instead of reporting it as zero — a zero reads as
+health, and "notification failures: 0" when the worker is unprovisioned says the opposite of the
+truth. **Found while building it:** `AuditLog` has no `correlationId` column, so an audit row cannot
+be tied to the operation that produced it. `DomainEvent` can, which is why the outbox is traceable
+and the audit trail is not. Recorded as a gap rather than papered over with a JSON-path guess.
+
+**P12.02 — the four missing dry-run reports.** Five of the plan's nine checks already had scripts;
+`scripts/reports/migration-readiness.ts` adds member-numbering duplicates, sequence-behind-highest,
+unfinished imports, exclusion owner XOR, and audit projection gaps. Read-only *by construction* —
+there is no `--apply` to forget, which is a stronger guarantee than a dry-run flag. A check that
+cannot **run** counts as a finding, not a pass, so a missing table fails the report instead of
+reading clean.
+
+**Run against production: all five read zero.**
+
+**Verified.** `next build` compiles and `/settings/support` appears in the route manifest; `tsc`
+clean; `eslint` clean; 46 new tests; full suite **3799 passed, 0 failed**; the readiness report
+exercised against both a freshly migrated database and production.
+
+---
+
+### P12.05 — NOT DONE, and not doable from here
+
+**Task** P12.05 · **No commit**
+
+Re-executing the human-factors run is 456 manual steps driven through a browser as five personas,
+plus 31 previously-blocked steps and seven new adjacent scenarios. It is a testing engagement, not a
+code change, and the owner's instruction during this work was explicit: **no UAT until everything
+else is finished.**
+
+Two things must be true before it can start, and neither is:
+
+1. **The four harness capabilities P00.05 identified are still unbuilt** — a mail sink, download
+   interception, an exhausted-benefit fixture and cold-offline navigation. Seven of the 31 blocked
+   steps cannot be unblocked by any product fix without them, so P12.05's "zero blocked" GO criterion
+   is unreachable until they exist.
+2. **`SCHEMA_DEPLOY_MODE` is still `push`.** A run against a build whose next migration would be
+   silently skipped is testing something other than the release.
+
+Its GO criteria also require sign-offs no engineer can give: a named business/security/accessibility
+owner accepting each remaining S3/S4 with an expiry, and support/operations sign-off on the
+dashboards and runbooks. The dashboards now exist (P12.01); the sign-off does not.
+
+---
+
 ## Corrections made to the implementation plan
 
 The plan is treated as authoritative but not infallible. Where a plan statement was checked against
