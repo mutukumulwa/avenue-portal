@@ -14,9 +14,11 @@
  *   npx tsx scripts/reports/member-identity-preflight.ts --json
  */
 
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+// The shared client, NOT `new PrismaClient()`: this project constructs Prisma
+// with a pg driver adapter, and a bare constructor throws
+// PrismaClientInitializationError — which a report only discovers on the day
+// somebody needs it.
+import { prisma } from "@/lib/prisma";
 
 interface Collision {
   tenantId: string;
