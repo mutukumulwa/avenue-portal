@@ -1718,6 +1718,61 @@ cannot distinguish RESERVED, PROCESSING and terminal outcomes or reconstruct a f
 process kill. Those are not small follow-ups to hide in this service: P06.02 and P06.03 own the
 persistent row/family ledger, lease/retry semantics and transaction boundary.
 
+### P06.02 — Durable import job and row/family-unit ledger
+
+| Field | Value |
+|---|---|
+| **Task** | P06.02 |
+| **Defect IDs** | DEF-036 (S2), DEF-068 (S2); adjacent partial-batch and response-loss outcomes |
+| **Commit** | `d1301d0` contains the schema declarations because the shared schema file was committed by the concurrent P09.05 task; migration/service/actions/UI/tests are in _this commit_ |
+| **Migrations / backfills** | `20260813001400_durable_import_ledger` — explicit batch/unit/row states, public reference, normalized row ledger, family units, legacy aggregate backfill. Proven with all **16** current migrations from empty and zero Prisma drift. A legacy upgrade rehearsal before the final generic-failure terminology correction produced the expected `SUCCEEDED`, `PARTIAL`, and honest `UNKNOWN` cases; the final SQL is syntax-proven on the clean install and its `FAILED` (not invented `REJECTED`) classification is regression-asserted. Production cutover remains outstanding. |
+| **Tests added** | `tests/services/member-import-job.service.test.ts` (8); action idempotency/nonterminal replay coverage extended |
+| **Commands / results** | Focused: **4 files / 70 tests passed**; targeted lint 0 errors. Full gate: typecheck 0; lint **0 errors / 216 warnings**; suite **313 files / 3594 tests passed**, 88 files / 598 skipped; production `next build` compiled and emitted all routes (one pre-existing BullMQ critical-dependency warning); brand, currency and locale guards green; `git diff --check` clean. |
+| **Routes exercised** | no live browser route. Admin and HR confirm actions, the ledger service and migration SQL were exercised directly; both import Client Components compiled in the production build and their existing validation-boundary tests passed. Browser response-loss/status-copy retest remains P12.05. |
+| **Evidence** | `prisma/schema.prisma`; migration `20260813001400_durable_import_ledger`; `member-import-job.service.ts`; both import actions/clients; import action/service tests |
+| **Feature flags** | none. A confirmed import always reserves the durable ledger before any business write. |
+| **Remaining risks** | **P06.03 remains the transaction/recovery boundary:** execution is still synchronous, family units are persisted but not yet leased/executed atomically, and a crash between a member/endorsement write and its row-ledger transition leaves an honest `PROCESSING`/`UNKNOWN` outcome requiring recovery. **P06.04 remains the support surface:** the immediate response shows batch reference/status, but history, polling, safe retry and durable reject download do not exist yet. P06.05 still needs file-byte/row ceilings; P06.06 XLSX parity; P06.07 restricted raw-source provenance and output-only spreadsheet escaping. No outcome notification/outbox or live response-loss/browser retest was added. |
+
+**Batch existence no longer means success.** The old `ImportBatch` reservation was also treated as
+the completion receipt. If the process died after creating it, a retry replayed `0 imported` as a
+successful deterministic no-op. A batch now has an explicit state, public opaque reference, source
+hash, actor/target metadata, timestamps and failure classification. Only `SUCCEEDED`, `PARTIAL` or
+`FAILED` is replayed as complete. `QUEUED`, `PROCESSING` and `UNKNOWN` are returned with their
+reference and an explicit nonterminal/unknown message; the clients no longer pair that message with
+a green “complete” heading.
+
+**Every confirm decision is durable before the first member or endorsement write.** Reservation is
+one database transaction creating the batch, every source row, every preflight error/warning and
+the family-unit boundaries derived from principal identity. Preflight rejects are already terminal;
+valid rows start queued. The same tenant/lane/group/content idempotency key still decides a
+concurrent race, but the loser reads the winner's state instead of assuming the winner finished.
+Public references are independent random identifiers, so internal CUIDs are not exposed as support
+handles.
+
+**Counts are projections, not claims made by the action.** Finalization reads `ImportRow` only,
+weights synthetic legacy summaries by `recordCount`, derives accepted/rejected/conflict/runtime
+failure totals, derives each unit state from its rows and then writes the batch projection. An empty
+or nonterminal unit is `UNKNOWN`, never vacuously successful. A row transition must update exactly
+one queued/processing row; otherwise processing stops and leaves a reconcilable unresolved batch.
+That guard also exposed and fixed a subtler HR risk: ledger completion used to sit inside the
+endorsement-number collision catch, so a ledger error could have been mistaken for `P2002` and
+created another endorsement. Business creation and ledger transition are now separate catch
+boundaries.
+
+**The legacy migration refuses to manufacture knowledge.** Historical batches whose aggregate
+totals prove completion receive synthetic weighted ledger rows so their counts reconstruct. A
+reservation whose total cannot prove completion becomes `UNKNOWN` with
+`LEGACY_OUTCOME_UNKNOWN`. The old `failedCount` mixed preflight rejects and runtime failures, so its
+synthetic row is the generic terminal `FAILED`, not a falsely specific `REJECTED` or `CONFLICT`.
+Existing detailed reject JSON remains for compatibility until P06.04 reads the normalized ledger.
+
+**This is deliberately not called resumable yet.** `ImportUnit` already carries unit key, attempts
+and lease fields so P06.03 has a persistent boundary, but this task does not pretend a synchronous
+loop is a worker. Member/endorsement creation and row finalization are not in the same transaction
+yet. A crash therefore produces an observable unknown outcome and suppresses automatic duplicate
+replay; P06.03 must make one family exactly-once recoverable, and P06.04 must give support the
+history/recovery controls instead of requiring database inspection.
+
 ### P09.01 (part) — Draft / approve / activate for package versions
 
 | Field | Value |
@@ -1885,6 +1940,42 @@ its date controls to.
 
 ---
 
+### P09.04 (part) — Every icon-only control has a name
+
+**Commit** `2d6b651` · **Defect** DEF-056 (S3, WCAG 2.2 SC 4.1.2)
+
+The run inspected the DOM and found the remove controls in Provider Eligibility and Treatment
+Exclusions with "innerText empty, aria-label null and title null". The register hedges — "applies to
+**at least** two sections of the package edit form". A sweep of every `.tsx` under `src/` found
+**twenty-seven**: delete controls on shared limits, referral rules, contract exclusions,
+approval-matrix rules, rate-table rows, practitioners, claim lines, procedures, diagnoses and
+benefit tiers; the close control on six modals including *Revoke API key*; and the clear/remove
+controls on `SearchFilterBar`, `MemberSearchPicker` and `FileUpload` — shared components, so each
+one is nameless on every screen that mounts it. Fixing the two named would have left the defect
+nearly everywhere it occurred.
+
+**Each name says what it acts on.** "Remove shared limit: Maternity pool". "Unlink practitioner Jane
+Doe from this provider". "Delete rate for ages 18-35, FEMALE, M_2". A bare "Delete" satisfies the
+letter of 4.1.2 and misses the point: a voice-control user saying "delete" against nine identical
+buttons is the exact situation the criterion exists to prevent. A test asserts none of the names is
+a bare verb.
+
+**The sweep is executable.** `tests/a11y/icon-button-names.test.ts` scans source rather than rendered
+DOM — jsdom has no accessibility tree, rendering all twenty-seven would need a mock per page, and a
+source scan cannot be satisfied by a component that merely happens not to be rendered in any test.
+It also asserts its own detector fires on a known-bad sample and stays quiet on a labelled button,
+because a scanner that can only pass is worth nothing.
+
+**tsc earned its place in the gate again.** Five of the labels referenced fields that do not exist
+on their row type — `r.title` on three rule types, `p.fullName`, `line.code`. All five were caught
+before the commit and corrected to the real fields.
+
+**Verified.** `next build` compiles; `tsc --noEmit` clean; `eslint` clean on all 21 changed files
+(one pre-existing unused-import warning in `BenefitTiersCard.tsx`); full suite **3600 passed, 0
+failed**.
+
+---
+
 ## Corrections made to the implementation plan
 
 The plan is treated as authoritative but not infallible. Where a plan statement was checked against
@@ -1908,7 +1999,7 @@ the divergence stays visible to a reviewer.
 | **P03** (partial) | **PASS** — 0 errors | **PASS** — 0 errors | **PASS** — 279 files / 2937 tests passed, 88 files / 598 skipped | P03.01 reporting half, 03.02–03.05 done; **03.06 blocked on P09** |
 | **P04** | **PASS** — 0 errors | **PASS** — 0 errors, 217 warnings | **PASS** — 286 files / 3079 tests passed | P04.01–P04.05 **complete** |
 | **P05** | **PASS** — 0 errors | **PASS** — 0 errors, 214 warnings | **PASS** — 308 files / 3465 tests passed | P05.01–P05.07 complete; governed alternate endorsement-engine cleanup remains P08.02 |
-| **P06** (partial) | **PASS** — 0 errors | **PASS** — 0 errors, 214 warnings | **PASS** — 311 files / 3538 tests passed | P06.01 complete; P06.05's DEF-069 half complete; durable job/row ledger, family-unit commit, history, XLSX and storage/export separation remain P06.02–P06.07 |
+| **P06** (partial) | **PASS** — 0 errors | **PASS** — 0 errors, 216 warnings | **PASS** — 313 files / 3594 tests passed | P06.01–P06.02 complete; P06.05's DEF-069 half complete; atomic resumable family-unit execution, history, XLSX and storage/export separation remain P06.03–P06.07 |
 | **P09** (partial) | **PASS** — 0 errors | **PASS** — 0 errors | **PASS** — 297 files / 3308 tests passed | P09.02 done; P09.06 impact half |
 | **P10** (partial) | **PASS** — 0 errors | **PASS** — 0 errors, 216 warnings | **PASS** — 293 files / 3248 tests passed | P10.02–P10.04 done; **P10.01 partial** |
 | **P11** (partial) | **PASS** — 0 errors | **PASS** — 0 errors | **PASS** — 296 files / 3287 tests passed | P11.02 done |
