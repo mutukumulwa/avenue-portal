@@ -1824,6 +1824,67 @@ the schema cutover is the other and remains a human ops step.
 
 ---
 
+### P09.05 — Deterministic provider-rule precedence
+
+**Commit** `d1301d0` · **Defects** DEF-054, DEF-055 (partial) · **Decision** DEC-04
+
+The run's observation was about a screen: INCLUDE "All PANEL tier providers" and EXCLUDE "Agape
+Medical Centre" saved together, "rendered side by side with no conflict badge, no ordering, no
+priority column and no warning", and a scan for precedence language returning nothing. Two separate
+problems sat behind it.
+
+**The answer existed and was never expressed.** The engine did resolve this — any EXCLUDE won — but
+the rule was implemented three times, in `eligibility/entitlement.ts`, preauth Gate 2 and
+`offline-pack.service.ts`. Three implementations is why no screen could state the answer: there was
+no single answer to state. All three now call `src/lib/provider-precedence.ts`, and the verdict
+carries the ID of the rule that decided it.
+
+**"Any EXCLUDE wins" is wrong at one edge.** DEC-04's ladder is specific `EXCLUDE`, then specific
+`INCLUDE`, then tier. The behaviour change is between ranks 2 and 3: under the old code, EXCLUDE
+"all PANEL" plus INCLUDE "Agape" left Agape out of network — an operator could name a hospital as a
+carve-out and be silently ignored. The specific rule now wins. **The run's own configuration is
+unaffected**: a specific EXCLUDE still beats a tier INCLUDE, so Agape stays excluded there.
+
+**Order-independence is structural.** Every candidate rule is scored and the maximum taken; nothing
+iterates in database order and stops early. `resolveProviderRule(rules, p)` and
+`resolveProviderRule([...rules].reverse(), p)` are asserted equal.
+
+**What cannot be resolved is refused, not guessed.** The ladder separates every pair except two
+*tier* rules on the same tier pointing opposite ways — rank 3 covers both directions.
+`detectProviderRuleConflicts` refuses that at authoring time; if such a pair is already in the data,
+the evaluator returns `AMBIGUOUS`, fails closed, and preauth routes to a human. This is the
+Diagnosis Gate bug class (row order deciding which condition's rules ran) and it is now impossible
+to reach silently.
+
+**The screen.** States the ladder in words, badges each rule with its rank, says which rule a
+specific one overrides, warns on unresolvable conflicts with `role="alert"`, and lists an
+**Effective outcome** — payable or not, per provider — computed by importing the evaluator's own
+module rather than reimplementing the ranking. A second copy in the UI would be a second chance to
+disagree with the engine, which is the defect. The delete control also gained an accessible name
+(DEF-055's "single unlabelled trash icon").
+
+**Schema.** `20260813001500_provider_rule_precedence` adds `priority`, `effectiveFrom`,
+`effectiveTo`, `isActive` to `PackageProviderEligibility`. All four carry defaults, so every
+existing row keeps its exact current meaning and the migration changes no decision by itself.
+
+**A correction worth recording.** The first draft of the tests asserted that INCLUDE and EXCLUDE
+naming the *same* provider was an unresolvable tie. DEC-04 says otherwise — specific EXCLUDE is rank
+1 and specific INCLUDE rank 2, so it is determinate and fails safe. The tests were corrected to the
+decision as written rather than the decision being bent to the tests, and the module now documents
+that pair explicitly, because it is the case a reader will also expect to be a conflict.
+
+**Verified.** `next build` compiles; `tsc --noEmit` clean; `eslint` clean on all twelve changed
+files (two pre-existing warnings in `preauth-adjudication.service.ts` untouched); 45 new tests in
+`tests/lib/provider-precedence.test.ts` plus two write-guard cases in the package-edit action suite;
+full suite **3592 passed, 0 failed**.
+
+**Not done here.** DEF-055's governance half — effective dates in the authoring form, a new package
+version per network change, the rules appearing on the package *detail* page, and a reason plus
+audit on removal — is P09.04 and remains open. The columns this task added are what P09.04 will bind
+its date controls to.
+
+---
+
 ## Corrections made to the implementation plan
 
 The plan is treated as authoritative but not infallible. Where a plan statement was checked against
