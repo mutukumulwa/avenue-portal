@@ -161,6 +161,8 @@ export const AUDIT_EXCLUSIONS: Record<string, string> = {
   "groups/[id]/self-funded/actions.ts:recordFundDepositAction": "PRE_EXISTING_GAP — audit wiring pending",
   "member/check-in/actions.ts:acknowledgeMemberCheckInAction": "PRE_EXISTING_GAP — audit wiring pending",
   "member/facilities/actions.ts:getNearbyProvidersAction": "READ_ONLY — geo search",
+  "(auth)/login/actions.ts:beginSignInAction":
+    "READ_ONLY — verifies a password to decide whether to ask for an authenticator code (P10.01/DEF-011); writes nothing itself, and a rejection is counted by registerFailedAttempt, which audits the lock it arms",
   "member/facilities/actions.ts:getProcedureCatalogAction": "READ_ONLY — catalogue read",
   "member/facilities/actions.ts:explainEmptyFacilityResultAction":
     "READ_ONLY — counts geocoded facilities to explain an empty Find Care result (DEF-007); returns the member's own tenant's contracted network, which /member/facilities already shows",

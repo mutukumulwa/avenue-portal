@@ -61,6 +61,92 @@ type CredentialInput =
   | undefined
   | null;
 
+
+/**
+ * UAT-HF P10.02 / P10.01 — the atomic failed-attempt counter, extracted.
+ *
+ * It was inline in `authorizeCredentials`. P10.01's password step needs the
+ * identical behaviour, and a second copy of a lockout counter is a second
+ * chance to get the rolling window or the UTC clock wrong — both of which this
+ * block was written to fix. One implementation, two callers.
+ */
+export async function registerFailedAttempt(userId: string, tenantId: string): Promise<void> {
+    // UAT-HF P10.02 / DEC-11 — "Attempt counters use atomic updates so parallel
+    // bad attempts cannot lose increments."
+    //
+    // This was read-then-write: `user.failedLoginCount` came from a findFirst
+    // several awaits earlier (a bcrypt compare sits between), so N parallel
+    // wrong passwords all read the same count and all wrote the same value.
+    // Five simultaneous guesses counted as one, and the lock never armed —
+    // which is precisely the throttle an attacker would parallelise past.
+    //
+    // One statement, evaluated in the database, preserving the D-9 rolling
+    // window: a stale last-failure restarts the count at 1 rather than
+    // extending an old streak.
+    const windowStart = new Date(Date.now() - ATTEMPT_WINDOW_MS);
+    const lockUntil = new Date(Date.now() + LOCK_MS);
+    let locking = false;
+    try {
+      const rows = await prisma.$queryRaw<{ failedLoginCount: number; locked: boolean }[]>`
+        UPDATE "User"
+           SET "failedLoginCount" = CASE
+                 WHEN "lastFailedLoginAt" IS NOT NULL AND "lastFailedLoginAt" > ${windowStart}
+                   THEN CASE WHEN "failedLoginCount" + 1 >= ${MAX_FAILED_ATTEMPTS} THEN 0 ELSE "failedLoginCount" + 1 END
+                 ELSE CASE WHEN 1 >= ${MAX_FAILED_ATTEMPTS} THEN 0 ELSE 1 END
+               END,
+               -- UTC, never CURRENT_TIMESTAMP. These are timestamp-without-
+               -- time-zone columns holding UTC (what Prisma writes), while
+               -- CURRENT_TIMESTAMP returns the server's LOCAL time. Measured
+               -- on a +03 host, that made a freshly applied lock read as
+               -- already expired: a three-hour hole in the throttle.
+               "lastFailedLoginAt" = (now() AT TIME ZONE 'UTC'),
+               "lockedUntil" = CASE
+                 WHEN (CASE
+                         WHEN "lastFailedLoginAt" IS NOT NULL AND "lastFailedLoginAt" > ${windowStart}
+                           THEN "failedLoginCount" + 1
+                         ELSE 1
+                       END) >= ${MAX_FAILED_ATTEMPTS}
+                   THEN ${lockUntil}
+                 ELSE "lockedUntil"
+               END
+         WHERE "id" = ${userId}
+        RETURNING "failedLoginCount", ("lockedUntil" IS NOT NULL AND "lockedUntil" > (now() AT TIME ZONE 'UTC')) AS locked
+      `;
+      // The row that actually armed the lock is the one that reports it, so
+      // exactly one audit entry is written however many attempts raced.
+      locking = rows[0]?.locked === true && rows[0]?.failedLoginCount === 0;
+    } catch {
+      // Throttling is best-effort-hardened: a transient DB error on the counter
+      // must never turn a normal wrong-password into a 500.
+    }
+
+    if (locking) {
+      // G-22: write the audit row directly — writeAudit() calls next/headers,
+      // whose context is unreliable inside authorize().
+      //
+      // WP-3.1 (DEF-005): carry tenantId so the lock event is inside the
+      // tenant hash chain (it was previously omitted → the row sat outside the
+      // chain and was invisible to tenant-scoped audit review). lockMinutes is
+      // derived from the constant, not hard-coded, so the record can never
+      // drift from the policy it documents.
+      await prisma.auditLog
+        .create({
+          data: {
+            userId,
+            tenantId,
+            action: "AUTH_ACCOUNT_LOCKED",
+            module: "AUTH",
+            description: "Account temporarily locked after repeated failed sign-ins",
+            metadata: {
+              attempts: MAX_FAILED_ATTEMPTS,
+              lockMinutes: LOCK_MS / 60_000,
+            },
+          },
+        })
+        .catch(() => {}); // never let audit failure block the auth response
+    }
+}
+
 export async function authorizeCredentials(credentials: CredentialInput): Promise<User | null> {
   return measureAsync("auth.credentials.authorize", async () => {
     if (!credentials?.email || !credentials?.password) {
@@ -132,80 +218,7 @@ export async function authorizeCredentials(credentials: CredentialInput): Promis
     const authOk = isPasswordValid && totpOk;
 
     if (!authOk) {
-      // UAT-HF P10.02 / DEC-11 — "Attempt counters use atomic updates so parallel
-      // bad attempts cannot lose increments."
-      //
-      // This was read-then-write: `user.failedLoginCount` came from a findFirst
-      // several awaits earlier (a bcrypt compare sits between), so N parallel
-      // wrong passwords all read the same count and all wrote the same value.
-      // Five simultaneous guesses counted as one, and the lock never armed —
-      // which is precisely the throttle an attacker would parallelise past.
-      //
-      // One statement, evaluated in the database, preserving the D-9 rolling
-      // window: a stale last-failure restarts the count at 1 rather than
-      // extending an old streak.
-      const windowStart = new Date(Date.now() - ATTEMPT_WINDOW_MS);
-      const lockUntil = new Date(Date.now() + LOCK_MS);
-      let locking = false;
-      try {
-        const rows = await prisma.$queryRaw<{ failedLoginCount: number; locked: boolean }[]>`
-          UPDATE "User"
-             SET "failedLoginCount" = CASE
-                   WHEN "lastFailedLoginAt" IS NOT NULL AND "lastFailedLoginAt" > ${windowStart}
-                     THEN CASE WHEN "failedLoginCount" + 1 >= ${MAX_FAILED_ATTEMPTS} THEN 0 ELSE "failedLoginCount" + 1 END
-                   ELSE CASE WHEN 1 >= ${MAX_FAILED_ATTEMPTS} THEN 0 ELSE 1 END
-                 END,
-                 -- UTC, never CURRENT_TIMESTAMP. These are timestamp-without-
-                 -- time-zone columns holding UTC (what Prisma writes), while
-                 -- CURRENT_TIMESTAMP returns the server's LOCAL time. Measured
-                 -- on a +03 host, that made a freshly applied lock read as
-                 -- already expired: a three-hour hole in the throttle.
-                 "lastFailedLoginAt" = (now() AT TIME ZONE 'UTC'),
-                 "lockedUntil" = CASE
-                   WHEN (CASE
-                           WHEN "lastFailedLoginAt" IS NOT NULL AND "lastFailedLoginAt" > ${windowStart}
-                             THEN "failedLoginCount" + 1
-                           ELSE 1
-                         END) >= ${MAX_FAILED_ATTEMPTS}
-                     THEN ${lockUntil}
-                   ELSE "lockedUntil"
-                 END
-           WHERE "id" = ${user.id}
-          RETURNING "failedLoginCount", ("lockedUntil" IS NOT NULL AND "lockedUntil" > (now() AT TIME ZONE 'UTC')) AS locked
-        `;
-        // The row that actually armed the lock is the one that reports it, so
-        // exactly one audit entry is written however many attempts raced.
-        locking = rows[0]?.locked === true && rows[0]?.failedLoginCount === 0;
-      } catch {
-        // Throttling is best-effort-hardened: a transient DB error on the counter
-        // must never turn a normal wrong-password into a 500.
-      }
-
-      if (locking) {
-        // G-22: write the audit row directly — writeAudit() calls next/headers,
-        // whose context is unreliable inside authorize().
-        //
-        // WP-3.1 (DEF-005): carry tenantId so the lock event is inside the
-        // tenant hash chain (it was previously omitted → the row sat outside the
-        // chain and was invisible to tenant-scoped audit review). lockMinutes is
-        // derived from the constant, not hard-coded, so the record can never
-        // drift from the policy it documents.
-        await prisma.auditLog
-          .create({
-            data: {
-              userId: user.id,
-              tenantId: user.tenantId,
-              action: "AUTH_ACCOUNT_LOCKED",
-              module: "AUTH",
-              description: "Account temporarily locked after repeated failed sign-ins",
-              metadata: {
-                attempts: MAX_FAILED_ATTEMPTS,
-                lockMinutes: LOCK_MS / 60_000,
-              },
-            },
-          })
-          .catch(() => {}); // never let audit failure block the auth response
-      }
+      await registerFailedAttempt(user.id, user.tenantId);
 
       return null; // D-13: same generic null as any wrong password
     }

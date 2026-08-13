@@ -1425,6 +1425,54 @@ That is a flex item's default `min-width: auto`. The wrapper cannot shrink below
 
 **34 wrappers, and a ratchet.** Every `overflow-x-auto` in `src/` now carries `min-w-0`, and a test walks the tree and fails on any that does not. One bare wrapper is one more table with unreachable columns, and the two classes only work as a pair.
 
+### P10.01 (completion) — the two-step sign-in
+
+| Field | Value |
+|---|---|
+| **Task** | P10.01 — closes the half the first pass left open |
+| **Defect IDs** | DEF-011 (S3) |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/lib/auth-challenge.test.ts` (11) |
+| **Evidence** | `src/lib/auth-challenge.ts` (new), `src/app/(auth)/login/actions.ts` (new), `src/app/(auth)/login/page.tsx`, `src/lib/auth-credentials.ts` |
+| **Feature flags** | none. |
+| **Remaining risks** | The password is held in **component state** between the two steps, because next-auth's credentials provider takes password and code in one call. Nothing durable is written (no storage, no cookie), and a refresh returns to step one — but a true challenge-token design would not hold it at all, and that is the stricter reading of "store no TOTP in durable client state" applied to the password too. The `PASSWORD_ONLY` path now runs **two** bcrypt comparisons (the step, then the sign-in), roughly doubling sign-in latency for users without an authenticator; measured at ~100 ms each, which is acceptable but is a real cost. Enrolment and password-reset flows were not restructured — only sign-in. |
+
+**The first pass could not answer the question the defect asks.** Its own note:
+"Whether a code is REQUIRED cannot be said before the password is verified,
+because saying it identifies the account." True — so it is now said *after*.
+
+`evaluateSignInStep` verifies the password and returns one of three values.
+`CODE_REQUIRED` reaches only a caller who has already proved the password, so it
+discloses nothing an attacker could not learn by signing in. Everything else —
+no account, wrong password, inactive, locked — collapses to a single `REJECTED`
+that renders one sentence. That is D-13, unchanged.
+
+**The optional field is gone, which is the actual acceptance criterion.** Every
+user was shown a box labelled *Authenticator code (if 2FA enabled)* with the
+hint "Leave blank if you have not set up an authenticator app" — a question most
+users cannot answer about themselves. Step one no longer has the field at all.
+Step two has it without the word "optional", because it is not.
+
+**A cheap password check outside the throttle would have been a brute-force
+bypass built while fixing a usability defect.** A rejection registers a failed
+attempt through the *same* atomic counter `authorizeCredentials` uses —
+extracted to `registerFailedAttempt` rather than copied, because a second
+lockout counter is a second chance to get the rolling window or the UTC clock
+wrong, and both of those were bugs this branch already fixed once.
+
+Three properties are pinned by tests because each is a way to get it wrong:
+a **success** does not clear the counter (a correct password with no code would
+otherwise reset the throttle for ever); an **already-locked** account is not
+re-counted (or anyone could extend a victim's lock by hammering it); and a
+**no-account** lookup still spends a bcrypt comparison, or the cheap path
+answers "does this address have an account here" by timing alone.
+
+**A rejected code no longer blames the password.** On step two the password is
+known good, so "Invalid email or password" would be a lie the user cannot act
+on. It now says codes expire in about 30 seconds and work once — which, since
+P10.03 made them single-use, is the most likely thing that went wrong.
+
 ### P11.02 (completion) — the other three portals get the drawer
 
 | Field | Value |

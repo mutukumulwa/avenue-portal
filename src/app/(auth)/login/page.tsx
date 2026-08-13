@@ -7,6 +7,7 @@ import { signIn } from "next-auth/react";
 import { useSearchParams } from "next/navigation";
 import { SESSION_EXPIRED_REASON, SIGN_IN_RECOVERY_GUIDANCE } from "@/lib/session-policy";
 import { DraftPurgeOnSignOut } from "@/components/forms/DraftPurgeOnSignOut";
+import { beginSignInAction } from "./actions";
 
 function safeCallbackUrl(value: string | null) {
   if (
@@ -26,17 +27,32 @@ function LoginForm() {
   const [totp, setTotp] = useState("");
 
   /**
-   * UAT-HF P10.01 — DEF-011, the half that can be answered without leaking.
+   * UAT-HF P10.01 — DEF-011, now in two steps.
    *
    * The run: a malformed code ("ab12") and an expired code both returned
    * "Invalid email or password. Please try again." — "Nothing tells the user a
    * code is required, that their code was malformed, or that it had expired."
    *
-   * Whether a code is REQUIRED cannot be said before the password is verified,
-   * because saying it identifies the account (see the remaining-work note in
-   * IMPLEMENTATION_LOG.md — that needs the two-step challenge). Whether a code
-   * is well FORMED is knowable in the browser, needs no round trip, and leaks
-   * nothing at all: "ab12" is not six digits whoever typed it.
+   * `"password"` collects email and password only. The code field does not
+   * exist on that step, which is the acceptance criterion: "users without TOTP
+   * never see an unexplained optional field". The old form showed a box
+   * labelled *(if 2FA enabled)* to every user, most of whom have no
+   * authenticator and no way to know whether it applied to them.
+   *
+   * `"code"` is reached only when the server has verified the password AND the
+   * account has an authenticator. So on that step the code is not optional and
+   * is not described as such.
+   *
+   * The password is held in component state across the two steps because
+   * next-auth's credentials provider takes both at once. Component state only —
+   * nothing durable, per P10.01's "store no TOTP in durable client state", and
+   * the same restraint applied to the password.
+   */
+  const [step, setStep] = useState<"password" | "code">("password");
+
+  /**
+   * Whether a code is well FORMED is knowable in the browser, needs no round
+   * trip, and leaks nothing: "ab12" is not six digits whoever typed it.
    */
   const totpFormatHint =
     totp.length > 0 && !/^\d{6}$/.test(totp)
@@ -50,9 +66,10 @@ function LoginForm() {
   // bubbles, which are transient, unstyled, not announced by screen readers and
   // vanish on blur. Validation state is now owned by the component so each
   // invalid field carries a persistent, associated, announced message.
-  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string }>({});
+  const [fieldErrors, setFieldErrors] = useState<{ email?: string; password?: string; totp?: string }>({});
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
+  const totpRef = useRef<HTMLInputElement>(null);
 
   // DEF-010: when a protected surface (or its client session guard) bounces an
   // expired idle session back here it carries ?reason=expired. Surface WHY the
@@ -61,7 +78,12 @@ function LoginForm() {
 
   /** Field-level validation. Deliberately says nothing about account existence. */
   const validate = () => {
-    const next: { email?: string; password?: string } = {};
+    // On the code step both are already filled and neither is editable, so
+    // there is nothing to validate but the code itself.
+    if (step === "code") {
+      return /^\d{6}$/.test(totp) ? {} : { totp: "Enter the 6-digit code from your authenticator app." };
+    }
+    const next: { email?: string; password?: string; totp?: string } = {};
     if (!email.trim()) next.email = "Enter your email address.";
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()))
       next.email = "Enter a valid email address, for example name@medvex.co.ug.";
@@ -78,11 +100,48 @@ function LoginForm() {
     if (Object.keys(invalid).length > 0) {
       // Focus moves to the first invalid field so keyboard and screen-reader
       // users are placed on the problem rather than left at the submit button.
-      (invalid.email ? emailRef : passwordRef).current?.focus();
+      (invalid.totp ? totpRef : invalid.email ? emailRef : passwordRef).current?.focus();
       return;
     }
 
     setLoading(true);
+
+    // ── Step 1: the password ────────────────────────────────────────────────
+    // Ask the server whether this sign-in needs a code before showing a field
+    // for one. Rejection here is deliberately indistinguishable from a rejected
+    // full sign-in: no account, wrong password and a locked account all produce
+    // the same sentence (D-13).
+    if (step === "password") {
+      let outcome: Awaited<ReturnType<typeof beginSignInAction>> | undefined;
+      try {
+        outcome = await beginSignInAction(email, password);
+      } catch {
+        setLoading(false);
+        setError(
+          "We couldn't reach the sign-in service. This can happen after several rapid attempts — wait a minute, then try again.",
+        );
+        return;
+      }
+
+      if (outcome.step === "REJECTED") {
+        setLoading(false);
+        setError("Invalid email or password. Please try again.");
+        return;
+      }
+
+      if (outcome.step === "CODE_REQUIRED") {
+        setLoading(false);
+        setStep("code");
+        // The heading changes and the code field is new, so focus has to move
+        // or a screen-reader user is left on a submit button whose meaning has
+        // silently changed under them.
+        setTimeout(() => totpRef.current?.focus(), 0);
+        return;
+      }
+      // PASSWORD_ONLY falls through and signs in with no code, which is what
+      // the great majority of users experience: one step, as before.
+    }
+
     const startedAt = performance.now();
 
     // OBS-K1: an upstream rate-limit can swallow the sign-in request entirely.
@@ -107,7 +166,13 @@ function LoginForm() {
     console.info(`[perf] login.signIn: ${(performance.now() - startedAt).toFixed(1)}ms`);
 
     if (result?.error) {
-      setError("Invalid email or password. Please try again.");
+      // On the code step the password is already known good, so blaming the
+      // password would be a lie the user cannot act on. Name what failed.
+      setError(
+        step === "code"
+          ? "That authenticator code was not accepted. Codes expire after about 30 seconds and each one works only once — open your app and enter the current code."
+          : "Invalid email or password. Please try again.",
+      );
       // UAT-HF P10.01 — DEF-012. "After a failed sign-in the Authenticator code
       // field still contains and displays the full value that was entered ...
       // On a shared front-desk screen the previously entered code stays visible
@@ -119,6 +184,7 @@ function LoginForm() {
       // legitimately be re-checking, and clearing it would be the DEF-071 class
       // of "lost typed input" all over again.
       setTotp("");
+      if (step === "code") setTimeout(() => totpRef.current?.focus(), 0);
       return;
     }
 
@@ -198,96 +264,133 @@ function LoginForm() {
                 </div>
               )}
 
-              <div className="space-y-1.5">
-                <label htmlFor="login-email" className="block text-sm font-bold text-brand-text-heading">
-                  Email Address
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-brand-text-muted">
-                    <Mail className="h-5 w-5" />
+              {step === "password" && (
+                <>
+                <div className="space-y-1.5">
+                  <label htmlFor="login-email" className="block text-sm font-bold text-brand-text-heading">
+                    Email Address
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-brand-text-muted">
+                      <Mail className="h-5 w-5" />
+                    </div>
+                    <input
+                      id="login-email"
+                      name="email"
+                      ref={emailRef}
+                      type="email"
+                      autoComplete="username"
+                      required
+                      aria-required="true"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      aria-invalid={fieldErrors.email ? true : false}
+                      aria-describedby={fieldErrors.email ? "login-email-error" : undefined}
+                      className={`bg-white border text-brand-text-heading text-sm rounded-[8px] focus:ring-2 focus:ring-brand-indigo focus:border-brand-indigo block w-full pl-10 p-2.5 outline-none transition-all ${
+                        fieldErrors.email ? "border-[#DC3545]" : "border-[#EEEEEE]"
+                      }`}
+                      placeholder="name@medvex.co.ug"
+                    />
                   </div>
-                  <input
-                    id="login-email"
-                    name="email"
-                    ref={emailRef}
-                    type="email"
-                    autoComplete="username"
-                    required
-                    aria-required="true"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    aria-invalid={fieldErrors.email ? true : false}
-                    aria-describedby={fieldErrors.email ? "login-email-error" : undefined}
-                    className={`bg-white border text-brand-text-heading text-sm rounded-[8px] focus:ring-2 focus:ring-brand-indigo focus:border-brand-indigo block w-full pl-10 p-2.5 outline-none transition-all ${
-                      fieldErrors.email ? "border-[#DC3545]" : "border-[#EEEEEE]"
-                    }`}
-                    placeholder="name@medvex.co.ug"
-                  />
+                  {fieldErrors.email && (
+                    <p id="login-email-error" role="alert" className="text-xs text-[#DC3545]">
+                      {fieldErrors.email}
+                    </p>
+                  )}
                 </div>
-                {fieldErrors.email && (
-                  <p id="login-email-error" role="alert" className="text-xs text-[#DC3545]">
-                    {fieldErrors.email}
-                  </p>
-                )}
-              </div>
 
-              <div className="space-y-1.5">
-                <label htmlFor="login-password" className="block text-sm font-bold text-brand-text-heading">
-                  Password
-                </label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-brand-text-muted">
-                    <Lock className="h-5 w-5" />
+                <div className="space-y-1.5">
+                  <label htmlFor="login-password" className="block text-sm font-bold text-brand-text-heading">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-brand-text-muted">
+                      <Lock className="h-5 w-5" />
+                    </div>
+                    <input
+                      id="login-password"
+                      name="password"
+                      ref={passwordRef}
+                      type="password"
+                      autoComplete="current-password"
+                      required
+                      aria-required="true"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      aria-invalid={fieldErrors.password ? true : false}
+                      aria-describedby={fieldErrors.password ? "login-password-error" : undefined}
+                      className={`bg-white border text-brand-text-heading text-sm rounded-[8px] focus:ring-2 focus:ring-brand-indigo focus:border-brand-indigo block w-full pl-10 p-2.5 outline-none transition-all ${
+                        fieldErrors.password ? "border-[#DC3545]" : "border-[#EEEEEE]"
+                      }`}
+                      placeholder="••••••••"
+                    />
                   </div>
-                  <input
-                    id="login-password"
-                    name="password"
-                    ref={passwordRef}
-                    type="password"
-                    autoComplete="current-password"
-                    required
-                    aria-required="true"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    aria-invalid={fieldErrors.password ? true : false}
-                    aria-describedby={fieldErrors.password ? "login-password-error" : undefined}
-                    className={`bg-white border text-brand-text-heading text-sm rounded-[8px] focus:ring-2 focus:ring-brand-indigo focus:border-brand-indigo block w-full pl-10 p-2.5 outline-none transition-all ${
-                      fieldErrors.password ? "border-[#DC3545]" : "border-[#EEEEEE]"
-                    }`}
-                    placeholder="••••••••"
-                  />
+                  {fieldErrors.password && (
+                    <p id="login-password-error" role="alert" className="text-xs text-[#DC3545]">
+                      {fieldErrors.password}
+                    </p>
+                  )}
                 </div>
-                {fieldErrors.password && (
-                  <p id="login-password-error" role="alert" className="text-xs text-[#DC3545]">
-                    {fieldErrors.password}
-                  </p>
-                )}
-              </div>
+                </>
+              )}
 
-              <div className="space-y-1.5">
-                <label htmlFor="login-totp" className="block text-sm font-bold text-brand-text-heading">
-                  Authenticator code{" "}
-                  <span className="font-normal text-brand-text-muted">(if 2FA enabled)</span>
-                </label>
-                {/* Correctly optional: users without 2FA must not be blocked. */}
-                <input
-                  id="login-totp"
-                  name="totp"
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  value={totp}
-                  onChange={(e) => setTotp(e.target.value)}
-                  aria-describedby="login-totp-hint"
-                  aria-invalid={totpFormatHint ? true : undefined}
-                  className="bg-white border border-[#EEEEEE] text-brand-text-heading text-sm rounded-[8px] focus:ring-2 focus:ring-brand-indigo focus:border-brand-indigo block w-full p-2.5 outline-none transition-all"
-                  placeholder="6-digit code"
-                  autoComplete="one-time-code"
-                />
-                <p id="login-totp-hint" className="text-xs text-brand-text-muted">
-                  {totpFormatHint ?? "Leave blank if you have not set up an authenticator app."}
-                </p>
-              </div>
+              {step === "code" && (
+                <>
+                  {/* The account is already identified by this point, so echoing
+                      it back is not a disclosure — it is what stops a user
+                      entering a code for the wrong account on a shared machine. */}
+                  <div className="rounded-[8px] border border-[#EEEEEE] bg-[#F8F9FA] px-3 py-2 text-sm">
+                    <span className="text-brand-text-muted">Signing in as </span>
+                    <span className="font-semibold text-brand-text-heading break-all">{email}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Leaving the code step must not leave a spent code
+                        // behind for the next person at the desk (DEF-012).
+                        setStep("password");
+                        setTotp("");
+                        setError("");
+                        setFieldErrors({});
+                      }}
+                      className="ml-2 text-xs text-brand-secondary hover:underline"
+                    >
+                      Use a different account
+                    </button>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label htmlFor="login-totp" className="block text-sm font-bold text-brand-text-heading">
+                      Authenticator code
+                    </label>
+                    {/* Not optional here, and not described as such: this step is
+                        reached only when the account actually requires a code. */}
+                    <input
+                      id="login-totp"
+                      name="totp"
+                      ref={totpRef}
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      required
+                      aria-required="true"
+                      value={totp}
+                      onChange={(e) => setTotp(e.target.value)}
+                      aria-describedby="login-totp-hint"
+                      aria-invalid={totpFormatHint || fieldErrors.totp ? true : undefined}
+                      className={`bg-white border text-brand-text-heading text-sm rounded-[8px] focus:ring-2 focus:ring-brand-indigo focus:border-brand-indigo block w-full p-2.5 outline-none transition-all ${
+                        totpFormatHint || fieldErrors.totp ? "border-[#DC3545]" : "border-[#EEEEEE]"
+                      }`}
+                      placeholder="6-digit code"
+                      autoComplete="one-time-code"
+                    />
+                    <p id="login-totp-hint" className={`text-xs ${totpFormatHint || fieldErrors.totp ? "text-[#DC3545]" : "text-brand-text-muted"}`}>
+                      {totpFormatHint ??
+                        fieldErrors.totp ??
+                        "Open your authenticator app and enter the current 6-digit code for Medvex."}
+                    </p>
+                  </div>
+                </>
+              )}
 
               <button
                 type="submit"
@@ -295,12 +398,14 @@ function LoginForm() {
                 aria-busy={loading}
                 className="w-full bg-brand-indigo hover:bg-brand-secondary text-white font-bold py-3 rounded-full transition-colors disabled:opacity-60 disabled:cursor-not-allowed mt-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-indigo focus-visible:ring-offset-2"
               >
-                {loading ? "Signing in…" : "Sign In"}
+                {loading ? "Signing in…" : step === "code" ? "Verify code" : "Continue"}
               </button>
 
-              <p className="text-center pt-1">
-                <a href="/reset" className="text-xs text-brand-secondary hover:underline">Forgot password?</a>
-              </p>
+              {step === "password" && (
+                <p className="text-center pt-1">
+                  <a href="/reset" className="text-xs text-brand-secondary hover:underline">Forgot password?</a>
+                </p>
+              )}
             </form>
           </CardContent>
         </Card>
