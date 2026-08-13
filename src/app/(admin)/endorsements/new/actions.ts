@@ -3,7 +3,7 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { peekNextDocumentNumber } from "@/lib/document-number";
+import { createWithDocumentNumber } from "@/lib/document-number";
 import {
   MemberActionGuardService,
   memberActionRefusal,
@@ -177,25 +177,38 @@ export async function submitEndorsementAction(formData: FormData): Promise<Endor
     proratedAmount = isCredit ? -(daily * daysRemaining) : daily * daysRemaining;
   }
 
-  const endorsementNumber = await peekNextDocumentNumber("END", (yp) =>
-    prisma.endorsement
-      .findFirst({ where: { tenantId, endorsementNumber: { startsWith: yp } }, orderBy: { endorsementNumber: "desc" }, select: { endorsementNumber: true } })
-      .then((r) => r?.endorsementNumber ?? null),
+  // UAT-HF P08.04 (DEF-048 adjacent) — atomic numbering with a legible outcome.
+  //
+  // This was `peekNextDocumentNumber` + a bare `create`: max-plus-one with no
+  // retry. `Endorsement` is unique on [tenantId, endorsementNumber], so two
+  // concurrent submissions did not duplicate — they threw a raw P2002 at
+  // whichever operator lost, which is the "outcomes legible" half of the task.
+  // The same read-then-write shape was measured in P05.02 producing ONE unique
+  // member number from fifty parallel allocations.
+  //
+  // `createWithDocumentNumber` advances and retries on a unique violation. It is
+  // safe here because that index is the ONLY unique this create can violate.
+  await createWithDocumentNumber(
+    "END",
+    (yp) =>
+      prisma.endorsement
+        .findFirst({ where: { tenantId, endorsementNumber: { startsWith: yp } }, orderBy: { endorsementNumber: "desc" }, select: { endorsementNumber: true } })
+        .then((r) => r?.endorsementNumber ?? null),
+    (endorsementNumber) =>
+      prisma.endorsement.create({
+        data: {
+          tenantId,
+          endorsementNumber,
+          groupId,
+          type: type as never,
+          status: "SUBMITTED",
+          effectiveDate: new Date(effectiveDate),
+          changeDetails: changeDetails as never,
+          proratedAmount,
+          requestedBy: session.user.id,
+        },
+      }),
   );
-
-  await prisma.endorsement.create({
-    data: {
-      tenantId,
-      endorsementNumber,
-      groupId,
-      type: type as never,
-      status: "SUBMITTED",
-      effectiveDate: new Date(effectiveDate),
-      changeDetails: changeDetails as never,
-      proratedAmount,
-      requestedBy: session.user.id,
-    },
-  });
 
   redirect("/endorsements");
 }

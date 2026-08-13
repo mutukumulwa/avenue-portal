@@ -38,8 +38,18 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/navigation", () => ({
   redirect: vi.fn((url: string) => { throw new Error(`NEXT_REDIRECT:${url}`); }),
 }));
+// P08.04: the action now uses the retrying allocator rather than peek + create.
+// The stub calls through with a fixed number so these tests still assert the
+// ACTION's behaviour; the allocator's own retry is covered by
+// tests/lib/document-number.test.ts.
 vi.mock("@/lib/document-number", () => ({
-  peekNextDocumentNumber: vi.fn(async () => "END-2026-00042"),
+  createWithDocumentNumber: vi.fn(
+    async (
+      _prefix: string,
+      _findLatest: (yp: string) => Promise<string | null>,
+      create: (n: string) => Promise<unknown>,
+    ) => create("END-2026-00042"),
+  ),
 }));
 
 const { submitLeaverRequestAction, withdrawLeaverRequestAction } = await import(

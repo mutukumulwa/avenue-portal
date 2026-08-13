@@ -3,6 +3,7 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { writeAudit } from "@/lib/audit";
+import { createWithDocumentNumber } from "@/lib/document-number";
 import type { MemberRelationship, Gender } from "@prisma/client";
 import type { ActionState } from "./types";
 import { resolveMemberEnrolmentDates } from "@/lib/member-enrolment";
@@ -121,42 +122,65 @@ export async function addMemberEndorsementAction(
 
   const warnings = candidateWarnings(identityMatches);
 
-  const endorsementNumber = `REQ-${new Date().getFullYear()}-${Math.floor(10000 + Math.random() * 90000)}`;
-
-  const endorsement = await prisma.endorsement.create({
-    data: {
-      tenantId,
-      groupId,
-      endorsementNumber,
-      type: "MEMBER_ADDITION",
-      status: "SUBMITTED",
-      effectiveDate: calendarDateToUtcDate(dates.value.requestedEffectiveDate)!,
-      requestedBy: session.user.id,
-      changeDetails: {
-         firstName: demographics.value.firstName,
-         lastName: demographics.value.lastName,
-         dateOfBirth: dates.value.dateOfBirth,
-         gender: demographics.value.gender,
-         relationship: demographics.value.relationship,
-         idNumber,
-         phone: demographics.value.phone,
-         email: demographics.value.email,
-         principalIdNumber: principalIdNumber || null,
-         sourceReference,
-         birthNotificationDate: dates.value.birthNotificationDate,
-         addressCountry: address.value.addressCountry,
-         addressDistrict: address.value.addressDistrict,
-         addressLocality: address.value.addressLocality,
-         addressSubcounty: address.value.addressSubcounty,
-         addressParish: address.value.addressParish,
-         addressVillage: address.value.addressVillage,
-         addressLine: address.value.addressLine,
-         addressLatitude: address.value.addressLatitude,
-         addressLongitude: address.value.addressLongitude,
-         addressCoordinateConsent: address.value.hasCoordinateConsent,
-      }
+  // UAT-HF P08.04 — a request reference that cannot collide.
+  //
+  // This was `REQ-${year}-${Math.floor(10000 + Math.random() * 90000)}`: a
+  // five-digit random number with no retry, against a column that is unique on
+  // [tenantId, endorsementNumber]. Roughly 90,000 possible values means a
+  // collision is a birthday problem, not a remote one — a few hundred requests
+  // in a year and it is likely — and the loser got a raw P2002.
+  //
+  // Two things change. The reference is now sequential like every other document
+  // in the product (an employer quoting "REQ-2026-88548" to their administrator
+  // can be found in an ordered list), and `createWithDocumentNumber` advances on
+  // a unique violation instead of failing. The REQ prefix is kept: it is what HR
+  // sees and what the run's evidence quotes.
+  const endorsement = await createWithDocumentNumber(
+    "REQ",
+    (yp) =>
+      prisma.endorsement
+        .findFirst({
+          where: { tenantId, endorsementNumber: { startsWith: yp } },
+          orderBy: { endorsementNumber: "desc" },
+          select: { endorsementNumber: true },
+        })
+        .then((r) => r?.endorsementNumber ?? null),
+    (endorsementNumber) =>
+      prisma.endorsement.create({
+        data: {
+            endorsementNumber,
+            tenantId,
+            groupId,
+            type: "MEMBER_ADDITION",
+            status: "SUBMITTED",
+            effectiveDate: calendarDateToUtcDate(dates.value.requestedEffectiveDate)!,
+            requestedBy: session.user.id,
+            changeDetails: {
+               firstName: demographics.value.firstName,
+               lastName: demographics.value.lastName,
+               dateOfBirth: dates.value.dateOfBirth,
+               gender: demographics.value.gender,
+               relationship: demographics.value.relationship,
+               idNumber,
+               phone: demographics.value.phone,
+               email: demographics.value.email,
+               principalIdNumber: principalIdNumber || null,
+               sourceReference,
+               birthNotificationDate: dates.value.birthNotificationDate,
+               addressCountry: address.value.addressCountry,
+               addressDistrict: address.value.addressDistrict,
+               addressLocality: address.value.addressLocality,
+               addressSubcounty: address.value.addressSubcounty,
+               addressParish: address.value.addressParish,
+               addressVillage: address.value.addressVillage,
+               addressLine: address.value.addressLine,
+               addressLatitude: address.value.addressLatitude,
+               addressLongitude: address.value.addressLongitude,
+               addressCoordinateConsent: address.value.hasCoordinateConsent,
+            }
     }
-  });
+      }),
+  );
 
   // WP-3.5G: audit the (previously silent) HR add-member request.
   await writeAudit({

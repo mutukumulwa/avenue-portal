@@ -2,7 +2,7 @@
 
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
-import { peekNextDocumentNumber } from "@/lib/document-number";
+import { createWithDocumentNumber } from "@/lib/document-number";
 import { revalidatePath } from "next/cache";
 import { writeAudit } from "@/lib/audit";
 
@@ -27,13 +27,20 @@ export async function schemeTransferAction(
   if (member.groupId === toGroupId) return { error: "Member is already in this group." };
 
   // Build endorsement number
-  const endorsementNumber = await peekNextDocumentNumber("END", (yp) =>
-    prisma.endorsement
-      .findFirst({ where: { tenantId, endorsementNumber: { startsWith: yp } }, orderBy: { endorsementNumber: "desc" }, select: { endorsementNumber: true } })
-      .then((r) => r?.endorsementNumber ?? null),
-  );
-
-  await prisma.$transaction(async (tx) => {
+  // UAT-HF P08.04 — atomic numbering around a TRANSACTION.
+  //
+  // The create is inside `$transaction`, so a P2002 cannot be caught and retried
+  // *within* it — the transaction is already aborted by then. So the retry wraps
+  // the whole transaction: on a collision it rolls back completely, the number
+  // advances, and the transaction runs again from the start. Re-running is safe
+  // precisely because nothing from the failed attempt survived.
+  await createWithDocumentNumber(
+    "END",
+    (yp) =>
+      prisma.endorsement
+        .findFirst({ where: { tenantId, endorsementNumber: { startsWith: yp } }, orderBy: { endorsementNumber: "desc" }, select: { endorsementNumber: true } })
+        .then((r) => r?.endorsementNumber ?? null),
+    (endorsementNumber) => prisma.$transaction(async (tx) => {
     // Create SCHEME_TRANSFER endorsement
     await tx.endorsement.create({
       data: {
@@ -62,7 +69,8 @@ export async function schemeTransferAction(
         benefitTierId:    null, // cleared — assign tier in destination group separately
       },
     });
-  });
+  }),
+  );
 
   await writeAudit({
     userId: session.user.id,
@@ -97,13 +105,20 @@ export async function tierChangeAction(
   if (tier.groupId !== member.groupId) return { error: "Tier does not belong to the member's group." };
   if (member.benefitTierId === toBenefitTierId) return { error: "Member is already in this tier." };
 
-  const endorsementNumber = await peekNextDocumentNumber("END", (yp) =>
-    prisma.endorsement
-      .findFirst({ where: { tenantId, endorsementNumber: { startsWith: yp } }, orderBy: { endorsementNumber: "desc" }, select: { endorsementNumber: true } })
-      .then((r) => r?.endorsementNumber ?? null),
-  );
-
-  await prisma.$transaction(async (tx) => {
+  // UAT-HF P08.04 — atomic numbering around a TRANSACTION.
+  //
+  // The create is inside `$transaction`, so a P2002 cannot be caught and retried
+  // *within* it — the transaction is already aborted by then. So the retry wraps
+  // the whole transaction: on a collision it rolls back completely, the number
+  // advances, and the transaction runs again from the start. Re-running is safe
+  // precisely because nothing from the failed attempt survived.
+  await createWithDocumentNumber(
+    "END",
+    (yp) =>
+      prisma.endorsement
+        .findFirst({ where: { tenantId, endorsementNumber: { startsWith: yp } }, orderBy: { endorsementNumber: "desc" }, select: { endorsementNumber: true } })
+        .then((r) => r?.endorsementNumber ?? null),
+    (endorsementNumber) => prisma.$transaction(async (tx) => {
     await tx.endorsement.create({
       data: {
         tenantId,
@@ -125,7 +140,8 @@ export async function tierChangeAction(
       where: { id: memberId },
       data: { benefitTierId: toBenefitTierId, packageId: tier.packageId },
     });
-  });
+  }),
+  );
 
   await writeAudit({
     userId: session.user.id,

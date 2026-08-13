@@ -4,7 +4,7 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { peekNextDocumentNumber } from "@/lib/document-number";
+import { createWithDocumentNumber } from "@/lib/document-number";
 import { validateEvidence } from "@/lib/endorsement-evidence";
 import { calendarDateToUtcDate, calendarDateFromInstant, formatCalendarDate } from "@/lib/calendar-date";
 import { writeAudit } from "@/lib/audit";
@@ -162,17 +162,20 @@ export async function submitLeaverRequestAction(formData: FormData): Promise<Lea
     return { ok: false, error: "Correct the highlighted details. Nothing has been submitted.", fieldErrors };
   }
 
-  const endorsementNumber = await peekNextDocumentNumber("END", (yp) =>
-    prisma.endorsement
-      .findFirst({
-        where: { tenantId, endorsementNumber: { startsWith: yp } },
-        orderBy: { endorsementNumber: "desc" },
-        select: { endorsementNumber: true },
-      })
-      .then((r) => r?.endorsementNumber ?? null),
-  );
-
-  const created = await prisma.endorsement.create({
+  // P08.04: the retrying allocator, not read-then-write. Two HR managers
+  // reporting leavers at the same moment computed the same max+1; the loser saw
+  // a raw P2002 on [tenantId, endorsementNumber].
+  const created = await createWithDocumentNumber(
+    "END",
+    (yp) =>
+      prisma.endorsement
+        .findFirst({
+          where: { tenantId, endorsementNumber: { startsWith: yp } },
+          orderBy: { endorsementNumber: "desc" },
+          select: { endorsementNumber: true },
+        })
+        .then((r) => r?.endorsementNumber ?? null),
+    (endorsementNumber) => prisma.endorsement.create({
     data: {
       tenantId,
       groupId,
@@ -202,7 +205,8 @@ export async function submitLeaverRequestAction(formData: FormData): Promise<Lea
       proratedAmount: 0,
     },
     select: { id: true, endorsementNumber: true },
-  });
+    }),
+  );
 
   await writeAudit({
     userId: session.user.id,

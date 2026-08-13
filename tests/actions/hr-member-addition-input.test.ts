@@ -12,7 +12,9 @@ const endorsementCreate = vi.hoisted(() => vi.fn());
 const memberFindFirst = vi.hoisted(() => vi.fn(async () => null));
 vi.mock("@/lib/prisma", () => ({
   prisma: {
-    endorsement: { create: endorsementCreate },
+    // P08.04: the action now resolves the next number through the allocator,
+    // which reads the highest existing one first. Null = none yet.
+    endorsement: { create: endorsementCreate, findFirst: vi.fn(async () => null) },
     member: { findFirst: memberFindFirst },
   },
 }));

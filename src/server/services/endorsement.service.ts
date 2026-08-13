@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { peekNextDocumentNumber } from "@/lib/document-number";
+import { createWithDocumentNumber } from "@/lib/document-number";
 import { GLService } from "@/server/services/gl.service";
 import { coverageService } from "@/server/services/coverage.service";
 import { auditChainService } from "@/server/services/audit-chain.service";
@@ -196,27 +196,32 @@ export class EndorsementsService {
     changeDetails: Record<string, string>; // JSON containing member profile diff
     requestedBy?: string;
   }) {
-    const endorsementNumber = await peekNextDocumentNumber("END", (yp) =>
-      prisma.endorsement
-        .findFirst({ where: { tenantId, endorsementNumber: { startsWith: yp } }, orderBy: { endorsementNumber: "desc" }, select: { endorsementNumber: true } })
-        .then((r) => r?.endorsementNumber ?? null),
-    );
-    
+    // UAT-HF P08.04 — atomic numbering. `peek` + a bare create is read-then-write:
+    // two concurrent callers computed the same max+1 and the loser hit a raw
+    // P2002 on [tenantId, endorsementNumber]. The allocator advances and retries.
     const proRataAdjustment = await this.calculateProRata(tenantId, data.groupId, data.effectiveDate, data.type);
 
-    return prisma.endorsement.create({
-      data: {
-        tenantId,
-        endorsementNumber,
-        groupId: data.groupId,
-        type: data.type,
-        status: "SUBMITTED",
-        effectiveDate: data.effectiveDate,
-        changeDetails: data.changeDetails as unknown as Record<string, string>,
-        proratedAmount: proRataAdjustment,
-        requestedBy: data.requestedBy || "SYSTEM",
-      },
-    });
+    return createWithDocumentNumber(
+      "END",
+      (yp) =>
+        prisma.endorsement
+          .findFirst({ where: { tenantId, endorsementNumber: { startsWith: yp } }, orderBy: { endorsementNumber: "desc" }, select: { endorsementNumber: true } })
+          .then((r) => r?.endorsementNumber ?? null),
+      (endorsementNumber) =>
+        prisma.endorsement.create({
+          data: {
+            tenantId,
+            endorsementNumber,
+            groupId: data.groupId,
+            type: data.type,
+            status: "SUBMITTED",
+            effectiveDate: data.effectiveDate,
+            changeDetails: data.changeDetails as unknown as Record<string, string>,
+            proratedAmount: proRataAdjustment,
+            requestedBy: data.requestedBy || "SYSTEM",
+          },
+        }),
+    );
   }
 
   /**
@@ -445,30 +450,43 @@ export class EndorsementsService {
           postedById: approvedBy,
         });
 
-        // Generate an auto-adjustment invoice for the group
-        const invoiceNumber = await peekNextDocumentNumber("INV", (yp) =>
-          prisma.invoice
-            .findFirst({ where: { tenantId, invoiceNumber: { startsWith: yp } }, orderBy: { invoiceNumber: "desc" }, select: { invoiceNumber: true } })
-            .then((r) => r?.invoiceNumber ?? null),
-        );
+        // Generate an auto-adjustment invoice for the group.
+        //
+        // P08.04: same read-then-write race as the endorsement number. `Invoice`
+        // carries TWO uniques — [tenantId, invoiceNumber] and [providerId,
+        // invoiceNumber] — and the helper is only safe when the document number
+        // is the one that can collide. It is: this create sets `groupId` and
+        // leaves `providerId` null, and NULLs are distinct in a Postgres unique
+        // index, so the provider index cannot fire here.
         const dueDate = new Date();
         dueDate.setDate(dueDate.getDate() + 30);
+        // Captured before the callback: inside one, TypeScript can no longer see
+        // the narrowing that proved this is non-null, and a `!` would assert
+        // rather than prove it.
+        const adjustment = endorsement.proratedAmount ?? 0;
 
-        await prisma.invoice.create({
+        await createWithDocumentNumber(
+          "INV",
+          (yp) =>
+            prisma.invoice
+              .findFirst({ where: { tenantId, invoiceNumber: { startsWith: yp } }, orderBy: { invoiceNumber: "desc" }, select: { invoiceNumber: true } })
+              .then((r) => r?.invoiceNumber ?? null),
+          (invoiceNumber) => prisma.invoice.create({
           data: {
              tenantId,
              invoiceNumber,
              groupId: endorsement.groupId,
              period: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
              memberCount: endorsement.type === "MEMBER_ADDITION" ? 1 : 0,
-             ratePerMember: Math.abs(Number(endorsement.proratedAmount)),
-             totalAmount: endorsement.proratedAmount,
-             balance: endorsement.proratedAmount,
+             ratePerMember: Math.abs(Number(adjustment)),
+             totalAmount: adjustment,
+             balance: adjustment,
              dueDate,
              status: "SENT", // Endorsement invoices implicitly sent
              notes: `Endorsement Adjustment for ${endorsement.endorsementNumber}`,
           }
-        });
+        }),
+        );
 
       } catch (err) {
         // NO swallow (PR-018 policy): an endorsement with a financial impact

@@ -60,7 +60,20 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 const peekNextDocumentNumber = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/document-number", () => ({ peekNextDocumentNumber }));
+// P08.04: endorsement creation moved from `peek + create` to the retrying
+// allocator. The stub calls through with a fixed number so these tests still
+// assert the ACTION's behaviour; the allocator itself is covered by
+// tests/lib/document-number.test.ts.
+const createWithDocumentNumber = vi.hoisted(() =>
+  vi.fn(
+    async (
+      _prefix: string,
+      _findLatest: (yp: string) => Promise<string | null>,
+      create: (n: string) => Promise<unknown>,
+    ) => create("END-2026-00042"),
+  ),
+);
+vi.mock("@/lib/document-number", () => ({ createWithDocumentNumber }));
 
 import {
   submitClaimAction,

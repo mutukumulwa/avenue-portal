@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+import { readFileSync } from "node:fs";
 import { createWithDocumentNumber, peekNextDocumentNumber } from "@/lib/document-number";
 
 /**
@@ -87,5 +88,60 @@ describe("peekNextDocumentNumber", () => {
     const finder = vi.fn(async () => null);
     await peekNextDocumentNumber("CASE", finder);
     expect(finder).toHaveBeenCalledWith(`CASE-${YEAR}-`);
+  });
+});
+
+/**
+ * UAT-HF P08.04 — every endorsement-numbering path uses the retrying allocator.
+ *
+ * "Make endorsement numbering atomic and outcomes legible."
+ *
+ * `Endorsement` is unique on [tenantId, endorsementNumber], so the old
+ * read-then-write never DUPLICATED — it threw a raw P2002 at whichever operator
+ * lost the race. That is the "outcomes legible" half. The same shape was
+ * measured in P05.02 producing one unique member number from fifty parallel
+ * allocations, so this is not theoretical.
+ */
+describe("P08.04 no endorsement path mints a number unsafely", () => {
+  const PATHS = [
+    "src/app/(admin)/endorsements/new/actions.ts",
+    "src/app/(admin)/members/[id]/transfer/actions.ts",
+    "src/app/(hr)/hr/roster/new/actions.ts",
+    "src/app/(hr)/hr/roster/[memberId]/leaver/actions.ts",
+    "src/server/services/endorsement.service.ts",
+    "src/server/services/amendment.service.ts",
+  ];
+
+  /** Strip comments so a doc-comment quoting the old code is not a false hit. */
+  const code = (p: string) =>
+    readFileSync(p, "utf8")
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .replace(/^\s*\/\/.*$/gm, "");
+
+  it.each(PATHS)("%s uses createWithDocumentNumber", (path) => {
+    expect(code(path)).toContain("createWithDocumentNumber");
+  });
+
+  it.each(PATHS)("%s no longer calls peekNextDocumentNumber", (path) => {
+    expect(code(path)).not.toContain("peekNextDocumentNumber");
+  });
+
+  it("the HR request reference is no longer random", () => {
+    // `REQ-${year}-${Math.floor(10000 + Math.random() * 90000)}` gave ~90,000
+    // values against a unique column — a birthday collision, not a remote one.
+    expect(code("src/app/(hr)/hr/roster/new/actions.ts")).not.toContain("Math.random");
+  });
+
+  it("keeps the REQ prefix HR already quotes", () => {
+    // The run's evidence cites "REQ-2026-88548"; changing the prefix would break
+    // every reference an employer has already been given.
+    expect(code("src/app/(hr)/hr/roster/new/actions.ts")).toContain('"REQ"');
+  });
+
+  it("the two transactional paths wrap the TRANSACTION, not a bare create", () => {
+    // A P2002 inside `$transaction` cannot be caught and retried within it — the
+    // transaction is already aborted. The retry has to re-run the whole thing.
+    const transfer = code("src/app/(admin)/members/[id]/transfer/actions.ts");
+    expect(transfer).toMatch(/createWithDocumentNumber\([\s\S]{0,400}prisma\.\$transaction/);
   });
 });

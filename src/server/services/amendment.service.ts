@@ -8,7 +8,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
-import { peekNextDocumentNumber } from "@/lib/document-number";
+import { createWithDocumentNumber } from "@/lib/document-number";
 import { TRPCError } from "@trpc/server";
 import { EndorsementType, ProRataType } from "@prisma/client";
 import { auditChainService } from "./audit-chain.service";
@@ -159,11 +159,6 @@ export const amendmentService = {
       // We just flag it; the override is validated before apply (see applyAmendment)
     }
 
-    const endorsementNumber = await peekNextDocumentNumber("END", (yp) =>
-      prisma.endorsement
-        .findFirst({ where: { tenantId, endorsementNumber: { startsWith: yp } }, orderBy: { endorsementNumber: "desc" }, select: { endorsementNumber: true } })
-        .then((r) => r?.endorsementNumber ?? null),
-    );
 
     // Capture before-snapshot of the affected member if applicable
     let beforeSnapshot: Record<string, unknown> | null = null;
@@ -188,7 +183,16 @@ export const amendmentService = {
       }
     }
 
-    const endorsement = await prisma.endorsement.create({
+    // P08.04: read-then-write numbering replaced by the retrying allocator. The
+    // create is not inside a transaction, so a P2002 can be caught and the
+    // number advanced — the number is the only unique this create can violate.
+    const endorsement = await createWithDocumentNumber(
+      "END",
+      (yp) =>
+        prisma.endorsement
+          .findFirst({ where: { tenantId, endorsementNumber: { startsWith: yp } }, orderBy: { endorsementNumber: "desc" }, select: { endorsementNumber: true } })
+          .then((r) => r?.endorsementNumber ?? null),
+      (endorsementNumber) => prisma.endorsement.create({
       data: {
         tenantId,
         endorsementNumber,
@@ -211,7 +215,8 @@ export const amendmentService = {
           ? data.newContributionKes - data.previousContributionKes
           : null,
       },
-    });
+    }),
+    );
 
     await auditChainService.append({
       actorId: makerId,
@@ -221,7 +226,7 @@ export const amendmentService = {
       entityId: endorsement.id,
       payload: { type: data.type, effectiveDate: data.effectiveDate, backDated },
       tenantId,
-      description: `Amendment ${endorsementNumber} initiated: ${data.type}`,
+      description: `Amendment ${endorsement.endorsementNumber} initiated: ${data.type}`,
     });
 
     return endorsement;
@@ -605,14 +610,16 @@ export const amendmentService = {
     const amount = Number(endorsement.proRataCalculation.adjustmentAmount);
     if (amount === 0) return;
 
-    const invoiceNumber = await peekNextDocumentNumber("INV-ADJ", (yp) =>
-      prisma.invoice
-        .findFirst({ where: { tenantId, invoiceNumber: { startsWith: yp } }, orderBy: { invoiceNumber: "desc" }, select: { invoiceNumber: true } })
-        .then((r) => r?.invoiceNumber ?? null),
-    );
     const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
 
-    await prisma.invoice.create({
+    // P08.04: the adjustment invoice number had the same read-then-write race.
+    await createWithDocumentNumber(
+      "INV-ADJ",
+      (yp) =>
+        prisma.invoice
+          .findFirst({ where: { tenantId, invoiceNumber: { startsWith: yp } }, orderBy: { invoiceNumber: "desc" }, select: { invoiceNumber: true } })
+          .then((r) => r?.invoiceNumber ?? null),
+      (invoiceNumber) => prisma.invoice.create({
       data: {
         tenantId,
         invoiceNumber,
@@ -627,7 +634,8 @@ export const amendmentService = {
         status: "SENT",
         notes: `Pro-rata adjustment: ${endorsement.endorsementNumber}`,
       },
-    });
+    }),
+    );
   },
 
   // ── 7. Commission clawback for removals ───────────────────────────────────
