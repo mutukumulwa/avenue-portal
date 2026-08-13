@@ -14,6 +14,7 @@ import { BenefitUsageService } from "@/server/services/benefit-usage.service";
 import { MemberProfileTabs } from "@/components/members/MemberProfileTabs";
 import { HouseholdPanel } from "@/components/members/HouseholdPanel";
 import { GovernedLifecycleAction } from "@/components/members/GovernedLifecycleAction";
+import { limitCaveat, limitsAreUsable } from "@/lib/member-action-policy";
 import {
   maskEmail,
   maskNationalId,
@@ -337,18 +338,42 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
       </div>
 
       {/* KPI summary bar */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: "Annual Limit (UGX)", value: totalLimit.toLocaleString(), color: "text-brand-indigo" },
-          { label: `Utilised (UGX)${totalHeld > 0 ? ` +${totalHeld.toLocaleString()} reserved` : ""}`, value: totalUsed.toLocaleString(), color: "text-[#FFC107]" },
-          { label: "Remaining (UGX)", value: totalRemaining.toLocaleString(), color: "text-[#28A745]" },
-          { label: "Total Claims", value: member.claims.length.toString(), color: "text-[#17A2B8]" },
-        ].map(s => (
-          <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-[8px] p-4 shadow-sm">
-            <p className="text-xs text-brand-text-muted font-bold uppercase">{s.label}</p>
-            <p className={`text-xl font-bold mt-1 ${s.color}`}>{s.value}</p>
-          </div>
-        ))}
+      <div className="space-y-2">
+        {/*
+          UAT-HF P07.06 — DEF-058. This bar "still displayed 'ANNUAL LIMIT (UGX)
+          25,000,000 / UTILISED (UGX) 0 / REMAINING (UGX) 25,000,000'
+          prominently" on a freshly loaded LAPSED profile.
+
+          The figures are still shown — an operator answering "what would they
+          have had" needs them, and blanking them replaces one wrong answer with
+          another. What changes is that they are no longer presented as
+          available: the caveat is stated once, above, and the money is muted.
+        */}
+        {limitCaveat(member.status) && (
+          <p
+            role="status"
+            className="rounded-lg border border-[#FFC107]/50 bg-[#FFC107]/10 px-3 py-2 text-xs font-semibold text-[#856404]"
+          >
+            {limitCaveat(member.status)}
+          </p>
+        )}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { label: "Annual Limit (UGX)", value: totalLimit.toLocaleString(), color: "text-brand-indigo" },
+            { label: `Utilised (UGX)${totalHeld > 0 ? ` +${totalHeld.toLocaleString()} reserved` : ""}`, value: totalUsed.toLocaleString(), color: "text-[#FFC107]" },
+            { label: "Remaining (UGX)", value: totalRemaining.toLocaleString(), color: "text-[#28A745]" },
+            { label: "Total Claims", value: member.claims.length.toString(), color: "text-[#17A2B8]" },
+          ].map(s => (
+            <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-[8px] p-4 shadow-sm">
+              <p className="text-xs text-brand-text-muted font-bold uppercase">{s.label}</p>
+              <p
+                className={`text-xl font-bold mt-1 ${limitsAreUsable(member.status) ? s.color : "text-brand-text-muted line-through decoration-1"}`}
+              >
+                {s.value}
+              </p>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Transfer / tier-change panel */}

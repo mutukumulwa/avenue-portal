@@ -193,14 +193,14 @@ describe("createMember — normalized duplicate detection (M-005/006/007)", () =
 
 describe("createMember — dependant guards (M-013 / M-014) + default tier", () => {
   it("M-013: rejects linking a dependant to a member that is not a PRINCIPAL", async () => {
-    overrides.principalById = { id: "p1", relationship: "CHILD", groupId: "g1", group: { id: "g1", packageId: "pkg1", packageVersionId: "pv1", clientId: "c1" } };
+    overrides.principalById = { id: "p1", relationship: "CHILD", status: "ACTIVE", groupId: "g1", group: { id: "g1", packageId: "pkg1", packageVersionId: "pv1", clientId: "c1" } };
     await expect(
       MembersService.createMember("t1", { ...base, relationship: "CHILD", principalId: "p1" }),
     ).rejects.toThrow(/can only be linked to a PRINCIPAL/i);
   });
 
   it("M-014: rejects a dependant enrolled into a scheme other than its principal's", async () => {
-    overrides.principalById = { id: "p1", relationship: "PRINCIPAL", groupId: "gPrincipal", group: { id: "gPrincipal", packageId: "pkg1", packageVersionId: "pv1", clientId: "c1" } };
+    overrides.principalById = { id: "p1", relationship: "PRINCIPAL", status: "ACTIVE", groupId: "gPrincipal", group: { id: "gPrincipal", packageId: "pkg1", packageVersionId: "pv1", clientId: "c1" } };
     await expect(
       MembersService.createMember("t1", { ...base, groupId: "gOther", relationship: "CHILD", principalId: "p1" }),
     ).rejects.toThrow(/same scheme as its principal/i);
@@ -241,7 +241,7 @@ describe("createMember — newborn (CT-033) + SIBLING", () => {
   });
 
   it("enrols a SIBLING dependant (new relationship)", async () => {
-    overrides.principalById = { id: "p1", relationship: "PRINCIPAL", groupId: "g1", group: { id: "g1", packageId: "pkg1", packageVersionId: "pv1", clientId: "c1" } };
+    overrides.principalById = { id: "p1", relationship: "PRINCIPAL", status: "ACTIVE", groupId: "g1", group: { id: "g1", packageId: "pkg1", packageVersionId: "pv1", clientId: "c1" } };
     await MembersService.createMember("t1", {
       groupId: "g1", firstName: "Sib", lastName: "Ling",
       dateOfBirth: "2000-01-01", gender: "MALE", relationship: "SIBLING", principalId: "p1",
@@ -376,6 +376,7 @@ describe("endorsement MEMBER_ADDITION → createMember (WP-3.5F HR-channel parit
     // createMember re-validates that id — both lookups must resolve.
     overrides.principalByIdNumber = { id: "principalMember" };
     overrides.principalById = {
+      status: "ACTIVE",
       id: "principalMember", relationship: "PRINCIPAL", groupId: "g1",
       group: { id: "g1", packageId: "pkg1", packageVersionId: "pv1", clientId: "c1" },
     };

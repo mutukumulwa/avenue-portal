@@ -1509,6 +1509,30 @@ Nothing new is invented here. The four ungoverned actions — Lapse, Reinstate, 
 
 **The irreversible one asks for the member number to be typed.** Standard Cancel applies a fee and ends cover; `requiredPhrase` makes it an act rather than a reflex.
 
+### P07.06 (part) — Status-aware actions
+
+| Field | Value |
+|---|---|
+| **Task** | P07.06 — the status-gating half; DEF-062/DEF-077's freshness half landed in P04.05 |
+| **Defect IDs** | DEF-058 (S2) |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/lib/member-action-policy.test.ts` (29); 4 fixtures corrected |
+| **Commands / results** | typecheck 0; lint 0 errors; suite 300 files / 3381 passed. |
+| **Evidence** | `src/lib/member-action-policy.ts`, `MemberProfileTabs.tsx`, member profile page, `members.service.ts` |
+| **Feature flags** | none. |
+| **Remaining risks** | **Only the Add Dependent path is enforced server-side.** The claim, pre-auth and endorsement entry points are gated in the UI but their own actions do not consult the policy, so a forged POST to `/claims/new` is not yet refused by this — the acceptance's "or forged request" is met for one action of four. The other three live in P05/P07's adjacent services and each needs the same two lines. **No override path**: the register mentions "no override step", and a legitimate back-dated claim on a since-lapsed member now has no route at all. That is safer than the previous silence but it is a new operational constraint, and P07.04's compensating events are where it belongs. |
+
+**The register ruled out the obvious cause itself.** "On a **FRESHLY loaded profile (not a stale tab)**" — so this is not staleness (that was DEF-062, fixed in P04.05). The page simply never asked what the status permitted, and offered all four actions plus a full remaining limit on a lapsed membership.
+
+**One policy module, consulted by the UI and the server.** The acceptance is "cannot invoke protected action through UI **or forged request**", and hiding a button is not a control. Two implementations of the same question would drift — and a UI that hides what the server would allow is its own defect. A test asserts all three files import the one module.
+
+**Actions are disabled, not hidden.** The run's complaint was not only that too much was offered; it was that "no point-in-time reason and no safe next action is offered for the non-active state anywhere". A vanished button explains nothing, so every refusal carries both — and the wording fits the status: a lapsed member is told to reinstate within the catch-up window, a terminated one is told it *cannot* be reinstated and pointed at a new membership.
+
+**The limits are still shown, and no longer presented as available.** An operator answering "what would they have had" needs the figures; blanking them replaces one wrong answer with another. They are muted, struck through, and carry "Not currently usable — this membership is lapsed."
+
+**The server check sits after the M-013/M-014 guards, deliberately.** When a dependant is linked to a dependant *and* that member is lapsed, "you linked to a dependant" is the more useful message. Four test fixtures were missing `status` and are corrected — real principals always have one, and the guard was right to refuse them.
+
 ---
 
 ## Corrections made to the implementation plan

@@ -10,6 +10,10 @@ import {
 } from "lucide-react";
 import { issueCardAction } from "@/app/(admin)/members/[id]/card/actions";
 import { RevealableDetail } from "@/components/members/RevealableDetail";
+import {
+  MEMBER_ACTION_LABELS,
+  canPerformMemberAction,
+} from "@/lib/member-action-policy";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -169,19 +173,55 @@ function OverviewTab({ member, age }: { member: Member; age: number }) {
         {/* Quick actions */}
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-4 shadow-sm">
           <p className="text-xs font-bold uppercase text-brand-text-muted mb-3">Quick Actions</p>
+          {/*
+            UAT-HF P07.06 — DEF-058. All four were offered unconditionally: "On
+            a FRESHLY loaded profile ... whose status chip reads LAPSED, the page
+            ... still offered New Claim, New Pre-Auth, New Endorsement and Add
+            Dependent. Clicking Add Dependent loaded the enrolment form ... no
+            warning that the principal is lapsed, no block, no override step."
+
+            Unavailable actions are shown DISABLED with the reason and a safe
+            next action, not hidden — the run's complaint included that "no
+            point-in-time reason and no safe next action is offered for the
+            non-active state anywhere", and a vanished button explains nothing.
+          */}
           <div className="grid grid-cols-2 gap-2">
-            {[
-              { label: "New Claim", href: `/claims/new?memberId=${member.id}`, color: "bg-brand-indigo" },
-              { label: "New Pre-Auth", href: `/preauth/new?memberId=${member.id}`, color: "bg-[#17A2B8]" },
-              { label: "New Endorsement", href: `/endorsements/new?memberId=${member.id}`, color: "bg-[#6C757D]" },
-              { label: "Add Dependent", href: `/members/new?principalId=${member.id}`, color: "bg-[#28A745]" },
-            ].map(a => (
-              <Link key={a.label} href={a.href}
-                className={`${a.color} text-white text-xs font-bold py-2 px-3 rounded-full text-center hover:opacity-90 transition-opacity`}>
-                {a.label}
-              </Link>
-            ))}
+            {([
+              { action: "CLAIM" as const, href: `/claims/new?memberId=${member.id}`, color: "bg-brand-indigo" },
+              { action: "PREAUTH" as const, href: `/preauth/new?memberId=${member.id}`, color: "bg-[#17A2B8]" },
+              { action: "ENDORSEMENT" as const, href: `/endorsements/new?memberId=${member.id}`, color: "bg-[#6C757D]" },
+              { action: "ADD_DEPENDANT" as const, href: `/members/new?principalId=${member.id}`, color: "bg-[#28A745]" },
+            ]).map(a => {
+              const verdict = canPerformMemberAction(member.status, a.action);
+              const label = MEMBER_ACTION_LABELS[a.action];
+              if (!verdict.allowed) {
+                return (
+                  <span
+                    key={label}
+                    title={`${verdict.reason} ${verdict.nextAction}`}
+                    aria-disabled="true"
+                    className="cursor-not-allowed rounded-full bg-[#E6E7E8] px-3 py-2 text-center text-xs font-bold text-[#6C757D]"
+                  >
+                    {label}
+                  </span>
+                );
+              }
+              return (
+                <Link key={label} href={a.href}
+                  className={`${a.color} text-white text-xs font-bold py-2 px-3 rounded-full text-center hover:opacity-90 transition-opacity`}>
+                  {label}
+                </Link>
+              );
+            })}
           </div>
+          {!canPerformMemberAction(member.status, "CLAIM").allowed && (
+            <p role="status" className="mt-2 text-[11px] text-[#856404]">
+              {canPerformMemberAction(member.status, "CLAIM").reason}{" "}
+              <span className="font-semibold">
+                {canPerformMemberAction(member.status, "CLAIM").nextAction}
+              </span>
+            </p>
+          )}
         </div>
       </div>
 

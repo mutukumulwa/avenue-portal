@@ -20,6 +20,7 @@ import {
   findIdentityMatches,
 } from "@/server/services/identity-match.service";
 import { canEditTransition } from "@/lib/member-status";
+import { canPerformMemberAction } from "@/lib/member-action-policy";
 import type { Prisma } from "@prisma/client";
 import {
   applyWithPrecondition,
@@ -131,7 +132,7 @@ export class MembersService {
       if (data.principalId) {
         const principal = await tx.member.findFirst({
           where: { id: data.principalId, tenantId },
-          select: { id: true, relationship: true, groupId: true, group: true },
+          select: { id: true, relationship: true, groupId: true, group: true, status: true },
         });
         if (!principal) throw new Error("Principal member not found for this dependant.");
         // M-013: a dependant cannot own dependants — the link target must itself be a
@@ -150,6 +151,20 @@ export class MembersService {
             "A dependant must be enrolled in the same scheme as its principal — cross-scheme dependant links are not allowed.",
           );
         }
+        // UAT-HF P07.06 — DEF-058. The run clicked Add Dependent on a LAPSED
+        // principal and got the enrolment form with "no warning that the
+        // principal is lapsed, no block, no override step". The acceptance is
+        // that a lapsed member "cannot invoke protected action through UI **or
+        // forged request**", so the refusal lives here, not only in the button.
+        //
+        // Checked AFTER the M-013/M-014 identity guards so those keep their own
+        // specific messages: "you linked to a dependant" is more useful than
+        // "that member is lapsed" when both are true.
+        const verdict = canPerformMemberAction(principal.status, "ADD_DEPENDANT");
+        if (!verdict.allowed) {
+          throw new Error(`${verdict.reason} ${verdict.nextAction}`);
+        }
+
         // Inherit the principal's scheme.
         effectiveGroup = principal.group;
         data.groupId = principal.groupId;
