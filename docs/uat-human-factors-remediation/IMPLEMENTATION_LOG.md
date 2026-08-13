@@ -1606,10 +1606,10 @@ refusal renders in an alert while preserving the operator's entries and re-enabl
 | **Defect IDs** | DEF-006, DEF-008, DEF-029, DEF-032, DEF-033, DEF-039, DEF-074, DEF-075 |
 | **Commit** | _this commit_ (the additive address schema and migration `012` entered the integration parent `df8e7b1` while this shared-worktree slice was in progress; the product wiring and drift cleanup are this commit) |
 | **Migrations / backfills** | `20260813001200_member_structured_address`: 10 nullable member-address columns and four coordinate pair/consent/range constraints; **no backfill** and no invented address for an existing member. `20260813001300_remove_redundant_member_national_id_index`: removes P05.01's duplicate non-unique index while retaining its unique constraint/index. Fresh database: **14 migrations applied**, `migrate status` current, **No difference detected**, all four address constraints present, unique national-ID index present. Disposable database dropped. |
-| **Tests added** | `member-enrolment.test.ts` (5), `member-address.test.ts` (6), `member-profile-date-address-boundary.test.ts` (4), `hr-member-addition-input.test.ts` (5); 3 in `member-enrolment-idempotency.test.ts`, 4 plus one extended in `member-enrolment-integrity.test.ts`, 3 in `member-new-form-draft.test.tsx`, 2 in `member-profile-edit.test.ts` |
-| **Commands / results** | Focused boundary suite: **9 files / 119 tests passed**. Full gate: typecheck 0; lint **0 errors / 214 warnings**; suite **308 files / 3465 tests passed**, 88 files / 598 skipped; currency guard green; locale guard green and baseline tightened **50 → 49**; `git diff --check` clean. |
+| **Tests added** | `member-enrolment.test.ts` (5), `member-address.test.ts` (6), `member-demographics.test.ts` (6), `member-profile-date-address-boundary.test.ts` (4), `hr-member-addition-input.test.ts` (6); 4 in `member-enrolment-idempotency.test.ts`, 8 plus one extended in `member-enrolment-integrity.test.ts`, 3 in `member-new-form-draft.test.tsx`, 3 in `member-profile-edit.test.ts` |
+| **Commands / results** | Focused boundary suite: **9 files / 117 tests passed**. Full gate at HEAD `ac9c920`: typecheck 0; lint **0 errors / 214 warnings**; suite **309 files / 3485 tests passed**, 88 files / 598 skipped; brand, currency and locale guards green; locale baseline tightened **50 → 49**; `git diff --check` clean. |
 | **Routes exercised** | no live browser route. Direct admin enrollment/edit, HR request and endorsement-approval boundaries are rendered/called in component, action and service tests. Browser retest remains P12.05. |
-| **Evidence** | `src/lib/member-enrolment.ts`, `src/lib/member-address.ts`, member create/edit/profile routes, HR member-addition route, `MembersService`, endorsement approval, migrations `012`/`013`, tests listed above |
+| **Evidence** | `src/lib/member-enrolment.ts`, `src/lib/member-address.ts`, `src/lib/member-demographics.ts`, member create/edit/profile routes, HR member-addition route, `MembersService`, endorsement approval, migrations `012`/`013`, tests listed above |
 | **Feature flags** | none. Address/date validation and exact readback are unconditional. |
 | **Remaining risks** | Production schema cutover remains the human operation in `SCHEMA_DEPLOYMENT.md` §3. Existing members have no address until corrected by an authorized operator. Precise-coordinate consent is an operator attestation and timestamp, not a linked consent document. Find Care does not consume member coordinates yet, so DEF-007's no-results cause remains unproven. The separate admin endorsement UI still exposes its own incomplete member/dependant-addition forms; P08.02 must remove that duplicate engine rather than grow a third enrollment form. No live browser route was exercised. |
 
@@ -1637,11 +1637,22 @@ coordinates.
 
 **Every enrollment rail uses the same rejection grammar.** A malformed phone can no longer fall
 through normalization and be stored verbatim by manual, HR, endorsement-approval or import callers.
+The same boundary canonicalizes Unicode/whitespace in names and refuses forged gender/relationship
+enums or malformed email before a request receipt, endorsement or member row exists. A profile edit
+uses the partial form of that validator, so it checks only the operator's changed fields without
+quietly replacing untouched data.
 The admin Server Action validates before reserving an operation receipt, so a correctable field
 error cannot leave an uncertain receipt. HR dependants must identify their principal and every HR
 request must carry the source/document reference the approval service requires before the request
 can enter the queue; otherwise approval would later discover an un-linkable family or missing
 evidence and leave a permanently unapprovable endorsement.
+
+**Profile editing cannot undo the family invariant.** The UI keeps a principal as the family root
+and offers only dependant-to-dependant relationship corrections for linked members. The service
+independently refuses a forged principal-to-dependant change without a principal link, a
+dependant-to-principal change that would retain its link, or demoting a member who owns dependants.
+Moving a member into or out of a family root remains a governed family correction rather than a
+demographic dropdown.
 
 **The migration rehearsal corrected an older claim.** Migration `007` created a normal index on
 `(tenantId, nationalIdNormalized)` and migration `008` created a unique index on the same columns.

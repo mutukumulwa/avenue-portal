@@ -322,6 +322,16 @@ export class EndorsementsService {
         principalId,
         effectiveDate,
         birthNotificationDate: details.birthNotificationDate || undefined,
+        addressCountry: details.addressCountry || undefined,
+        addressDistrict: details.addressDistrict || undefined,
+        addressLocality: details.addressLocality || undefined,
+        addressSubcounty: details.addressSubcounty || undefined,
+        addressParish: details.addressParish || undefined,
+        addressVillage: details.addressVillage || undefined,
+        addressLine: details.addressLine || undefined,
+        addressLatitude: details.addressLatitude || undefined,
+        addressLongitude: details.addressLongitude || undefined,
+        addressCoordinateConsent: String(details.addressCoordinateConsent) === "true",
         coveragePeriodReason: "ENDORSEMENT",
       });
 

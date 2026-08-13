@@ -189,6 +189,66 @@ describe("createMember — normalized duplicate detection (M-005/006/007)", () =
     // time. Not any more, in either direction.
     expect(String(error)).not.toMatch(/Bob|Old|MVX-2/);
   });
+
+  it("refuses an unparseable phone instead of storing the raw garbage — DEF-029", async () => {
+    await expect(
+      MembersService.createMember("t1", { ...base, phone: "12345" }),
+    ).rejects.toThrow(/Ugandan phone number/i);
+    expect(db.member.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses forged demographics before opening the enrolment transaction", async () => {
+    await expect(
+      MembersService.createMember("t1", {
+        ...base,
+        gender: "UNKNOWN" as never,
+        email: "not-an-email",
+      }),
+    ).rejects.toThrow(/valid gender|valid email/i);
+    expect(db.member.create).not.toHaveBeenCalled();
+  });
+});
+
+describe("createMember — structured address (P05.06)", () => {
+  it("stores every Uganda hierarchy level and a server-owned coordinate consent timestamp", async () => {
+    await MembersService.createMember("t1", {
+      ...base,
+      addressCountry: "Uganda",
+      addressDistrict: "Wakiso",
+      addressLocality: "Kira Municipality",
+      addressSubcounty: "Namugongo Division",
+      addressParish: "Kyaliwajjala",
+      addressVillage: "Buwate",
+      addressLine: "Plot 18",
+      addressLatitude: "0.347596",
+      addressLongitude: "32.582520",
+      addressCoordinateConsent: true,
+    });
+    expect(lastCreate()).toMatchObject({
+      addressCountry: "Uganda",
+      addressDistrict: "Wakiso",
+      addressLocality: "Kira Municipality",
+      addressSubcounty: "Namugongo Division",
+      addressParish: "Kyaliwajjala",
+      addressVillage: "Buwate",
+      addressLine: "Plot 18",
+      addressLatitude: "0.347596",
+      addressLongitude: "32.582520",
+      addressCoordinateConsentAt: expect.any(Date),
+    });
+  });
+
+  it("refuses coordinates without consent at the service boundary", async () => {
+    await expect(
+      MembersService.createMember("t1", {
+        ...base,
+        addressDistrict: "Wakiso",
+        addressLatitude: "0.347596",
+        addressLongitude: "32.582520",
+      }),
+    ).rejects.toThrow(/consent/i);
+    expect(db.member.create).not.toHaveBeenCalled();
+  });
 });
 
 describe("createMember — dependant guards (M-013 / M-014) + default tier", () => {
@@ -392,6 +452,44 @@ describe("updateProfile — P05.05 concurrency and scope", () => {
     expect(data.email).toBe("a@b.com");
   });
 
+  it("rejects invalid partial demographics at the service boundary", async () => {
+    await expect(
+      MembersService.updateProfile(
+        "t1",
+        "m1",
+        { relationship: "COUSIN", email: "not-an-email" },
+        { updatedAt: new Date() },
+      ),
+    ).rejects.toThrow(/valid relationship|valid email/i);
+    expect(db.member.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("cannot turn an unlinked principal into an orphan dependant through profile editing", async () => {
+    overrides.memberById = { principalId: null, _count: { dependents: 0 } };
+    await expect(
+      MembersService.updateProfile(
+        "t1",
+        "m1",
+        { relationship: "CHILD" },
+        { updatedAt: new Date() },
+      ),
+    ).rejects.toThrow(/cannot be changed into a dependant/i);
+    expect(db.member.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("cannot turn a linked dependant into a principal while retaining its family link", async () => {
+    overrides.memberById = { principalId: "p1", _count: { dependents: 0 } };
+    await expect(
+      MembersService.updateProfile(
+        "t1",
+        "m1",
+        { relationship: "PRINCIPAL" },
+        { updatedAt: new Date() },
+      ),
+    ).rejects.toThrow(/cannot be changed into a principal/i);
+    expect(db.member.updateMany).not.toHaveBeenCalled();
+  });
+
   it("still refuses a national ID that belongs to somebody else, naming nobody", async () => {
     overrides.idDup = { id: "m-other", memberNumber: "MVX-9", firstName: "Zed", lastName: "Other" };
     db.member.updateMany.mockResolvedValue({ count: 1 });
@@ -411,6 +509,46 @@ describe("updateProfile — P05.05 concurrency and scope", () => {
     expect(outcome).toBe("APPLIED");
     expect(db.member.updateMany).not.toHaveBeenCalled();
   });
+
+  it("updates a complete validated address block and clears coordinates on consent withdrawal", async () => {
+    overrides.memberById = {
+      addressCountry: "Uganda",
+      addressDistrict: "Wakiso",
+      addressLocality: "Kira",
+      addressSubcounty: null,
+      addressParish: null,
+      addressVillage: null,
+      addressLine: null,
+      addressLatitude: { toString: () => "0.347596" },
+      addressLongitude: { toString: () => "32.582520" },
+      addressCoordinateConsentAt: new Date("2026-08-01T00:00:00Z"),
+    };
+    await MembersService.updateProfile(
+      "t1",
+      "m1",
+      {
+        addressCountry: "Uganda",
+        addressDistrict: "Kampala",
+        addressLocality: "Central Division",
+        addressSubcounty: "",
+        addressParish: "",
+        addressVillage: "",
+        addressLine: "",
+        addressLatitude: "",
+        addressLongitude: "",
+        addressCoordinateConsent: "",
+      },
+      { updatedAt: new Date() },
+    );
+    expect(db.member.updateMany.mock.calls.at(-1)![0].data).toMatchObject({
+      addressCountry: "Uganda",
+      addressDistrict: "Kampala",
+      addressLocality: "Central Division",
+      addressLatitude: null,
+      addressLongitude: null,
+      addressCoordinateConsentAt: null,
+    });
+  });
 });
 
 describe("endorsement MEMBER_ADDITION → createMember (WP-3.5F HR-channel parity)", () => {
@@ -429,6 +567,9 @@ describe("endorsement MEMBER_ADDITION → createMember (WP-3.5F HR-channel parit
         firstName: "Dep", lastName: "Endant", dateOfBirth: "2010-05-05", gender: "FEMALE",
         relationship: "CHILD", idNumber: "cd 99 88", phone: "0700999888", email: "Dep@Family.com",
         principalIdNumber: "PRIN123", sourceReference: "HR-LTR-2026-0005",
+        addressCountry: "Uganda", addressDistrict: "Wakiso", addressLocality: "Kira",
+        addressSubcounty: "Namugongo", addressParish: "Kyaliwajjala", addressVillage: "Buwate",
+        addressLatitude: "0.347596", addressLongitude: "32.582520", addressCoordinateConsent: true,
       },
       // WP-E1: past effective date → E-007 override linked (APPROVED in beforeEach).
       effectiveDate: new Date("2026-08-01"), proratedAmount: 0, groupId: "g1", overrideRecordId: "ovr1", endorsementNumber: "END-1",
@@ -444,5 +585,16 @@ describe("endorsement MEMBER_ADDITION → createMember (WP-3.5F HR-channel parit
     // The dependant is LINKED to the principal (resolved from the National ID).
     expect(d.principalId).toBe("principalMember");
     expect(d.relationship).toBe("CHILD");
+    expect(d).toMatchObject({
+      addressCountry: "Uganda",
+      addressDistrict: "Wakiso",
+      addressLocality: "Kira",
+      addressSubcounty: "Namugongo",
+      addressParish: "Kyaliwajjala",
+      addressVillage: "Buwate",
+      addressLatitude: "0.347596",
+      addressLongitude: "32.582520",
+      addressCoordinateConsentAt: expect.any(Date),
+    });
   });
 });

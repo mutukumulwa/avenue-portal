@@ -14,6 +14,7 @@ import {
   MEMBER_ACTION_LABELS,
   canPerformMemberAction,
 } from "@/lib/member-action-policy";
+import { formatCalendarDate, parseCalendarDate } from "@/lib/calendar-date";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -50,8 +51,10 @@ type Member = {
   id: string; firstName: string; otherNames: string | null; lastName: string;
   memberNumber: string; status: string; dateOfBirth: string; gender: string;
   idNumber: string | null; phone: string | null; email: string | null;
-  relationship: string; enrollmentDate: string; activationDate: string | null;
+  relationship: string; enrollmentDate: string; coverStartDate: string | null; activationDate: string | null;
   smartCardNumber: string | null;
+  addressLines: string[];
+  hasAddressCoordinates: boolean;
   group: { id: string; name: string; renewalDate: string };
   package: { name: string; currentVersion: { benefits: Benefit[] } | null };
   dependents: Dependent[];
@@ -84,14 +87,15 @@ const statusPill = (s: string) => {
 
 const fmt = (n: number) => n.toLocaleString("en-UG");
 const fmtDate = (d: string) => new Date(d).toLocaleDateString("en-UG");
+const fmtCalendarDate = (d: string) => formatCalendarDate(parseCalendarDate(d.slice(0, 10)));
 const fmtDateTime = (d: string) =>
   new Date(d).toLocaleString("en-UG", { dateStyle: "medium", timeStyle: "short" });
 
 // ─── Insurance Card ───────────────────────────────────────────────────────────
 
 function InsuranceCard({ member }: { member: Member }) {
-  const validTo = new Date(member.group.renewalDate);
-  const validFrom = new Date(member.enrollmentDate);
+  const validTo = fmtCalendarDate(member.group.renewalDate);
+  const validFrom = fmtCalendarDate(member.coverStartDate ?? member.enrollmentDate);
 
   return (
     <div
@@ -143,7 +147,7 @@ function InsuranceCard({ member }: { member: Member }) {
             <p className="text-[10px] text-white/70 uppercase mt-0.5">{member.relationship}</p>
             <div className="mt-2">
               <p className="text-[10px] text-white/60 uppercase tracking-widest mb-0.5">Valid Period</p>
-              <p className="text-xs font-bold text-white">{validFrom.toLocaleDateString("en-UG", { month: "short", year: "numeric" })} — {validTo.toLocaleDateString("en-UG", { month: "short", year: "numeric" })}</p>
+              <p className="text-xs font-bold text-white">{validFrom} — {validTo}</p>
               <p className="text-[10px] text-white/70 mt-0.5">{member.group.name}</p>
             </div>
           </div>
@@ -234,7 +238,7 @@ function OverviewTab({ member, age }: { member: Member; age: number }) {
             rendered in full on the landing view, on "the screen an agent has
             open with a member standing at the counter". */}
         {[
-          { label: "Date of Birth", value: `${fmtDate(member.dateOfBirth)} (Age ${age})` },
+          { label: "Date of Birth", value: `${fmtCalendarDate(member.dateOfBirth)} (Age ${age})` },
           { label: "Gender", value: member.gender },
           {
             label: "ID / Passport",
@@ -260,9 +264,10 @@ function OverviewTab({ member, age }: { member: Member; age: number }) {
         {[
           { label: "Group", value: <Link href={`/groups/${member.group.id}`} className="text-brand-indigo hover:underline font-semibold">{member.group.name}</Link> },
           { label: "Package", value: member.package.name },
-          { label: "Enrolled", value: fmtDate(member.enrollmentDate) },
-          { label: "Activated", value: member.activationDate ? fmtDate(member.activationDate) : "Pending" },
-          { label: "Renewal", value: fmtDate(member.group.renewalDate) },
+          { label: "Requested / enrolled", value: fmtCalendarDate(member.enrollmentDate) },
+          { label: "Cover starts", value: fmtCalendarDate(member.coverStartDate ?? member.enrollmentDate) },
+          { label: "Activated", value: member.activationDate ? fmtCalendarDate(member.activationDate) : "Pending" },
+          { label: "Renewal", value: fmtCalendarDate(member.group.renewalDate) },
           { label: "SMART Card No.", value: member.smartCardNumber ?? "—" },
         ].map(f => (
           <div key={f.label} className="flex justify-between text-sm py-1 border-b border-[#EEEEEE]/50 last:border-0">
@@ -270,6 +275,18 @@ function OverviewTab({ member, age }: { member: Member; age: number }) {
             <span className="font-semibold text-brand-text-heading">{f.value}</span>
           </div>
         ))}
+
+        <h3 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2 pt-2">Address</h3>
+        {member.addressLines.length > 0 ? (
+          <div className="text-sm text-brand-text-heading">
+            {member.addressLines.map((line) => <p key={line}>{line}</p>)}
+            {member.hasAddressCoordinates && (
+              <p className="mt-1 text-xs text-brand-text-muted">Precise coordinates recorded with member consent.</p>
+            )}
+          </div>
+        ) : (
+          <p className="text-sm text-brand-text-muted">No address recorded. Use Edit to add the member&rsquo;s Uganda address.</p>
+        )}
       </div>
     </div>
   );

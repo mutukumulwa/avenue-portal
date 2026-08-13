@@ -70,9 +70,6 @@
   "src/app/(hr)/hr/roster/[memberId]/page.tsx": {
     "ambiguous-date-format": 3
   },
-  "src/app/(hr)/hr/roster/new/HRAddMemberForm.tsx": {
-    "kenyan-calling-code": 1
-  },
   "src/app/(hr)/hr/roster/page.tsx": {
     "ambiguous-date-format": 1
   },

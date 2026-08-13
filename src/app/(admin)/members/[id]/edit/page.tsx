@@ -1,7 +1,7 @@
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { requireRole, ROLES } from "@/lib/rbac";
-import { redirect, notFound } from "next/navigation";
+import { notFound } from "next/navigation";
 import { MembersService } from "@/server/services/members.service";
 import { MemberEditForm } from "./MemberEditForm";
 
@@ -24,6 +24,19 @@ export default async function MemberEditPage({ params }: { params: Promise<{ id:
     email: member.email ?? null,
     relationship: member.relationship,
     status: member.status,
+    addressCountry: member.addressCountry ?? "Uganda",
+    addressDistrict: member.addressDistrict ?? "",
+    addressLocality: member.addressLocality ?? "",
+    addressSubcounty: member.addressSubcounty ?? "",
+    addressParish: member.addressParish ?? "",
+    addressVillage: member.addressVillage ?? "",
+    addressLine: member.addressLine ?? "",
+    addressLatitude: member.addressLatitude?.toString() ?? "",
+    addressLongitude: member.addressLongitude?.toString() ?? "",
+    addressCoordinateConsent:
+      member.addressLatitude && member.addressLongitude && member.addressCoordinateConsentAt
+        ? "on"
+        : "",
     // UAT-HF P05.05: the precondition travels with the copy the browser gets,
     // so the save can be rejected if the record moves in the meantime.
     updatedAt: member.updatedAt.toISOString(),

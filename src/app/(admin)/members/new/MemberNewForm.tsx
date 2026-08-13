@@ -13,9 +13,44 @@ import { EXAMPLES } from "@/lib/locale-config";
 import { addMemberAction, type MemberCreated } from "./actions";
 import { Save, AlertTriangle } from "lucide-react";
 import { SessionExpiryGuard } from "@/components/layouts/SessionExpiryGuard";
+import {
+  calendarDateReadback,
+  todayCalendarDate,
+} from "@/lib/calendar-date";
+import { resolveMemberEnrolmentDates } from "@/lib/member-enrolment";
+import { MEMBER_ADDRESS_COUNTRY } from "@/lib/member-address";
 
 const inputCls = "w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo transition-colors";
 const labelCls = "text-xs font-bold text-brand-text-muted uppercase block mb-1";
+const ENROLMENT_FIELD_ORDER = [
+  "groupId", "relationship", "effectiveDate", "firstName", "lastName",
+  "dateOfBirth", "gender", "idNumber", "birthNotificationDate", "phone", "email",
+  "addressDistrict", "addressLocality", "addressSubcounty", "addressParish",
+  "addressVillage", "addressLine", "addressLatitude", "addressLongitude",
+  "addressCoordinateConsent",
+];
+const ENROLMENT_FIELD_LABELS: Record<string, string> = {
+  groupId: "Group",
+  relationship: "Relationship",
+  effectiveDate: "Effective date",
+  firstName: "First name",
+  lastName: "Last name",
+  dateOfBirth: "Date of birth",
+  gender: "Gender",
+  idNumber: "National ID / Passport",
+  birthNotificationDate: "Birth notification date",
+  phone: "Phone number",
+  email: "Email address",
+  addressDistrict: "District",
+  addressLocality: "City / municipality / county",
+  addressSubcounty: "Subcounty / division",
+  addressParish: "Parish / ward",
+  addressVillage: "Village / zone",
+  addressLine: "Building / street / landmark",
+  addressLatitude: "Latitude",
+  addressLongitude: "Longitude",
+  addressCoordinateConsent: "Coordinate consent",
+};
 
 interface Props {
   groups: { id: string; name: string }[];
@@ -52,6 +87,11 @@ export function MemberNewForm({ groups, principal, draftScope = null }: Props) {
   // would change without re-rendering and the tab-close warning would never
   // arm — which is the DEF-008 symptom, reintroduced.
   const [isDirty, setIsDirty] = useState(false);
+  const [dateValues, setDateValues] = useState<Record<string, string>>({
+    effectiveDate: todayCalendarDate(),
+    relationship: principal ? "SPOUSE" : "PRINCIPAL",
+  });
+  const [coordinateConsent, setCoordinateConsent] = useState(false);
 
   /**
    * UAT-HF P04.02 — DEF-071. Nothing was kept while the operator typed, and a
@@ -67,7 +107,10 @@ export function MemberNewForm({ groups, principal, draftScope = null }: Props) {
   const onFormInput = useCallback(() => {
     if (!formRef.current) return;
     setIsDirty(true);
-    draft.capture(readFormValues(formRef.current));
+    const values = readFormValues(formRef.current);
+    setDateValues(values);
+    setCoordinateConsent(values.addressCoordinateConsent === "on");
+    draft.capture(values);
   }, [draft]);
 
   const applyDraft = useCallback(() => {
@@ -77,9 +120,16 @@ export function MemberNewForm({ groups, principal, draftScope = null }: Props) {
     for (const [name, value] of Object.entries(values)) {
       const field = form.elements.namedItem(name);
       if (field instanceof HTMLInputElement || field instanceof HTMLSelectElement) {
-        field.value = value;
+        if (field instanceof HTMLInputElement && field.type === "checkbox") {
+          field.checked = value === "on" || value === "true";
+        } else {
+          field.value = value;
+        }
       }
     }
+    const restored = readFormValues(form);
+    setDateValues(restored);
+    setCoordinateConsent(restored.addressCoordinateConsent === "on");
     setIsDirty(true);
   }, [draft]);
 
@@ -103,10 +153,34 @@ export function MemberNewForm({ groups, principal, draftScope = null }: Props) {
     router.push(principal ? `/members/${principal.id}` : "/members");
   }, [confirmDiscard, draft, router, principal]);
 
+  const failure = state && !state.ok ? state : null;
+  const errorFor = (field: string) => failure?.fieldErrors?.[field]?.[0];
+  const a11y = (field: string) => ({
+    id: field,
+    "aria-invalid": !!errorFor(field),
+    "aria-describedby": errorFor(field) ? `${field}-error` : undefined,
+  });
+  const inlineError = (field: string) =>
+    errorFor(field) ? (
+      <p id={`${field}-error`} role="alert" className="mt-1 text-xs text-brand-error">
+        {errorFor(field)}
+      </p>
+    ) : null;
+  const dateResolution = resolveMemberEnrolmentDates({
+    dateOfBirth: dateValues.dateOfBirth,
+    effectiveDate: dateValues.effectiveDate,
+    birthNotificationDate: dateValues.birthNotificationDate,
+    relationship: dateValues.relationship,
+  });
+
   return (
     <div className="bg-white border border-[#EEEEEE] rounded-[8px] shadow-sm p-6">
       {/* Field-level problems, focus-managed (P01.01). */}
-      <ErrorSummary failure={state && !state.ok ? state : null} />
+      <ErrorSummary
+        failure={failure}
+        fieldOrder={ENROLMENT_FIELD_ORDER}
+        fieldLabels={ENROLMENT_FIELD_LABELS}
+      />
 
       {/*
         Every non-validation outcome gets its own distinct state, including
@@ -167,21 +241,27 @@ export function MemberNewForm({ groups, principal, draftScope = null }: Props) {
           <h3 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Policy & Group</h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={labelCls}>Group *</label>
+              <label htmlFor="groupId" className={labelCls}>Group *</label>
               {principal ? (
                 <>
                   <input type="hidden" name="groupId" value={principal.groupId} />
-                  <div className={`${inputCls} bg-[#F8F9FA] text-brand-text-muted`}>{principal.groupName}</div>
+                  <input
+                    {...a11y("groupId")}
+                    value={principal.groupName}
+                    readOnly
+                    className={`${inputCls} bg-[#F8F9FA] text-brand-text-muted`}
+                  />
                 </>
               ) : (
-                <select required name="groupId" className={inputCls}>
+                <select {...a11y("groupId")} required name="groupId" className={inputCls}>
                   <option value="">Select group…</option>
                   {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
                 </select>
               )}
+              {inlineError("groupId")}
             </div>
             <div>
-              <label className={labelCls}>Relationship *</label>
+              <label htmlFor="relationship" className={labelCls}>Relationship *</label>
               {/*
                 UAT-HF P05.03 — DEF-031 (S2). "Selecting Relationship 'Child'
                 (or Spouse/Parent/Sibling) presents no principal selector at all
@@ -195,7 +275,7 @@ export function MemberNewForm({ groups, principal, draftScope = null }: Props) {
                 orphans is the whole defect. The dependant options are gone from
                 the generic form, and the note says where they live.
               */}
-              <select required name="relationship" defaultValue={principal ? "SPOUSE" : "PRINCIPAL"} className={inputCls}>
+              <select {...a11y("relationship")} required name="relationship" defaultValue={principal ? "SPOUSE" : "PRINCIPAL"} className={inputCls}>
                 {principal ? (
                   <>
                     <option value="SPOUSE">Spouse</option>
@@ -207,6 +287,7 @@ export function MemberNewForm({ groups, principal, draftScope = null }: Props) {
                   <option value="PRINCIPAL">Principal</option>
                 )}
               </select>
+              {inlineError("relationship")}
               {!principal && (
                 <p className="text-[10px] text-brand-text-muted mt-1">
                   This form enrols a principal. To add a spouse, child, parent or sibling, open the
@@ -216,15 +297,17 @@ export function MemberNewForm({ groups, principal, draftScope = null }: Props) {
               )}
             </div>
             <div>
-              <label className={labelCls}>Effective Date *</label>
+              <label htmlFor="effectiveDate" className={labelCls}>Effective Date *</label>
               <input
+                {...a11y("effectiveDate")}
                 required
                 name="effectiveDate"
                 type="date"
-                defaultValue={new Date().toISOString().slice(0, 10)}
+                defaultValue={todayCalendarDate()}
                 className={inputCls}
               />
               <p className="text-[10px] text-brand-text-muted mt-1">Cover start — drives eligibility from this date.</p>
+              {inlineError("effectiveDate")}
             </div>
           </div>
         </div>
@@ -234,35 +317,54 @@ export function MemberNewForm({ groups, principal, draftScope = null }: Props) {
           <h3 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Personal Information</h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={labelCls}>First Name *</label>
-              <input required name="firstName" type="text" placeholder="e.g. John" className={inputCls} />
+              <label htmlFor="firstName" className={labelCls}>First Name *</label>
+              <input {...a11y("firstName")} required name="firstName" type="text" placeholder="e.g. John" className={inputCls} />
+              {inlineError("firstName")}
             </div>
             <div>
-              <label className={labelCls}>Last Name *</label>
-              <input required name="lastName" type="text" placeholder="e.g. Doe" className={inputCls} />
+              <label htmlFor="lastName" className={labelCls}>Last Name *</label>
+              <input {...a11y("lastName")} required name="lastName" type="text" placeholder="e.g. Doe" className={inputCls} />
+              {inlineError("lastName")}
             </div>
             <div>
-              <label className={labelCls}>Date of Birth *</label>
-              <input required name="dateOfBirth" type="date" className={inputCls} />
+              <label htmlFor="dateOfBirth" className={labelCls}>Date of Birth *</label>
+              <input {...a11y("dateOfBirth")} required name="dateOfBirth" type="date" className={inputCls} />
+              {inlineError("dateOfBirth")}
             </div>
             <div>
-              <label className={labelCls}>Gender *</label>
-              <select required name="gender" className={inputCls}>
+              <label htmlFor="gender" className={labelCls}>Gender *</label>
+              <select {...a11y("gender")} required name="gender" className={inputCls}>
                 <option value="MALE">Male</option>
                 <option value="FEMALE">Female</option>
                 <option value="OTHER">Other</option>
               </select>
+              {inlineError("gender")}
             </div>
             <div className="col-span-2">
-              <label className={labelCls}>National ID / Passport</label>
-              <input name="idNumber" type="text" placeholder="e.g. 12345678" className={inputCls} />
+              <label htmlFor="idNumber" className={labelCls}>National ID / Passport</label>
+              <input {...a11y("idNumber")} name="idNumber" type="text" placeholder="e.g. 12345678" className={inputCls} />
               <p className="text-[10px] text-brand-text-muted mt-1">Used for duplicate detection — must be unique across all members. Newborns may be enrolled without an ID.</p>
+              {inlineError("idNumber")}
             </div>
             <div className="col-span-2">
-              <label className={labelCls}>Birth Notification Date <span className="font-normal text-brand-text-muted normal-case">(newborns only)</span></label>
-              <input name="birthNotificationDate" type="date" className={inputCls} />
+              <label htmlFor="birthNotificationDate" className={labelCls}>Birth Notification Date <span className="font-normal text-brand-text-muted normal-case">(newborns only)</span></label>
+              <input {...a11y("birthNotificationDate")} name="birthNotificationDate" type="date" className={inputCls} />
               <p className="text-[10px] text-brand-text-muted mt-1">When a birth is notified within 30 days, cover starts from the date of birth (no national ID required).</p>
+              {inlineError("birthNotificationDate")}
             </div>
+            {dateResolution.ok && (
+              <div role="status" className="col-span-2 rounded-lg border border-brand-indigo/20 bg-brand-indigo/5 px-4 py-3 text-sm text-brand-text-heading">
+                <p>{calendarDateReadback(dateResolution.value.requestedEffectiveDate, "Requested cover start")}</p>
+                <p className="font-semibold">
+                  {calendarDateReadback(dateResolution.value.coverStartDate, "Resulting cover start")}
+                </p>
+                {dateResolution.value.newbornRuleApplied && (
+                  <p className="mt-1 text-xs text-brand-text-muted">
+                    Newborn rule applied: notification was within 30 days, so cover starts on the exact date of birth.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
 
@@ -271,13 +373,70 @@ export function MemberNewForm({ groups, principal, draftScope = null }: Props) {
           <h3 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Contact Information <span className="font-normal text-brand-text-muted">(optional)</span></h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className={labelCls}>Phone Number</label>
-              <input name="phone" type="text" placeholder={EXAMPLES.phone} className={inputCls} />
+              <label htmlFor="phone" className={labelCls}>Phone Number</label>
+              <input {...a11y("phone")} name="phone" type="tel" placeholder={EXAMPLES.phone} className={inputCls} />
+              <p className="text-[10px] text-brand-text-muted mt-1">Uganda format: +256 772 555 042 or 0772 555 042.</p>
+              {inlineError("phone")}
             </div>
             <div>
-              <label className={labelCls}>Email Address</label>
-              <input name="email" type="email" placeholder="user@example.com" className={inputCls} />
+              <label htmlFor="email" className={labelCls}>Email Address</label>
+              <input {...a11y("email")} name="email" type="email" placeholder="user@example.com" className={inputCls} />
+              {inlineError("email")}
             </div>
+          </div>
+        </div>
+
+        {/* DEF-033: the tested form had no way to record any part of a Uganda
+            address. The hierarchy is optional, but once started the district is
+            required. Coordinates are a separate, explicit-consent choice. */}
+        <div>
+          <h3 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">
+            Address <span className="font-normal text-brand-text-muted">(optional)</span>
+          </h3>
+          <input type="hidden" name="addressCountry" value={MEMBER_ADDRESS_COUNTRY} />
+          <p className="mb-3 text-xs text-brand-text-muted">Country: <strong>Uganda</strong></p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {([
+              ["addressDistrict", "District", "e.g. Wakiso"],
+              ["addressLocality", "City / Municipality / County", "e.g. Kira Municipality"],
+              ["addressSubcounty", "Subcounty / Division", "e.g. Namugongo Division"],
+              ["addressParish", "Parish / Ward", "e.g. Kyaliwajjala"],
+              ["addressVillage", "Village / Zone", "e.g. Buwate"],
+              ["addressLine", "Building / Street / Landmark", "Optional directions or landmark"],
+            ] as const).map(([name, label, placeholder]) => (
+              <div key={name} className={name === "addressLine" ? "md:col-span-2" : undefined}>
+                <label htmlFor={name} className={labelCls}>{label}</label>
+                <input {...a11y(name)} name={name} type="text" maxLength={name === "addressLine" ? 200 : 100} placeholder={placeholder} className={inputCls} />
+                {inlineError(name)}
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 rounded-lg border border-[#EEEEEE] bg-[#F8F9FA] p-4 space-y-3">
+            <label htmlFor="addressCoordinateConsent" className="flex items-start gap-2 text-sm text-brand-text-heading">
+              <input
+                {...a11y("addressCoordinateConsent")}
+                name="addressCoordinateConsent"
+                type="checkbox"
+                className="mt-1"
+              />
+              <span>I confirm the member consented to storing precise coordinates for authorized location-based workflows.</span>
+            </label>
+            {inlineError("addressCoordinateConsent")}
+            {coordinateConsent && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="addressLatitude" className={labelCls}>Latitude *</label>
+                  <input {...a11y("addressLatitude")} required name="addressLatitude" inputMode="decimal" placeholder="0.347596" className={inputCls} />
+                  {inlineError("addressLatitude")}
+                </div>
+                <div>
+                  <label htmlFor="addressLongitude" className={labelCls}>Longitude *</label>
+                  <input {...a11y("addressLongitude")} required name="addressLongitude" inputMode="decimal" placeholder="32.582520" className={inputCls} />
+                  {inlineError("addressLongitude")}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 

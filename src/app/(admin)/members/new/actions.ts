@@ -38,6 +38,10 @@ import {
 } from "@/lib/mutation-contract";
 import { newCorrelationId } from "@/lib/correlation";
 import { OperationReceiptService } from "@/server/services/operation-receipt.service";
+import { resolveMemberEnrolmentDates } from "@/lib/member-enrolment";
+import { validateMemberAddress } from "@/lib/member-address";
+import { calendarDateFromUtcDate } from "@/lib/calendar-date";
+import { validateMemberDemographics } from "@/lib/member-demographics";
 
 const OPERATION_TYPE = "members.create";
 
@@ -45,6 +49,8 @@ export interface MemberCreated {
   memberNumber: string;
   memberId: string;
   warnings: string[];
+  coverStartDate?: string;
+  newbornRuleApplied?: boolean;
 }
 
 export async function addMemberAction(
@@ -56,14 +62,19 @@ export async function addMemberAction(
   const correlationId = newCorrelationId();
 
   const data = {
-    groupId: formData.get("groupId") as string,
-    firstName: formData.get("firstName") as string,
-    lastName: formData.get("lastName") as string,
-    idNumber: formData.get("idNumber") as string,
-    dateOfBirth: formData.get("dateOfBirth") as string,
+    // `String(... ?? "")`, not `as string`: an absent optional field arrives as
+    // NULL, and the cast only silenced the type error — it did not make the
+    // value a string. The P05.06 validation below dereferences these, so the
+    // cast turned a blank phone into a crash. This is the same pattern the
+    // address fields in this literal already use.
+    groupId: String(formData.get("groupId") ?? ""),
+    firstName: String(formData.get("firstName") ?? ""),
+    lastName: String(formData.get("lastName") ?? ""),
+    idNumber: String(formData.get("idNumber") ?? ""),
+    dateOfBirth: String(formData.get("dateOfBirth") ?? ""),
     gender: formData.get("gender") as "MALE" | "FEMALE" | "OTHER",
-    phone: formData.get("phone") as string,
-    email: formData.get("email") as string,
+    phone: String(formData.get("phone") ?? ""),
+    email: String(formData.get("email") ?? ""),
     relationship: formData.get("relationship") as "PRINCIPAL" | "SPOUSE" | "CHILD" | "PARENT" | "SIBLING",
     // NW-D02: link a dependant to its principal when the form was opened from a
     // principal's "Add Dependent" action (/members/new?principalId=…).
@@ -73,6 +84,16 @@ export async function addMemberAction(
     // WP-3.5F newborn (CT-033): when supplied and within 30 days of DOB, cover
     // starts from the date of birth (and no national ID is required).
     birthNotificationDate: (formData.get("birthNotificationDate") as string | null)?.trim() || undefined,
+    addressCountry: String(formData.get("addressCountry") ?? "").trim(),
+    addressDistrict: String(formData.get("addressDistrict") ?? "").trim(),
+    addressLocality: String(formData.get("addressLocality") ?? "").trim(),
+    addressSubcounty: String(formData.get("addressSubcounty") ?? "").trim(),
+    addressParish: String(formData.get("addressParish") ?? "").trim(),
+    addressVillage: String(formData.get("addressVillage") ?? "").trim(),
+    addressLine: String(formData.get("addressLine") ?? "").trim(),
+    addressLatitude: String(formData.get("addressLatitude") ?? "").trim(),
+    addressLongitude: String(formData.get("addressLongitude") ?? "").trim(),
+    addressCoordinateConsent: String(formData.get("addressCoordinateConsent") ?? ""),
   };
 
   const idempotencyKey = String(formData.get(OPERATION_ID_FIELD) ?? "").trim();
@@ -84,6 +105,47 @@ export async function addMemberAction(
       message: "This form could not be submitted safely. Reload the page and try again.",
     });
   }
+
+  // Server Actions are public mutation endpoints. Native `required` and date
+  // controls improve the browser experience but a forged POST can skip them,
+  // so validate the exact same calendar/address grammar before reserving an
+  // operation receipt or touching the database.
+  const fieldErrors: Record<string, string[]> = {};
+  if (!data.groupId) fieldErrors.groupId = ["Select a group."];
+  const demographics = validateMemberDemographics(data);
+  if (!demographics.ok) Object.assign(fieldErrors, demographics.fieldErrors);
+
+  const dates = resolveMemberEnrolmentDates(data);
+  if (!dates.ok) Object.assign(fieldErrors, dates.fieldErrors);
+
+  const address = validateMemberAddress(data);
+  if (!address.ok) Object.assign(fieldErrors, address.fieldErrors);
+
+  if (Object.keys(fieldErrors).length > 0 || !dates.ok || !address.ok || !demographics.ok) {
+    return mutationFail("VALIDATION", {
+      correlationId,
+      operationId: idempotencyKey,
+      fieldErrors,
+      message: "Correct the highlighted member details. Nothing has been submitted.",
+    });
+  }
+
+  // Canonical strings become part of the idempotency request hash. Cosmetic
+  // whitespace must not turn the same business intent into a conflict.
+  const { hasCoordinateConsent, ...addressFields } = address.value;
+  Object.assign(data, {
+    dateOfBirth: dates.value.dateOfBirth,
+    effectiveDate: dates.value.requestedEffectiveDate,
+    birthNotificationDate: dates.value.birthNotificationDate ?? undefined,
+    firstName: demographics.value.firstName,
+    lastName: demographics.value.lastName,
+    gender: demographics.value.gender,
+    relationship: demographics.value.relationship,
+    phone: demographics.value.phone ?? "",
+    email: demographics.value.email ?? "",
+    ...addressFields,
+    addressCoordinateConsent: hasCoordinateConsent,
+  });
 
   try {
     const reservation = await OperationReceiptService.reserve({
@@ -156,6 +218,8 @@ export async function addMemberAction(
         memberNumber: result.member.memberNumber,
         memberId: result.member.id,
         warnings: result.warnings,
+        coverStartDate: calendarDateFromUtcDate(result.member.coverStartDate) ?? undefined,
+        newbornRuleApplied: dates.value.newbornRuleApplied,
       },
     });
   } catch (err) {

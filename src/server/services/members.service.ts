@@ -7,9 +7,7 @@ import { assertEnrolmentAge } from "./eligibility/enrolment-age";
 import { GroupsService } from "./groups.service";
 import {
   memberIdentityKeys,
-  normalizeEmail,
   normalizeNationalId,
-  normalizePhone,
   normalizeSearchName,
 } from "@/lib/normalize";
 import {
@@ -27,6 +25,17 @@ import {
   type ExpectedState,
   type PreconditionOutcome,
 } from "@/lib/concurrency";
+import { calendarDateToUtcDate } from "@/lib/calendar-date";
+import { resolveMemberEnrolmentDates } from "@/lib/member-enrolment";
+import {
+  MEMBER_ADDRESS_FIELDS,
+  validateMemberAddress,
+  type MemberAddressInput,
+} from "@/lib/member-address";
+import {
+  validateMemberDemographicEdits,
+  validateMemberDemographics,
+} from "@/lib/member-demographics";
 
 /** Relationships an enrolment path may assign (SIBLING added in WP-3.5F). */
 export type EnrolmentRelationship = "PRINCIPAL" | "SPOUSE" | "CHILD" | "PARENT" | "SIBLING";
@@ -94,6 +103,17 @@ export class MembersService {
      * the DOB) and may enrol without a national ID. Stored on the member.
      */
     birthNotificationDate?: string | Date;
+    /** UAT-HF P05.06: structured Uganda address and optional consented coordinates. */
+    addressCountry?: string;
+    addressDistrict?: string;
+    addressLocality?: string;
+    addressSubcounty?: string;
+    addressParish?: string;
+    addressVillage?: string;
+    addressLine?: string;
+    addressLatitude?: string | number;
+    addressLongitude?: string | number;
+    addressCoordinateConsent?: string | boolean;
     /**
      * WP-3.5E/F: the reason stamped on the opening MemberCoveragePeriod. The HR /
      * endorsement channel passes "ENDORSEMENT"; defaults to "ENROLMENT" (manual +
@@ -101,6 +121,49 @@ export class MembersService {
      */
     coveragePeriodReason?: string;
   }) {
+    const demographics = validateMemberDemographics({
+      firstName: data.firstName,
+      lastName: data.lastName,
+      gender: data.gender,
+      relationship: data.relationship || "PRINCIPAL",
+      phone: data.phone,
+      email: data.email,
+    });
+    if (!demographics.ok) {
+      throw new Error(Object.values(demographics.fieldErrors).flat().join(" "));
+    }
+    const relationship = demographics.value.relationship;
+    const dateResult = resolveMemberEnrolmentDates({
+      dateOfBirth:
+        data.dateOfBirth instanceof Date ? data.dateOfBirth.toISOString().slice(0, 10) : data.dateOfBirth,
+      effectiveDate:
+        data.effectiveDate instanceof Date
+          ? data.effectiveDate.toISOString().slice(0, 10)
+          : data.effectiveDate,
+      birthNotificationDate:
+        data.birthNotificationDate instanceof Date
+          ? data.birthNotificationDate.toISOString().slice(0, 10)
+          : data.birthNotificationDate,
+      relationship,
+    });
+    if (!dateResult.ok) {
+      throw new Error(Object.values(dateResult.fieldErrors).flat().join(" "));
+    }
+    const dateOfBirth = calendarDateToUtcDate(dateResult.value.dateOfBirth)!;
+    const effectiveDate = calendarDateToUtcDate(dateResult.value.coverStartDate)!;
+    const birthNotificationDate = dateResult.value.birthNotificationDate
+      ? calendarDateToUtcDate(dateResult.value.birthNotificationDate)
+      : null;
+
+    const phoneKey = demographics.value.phone;
+
+    const addressResult = validateMemberAddress(data as MemberAddressInput);
+    if (!addressResult.ok) {
+      throw new Error(Object.values(addressResult.fieldErrors).flat().join(" "));
+    }
+    const address = addressResult.value;
+    const addressCoordinateConsentAt = address.hasCoordinateConsent ? new Date() : null;
+
     /**
      * UAT-HF P05.03 — the whole enrolment is ONE transaction.
      *
@@ -140,7 +203,6 @@ export class MembersService {
       // principal's entire limit. The relationship is refused rather than a
       // principal being guessed — the correct route (a principal's "Add
       // Dependent") already exists and carries the link.
-      const relationship = data.relationship || "PRINCIPAL";
       if (relationship !== "PRINCIPAL" && !data.principalId) {
         throw new Error(
           `A ${relationship.toLowerCase()} must be linked to a principal member. ` +
@@ -190,24 +252,6 @@ export class MembersService {
         data.groupId = principal.groupId;
       }
 
-      // ── WP-3.5F newborn (CT-033): DOB-effective when notified within 30 days ────
-      // A newborn notified within 30 days of birth is covered FROM the date of birth
-      // (and may enrol without a national ID — idNumber is already optional). Later
-      // notifications keep the supplied effective date (or today).
-      const dobForEffective = new Date(data.dateOfBirth);
-      let effectiveDate = data.effectiveDate ? new Date(data.effectiveDate) : new Date();
-      const birthNotificationDate = data.birthNotificationDate ? new Date(data.birthNotificationDate) : null;
-      if (
-        birthNotificationDate &&
-        !Number.isNaN(birthNotificationDate.getTime()) &&
-        !Number.isNaN(dobForEffective.getTime())
-      ) {
-        const daysSinceBirth = Math.floor((birthNotificationDate.getTime() - dobForEffective.getTime()) / 86_400_000);
-        if (daysSinceBirth >= 0 && daysSinceBirth <= 30) {
-          effectiveDate = dobForEffective; // covered from birth
-        }
-      }
-
       // ── WP-3.5D: age gate at enrolment ────────────────────────────────────────
       // Reject an over-age principal / dependant (and future/impossible DOB) against
       // the scheme package's caps, as of the effective date. Exactly-max is eligible.
@@ -217,10 +261,10 @@ export class MembersService {
       });
       assertEnrolmentAge(
         {
-          relationship: data.relationship ?? "PRINCIPAL",
-          dateOfBirth: data.dateOfBirth,
-          firstName: data.firstName,
-          lastName: data.lastName,
+          relationship,
+          dateOfBirth,
+          firstName: demographics.value.firstName,
+          lastName: demographics.value.lastName,
         },
         effectiveDate,
         ageRules,
@@ -232,8 +276,7 @@ export class MembersService {
       // New members are then STORED in the normalized form so the probes stay
       // consistent (idKey/phoneKey/emailKey below).
       const idKey = data.idNumber?.trim() ? normalizeNationalId(data.idNumber) : "";
-      const phoneKey = data.phone?.trim() ? normalizePhone(data.phone) : null;
-      const emailKey = data.email?.trim() ? normalizeEmail(data.email) : "";
+      const emailKey = demographics.value.email ?? "";
 
       // ── UAT-HF P05.04 — DEF-078 / DEC-07 ─────────────────────────────────────
       // These four probes used to throw messages naming the other member and
@@ -249,11 +292,11 @@ export class MembersService {
       // into the same `warnings` channel the form already renders.
       const identityMatches = await findIdentityMatches(tx, tenantId, {
         nationalId: data.idNumber,
-        phone: data.phone,
-        email: data.email,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        dateOfBirth: data.dateOfBirth,
+        phone: phoneKey,
+        email: emailKey,
+        firstName: demographics.value.firstName,
+        lastName: demographics.value.lastName,
+        dateOfBirth,
       });
 
       const blocking = blockingMatch(identityMatches);
@@ -270,8 +313,8 @@ export class MembersService {
       const enrollmentWarnings = await FraudService.checkEnrollmentRisk({
         groupId: data.groupId,
         tenantId,
-        dateOfBirth: new Date(data.dateOfBirth),
-        relationship: data.relationship,
+        dateOfBirth,
+        relationship,
       });
       // ─────────────────────────────────────────────────────────────────────────
 
@@ -288,15 +331,25 @@ export class MembersService {
           tenantId,
           memberNumber,
           groupId: effectiveGroup.id,
-          firstName: data.firstName,
-          lastName: data.lastName,
+          firstName: demographics.value.firstName,
+          lastName: demographics.value.lastName,
           // Store the NORMALIZED identity keys so dedup stays consistent going forward.
           idNumber: idKey || null,
-          dateOfBirth: new Date(data.dateOfBirth),
-          gender: data.gender,
-          phone: phoneKey ?? data.phone?.trim() ?? null,
+          dateOfBirth,
+          gender: demographics.value.gender,
+          phone: phoneKey,
           email: emailKey || null,
-          relationship: (data.relationship || "PRINCIPAL") as MemberRelationship,
+          addressCountry: address.addressCountry,
+          addressDistrict: address.addressDistrict,
+          addressLocality: address.addressLocality,
+          addressSubcounty: address.addressSubcounty,
+          addressParish: address.addressParish,
+          addressVillage: address.addressVillage,
+          addressLine: address.addressLine,
+          addressLatitude: address.addressLatitude,
+          addressLongitude: address.addressLongitude,
+          addressCoordinateConsentAt,
+          relationship: relationship as MemberRelationship,
           principalId: data.principalId,
           benefitTierId,
           packageId: effectiveGroup.packageId,
@@ -310,11 +363,11 @@ export class MembersService {
           // asymmetry that caused DEF-030 in the first place.
           ...memberIdentityKeys({
             idNumber: idKey || null,
-            phone: phoneKey ?? data.phone,
+            phone: phoneKey,
             email: emailKey || null,
             memberNumber,
-            firstName: data.firstName,
-            lastName: data.lastName,
+            firstName: demographics.value.firstName,
+            lastName: demographics.value.lastName,
           }),
         },
       });
@@ -358,10 +411,47 @@ export class MembersService {
       phone: string;
       email: string;
       relationship: string;
+      addressCountry: string;
+      addressDistrict: string;
+      addressLocality: string;
+      addressSubcounty: string;
+      addressParish: string;
+      addressVillage: string;
+      addressLine: string;
+      addressLatitude: string;
+      addressLongitude: string;
+      addressCoordinateConsent: string | boolean;
     }>,
     expected: ExpectedState,
   ): Promise<PreconditionOutcome> {
     if (Object.keys(edits).length === 0) return "APPLIED";
+
+    const demographics = validateMemberDemographicEdits(edits);
+    if (!demographics.ok) {
+      throw new Error(Object.values(demographics.fieldErrors).flat().join(" "));
+    }
+    const canonical = demographics.value;
+
+    if (edits.relationship !== undefined) {
+      const familyRole = await prisma.member.findFirst({
+        where: { id: memberId, tenantId },
+        select: { principalId: true, _count: { select: { dependents: true } } },
+      });
+      if (!familyRole) throw new Error("Member not found");
+      if (canonical.relationship === "PRINCIPAL" && familyRole.principalId) {
+        throw new Error(
+          "A dependant cannot be changed into a principal from profile editing because it would retain its existing family link.",
+        );
+      }
+      if (canonical.relationship !== "PRINCIPAL" && !familyRole.principalId) {
+        throw new Error(
+          "A principal cannot be changed into a dependant from profile editing. Link the member through a governed family correction instead.",
+        );
+      }
+      if (canonical.relationship !== "PRINCIPAL" && familyRole._count.dependents > 0) {
+        throw new Error("A member who owns dependants cannot be changed into a dependant.");
+      }
+    }
 
     // P05.04: identity rules are the same in every channel. National ID blocks;
     // a shared phone does not (DEC-07).
@@ -369,7 +459,7 @@ export class MembersService {
       const matches = await findIdentityMatches(
         prisma,
         tenantId,
-        { nationalId: edits.idNumber, phone: edits.phone },
+        { nationalId: edits.idNumber, phone: canonical.phone ?? undefined },
         { excludeMemberId: memberId },
       );
       const blocking = blockingMatch(matches);
@@ -377,20 +467,75 @@ export class MembersService {
     }
 
     const data: Prisma.MemberUpdateInput = {};
-    if (edits.firstName !== undefined) data.firstName = edits.firstName;
-    if (edits.lastName !== undefined) data.lastName = edits.lastName;
+    if (edits.firstName !== undefined) data.firstName = canonical.firstName;
+    if (edits.lastName !== undefined) data.lastName = canonical.lastName;
     if (edits.otherNames !== undefined) data.otherNames = edits.otherNames || null;
     if (edits.idNumber !== undefined) {
       data.idNumber = edits.idNumber ? normalizeNationalId(edits.idNumber) : null;
     }
-    if (edits.dateOfBirth !== undefined) data.dateOfBirth = new Date(edits.dateOfBirth);
-    if (edits.gender !== undefined) data.gender = edits.gender as Gender;
-    if (edits.phone !== undefined) {
-      data.phone = edits.phone ? (normalizePhone(edits.phone) ?? edits.phone) : null;
+    if (edits.dateOfBirth !== undefined) {
+      const dates = resolveMemberEnrolmentDates({
+        dateOfBirth: edits.dateOfBirth,
+        relationship: edits.relationship,
+      });
+      if (!dates.ok) throw new Error(dates.fieldErrors.dateOfBirth?.[0] ?? "Enter a valid date of birth.");
+      data.dateOfBirth = calendarDateToUtcDate(dates.value.dateOfBirth)!;
     }
-    if (edits.email !== undefined) data.email = edits.email ? normalizeEmail(edits.email) : null;
+    if (edits.gender !== undefined) data.gender = canonical.gender as Gender;
+    if (edits.phone !== undefined) {
+      data.phone = canonical.phone;
+    }
+    if (edits.email !== undefined) data.email = canonical.email;
     if (edits.relationship !== undefined) {
-      data.relationship = edits.relationship as MemberRelationship;
+      data.relationship = canonical.relationship as MemberRelationship;
+    }
+
+    const addressChanged = MEMBER_ADDRESS_FIELDS.some((field) => edits[field] !== undefined);
+    if (addressChanged) {
+      const currentAddress = await prisma.member.findFirst({
+        where: { id: memberId, tenantId },
+        select: {
+          addressCountry: true,
+          addressDistrict: true,
+          addressLocality: true,
+          addressSubcounty: true,
+          addressParish: true,
+          addressVillage: true,
+          addressLine: true,
+          addressLatitude: true,
+          addressLongitude: true,
+          addressCoordinateConsentAt: true,
+        },
+      });
+      if (!currentAddress) throw new Error("Member not found");
+      const addressResult = validateMemberAddress({
+        addressCountry: edits.addressCountry ?? currentAddress.addressCountry,
+        addressDistrict: edits.addressDistrict ?? currentAddress.addressDistrict,
+        addressLocality: edits.addressLocality ?? currentAddress.addressLocality,
+        addressSubcounty: edits.addressSubcounty ?? currentAddress.addressSubcounty,
+        addressParish: edits.addressParish ?? currentAddress.addressParish,
+        addressVillage: edits.addressVillage ?? currentAddress.addressVillage,
+        addressLine: edits.addressLine ?? currentAddress.addressLine,
+        addressLatitude: edits.addressLatitude ?? currentAddress.addressLatitude?.toString(),
+        addressLongitude: edits.addressLongitude ?? currentAddress.addressLongitude?.toString(),
+        addressCoordinateConsent:
+          edits.addressCoordinateConsent ??
+          (currentAddress.addressCoordinateConsentAt ? "on" : ""),
+      });
+      if (!addressResult.ok) {
+        throw new Error(Object.values(addressResult.fieldErrors).flat().join(" "));
+      }
+      const address = addressResult.value;
+      data.addressCountry = address.addressCountry;
+      data.addressDistrict = address.addressDistrict;
+      data.addressLocality = address.addressLocality;
+      data.addressSubcounty = address.addressSubcounty;
+      data.addressParish = address.addressParish;
+      data.addressVillage = address.addressVillage;
+      data.addressLine = address.addressLine;
+      data.addressLatitude = address.addressLatitude;
+      data.addressLongitude = address.addressLongitude;
+      data.addressCoordinateConsentAt = address.hasCoordinateConsent ? new Date() : null;
     }
 
     // P05.01: keep the canonical keys in step with the fields they derive from,
@@ -399,10 +544,10 @@ export class MembersService {
       data.nationalIdNormalized = edits.idNumber ? normalizeNationalId(edits.idNumber) : null;
     }
     if (edits.phone !== undefined) {
-      data.phoneNormalized = edits.phone ? normalizePhone(edits.phone) : null;
+      data.phoneNormalized = canonical.phone;
     }
     if (edits.email !== undefined) {
-      data.emailNormalized = edits.email ? normalizeEmail(edits.email) : null;
+      data.emailNormalized = canonical.email;
     }
     if (edits.firstName !== undefined || edits.lastName !== undefined || edits.otherNames !== undefined) {
       const names = await prisma.member.findFirst({
@@ -410,8 +555,8 @@ export class MembersService {
         select: { firstName: true, lastName: true, otherNames: true },
       });
       data.searchNameNormalized = normalizeSearchName({
-        firstName: edits.firstName ?? names?.firstName,
-        lastName: edits.lastName ?? names?.lastName,
+        firstName: canonical.firstName ?? names?.firstName,
+        lastName: canonical.lastName ?? names?.lastName,
         otherNames: edits.otherNames ?? names?.otherNames,
       });
     }

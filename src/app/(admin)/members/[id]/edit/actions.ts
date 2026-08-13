@@ -44,6 +44,12 @@ import { newCorrelationId } from "@/lib/correlation";
 import { changedFields, describeConflict, readExpectedState } from "@/lib/concurrency";
 import { DuplicateIdentityError } from "@/server/services/identity-match.service";
 import type { MemberStatus, MemberRelationship, Gender } from "@prisma/client";
+import { resolveMemberEnrolmentDates } from "@/lib/member-enrolment";
+import {
+  MEMBER_ADDRESS_FIELDS,
+  validateMemberAddress,
+} from "@/lib/member-address";
+import { validateMemberDemographics } from "@/lib/member-demographics";
 
 /**
  * The only fields a profile edit may touch. `status` is deliberately absent —
@@ -60,6 +66,7 @@ const PROFILE_FIELDS = [
   "phone",
   "email",
   "relationship",
+  ...MEMBER_ADDRESS_FIELDS,
 ] as const;
 
 type ProfileField = (typeof PROFILE_FIELDS)[number];
@@ -86,6 +93,16 @@ function toComparable(member: {
   phone: string | null;
   email: string | null;
   relationship: string;
+  addressCountry: string | null;
+  addressDistrict: string | null;
+  addressLocality: string | null;
+  addressSubcounty: string | null;
+  addressParish: string | null;
+  addressVillage: string | null;
+  addressLine: string | null;
+  addressLatitude: { toString(): string } | null;
+  addressLongitude: { toString(): string } | null;
+  addressCoordinateConsentAt: Date | null;
 }): ProfileValues {
   return {
     firstName: member.firstName,
@@ -97,6 +114,17 @@ function toComparable(member: {
     phone: member.phone ?? "",
     email: member.email ?? "",
     relationship: member.relationship,
+    addressCountry: member.addressCountry ?? "Uganda",
+    addressDistrict: member.addressDistrict ?? "",
+    addressLocality: member.addressLocality ?? "",
+    addressSubcounty: member.addressSubcounty ?? "",
+    addressParish: member.addressParish ?? "",
+    addressVillage: member.addressVillage ?? "",
+    addressLine: member.addressLine ?? "",
+    addressLatitude: member.addressLatitude?.toString() ?? "",
+    addressLongitude: member.addressLongitude?.toString() ?? "",
+    addressCoordinateConsent:
+      member.addressLatitude && member.addressLongitude && member.addressCoordinateConsentAt ? "on" : "",
   };
 }
 
@@ -140,6 +168,16 @@ export async function updateMemberProfileAction(
         phone: true,
         email: true,
         relationship: true,
+        addressCountry: true,
+        addressDistrict: true,
+        addressLocality: true,
+        addressSubcounty: true,
+        addressParish: true,
+        addressVillage: true,
+        addressLine: true,
+        addressLatitude: true,
+        addressLongitude: true,
+        addressCoordinateConsentAt: true,
         updatedAt: true,
       },
     });
@@ -147,9 +185,57 @@ export async function updateMemberProfileAction(
       return mutationFail("VALIDATION", { correlationId, message: "That member no longer exists." });
     }
 
+    const fieldErrors: Record<string, string[]> = {};
+    const demographics = validateMemberDemographics(submitted);
+    if (!demographics.ok) Object.assign(fieldErrors, demographics.fieldErrors);
+    const dates = resolveMemberEnrolmentDates({
+      dateOfBirth: submitted.dateOfBirth,
+      relationship: submitted.relationship,
+    });
+    if (!dates.ok) {
+      // The edit form has no effective-date field; only DOB is relevant here.
+      if (dates.fieldErrors.dateOfBirth) fieldErrors.dateOfBirth = dates.fieldErrors.dateOfBirth;
+    }
+    const address = validateMemberAddress(submitted);
+    if (!address.ok) Object.assign(fieldErrors, address.fieldErrors);
+    if (Object.keys(fieldErrors).length > 0 || !address.ok || !demographics.ok || !dates.ok) {
+      return mutationFail("VALIDATION", {
+        correlationId,
+        message: "Correct the highlighted member details. Nothing was saved.",
+        fieldErrors,
+      });
+    }
+
+    Object.assign(submitted, {
+      firstName: demographics.value.firstName,
+      lastName: demographics.value.lastName,
+      gender: demographics.value.gender,
+      relationship: demographics.value.relationship,
+      phone: demographics.value.phone ?? "",
+      email: demographics.value.email ?? "",
+      dateOfBirth: dates.value.dateOfBirth,
+    });
+
     // Only what THIS operator actually changed. Writing the whole record from a
     // stale copy is the half of DEF-077 that a precondition alone cannot fix.
     const edits = changedFields(original, submitted);
+    if (MEMBER_ADDRESS_FIELDS.some((field) => field in edits)) {
+      // The address validator reasons about the complete hierarchy and the
+      // coordinate pair. Send the complete canonical block when any part moves;
+      // the optimistic precondition still prevents overwriting a newer copy.
+      Object.assign(edits, {
+        addressCountry: address.value.addressCountry,
+        addressDistrict: address.value.addressDistrict ?? "",
+        addressLocality: address.value.addressLocality ?? "",
+        addressSubcounty: address.value.addressSubcounty ?? "",
+        addressParish: address.value.addressParish ?? "",
+        addressVillage: address.value.addressVillage ?? "",
+        addressLine: address.value.addressLine ?? "",
+        addressLatitude: address.value.addressLatitude ?? "",
+        addressLongitude: address.value.addressLongitude ?? "",
+        addressCoordinateConsent: address.value.hasCoordinateConsent ? "on" : "",
+      });
+    }
     if (Object.keys(edits).length === 0) {
       return mutationOk<ProfileUpdated>(memberId, {
         nextAction: "Back to member",

@@ -25,6 +25,7 @@ import { MemberTransferPanel } from "./transfer/MemberTransferPanel";
 import { PortalLoginPanel } from "./PortalLoginPanel";
 import { BranchEnrollmentPanel } from "./webauthn/BranchEnrollmentPanel";
 import QRCode from "react-qr-code";
+import { memberAddressLines } from "@/lib/member-address";
 
 export default async function MemberDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requireRole(ROLES.MEMBER_OPS);
@@ -211,7 +212,24 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
     email: maskEmail(member.email),
     relationship: member.relationship,
     enrollmentDate: member.enrollmentDate.toISOString(),
+    coverStartDate: member.coverStartDate?.toISOString() ?? null,
     activationDate: member.activationDate?.toISOString() ?? null,
+    addressLines:
+      member.addressDistrict || member.addressLocality || member.addressSubcounty ||
+      member.addressParish || member.addressVillage || member.addressLine
+        ? memberAddressLines({
+            addressCountry: member.addressCountry ?? "Uganda",
+            addressDistrict: member.addressDistrict,
+            addressLocality: member.addressLocality,
+            addressSubcounty: member.addressSubcounty,
+            addressParish: member.addressParish,
+            addressVillage: member.addressVillage,
+            addressLine: member.addressLine,
+          })
+        : [],
+    hasAddressCoordinates: Boolean(
+      member.addressLatitude && member.addressLongitude && member.addressCoordinateConsentAt,
+    ),
     smartCardNumber: member.smartCardNumber,
     group: {
       id: member.group.id,

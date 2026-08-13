@@ -174,3 +174,77 @@ describe("P04.01 the receipt is completed with the real reference", () => {
     expect(arg.tenantId).toBe("t1");
   });
 });
+
+describe("P05.06 validation happens before reservation", () => {
+  it("refuses a malformed phone as a named field problem without reserving or writing", async () => {
+    const result = await run(form({ phone: "+256 77 ABC 044" }));
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unreachable");
+    expect(result.kind).toBe("VALIDATION");
+    expect(result.fieldErrors?.phone?.[0]).toMatch(/Ugandan phone number/i);
+    expect(receipts.reserve).not.toHaveBeenCalled();
+    expect(createMember).not.toHaveBeenCalled();
+  });
+
+  it("rejects forged enum and email values before reserving an operation", async () => {
+    const result = await run(form({ gender: "UNKNOWN", relationship: "COUSIN", email: "bad" }));
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unreachable");
+    expect(result.fieldErrors?.gender).toBeDefined();
+    expect(result.fieldErrors?.relationship).toBeDefined();
+    expect(result.fieldErrors?.email).toBeDefined();
+    expect(receipts.reserve).not.toHaveBeenCalled();
+    expect(createMember).not.toHaveBeenCalled();
+  });
+
+  it("passes the complete consented address through the operation hash and member service", async () => {
+    await run(
+      form({
+        addressCountry: "Uganda",
+        addressDistrict: "Wakiso",
+        addressLocality: "Kira Municipality",
+        addressSubcounty: "Namugongo Division",
+        addressParish: "Kyaliwajjala",
+        addressVillage: "Buwate",
+        addressLatitude: "0.347596",
+        addressLongitude: "32.582520",
+        addressCoordinateConsent: "on",
+      }),
+    );
+    const request = receipts.reserve.mock.calls[0][0].request;
+    expect(request).toMatchObject({
+      addressCountry: "Uganda",
+      addressDistrict: "Wakiso",
+      addressVillage: "Buwate",
+      addressLatitude: "0.347596",
+      addressLongitude: "32.582520",
+      addressCoordinateConsent: true,
+    });
+    expect(request).not.toHaveProperty("hasCoordinateConsent");
+    expect(createMember).toHaveBeenCalledWith("t1", expect.objectContaining(request));
+  });
+
+  it("returns the exact resulting newborn cover date", async () => {
+    createMember.mockResolvedValue({
+      member: {
+        id: "m1",
+        memberNumber: "UX26-2026-00017",
+        coverStartDate: new Date("2026-08-01T00:00:00.000Z"),
+      },
+      warnings: [],
+    });
+    const result = await run(
+      form({
+        relationship: "CHILD",
+        dateOfBirth: "2026-08-01",
+        effectiveDate: "2026-08-13",
+        birthNotificationDate: "2026-08-11",
+      }),
+    );
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data?.coverStartDate).toBe("2026-08-01");
+      expect(result.data?.newbornRuleApplied).toBe(true);
+    }
+  });
+});

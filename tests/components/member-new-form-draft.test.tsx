@@ -311,3 +311,44 @@ describe("P05.03 DEF-031 — the generic form cannot orphan a dependant", () => 
     expect(options).not.toContain("PRINCIPAL");
   });
 });
+
+describe("P05.06 exact cover readback and Uganda address", () => {
+  it("associates labels with the enrollment controls", () => {
+    renderForm();
+    expect(screen.getByLabelText(/First Name/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Date of Birth/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Phone Number/)).toHaveAttribute("placeholder", expect.stringMatching(/^\+256/));
+    expect(screen.getByLabelText("District")).toBeInTheDocument();
+  });
+
+  it("shows the exact DOB as resulting cover start when CT-033 applies", async () => {
+    render(
+      <MemberNewForm
+        groups={GROUPS}
+        draftScope={SCOPE}
+        principal={{
+          id: "p1",
+          name: "Valid Principal",
+          memberNumber: "UX26-2026-00030",
+          groupId: "g1",
+          groupName: "Staff",
+        }}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText(/Relationship/), { target: { value: "CHILD" } });
+    fireEvent.change(screen.getByLabelText(/Date of Birth/), { target: { value: "2026-08-01" } });
+    fireEvent.change(screen.getByLabelText(/Effective Date/), { target: { value: "2026-08-13" } });
+    fireEvent.change(screen.getByLabelText(/Birth Notification Date/), { target: { value: "2026-08-11" } });
+
+    expect(await screen.findByText(/Resulting cover start: 1 Aug 2026/i)).toBeInTheDocument();
+    expect(screen.getByText(/Newborn rule applied/i)).toBeInTheDocument();
+  });
+
+  it("reveals coordinate inputs only after explicit consent", () => {
+    renderForm();
+    expect(screen.queryByLabelText(/Latitude/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByLabelText(/consented to storing precise coordinates/i));
+    expect(screen.getByLabelText(/Latitude/)).toBeRequired();
+    expect(screen.getByLabelText(/Longitude/)).toBeRequired();
+  });
+});

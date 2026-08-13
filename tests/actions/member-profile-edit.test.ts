@@ -137,6 +137,50 @@ describe("P05.05 only the operator's own edits are written", () => {
   });
 });
 
+describe("P05.06 profile input validation and address plumbing", () => {
+  it("refuses malformed phone before calling the service", async () => {
+    const result = await run(form({ phone: "12345" }));
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unreachable");
+    expect(result.fieldErrors?.phone?.[0]).toMatch(/Ugandan phone/i);
+    expect(updateProfile).not.toHaveBeenCalled();
+  });
+
+  it("refuses forged enums and malformed email before calling the service", async () => {
+    const result = await run(form({ gender: "UNKNOWN", relationship: "COUSIN", email: "bad" }));
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unreachable");
+    expect(result.fieldErrors?.gender).toBeDefined();
+    expect(result.fieldErrors?.relationship).toBeDefined();
+    expect(result.fieldErrors?.email).toBeDefined();
+    expect(updateProfile).not.toHaveBeenCalled();
+  });
+
+  it("sends the complete canonical address block when one address field changes", async () => {
+    await run(
+      form({
+        addressCountry: "Uganda",
+        addressDistrict: "Wakiso",
+        addressLocality: "Kira Municipality",
+        addressSubcounty: "Namugongo",
+        addressParish: "Kyaliwajjala",
+        addressVillage: "Buwate",
+      }),
+    );
+    expect(updateProfile.mock.calls[0][2]).toMatchObject({
+      addressCountry: "Uganda",
+      addressDistrict: "Wakiso",
+      addressLocality: "Kira Municipality",
+      addressSubcounty: "Namugongo",
+      addressParish: "Kyaliwajjala",
+      addressVillage: "Buwate",
+      addressLatitude: "",
+      addressLongitude: "",
+      addressCoordinateConsent: "",
+    });
+  });
+});
+
 describe("P05.05 the profile form cannot change lifecycle status", () => {
   it("ignores a forged status field entirely", async () => {
     const result = await run(form({ lastName: "StaleTwo", status: "TERMINATED" }));
