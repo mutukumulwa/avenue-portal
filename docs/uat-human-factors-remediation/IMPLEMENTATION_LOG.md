@@ -1469,6 +1469,60 @@ periods run from X" heading was correct only while the basis was hard-coded;
 now that it varies per benefit, one line for the card would be wrong for any
 benefit configured differently from the first.
 
+### P07.01 — the lifecycle transition command and policy table
+
+| Field | Value |
+|---|---|
+| **Task** | P07.01 — the policy table and command; **not** the execution (P07.02) |
+| **Defect IDs** | DEF-040, DEF-041, DEF-042, DEF-043, DEF-058, DEF-059, DEF-077, DEF-081 |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/lib/member-lifecycle-policy.test.ts` (28, covering all 121 from/to pairs) |
+| **Evidence** | `src/lib/member-lifecycle-policy.ts` |
+| **Feature flags** | none. |
+| **Remaining risks** | **The table is not wired into the write path.** `changeMemberStatusAction` still decides with `canEditTransition`, which is the *edit-dropdown* subset and knows nothing about roles, checkers or DEC-12. Concretely, the live path today lets `MEMBER_OPS` terminate a member **with a reason but no checker and no last covered day**, which this policy refuses on both counts. Replacing that call site — and passing one transaction client through the status write, the coverage period, the event and the receipt — is P07.02, and it is **not done**. Until then the table is a specification with a test, not an enforcement. `TERMINATED_FRAUD`/`TERMINATED_BREACH` role restrictions name roles as strings; they are not yet reconciled against the RBAC permission catalogue, so a role rename would silently narrow them. |
+
+**One shape repeated eight times.** Every defect P07.01 lists is lifecycle
+change as a *fragmented direct action* — a status dropdown here, a micro-form
+there, each with its own idea of what was allowed, what needed a reason, and who
+could do it. DEF-040 is the sharpest instance: "Standard Cancel" terminating a
+member on one unconfirmed click, from the form used to correct a spelling.
+
+**`member-status.ts` was never the policy.** It models what the edit dropdown
+may do, which is a deliberate subset. It cannot say who may act, whether a
+reason is required, whether a checker must approve, or what the consequence is.
+Those four questions are what turned each screen into its own small ruleset.
+
+**A transition names its channel, and that one field is the DEF-040 fix.**
+`GOVERNED_FLOW` transitions are refused from the profile form whatever the
+caller — the prohibition expressed once instead of re-derived per screen. The
+two exceptions are asserted explicitly (`ACTIVE→LAPSED`, `SUSPENDED→LAPSED`) so
+they read as decisions rather than oversights, and suspension is deliberately
+left on the edit form: it is reversible and ends no cover, and a ceremony around
+it would train operators to treat ceremonies as noise.
+
+**Staleness is checked before anything else.** A stale command that is *also*
+missing a reason reports staleness — telling the operator to add a reason would
+invite them to retry a command that can never apply. Version as well as status,
+because two operators reading the same ACTIVE member and both acting would both
+pass a status-only check.
+
+**All 121 pairs are evaluated, and the evaluator is total.** A pair nobody
+thought about is a pair that fails open; the only way to know is to enumerate
+them. An unlisted pair returns a refusal rather than throwing, because an
+evaluator that throws on an unexpected pair is one that fails open upstream.
+
+**Death does not need a checker; fraud and breach need a senior role and one.**
+Delaying a death termination leaves cover open on a deceased member and asks a
+family to wait for a second signature. Fraud and breach are accusations as well
+as terminations, and a single operator must not be able to brand a member
+fraudulent alone.
+
+**The consequences preview is computed from the same policy the decision uses**,
+so the sentence shown before confirming cannot describe something other than
+what happens — and it reads DEC-12 back inclusively, because "termination date"
+is exactly the field users get wrong and off-by-one is a day of claims.
+
 ### P03.06 — the policy parity gate
 
 | Field | Value |
