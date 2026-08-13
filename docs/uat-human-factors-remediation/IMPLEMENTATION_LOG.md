@@ -2035,6 +2035,64 @@ approved even once HR could raise one, so this is the prerequisite rather than t
 
 ---
 
+### P08.01 — HR can report a leaver
+
+**Commit** `647f783` · **Defect** DEF-004 (S2)
+
+The employer side of the lifecycle was add-only. Roster's *Add Member* and Endorsements'
+*+ New Endorsement* both landed on the same Member Addition form; the member detail page offered
+only *View All Endorsements*; and the endorsement list carried a **Member Deletion filter**,
+"advertising a capability with no creation path behind it". The cost is the one the register names:
+terminated staff stay ACTIVE on the roster and remain eligible, so claims can be incurred against a
+leaver until someone intervenes outside the portal.
+
+**A separate form, not a type dropdown.** Adding a selector to the addition form would have kept the
+add-only assumption and buried the leaver one choice deep — when it is the second of exactly two
+things an employer does. It is reachable from both places HR already looks, the roster row and the
+member detail page, so the plan's "without route knowledge" holds by construction: the member comes
+from the route, there is no picker to get wrong, and no path to another employer's staff.
+
+**It changes no cover, and says so.** That is the acceptance criterion and the reason an
+employer-side control is safe to give at all — HR reports, the TPA's checker decides, and only the
+approval moves eligibility. The form states it plainly, because an employer who believes cover ended
+today stops checking.
+
+**The inclusive last day is read back in words.** CT-034 requires the member to stay eligible
+*through* the approved final day. "Last day of cover" and "date cover ends" differ by one day, and
+that day is a day of claims — so the form answers with "stays covered **through the whole of**
+31 August 2026, and is not covered from the following day" rather than trusting a label to be read
+the intended way.
+
+**Other refusals, each with its reason:** a source reference is required at creation, because
+`MEMBER_DELETION` is material and without it this rail would be fixed at the HR end and still dead
+at the TPA end (DEF-046); a second request is refused while one is in flight, naming the existing
+reference, so one departure cannot become two pro-rata credits; a leaver more than 90 days back is
+refused with the day count and the route to an override; the dependants who lose cover with the
+principal are named, since a checker who cannot see them is approving a bigger change than they
+think.
+
+**Withdraw before approval**, maker-only and audited. Without it an HR manager who reports the wrong
+person must ask the TPA to reject their own request, which reads in the audit trail as the
+administrator refusing the employer rather than the employer correcting themselves.
+
+**Two things fixed in passing.** *+ New Endorsement* became two named actions instead of one button
+that meant only one of them. And the HR endorsement detail never read `searchParams`, so the
+post-submit redirect would have landed with no confirmation at all — it now renders a `role="status"`
+receipt naming the reference.
+
+**Guard repeated deliberately.** An HR account with no `groupId` is refused rather than queried.
+Prisma drops an undefined key, so an unguarded lookup would widen to every group in the tenant — the
+same N3 / PRIVACY-S1-B trap already guarded on the detail page.
+
+**Verified.** `next build` compiles; `tsc --noEmit` clean; `eslint` clean on all nine changed files;
+33 new tests; full suite **3666 passed, 0 failed**.
+
+**The rail is now whole.** DEF-004 and DEF-046 were the same rail at opposite ends — HR could not
+raise a leaver, and a raised leaver could not have been approved. Both are closed, so the
+employer-to-TPA lifecycle can be exercised end to end at retest.
+
+---
+
 ## Corrections made to the implementation plan
 
 The plan is treated as authoritative but not infallible. Where a plan statement was checked against
