@@ -9,6 +9,7 @@ import {
   AlertTriangle, ChevronRight, Plus, Send, CreditCard, RefreshCw
 } from "lucide-react";
 import { issueCardAction } from "@/app/(admin)/members/[id]/card/actions";
+import { RevealableDetail } from "@/components/members/RevealableDetail";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -187,12 +188,26 @@ function OverviewTab({ member, age }: { member: Member; age: number }) {
       {/* Member details */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-2.5">
         <h3 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2">Personal Information</h3>
+        {/* UAT-HF P11.05 — DEF-080 / DEC-10. The three identity fields arrive
+            MASKED from the server; the full value is fetched by RevealableDetail
+            through an audited, permission-gated action. They were previously
+            rendered in full on the landing view, on "the screen an agent has
+            open with a member standing at the counter". */}
         {[
           { label: "Date of Birth", value: `${fmtDate(member.dateOfBirth)} (Age ${age})` },
           { label: "Gender", value: member.gender },
-          { label: "ID / Passport", value: member.idNumber ?? "—" },
-          { label: "Phone", value: member.phone ?? "—" },
-          { label: "Email", value: member.email ?? "—" },
+          {
+            label: "ID / Passport",
+            value: <RevealableDetail memberId={member.id} field="idNumber" masked={member.idNumber} />,
+          },
+          {
+            label: "Phone",
+            value: <RevealableDetail memberId={member.id} field="phone" masked={member.phone} />,
+          },
+          {
+            label: "Email",
+            value: <RevealableDetail memberId={member.id} field="email" masked={member.email} />,
+          },
           { label: "Relationship", value: member.relationship },
         ].map(f => (
           <div key={f.label} className="flex justify-between text-sm py-1 border-b border-[#EEEEEE]/50 last:border-0">

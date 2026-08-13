@@ -2,7 +2,7 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { ArrowLeft, Pencil, CreditCard, AlertTriangle, CheckCircle2, XCircle, Clock } from "lucide-react";
+import { ArrowLeft, Pencil, CreditCard, AlertTriangle, XCircle, Clock } from "lucide-react";
 import { lifecycleService } from "@/server/services/lifecycle.service";
 import {
   lapseManuallyAction, reinstateWithinCatchupAction,
@@ -11,7 +11,13 @@ import {
 } from "./lifecycle-actions";
 import { BenefitUsageService } from "@/server/services/benefit-usage.service";
 import { MemberProfileTabs } from "@/components/members/MemberProfileTabs";
-import { FamilyTreeView } from "@/components/members/FamilyTreeView";
+import { HouseholdPanel } from "@/components/members/HouseholdPanel";
+import {
+  maskEmail,
+  maskNationalId,
+  maskPhone,
+  summariseHousehold,
+} from "@/lib/sensitive-detail";
 import { MemberTransferPanel } from "./transfer/MemberTransferPanel";
 import { PortalLoginPanel } from "./PortalLoginPanel";
 import { BranchEnrollmentPanel } from "./webauthn/BranchEnrollmentPanel";
@@ -189,9 +195,13 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
     status: member.status,
     dateOfBirth: member.dateOfBirth.toISOString(),
     gender: member.gender,
-    idNumber: member.idNumber,
-    phone: member.phone,
-    email: member.email,
+    // UAT-HF P11.05 — DEF-080 / DEC-10. MASKS, not values. DEC-10 forbids
+    // serialising hidden data "just to hide it with CSS", so the full values
+    // never cross this boundary; RevealableDetail asks for them, with a purpose,
+    // through an audited action.
+    idNumber: maskNationalId(member.idNumber),
+    phone: maskPhone(member.phone),
+    email: maskEmail(member.email),
     relationship: member.relationship,
     enrollmentDate: member.enrollmentDate.toISOString(),
     activationDate: member.activationDate?.toISOString() ?? null,
@@ -355,27 +365,14 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
 
       <BranchEnrollmentPanel memberId={member.id} />
 
-      {/* D-10: Family tree */}
+      {/* D-10 family tree, collapsed by default — UAT-HF P11.05 / DEF-080.
+          Only the COUNTS cross this boundary; the dependants' names are fetched
+          when the operator asks, so a profile open at a counter no longer shows
+          a household (and a minor) to whoever is next in the queue. */}
       {member.relationship === "PRINCIPAL" && (
-        <FamilyTreeView
-          principal={{
-            id: member.id,
-            memberNumber: member.memberNumber,
-            firstName: member.firstName,
-            lastName: member.lastName,
-            relationship: member.relationship,
-            status: member.status,
-            dateOfBirth: member.dateOfBirth,
-          }}
-          dependants={member.dependents.map((d) => ({
-            id: d.id,
-            memberNumber: d.memberNumber,
-            firstName: d.firstName,
-            lastName: d.lastName,
-            relationship: d.relationship,
-            status: d.status,
-            dateOfBirth: d.dateOfBirth,
-          }))}
+        <HouseholdPanel
+          memberId={member.id}
+          summaryLabel={summariseHousehold(member.dependents).label}
           highlightId={id}
         />
       )}

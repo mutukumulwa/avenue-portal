@@ -77,6 +77,13 @@ export const AUDIT_EXCLUSIONS: Record<string, string> = {
   // reports on is itself audited by addMemberAction.
   "members/new/actions.ts:lookupEnrolmentOutcomeAction":
     "READ_ONLY - reads the caller's own OperationReceipt so an operator can discover a prior attempt's outcome",
+  // UAT-HF P11.05 — expanding the household is a READ, and deliberately NOT
+  // audited. DEC-10 gates and audits a reveal of a SENSITIVE FIELD (national ID,
+  // phone, email — see revealMemberFieldAction, which does audit); household
+  // composition is listed there as "collapsed", not as restricted. Auditing
+  // every expansion would bury the reveals that matter under routine noise.
+  "members/[id]/reveal-actions.ts:loadHouseholdAction":
+    "READ_ONLY - returns the dependant list an operator asked to expand; the sensitive-field reveal beside it IS audited (DEC-10)",
   // UAT-HF P03.05 — eligibility is a READ. It writes no business state; the
   // service records its own ProviderEligibilityCheck evidence row with actor,
   // provider, member, service date and result, which is the point-in-time

@@ -1449,6 +1449,32 @@ That is a flex item's default `min-width: auto`. The wrapper cannot shrink below
 
 **Only the transition INTO archived is guarded.** Re-saving an already-archived package is not a destructive act and is not obstructed — a test pins that, because a confirmation that fires on every save is one people learn to dismiss.
 
+### P11.05 — Minimum-necessary member detail
+
+| Field | Value |
+|---|---|
+| **Task** | P11.05 |
+| **Defect IDs** | DEF-080 (S2) |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/lib/sensitive-detail.test.ts` (23); 1 catalogue entry |
+| **Commands / results** | typecheck 0; lint 0 errors; suite 298 files / 3331 passed. |
+| **Evidence** | `src/lib/sensitive-detail.ts`, `src/app/(admin)/members/[id]/reveal-actions.ts`, `RevealableDetail.tsx`, `HouseholdPanel.tsx`, member profile page and tabs |
+| **Feature flags** | none. |
+| **Remaining risks** | **`member.sensitive.reveal` is granted to no role**, so today *nobody* can reveal — the masks are hard walls until an ops grant lands. That is the safe direction to fail, but it is a real operational gap and is the one thing to action before this reaches a desk. **The Dependants tab still receives names in the page payload**: the register treats the tab as correctly gated ("each require a deliberate click"), and DEC-10's "never serialize" names the sensitive *fields*, which are masked — but a strict reading would move the tab to on-demand too, as the landing view now is. Other member surfaces (search results, the register, HR roster) were not audited for the same eager exposure. |
+
+**The register named the fix, and it is the page's own pattern.** "Benefits, Dependants, Claims & Pre-Auths, Activity Log and Correspondence each require a deliberate click — which makes the inline household summary the outlier rather than the pattern." So this is not new policy; it is applying an existing gate to the two blocks that skipped it.
+
+**Masks, not flags — because DEC-10 forbids the alternative.** "Hidden data must never be serialized into client HTML or network payloads 'just to hide it with CSS' — the default operator DOM must not contain the full sensitive fields." That single line is why `sensitive-detail.ts` has no `{ value, hidden: true }` shape anywhere: such a shape ends up in the payload and the mask becomes decoration. The server sends `••••••78`; the full value is fetched by a separate audited call or is not available at all.
+
+**The household is fetched, not hidden.** A prop is a payload, so the landing view receives *counts* — "2 dependants (1 under 18)" — and the names arrive only when an operator asks. DEF-080's specific harm was a minor's full name and member number on "the screen an agent has open with a member standing at the counter, and with anyone behind them able to read it". A count answers the operational question without naming a child to the queue.
+
+**Two orderings are load-bearing, and both are pinned by tests.** The permission is checked *before* the read, so an unauthorized request never loads what it may not see. The audit is written *before* the value is returned, so a failed audit means no value — an un-audited reveal is precisely what DEC-10 forbids.
+
+**"Expires on navigation" needed no implementation, which is the point.** The revealed value lives in the component's state and nowhere else, so a route change discards it. A test asserts the component touches no `localStorage`, `sessionStorage` or cookie: nothing persists it, so nothing has to remember to clear it.
+
+**Expanding the household is deliberately NOT audited.** DEC-10 gates and audits a reveal of a *sensitive field*; household composition is listed there as "collapsed", not as restricted. Auditing every expansion would bury the reveals that matter under routine noise. The audit-coverage harness caught the new read and now carries that reasoning as its catalogue entry.
+
 ---
 
 ## Corrections made to the implementation plan
