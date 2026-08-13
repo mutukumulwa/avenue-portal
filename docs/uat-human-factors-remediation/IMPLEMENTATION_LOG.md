@@ -1095,7 +1095,7 @@ The three-way comparison is also what distinguishes *your* edit from *theirs*: a
 | **Commands / results** | typecheck 0; lint 0 errors; suite 287 files / 3104 passed. |
 | **Evidence** | `src/server/services/identity-match.service.ts`, `src/server/services/members.service.ts` |
 | **Feature flags** | none. |
-| **Remaining risks** | **The authorized review screen is not built** — `mayReviewDuplicates` and `DUPLICATE_REVIEW_PERMISSION` exist and are tested, but no route resolves a match to a person, and `member.duplicate.review` is granted to no role. Until that ships an operator who hits a hard conflict cannot get the answer from anyone in-product. **No DB unique constraint yet**: the acceptance's "concurrent exact-ID creation is stopped by DB constraint" needs the `@@unique([tenantId, nationalIdNormalized])` that P05.01 adds, so two simultaneous enrolments can still both pass the probe. The import channel does not call this service yet (P06.01). |
+| **Remaining risks** | ~~The authorized review screen is not built.~~ *The service half is closed in the follow-up below; there is still **no page** calling it, and `member.duplicate.review` is granted to no role, so it is not yet reachable by a human.* **No DB unique constraint yet**: the acceptance's "concurrent exact-ID creation is stopped by DB constraint" needs the `@@unique([tenantId, nationalIdNormalized])` that P05.01 adds, so two simultaneous enrolments can still both pass the probe. The import channel does not call this service yet (P06.01). |
 
 **The disclosure was structural, not a wording slip.** All four probes did `select: { memberNumber, firstName, lastName }`, so a name and member number were sitting in scope waiting to be interpolated — and were, in four messages. The fix does not rewrite the sentences; it stops fetching the data. `findIdentityMatches` selects `{ id: true }` and returns an opaque id, so there is no code path in which a name *could* be interpolated by accident. A test asserts the returned object has exactly three keys.
 
@@ -1693,6 +1693,48 @@ says could not reach it.
 control is reachable"; the task is "expose a *governed* renewal path". Routing
 answered the first. Governance — approval, exceptions, notification — is the
 second, and it is not done.
+
+### P05.04 (follow-up) — resolving a duplicate match to a person
+
+| Field | Value |
+|---|---|
+| **Task** | P05.04 — the authorized-review half |
+| **Defect IDs** | DEF-078, and DEC-07 |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/services/duplicate-review.test.ts` (13) |
+| **Evidence** | `src/server/services/duplicate-review.service.ts` (new) |
+| **Feature flags** | none. |
+| **Remaining risks** | **No page calls this yet, and no role holds the permission.** The service is complete and tested but a human still cannot reach it — a route under the member registry plus a `member.duplicate.review` grant are both outstanding, and the grant is one of the operational items already on your list. It also does not offer a *merge*: a reviewer can confirm two records are the same person but cannot act on that in-product, which is deliberate (merging is destructive and belongs behind maker/checker) but means the journey still ends in a manual step. |
+
+**Blocking the disclosure was right; leaving no route was the cost.** The
+enrolment form deliberately cannot say who holds a national ID — the run's
+operator learned the outcome of a lost write from a disclosed member number
+belonging to a *different client group*, which is a cross-client PII leak
+dressed as a helpful error. But the recorded consequence was that an operator
+who hits a hard conflict "cannot get the answer from anyone in-product". They
+ring a colleague, or they create the second record the block existed to prevent.
+
+**Three properties make it safe to have at all.** It is gated on
+`member.duplicate.review` — a *permission* granted to a person, not a role
+everyone in MEMBER_OPS inherits. It is minimum-necessary: name, number, scheme
+and status, which is what answers "is this the same person?", and a test asserts
+date of birth, national ID, phone, email and address are **not selected**. And
+every resolution is audited *before* the name is returned, with the reviewer's
+stated purpose — a test kills the audit write and asserts no name comes back,
+because a reveal that fails to record itself must not still disclose.
+
+**It deliberately does not scope by client.** The match is very often in another
+client group — that is precisely why the enrolment form cannot answer it. The
+audit row is what makes reaching across acceptable, which is why it is written
+first rather than last.
+
+**DEC-07 travels with the answer.** A phone match carries "a shared phone number
+is normal — households and small employers routinely use one"; a name+DOB match
+says they can coincide. A national-ID match carries no caveat, because softening
+a signal that is unique by construction would invite the opposite error. Without
+this, the surface that exists to prevent duplicates becomes the one that merges
+a husband and wife who share a handset.
 
 ### P03.06 (follow-up) — the provider desk evaluates the waiting period
 
