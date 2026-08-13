@@ -1523,6 +1523,51 @@ so the sentence shown before confirming cannot describe something other than
 what happens — and it reads DEC-12 back inclusively, because "termination date"
 is exactly the field users get wrong and off-by-one is a day of claims.
 
+### P07.02 (part) — the transition executes atomically
+
+| Field | Value |
+|---|---|
+| **Task** | P07.02 — the atomicity and concurrency half; the command wiring is **not** done |
+| **Defect IDs** | DEF-041, DEF-042, DEF-043, DEF-077 |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/services/member-status-atomicity.test.ts` (14) |
+| **Evidence** | `src/server/services/members.service.ts`, member edit action |
+| **Feature flags** | none. |
+| **Remaining risks** | **P07.01's policy table is still not the decision-maker.** `changeStatus` continues to validate with `canEditTransition`, so roles, checkers and the DEC-12 date requirement are *not* enforced on the write path — a `MEMBER_OPS` user can still terminate with no checker. Wiring `evaluateTransition` in is the rest of P07.02 and is not done. **No `DomainEvent`, outbox row or operation receipt is written inside the transaction**, so P07.02's "persist event/outbox/receipt" limb is unmet; the audit row is still written by the action *after* the transaction commits, which means a crash in between loses the trail for a change that happened. `effectiveAt` is plumbed but **no caller passes it yet** — the edit action has no date field — so back-dating is possible in the service and not yet reachable from the UI. Only the member-status path was made atomic; contract, package and endorsement transitions were not audited for the same shape. |
+
+**Three faults, and the middle one is a money bug.**
+
+**1. Read-then-write.** `findFirst` then `update`, with no precondition. Two
+operators reading the same ACTIVE member both passed the check and both wrote.
+The update is now a conditional `updateMany` keyed on the status it read (and
+the version, when a caller supplies one); a `count` of 0 raises a typed
+`StaleMemberTransitionError` that the action maps to a CONFLICT, rather than
+reporting success for a write that did not happen.
+
+**2. The status write and the coverage period were in separate transactions.**
+A failure between them left a SUSPENDED member with an **open coverage period** —
+and the claim rails read the period, not the status, so the member stayed
+claimable while the roster said suspended. `coverageService.closeOpenPeriods`
+and `openPeriod` have taken a `Prisma.TransactionClient` as their first argument
+all along; the caller passed the global client, so the guarantee they were built
+for never actually held. One `$transaction`, one client, and a test asserts the
+client reaching `coverageService` is the transaction's rather than the global
+one — because that is the difference, and it is invisible in a diff that only
+looks at whether the call is present.
+
+**3. The coverage boundary was `new Date()`.** DEC-12 makes the operator's date
+the last covered day; closing at "now" instead moves the boundary to whenever
+the button was clicked, which for a back-dated suspension is wrong by however
+many days it was back-dated.
+
+**The re-read inside the transaction was removed rather than mocked around.**
+An earlier draft ended the transaction with a `findFirstOrThrow` to return the
+updated row, which broke two existing suites whose transaction mocks did not
+carry that method. The right answer was not to widen the mocks: the conditional
+update had just succeeded, so the row's status is known without asking, and the
+query was a round trip inside a transaction to learn something already in hand.
+
 ### P03.06 — the policy parity gate
 
 | Field | Value |

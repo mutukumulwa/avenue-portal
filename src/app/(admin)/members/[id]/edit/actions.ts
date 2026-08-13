@@ -30,7 +30,7 @@
 
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
-import { MembersService } from "@/server/services/members.service";
+import { StaleMemberTransitionError, MembersService } from "@/server/services/members.service";
 import { writeAudit } from "@/lib/audit";
 import { memberTransitionAuditAction, canEditTransition } from "@/lib/member-status";
 import {
@@ -332,7 +332,17 @@ export async function changeMemberStatusAction(
       });
     }
 
-    await MembersService.changeStatus(tenantId, memberId, nextStatus);
+    // UAT-HF P07.02: the transition is now one transaction with a conditional
+    // update. A lost race raises StaleMemberTransitionError rather than
+    // silently overwriting somebody else's change.
+    try {
+      await MembersService.changeStatus(tenantId, memberId, nextStatus);
+    } catch (err) {
+      if (err instanceof StaleMemberTransitionError) {
+        return mutationFail("CONFLICT", { correlationId, message: err.message });
+      }
+      throw err;
+    }
 
     await writeAudit({
       userId: session.user.id,

@@ -40,6 +40,23 @@ import {
 /** Relationships an enrolment path may assign (SIBLING added in WP-3.5F). */
 export type EnrolmentRelationship = "PRINCIPAL" | "SPOUSE" | "CHILD" | "PARENT" | "SIBLING";
 
+/**
+ * UAT-HF P07.02 — raised when a lifecycle command is applied to a member who has
+ * moved since the operator's view loaded.
+ *
+ * Typed rather than a bare Error so the action layer can answer with a CONFLICT
+ * the operator can act on, instead of the generic failure a thrown string
+ * produces.
+ */
+export class StaleMemberTransitionError extends Error {
+  constructor(public readonly expectedStatus: string) {
+    super(
+      `This member is no longer ${expectedStatus.replace(/_/g, " ").toLowerCase()}. Reload and check the current status before acting.`,
+    );
+    this.name = "StaleMemberTransitionError";
+  }
+}
+
 export class MembersService {
   /**
    * Retrieves all members for a given tenant
@@ -601,10 +618,45 @@ export class MembersService {
    *
    * P07.01 replaces this with the full transition policy table.
    */
-  static async changeStatus(tenantId: string, memberId: string, next: MemberStatus) {
+  /**
+   * UAT-HF P07.02 — the lifecycle transition, executed atomically.
+   *
+   * Three faults were in the previous shape, and the middle one is a money bug:
+   *
+   * **1. Read-then-write.** `findFirst` then `update` with no precondition, so
+   * two operators reading the same ACTIVE member both passed the check and both
+   * wrote. The update is now conditional on the status (and the version, when
+   * the caller supplies one), and a `count` of 0 is reported as a stale command
+   * rather than silently succeeding.
+   *
+   * **2. The status write and the coverage period were separate transactions.**
+   * A failure in between left a SUSPENDED member with an **open coverage
+   * period** — which is what the claim rails read, so the member stayed
+   * eligible while the roster said otherwise. `coverageService` already took a
+   * transaction client for exactly this reason; the caller passed the global
+   * one. P07.02's acceptance is "injected failure at each write boundary rolls
+   * back the entire command", and one `$transaction` is what makes that true.
+   *
+   * **3. The coverage boundary was `new Date()`.** DEC-12 says the operator's
+   * date is the LAST COVERED DAY and ineligibility starts the following day.
+   * Closing the period at "now" instead silently moved the boundary to whenever
+   * the button was clicked, which for a back-dated suspension is wrong by
+   * however many days it was back-dated.
+   */
+  static async changeStatus(
+    tenantId: string,
+    memberId: string,
+    next: MemberStatus,
+    options: {
+      /** DEC-12 — the last covered day. Defaults to now for a live change. */
+      effectiveAt?: Date;
+      /** Optimistic precondition; omit to fall back to the status check alone. */
+      expectedVersion?: number;
+    } = {},
+  ) {
     const member = await prisma.member.findFirst({
       where: { id: memberId, tenantId },
-      select: { id: true, status: true },
+      select: { id: true, status: true, version: true },
     });
     if (!member) throw new Error("Member not found");
 
@@ -615,17 +667,39 @@ export class MembersService {
       );
     }
 
-    const updated = await prisma.member.update({
-      where: { id: memberId, tenantId },
-      data: { status: next },
+    const boundary = options.effectiveAt ?? new Date();
+
+    return prisma.$transaction(async (tx) => {
+      // The precondition IS the WHERE clause. Reading the row and then updating
+      // it leaves exactly the race this closes.
+      const claimed = await tx.member.updateMany({
+        where: {
+          id: memberId,
+          tenantId,
+          status: member.status,
+          ...(options.expectedVersion !== undefined ? { version: options.expectedVersion } : {}),
+        },
+        data: { status: next, version: { increment: 1 } },
+      });
+
+      if (claimed.count !== 1) {
+        // Somebody else moved this member between the read and the write. The
+        // transaction rolls back, so no coverage period is touched either.
+        throw new StaleMemberTransitionError(member.status);
+      }
+
+      // Same `tx`. This is the whole point: a failure here rolls the status
+      // change back rather than leaving the two halves disagreeing.
+      if (member.status !== "SUSPENDED" && next === "SUSPENDED") {
+        await coverageService.closeOpenPeriods(tx, memberId, boundary, "SUSPENDED");
+      } else if (member.status === "SUSPENDED" && next === "ACTIVE") {
+        await coverageService.openPeriod(tx, tenantId, memberId, boundary, "REINSTATEMENT");
+      }
+
+      // No re-read. The conditional update above succeeded, so the row's status
+      // is exactly `next` — querying again would cost a round trip inside the
+      // transaction to learn something already known.
+      return { member: { ...member, status: next }, previousStatus: member.status };
     });
-
-    if (member.status !== "SUSPENDED" && next === "SUSPENDED") {
-      await coverageService.closeOpenPeriods(prisma, memberId, new Date(), "SUSPENDED");
-    } else if (member.status === "SUSPENDED" && next === "ACTIVE") {
-      await coverageService.openPeriod(prisma, tenantId, memberId, new Date(), "REINSTATEMENT");
-    }
-
-    return { member: updated, previousStatus: member.status };
   }
 }
