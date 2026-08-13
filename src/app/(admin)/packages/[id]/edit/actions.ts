@@ -4,6 +4,13 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { redirect, notFound } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import {
+  planPackageMigration,
+  executePackageMigration,
+  MIGRATION_SUCCESSOR_FIELD,
+  MIGRATION_MOVE_MEMBERS_FIELD,
+  type MigrationOutcome,
+} from "@/server/services/package-migration.service";
 import { writeAudit } from "@/lib/audit";
 import { ok, fail, type ActionResult } from "@/lib/action-result";
 import {
@@ -170,16 +177,55 @@ export async function updatePackageAction(
         "Archiving was not applied. Confirm the effect on the schemes below first.",
       );
     }
+
+    // UAT-HF P09.06 — the migration half (DEF-025).
+    //
+    // Acknowledging the impact says "I understand what will be stranded". A
+    // migration says "move it instead". The operator may do either, and the
+    // second is what P09.06's acceptance means by "completed controlled
+    // migration leaves no dangling current reference".
+    //
+    // Re-planned here rather than trusted from the form: the counts the
+    // operator saw are a snapshot, and a successor archived in between would
+    // otherwise move every scheme onto a second dead package.
+    const successorId = String(formData.get(MIGRATION_SUCCESSOR_FIELD) ?? "").trim();
+    let migration: MigrationOutcome | null = null;
+    if (successorId) {
+      const moveMembers = formData.get(MIGRATION_MOVE_MEMBERS_FIELD) === "yes";
+      const planned = await planPackageMigration({ tenantId, packageId, successorId, moveMembers });
+      if (!planned.ok) {
+        // Nothing has been written yet — the status change happens below — so
+        // refusing here leaves the package exactly as it was.
+        return fail({ status: [planned.message] }, "Nothing was archived and nothing was moved.");
+      }
+      migration = await executePackageMigration({
+        tenantId,
+        packageId,
+        plan: planned.plan,
+        moveMembers,
+      });
+    }
+
     await writeAudit({
       userId: session.user.id,
       action: "PACKAGE_ARCHIVED",
       module: "PACKAGES",
-      description: `Package archived: ${pkg.name}`,
+      description: migration
+        ? `Package archived: ${pkg.name} — dependencies migrated to ${migration.successorName}`
+        : `Package archived: ${pkg.name}`,
       metadata: {
         packageId,
         schemesAffected: impact.schemes.length,
         membersAffected: impact.memberCount,
         acknowledgedInUse: acknowledged,
+        // Recorded separately from the impact counts: what WOULD have been
+        // stranded and what actually moved are different questions at a
+        // dispute, and a migration that moved fewer rows than the impact
+        // reported is the thing an auditor needs to be able to see.
+        migratedTo: migration?.successorId ?? null,
+        schemesMoved: migration?.schemesMoved ?? 0,
+        tiersMoved: migration?.tiersMoved ?? 0,
+        membersMoved: migration?.membersMoved ?? 0,
       },
     });
   }

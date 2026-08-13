@@ -1425,6 +1425,52 @@ That is a flex item's default `min-width: auto`. The wrapper cannot shrink below
 
 **34 wrappers, and a ratchet.** Every `overflow-x-auto` in `src/` now carries `min-w-0`, and a test walks the tree and fails on any that does not. One bare wrapper is one more table with unreachable columns, and the two classes only work as a pair.
 
+### P09.06 (completion) — migration control on archive
+
+| Field | Value |
+|---|---|
+| **Task** | P09.06 — the migration half the first pass left open |
+| **Defect IDs** | DEF-025 (S2) |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/services/package-migration.test.ts` (14) |
+| **Evidence** | `src/server/services/package-migration.service.ts` (new), package edit action / form / page |
+| **Feature flags** | none. |
+| **Remaining risks** | Archiving is still reached through the **Status dropdown** rather than a dedicated destructive control, so DEF-025's "visually distinct from Save" limb (UX-004) remains only partly met — the warning is distinct, the control is not. A member move writes **one** audit row with a count, not a row per member; that is the right granularity for an operator action but it means an individual member's package change is reconstructable only from the batch. No `DomainEvent`/receipt is emitted for the migration, so P09.06's "event/receipt/audit" is audit-only. Other archivable entities (providers, rate cards) were not audited for the same pattern. |
+
+**"Move them by hand" was the failure mode, not the remedy.** The first pass
+told the operator exactly what would be stranded and left them to repoint each
+scheme themselves. Repointing three schemes out of four leaves one pointing at
+an archived package, and nothing in the product surfaces it again — which is
+precisely what P09.06's acceptance calls a "dangling current reference".
+
+**Two choices, because they are genuinely different decisions.** *Strand*
+acknowledges the effect; *migrate* avoids it. The acknowledgement checkbox stays
+either way, so an operator who chooses to strand still has to say so.
+
+**Schemes are configuration. Members are people with cover.** Repointing a
+scheme changes what future enrolments get and strands nobody. Repointing a
+member changes the benefits they can claim against from that moment, so it is
+its own tick, with its own sentence naming the count, and the server refuses the
+migration without it rather than moving them quietly.
+
+**The version pin moves with the member, or the fix creates the bug.** Setting
+`packageId` to the successor while leaving `packageVersionId` on the archived
+package's version is itself a dangling reference — and every benefit lookup
+reads the pin first, so it would silently keep serving the archived package's
+limits to someone the system says is on a different package.
+
+**`updateMany`, not a list read earlier.** The counts the operator saw are a
+snapshot. Defining the move over "whatever currently points here" is what stops
+a scheme created between the preview and the save from being the one left
+behind. The successor is re-validated at the same moment for the same reason:
+one archived in between would otherwise collect every scheme onto a second dead
+package.
+
+**One transaction.** A partial migration is the exact state this control exists
+to prevent, so either every dependency moves or none does and the package stays
+un-archived.
+
 ### P05.01 (completion) — the precondition reads the row version
 
 | Field | Value |

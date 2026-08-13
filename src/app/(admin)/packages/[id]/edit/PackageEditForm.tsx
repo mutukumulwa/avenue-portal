@@ -54,6 +54,8 @@ const cellInputCls =
 export type ArchiveImpactView = {
   summary: string;
   inUse: boolean;
+  /** Enrolled members — moving them is a cover change, so it is asked separately. */
+  memberCount: number;
   schemes: { id: string; name: string; tierName?: string }[];
 };
 
@@ -62,16 +64,34 @@ export function PackageEditForm({
   pkg,
   benefits,
   impact,
+  successors,
 }: {
   packageId: string;
   pkg: PackageView;
   benefits: BenefitRow[];
   impact: ArchiveImpactView;
+  /** Active packages a migration may repoint dependencies onto (P09.06). */
+  successors: { id: string; name: string }[];
 }) {
   const [status, setStatus] = useState(pkg.status);
   // Only the TRANSITION into archived is a destructive act; re-saving an
   // already-archived package is not, and must not be nagged.
   const archivingNow = status === "ARCHIVED" && pkg.status !== "ARCHIVED";
+
+  /**
+   * UAT-HF P09.06 — "and migration control".
+   *
+   * The first pass told the operator what would be stranded and left them to
+   * repoint each scheme by hand. Repointing three schemes out of four leaves a
+   * scheme pointing at an archived package, and nothing surfaces it again —
+   * P09.06 calls that a dangling current reference.
+   *
+   * Two mutually exclusive choices, because they are genuinely different
+   * decisions: STRAND acknowledges the effect, MIGRATE avoids it.
+   */
+  const [archiveMode, setArchiveMode] = useState<"STRAND" | "MIGRATE">("STRAND");
+  const [successorId, setSuccessorId] = useState("");
+  const [moveMembers, setMoveMembers] = useState(false);
   const [state, formAction, pending] = useActionState<ActionResult, FormData>(
     updatePackageAction,
     { ok: true },
@@ -149,19 +169,99 @@ export function PackageEditForm({
                   </ul>
                 )}
                 {impact.inUse && (
-                  <label className="mt-2 flex items-start gap-2 font-semibold">
-                    <input
-                      type="checkbox"
-                      name="__confirmArchiveInUse"
-                      value="yes"
-                      className="mt-0.5"
-                      required
-                    />
-                    <span>
-                      I understand this package is in use and that archiving it does not move or
-                      end anyone&rsquo;s cover.
-                    </span>
-                  </label>
+                  <>
+                    <label className="mt-2 flex items-start gap-2 font-semibold">
+                      <input
+                        type="checkbox"
+                        name="__confirmArchiveInUse"
+                        value="yes"
+                        className="mt-0.5"
+                        required
+                      />
+                      <span>
+                        I understand this package is in use and that archiving it does not move or
+                        end anyone&rsquo;s cover.
+                      </span>
+                    </label>
+
+                    <fieldset className="mt-3 border-t border-[#FFC107]/40 pt-3">
+                      <legend className="sr-only">What happens to the schemes using this package</legend>
+                      <label className="flex items-start gap-2">
+                        <input
+                          type="radio"
+                          name="__archiveMode"
+                          value="STRAND"
+                          checked={archiveMode === "STRAND"}
+                          onChange={() => setArchiveMode("STRAND")}
+                          className="mt-0.5"
+                        />
+                        <span>Leave them pointing at this archived package. I will move them myself.</span>
+                      </label>
+
+                      <label className="mt-1.5 flex items-start gap-2">
+                        <input
+                          type="radio"
+                          name="__archiveMode"
+                          value="MIGRATE"
+                          checked={archiveMode === "MIGRATE"}
+                          onChange={() => setArchiveMode("MIGRATE")}
+                          className="mt-0.5"
+                          disabled={successors.length === 0}
+                        />
+                        <span>
+                          Move them to another package now.
+                          {successors.length === 0 && (
+                            <span className="block font-normal">
+                              No other active package exists to move them to.
+                            </span>
+                          )}
+                        </span>
+                      </label>
+
+                      {archiveMode === "MIGRATE" && successors.length > 0 && (
+                        <div className="mt-2 space-y-2 pl-6">
+                          <label className="block">
+                            <span className="block font-semibold">Move everything to</span>
+                            <select
+                              name={successorId ? "__migrateToPackageId" : "__unusedSuccessor"}
+                              value={successorId}
+                              onChange={(e) => setSuccessorId(e.target.value)}
+                              required
+                              className="mt-1 w-full rounded-[8px] border border-[#EEEEEE] bg-white px-2 py-1.5 text-xs"
+                            >
+                              <option value="">Choose a package…</option>
+                              {successors.map((s) => (
+                                <option key={s.id} value={s.id}>{s.name}</option>
+                              ))}
+                            </select>
+                          </label>
+
+                          {impact.memberCount > 0 && (
+                            /* Schemes are configuration; members are people with
+                               cover. Moving them changes what they can claim
+                               against, so it is its own decision and its own
+                               tick — the server refuses the migration without
+                               it rather than moving them quietly. */
+                            <label className="flex items-start gap-2 font-semibold">
+                              <input
+                                type="checkbox"
+                                name="__migrateMembers"
+                                value="yes"
+                                checked={moveMembers}
+                                onChange={(e) => setMoveMembers(e.target.checked)}
+                                className="mt-0.5"
+                              />
+                              <span>
+                                Also move {impact.memberCount}{" "}
+                                {impact.memberCount === 1 ? "member" : "members"}. Their cover
+                                changes to the new package&rsquo;s benefits and limits immediately.
+                              </span>
+                            </label>
+                          )}
+                        </div>
+                      )}
+                    </fieldset>
+                  </>
                 )}
               </div>
             )}

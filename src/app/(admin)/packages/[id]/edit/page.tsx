@@ -67,6 +67,17 @@ export default async function EditPackagePage({ params }: { params: Promise<{ id
     }),
   ]);
 
+  // UAT-HF P09.06 — the successors a migration may point at. ACTIVE only, and
+  // never this package: migrating onto a DRAFT or ARCHIVED package moves the
+  // problem instead of solving it. The server re-validates the choice.
+  const successors = archiveImpact.inUse
+    ? await prisma.package.findMany({
+        where: { tenantId: session.user.tenantId, status: "ACTIVE", id: { not: id } },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      })
+    : [];
+
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div className="flex items-center gap-3">
@@ -102,12 +113,14 @@ export default async function EditPackagePage({ params }: { params: Promise<{ id
         impact={{
           summary: describeArchiveImpact(archiveImpact, pkg.name),
           inUse: archiveImpact.inUse,
+          memberCount: archiveImpact.memberCount,
           schemes: archiveImpact.schemes.map((s) => ({
             id: s.id,
             name: s.name,
             ...(s.tierName ? { tierName: s.tierName } : {}),
           })),
         }}
+        successors={successors}
         pkg={{
           name: pkg.name,
           description: pkg.description ?? null,
