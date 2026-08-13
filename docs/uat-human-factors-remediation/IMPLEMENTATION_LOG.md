@@ -2332,6 +2332,58 @@ Covered by `tests/lib/s3-batch.test.ts` ("no warning names the other member") an
 
 ---
 
+### P06.07 — The formula defence moves to the export boundary
+
+**Commit** `2949d45` · **Defect** DEF-038 (S4)
+
+**The objection was to the location, not the defence.** The register is careful about this: the
+behaviour is "a deliberate CSV/spreadsheet formula-injection defence, **and a good one**", logged Low
+"purely because the scenario requires exact source-text preservation and the transformation is real".
+So nothing was removed — it moved.
+
+A stored name is data. A spreadsheet evaluates a cell only when it **opens an export**, and
+`csvSafeCell` neutralizes every exported cell regardless of how the value reached the database,
+independently of the import path. The import-side call therefore protected nothing that was not
+already protected, and silently rewrote the employer's source text on the way through. A name stored
+as `=2+2` is still exported as `'=2+2`; it is simply no longer *stored* that way.
+
+The code had already named the task: *"P06.07 will separate display-name storage from export
+escaping."*
+
+**A test asserted the defect.** `members-import.test.ts` required the ingested name to begin `'=`.
+Rewritten rather than relaxed, and split in two — the name survives ingest exactly, **and** it is
+still neutralized on the way to a spreadsheet. Dropping the import call would be a regression rather
+than a fix if the export half did not hold, so both halves are pinned.
+
+`tests/lib/csv-formula-boundary.test.ts` covers all four shapes the run tried, asserts signed numbers
+are still untouched (money, balance and phone columns lead with `+`/`-` legitimately, and mangling
+them would corrupt every numeric column in the exports), asserts idempotence so a re-export cannot
+stack apostrophes, and asserts that **no write path** calls `neutralizeFormula` — a new caller there
+is almost certainly this defect returning.
+
+**Verified.** `next build` compiles; `tsc --noEmit` clean; `eslint` clean; 13 new tests; full suite
+**3753 passed, 0 failed**.
+
+---
+
+### DEF-002 — withdrawn by the run itself; no product change
+
+**Defect** DEF-002 (S4) · **No commit — nothing to fix**
+
+Recorded so the severity band reconciles and nobody re-opens it looking for a fix.
+
+The run retracted this one: *"RETRACTED. The product does show progress: the Sign In button is
+disabled and relabelled 'Signing in…' for the whole submission. The original 8-11 s figure wrongly
+included tester typing time and a fixed 2 s harness wait; clean re-measurement gives 3.4-4.8 s to
+navigation."* The register keeps it as a withdrawn row rather than deleting it, "so the audit trail
+shows the correction" — and this entry exists for the same reason.
+
+Worth noting what the run did here, because it is the same discipline that caught my own two
+mis-measurements in this engagement: the finding was checked against a cleaner measurement before it
+was believed, and the correction was published rather than quietly dropped.
+
+---
+
 ## Corrections made to the implementation plan
 
 The plan is treated as authoritative but not infallible. Where a plan statement was checked against
