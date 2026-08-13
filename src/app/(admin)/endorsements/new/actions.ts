@@ -8,6 +8,7 @@ import {
   MemberActionGuardService,
   memberActionRefusal,
 } from "@/server/services/member-action-guard.service";
+import { validateEvidence } from "@/lib/endorsement-evidence";
 
 export type EndorsementSubmitResult = { ok: false; error: string } | undefined;
 
@@ -114,7 +115,7 @@ export async function submitEndorsementAction(formData: FormData): Promise<Endor
       Object.assign(changeDetails, {
         modificationType: get("modificationType"),
         benefitCategory: get("benefitCategory"),
-        newLimit: get("newLimit"), notes: get("notes"),
+        newLimit: get("newLimit"), modificationNotes: get("modificationNotes"),
       });
       break;
     case "GROUP_DATA_CHANGE":
@@ -142,6 +143,26 @@ export async function submitEndorsementAction(formData: FormData): Promise<Endor
   }
 
   if (get("notes")) changeDetails.notes = get("notes");
+
+  // UAT-HF P08.03 (DEF-046) — E-015 evidence is captured HERE, not discovered at
+  // approval. Every material endorsement raised through this form was previously
+  // born unapprovable: the gate reads `sourceReference`/`documentReference`/
+  // `docRef`, and this action wrote `notes`. The run filled Notes with an
+  // explicit source reference, watched it render on the detail page, and was
+  // still refused.
+  //
+  // Refusing at creation is the whole point of the fix. An operator who is told
+  // now can fix it now; one who is told at approval has already handed the
+  // request to a checker who cannot act on it and cannot supply the evidence
+  // themselves without approving their own paperwork.
+  const evidence = validateEvidence({
+    type,
+    sourceReference: get("sourceReference"),
+  });
+  if (!evidence.ok) {
+    return { ok: false, error: evidence.message };
+  }
+  if (evidence.value) changeDetails.sourceReference = evidence.value;
 
   // Calculate pro-rata for financial types
   const FINANCIAL_TYPES = new Set(["MEMBER_ADDITION","MEMBER_DELETION","DEPENDENT_ADDITION","DEPENDENT_DELETION","PACKAGE_UPGRADE","PACKAGE_DOWNGRADE","SALARY_CHANGE"]);

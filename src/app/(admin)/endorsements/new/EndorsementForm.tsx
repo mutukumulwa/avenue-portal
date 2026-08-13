@@ -4,6 +4,13 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { ArrowLeft, Save, Calculator, AlertCircle } from "lucide-react";
 import { submitEndorsementAction } from "./actions";
+import {
+  EVIDENCE_HELP,
+  EVIDENCE_LABEL,
+  EVIDENCE_PLACEHOLDER,
+  MAX_EVIDENCE_LEN,
+  requiresEvidence,
+} from "@/lib/endorsement-evidence";
 
 type Group   = { id: string; name: string; contributionRate: number; renewalDate: string };
 type Package = { id: string; name: string; annualLimit: number; contributionAmount: number };
@@ -61,6 +68,11 @@ export function EndorsementForm({
   const [effectiveDate, setEffectiveDate] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // P08.03: whether E-015 will demand evidence for the selected type. Read from
+  // the shared contract rather than re-listed here, so the form and the gate
+  // that refuses the approval cannot disagree.
+  const needsEvidence = requiresEvidence(type);
 
   const selectedGroup = useMemo(() => groups.find(g => g.id === groupId), [groups, groupId]);
   const groupMemberList = useMemo(() => members.filter(m => m.groupId === groupId), [members, groupId]);
@@ -404,8 +416,13 @@ export function EndorsementForm({
               <Field label="New Sub-Limit (UGX)">
                 <input name="newLimit" type="number" min="0" className={inputCls()} placeholder="0" />
               </Field>
-              <Field label="Notes">
-                <input name="notes" type="text" className={inputCls()} placeholder="Board resolution ref, etc." />
+              {/* P08.03 (adjacent): this was a SECOND input named "notes" in the
+                  same form, so formData.get("notes") returned this one and the
+                  operator's Additional Notes textarea was silently discarded for
+                  this type. Renamed, and its placeholder no longer invites a
+                  source reference into a field that is not one. */}
+              <Field label="Modification Notes">
+                <input name="modificationNotes" type="text" className={inputCls()} placeholder="What is changing and why" />
               </Field>
             </div>
           </div>
@@ -504,6 +521,34 @@ export function EndorsementForm({
           </div>
         )}
 
+        {/* ── Source reference (E-015) ─────────────────────
+            UAT-HF P08.03 / DEF-046. This field did not exist, and its absence is
+            why "three controlled endorsements all remain SUBMITTED": the
+            approval gate reads a source reference, and no control on any page
+            wrote one. The Notes box below invited approval references and
+            the gate never read it — which is exactly how the run was misled. */}
+        <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-3">
+          <h2 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2">
+            {EVIDENCE_LABEL}{needsEvidence && <span className="text-[#DC3545]"> *</span>}
+          </h2>
+          <p className="text-xs text-brand-text-muted">{EVIDENCE_HELP}</p>
+          <input
+            id="sourceReference"
+            name="sourceReference"
+            type="text"
+            maxLength={MAX_EVIDENCE_LEN}
+            required={needsEvidence}
+            aria-describedby="sourceReference-help"
+            placeholder={EVIDENCE_PLACEHOLDER}
+            className={inputCls()}
+          />
+          <p id="sourceReference-help" className="text-xs text-brand-text-muted">
+            {needsEvidence
+              ? "This change moves money or eligibility, so a checker cannot approve it without this."
+              : "Optional for this endorsement type."}
+          </p>
+        </div>
+
         {/* ── Notes ────────────────────────────────────── */}
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-3">
           <h2 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2">
@@ -512,9 +557,13 @@ export function EndorsementForm({
           <textarea
             name="notes"
             rows={3}
-            placeholder="Any context, HR approval references, or special instructions…"
+            placeholder="Any extra context or special instructions…"
             className={`${inputCls()} resize-none`}
           />
+          <p className="text-xs text-brand-text-muted">
+            Notes are not a source reference. Put the authorising document in the
+            field above, or a checker will not be able to approve this.
+          </p>
         </div>
 
         <div className="flex justify-end gap-3">

@@ -144,6 +144,11 @@ export const AUDIT_EXCLUSIONS: Record<string, string> = {
   "endorsements/[id]/amendment-actions.ts:computeProRataAction": "READ_MODEL — pro-rata preview computation",
   "endorsements/[id]/amendment-actions.ts:rejectAmendmentAction": "PRE_EXISTING_GAP — audit wiring pending",
   "endorsements/[id]/amendment-actions.ts:submitAmendmentAction": "PRE_EXISTING_GAP — audit wiring pending",
+  // UAT-HF P08.03 (DEF-046). Not a gap: amendmentService.supplyMaterialEvidence
+  // appends AMENDMENT:EVIDENCE_SUPPLIED with the actor and the reference, inside
+  // the same call that writes it. Auditing again in the action would double-log.
+  "endorsements/[id]/amendment-actions.ts:supplyEndorsementEvidenceAction":
+    "SERVICE_AUDITED — amendmentService.supplyMaterialEvidence appends AMENDMENT:EVIDENCE_SUPPLIED",
   "endorsements/new/actions.ts:submitEndorsementAction": "PRE_EXISTING_GAP — audit wiring pending",
   "fund/[groupId]/actions.ts:generateAdminFeeInvoiceAction": "PRE_EXISTING_GAP — audit wiring pending",
   "fund/[groupId]/actions.ts:recordDepositAction": "PRE_EXISTING_GAP — audit wiring pending",

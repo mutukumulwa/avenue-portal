@@ -4,8 +4,11 @@ import { approveEndorsementAction, rejectEndorsementAction } from "./actions";
 import { amendmentService } from "@/server/services/amendment.service";
 import {
   computeProRataAction, approveAmendmentAction, applyAmendmentAction,
-  rejectAmendmentAction, submitAmendmentAction,
+  rejectAmendmentAction, submitAmendmentAction, supplyEndorsementEvidenceAction,
 } from "./amendment-actions";
+import {
+  EVIDENCE_PLACEHOLDER, MAX_EVIDENCE_LEN, readEvidence, requiresEvidence,
+} from "@/lib/endorsement-evidence";
 import { EndorsementsService } from "@/server/services/endorsement.service";
 import { requireRole, ROLES } from "@/lib/rbac";
 import { notFound } from "next/navigation";
@@ -33,6 +36,8 @@ const KEY_LABELS: Record<string, string> = {
   contactPersonEmail: "New Contact Email", paymentFrequency: "Payment Frequency",
   address: "New Address", fieldName: "Field Corrected", oldValue: "Old Value",
   newValue: "New Value", docRef: "Document Reference", notes: "Notes",
+  modificationNotes: "Modification Notes",
+  sourceReference: "Authorising Document", documentReference: "Document Reference",
 };
 
 export default async function EndorsementReviewPage({
@@ -66,6 +71,14 @@ export default async function EndorsementReviewPage({
   const isApproved      = endorsement.status === "APPROVED";
   const beforeSnap      = richEndorsement?.beforeSnapshot as Record<string, unknown> | null;
   const afterSnap       = richEndorsement?.afterSnapshot  as Record<string, unknown> | null;
+
+  // UAT-HF P08.03 (DEF-046). The run could not approve anything and the page
+  // gave no clue why: E-015's requirement was invisible until the moment it
+  // refused. Surface the evidence a checker is relying on, and — when it is
+  // missing — say so BEFORE they press Approve.
+  const evidence        = readEvidence(endorsement.changeDetails);
+  const needsEvidence   = requiresEvidence(endorsement.type);
+  const evidenceMissing = needsEvidence && !evidence && canAction;
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
@@ -112,13 +125,19 @@ export default async function EndorsementReviewPage({
                 <XCircle size={15} /> Reject
               </button>
             </form>
-            <form action={approveEndorsementAction}>
-              <input type="hidden" name="endorsementId" value={endorsement.id} />
-              <button type="submit"
-                className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold bg-[#28A745] hover:bg-[#218838] text-white transition-colors">
-                <CheckCircle size={15} /> Approve & Apply
-              </button>
-            </form>
+            {/* P08.03 (DEF-046): the SECOND route to the same refusal. The run
+                pressed this one. Gating only the amendment-engine Approve below
+                would have left this button still promising an action E-015 was
+                always going to reject. */}
+            {!evidenceMissing && (
+              <form action={approveEndorsementAction}>
+                <input type="hidden" name="endorsementId" value={endorsement.id} />
+                <button type="submit"
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-bold bg-[#28A745] hover:bg-[#218838] text-white transition-colors">
+                  <CheckCircle size={15} /> Approve & Apply
+                </button>
+              </form>
+            )}
           </div>
         )}
       </div>
@@ -174,6 +193,34 @@ export default async function EndorsementReviewPage({
           </div>
         )}
       </div>
+
+      {/* ── E-015 authorising document (UAT-HF P08.03 / DEF-046) ──────────
+          The run pressed Approve and was refused by a control it had no way to
+          see beforehand. Its state is now stated up front, on the page where
+          the decision is made. */}
+      {needsEvidence && (
+        <div className={`rounded-[8px] p-4 flex items-start gap-3 border ${
+          evidence
+            ? "bg-[#28A745]/5 border-[#28A745]/30"
+            : "bg-[#FFC107]/10 border-[#FFC107]/40"
+        }`}>
+          <AlertTriangle size={16} className={`mt-0.5 shrink-0 ${evidence ? "text-[#28A745]" : "text-[#856404]"}`} />
+          <div className="min-w-0">
+            <p className={`font-semibold text-sm ${evidence ? "text-[#28A745]" : "text-[#856404]"}`}>
+              {evidence ? "Authorising document recorded" : "No authorising document yet"}
+            </p>
+            {evidence ? (
+              <p className="text-xs text-brand-text-muted mt-1 break-words">{evidence}</p>
+            ) : (
+              <p className="text-xs text-brand-text-muted mt-1">
+                This change moves money or eligibility, so it cannot be approved
+                until the person who raised it records what authorises it.
+                Notes are not a source reference.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Change details — human-readable */}
       <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-3">
@@ -311,8 +358,11 @@ export default async function EndorsementReviewPage({
             </form>
           )}
 
-          {/* Approve (SUBMITTED → APPROVED) — only non-maker */}
-          {canAction && !isMaker && (
+          {/* Approve (SUBMITTED → APPROVED) — only non-maker, and only once
+              E-015 can actually be satisfied. Offering a control that is
+              guaranteed to be refused is what the run spent three endorsements
+              discovering (DEF-046). */}
+          {canAction && !isMaker && !evidenceMissing && (
             <form action={approveAmendmentAction}>
               <input type="hidden" name="endorsementId" value={id} />
               <button type="submit"
@@ -320,6 +370,15 @@ export default async function EndorsementReviewPage({
                 <CheckCircle size={12} /> Approve
               </button>
             </form>
+          )}
+
+          {canAction && !isMaker && evidenceMissing && (
+            <p className="text-xs text-[#856404] flex items-center gap-1 self-center max-w-md">
+              <AlertTriangle size={11} className="shrink-0" />
+              This change cannot be approved until the person who raised it records
+              the document authorising it. You cannot add it yourself — supplying
+              the evidence and then approving on it is not a review.
+            </p>
           )}
 
           {/* Apply (APPROVED → APPLIED) */}
@@ -350,6 +409,39 @@ export default async function EndorsementReviewPage({
             <p className="text-xs text-[#856404] flex items-center gap-1 self-center">
               <AlertTriangle size={11} /> You initiated this amendment. A different user must approve.
             </p>
+          )}
+
+          {/* UAT-HF P08.03 (DEF-046) — the way out for an endorsement raised
+              before the creation form asked for a source reference. Seven were
+              stuck this way at the end of the run: unapprovable, and rejecting
+              them would have discarded correct work. Maker only, by design. */}
+          {isMaker && evidenceMissing && (
+            <form action={supplyEndorsementEvidenceAction} className="w-full space-y-2 border-t border-[#EEEEEE] pt-3">
+              <label htmlFor="supply-evidence" className="block text-xs font-bold text-brand-text-heading">
+                Record the document authorising this change
+              </label>
+              <p className="text-[11px] text-brand-text-muted">
+                This endorsement was raised before the form asked for one, so no
+                checker can approve it yet. Adding it here does not change what
+                you requested — it records what authorises it.
+              </p>
+              <input type="hidden" name="endorsementId" value={id} />
+              <div className="flex gap-2">
+                <input
+                  id="supply-evidence"
+                  name="sourceReference"
+                  type="text"
+                  required
+                  maxLength={MAX_EVIDENCE_LEN}
+                  placeholder={EVIDENCE_PLACEHOLDER}
+                  className="flex-1 border border-[#EEEEEE] px-3 py-1.5 rounded-[6px] text-xs focus:outline-none focus:ring-1 focus:ring-brand-indigo"
+                />
+                <button type="submit"
+                  className="bg-brand-indigo text-white px-4 py-1.5 rounded-full text-xs font-semibold hover:bg-brand-secondary transition-colors">
+                  Record reference
+                </button>
+              </div>
+            </form>
           )}
         </div>
       </div>

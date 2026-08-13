@@ -14,6 +14,7 @@ import { EndorsementType, ProRataType } from "@prisma/client";
 import { auditChainService } from "./audit-chain.service";
 import { overrideService } from "./override.service";
 import { rbacService } from "./rbac.service";
+import { readEvidence, validateEvidence } from "@/lib/endorsement-evidence";
 
 /**
  * F-PIN-3: whenever an amendment changes a member's/group's `packageId`, the
@@ -115,11 +116,11 @@ export async function assertMaterialEvidence(
   tenantId: string,
 ): Promise<void> {
   if (!isMaterialAmendment(endorsement.type)) return;
-  const details = (endorsement.changeDetails ?? {}) as Record<string, unknown>;
-  const hasReference = ["sourceReference", "documentReference", "docRef"].some(
-    (k) => typeof details[k] === "string" && (details[k] as string).trim() !== "",
-  );
-  if (hasReference) return;
+  // UAT-HF P08.03: the accepted keys now live in `@/lib/endorsement-evidence`
+  // beside the creation-time validator, so the gate and the form that has to
+  // satisfy it read the same list. They were inlined here, which is how the form
+  // came to write `notes` — a key this gate has never accepted (DEF-046).
+  if (readEvidence(endorsement.changeDetails)) return;
   const linkedDocuments = await prisma.document.count({
     where: { endorsementId: endorsement.id, tenantId },
   });
@@ -127,7 +128,7 @@ export async function assertMaterialEvidence(
   throw new TRPCError({
     code: "PRECONDITION_FAILED",
     message:
-      "Material change control (E-015): a source reference or supporting document is required before this endorsement can be approved.",
+      "Material change control (E-015): a source reference or supporting document is required before this endorsement can be approved. The maker can add one on this endorsement without raising it again.",
   });
 }
 
@@ -691,6 +692,95 @@ export const amendmentService = {
       tenantId,
       description: `Amendment ${endorsement.endorsementNumber} rejected: ${reason}`,
     });
+  },
+
+  // ── 8b. Supply missing E-015 evidence (UAT-HF P08.03 / DEF-046) ───────────
+
+  /**
+   * Record the source reference on an endorsement that was raised before the
+   * creation form asked for one.
+   *
+   * The run left seven endorsements permanently stuck: they could not be
+   * approved (no evidence) and rejecting them would have discarded correct work.
+   * This is the governed way out.
+   *
+   * Three rules, all enforced here rather than in the UI:
+   *
+   * 1. **Maker only.** A checker who supplies the evidence and then approves on
+   *    it has approved their own paperwork — precisely the separation E-015
+   *    exists to enforce. This is the reason the method takes an actor at all.
+   * 2. **Not on a decided endorsement.** Once APPROVED, REJECTED or APPLIED, the
+   *    evidence is part of the record a decision was made against.
+   * 3. **Never overwrites.** If evidence is already present the call is refused,
+   *    so this cannot be used to quietly restate the justification for a change
+   *    after the fact.
+   */
+  async supplyMaterialEvidence(
+    endorsementId: string,
+    tenantId: string,
+    actorId: string,
+    sourceReference: string,
+  ): Promise<{ ok: true } | { ok: false; error: string }> {
+    const endorsement = await prisma.endorsement.findUnique({
+      where: { id: endorsementId, tenantId },
+      select: {
+        id: true,
+        type: true,
+        status: true,
+        requestedBy: true,
+        endorsementNumber: true,
+        changeDetails: true,
+      },
+    });
+    if (!endorsement) return { ok: false, error: "Endorsement not found." };
+
+    if (!["DRAFT", "SUBMITTED", "UNDER_REVIEW"].includes(endorsement.status)) {
+      return {
+        ok: false,
+        error: `This endorsement is ${endorsement.status.replace(/_/g, " ").toLowerCase()}. A source reference can only be added while it is still awaiting a decision.`,
+      };
+    }
+
+    if (endorsement.requestedBy !== actorId) {
+      return {
+        ok: false,
+        error:
+          "Only the person who raised this endorsement can add its source reference. A checker who supplies the evidence and then approves on it has approved their own paperwork.",
+      };
+    }
+
+    if (readEvidence(endorsement.changeDetails)) {
+      return {
+        ok: false,
+        error:
+          "This endorsement already carries a source reference. Reject it and raise a corrected one rather than restating the justification.",
+      };
+    }
+
+    const check = validateEvidence({ type: endorsement.type, sourceReference });
+    if (!check.ok) return { ok: false, error: check.message };
+    if (!check.value) {
+      return { ok: false, error: "Enter the document or instruction that authorises this change." };
+    }
+
+    const details = (endorsement.changeDetails ?? {}) as Record<string, unknown>;
+    await prisma.endorsement.update({
+      where: { id: endorsementId, tenantId },
+      data: { changeDetails: { ...details, sourceReference: check.value } as never },
+    });
+
+    await auditChainService.append({
+      actorId,
+      action: "AMENDMENT:EVIDENCE_SUPPLIED",
+      module: "AMENDMENT",
+      entityType: "Endorsement",
+      entityId: endorsementId,
+      payload: { sourceReference: check.value },
+      tenantId,
+      description: `Source reference recorded on ${endorsement.endorsementNumber} by its maker: ${check.value}`,
+    });
+
+    return { ok: true };
   },
 
   // ── 9. Link back-date override ────────────────────────────────────────────
