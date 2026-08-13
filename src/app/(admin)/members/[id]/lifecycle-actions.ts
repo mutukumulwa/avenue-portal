@@ -5,6 +5,9 @@ import { lifecycleService } from "@/server/services/lifecycle.service";
 import { revalidatePath } from "next/cache";
 import { writeAudit } from "@/lib/audit";
 import { MembersService } from "@/server/services/members.service";
+import { prisma } from "@/lib/prisma";
+import { evaluateTransition, type MemberStatusValue } from "@/lib/member-lifecycle-policy";
+import { newCorrelationId } from "@/lib/correlation";
 
 /**
  * UAT-HF P07.03 — the reason a cover-changing action was taken (DEF-040/059).
@@ -148,15 +151,91 @@ export async function recordDeathAction(formData: FormData) {
  * suspension is an uncovered gap; un-suspending opens a fresh one — and the same
  * `requireReason` guard as every other cover-changing action here.
  */
+
+/**
+ * UAT-HF P07.02/P07.01 — decide a suspend/unsuspend against the policy table.
+ *
+ * These two are the lifecycle transitions that go through
+ * `MembersService.changeStatus` rather than `lifecycleService`, and they are the
+ * ones the member page actually calls. The policy table was wired into
+ * `changeMemberStatusAction` first — which has **no callers** — so until now the
+ * live path enforced neither the role rules nor staleness, and wrote no domain
+ * event inside the transaction.
+ *
+ * Returns the member's current status and version so the caller can pass the
+ * version on as an optimistic precondition rather than re-reading it.
+ */
+async function decideLifecycle(
+  tenantId: string,
+  memberId: string,
+  toStatus: MemberStatusValue,
+  input: { reason: string; makerId: string; makerRole: string; lastCoveredDay?: string; correlationId: string },
+): Promise<{ status: MemberStatusValue; version: number }> {
+  const member = await prisma.member.findFirst({
+    where: { id: memberId, tenantId },
+    select: { status: true, version: true },
+  });
+  if (!member) throw new Error("Member not found");
+
+  const decision = evaluateTransition(
+    {
+      memberId,
+      fromStatus: member.status as MemberStatusValue,
+      fromVersion: member.version,
+      toStatus,
+      reasonNote: input.reason,
+      lastCoveredDay: input.lastCoveredDay,
+      requestedAt: new Date(),
+      makerId: input.makerId,
+      makerRole: input.makerRole,
+      idempotencyKey: input.correlationId,
+    },
+    {
+      // This IS the governed surface — a confirmation dialog that states the
+      // consequence, not the profile form.
+      channel: "GOVERNED_FLOW",
+      currentStatus: member.status as MemberStatusValue,
+      currentVersion: member.version,
+    },
+  );
+
+  if (!decision.allowed) throw new Error(decision.message);
+  return { status: member.status as MemberStatusValue, version: member.version };
+}
+
 export async function suspendMemberAction(formData: FormData) {
   const session = await requireRole(ROLES.MEMBER_OPS);
   const memberId = formData.get("memberId") as string;
   const reason = requireReason(formData);
+  const effectiveAt = parseEffectiveDate(formData);
+  const correlationId = newCorrelationId();
+
+  const current = await decideLifecycle(session.user.tenantId, memberId, "SUSPENDED", {
+    reason,
+    makerId: session.user.id,
+    makerRole: session.user.role ?? "",
+    lastCoveredDay: effectiveAt?.toISOString().slice(0, 10),
+    correlationId,
+  });
 
   const { previousStatus } = await MembersService.changeStatus(
     session.user.tenantId,
     memberId,
     "SUSPENDED",
+    {
+      // DEC-12: an operator who back-dated the suspension had that date ignored —
+      // the coverage period closed at the click instead.
+      effectiveAt,
+      expectedVersion: current.version,
+      // The event commits WITH the change. The audit row below still runs, but
+      // it runs after the transaction, so on its own it loses the record of a
+      // suspension that did happen.
+      event: {
+        actor: { id: session.user.id, role: session.user.role ?? undefined },
+        reasonNote: reason,
+        correlationId,
+      },
+    },
   );
 
   await auditLifecycleReason(formData, {
@@ -173,8 +252,25 @@ export async function unsuspendMemberAction(formData: FormData) {
   const session = await requireRole(ROLES.MEMBER_OPS);
   const memberId = formData.get("memberId") as string;
   const reason = requireReason(formData);
+  const effectiveAt = parseEffectiveDate(formData);
+  const correlationId = newCorrelationId();
 
-  await MembersService.changeStatus(session.user.tenantId, memberId, "ACTIVE");
+  const current = await decideLifecycle(session.user.tenantId, memberId, "ACTIVE", {
+    reason,
+    makerId: session.user.id,
+    makerRole: session.user.role ?? "",
+    correlationId,
+  });
+
+  await MembersService.changeStatus(session.user.tenantId, memberId, "ACTIVE", {
+    effectiveAt,
+    expectedVersion: current.version,
+    event: {
+      actor: { id: session.user.id, role: session.user.role ?? undefined },
+      reasonNote: reason,
+      correlationId,
+    },
+  });
 
   await auditLifecycleReason(formData, {
     memberId,

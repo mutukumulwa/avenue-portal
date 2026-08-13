@@ -1694,6 +1694,47 @@ control is reachable"; the task is "expose a *governed* renewal path". Routing
 answered the first. Governance — approval, exceptions, notification — is the
 second, and it is not done.
 
+### P07.02 (follow-up 3) — the LIVE path, not the dead one
+
+| Field | Value |
+|---|---|
+| **Task** | P07.02 — applying the previous three commits where operators actually go |
+| **Defect IDs** | DEF-040, DEF-041, DEF-042, DEF-043 |
+| **Commit** | _this commit_ |
+| **Migrations / backfills** | none |
+| **Tests added** | `tests/actions/lifecycle-live-path.test.ts` (8) |
+| **Evidence** | `src/app/(admin)/members/[id]/lifecycle-actions.ts` |
+| **Feature flags** | none. |
+| **Remaining risks** | The seven `lifecycleService` flows (lapse, reinstate, cooling-off, standard cancellation, fraud, breach, death) still **do not consult the policy table** — they have their own internal rules, and reconciling them is a larger piece than this. Suspension and un-suspension are the only two transitions routed through `MembersService.changeStatus`, so they are the only two this reaches. Termination's `requiresApproval` is therefore still unenforced on the live surface, because termination goes through `lifecycleService`. |
+
+**I hardened dead code, and this fixes that.** The three previous P07.02 commits
+wired the policy table, the version precondition, the DEC-12 date and the
+transactional domain event into `changeMemberStatusAction` — which has **no
+callers anywhere in the app**. The member detail page calls
+`suspendMemberAction` / `unsuspendMemberAction`, and those went straight to
+`MembersService.changeStatus` with no options at all.
+
+So every guarantee those commits described was, on the path operators actually
+use, absent. The correction also revises a claim made earlier in this branch's
+notes: P07.03's confirmation surface **does** exist and suspension **is**
+reachable from the member page — `GovernedLifecycleAction` is wired to nine
+lifecycle actions. What was missing was never the surface; it was the
+enforcement behind two of them.
+
+**This is the third instance of one shape.** `coverageService` took a
+transaction client and the caller passed the global one. `DomainEventService`
+took a transaction client and the caller passed nothing. Now: a policy table and
+an options bag that the live caller ignored entirely. Each time, the
+infrastructure was correct, the call compiled, every test passed, and the
+guarantee was simply not in effect. **A parameter existing is not evidence
+anyone passes it** — and no type-check or test catches the difference, because
+omitting an optional argument is valid code.
+
+**A back-dated suspension was silently ignored.** `parseEffectiveDate` was
+already parsing the operator's `effectiveDate` out of the form, and
+`suspendMemberAction` then never passed it — so the coverage period closed at
+the click. The form collected a date it did not use.
+
 ### P03.06 — the policy parity gate
 
 | Field | Value |
