@@ -299,6 +299,7 @@ export function ProcedureLineItems({ value, onChange, primaryIcdCode = "" }: Pro
                       {CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
                     </select>
                     <button type="button" onClick={() => removeLine(line.id)}
+                      aria-label={`Remove procedure ${line.cptCode}${line.description ? `: ${line.description}` : ""}`}
                       className="p-1 rounded text-brand-text-muted hover:text-[#DC3545] hover:bg-[#DC3545]/10 transition-colors">
                       <Trash2 size={13} />
                     </button>

@@ -22,7 +22,7 @@ export function CreateModelModal() {
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
             <div className="flex items-center justify-between p-4 border-b border-[#EEEEEE] bg-[#F8F9FA]">
               <h2 className="font-bold text-brand-text-heading">Create Pricing Model</h2>
-              <button onClick={() => setOpen(false)} className="text-brand-text-muted hover:text-brand-text-heading">
+              <button onClick={() => setOpen(false)} aria-label="Close new pricing model dialog" className="text-brand-text-muted hover:text-brand-text-heading">
                 <X size={20} />
               </button>
             </div>

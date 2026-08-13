@@ -302,6 +302,7 @@ export function ContractExclusionsManager({
               </div>
               {editable && (
                 <button type="button" onClick={() => handleDelete(r.id)} disabled={isPending}
+                  aria-label={`Remove ${r.ruleCategory.replace(/_/g, " ").toLowerCase()} exclusion rule effective ${fmt(r.effectiveFrom)}`}
                   className="text-red-500 hover:bg-red-50 p-2 rounded disabled:opacity-50">
                   <Trash2 size={16} />
                 </button>

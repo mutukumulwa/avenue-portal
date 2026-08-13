@@ -82,7 +82,7 @@ export function MemberSearchPicker({ name = "memberId" }: { name?: string }) {
           <span className="text-brand-text-heading">
             {selected.name} · {selected.memberNumber} · {selected.groupName}
           </span>
-          <button type="button" onClick={clear} className="p-0.5 rounded hover:bg-[#F8F9FA] text-brand-text-muted hover:text-[#DC3545] transition-colors">
+          <button type="button" onClick={clear} aria-label={`Clear selected member ${selected.name}`} className="p-0.5 rounded hover:bg-[#F8F9FA] text-brand-text-muted hover:text-[#DC3545] transition-colors">
             <X size={14} />
           </button>
         </div>

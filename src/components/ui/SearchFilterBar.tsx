@@ -138,7 +138,7 @@ function Chip({ label, onRemove }: { label: string; onRemove: () => void }) {
   return (
     <span className="inline-flex items-center gap-1 bg-brand-indigo/10 text-brand-indigo text-xs font-semibold px-2.5 py-1 rounded-full">
       {label}
-      <button onClick={onRemove} className="hover:text-brand-secondary ml-0.5">
+      <button onClick={onRemove} aria-label={`Remove filter ${label}`} className="hover:text-brand-secondary ml-0.5">
         <X size={11} />
       </button>
     </span>

@@ -79,6 +79,7 @@ export function InviteUserModal({ groups = [], brokers = [], fundGroups = [], pr
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 relative max-h-[90vh] overflow-y-auto">
             <button
               onClick={() => setOpen(false)}
+              aria-label="Close invite user dialog"
               className="absolute top-4 right-4 text-brand-text-muted hover:text-brand-text-heading"
             >
               <X size={18} />

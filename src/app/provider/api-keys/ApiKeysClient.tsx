@@ -170,7 +170,7 @@ export function ApiKeysClient({ providerName, branches, scopeOptions, keys }: Pr
       {revokeTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 relative">
-            <button onClick={() => setRevokeTarget(null)} className="absolute top-4 right-4 text-brand-text-muted hover:text-brand-text-heading"><X size={18} /></button>
+            <button onClick={() => setRevokeTarget(null)} aria-label="Close revoke API key dialog" className="absolute top-4 right-4 text-brand-text-muted hover:text-brand-text-heading"><X size={18} /></button>
             <h2 className="text-lg font-bold text-brand-text-heading font-heading flex items-center gap-2"><ShieldAlert size={18} className="text-[#DC3545]" /> Revoke API key</h2>
             <p className="text-sm text-brand-text-body mt-2">
               Revoking <span className="font-semibold">{revokeTarget.label}</span> ({revokeTarget.keyPrefix}…) takes effect

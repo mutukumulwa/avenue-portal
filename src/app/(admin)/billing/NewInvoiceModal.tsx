@@ -35,6 +35,7 @@ export function NewInvoiceModal({ groups }: { groups: Group[] }) {
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 relative">
             <button
               onClick={() => setOpen(false)}
+              aria-label="Close new invoice dialog"
               className="absolute top-4 right-4 text-brand-text-muted hover:text-brand-text-heading"
             >
               <X size={18} />

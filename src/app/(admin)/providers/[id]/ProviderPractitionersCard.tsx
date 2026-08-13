@@ -108,7 +108,7 @@ function PractitionerRow({ link, providerId }: { link: Practitioner; providerId:
           <button onClick={() => setAddingCred(v => !v)} className="text-xs px-2.5 py-1 bg-[#17A2B8]/10 text-[#17A2B8] rounded font-bold hover:bg-[#17A2B8] hover:text-white transition-colors flex items-center gap-1">
             <Plus size={11} /> Credential
           </button>
-          <button onClick={handleUnlink} disabled={isPending} className="p-1.5 text-red-400 hover:bg-red-50 rounded disabled:opacity-40">
+          <button onClick={handleUnlink} disabled={isPending} aria-label={`Unlink practitioner ${p.firstName} ${p.lastName} from this provider`} className="p-1.5 text-red-400 hover:bg-red-50 rounded disabled:opacity-40">
             <Trash2 size={14} />
           </button>
         </div>

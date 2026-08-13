@@ -45,7 +45,7 @@ export function ExceptionModal({
                 <AlertTriangle size={18} className="text-[#856404]" />
                 <h2 className="font-bold text-brand-text-heading font-heading">Flag Manual Exception</h2>
               </div>
-              <button onClick={() => setOpen(false)} className="text-brand-text-muted hover:text-brand-text-heading transition-colors">
+              <button onClick={() => setOpen(false)} aria-label="Close exception dialog" className="text-brand-text-muted hover:text-brand-text-heading transition-colors">
                 <X size={18} />
               </button>
             </div>

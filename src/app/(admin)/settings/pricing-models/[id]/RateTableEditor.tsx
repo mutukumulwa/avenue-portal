@@ -116,8 +116,8 @@ export function RateTableEditor({ pricingModelId, initialData }: { pricingModelI
                 </td>
                 <td className="p-2"><input type="number" className={inputCls} style={{width: 120}} value={editForm.baseRate} onChange={e => setEditForm({ ...editForm, baseRate: parseFloat(e.target.value) })} /></td>
                 <td className="p-2 text-right">
-                  <button onClick={handleSave} disabled={isPending} className="text-green-600 p-1 hover:bg-green-50 rounded disabled:opacity-50"><Save size={16} /></button>
-                  <button onClick={cancelEdit} className="text-gray-500 p-1 hover:bg-gray-100 rounded ml-1"><X size={16} /></button>
+                  <button onClick={handleSave} disabled={isPending} aria-label="Save this rate" className="text-green-600 p-1 hover:bg-green-50 rounded disabled:opacity-50"><Save size={16} /></button>
+                  <button onClick={cancelEdit} aria-label="Cancel editing this rate" className="text-gray-500 p-1 hover:bg-gray-100 rounded ml-1"><X size={16} /></button>
                 </td>
               </tr>
             )}
@@ -141,8 +141,8 @@ export function RateTableEditor({ pricingModelId, initialData }: { pricingModelI
                     </td>
                     <td className="p-2"><input type="number" className={inputCls} style={{width: 120}} value={editForm.baseRate} onChange={e => setEditForm({ ...editForm, baseRate: parseFloat(e.target.value) })} /></td>
                     <td className="p-2 text-right">
-                      <button onClick={handleSave} disabled={isPending} className="text-green-600 p-1 hover:bg-green-50 rounded disabled:opacity-50"><Save size={16} /></button>
-                      <button onClick={cancelEdit} className="text-gray-500 p-1 hover:bg-gray-100 rounded ml-1"><X size={16} /></button>
+                      <button onClick={handleSave} disabled={isPending} aria-label="Save this rate" className="text-green-600 p-1 hover:bg-green-50 rounded disabled:opacity-50"><Save size={16} /></button>
+                      <button onClick={cancelEdit} aria-label="Cancel editing this rate" className="text-gray-500 p-1 hover:bg-gray-100 rounded ml-1"><X size={16} /></button>
                     </td>
                   </>
                 ) : (
@@ -154,7 +154,7 @@ export function RateTableEditor({ pricingModelId, initialData }: { pricingModelI
                     <td className="p-3 font-medium text-brand-text-heading">{Number(entry.baseRate).toLocaleString("en-UG")}</td>
                     <td className="p-3 text-right">
                       <button onClick={() => handleEdit(entry)} disabled={editingId !== null || isPending} className="text-brand-indigo p-1 hover:bg-blue-50 rounded text-xs font-bold mr-2 disabled:opacity-40">Edit</button>
-                      <button onClick={() => handleDelete(entry)} disabled={isPending} className="text-red-500 p-1 hover:bg-red-50 rounded disabled:opacity-40"><Trash2 size={16} /></button>
+                      <button onClick={() => handleDelete(entry)} disabled={isPending} aria-label={`Delete rate for ages ${entry.minAge}-${entry.maxAge}, ${entry.gender}, ${entry.familySize}`} className="text-red-500 p-1 hover:bg-red-50 rounded disabled:opacity-40"><Trash2 size={16} /></button>
                     </td>
                   </>
                 )}

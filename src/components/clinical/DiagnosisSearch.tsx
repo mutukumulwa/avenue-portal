@@ -106,6 +106,7 @@ export function DiagnosisSearch({ value, onChange, max = 5 }: Props) {
                 </span>
               )}
               <button type="button" onClick={() => remove(d.code)}
+                aria-label={`Remove diagnosis ${d.code}${d.description ? `: ${d.description}` : ""}`}
                 className="shrink-0 text-brand-text-muted hover:text-[#DC3545] transition-colors">
                 <X size={14} />
               </button>

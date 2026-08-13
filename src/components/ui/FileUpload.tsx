@@ -133,7 +133,7 @@ export function FileUpload({
         <div className="flex items-center gap-2 text-sm text-[#DC3545] bg-[#DC3545]/5 border border-[#DC3545]/20 rounded-lg px-3 py-2">
           <AlertCircle size={14} className="shrink-0" />
           <span>{error}</span>
-          <button onClick={() => setError(null)} className="ml-auto">
+          <button onClick={() => setError(null)} aria-label="Dismiss this error" className="ml-auto">
             <X size={14} />
           </button>
         </div>

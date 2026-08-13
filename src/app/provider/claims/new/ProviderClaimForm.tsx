@@ -177,7 +177,7 @@ export function ProviderClaimForm({
               </div>
               <div className="col-span-1 flex justify-end">
                 {lines.length > 1 && (
-                  <button type="button" onClick={() => setLines((p) => p.filter((_, idx) => idx !== i))} className="p-1.5 text-brand-text-muted hover:text-[#DC3545]"><Trash2 size={14} /></button>
+                  <button type="button" onClick={() => setLines((p) => p.filter((_, idx) => idx !== i))} aria-label={`Remove claim line ${i + 1}`} className="p-1.5 text-brand-text-muted hover:text-[#DC3545]"><Trash2 size={14} /></button>
                 )}
               </div>
             </div>

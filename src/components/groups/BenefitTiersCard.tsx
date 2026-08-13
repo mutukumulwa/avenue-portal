@@ -214,6 +214,7 @@ export function BenefitTiersCard({ groupId, tiers, packages, currency = BASE_CUR
 
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button onClick={() => setEditId(tier.id)}
+                    aria-label={`Edit tier ${tier.name}`}
                     className="p-1.5 rounded-lg text-brand-text-muted hover:text-brand-indigo hover:bg-brand-indigo/10 transition-colors">
                     <Pencil size={14} />
                   </button>

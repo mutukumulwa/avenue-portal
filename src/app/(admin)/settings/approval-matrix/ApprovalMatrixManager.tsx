@@ -150,10 +150,10 @@ export function ApprovalMatrixManager({ rules, clients }: Props) {
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2 justify-end">
-                      <button onClick={() => handleToggle(r.id)} disabled={isPending} className="text-brand-text-muted hover:text-brand-indigo disabled:opacity-50 transition-colors">
+                      <button onClick={() => handleToggle(r.id)} disabled={isPending} aria-label={`${r.isActive ? "Deactivate" : "Activate"} approval rule for ${r.actionType}`} className="text-brand-text-muted hover:text-brand-indigo disabled:opacity-50 transition-colors">
                         {r.isActive ? <ToggleRight size={18} className="text-[#28A745]" /> : <ToggleLeft size={18} />}
                       </button>
-                      <button onClick={() => handleDelete(r.id)} disabled={isPending} className="text-brand-text-muted hover:text-[#DC3545] disabled:opacity-50 transition-colors">
+                      <button onClick={() => handleDelete(r.id)} disabled={isPending} aria-label={`Delete approval rule for ${r.actionType}`} className="text-brand-text-muted hover:text-[#DC3545] disabled:opacity-50 transition-colors">
                         <Trash2 size={14} />
                       </button>
                     </div>

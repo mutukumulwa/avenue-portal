@@ -292,6 +292,7 @@ export function TreatmentExclusionsManager({
                 <p className="text-[11px] text-gray-400 mt-1">Effective {fmt(r.effectiveFrom)} → {fmt(r.effectiveTo)}</p>
               </div>
               <button type="button" onClick={() => handleDelete(r.id)} disabled={isPending}
+                aria-label={`Remove ${r.ruleCategory.replace(/_/g, " ").toLowerCase()} treatment exclusion effective ${fmt(r.effectiveFrom)}`}
                 className="text-red-500 hover:bg-red-50 p-2 rounded disabled:opacity-50">
                 <Trash2 size={16} />
               </button>

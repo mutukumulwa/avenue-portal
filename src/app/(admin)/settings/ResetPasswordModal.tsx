@@ -50,6 +50,7 @@ export function ResetPasswordModal({ userId, userName, userEmail }: ResetPasswor
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 relative">
             <button
               onClick={() => setOpen(false)}
+              aria-label="Close reset password dialog"
               className="absolute top-4 right-4 text-brand-text-muted hover:text-brand-text-heading"
             >
               <X size={18} />

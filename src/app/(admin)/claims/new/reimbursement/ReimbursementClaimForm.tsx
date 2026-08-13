@@ -201,6 +201,7 @@ export function ReimbursementClaimForm({ members, providers }: { members: Member
                   <td className="py-2">
                     {lines.length > 1 && (
                       <button type="button" onClick={() => setLines(prev => prev.filter((_, j) => j !== i))}
+                        aria-label={`Remove claim line ${i + 1}${line.description ? `: ${line.description}` : ""}`}
                         className="text-brand-text-muted hover:text-[#DC3545] transition-colors">
                         <Trash2 size={13} />
                       </button>

@@ -203,6 +203,7 @@ export function SharedLimitsManager({
                 type="button"
                 onClick={() => handleDelete(sl.id)}
                 disabled={isPending}
+                aria-label={`Remove shared limit: ${sl.name}`}
                 className="text-red-500 hover:bg-red-50 p-2 rounded disabled:opacity-50"
               >
                 <Trash2 size={16} />
