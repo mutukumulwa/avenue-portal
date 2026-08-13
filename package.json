@@ -20,7 +20,9 @@
     "db:checkin-audit-guard": "node scripts/apply-checkin-audit-guard.mjs",
     "worker": "tsx src/server/jobs/worker.ts",
     "audit:smoke": "node scripts/audit-menu-smoke.mjs",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "verify": "node scripts/verification-gate.mjs",
+    "verify:release": "node scripts/verification-gate.mjs --release"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.8.0",
