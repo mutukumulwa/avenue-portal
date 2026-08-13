@@ -1,7 +1,7 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
-import { Search, Plus, Download, Eye, FileSpreadsheet } from "lucide-react";
+import { Search, Plus, Download, Eye, FileSpreadsheet, UserMinus } from "lucide-react";
 import type { MemberRelationship, Prisma } from "@prisma/client";
 import { RosterFilters } from "./RosterFilters";
 
@@ -130,13 +130,31 @@ export default async function RosterPage(
                      </span>
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <Link 
-                       href={`/hr/roster/${m.id}`} 
-                       className="text-brand-indigo hover:text-brand-secondary inline-flex items-center opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <Eye className="w-4 h-4 mr-1" />
-                      <span className="text-xs font-bold">View</span>
-                    </Link>
+                    <div className="inline-flex items-center gap-3 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                      {/* UAT-HF P08.01 (DEF-004): the leaver action reachable
+                          from the list the HR manager is already reading, so
+                          reporting a departure needs no route knowledge. Shown
+                          only for ACTIVE members — there is nothing to end
+                          otherwise. */}
+                      {m.status === "ACTIVE" && (
+                        <Link
+                          href={`/hr/roster/${m.id}/leaver`}
+                          aria-label={`Report ${m.firstName} ${m.lastName} leaving`}
+                          className="text-[#DC3545] hover:text-[#c82333] inline-flex items-center"
+                        >
+                          <UserMinus className="w-4 h-4 mr-1" />
+                          <span className="text-xs font-bold">Report leaving</span>
+                        </Link>
+                      )}
+                      <Link
+                         href={`/hr/roster/${m.id}`}
+                         aria-label={`View ${m.firstName} ${m.lastName}`}
+                         className="text-brand-indigo hover:text-brand-secondary inline-flex items-center"
+                      >
+                        <Eye className="w-4 h-4 mr-1" />
+                        <span className="text-xs font-bold">View</span>
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               ))}

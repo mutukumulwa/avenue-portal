@@ -50,9 +50,19 @@ export default async function HREndorsementsPage(
           <h1 className="text-2xl font-bold text-brand-text-heading font-heading">Endorsement Requests</h1>
           <p className="text-brand-text-body font-body mt-1">Track the status of your reported additions, terminations, and group changes.</p>
         </div>
-        <Link href="/hr/roster/new" className="px-5 py-2 bg-brand-indigo text-white rounded-full text-sm font-semibold hover:bg-brand-secondary transition-colors">
-          + New Endorsement
-        </Link>
+        {/* UAT-HF P08.01 (DEF-004). "+ New Endorsement" went to /hr/roster/new,
+            a Member Addition form with no type selector — while this very page
+            offered a "Member Deletion" FILTER, "advertising a capability with no
+            creation path behind it". Two named actions instead of one button
+            that means only one of them. */}
+        <div className="flex gap-2">
+          <Link href="/hr/roster/new" className="px-5 py-2 bg-brand-indigo text-white rounded-full text-sm font-semibold hover:bg-brand-secondary transition-colors">
+            Add a member
+          </Link>
+          <Link href="/hr/roster" className="px-5 py-2 bg-white text-[#DC3545] border border-[#DC3545] rounded-full text-sm font-semibold hover:bg-[#DC3545]/10 transition-colors">
+            Report a leaver
+          </Link>
+        </div>
       </div>
 
       <div className="bg-white border border-[#EEEEEE] rounded-2xl shadow-sm overflow-hidden flex flex-col">

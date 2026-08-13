@@ -1,6 +1,7 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
+import { WithdrawRequest } from "./WithdrawRequest";
 import Link from "next/link";
 import { ArrowLeft, FileText } from "lucide-react";
 
@@ -27,11 +28,18 @@ const KEY_LABELS: Record<string, string> = {
   notes: "Notes",
 };
 
-export default async function HREndorsementDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function HREndorsementDetailPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ raised?: string }>;
+}) {
   const session = await requireRole(ROLES.HR);
   if (!session.user.groupId) notFound();
 
   const { id } = await params;
+  const { raised } = await searchParams;
   const endorsement = await prisma.endorsement.findFirst({
     where: { id, tenantId: session.user.tenantId, groupId: session.user.groupId },
     include: {
@@ -44,8 +52,28 @@ export default async function HREndorsementDetailPage({ params }: { params: Prom
 
   const details = (endorsement.changeDetails as Record<string, unknown> | null) ?? {};
 
+  // UAT-HF P08.01 (DEF-004) — "cancel/withdraw before approval". Only the person
+  // who raised it, and only while it is still undecided. The server enforces
+  // both; this only decides whether to render the control.
+  const canWithdraw =
+    endorsement.requestedBy === session.user.id &&
+    ["DRAFT", "SUBMITTED", "UNDER_REVIEW"].includes(endorsement.status);
+
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
+      {/* P08.01: a submitted request that says nothing is indistinguishable from
+          one that failed. The operator arrives here straight from the leaver
+          form, so this is where the confirmation belongs. */}
+      {raised && (
+        <div role="status" className="rounded-[8px] border border-[#28A745]/30 bg-[#28A745]/5 p-4">
+          <p className="text-sm font-semibold text-[#28A745]">Request sent to your scheme administrator.</p>
+          <p className="text-xs text-brand-text-muted mt-1">
+            Reference {endorsement.endorsementNumber}. Cover is unchanged until they
+            approve it — you can withdraw this request until then.
+          </p>
+        </div>
+      )}
+
       <div className="flex items-center gap-3">
         <Link href="/hr/endorsements" className="text-brand-text-muted hover:text-brand-indigo transition-colors">
           <ArrowLeft size={20} />
@@ -99,6 +127,19 @@ export default async function HREndorsementDetailPage({ params }: { params: Prom
           <p className="text-sm text-brand-text-muted">No change details recorded.</p>
         )}
       </div>
+
+      {canWithdraw && (
+        <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-3">
+          <h2 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2">
+            Change your mind?
+          </h2>
+          <p className="text-sm text-brand-text-muted">
+            This request is still awaiting your scheme administrator. You can withdraw
+            it yourself rather than asking them to reject it.
+          </p>
+          <WithdrawRequest endorsementId={endorsement.id} />
+        </div>
+      )}
 
       {endorsement.documents.length > 0 && (
         <div className="bg-white border border-[#EEEEEE] rounded-[8px] p-5 shadow-sm space-y-3">

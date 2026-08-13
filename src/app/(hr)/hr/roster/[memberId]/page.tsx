@@ -2,7 +2,7 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, User as UserIcon, Calendar, Info, Phone, Mail, FileText, ShieldCheck, Wallet } from "lucide-react";
+import { ArrowLeft, User as UserIcon, Calendar, Info, Phone, Mail, FileText, ShieldCheck, Wallet, UserMinus, Clock } from "lucide-react";
 import { evaluateEligibility, memberBenefitSummary } from "@/server/services/eligibility/evaluator";
 
 export default async function HRMemberDetailPage(
@@ -42,9 +42,21 @@ export default async function HRMemberDetailPage(
   // the eligibility verdict + balances come from the SINGLE evaluator (own-group
   // projection), never a re-computed status check, so HR sees the SAME numbers as
   // admin / member / provider.
-  const [eligibility, balances] = await Promise.all([
+  const [eligibility, balances, openLeaverRequest] = await Promise.all([
     evaluateEligibility({ tenantId: session.user.tenantId, memberRef: member.memberNumber }),
     memberBenefitSummary(member.id),
+    // P08.01: an undecided leaver request for THIS member. Offering "Report
+    // leaving" again would let one departure produce two pro-rata credits.
+    prisma.endorsement.findFirst({
+      where: {
+        tenantId: session.user.tenantId,
+        groupId: session.user.groupId,
+        type: "MEMBER_DELETION",
+        status: { in: ["DRAFT", "SUBMITTED", "UNDER_REVIEW", "APPROVED"] },
+        changeDetails: { path: ["memberId"], equals: member.id },
+      },
+      select: { id: true, status: true },
+    }),
   ]);
   const eligBadge =
     eligibility.conclusion === "ELIGIBLE"
@@ -78,6 +90,35 @@ export default async function HRMemberDetailPage(
           </div>
           <p className="text-brand-text-body font-body mt-1">Member #{member.memberNumber}</p>
         </div>
+
+        {/* UAT-HF P08.01 (DEF-004) — the lifecycle action the HR portal had
+            nowhere. The run found "the member detail page /hr/roster/<id>
+            exposes only 'View All Endorsements' and no lifecycle action", while
+            the endorsement list advertised a Member Deletion FILTER with no
+            creation path behind it. Only offered on an ACTIVE member, and only
+            when no request is already in flight — a control that is going to be
+            refused is worse than no control (DEF-058's lesson). */}
+        {member.status === "ACTIVE" && (
+          <div className="ml-auto text-right">
+            {openLeaverRequest ? (
+              <Link
+                href={`/hr/endorsements/${openLeaverRequest.id}`}
+                className="inline-flex items-center gap-1.5 text-sm font-bold text-[#856404] bg-[#FFC107]/10 border border-[#FFC107]/40 px-4 py-2 rounded-full hover:bg-[#FFC107]/20 transition-colors"
+              >
+                <Clock size={14} />
+                Leaver request {openLeaverRequest.status.replace(/_/g, " ").toLowerCase()}
+              </Link>
+            ) : (
+              <Link
+                href={`/hr/roster/${member.id}/leaver`}
+                className="inline-flex items-center gap-1.5 text-sm font-bold text-[#DC3545] border border-[#DC3545] px-4 py-2 rounded-full hover:bg-[#DC3545]/10 transition-colors"
+              >
+                <UserMinus size={14} />
+                Report leaving
+              </Link>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
