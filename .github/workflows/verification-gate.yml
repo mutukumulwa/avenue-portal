@@ -45,6 +45,25 @@ jobs:
 
     env:
       GATE_DATABASE_URL: postgresql://gate:gate@localhost:5432/gate
+
+      # Needed by `npm ci` itself, before any check runs.
+      #
+      # `postinstall` is `prisma generate`, which loads prisma.config.ts, which
+      # resolves `env("DIRECT_URL")` eagerly inside the defineConfig literal.
+      # Prisma 7's `env()` THROWS on an absent variable rather than returning
+      # undefined (PrismaConfigEnvError), and `.gitignore` excludes `.env*`, so
+      # on a runner there was nothing to supply it: every run of this workflow
+      # died in Install at ~28s having verified nothing. Same literal as
+      # GATE_DATABASE_URL above because GitHub does not let one key in an `env:`
+      # block reference another.
+      DIRECT_URL: postgresql://gate:gate@localhost:5432/gate
+
+      # DATABASE_URL is deliberately NOT set here. src/lib/prisma.ts builds its
+      # pg Pool from it at module scope, and step 3b (`next build`) runs BEFORE
+      # step 4 migrates. Leaving it unset makes an accidental build-time query
+      # fail loudly rather than quietly read an empty database. The gate script
+      # sets it per-step, for the steps that genuinely want one.
+      #
       # The build must never touch a real database in CI.
       SCHEMA_DEPLOY_MODE: skip
 
@@ -64,22 +83,24 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Verification gate (steps 1-5)
-        # Not `--release`: that mode intentionally fails while steps 6-8 have no
-        # automation, which would make every CI run red and teach people to
-        # ignore it. The uncovered steps are reported in the job summary below
-        # instead, where they stay visible without crying wolf.
-        run: node scripts/verification-gate.mjs --release || true
-
-      - name: Enforce steps 1-5
-        run: |
-          set -e
-          npm run typecheck
-          npx eslint . --max-warnings=-1
-          npx vitest run
-          SCHEMA_DEPLOY_MODE=skip npx next build
-          DATABASE_URL="$GATE_DATABASE_URL" DIRECT_URL="$GATE_DATABASE_URL" npx prisma migrate deploy
-          DATABASE_URL="$GATE_DATABASE_URL" DIRECT_URL="$GATE_DATABASE_URL" npx prisma db push --skip-generate
+      - name: Verification gate
+        # One command, one exit code.
+        #
+        # This was two steps: the gate script under `|| true`, and a hand-copied
+        # subset of its commands that actually decided the job. That made this
+        # file a second, silent implementation of scripts/verification-gate.mjs'
+        # list — and the two drifted. `prisma db push --skip-generate` survived
+        # here for a day after the script had dropped it, on a flag Prisma 7
+        # removed and exits 1 on; and steps 2b, 4b, 5 and 5b existed only in the
+        # script, so nothing in CI could fail on them. The live RBAC drift check
+        # was added "as gate step 4b" while this file could not run it.
+        #
+        # `--ci` rather than `--release`: release mode is red by design while
+        # steps 6-8 have no automation, which would make every run red and teach
+        # people to ignore it. `--ci` tolerates exactly the gaps the script
+        # records and nothing else, and fails if one is quietly closed, so the
+        # list cannot rot into a rubber stamp.
+        run: node scripts/verification-gate.mjs --ci
 
       - name: Record what this gate does NOT cover
         if: always()
@@ -91,14 +112,19 @@ jobs:
             echo "|---|---|"
             echo "| 1 typecheck | yes |"
             echo "| 2 eslint (repo-wide, 0 errors) | yes |"
+            echo "| 2b RBAC drift (source) | yes |"
             echo "| 3 vitest (full suite) | yes |"
             echo "| 3b next build | yes — added to the plan's list, see AGENTS.md |"
-            echo "| 4 fresh db migrate + drift | yes |"
+            echo "| 4 fresh db migrate + drift | yes — \`migrate diff --exit-code\`, read-only |"
+            echo "| 4b RBAC live drift (database) | yes |"
             echo "| 5 upgrade db preflight + migrate | partial — preflight needs production-shaped data |"
+            echo "| 5b policy parity (P03.06) | runs — **known failure**, tolerated by \`--ci\` only |"
             echo "| 6 browser (Chromium + one other) | **no** — no Playwright infrastructure exists |"
             echo "| 7 network-fault | **no** — needs a running app + fault injection |"
             echo "| 8 accessibility (keyboard/zoom/360px) | **partial** — accessible names covered by rendering tests |"
             echo ""
             echo "P12.04's acceptance treats a skipped critical check as a release failure."
-            echo "A green run here means steps 1-5 passed, **not** that 6-8 were checked."
+            echo "A green run here means every row above except 5b, 6, 7 and 8 passed."
+            echo "It is **not** a release verdict — that is \`npm run verify:release\`, which"
+            echo "fails on all four."
           } >> "$GITHUB_STEP_SUMMARY"

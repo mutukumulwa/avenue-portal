@@ -23,6 +23,7 @@
     "postinstall": "prisma generate",
     "verify": "node scripts/verification-gate.mjs",
     "verify:release": "node scripts/verification-gate.mjs --release",
+    "verify:ci": "node scripts/verification-gate.mjs --ci",
     "build:dir": "node scripts/local-build-dir.mjs",
     "build:local": "node scripts/local-build-dir.mjs && SCHEMA_DEPLOY_MODE=skip next build"
   },
