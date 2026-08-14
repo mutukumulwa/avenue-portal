@@ -3417,3 +3417,71 @@ closed by the two fixes above.
 - `tests/audit-coverage/catalogue.ts` — the new read-only action is justified
   rather than left unaudited.
 - tsc clean · eslint clean · `next build` EXIT=0 · full suite green.
+
+## P12.04b — A permission nobody can hold is now a gate failure
+
+**Task:** P12.04b · **Defects:** DEF-060, DEF-061 (permission model) · **Decision:** DEC-16
+
+### What went wrong five times
+
+This branch shipped five permissions that only `SUPER_ADMIN` could satisfy:
+
+| Permission | Shape of the defect |
+|---|---|
+| `member.sensitive.reveal` | constant declared beside its call site, never catalogued |
+| `member.duplicate.review` | same |
+| `network.analytics.read` | same |
+| `support.operation.lookup` | same |
+| `provider.preauth.cancel` | catalogued, granted to **no role at all** |
+
+`permitted()` is an exact string match, so an uncatalogued code matches only the
+`"*"` wildcard. The duplicate-review queue and the support lookup were built,
+tested, deployed and unreachable. Nobody could cancel a pre-authorisation.
+
+Every one of these passed `npm run typecheck`, `npx eslint .` and 4,100 tests,
+because **a permission string that matches nothing is syntactically perfect
+code**. Each was found by a person reading the tables by hand, late. That is not
+a control, and repeating it five times in one day is the argument for this task.
+
+### `scripts/rbac-drift-check.mjs`
+
+Four static checks, no database — parsing the seeds rather than importing them,
+because a drift check that needs a connection to report a typo is a check nobody
+runs:
+
+- **A** every `*_PERMISSION` constant in `src/` exists in the seed catalogue
+- **B** every catalogued permission is granted to some role
+- **C** every code a role grants exists in the catalogue (`seedRbac` skips
+  unknown codes *silently*, so such a grant would never exist)
+- **D** every code in the runtime `ROLE_GRANTS` exists in the catalogue
+
+**B is split**, because two findings under one banner is how a check gets
+silenced. Unheld *and checked in code* is an unreachable feature and fails.
+Unheld and never checked is dead vocabulary — reported, not fatal. Running it
+for the first time immediately found two of the latter: `BROKER:MANAGE` and
+`ANALYTICS:EXPORT`, catalogued, never checked, held by nobody. Left in place and
+reported rather than deleted: removing a catalogue entry touches production
+rows, and neither blocks anyone.
+
+`support.operation.lookup` is checked *and* deliberately unheld pending DEC-14,
+so it sits in `ALLOWED_UNHELD` with its reason written next to it. An exemption
+with a name attached is the opposite of the silence this removes.
+
+### Placed at pre-push, not release
+
+Step **2b**, beside ESLint. It needs no database and runs in under a second, and
+the defect is created at the moment somebody types the string — catching it at
+release means catching it after five of them accumulated. `--release` runs
+pre-push steps too, so the release gate covers it either way.
+
+### Verification
+
+- `tests/lib/rbac-drift-check.test.ts` — 10 tests. Each of A/B/C/D is
+  reconstructed as a fixture repository and asserted to **fail**; the split in B
+  is asserted in both directions; `ALLOWED_UNHELD` is exercised against the real
+  seeds; and the last test runs the check against the real tree so the fixtures
+  cannot drift into testing only themselves.
+- Negative control: replacing the script's `process.exit(1)` with `exit(0)`
+  fails exactly four tests, one per check class. A guard verified only against
+  input that passes is not verified.
+- tsc clean · eslint clean · `next build` EXIT=0 · full suite green.

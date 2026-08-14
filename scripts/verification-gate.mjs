@@ -68,6 +68,23 @@ const STEPS = [
     cmd: "npx eslint . --max-warnings=-1",
   },
   {
+    // UAT-HF DEC-16. Pre-push rather than release, deliberately: it needs no
+    // database and takes under a second, and the defect it catches is created
+    // at the moment somebody writes a permission string. Release mode runs
+    // pre-push steps too, so it gates both.
+    //
+    // Five permissions reached this branch checkable by nobody but SUPER_ADMIN
+    // — four declared beside their call sites and never catalogued, plus
+    // `provider.preauth.cancel` catalogued and granted to no role. Typecheck,
+    // lint and 4,100 tests were green on every one of them, because a string
+    // that matches nothing is valid code. Each was found by a person reading
+    // tables, which is not a control.
+    id: "2b",
+    name: "RBAC drift — every permission code is defined, and somebody can hold it",
+    phase: "pre-push",
+    cmd: "node scripts/rbac-drift-check.mjs",
+  },
+  {
     id: "3",
     name: "Vitest — full suite",
     phase: "pre-push",
