@@ -52,20 +52,55 @@ if (!process.env.DIRECT_URL) {
 }
 
 // Report what was actually READ, not just what it resolved to. Three production
-// deploys in a row logged `mode=push` while the operator had set the variable to
-// `migrate`, and the log could not distinguish "unset" from "set to push" — so
-// the diagnosis was guesswork about a dashboard nobody could see from here.
-// `<undefined>` means the variable never reached this build; a quoted value means
-// it did and says exactly what it was, whitespace included.
+// deploys in a row logged `mode=push` while the operator believed the variable
+// was set to `migrate`, and the log could not distinguish "unset" from "set to
+// push" — so the diagnosis was guesswork about a dashboard nobody could see
+// from here. It turned out to be set on a SIBLING PROJECT in the same team.
+// `<undefined>` means the variable never reached this build; a quoted value
+// says exactly what did arrive, whitespace included.
 const rawMode = process.env.SCHEMA_DEPLOY_MODE;
 console.log(
   `[db-sync] SCHEMA_DEPLOY_MODE=${rawMode === undefined ? "<undefined>" : JSON.stringify(rawMode)}`,
 );
 
+// ── No silent default on production ─────────────────────────────────────────
+//
+// This used to fall back to `push` when the variable was absent. That fallback
+// is how five consecutive production deploys ran `db push` while everyone
+// believed the migrate cutover was live: each one applied schema changes
+// without recording a migration row, and each row then had to be written by
+// hand before `migrate deploy` could ever run.
+//
+// A default that is silently wrong is the same defect class this branch exists
+// to remove. So production must SAY which mode it wants. `push` remains
+// perfectly valid — it just has to be chosen rather than inherited.
+//
+// This is deliberately fatal rather than a warning: a warning in a build log is
+// a thing nobody reads until the incident review.
+if (rawMode === undefined) {
+  console.error(
+    "[db-sync] SCHEMA_DEPLOY_MODE is not set on this production deployment.\n" +
+      "\n" +
+      "  Refusing to guess. This used to default to `push`, which silently applied\n" +
+      "  schema changes without recording a migration row — five deploys ran that\n" +
+      "  way before anyone noticed, and every one needed a manual repair after.\n" +
+      "\n" +
+      "  Set it in Vercel → the avenue-portal project → Settings → Environment\n" +
+      "  Variables, ticked for the PRODUCTION environment:\n" +
+      "\n" +
+      "    SCHEMA_DEPLOY_MODE=migrate   apply prisma/migrations via `migrate deploy`\n" +
+      "    SCHEMA_DEPLOY_MODE=push      previous behaviour, no migration history\n" +
+      "\n" +
+      "  Check the PROJECT as well as the value: this was once set on a sibling\n" +
+      "  project in the same team, which reads as configured and reaches nothing.",
+  );
+  process.exit(1);
+}
+
 // `.trim()` because a trailing space in a dashboard field is invisible and would
 // otherwise fail the build on an unrecognised value rather than doing the
 // obvious thing.
-const mode = (rawMode ?? "push").trim().toLowerCase();
+const mode = rawMode.trim().toLowerCase();
 
 if (mode !== "push" && mode !== "migrate") {
   console.error(
