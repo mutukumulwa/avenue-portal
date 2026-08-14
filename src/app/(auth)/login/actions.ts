@@ -1,6 +1,8 @@
 "use server";
 
+import { headers } from "next/headers";
 import { evaluateSignInStep, type SignInStep } from "@/lib/auth-challenge";
+import { rateLimitKey } from "@/server/services/sign-in-rate-limit.service";
 
 /**
  * UAT-HF P10.01 — DEF-011.
@@ -22,5 +24,9 @@ export async function beginSignInAction(
   password: string,
 ): Promise<{ step: SignInStep }> {
   if (!email?.trim() || !password) return { step: "REJECTED" };
-  return { step: await evaluateSignInStep(email.trim(), password) };
+  // UAT-HF P10.07. A server action has a reliable request context, so the
+  // source address is read here and passed down rather than reached for inside
+  // the auth library.
+  const ip = rateLimitKey(await headers());
+  return { step: await evaluateSignInStep(email.trim(), password, ip) };
 }

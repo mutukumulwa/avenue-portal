@@ -3,15 +3,23 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import { measureAsync } from "@/lib/perf";
 import { consumeTotpCounter, verifyTotpCounter, totpEnrolmentRequiredNow } from "@/lib/totp";
-import { LOCK_DURATION_MS as LOCK_MS } from "@/lib/session-policy";
+import { LOCK_DURATION_MS as LOCK_MS, ATTEMPT_WINDOW_MS as WINDOW_MS } from "@/lib/session-policy";
 import { effectivePermissions } from "@/lib/authz/catalog";
 import {
+  reportIpBlocked,
   recordFailedSignIn,
   recordBlockedSignIn,
   recordInactiveAccountSignIn,
   findDeactivatedAccount,
   type SignInFailureReason,
 } from "@/lib/auth-audit";
+import {
+  rateLimitKey,
+  checkIpGate,
+  registerIpFailure,
+  IP_FAILURE_LIMIT,
+  IP_WINDOW_MS,
+} from "@/server/services/sign-in-rate-limit.service";
 
 /**
  * Credential authorization for the NextAuth CredentialsProvider, extracted out
@@ -28,8 +36,13 @@ export const MAX_FAILED_ATTEMPTS = 5; // D-8
 // D-10. Defined in session-policy.ts, which is client-safe: the sign-in page
 // renders the cooldown and must not import this module (it pulls in Prisma and
 // bcrypt). Re-exported here so existing callers and tests are unchanged.
-export { LOCK_DURATION_MS, SIGN_IN_RECOVERY_GUIDANCE } from "@/lib/session-policy";
-export const ATTEMPT_WINDOW_MS = 15 * 60_000; // D-9
+export {
+  LOCK_DURATION_MS,
+  SIGN_IN_RECOVERY_GUIDANCE,
+  // D-9. Defined in session-policy.ts so the per-IP throttle can use it without
+  // importing this module, which imports the throttle.
+  ATTEMPT_WINDOW_MS,
+} from "@/lib/session-policy";
 
 /**
  * A bcrypt hash of 32 random bytes that were then discarded, at the SAME cost
@@ -138,7 +151,7 @@ export async function registerFailedAttempt(
     // One statement, evaluated in the database, preserving the D-9 rolling
     // window: a stale last-failure restarts the count at 1 rather than
     // extending an old streak.
-    const windowStart = new Date(Date.now() - ATTEMPT_WINDOW_MS);
+    const windowStart = new Date(Date.now() - WINDOW_MS);
     const lockUntil = new Date(Date.now() + LOCK_MS);
     let locking = false;
     // null means the counter statement itself failed. The attempt is still
@@ -221,9 +234,26 @@ export async function registerFailedAttempt(
     }
 }
 
-export async function authorizeCredentials(credentials: CredentialInput): Promise<User | null> {
+export async function authorizeCredentials(
+  credentials: CredentialInput,
+  // UAT-HF P10.07. NextAuth v5 passes the Request to `authorize`, which is the
+  // reliable way to read headers here — `next/headers` is not dependable inside
+  // authorize(), which is why the audit writes in this file bypass writeAudit().
+  request?: Request,
+): Promise<User | null> {
   return measureAsync("auth.credentials.authorize", async () => {
     if (!credentials?.email || !credentials?.password) {
+      return null;
+    }
+
+    // Source-level throttle, checked BEFORE any lookup or comparison. Refusing
+    // after the bcrypt has run would cost precisely what it exists to save.
+    const ip = rateLimitKey(request?.headers);
+    const gate = await checkIpGate(ip);
+    if (gate.blocked) {
+      // Same generic null as every other rejection (D-13). The two-step action
+      // is what the sign-in page calls first and it CAN say something useful,
+      // so in practice a real person sees an honest message, not this.
       return null;
     }
 
@@ -274,6 +304,13 @@ export async function authorizeCredentials(credentials: CredentialInput): Promis
       // previously returned in microseconds, this is the actual fix for the
       // enumeration oracle.
       await equaliseRejectionTiming(credentials.password as string);
+
+      // A nonexistent address counts toward the source limit. It has to: a
+      // sweep across addresses that do not exist is the pattern with NO
+      // per-account counter behind it, so this is the only control that sees it.
+      if (await registerIpFailure(ip)) {
+        reportIpBlocked(ip!, IP_FAILURE_LIMIT, IP_WINDOW_MS / 60_000);
+      }
 
       const deactivated = await findDeactivatedAccount(credentials.email as string);
       if (deactivated) {
@@ -343,6 +380,9 @@ export async function authorizeCredentials(credentials: CredentialInput): Promis
         user.tenantId,
         isPasswordValid ? "BAD_TOTP" : "BAD_PASSWORD",
       );
+      if (await registerIpFailure(ip)) {
+        reportIpBlocked(ip!, IP_FAILURE_LIMIT, IP_WINDOW_MS / 60_000);
+      }
 
       return null; // D-13: same generic null as any wrong password
     }

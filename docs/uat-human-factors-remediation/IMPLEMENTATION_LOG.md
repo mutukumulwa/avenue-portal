@@ -3672,3 +3672,125 @@ differs between branches (an unknown address costs two lookups, a live account
 one), and a sufficiently precise attacker measuring at scale may still find
 signal. Rate limiting by source IP is the control for that, and it does not
 exist here.
+
+## P10.07 — Rate limiting by source address
+
+**Task:** P10.07 · **Defects:** DEF-002 (extends) · **Owner decision:** 2026-08-14
+
+Named as the missing control at the end of P10.06 and asked for directly.
+
+### What the account throttle cannot see
+
+DEF-002 stops five guesses against **one** account. It does nothing about one
+source working through a list: an attacker with 10,000 addresses gets four free
+guesses at each, for ever, and every account's counter looks innocent the whole
+time. Password spraying is built around a per-account limit.
+
+### The header is the whole problem
+
+`x-forwarded-for` is a request header. Anyone can set it. Keying a limit on a
+value the attacker chooses gives them two things — rotate it and the limit never
+applies, or put a **victim's** address in it and have that address blocked. The
+second converts a brute-force defence into a denial-of-service tool aimed at
+whoever they name, which is why "use it as a best effort" is not available.
+
+Vercel's documented behaviour is the basis for using it at all: *"Vercel
+overwrites this header and does not forward external IPs to prevent spoofing."*
+So `src/lib/request-ip.ts` trusts it **on Vercel and nowhere else**, unless an
+operator asserts `TRUST_PROXY_IP_HEADER=true`. Off-platform — self-hosted, the
+in-country Kampala option, a container behind an unknown ingress — there is no
+key and the control is simply off. No key is strictly safer than an aimed one.
+
+This is deliberately **not** shared with `lib/audit.ts`, which reads the same
+header without the check and should keep doing so. An audit row is a *record*;
+"the request claimed to come from here" is worth keeping even unverified. A rate
+limit is a *control*.
+
+### Database-backed, because the alternative was already rejected here
+
+`lib/rate-limit.ts` exists and is in-process by design — its own header says
+"not a distributed quota". For sign-in that gives an attacker
+`limit × instance count`, and Vercel decides the instance count. DEF-002 went to
+the database for exactly this reason; a second, weaker mechanism beside it would
+be a hole with a control's name on it. New `SignInIpThrottle`, one row per
+address rolled in place, same atomic-upsert shape as the account counter.
+
+### The limit is set for carrier-grade NAT, and that is the real design
+
+In Uganda most users arrive over mobile data behind CGNAT — thousands of
+unrelated people on one address; a hospital reaches this from one office IP. A
+tight limit does not slow an attacker (they have addresses) but does lock out a
+carrier's subscribers, silently, at the moment the system looks busiest.
+
+So: only **failures** count, the default is 50 per 15 minutes, it is env-tunable
+without a deploy, `SIGN_IN_IP_ALLOWLIST` covers known shared egress, and every
+block logs a line naming the address and saying that everyone behind it is now
+refused.
+
+The residual trade-off cannot be engineered away at this layer: a blocked
+address blocks the legitimate users behind it. That is inherent to limiting by
+source, and it is why the number is where it is. **This is the part to revisit
+with real traffic.**
+
+### Fails open
+
+If the database is unreachable, sign-in proceeds. A limiter that fails closed
+turns a database blip into "nobody in the country can log in" — a larger
+incident than the one it prevents — and the account throttle still applies.
+
+### An honest message, not a lie
+
+`evaluateSignInStep` gains `RATE_LIMITED`, distinct from `REJECTED`. It is not
+an enumeration leak: it is a fact about the *network*, true whether or not the
+address typed belongs to anyone. Collapsing it into "invalid email or password"
+sends a user whose credentials are perfectly good into a password reset that
+cannot possibly help — the exact failure P10.02 existed to remove. The sign-in
+page names the shared connection, because on a hospital NAT the cause is
+somebody else entirely and the user has no way to guess that.
+
+### Verified against real Postgres, not only mocks
+
+The upsert is the riskiest part here and mocks cannot validate SQL. Against a
+throwaway Postgres 16:
+
+- attempts 1-4 increment, attempt 5 arms the block, and `armed` is true
+  **exactly once** — so one log line per block, not per refused attempt, which
+  is volume the attacker controls;
+- a stale streak restarts at 1 rather than extending;
+- **20 parallel failures recorded 20** — no lost increments, which is precisely
+  the bug the account counter shipped with;
+- `migrate deploy` applies all 18 migrations from empty, and `db push` then
+  reports **"already in sync"** — the hand-written migration matches
+  `schema.prisma` exactly. That mattered more than usual: `SCHEMA_DEPLOY_MODE`
+  is now `migrate` in production, so a mismatch is a failed deploy.
+
+### A defect found in the gate itself
+
+Step 4 ran `npx prisma db push --skip-generate`. **Prisma 7 removed that flag**
+and exits 1 on "unknown or unexpected option". Chained with `&&` after
+`migrate deploy`, it made step 4 **unpassable** — the release gate's own
+database check could only ever fail, and would have read as a schema problem.
+Fixed; step 4 and step 5 now both pass for the first time.
+
+### Verification
+
+- `tests/lib/request-ip.test.ts` — 14 tests, mostly about refusing: not trusted
+  off-platform, only the literal `"true"` enables it, an explicit opt-out beats
+  the platform default, and a non-IP-shaped value is rejected before it can
+  become a primary key.
+- `tests/services/sign-in-rate-limit.test.ts` — 21 tests: the gate, the
+  allowlist, fail-open on both paths, `armed` true only on the arming failure,
+  and the statement asserted to be one `ON CONFLICT` upsert using
+  `now() AT TIME ZONE 'UTC'` and never `CURRENT_TIMESTAMP`.
+- `tests/lib/auth-challenge.test.ts` — the gate refuses **before** the user
+  lookup, and does nothing at all when the address cannot be trusted.
+- Negative controls: removing the gate fails the refusal test; removing the
+  allowlist fails both allowlist tests.
+- tsc clean · eslint clean · `next build` EXIT=0 · 4,181 tests green · release
+  gate steps 4 and 5 green against real Postgres.
+
+### Still not covered
+
+Response-time equalisation and per-source limiting both operate per request.
+Neither addresses a slow distributed attack from many addresses at a low rate,
+which needs traffic-level analysis rather than anything in this codebase.

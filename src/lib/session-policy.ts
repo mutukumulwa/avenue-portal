@@ -197,6 +197,17 @@ function finite(value: number | null | undefined): number | null {
 export const LOCK_DURATION_MS = 15 * 60_000;
 
 /**
+ * D-9. Rolling window over which failed attempts accumulate into a streak.
+ *
+ * Moved here from auth-credentials.ts for the same reason LOCK_DURATION_MS was:
+ * it is a policy number with no dependencies, and the per-IP throttle
+ * (P10.07) needs it without importing a module that imports the throttle back.
+ * Still re-exported from auth-credentials, so every existing caller is
+ * unchanged.
+ */
+export const ATTEMPT_WINDOW_MS = 15 * 60_000;
+
+/**
  * UAT-HF P10.02 / DEC-11 — the recovery guidance shown after a failed sign-in.
  *
  * DEF-010: "After five or six consecutive failed sign-ins the account is locked,

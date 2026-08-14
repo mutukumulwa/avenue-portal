@@ -38,6 +38,11 @@ const mocks = vi.hoisted(() => ({
   // caught a defect — `prisma.auditLog` being undefined threw SYNCHRONOUSLY out
   // of evaluateSignInStep, which `.catch()` in the writer could not intercept.
   auditCreate: vi.fn(async (_args: { data: AuditRow }) => ({})),
+  // UAT-HF P10.07 — the per-source throttle. A real fake: it fails OPEN on
+  // error, so a missing mock would let every test below pass while the gate
+  // did nothing.
+  ipFindUnique: vi.fn(async () => null as { blockedUntil: Date | null } | null),
+  queryRaw: vi.fn(async () => [] as unknown[]),
   auditFindFirst: vi.fn(async (): Promise<{ id: string } | null> => null),
 }));
 
@@ -45,6 +50,8 @@ vi.mock("@/lib/prisma", () => ({
   prisma: {
     user: { findFirst: mocks.findFirst, update: mocks.update },
     auditLog: { create: mocks.auditCreate, findFirst: mocks.auditFindFirst },
+    signInIpThrottle: { findUnique: mocks.ipFindUnique },
+    $queryRaw: mocks.queryRaw,
   },
 }));
 // Partial: `equaliseRejectionTiming` is kept REAL, because it is what spends
@@ -55,7 +62,7 @@ vi.mock("@/lib/auth-credentials", async (importOriginal) => {
   return { ...actual, registerFailedAttempt: mocks.registerFailedAttempt };
 });
 
-import { evaluateSignInStep } from "@/lib/auth-challenge";
+import { evaluateSignInStep, type SignInStep } from "@/lib/auth-challenge";
 
 const PASSWORD = "Correct-Horse-1";
 let hash: string;
@@ -69,6 +76,9 @@ beforeEach(async () => {
   // restored explicitly rather than relying on clear semantics.
   mocks.auditFindFirst.mockResolvedValue(null);
   mocks.auditCreate.mockResolvedValue({});
+  mocks.ipFindUnique.mockResolvedValue(null);
+  mocks.queryRaw.mockResolvedValue([]);
+  process.env.VERCEL = "1"; // the forwarded-for header is only trusted there
   hash ??= await bcrypt.hash(PASSWORD, 4);
 });
 
@@ -189,6 +199,32 @@ describe("evaluateSignInStep", () => {
     mocks.findFirst.mockResolvedValue(account({ lockedUntil: new Date(Date.now() + 600_000) }));
     mocks.auditCreate.mockRejectedValue(new Error("audit table unavailable"));
     await expect(evaluateSignInStep("a@b.ug", PASSWORD)).resolves.toBe("REJECTED");
+  });
+
+  it("refuses before any lookup when the source address is blocked", async () => {
+    // UAT-HF P10.07. The per-account throttle stops five guesses at ONE
+    // account; it does nothing about one source working through a list, which
+    // is what password spraying is. Refusing BEFORE the lookup is the point —
+    // gating after the bcrypt would cost exactly what it exists to save.
+    mocks.ipFindUnique.mockResolvedValue({ blockedUntil: new Date(Date.now() + 600_000) });
+    expect(await evaluateSignInStep("a@b.ug", PASSWORD, "41.210.0.9")).toBe("RATE_LIMITED");
+    expect(mocks.findFirst).not.toHaveBeenCalled();
+  });
+
+  it("says RATE_LIMITED rather than REJECTED, which would be a lie", () => {
+    // Not an enumeration leak: it is a fact about the NETWORK, true whether or
+    // not the address typed belongs to anyone. Collapsing it into "invalid
+    // email or password" sends a user with perfectly good credentials into a
+    // password reset that cannot help — the DEF-011/P10.02 failure exactly.
+    expect<SignInStep>("RATE_LIMITED").not.toBe("REJECTED");
+  });
+
+  it("does not gate at all when the address cannot be trusted", async () => {
+    // rateLimitKey returns null off-Vercel. Keying on a spoofable header would
+    // let an attacker have a VICTIM'S address blocked, so no key means no gate.
+    mocks.ipFindUnique.mockResolvedValue({ blockedUntil: new Date(Date.now() + 600_000) });
+    mocks.findFirst.mockResolvedValue(account());
+    expect(await evaluateSignInStep("a@b.ug", PASSWORD, null)).toBe("PASSWORD_ONLY");
   });
 
   it("does not count an attempt when the password is correct", async () => {

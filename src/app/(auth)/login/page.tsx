@@ -123,6 +123,22 @@ function LoginForm() {
         return;
       }
 
+      if (outcome.step === "RATE_LIMITED") {
+        // UAT-HF P10.07. Deliberately NOT "invalid email or password": that is
+        // false here, and it sends someone whose credentials are perfectly good
+        // into a password reset that cannot help — the exact failure P10.02
+        // existed to remove. It also names the shared connection, because on a
+        // hospital NAT or mobile carrier the cause is somebody else entirely
+        // and the user has no way to guess that.
+        setLoading(false);
+        setError(
+          "Too many failed sign-in attempts from this network. This can happen when a connection is shared — " +
+            "at a facility or on mobile data — so it may not have been you. Wait about 15 minutes and try again, " +
+            "or ask an administrator to check.",
+        );
+        return;
+      }
+
       if (outcome.step === "REJECTED") {
         setLoading(false);
         setError("Invalid email or password. Please try again.");

@@ -109,7 +109,12 @@ const STEPS = [
       // A fresh migrate must leave zero drift against schema.prisma. `db push`
       // reporting "already in sync" is the same assertion Prisma's own engine
       // makes during a deploy, and needs no shadow database.
-      "npx prisma db push --skip-generate",
+      // NOT `--skip-generate`: Prisma 7 removed the flag and exits 1 on
+      // "unknown or unexpected option". Chained with && after migrate deploy,
+      // that made this step UNPASSABLE — the release gate's own database check
+      // could only ever fail, and would have been read as a schema problem.
+      // Found on 2026-08-14 while verifying a migration against real Postgres.
+      "npx prisma db push",
     ].join(" && "),
   },
   {

@@ -1,7 +1,18 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { registerFailedAttempt, equaliseRejectionTiming } from "@/lib/auth-credentials";
-import { recordBlockedSignIn, recordInactiveAccountSignIn, findDeactivatedAccount } from "@/lib/auth-audit";
+import {
+  recordBlockedSignIn,
+  recordInactiveAccountSignIn,
+  findDeactivatedAccount,
+  reportIpBlocked,
+} from "@/lib/auth-audit";
+import {
+  checkIpGate,
+  registerIpFailure,
+  IP_FAILURE_LIMIT,
+  IP_WINDOW_MS,
+} from "@/server/services/sign-in-rate-limit.service";
 
 /**
  * UAT-HF P10.01 — the password step of the two-step sign-in (DEF-011).
@@ -45,6 +56,16 @@ import { recordBlockedSignIn, recordInactiveAccountSignIn, findDeactivatedAccoun
 export type SignInStep =
   /** No account, wrong password, inactive, or locked. Say nothing more. */
   | "REJECTED"
+  /**
+   * Too many failures from this source address (UAT-HF P10.07).
+   *
+   * Distinct from REJECTED, and it is not an enumeration leak: it is a fact
+   * about the *network*, true regardless of whether the address typed belongs
+   * to anyone. Saying it is strictly better than "invalid email or password" —
+   * that sends a legitimate user behind a shared connection into a password
+   * reset that cannot possibly help, which is the failure P10.02 was about.
+   */
+  | "RATE_LIMITED"
   /** Password is correct and the account has no authenticator. Sign in now. */
   | "PASSWORD_ONLY"
   /** Password is correct and an authenticator code is required. Ask for it. */
@@ -59,7 +80,19 @@ export type SignInStep =
  * One constant, pinned to PASSWORD_BCRYPT_COST by test.
  */
 
-export async function evaluateSignInStep(email: string, password: string): Promise<SignInStep> {
+export async function evaluateSignInStep(
+  email: string,
+  password: string,
+  // Supplied by the server action, which can read headers reliably. Null
+  // disables the source control — see request-ip.ts on why a spoofable key is
+  // worse than none.
+  ip: string | null = null,
+): Promise<SignInStep> {
+  // Before any lookup or comparison: refusing after the work is done saves
+  // nothing, and this step is the cheap one an attacker would target.
+  const gate = await checkIpGate(ip);
+  if (gate.blocked) return "RATE_LIMITED";
+
   const user = await prisma.user.findFirst({
     where: { email, isActive: true },
     select: {
@@ -80,6 +113,9 @@ export async function evaluateSignInStep(email: string, password: string): Promi
     // reasoning and same limits as authorizeCredentials: a deactivated account
     // is recorded, an unknown address cannot be (AuditLog.userId is a required
     // FK), and the response is unchanged either way.
+    if (await registerIpFailure(ip)) {
+      reportIpBlocked(ip!, IP_FAILURE_LIMIT, IP_WINDOW_MS / 60_000);
+    }
     const deactivated = await findDeactivatedAccount(email);
     if (deactivated) {
       await recordInactiveAccountSignIn({ userId: deactivated.id, tenantId: deactivated.tenantId });
@@ -110,6 +146,9 @@ export async function evaluateSignInStep(email: string, password: string): Promi
     // No TOTP is verified at this step, so the only reason available here is a
     // bad password. BAD_TOTP can only be reached from authorizeCredentials.
     await registerFailedAttempt(user.id, user.tenantId, "BAD_PASSWORD");
+    if (await registerIpFailure(ip)) {
+      reportIpBlocked(ip!, IP_FAILURE_LIMIT, IP_WINDOW_MS / 60_000);
+    }
     return "REJECTED";
   }
 

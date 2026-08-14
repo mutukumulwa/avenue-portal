@@ -9036,3 +9036,33 @@ model MemberNumberSequence {
   @@unique([tenantId, prefix, year])
   @@index([tenantId])
 }
+
+/// UAT-HF P10.07 — per-source-IP sign-in throttle.
+///
+/// Deliberately mirrors the per-account throttle on User (DEF-002): the counter
+/// lives in the database, not in process memory, so the control holds across
+/// every serverless instance. `lib/rate-limit.ts` is in-process by design and
+/// says so; for sign-in that would give an attacker `limit × instance count`.
+///
+/// One row per address, updated in place with a rolling window, rather than a
+/// row per address per window — the latter grows without bound and needs a
+/// sweeper before it is even correct.
+///
+/// NOT tenant-scoped: an address is not a tenant's property, and the whole point
+/// is to see one source working across many accounts, which may span tenants.
+model SignInIpThrottle {
+  /// The address itself is the key. Bounded in shape by isPlausibleIp().
+  ipAddress     String    @id
+  failureCount  Int       @default(0)
+  lastFailureAt DateTime?
+  blockedUntil  DateTime?
+  /// Lifetime totals, never reset by a window roll — so "this address has been
+  /// blocked 40 times this month" is answerable without keeping every row.
+  totalFailures Int       @default(0)
+  totalBlocks   Int       @default(0)
+  updatedAt     DateTime  @updatedAt
+
+  /// For pruning addresses that have gone quiet.
+  @@index([updatedAt])
+  @@index([blockedUntil])
+}

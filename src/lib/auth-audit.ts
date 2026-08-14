@@ -63,6 +63,8 @@ export type SignInFailureReason =
 export const AUTH_SIGN_IN_FAILED = "AUTH_SIGN_IN_FAILED";
 export const AUTH_SIGN_IN_BLOCKED = "AUTH_SIGN_IN_BLOCKED";
 export const AUTH_SIGN_IN_INACTIVE = "AUTH_SIGN_IN_INACTIVE";
+/** UAT-HF P10.07 — a source address hit the failure limit. */
+export const AUTH_SIGN_IN_IP_BLOCKED = "AUTH_SIGN_IN_IP_BLOCKED";
 
 /**
  * Written directly rather than through `writeAudit()`.
@@ -229,4 +231,32 @@ export async function findDeactivatedAccount(
   } catch {
     return null;
   }
+}
+
+/**
+ * A source address just hit the failure limit.
+ *
+ * Recorded once, by the failure that armed the block — not per refused attempt,
+ * which an attacker controls the volume of.
+ *
+ * This one is NOT attached to a user: the whole point of a source-level control
+ * is that it fires across accounts, and picking one of them to hang the row on
+ * would misattribute it. `AuditLog.userId` is a required foreign key, so it is
+ * attached to the actor who is available and unambiguous — nobody — which the
+ * table cannot express. It therefore goes to the application log rather than
+ * pretending to a row it cannot honestly write.
+ *
+ * That is the same gap as the unknown-address one above, and it is the second
+ * time it has forced a compromise. A nullable `userId` on AuditLog would close
+ * both; it is a schema decision with readers to check, and it is now the single
+ * highest-value fix to this table.
+ */
+export function reportIpBlocked(ip: string, limit: number, windowMinutes: number): void {
+  // Structured, single line, greppable. Vercel's log drain is where this is
+  // actually read from, and a false positive — a clinic behind one NAT — has to
+  // be visible there without a database query.
+  console.warn(
+    `[auth] AUTH_SIGN_IN_IP_BLOCKED ip=${ip} limit=${limit} windowMinutes=${windowMinutes} ` +
+      `— every user behind this address is now refused until the block expires`,
+  );
 }
