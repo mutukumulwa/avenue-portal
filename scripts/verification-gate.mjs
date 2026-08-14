@@ -118,6 +118,20 @@ const STEPS = [
     ].join(" && "),
   },
   {
+    // UAT-HF P12.04d — layer (c) of the RBAC drift check. Step 2b reads SOURCE
+    // and belongs at pre-push; it cannot see a database that disagrees with
+    // correct code. On 2026-08-14 production held 80 of 84 permissions for
+    // SUPER_ADMIN — the four newest missing — with nothing wrong in the source.
+    // Only the wildcard in ROLE_GRANTS kept that from mattering.
+    //
+    // Read-only. It prints remediation SQL and never runs it.
+    id: "4b",
+    name: "RBAC live drift — the database holds what the seed says it should",
+    phase: "release",
+    db: true,
+    cmd: "npx tsx scripts/rbac-live-drift-check.ts --release",
+  },
+  {
     id: "5",
     name: "Upgrade database — preflight, then migrate onto existing data",
     phase: "release",

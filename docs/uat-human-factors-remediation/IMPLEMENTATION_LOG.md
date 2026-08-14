@@ -3938,3 +3938,86 @@ silently, and it is the argument for building layer (c) of that check.
 - Drift check green: 84 catalogued, 83 held by a real role, 1 deliberately
   unheld, no dead vocabulary remaining.
 - tsc clean · eslint clean · `next build` EXIT=0 · 4,181 tests green.
+
+## P12.04d — Layer (c): what the code says versus what the database holds
+
+**Task:** P12.04d · **Decision:** DEC-16 · **Owner decision:** 2026-08-14
+
+The static check (step 2b) reads source and belongs at pre-push. It cannot see a
+database that disagrees with **perfectly correct code** — which is what
+production did: SUPER_ADMIN held **80 of 84** permissions, the four missing being
+the four added that day. Nothing in the source was wrong. Only the database was,
+and no check looked.
+
+### It found more than the case that prompted it
+
+Run against production, three roles hold **more** than the seed grants them:
+
+| Role | Drift |
+|---|---|
+| `SUPER_ADMIN` | missing 4 grants (the four added 2026-08-14) |
+| `CUSTOMER_SERVICE` | **4 extra**: `ANALYTICS:VIEW`, `BILLING:VIEW`, `CLAIM:VIEW`, `PREAUTH:VIEW` |
+| `UNDERWRITER` | **2 extra**: `CLAIM:VIEW`, `PREAUTH:VIEW` |
+| `SENIOR_UNDERWRITER` | 1 extra |
+
+21 of 25 roles agree exactly. The extras are read permissions, so nothing
+alarming — but they are access **nobody currently approves**, most likely a seed
+bundle narrowed at some point while the rows stayed (seeds are additive). None
+of it was visible before today.
+
+### Read-only, permanently
+
+It never writes. `--sql` **prints** remediation for a person to read and run. An
+auto-fixing RBAC tool is one bad diff away from granting permissions nobody
+approved, and the premise of this file is that the database is where the
+surprises are.
+
+Extra grants get **no SQL at all**: delete the row, or add it to the seed? Only a
+person knows, and printing a `DELETE` would make revoking access the default
+answer to a question nobody asked.
+
+### Multi-tenant by construction
+
+`Permission` is global (`code` unique, no tenant); `Role` is unique per
+`(tenantId, code)`. Grants are therefore compared tenant by tenant — a tenant
+provisioned before a permission existed lacks its grants, which is the exact
+shape of the defect above.
+
+### The comparison is a pure function
+
+`computeDrift()` takes plain data and returns findings; `main()` does the I/O.
+The gate step runs only in `--release` with a database, so without a pure core
+this logic would be exercised roughly never — and a drift checker whose own
+comparison is untested is a poor joke. The Prisma client is created **inside**
+`main()` for the same reason: a module-level `process.exit` on a missing
+`DATABASE_URL` would kill any test that imports the function.
+
+### Verification
+
+- Against a real Postgres seeded from current code: clean. Then five drift
+  classes introduced deliberately — missing permission, extra permission,
+  missing grant, extra grant, unknown role — and **all five detected**.
+- The printed SQL was applied back and the findings cleared. It also correctly
+  re-detected the second-order gap: restoring a `Permission` row does not
+  restore its grants, so it converges over repeated runs rather than claiming
+  done.
+- **A fixture error caught first:** two of five classes appeared undetected
+  until I checked, and the cause was my own test data — `CLAIM:APPROVE` and
+  `MEMBER:DELETE` are not real permission codes, so the SQL that "introduced"
+  the drift had matched nothing. Verified with codes that exist.
+- `tests/lib/rbac-live-drift-check.test.ts` — 13 tests on the pure core,
+  including that a missing grant for an absent permission is NOT double-reported,
+  that the delete SQL orders `RolePermission` before `Permission` (the other
+  order violates the FK), and that a quote in a description is escaped.
+- Negative controls: neutering missing-grant detection fails 3 tests; neutering
+  extra-grant detection fails 2.
+- Release gate steps 1-5 all green, step 4b in 0.7s.
+
+### The limit worth stating
+
+**The gate step cannot reach production from this machine.** It runs against any
+database reachable via `DATABASE_URL`; production is only available here through
+the Supabase connection, and `.env` points at a local `aicare_uat`. The
+production figures above were obtained by generating the expected pairs from the
+seed and diffing them in SQL. Someone with the production connection string
+should run the script itself.
