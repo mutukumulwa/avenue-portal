@@ -51,7 +51,21 @@ if (!process.env.DIRECT_URL) {
   process.exit(0);
 }
 
-const mode = (process.env.SCHEMA_DEPLOY_MODE ?? "push").toLowerCase();
+// Report what was actually READ, not just what it resolved to. Three production
+// deploys in a row logged `mode=push` while the operator had set the variable to
+// `migrate`, and the log could not distinguish "unset" from "set to push" — so
+// the diagnosis was guesswork about a dashboard nobody could see from here.
+// `<undefined>` means the variable never reached this build; a quoted value means
+// it did and says exactly what it was, whitespace included.
+const rawMode = process.env.SCHEMA_DEPLOY_MODE;
+console.log(
+  `[db-sync] SCHEMA_DEPLOY_MODE=${rawMode === undefined ? "<undefined>" : JSON.stringify(rawMode)}`,
+);
+
+// `.trim()` because a trailing space in a dashboard field is invisible and would
+// otherwise fail the build on an unrecognised value rather than doing the
+// obvious thing.
+const mode = (rawMode ?? "push").trim().toLowerCase();
 
 if (mode !== "push" && mode !== "migrate") {
   console.error(
