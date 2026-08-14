@@ -1775,6 +1775,60 @@ different failures: the gate catches the module diverging, the test catches the
 caller opting out. That distinction is exactly what the three
 `transaction-client` bugs on this branch turned on.
 
+### P00.04 (production) — the migrate cutover, and the repair it needed
+
+| Field | Value |
+|---|---|
+| **Task** | P00.04 / DEC-13 — the production half of the schema-deployment cutover |
+| **Defect IDs** | none — this is the deployment mechanism the branch was built on |
+| **Commit** | _this commit_ (record only; the actions below were taken against production) |
+| **Migrations / backfills** | `20260813001600_waiting_period_basis` applied to production; one `_prisma_migrations` row inserted by hand |
+| **Tests added** | none — this is an operational record |
+| **Evidence** | Vercel `dpl_2ryot4ERDxuijQeY5Q2dFa5w9oKr`, production `_prisma_migrations` |
+| **Feature flags** | `SCHEMA_DEPLOY_MODE` — **still `push` as at this commit** |
+| **Remaining risks** | **The cutover is NOT complete.** The deployment that shipped this to production still logged `mode=push`. Until a deploy logs `mode=migrate`, every future migration lands the same way and needs the same manual repair. Vercel snapshots environment variables when a deployment is **created**, so a value saved during a push may not reach that build — change it *then* deploy, never the reverse. |
+
+**Three states had to be reconciled, and only one was visible from the repo.**
+
+`20260813001400_durable_import_ledger` had been applied to production (33 steps,
+2026-08-13) but existed only as an **untracked file** in a shared working tree.
+So production listed 16 migrations while `main` held 15 — the one state
+`prisma migrate deploy` refuses outright: *"The following migration(s) are
+applied to the database but missing from the local migrations directory."*
+Flipping the flag before committing that file would have turned a green
+production pipeline red. `db push` tolerated it only because it ignores
+migration history entirely, which is the same property that produced the drift.
+
+**Committing the file required checking the bytes, not just the name.** Prisma
+records a checksum per migration and reports an edited one as *"modified after
+it was applied"* — a different failure with the same symptom. The committed
+file's SHA-256 matched production's recorded checksum exactly, so the commit
+reconciled the history rather than replacing one error with another.
+
+**The merge then raced the environment variable, and lost.** `main` was pushed;
+Vercel created the production deployment seconds later and captured
+`SCHEMA_DEPLOY_MODE=push`. The build log is unambiguous —
+`[db-sync] mode=push — running \`npx prisma db push\``. So the schema went in
+(enum + column) with **no migration row**: exactly the outcome the ordering was
+meant to avoid, arriving through timing rather than through the decision.
+
+**Why that mattered more than it looked.** The migration is not idempotent —
+`CREATE TYPE "WaitingPeriodBasis"` against an existing type fails. Left alone, the
+first `migrate deploy` would have failed *and* written a failed migration row,
+which blocks every deploy after it.
+
+**The repair row asserts something that was checked first.** Before inserting,
+the database was compared against what the migration produces: the enum carries
+exactly its four labels in declared order, and the column is `NOT NULL` with
+default `'COVER_START'`. Recording a migration as applied when the schema does
+not match would be worse than the drift it fixes. The insert is guarded with
+`WHERE NOT EXISTS`, carries the real checksum so `migrate deploy` skips rather
+than re-runs it, and its `logs` column records the provenance — which deployment
+applied the schema, why the row was written by hand, and what was verified.
+
+**State after:** 17 applied, 17 committed, zero orphans in either direction,
+none unfinished or rolled back, and every recorded checksum matching its file.
+
 ### P07.02 (follow-up 3) — the LIVE path, not the dead one
 
 | Field | Value |
