@@ -360,6 +360,7 @@ export async function seedRbac(prisma: PrismaClient, tenantId: string) {
   });
 
   let assignCount = 0;
+  let revokedSkipped = 0;
   for (const user of users) {
     const roleCode = user.role as string;
     if (!ENUM_ROLE_CODES.has(roleCode)) continue;
@@ -367,10 +368,30 @@ export async function seedRbac(prisma: PrismaClient, tenantId: string) {
     const roleId = roleMap[roleCode];
     if (!roleId) continue;
 
-    const existing = await prisma.userRoleAssignment.findFirst({
-      where: { userId: user.id, roleId, tenantId, isActive: true },
+    // UAT-HF DEC-16 — do not resurrect access somebody deliberately removed.
+    //
+    // This previously looked only for an ACTIVE assignment, so a revoked one was
+    // invisible and this step re-created it. Revoking is the ONLY permission
+    // action the admin UI offers (`revokeAssignmentAction`), and provisioning
+    // runs `seedRbac` — so the single control an administrator has was undone by
+    // the routine command that fixes everything else, silently, with the new row
+    // self-made and self-checked.
+    //
+    // Revocation retains the row and stamps `revokedAt`/`revokedById`, so the
+    // decision is on the record. It just was not being read.
+    const prior = await prisma.userRoleAssignment.findMany({
+      where: { userId: user.id, roleId, tenantId },
+      select: { isActive: true, revokedAt: true },
     });
-    if (existing) continue;
+
+    if (prior.some((a) => a.isActive)) continue;
+
+    if (prior.some((a) => a.revokedAt !== null)) {
+      // Deliberately removed. Re-granting is a decision for a human with a
+      // reason, not a side effect of provisioning.
+      revokedSkipped++;
+      continue;
+    }
 
     await prisma.userRoleAssignment.create({
       data: {
@@ -387,4 +408,10 @@ export async function seedRbac(prisma: PrismaClient, tenantId: string) {
     assignCount++;
   }
   console.log(`  ✅ ${assignCount} existing user role assignments migrated`);
+  if (revokedSkipped > 0) {
+    console.log(
+      `  ⏭️  ${revokedSkipped} skipped — previously revoked, left revoked (DEC-16). ` +
+        `Re-grant deliberately if that is wrong.`,
+    );
+  }
 }

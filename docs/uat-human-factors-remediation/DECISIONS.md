@@ -314,6 +314,16 @@ answer today is a pull request.
 remediation task, and it needs DEC-15 settled first — there is no point building
 a UI for a role model that is about to change shape.
 
+**One half IS fixed:** `seedRbac` step 4 no longer resurrects revoked access.
+It looked only for an *active* assignment, so a revoked one was invisible and
+provisioning re-created it — self-made, self-checked, no reason recorded. Since
+revoking is the only permission action the UI offers and provisioning calls
+`seedRbac`, the single control an administrator had was undone by the routine
+command that fixes everything else. Revocation always stamped `revokedAt`; the
+seed simply was not reading it. Verified by removing the guard and watching the
+test fail on the assertion — the first attempt at that check failed for the
+wrong reason (a missing mock method), which looks identical to the guard working.
+
 ---
 
 ## 3. Amendments
