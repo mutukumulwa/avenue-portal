@@ -6,6 +6,8 @@ import {
   recordInactiveAccountSignIn,
   findDeactivatedAccount,
   reportIpBlocked,
+  recordIpBlocked,
+  recordUnknownAddressSignIn,
 } from "@/lib/auth-audit";
 import {
   checkIpGate,
@@ -115,10 +117,15 @@ export async function evaluateSignInStep(
     // FK), and the response is unchanged either way.
     if (await registerIpFailure(ip)) {
       reportIpBlocked(ip!, IP_FAILURE_LIMIT, IP_WINDOW_MS / 60_000);
+      await recordIpBlocked(ip!, IP_FAILURE_LIMIT, IP_WINDOW_MS / 60_000);
     }
     const deactivated = await findDeactivatedAccount(email);
     if (deactivated) {
       await recordInactiveAccountSignIn({ userId: deactivated.id, tenantId: deactivated.tenantId });
+    } else {
+      // UAT-HF P10.08 — see authorizeCredentials. This step is the cheap one an
+      // attacker would target, so it must leave the same trail.
+      await recordUnknownAddressSignIn(email);
     }
     return "REJECTED";
   }
@@ -148,6 +155,7 @@ export async function evaluateSignInStep(
     await registerFailedAttempt(user.id, user.tenantId, "BAD_PASSWORD");
     if (await registerIpFailure(ip)) {
       reportIpBlocked(ip!, IP_FAILURE_LIMIT, IP_WINDOW_MS / 60_000);
+      await recordIpBlocked(ip!, IP_FAILURE_LIMIT, IP_WINDOW_MS / 60_000);
     }
     return "REJECTED";
   }

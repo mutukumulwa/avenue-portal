@@ -5396,8 +5396,28 @@ model ActivityLog {
 
 model AuditLog {
   id            String   @id @default(cuid())
-  userId        String
-  user          User     @relation(fields: [userId], references: [id])
+  /// NULLABLE since UAT-HF P10.08.
+  ///
+  /// It was required, and that forced two events to go unrecorded rather than
+  /// unattributed:
+  ///
+  ///   - a sign-in attempt against an address with NO account. There is no user
+  ///     row to point at, and a credential-stuffing sweep across addresses that
+  ///     do not exist is exactly the pattern the audit trail should show.
+  ///   - a source address hitting the rate limit. That control fires ACROSS
+  ///     accounts by design; hanging the row on one of them would misattribute
+  ///     it, and picking "the last one tried" would be a fiction.
+  ///
+  /// A null here means "no actor", which is a fact — not a missing value. It is
+  /// never a stand-in for an actor we failed to look up: every code path that
+  /// HAS an actor still passes one, and `writeAudit`/`auditChainService` still
+  /// require one.
+  ///
+  /// Readers must treat a null actor as "System / unauthenticated", which the
+  /// audit-log page does. The hash chain is unaffected — it hashes the metadata
+  /// payload only, never userId.
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id])
   tenantId      String?
   action        String
   module        String

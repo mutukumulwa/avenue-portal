@@ -94,8 +94,34 @@ export default async function AuditLogPage({
                   {new Date(log.createdAt).toLocaleString("en-UG", { dateStyle: "short", timeStyle: "medium" })}
                 </td>
                 <td className="px-5 py-3">
-                  <p className="font-semibold text-brand-text-heading text-xs">{log.user.firstName} {log.user.lastName}</p>
-                  <p className="text-[10px] text-brand-text-muted">{log.user.email}</p>
+                  {/*
+                    UAT-HF P10.08 — a null actor is a FACT, not a missing value:
+                    the event had no authenticated user. A sign-in attempt
+                    against an address with no account, or a source address
+                    hitting the rate limit, are the two that produce it.
+
+                    Rendered as a labelled state rather than a blank cell or an
+                    em dash, because "no actor" and "we could not load the
+                    actor" look identical when you print nothing, and only one
+                    of them is fine.
+                  */}
+                  {log.user ? (
+                    <>
+                      <p className="font-semibold text-brand-text-heading text-xs">
+                        {log.user.firstName} {log.user.lastName}
+                      </p>
+                      <p className="text-[10px] text-brand-text-muted">{log.user.email}</p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="font-semibold text-brand-text-muted text-xs italic">
+                        Unauthenticated
+                      </p>
+                      <p className="text-[10px] text-brand-text-muted">
+                        No signed-in user — see the address and description
+                      </p>
+                    </>
+                  )}
                 </td>
                 <td className="px-5 py-3">
                   <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${MODULE_COLOR[log.module] ?? "bg-[#6C757D]/10 text-[#6C757D]"}`}>

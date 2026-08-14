@@ -7,6 +7,8 @@ import { LOCK_DURATION_MS as LOCK_MS, ATTEMPT_WINDOW_MS as WINDOW_MS } from "@/l
 import { effectivePermissions } from "@/lib/authz/catalog";
 import {
   reportIpBlocked,
+  recordIpBlocked,
+  recordUnknownAddressSignIn,
   recordFailedSignIn,
   recordBlockedSignIn,
   recordInactiveAccountSignIn,
@@ -310,6 +312,7 @@ export async function authorizeCredentials(
       // per-account counter behind it, so this is the only control that sees it.
       if (await registerIpFailure(ip)) {
         reportIpBlocked(ip!, IP_FAILURE_LIMIT, IP_WINDOW_MS / 60_000);
+        await recordIpBlocked(ip!, IP_FAILURE_LIMIT, IP_WINDOW_MS / 60_000);
       }
 
       const deactivated = await findDeactivatedAccount(credentials.email as string);
@@ -318,6 +321,11 @@ export async function authorizeCredentials(
           userId: deactivated.id,
           tenantId: deactivated.tenantId,
         });
+      } else {
+        // UAT-HF P10.08. Genuinely no account. Previously unrecordable — the
+        // audit FK had nothing to point at — and it is the clearest signal
+        // credential stuffing produces.
+        await recordUnknownAddressSignIn(credentials.email as string);
       }
       return null; // D-13: the response is identical either way
     }
@@ -382,6 +390,7 @@ export async function authorizeCredentials(
       );
       if (await registerIpFailure(ip)) {
         reportIpBlocked(ip!, IP_FAILURE_LIMIT, IP_WINDOW_MS / 60_000);
+        await recordIpBlocked(ip!, IP_FAILURE_LIMIT, IP_WINDOW_MS / 60_000);
       }
 
       return null; // D-13: same generic null as any wrong password

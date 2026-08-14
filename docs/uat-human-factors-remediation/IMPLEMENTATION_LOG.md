@@ -3794,3 +3794,81 @@ Fixed; step 4 and step 5 now both pass for the first time.
 Response-time equalisation and per-source limiting both operate per request.
 Neither addresses a slow distributed attack from many addresses at a low rate,
 which needs traffic-level analysis rather than anything in this codebase.
+
+## P10.08 — AuditLog.userId becomes nullable, and two invisible events become visible
+
+**Task:** P10.08 · **Defects:** DEF-005 (extends) · **Owner decision:** 2026-08-14
+
+### Why
+
+`AuditLog.userId` was a required foreign key. That forced two security events to
+go **unrecorded** — not anonymised, absent:
+
+- **A sign-in attempt against an address with no account.** No user row, so
+  nothing for the key to point at. A credential-stuffing sweep across addresses
+  that do not exist is the clearest pattern the audit trail could show, and it
+  showed nothing.
+- **A source address hitting the rate limit.** That control fires *across*
+  accounts by design; hanging the row on whichever account happened to be tried
+  last would be a fiction that reads like a fact. It went to `console.warn`
+  instead — and a log line is not an audit trail: not queryable beside the
+  events around it, ages out on a retention policy nobody chose for this
+  purpose, and invisible on the page an operator actually opens.
+
+The constraint had forced a compromise twice in one day, which is the argument.
+
+### The column change is small; the point is what it unblocks
+
+`userId String?`, relation optional, one `DROP NOT NULL`. A null means **"no
+actor"** — a fact — and never a stand-in for an actor we failed to resolve.
+Every path that has an actor still passes one, and `writeAudit` /
+`auditChainService` still require one.
+
+**The hash chain is unaffected**, and that was the main risk worth checking
+rather than assuming: `audit-chain.service.ts` hashes the canonical `payload`
+only, never `userId`. Chain verification behaves identically.
+
+Exactly **three** call sites needed changing, all in the audit-log page, which
+is a good sign for how contained the model was. A null actor renders as
+*Unauthenticated* with a line of explanation — a labelled state, not a blank
+cell, because "no actor" and "we could not load the actor" look identical when
+you print nothing and only one of them is fine.
+
+### The password-in-the-email-field problem
+
+Recording the attempted address is the whole value of the unknown-address row.
+But people type their password into the email field, and storing whatever
+arrived would put plaintext passwords into a table that is retained, exported
+and read by staff — building a credential leak while building a security
+control.
+
+So the value is stored only when it is **email-shaped**. Otherwise the row
+records the shape and length and withholds the content. The event still counts:
+redacting the value must not discard the attempt, because the count is what
+reveals the sweep. A password containing `@` does not pass the check — it is an
+address check, not an "@" check, and there is a test for exactly that.
+
+### What this does not fix
+
+An unknown-address row has no tenant, so it sits **outside the per-tenant hash
+chain**. That is a property of the event rather than a defect in the write — the
+chain is per-tenant and this event belongs to no tenant. The row is in the
+table and queryable, which is the entire improvement over nothing.
+
+### Verification
+
+- `tests/lib/auth-audit.test.ts` — 7 new: null actor and null tenant on both
+  events, address normalised to lowercase, a non-email value withheld with its
+  shape recorded, the attempt still counted when withheld, `p@ssword` not
+  mistaken for an address, and neither write throwing.
+- `tests/lib/auth-challenge.test.ts` — a test that previously asserted **nothing
+  was written** now asserts the row, because the gap it documented is closed.
+- Negative control: forcing the redaction branch to always store fails exactly
+  the two withholding tests.
+- Against real Postgres, on the **upgrade path** rather than an empty database —
+  an `ALTER` on an empty table proves nothing. 18 migrations applied, a real
+  `AuditLog` row inserted under the old `NOT NULL`, then the new migration:
+  the column became nullable, **the pre-existing row was untouched**, an
+  actor-less row inserted successfully, and `db push` reported *"already in
+  sync"*.
+- Release gate steps 1-5 all green, including both database steps.

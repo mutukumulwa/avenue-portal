@@ -18,8 +18,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 /** The shapes auth-audit.ts passes to Prisma, typed so tsc checks the assertions. */
 type AuditRow = {
-  userId: string;
-  tenantId: string;
+  // Nullable since P10.08 — see the model comment. A null is "no actor", a
+  // fact, never a stand-in for one we failed to resolve.
+  userId: string | null;
+  tenantId: string | null;
   action: string;
   module: string;
   description: string;
@@ -44,6 +46,8 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 import {
+  recordUnknownAddressSignIn,
+  recordIpBlocked,
   recordFailedSignIn,
   recordBlockedSignIn,
   recordInactiveAccountSignIn,
@@ -51,6 +55,8 @@ import {
   AUTH_SIGN_IN_FAILED,
   AUTH_SIGN_IN_BLOCKED,
   AUTH_SIGN_IN_INACTIVE,
+  AUTH_SIGN_IN_UNKNOWN,
+  AUTH_SIGN_IN_IP_BLOCKED,
 } from "@/lib/auth-audit";
 import { LOCK_DURATION_MS } from "@/lib/session-policy";
 
@@ -241,5 +247,70 @@ describe("no audit failure ever reaches the auth path", () => {
         userId: "u1", tenantId: "t1", reason: "BAD_PASSWORD", attemptsInWindow: 1, lockArmed: false,
       }),
     ).resolves.toBeUndefined();
+  });
+});
+
+describe("the two events that had no actor to attach to", () => {
+  /**
+   * Both were UNRECORDED before P10.08 — not anonymised, absent — because
+   * AuditLog.userId was a required foreign key. They are the patterns an
+   * investigation looks for, and both are actor-less by nature.
+   */
+
+  it("an unknown address is recorded with a null actor and null tenant", async () => {
+    await recordUnknownAddressSignIn("nobody@example.ug");
+    expect(row()).toMatchObject({
+      userId: null,
+      tenantId: null,
+      action: AUTH_SIGN_IN_UNKNOWN,
+      module: "AUTH",
+    });
+    expect(row().metadata).toMatchObject({ attempted: "nobody@example.ug" });
+  });
+
+  it("normalises the address so one attacker is one pattern", async () => {
+    await recordUnknownAddressSignIn("  NoBody@Example.UG  ");
+    expect(row().metadata).toMatchObject({ attempted: "nobody@example.ug" });
+  });
+
+  it("WITHHOLDS a value that is not email-shaped", async () => {
+    // People type their password into the email field. Storing whatever
+    // arrived would put plaintext passwords into a table that is retained,
+    // exported and read by staff — building a credential leak while building a
+    // security control.
+    await recordUnknownAddressSignIn("Hunter2!MyRealPassword");
+    expect(row().metadata).toMatchObject({
+      attempted: null,
+      redacted: "NOT_EMAIL_SHAPED",
+      length: "Hunter2!MyRealPassword".length,
+    });
+  });
+
+  it("still records the attempt when the value is withheld", async () => {
+    // Redacting the content must not discard the EVENT: the count is what
+    // reveals the sweep.
+    await recordUnknownAddressSignIn("not-an-address");
+    expect(mocks.create).toHaveBeenCalledTimes(1);
+    expect(row().action).toBe(AUTH_SIGN_IN_UNKNOWN);
+  });
+
+  it("does not mistake a password containing @ for an address", async () => {
+    // The shape check has to be an address check, not an "@" check.
+    await recordUnknownAddressSignIn("p@ssword");
+    expect(row().metadata).toMatchObject({ redacted: "NOT_EMAIL_SHAPED" });
+  });
+
+  it("an IP block is recorded with a null actor", async () => {
+    // A source-level control fires ACROSS accounts. Hanging the row on
+    // whichever account was tried last would be a fiction that reads as fact.
+    await recordIpBlocked("41.210.0.9", 50, 15);
+    expect(row()).toMatchObject({ userId: null, action: AUTH_SIGN_IN_IP_BLOCKED });
+    expect(row().metadata).toMatchObject({ ipAddress: "41.210.0.9", limit: 50, windowMinutes: 15 });
+  });
+
+  it("neither throws when the write fails", async () => {
+    mocks.create.mockRejectedValue(new Error("audit table unavailable"));
+    await expect(recordUnknownAddressSignIn("a@b.ug")).resolves.toBeUndefined();
+    await expect(recordIpBlocked("41.210.0.9", 50, 15)).resolves.toBeUndefined();
   });
 });

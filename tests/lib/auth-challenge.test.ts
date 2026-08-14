@@ -184,13 +184,21 @@ describe("evaluateSignInStep", () => {
     expect(row).toMatchObject({ userId: "gone", tenantId: "t1", action: "AUTH_SIGN_IN_INACTIVE" });
   });
 
-  it("writes nothing for an address with no account at all", async () => {
-    // Not a policy choice: AuditLog.userId is a required FK, so there is no row
-    // to attach one to. Asserted so the limitation stays visible rather than
-    // being mistaken for coverage.
+  it("records an address with no account, with a null actor", async () => {
+    // This used to assert the opposite — that NOTHING was written — because
+    // AuditLog.userId was a required FK and there was no row to point at.
+    // P10.08 made it nullable precisely so this event, the clearest signal
+    // credential stuffing produces, stops being invisible.
     mocks.findFirst.mockResolvedValue(null);
     expect(await evaluateSignInStep("nobody@b.ug", PASSWORD)).toBe("REJECTED");
-    expect(mocks.auditCreate).not.toHaveBeenCalled();
+
+    const row = mocks.auditCreate.mock.calls[0]?.[0]?.data;
+    expect(row).toMatchObject({ action: "AUTH_SIGN_IN_UNKNOWN", userId: null });
+    // No tenant either: an address matching no account belongs to nobody. The
+    // row is outside the per-tenant hash chain, which is a property of the
+    // event rather than a defect in the write.
+    expect(row.tenantId).toBeNull();
+    expect(row.metadata).toMatchObject({ attempted: "nobody@b.ug" });
   });
 
   it("an audit failure never turns a rejection into an exception", async () => {

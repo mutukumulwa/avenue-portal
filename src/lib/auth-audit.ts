@@ -25,16 +25,17 @@ import { LOCK_DURATION_MS } from "@/lib/session-policy";
  * table that the person signing in never sees. Recording what happened and
  * refusing to disclose it are different controls.
  *
- * ## What cannot be recorded, and why
+ * ## The unattributed events
  *
- * `AuditLog.userId` is a required foreign key to `User`. An attempt against an
- * address with no account therefore **cannot** be written here — there is no
- * row to point at. That is a real gap: a credential-stuffing sweep across
- * addresses that do not exist is exactly the pattern this would otherwise
- * catch. Closing it needs either a nullable `userId` (which every reader of
- * this table currently assumes is present) or a separate store keyed by
- * address and source IP. Both are decisions, not refactors, so the gap is
- * stated here rather than silently absorbed.
+ * `AuditLog.userId` was a required foreign key until P10.08, which meant two
+ * events could not be written at all — not written badly, not written
+ * anonymously: absent. A sweep across addresses with no accounts, and a source
+ * address hitting the rate limit, are precisely the patterns an investigation
+ * looks for, and both are actor-less by nature.
+ *
+ * They are now written with a null actor, which is a *fact* rather than a
+ * missing value. Nothing else changed: every path that HAS an actor still
+ * passes one.
  *
  * ## Volume is bounded on every path
  *
@@ -65,6 +66,8 @@ export const AUTH_SIGN_IN_BLOCKED = "AUTH_SIGN_IN_BLOCKED";
 export const AUTH_SIGN_IN_INACTIVE = "AUTH_SIGN_IN_INACTIVE";
 /** UAT-HF P10.07 — a source address hit the failure limit. */
 export const AUTH_SIGN_IN_IP_BLOCKED = "AUTH_SIGN_IN_IP_BLOCKED";
+/** UAT-HF P10.08 — an attempt against an address with no account. */
+export const AUTH_SIGN_IN_UNKNOWN = "AUTH_SIGN_IN_UNKNOWN";
 
 /**
  * Written directly rather than through `writeAudit()`.
@@ -78,8 +81,11 @@ export const AUTH_SIGN_IN_IP_BLOCKED = "AUTH_SIGN_IN_IP_BLOCKED";
  * into a 500, nor — far worse — into a successful sign-in.
  */
 async function write(
-  userId: string,
-  tenantId: string,
+  userId: string | null,
+  // Null for an event with no tenant — an address that matches no account
+  // belongs to nobody. Such a row sits outside the per-tenant hash chain by
+  // construction, which is a property of the event, not a defect in the write.
+  tenantId: string | null,
   action: string,
   description: string,
   // Prisma's own JSON input type, not Record<string, unknown>: the latter
@@ -234,29 +240,77 @@ export async function findDeactivatedAccount(
 }
 
 /**
- * A source address just hit the failure limit.
+ * The block, as a log line as well as an audit row.
  *
- * Recorded once, by the failure that armed the block — not per refused attempt,
- * which an attacker controls the volume of.
- *
- * This one is NOT attached to a user: the whole point of a source-level control
- * is that it fires across accounts, and picking one of them to hang the row on
- * would misattribute it. `AuditLog.userId` is a required foreign key, so it is
- * attached to the actor who is available and unambiguous — nobody — which the
- * table cannot express. It therefore goes to the application log rather than
- * pretending to a row it cannot honestly write.
- *
- * That is the same gap as the unknown-address one above, and it is the second
- * time it has forced a compromise. A nullable `userId` on AuditLog would close
- * both; it is a schema decision with readers to check, and it is now the single
- * highest-value fix to this table.
+ * Both, deliberately. The audit row is the record; the log line is what an
+ * on-call engineer greps at 2am when a facility says nobody can sign in, and it
+ * survives the database being the thing that is broken.
  */
 export function reportIpBlocked(ip: string, limit: number, windowMinutes: number): void {
-  // Structured, single line, greppable. Vercel's log drain is where this is
-  // actually read from, and a false positive — a clinic behind one NAT — has to
-  // be visible there without a database query.
   console.warn(
     `[auth] AUTH_SIGN_IN_IP_BLOCKED ip=${ip} limit=${limit} windowMinutes=${windowMinutes} ` +
       `— every user behind this address is now refused until the block expires`,
   );
+}
+
+/**
+ * A sign-in attempt against an address that has no account.
+ *
+ * The single most useful signal for credential stuffing, and until P10.08 it
+ * could not be recorded: there was no user row for the foreign key to point at.
+ *
+ * ## The attempted address is stored only when it looks like an address
+ *
+ * People type their password into the email field. Storing whatever arrived
+ * would put plaintext passwords into an audit table that is retained, exported
+ * and read by staff — creating a credential leak while building a security
+ * control. So a value that is not email-shaped is recorded by SHAPE only, never
+ * by content, and the row still counts toward the pattern.
+ *
+ * `tenantId` is null: an address with no account belongs to no tenant. Such a
+ * row therefore sits outside the tenant hash chain, which is unavoidable — the
+ * chain is per-tenant and this event has no tenant. It is still in the table,
+ * still queryable, and infinitely better than the nothing it replaced.
+ */
+export async function recordUnknownAddressSignIn(attempted: string): Promise<void> {
+  const looksLikeEmail = /^[^\s@]{1,64}@[^\s@]{1,255}\.[^\s@]{2,}$/.test(attempted.trim());
+  await write(
+    null,
+    null,
+    AUTH_SIGN_IN_UNKNOWN,
+    "Sign-in attempted for an address with no account",
+    looksLikeEmail
+      ? { attempted: attempted.trim().toLowerCase() }
+      : {
+          attempted: null,
+          redacted: "NOT_EMAIL_SHAPED",
+          length: attempted.length,
+          note: "withheld — a value in the email field that is not an address is frequently a password",
+        },
+  );
+}
+
+/**
+ * A source address hit the sign-in failure limit.
+ *
+ * Written once, by the failure that armed the block. Actor-less on purpose: a
+ * source-level control fires ACROSS accounts, and hanging the row on whichever
+ * account happened to be tried last would be a fiction that reads like a fact.
+ *
+ * This replaces a console line. A log line is not an audit trail — it is not
+ * queryable beside the events around it, it ages out on a retention policy
+ * nobody chose for this purpose, and it is invisible to the audit-log page an
+ * operator actually opens when a facility reports it cannot sign in.
+ */
+export async function recordIpBlocked(
+  ip: string,
+  limit: number,
+  windowMinutes: number,
+): Promise<void> {
+  await write(null, null, AUTH_SIGN_IN_IP_BLOCKED, "Source address blocked after repeated failed sign-ins", {
+    ipAddress: ip,
+    limit,
+    windowMinutes,
+    note: "every user behind this address is refused until the block expires",
+  });
 }
