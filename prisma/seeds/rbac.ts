@@ -359,6 +359,7 @@ export async function seedRbac(prisma: PrismaClient, tenantId: string) {
 
   let assignCount = 0;
   let revokedSkipped = 0;
+  let alreadyAssignedSkipped = 0;
   for (const user of users) {
     const roleCode = user.role as string;
     if (!ENUM_ROLE_CODES.has(roleCode)) continue;
@@ -377,12 +378,36 @@ export async function seedRbac(prisma: PrismaClient, tenantId: string) {
     //
     // Revocation retains the row and stamps `revokedAt`/`revokedById`, so the
     // decision is on the record. It just was not being read.
+    // UAT-HF P12.04f — do not re-add a role a deliberate assignment superseded.
+    //
+    // Found in production on 2026-08-14: a UAT account whose `User.role` said
+    // UNDERWRITER had been given an ACTIVE SENIOR_UNDERWRITER assignment to make
+    // it a *checker*, and the enum column was never updated. Re-running the seed
+    // handed UNDERWRITER back — putting maker and checker on one account and
+    // collapsing, there, the separation the move had created.
+    //
+    // So: any active assignment at all means somebody has deliberately set this
+    // user's roles, and the legacy column stops being a source of new ones. Not
+    // scoped to `roleId` — that is precisely the scoping that let a DIFFERENT
+    // role be added beside the deliberate one.
+    //
+    // This removes no access. `effectivePermissions` unions the enum-role
+    // baseline from ROLE_GRANTS with the codes from assignments, so `User.role`
+    // still grants what it always did; the assignment row is a migration
+    // record, not the mechanism. Skipping it costs nobody a permission.
+    const activeAssignment = await prisma.userRoleAssignment.findFirst({
+      where: { userId: user.id, tenantId, isActive: true },
+      select: { id: true },
+    });
+    if (activeAssignment) {
+      alreadyAssignedSkipped++;
+      continue;
+    }
+
     const prior = await prisma.userRoleAssignment.findMany({
       where: { userId: user.id, roleId, tenantId },
       select: { isActive: true, revokedAt: true },
     });
-
-    if (prior.some((a) => a.isActive)) continue;
 
     if (prior.some((a) => a.revokedAt !== null)) {
       // Deliberately removed. Re-granting is a decision for a human with a
@@ -410,6 +435,16 @@ export async function seedRbac(prisma: PrismaClient, tenantId: string) {
     console.log(
       `  ⏭️  ${revokedSkipped} skipped — previously revoked, left revoked (DEC-16). ` +
         `Re-grant deliberately if that is wrong.`,
+    );
+  }
+  if (alreadyAssignedSkipped > 0) {
+    // Said out loud, because a silent skip is how the opposite behaviour went
+    // unnoticed: whoever runs this should see that the legacy column was
+    // deliberately not applied to these users.
+    console.log(
+      `  ⏭️  ${alreadyAssignedSkipped} skipped — already hold an active assignment, so ` +
+        `User.role was not re-applied (P12.04f). Their access is unchanged: the enum ` +
+        `role still grants its baseline through effectivePermissions.`,
     );
   }
 }

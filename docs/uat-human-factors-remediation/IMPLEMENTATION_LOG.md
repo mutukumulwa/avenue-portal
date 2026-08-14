@@ -4130,3 +4130,72 @@ DEC-15/16 rather than being chosen here.
 
 permissions 84 · roles 25 · grants 361 · assignments **121** (was 120) ·
 step-4 work remaining **0** · SUPER_ADMIN 84/84.
+
+## P12.04f — seedRbac step 4 no longer re-applies User.role over a deliberate assignment
+
+**Task:** P12.04f · **Decision:** DEC-16 · **Owner decision:** 2026-08-14
+
+### The defect, found in production
+
+Step 4 migrates `User.role` into a `UserRoleAssignment`. Its guard was scoped to
+the **role being created** — "does this user already have THIS role" — so a user
+who had been deliberately assigned a *different* role still got the enum role
+added beside it.
+
+Production had exactly that: an account whose `User.role` said `UNDERWRITER`,
+given an active `SENIOR_UNDERWRITER` assignment during the UAT run to make it a
+**checker**, with the enum column never updated. Re-running the seed handed
+`UNDERWRITER` back — putting maker and checker on one account and collapsing,
+there, the separation the move had created.
+
+Sibling of the revocation bug fixed earlier on this branch. Same root: the seed
+treating a stale column as truth and re-granting from it.
+
+### The fix
+
+Any **active assignment at all** now means somebody has deliberately set this
+user's roles, and the legacy column stops being a source of new ones.
+Deliberately not scoped to `roleId` — that scoping was the bug.
+
+**It removes no access, and that is what makes it safe.**
+`effectivePermissions()` unions `ROLE_GRANTS[User.role]` with the codes from
+assignments, so the enum role still grants exactly what it always did. The
+assignment row is a migration record, not the mechanism. A test asserts this
+rather than leaving it as a claim in a comment.
+
+The skip is **counted and printed**, because a silent skip is how the opposite
+behaviour went unnoticed in the first place.
+
+### What still migrates
+
+- a user with **no** assignment — the legitimate migration path;
+- a user whose only assignment is **inactive and unrevoked** (an expiry, say):
+  nobody decided to remove it and nothing is in force, so the legacy column is
+  still the best information available.
+
+And unchanged from before: an assignment **revoked** for this role is still left
+revoked (DEC-16).
+
+### Verification
+
+- `tests/lib/rbac-seed-revocation-guard.test.ts` — 10 tests, 4 new: the
+  different-role case reproduced exactly; the enum baseline proven unaffected;
+  and both paths that must still migrate.
+- **Negative controls, both fire.** Removing the guard fails 2 tests. Restoring
+  the `roleId` scoping — i.e. reintroducing the production bug precisely — fails
+  the one test written for it.
+- **Against real Prisma, not only the fake**, which mattered: the fake's
+  `findFirst` required `where.roleId` and returned null for the new query, which
+  would have disabled the guard under test. It now treats every field as
+  optional, as Prisma does. On a real database, seeding twice left the checker
+  account holding `SENIOR_UNDERWRITER` alone, while an account with no
+  assignment still migrated: `1 migrated, 2 skipped`.
+- Release gate steps 1-5 green.
+
+### Open — the row already written
+
+The production row created by P12.04e (`id` beginning `seed-step4-20260814-`)
+**still exists**. The fix stops the seed creating another; it does not remove
+that one. The account is deactivated so the row is inert, but it is now
+inconsistent with the rule this task establishes. Deleting it is a permission
+change and is the owner's call.

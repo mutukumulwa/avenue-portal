@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { seedRbac } from "../../prisma/seeds/rbac";
+import { effectivePermissions, ROLE_GRANTS } from "@/lib/authz/catalog";
 import type { PrismaClient } from "@prisma/client";
 
 /**
@@ -47,11 +48,16 @@ function fakePrisma(rec: Recorder, users: { id: string; role: string }[]) {
       // Present so the PRE-guard implementation can run too. Without it these
       // tests fail with "findFirst is not a function" — which looks like the
       // guard working and is not.
-      findFirst: vi.fn(async ({ where }: { where: { userId: string; roleId: string; isActive?: boolean } }) =>
+      //
+      // Every field is OPTIONAL, matching Prisma: an absent `roleId` means "any
+      // role", which is exactly what the P12.04f guard queries for. An earlier
+      // version required `roleId` and so returned null for that query, quietly
+      // disabling the guard under test.
+      findFirst: vi.fn(async ({ where }: { where: { userId?: string; roleId?: string; isActive?: boolean } }) =>
         rec.assignments.find(
           (a) =>
-            a.userId === where.userId &&
-            a.roleId === where.roleId &&
+            (where.userId === undefined || a.userId === where.userId) &&
+            (where.roleId === undefined || a.roleId === where.roleId) &&
             (where.isActive === undefined || a.isActive === where.isActive),
         ) ?? null,
       ),
@@ -117,6 +123,46 @@ describe("seedRbac step 4 — revoked assignments stay revoked", () => {
     ];
     await seedRbac(fakePrisma(rec, [{ id: "u5", role: "UNDERWRITER" }]), "t1");
     expect(rec.created).toEqual([{ userId: "u5", roleId: "role_UNDERWRITER" }]);
+  });
+
+  it("does NOT re-add the enum role to a user who holds a DIFFERENT role actively", async () => {
+    // UAT-HF P12.04f, found in production. A UAT account whose User.role said
+    // UNDERWRITER had been given an ACTIVE SENIOR_UNDERWRITER assignment to make
+    // it a *checker*, and the enum column was never updated. Re-running the seed
+    // handed UNDERWRITER back, putting maker and checker on one account.
+    rec.assignments = [
+      { userId: "u7", roleId: "role_SENIOR_UNDERWRITER", isActive: true, revokedAt: null },
+    ];
+    await seedRbac(fakePrisma(rec, [{ id: "u7", role: "UNDERWRITER" }]), "t1");
+    expect(rec.created).toEqual([]);
+  });
+
+  it("removes no access by skipping — the enum baseline is unaffected", () => {
+    // The reason the skip is safe at all: effectivePermissions() UNIONS
+    // ROLE_GRANTS[User.role] with the codes from assignments, so the enum role
+    // still grants exactly what it always did. The assignment row is a
+    // migration record, not the mechanism.
+    expect(effectivePermissions("UNDERWRITER", [])).toEqual(
+      expect.arrayContaining(ROLE_GRANTS.UNDERWRITER as string[]),
+    );
+    expect(effectivePermissions("UNDERWRITER", []).length).toBeGreaterThan(0);
+  });
+
+  it("still migrates a user who holds NO assignment at all", async () => {
+    // The legitimate migration path must survive the new guard.
+    rec.assignments = [];
+    await seedRbac(fakePrisma(rec, [{ id: "u8", role: "CLAIMS_OFFICER" }]), "t1");
+    expect(rec.created).toEqual([{ userId: "u8", roleId: "role_CLAIMS_OFFICER" }]);
+  });
+
+  it("still migrates a user whose only assignment is INACTIVE and unrevoked", async () => {
+    // e.g. an expired grant. Nobody decided to remove it and nothing is in
+    // force, so the legacy column is still the best information available.
+    rec.assignments = [
+      { userId: "u9", roleId: "role_SENIOR_UNDERWRITER", isActive: false, revokedAt: null },
+    ];
+    await seedRbac(fakePrisma(rec, [{ id: "u9", role: "UNDERWRITER" }]), "t1");
+    expect(rec.created).toEqual([{ userId: "u9", roleId: "role_UNDERWRITER" }]);
   });
 
   it("skips users whose role is not an enum role at all", async () => {
