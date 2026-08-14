@@ -288,7 +288,12 @@ describe("P10.02 the admin unlock path the run could not find", () => {
 
   it("requires a reason, and records it", () => {
     expect(actions).toMatch(/Give a reason for the unlock/);
-    expect(actions).toMatch(/metadata: \{ targetUserId: target\.id, targetEmail: target\.email, reason/);
+    // Matched per-field rather than as one literal line: the previous regex
+    // pinned the metadata object's FORMATTING, so adding a field to it failed a
+    // test about whether a reason is recorded. Reformatting is not a defect.
+    expect(actions).toMatch(/targetUserId: target\.id/);
+    expect(actions).toMatch(/targetEmail: target\.email/);
+    expect(actions).toMatch(/\breason,/);
   });
 
   it("is admin-gated and tenant-scoped", () => {

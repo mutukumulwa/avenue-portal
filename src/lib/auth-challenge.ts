@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { registerFailedAttempt } from "@/lib/auth-credentials";
+import { recordBlockedSignIn, recordInactiveAccountSignIn, findDeactivatedAccount } from "@/lib/auth-audit";
 
 /**
  * UAT-HF P10.01 — the password step of the two-step sign-in (DEF-011).
@@ -74,6 +75,16 @@ export async function evaluateSignInStep(email: string, password: string): Promi
 
   if (!user) {
     await bcrypt.compare(password, TIMING_EQUALISER);
+    // UAT-HF P10.05. This step is the cheap one an attacker would target, so it
+    // must leave the same trail as the full sign-in — a rail that records only
+    // on the expensive path is a rail with a documented way round it. Same
+    // reasoning and same limits as authorizeCredentials: a deactivated account
+    // is recorded, an unknown address cannot be (AuditLog.userId is a required
+    // FK), and the response is unchanged either way.
+    const deactivated = await findDeactivatedAccount(email);
+    if (deactivated) {
+      await recordInactiveAccountSignIn({ userId: deactivated.id, tenantId: deactivated.tenantId });
+    }
     return "REJECTED";
   }
 
@@ -82,11 +93,18 @@ export async function evaluateSignInStep(email: string, password: string): Promi
   // further failed attempt: the lock is already armed, and re-counting would
   // let an attacker extend someone else's lock indefinitely by hammering it.
   if (user.lockedUntil && user.lockedUntil > new Date()) {
+    await recordBlockedSignIn({
+      userId: user.id,
+      tenantId: user.tenantId,
+      lockedUntil: user.lockedUntil,
+    });
     return "REJECTED";
   }
 
   if (!(await bcrypt.compare(password, user.passwordHash))) {
-    await registerFailedAttempt(user.id, user.tenantId);
+    // No TOTP is verified at this step, so the only reason available here is a
+    // bad password. BAD_TOTP can only be reached from authorizeCredentials.
+    await registerFailedAttempt(user.id, user.tenantId, "BAD_PASSWORD");
     return "REJECTED";
   }
 

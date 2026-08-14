@@ -93,7 +93,19 @@ describe("DEF-002 — brute-force lockout", () => {
    * What is asserted here is what the surrounding TypeScript does with the
    * result — the part mocks can speak to.
    */
-  it("does not lock, and writes no audit, while the counter is below the threshold", async () => {
+  /**
+   * UAT-HF P10.05 — every failure now writes an AUTH_SIGN_IN_FAILED row, so
+   * "was an audit written" is no longer the same question as "did it lock".
+   * These read rows by action rather than counting calls, which is what the
+   * assertions below actually meant all along.
+   */
+  type AuditData = { action: string; tenantId?: string; metadata: Record<string, unknown> };
+  const auditRows = (action: string): AuditData[] =>
+    (prismaMock.auditLog.create.mock.calls as unknown[][])
+      .map((c) => (c[0] as { data: AuditData }).data)
+      .filter((d) => d.action === action);
+
+  it("does not lock while the counter is below the threshold, but records the attempt", async () => {
     prismaMock.user.findFirst.mockResolvedValue(
       baseUser({ failedLoginCount: 3, lastFailedLoginAt: new Date(Date.now() - 60_000) }),
     );
@@ -104,7 +116,18 @@ describe("DEF-002 — brute-force lockout", () => {
 
     expect(res).toBeNull();
     expect(prismaMock.$queryRaw).toHaveBeenCalledTimes(1);
-    expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
+    // No lock — that is the original assertion, unchanged in meaning.
+    expect(auditRows("AUTH_ACCOUNT_LOCKED")).toHaveLength(0);
+    // But the attempt itself is no longer invisible. Before P10.05 four of
+    // every five failures left no trace at all.
+    const failed = auditRows("AUTH_SIGN_IN_FAILED");
+    expect(failed).toHaveLength(1);
+    expect(failed[0].metadata).toMatchObject({
+      reason: "BAD_PASSWORD",
+      attemptsInWindow: 4,
+      lockArmed: false,
+    });
+    expect(failed[0].tenantId).toBe("t1");
   });
 
   it("counts the failure in ONE statement, never a read-then-write", async () => {
@@ -148,8 +171,16 @@ describe("DEF-002 — brute-force lockout", () => {
     const res = await authorizeCredentials({ email: "a@x.com", password: "wrong" });
 
     expect(res).toBeNull();
-    expect(prismaMock.auditLog.create).toHaveBeenCalledTimes(1);
-    const lockAudit = prismaMock.auditLog.create.mock.calls[0][0].data;
+    // Two rows now: the attempt, then the lock it armed — in that order, so a
+    // reader sees the cause immediately above the effect.
+    expect(prismaMock.auditLog.create).toHaveBeenCalledTimes(2);
+    const failed = auditRows("AUTH_SIGN_IN_FAILED");
+    expect(failed).toHaveLength(1);
+    // The statement wraps the counter to 0 on the attempt that arms the lock,
+    // so a naive read of the column would report this fifth attempt as the 0th.
+    expect(failed[0].metadata).toMatchObject({ attemptsInWindow: 5, lockArmed: true });
+
+    const lockAudit = auditRows("AUTH_ACCOUNT_LOCKED")[0];
     expect(lockAudit.action).toBe("AUTH_ACCOUNT_LOCKED");
     // WP-3.1 (DEF-005): the lock event must carry tenantId so it sits inside the
     // tenant hash chain (it was previously omitted → outside the chain).
@@ -240,7 +271,9 @@ describe("DEF-002 — brute-force lockout", () => {
     const params = (prismaMock.$queryRaw.mock.calls[0] as unknown as unknown[]).slice(1);
     const windowStart = params.find((v): v is Date => v instanceof Date)!;
     expect(Date.now() - windowStart.getTime()).toBeGreaterThan(ATTEMPT_WINDOW_MS - 5_000);
-    expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
+    expect(auditRows("AUTH_ACCOUNT_LOCKED")).toHaveLength(0);
+    // The restarted streak is recorded as attempt 1, not as a continuation.
+    expect(auditRows("AUTH_SIGN_IN_FAILED")[0].metadata).toMatchObject({ attemptsInWindow: 1 });
   });
 
   it("a wrong TOTP on a correct password still counts as a failure (D-11)", async () => {

@@ -3485,3 +3485,108 @@ pre-push steps too, so the release gate covers it either way.
   fails exactly four tests, one per check class. A guard verified only against
   input that passes is not verified.
 - tsc clean · eslint clean · `next build` EXIT=0 · full suite green.
+
+## P10.05 — A failed sign-in leaves a record
+
+**Task:** P10.05 · **Defects:** DEF-002, DEF-005 (auth observability) · **Owner decision:** 2026-08-14
+
+### What the log could and could not say
+
+One row was written per **lock** — every fifth failure. So the audit trail could
+say "this account locked at 14:32" and could not say whether that was one person
+mistyping a new password five times or a list being worked through. Four
+failures in five left no trace, and attempts made *during* a lock left none at
+all — the period when an attack is loudest, because the throttle deliberately
+stops counting there (counting would let an attacker hold a victim's lock open
+indefinitely).
+
+The evidence that did exist was on the `User` row: `failedLoginCount` and
+`lastFailedLoginAt`. An admin password reset clears both, correctly — they are
+live throttle state and a reset must release the throttle. But resetting the
+password is the **first thing an operator does** when someone reports a
+suspicious sign-in. The reaction to the report destroyed the record of it.
+
+### `src/lib/auth-audit.ts`
+
+Three actions, each written directly with `tenantId` so the row sits inside the
+tenant hash chain (`writeAudit()` calls `next/headers`, unusable inside
+`authorize()`, and cannot carry the tenant — DEF-005/WP-3.1):
+
+| Action | When | Bound |
+|---|---|---|
+| `AUTH_SIGN_IN_FAILED` | every counted failure | throttle caps it at 5/window |
+| `AUTH_SIGN_IN_BLOCKED` | an attempt while locked | once per **lock** |
+| `AUTH_SIGN_IN_INACTIVE` | an attempt on a deactivated account | once per lock window |
+
+Bounding is not decoration. A row per attempt is only safe where attempts are
+themselves bounded; the other two paths can be hammered indefinitely, and
+recording each one would hand an attacker a way to grow the audit table at will.
+
+`AUTH_SIGN_IN_FAILED` carries `reason`, and the distinction is the most useful
+thing in the record: **`BAD_TOTP` means somebody holds a valid password.** Every
+other failure is consistent with a user mistyping. Both return the identical
+nothing to the caller — D-13 is untouched, because D-13 governs the *response*,
+not what the system knows.
+
+`attemptsInWindow` is the streak, so 1-2-3-4-5 is readable without joining rows.
+It is `null` — not `0` — when the counter statement itself failed: `0` would
+read as "no prior failures", a different claim.
+
+### What cannot be recorded
+
+`AuditLog.userId` is a **required foreign key**. An attempt against an address
+with no account has nothing to attach a row to, so credential-stuffing across
+non-existent addresses stays invisible. Closing it needs a nullable `userId`
+(which every reader of this table assumes is present) or a separate store keyed
+by address and source IP. Both are decisions; the gap is stated in the module
+header and asserted in a test rather than quietly absorbed.
+
+A deactivated account **is** recorded — the credential lookup filters on
+`isActive`, so it was previously indistinguishable from an unknown address, and
+it is the more interesting of the two (usually a departure). The lookup that
+resolves it is deliberately separate from the credential query: a deactivated
+user must never authenticate, and the way to guarantee that is never to load
+them into the path that could.
+
+### A defect found in this work, by a missing test fixture
+
+The writer used `prisma.auditLog.create(...).catch(() => {})` under a comment
+promising it could never throw. It could: if `prisma.auditLog` is undefined the
+property access throws **synchronously**, before any promise exists, and
+`.catch()` never runs. That escaped as an exception out of `evaluateSignInStep`
+and would have turned a rejected sign-in into a 500 — strictly worse than the
+gap being closed. Caught because a test fixture simply had no `auditLog` mock.
+All three auth audit writes (including the two pre-existing ones) now use
+`try/catch`.
+
+### Admin reset and unlock
+
+Both still clear the counters — that is correct. Both now stamp
+`failedLoginCountAtReset`/`AtUnlock` and the last-failure timestamp into the
+audit metadata first. Redundant once the rail is live, and not redundant for
+failures that accumulated before it, which is exactly the backlog an early
+investigation reaches for.
+
+### Verification
+
+- `tests/lib/auth-audit.test.ts` — 18 tests: field-level content, the tenant on
+  every row, both dedupe windows and their anchors, a second lock recording
+  separately, a failed lookback erring toward recording, and both throw modes.
+- `tests/lib/auth-challenge.test.ts` — 6 new: the cheap password-only step
+  leaves the same trail as the full sign-in (a rail that records only on the
+  expensive path has a documented way round it), plus the unknown-address gap
+  asserted as a gap.
+- `tests/lib/auth-lockout.test.ts` — the three assertions that said "no audit
+  was written" now read rows **by action**, which is what they always meant.
+- Negative control: neutering the dedupe fails exactly the two "once per"
+  tests; neutering the throw guard fails exactly the two swallow tests.
+- tsc clean · eslint clean · `next build` EXIT=0 · 4,131 tests green.
+
+### Still open for the owner
+
+`authorizeCredentials` returns immediately when no account matches, while a real
+account spends ~100 ms in bcrypt — a timing oracle answering "does this address
+have an account here". `evaluateSignInStep` already closes it with a
+`TIMING_EQUALISER` compare; `authorizeCredentials` does not. Pre-existing, not
+touched here because it changes auth timing behaviour and was not part of this
+decision.

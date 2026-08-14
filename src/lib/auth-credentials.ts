@@ -5,6 +5,13 @@ import { measureAsync } from "@/lib/perf";
 import { consumeTotpCounter, verifyTotpCounter, totpEnrolmentRequiredNow } from "@/lib/totp";
 import { LOCK_DURATION_MS as LOCK_MS } from "@/lib/session-policy";
 import { effectivePermissions } from "@/lib/authz/catalog";
+import {
+  recordFailedSignIn,
+  recordBlockedSignIn,
+  recordInactiveAccountSignIn,
+  findDeactivatedAccount,
+  type SignInFailureReason,
+} from "@/lib/auth-audit";
 
 /**
  * Credential authorization for the NextAuth CredentialsProvider, extracted out
@@ -70,7 +77,16 @@ type CredentialInput =
  * chance to get the rolling window or the UTC clock wrong — both of which this
  * block was written to fix. One implementation, two callers.
  */
-export async function registerFailedAttempt(userId: string, tenantId: string): Promise<void> {
+export async function registerFailedAttempt(
+  userId: string,
+  tenantId: string,
+  // UAT-HF P10.05. Defaulted so the two existing call sites keep compiling if
+  // one is ever missed — but both pass it, and BAD_TOTP is the value worth
+  // having: a correct password with a rejected code means somebody holds the
+  // password. Defaulting to BAD_PASSWORD is the safe direction to be wrong in
+  // (it under-claims rather than manufacturing an incident).
+  reason: SignInFailureReason = "BAD_PASSWORD",
+): Promise<void> {
     // UAT-HF P10.02 / DEC-11 — "Attempt counters use atomic updates so parallel
     // bad attempts cannot lose increments."
     //
@@ -86,6 +102,11 @@ export async function registerFailedAttempt(userId: string, tenantId: string): P
     const windowStart = new Date(Date.now() - ATTEMPT_WINDOW_MS);
     const lockUntil = new Date(Date.now() + LOCK_MS);
     let locking = false;
+    // null means the counter statement itself failed. The attempt is still
+    // recorded — losing the audit row because the throttle had a bad moment
+    // would defeat the purpose — but the streak length is then unknown, and
+    // says so rather than reporting a fabricated number.
+    let attemptsInWindow: number | null = null;
     try {
       const rows = await prisma.$queryRaw<{ failedLoginCount: number; locked: boolean }[]>`
         UPDATE "User"
@@ -115,10 +136,18 @@ export async function registerFailedAttempt(userId: string, tenantId: string): P
       // The row that actually armed the lock is the one that reports it, so
       // exactly one audit entry is written however many attempts raced.
       locking = rows[0]?.locked === true && rows[0]?.failedLoginCount === 0;
+      // The statement wraps the counter to 0 on the attempt that arms the lock,
+      // so the raw column under-reports by exactly that case.
+      if (rows[0]) attemptsInWindow = locking ? MAX_FAILED_ATTEMPTS : rows[0].failedLoginCount;
     } catch {
       // Throttling is best-effort-hardened: a transient DB error on the counter
       // must never turn a normal wrong-password into a 500.
     }
+
+    // UAT-HF P10.05 — every counted failure leaves a row, not just the fifth.
+    // Written before the lock event so a reader sees the attempt that armed the
+    // lock immediately preceding the lock itself.
+    await recordFailedSignIn({ userId, tenantId, reason, attemptsInWindow, lockArmed: locking });
 
     if (locking) {
       // G-22: write the audit row directly — writeAudit() calls next/headers,
@@ -129,8 +158,12 @@ export async function registerFailedAttempt(userId: string, tenantId: string): P
       // chain and was invisible to tenant-scoped audit review). lockMinutes is
       // derived from the constant, not hard-coded, so the record can never
       // drift from the policy it documents.
-      await prisma.auditLog
-        .create({
+      // try/catch rather than `.catch()`: a synchronous throw from the property
+      // access is not a rejected promise and `.catch()` would miss it, letting
+      // an audit failure escape as a 500 out of authorize(). Same fix, same
+      // reason, as the helper in auth-audit.ts.
+      try {
+        await prisma.auditLog.create({
           data: {
             userId,
             tenantId,
@@ -142,8 +175,10 @@ export async function registerFailedAttempt(userId: string, tenantId: string): P
               lockMinutes: LOCK_MS / 60_000,
             },
           },
-        })
-        .catch(() => {}); // never let audit failure block the auth response
+        });
+      } catch {
+        // never let audit failure block the auth response
+      }
     }
 }
 
@@ -184,13 +219,43 @@ export async function authorizeCredentials(credentials: CredentialInput): Promis
 
     if (!user) {
       // Non-existent accounts are never locked and reveal nothing (D-13).
-      return null;
+      //
+      // UAT-HF P10.05: the lookup above filters on isActive, so this branch is
+      // reached by two very different events — an address with no account, and
+      // a real account that has been switched off. The second is worth
+      // recording (an ex-employee's credentials still being tried is exactly
+      // the thing an investigation wants), and it is the only one that CAN be
+      // recorded: AuditLog.userId is a required FK, so an unknown address has
+      // nothing to attach a row to. See auth-audit.ts.
+      //
+      // This lookup is audit-only and deliberately separate from the credential
+      // query. A deactivated user must never authenticate, and the way to be
+      // certain of that is to never load them into the path that could.
+      const deactivated = await findDeactivatedAccount(credentials.email as string);
+      if (deactivated) {
+        await recordInactiveAccountSignIn({
+          userId: deactivated.id,
+          tenantId: deactivated.tenantId,
+        });
+      }
+      return null; // D-13: the response is identical either way
     }
 
     // DEF-002 AC 2: an active temporary lock fails the login even with the
     // correct password. Checked BEFORE bcrypt.compare so a locked account never
     // spends a hash comparison.
     if (user.lockedUntil && user.lockedUntil > new Date()) {
+      // UAT-HF P10.05. These attempts are deliberately NOT counted by the
+      // throttle — counting them would let an attacker hold a victim's lock
+      // open for ever — which also meant they were recorded nowhere at all.
+      // "The attempts kept coming through the lock" is the whole difference
+      // between a forgetful user and somebody working a list, so it is now
+      // recorded, once per lock.
+      await recordBlockedSignIn({
+        userId: user.id,
+        tenantId: user.tenantId,
+        lockedUntil: user.lockedUntil,
+      });
       return null; // D-13: identical generic null as any wrong password
     }
 
@@ -218,7 +283,15 @@ export async function authorizeCredentials(credentials: CredentialInput): Promis
     const authOk = isPasswordValid && totpOk;
 
     if (!authOk) {
-      await registerFailedAttempt(user.id, user.tenantId);
+      // UAT-HF P10.05 — which half failed is the single most useful thing in
+      // this record. A rejected code on a CORRECT password means somebody has
+      // the password; a rejected password does not. Both return the same
+      // nothing to the caller (D-13); only the audit row distinguishes them.
+      await registerFailedAttempt(
+        user.id,
+        user.tenantId,
+        isPasswordValid ? "BAD_TOTP" : "BAD_PASSWORD",
+      );
 
       return null; // D-13: same generic null as any wrong password
     }
@@ -245,8 +318,11 @@ export async function authorizeCredentials(credentials: CredentialInput): Promis
     // successful sign-in is a complete, observable lifecycle — not just a lock
     // event with no matching release. tenantId keeps it inside the hash chain.
     if (user.lockedUntil) {
-      await prisma.auditLog
-        .create({
+      // try/catch, not `.catch()` — see the lock-audit block above. This one
+      // sits on the SUCCESS path, where an escaping exception would fail a
+      // sign-in that had already been authenticated.
+      try {
+        await prisma.auditLog.create({
           data: {
             userId: user.id,
             tenantId: user.tenantId,
@@ -255,8 +331,10 @@ export async function authorizeCredentials(credentials: CredentialInput): Promis
             description: "Account lock cleared on successful sign-in after the lock window elapsed",
             metadata: { reason: "LOCK_EXPIRED_LOGIN" },
           },
-        })
-        .catch(() => {}); // audit failure must never block the auth response
+        });
+      } catch {
+        // audit failure must never block the auth response
+      }
     }
 
     return {

@@ -19,14 +19,33 @@ import bcrypt from "bcryptjs";
  * on a half-finished sign-in.
  */
 
+/** The shape auth-audit.ts writes. Typed so tsc checks the assertions below. */
+type AuditRow = {
+  userId: string;
+  tenantId: string;
+  action: string;
+  module: string;
+  description: string;
+  metadata: Record<string, unknown>;
+};
+
 const mocks = vi.hoisted(() => ({
   findFirst: vi.fn(),
   update: vi.fn(),
   registerFailedAttempt: vi.fn(async () => {}),
+  // UAT-HF P10.05. A real fake, not a stub: the audit rows this step now writes
+  // are asserted below, so swallowing them would test nothing. Its absence also
+  // caught a defect — `prisma.auditLog` being undefined threw SYNCHRONOUSLY out
+  // of evaluateSignInStep, which `.catch()` in the writer could not intercept.
+  auditCreate: vi.fn(async (_args: { data: AuditRow }) => ({})),
+  auditFindFirst: vi.fn(async (): Promise<{ id: string } | null> => null),
 }));
 
 vi.mock("@/lib/prisma", () => ({
-  prisma: { user: { findFirst: mocks.findFirst, update: mocks.update } },
+  prisma: {
+    user: { findFirst: mocks.findFirst, update: mocks.update },
+    auditLog: { create: mocks.auditCreate, findFirst: mocks.auditFindFirst },
+  },
 }));
 vi.mock("@/lib/auth-credentials", () => ({ registerFailedAttempt: mocks.registerFailedAttempt }));
 
@@ -37,6 +56,13 @@ let hash: string;
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  // clearAllMocks clears CALLS, not implementations — so a mockResolvedValue
+  // set by one test survives into the next. That silently broke the
+  // deactivated-account test (it passed alone, failed in the suite) because the
+  // "once per lock" stub left auditFindFirst returning a row. Defaults are
+  // restored explicitly rather than relying on clear semantics.
+  mocks.auditFindFirst.mockResolvedValue(null);
+  mocks.auditCreate.mockResolvedValue({});
   hash ??= await bcrypt.hash(PASSWORD, 4);
 });
 
@@ -91,7 +117,7 @@ describe("evaluateSignInStep", () => {
   it("registers a failed attempt so this step cannot be used to bypass the lockout", async () => {
     mocks.findFirst.mockResolvedValue(account());
     await evaluateSignInStep("a@b.ug", "wrong");
-    expect(mocks.registerFailedAttempt).toHaveBeenCalledWith("u1", "t1");
+    expect(mocks.registerFailedAttempt).toHaveBeenCalledWith("u1", "t1", "BAD_PASSWORD");
   });
 
   it("does not count an attempt against an account that is already locked", async () => {
@@ -100,6 +126,63 @@ describe("evaluateSignInStep", () => {
     mocks.findFirst.mockResolvedValue(account({ lockedUntil: new Date(Date.now() + 600_000) }));
     expect(await evaluateSignInStep("a@b.ug", PASSWORD)).toBe("REJECTED");
     expect(mocks.registerFailedAttempt).not.toHaveBeenCalled();
+  });
+
+  it("records an attempt made while the account is locked", async () => {
+    // UAT-HF P10.05. The throttle deliberately does NOT count these, which is
+    // why they were previously invisible everywhere. Attempts continuing
+    // through a lock is the signal that separates a forgetful user from an
+    // attack, so the audit rail records it even though the counter must not.
+    const lockedUntil = new Date(Date.now() + 600_000);
+    mocks.findFirst.mockResolvedValue(account({ lockedUntil }));
+    await evaluateSignInStep("a@b.ug", PASSWORD);
+
+    const row = mocks.auditCreate.mock.calls[0]?.[0]?.data;
+    expect(row).toMatchObject({ userId: "u1", tenantId: "t1", action: "AUTH_SIGN_IN_BLOCKED" });
+    // tenantId present is the whole point — a row without it sits outside the
+    // tenant hash chain and is invisible to tenant-scoped review (DEF-005).
+    expect(row.tenantId).toBe("t1");
+  });
+
+  it("records only once per lock, however many attempts are made", async () => {
+    mocks.findFirst.mockResolvedValue(account({ lockedUntil: new Date(Date.now() + 600_000) }));
+    mocks.auditFindFirst.mockResolvedValue({ id: "already-written" });
+    await evaluateSignInStep("a@b.ug", PASSWORD);
+    // Otherwise an attacker hammering a locked account grows the audit table at
+    // will — a rail that records everything is a rail that can be used to fill
+    // the disk.
+    expect(mocks.auditCreate).not.toHaveBeenCalled();
+  });
+
+  it("records an attempt against a deactivated account", async () => {
+    // The credential lookup filters on isActive, so this is indistinguishable
+    // from an unknown address at the point of rejection — and it is the more
+    // interesting of the two: somebody is trying to sign in as a person who was
+    // switched off.
+    mocks.findFirst
+      .mockResolvedValueOnce(null) // the isActive-filtered credential lookup
+      .mockResolvedValueOnce({ id: "gone", tenantId: "t1" }); // the audit-only lookup
+    expect(await evaluateSignInStep("ex@b.ug", PASSWORD)).toBe("REJECTED");
+
+    const row = mocks.auditCreate.mock.calls[0]?.[0]?.data;
+    expect(row).toMatchObject({ userId: "gone", tenantId: "t1", action: "AUTH_SIGN_IN_INACTIVE" });
+  });
+
+  it("writes nothing for an address with no account at all", async () => {
+    // Not a policy choice: AuditLog.userId is a required FK, so there is no row
+    // to attach one to. Asserted so the limitation stays visible rather than
+    // being mistaken for coverage.
+    mocks.findFirst.mockResolvedValue(null);
+    expect(await evaluateSignInStep("nobody@b.ug", PASSWORD)).toBe("REJECTED");
+    expect(mocks.auditCreate).not.toHaveBeenCalled();
+  });
+
+  it("an audit failure never turns a rejection into an exception", async () => {
+    // The rail is best-effort by contract. If writing the row could throw, a
+    // wrong password would become a 500 — strictly worse than the gap it fixes.
+    mocks.findFirst.mockResolvedValue(account({ lockedUntil: new Date(Date.now() + 600_000) }));
+    mocks.auditCreate.mockRejectedValue(new Error("audit table unavailable"));
+    await expect(evaluateSignInStep("a@b.ug", PASSWORD)).resolves.toBe("REJECTED");
   });
 
   it("does not count an attempt when the password is correct", async () => {

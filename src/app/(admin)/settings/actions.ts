@@ -276,7 +276,7 @@ export async function resetUserPasswordAction(
     where: { id: userId, tenantId: session.user.tenantId },
     select: {
       id: true, email: true, role: true, firstName: true, lastName: true,
-      lockedUntil: true, failedLoginCount: true,
+      lockedUntil: true, failedLoginCount: true, lastFailedLoginAt: true,
     },
   });
   if (!target) return { error: "User not found." };
@@ -318,6 +318,20 @@ export async function resetUserPasswordAction(
       targetRole: target.role,
       sessionsRevoked: true,
       lockCleared,
+      // UAT-HF P10.05. The write below sets failedLoginCount, lockedUntil and
+      // lastFailedLoginAt to zero — correctly, they are live throttle state and
+      // a reset must release the throttle. But they were also the only record
+      // that the failures happened, and an operator resets the password as the
+      // FIRST response to "somebody may be trying to get into my account". The
+      // evidence was being destroyed by the reaction to it.
+      //
+      // Failed sign-ins now write their own audit rows (see auth-audit.ts), so
+      // the history no longer depends on these columns. This preserves them
+      // anyway: it costs nothing, and it covers failures that accumulated
+      // before that rail existed, which is precisely the backlog an early
+      // investigation would reach for.
+      failedLoginCountAtReset: target.failedLoginCount,
+      lastFailedLoginAtReset: target.lastFailedLoginAt?.toISOString() ?? null,
     },
   });
 
@@ -450,7 +464,7 @@ export async function unlockUserAccountAction(
     where: { id: userId, tenantId: session.user.tenantId },
     select: {
       id: true, email: true, role: true, firstName: true, lastName: true,
-      lockedUntil: true, failedLoginCount: true,
+      lockedUntil: true, failedLoginCount: true, lastFailedLoginAt: true,
     },
   });
   if (!target) return { error: "User not found." };
@@ -477,7 +491,17 @@ export async function unlockUserAccountAction(
       action: "AUTH_ACCOUNT_UNLOCKED",
       module: "AUTH",
       description: `Account lock cleared for ${target.firstName} ${target.lastName} (${target.email})`,
-      metadata: { targetUserId: target.id, targetEmail: target.email, reason, credentialsUnchanged: true },
+      metadata: {
+        targetUserId: target.id,
+        targetEmail: target.email,
+        reason,
+        credentialsUnchanged: true,
+        // UAT-HF P10.05 — same reasoning as the password reset: the update
+        // above clears the only columns saying how many failures preceded this
+        // unlock and when the last one was. Preserved here before they go.
+        failedLoginCountAtUnlock: target.failedLoginCount,
+        lastFailedLoginAtUnlock: target.lastFailedLoginAt?.toISOString() ?? null,
+      },
     },
   });
 
