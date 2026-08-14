@@ -21,8 +21,10 @@ const ROLES = [
   { value: "PROVIDER_USER",   label: "Provider (Facility)" },
 ];
 
-// ELIG-GAP-005: the six grantable provider personas (must match
+// ELIG-GAP-005: the grantable provider personas (must match
 // PROVIDER_PERSONA_ROLE_CODES / PROVIDER_ROLE_LABELS). PROVIDER_LEGACY is never offered.
+// Ordered narrow → broad so the default reading order does not nudge an operator
+// toward over-granting; PROVIDER_FACILITY_ADMIN is the superset and sits last.
 const PROVIDER_PERSONAS = [
   { value: "PROVIDER_FRONT_DESK", label: "Front Desk" },
   { value: "PROVIDER_CLINICIAN", label: "Clinician" },
@@ -30,6 +32,7 @@ const PROVIDER_PERSONAS = [
   { value: "PROVIDER_FINANCE", label: "Finance" },
   { value: "PROVIDER_ADMIN", label: "Admin" },
   { value: "PROVIDER_INTEGRATION_ADMIN", label: "Integration Admin" },
+  { value: "PROVIDER_FACILITY_ADMIN", label: "Facility Admin" },
 ];
 
 interface InviteUserModalProps {

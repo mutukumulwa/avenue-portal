@@ -79,6 +79,7 @@ export const PROVIDER_ROLE_LABELS: Record<string, string> = {
   PROVIDER_FINANCE: "Finance",
   PROVIDER_ADMIN: "Admin",
   PROVIDER_INTEGRATION_ADMIN: "Integration Admin",
+  PROVIDER_FACILITY_ADMIN: "Facility Admin",
 };
 
 /**
@@ -87,6 +88,9 @@ export const PROVIDER_ROLE_LABELS: Record<string, string> = {
  * DB row order.
  */
 const PROVIDER_PERSONA_PRIORITY: readonly string[] = [
+  // The superset persona outranks the rest: a user holding it plus any narrower
+  // role is, in substance, a facility admin.
+  "PROVIDER_FACILITY_ADMIN",
   "PROVIDER_ADMIN",
   "PROVIDER_INTEGRATION_ADMIN",
   "PROVIDER_FINANCE",

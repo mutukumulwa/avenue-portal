@@ -100,12 +100,13 @@ describe("DEF-001 — signed-in identity in every portal shell", () => {
 });
 
 describe("DEF-002 — resolveProviderPersonaLabel (pure)", () => {
-  it("maps exactly the six persona codes", () => {
+  it("maps exactly the seven persona codes", () => {
     expect(Object.keys(PROVIDER_ROLE_LABELS).sort()).toEqual(
       [
         "PROVIDER_ADMIN",
         "PROVIDER_BILLER",
         "PROVIDER_CLINICIAN",
+        "PROVIDER_FACILITY_ADMIN",
         "PROVIDER_FINANCE",
         "PROVIDER_FRONT_DESK",
         "PROVIDER_INTEGRATION_ADMIN",
@@ -124,5 +125,9 @@ describe("DEF-002 — resolveProviderPersonaLabel (pure)", () => {
   it("is deterministic for a multi-persona user (most-representative wins)", () => {
     expect(resolveProviderPersonaLabel(["PROVIDER_FRONT_DESK", "PROVIDER_ADMIN"])).toBe("Admin");
     expect(resolveProviderPersonaLabel(["PROVIDER_BILLER", "PROVIDER_FINANCE"])).toBe("Finance");
+    // The superset persona outranks every narrower one, in either row order.
+    expect(resolveProviderPersonaLabel(["PROVIDER_FACILITY_ADMIN"])).toBe("Facility Admin");
+    expect(resolveProviderPersonaLabel(["PROVIDER_ADMIN", "PROVIDER_FACILITY_ADMIN"])).toBe("Facility Admin");
+    expect(resolveProviderPersonaLabel(["PROVIDER_FACILITY_ADMIN", "PROVIDER_FRONT_DESK"])).toBe("Facility Admin");
   });
 });
