@@ -151,6 +151,22 @@ export async function scheduleReportGenerationJob() {
 }
 
 /**
+ * Sweep stuck member imports every 15 minutes.
+ *
+ * Not every minute like the claim-autopilot recovery beside it: that one
+ * re-drives work meant to complete, while this only touches batches already
+ * declared stale, and running sooner would race an import still legitimately
+ * in flight.
+ */
+export async function scheduleMemberImportReaper() {
+  await Queues.system.add(
+    "member-import-reaper",
+    {},
+    { repeat: { every: 15 * 60_000 }, jobId: "member-import-reaper", removeOnComplete: 100, removeOnFail: 100 },
+  );
+}
+
+/**
  * Schedule lapse detection — daily at 23:00 EAT (20:00 UTC).
  */
 export async function scheduleLapseDetectionJob() {

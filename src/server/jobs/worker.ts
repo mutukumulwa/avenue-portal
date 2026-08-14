@@ -6,7 +6,7 @@ import os from "node:os";
 import { validateWorkerConfig } from "./worker-config";
 import { prisma } from "../../lib/prisma";
 import { Worker, Job } from "bullmq";
-import { getConnection, scheduleEscalationJob, scheduleDailyJobs, scheduleCommissionReconciliationJob, scheduleAnalyticsRefreshJob, scheduleIntakeJobs, scheduleQuotationExpiryJob, scheduleMembershipActivationJob, scheduleLapseDetectionJob, scheduleReportGenerationJob, scheduleAdminFeeAccrualJob, scheduleFraudScanJob } from "../../lib/queue";
+import { getConnection, scheduleEscalationJob, scheduleDailyJobs, scheduleCommissionReconciliationJob, scheduleAnalyticsRefreshJob, scheduleIntakeJobs, scheduleQuotationExpiryJob, scheduleMembershipActivationJob, scheduleLapseDetectionJob, scheduleReportGenerationJob, scheduleAdminFeeAccrualJob, scheduleFraudScanJob, scheduleMemberImportReaper } from "../../lib/queue";
 import { NotificationService } from "../services/notification.service";
 import { runPreauthEscalationJob } from "./preauth-escalation.job";
 import { runRenewalReminderJob }    from "./renewal-reminder.job";
@@ -24,6 +24,7 @@ import { runLapseDetectionJob } from "./lapse-detection.job";
 import { runAdminFeeAccrualJob } from "./admin-fee-accrual.job";
 import { runFraudScanJob } from "./fraud-scan.job";
 import { runContractLifecycleJob } from "./contract-lifecycle.job";
+import { runMemberImportReaperJob } from "./member-import-reaper.job";
 import { runOfflinePackJob } from "./offline-pack.job";
 import { runClaimAutopilotRunJob, runClaimAutopilotRecoveryJob } from "./claim-autopilot.job";
 import { scheduleClaimAutopilotRecovery } from "../../lib/queue";
@@ -87,6 +88,7 @@ scheduleReportGenerationJob().catch(err => console.error("[Worker] Failed to sch
 scheduleAdminFeeAccrualJob().catch(err => console.error("[Worker] Failed to schedule admin-fee accrual job:", err));
 scheduleFraudScanJob().catch(err => console.error("[Worker] Failed to schedule fraud-scan job:", err));
 scheduleClaimAutopilotRecovery().catch(err => console.error("[Worker] Failed to schedule claim-autopilot recovery:", err));
+scheduleMemberImportReaper().catch(err => console.error("[Worker] Failed to schedule member-import reaper:", err));
 registerClaimAutopilotProcessor(); // real evaluate→plan→execute processor (replaces the fail-closed default)
 
 /**
@@ -189,6 +191,15 @@ const systemWorker = new Worker("system", async (job: Job) => {
   if (job.name === "contract-lifecycle") {
     const result = await runContractLifecycleJob();
     console.log(`[Worker] Contract lifecycle complete — ${result.activated} activated, ${result.expired} expired, ${result.reswept} re-swept`);
+  }
+  if (job.name === "member-import-reaper") {
+    const result = await runMemberImportReaperJob();
+    if (result.batches > 0) {
+      console.log(
+        `[Worker] Import reaper complete — ${result.batches} stuck batch(es): ${result.recovered} row(s) recovered, ` +
+        `${result.abandoned} abandoned, ${result.unresolved} still UNKNOWN`,
+      );
+    }
   }
 }, { connection });
 

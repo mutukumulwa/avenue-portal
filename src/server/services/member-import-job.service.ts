@@ -73,6 +73,28 @@ function snapshot(batch: {
   };
 }
 
+/**
+ * How long a batch may sit non-terminal before the reaper treats it as
+ * abandoned. An import runs synchronously inside a server action, well inside
+ * any platform request budget, so anything still QUEUED or PROCESSING after
+ * this did not slow down — it stopped.
+ */
+export const STALE_IMPORT_AFTER_MS = 15 * 60_000;
+
+export type ReapOutcome = {
+  batchId: string;
+  batchRef: string;
+  lane: string;
+  /** Batch status after reconciliation. UNKNOWN means a person still must look. */
+  status: ImportBatchStatus;
+  /** Rows that HAD created their record — the crash was after the write. */
+  recovered: number;
+  /** Rows with no record to find — the import stopped before reaching them. */
+  abandoned: number;
+  /** Rows with nothing to match on. These keep the batch UNKNOWN, deliberately. */
+  inconclusive: number;
+};
+
 export class MemberImportJobService {
   static async reserve(
     db: PrismaClient,
@@ -289,5 +311,208 @@ export class MemberImportJobService {
       });
       return snapshot(batch);
     });
+  }
+
+  /**
+   * Resolve imports that stopped without finishing.
+   *
+   * ## The defect this closes
+   *
+   * `finishRow` throws, and `confirmImportAction` does not catch it. When it
+   * fires the server action 500s with the batch left PROCESSING and `finalize`
+   * never called. `reserve` then finds a non-terminal batch and refuses to
+   * replay it — correctly, because nobody knows what happened — and since the
+   * idempotency key is a hash of the file's content, THAT FILE CAN NEVER BE
+   * SUBMITTED FOR THAT GROUP AGAIN. A crash mid-import was permanent.
+   *
+   * ## Why it can do better than guessing
+   *
+   * The obvious reaper marks abandoned rows FAILED and moves on. That is a lie
+   * in the one case that matters: `createMember` can succeed and the process
+   * die before `finishRow` records it, so a QUEUED row is NOT evidence that
+   * nothing was created. Marking it failed would hide a real member and invite
+   * a duplicate on the next attempt.
+   *
+   * So this reconciles against the records themselves. `Member.nationalIdNormalized`
+   * is unique per tenant and `Endorsement.changeDetails` carries the row's raw
+   * `idNumber`, so for any row that HAS a national ID the question "did this row
+   * create its record" has an exact answer, not a heuristic one. Constraining
+   * the search to records created after the batch started keeps it from
+   * adopting a member some earlier import made.
+   *
+   * A row with no national ID has nothing to match on. Those are marked UNKNOWN
+   * rather than guessed at, which keeps the whole batch UNKNOWN — still blocked,
+   * now visibly and with a reason, which is the honest outcome. Everything else
+   * finalizes to a truthful SUCCEEDED / PARTIAL / FAILED, and a truthful
+   * terminal status is what lets `reserve` replay the recorded result instead
+   * of refusing forever.
+   *
+   * Provenance lives on the ROWS (`failureCode` ABANDONED / REAPED_INCONCLUSIVE).
+   * `finalize` stays authoritative at batch level rather than being second-
+   * guessed here, so there is one place that decides what a batch's status means.
+   */
+  static async reap(
+    db: PrismaClient,
+    opts: { staleAfterMs?: number; now?: Date; limit?: number; dryRun?: boolean } = {},
+  ): Promise<ReapOutcome[]> {
+    const now = opts.now ?? new Date();
+    const cutoff = new Date(now.getTime() - (opts.staleAfterMs ?? STALE_IMPORT_AFTER_MS));
+
+    const batches = await db.importBatch.findMany({
+      where: {
+        status: { in: ["QUEUED", "PROCESSING"] },
+        // PROCESSING is timed from when it was claimed; a batch that never got
+        // claimed at all is timed from when it was queued.
+        OR: [{ processingAt: { lt: cutoff } }, { processingAt: null, queuedAt: { lt: cutoff } }],
+      },
+      select: {
+        id: true, batchRef: true, tenantId: true, groupId: true, lane: true,
+        status: true, queuedAt: true, processingAt: true,
+      },
+      orderBy: { createdAt: "asc" },
+      take: opts.limit ?? 25,
+    });
+
+    const outcomes: ReapOutcome[] = [];
+    for (const batch of batches) {
+      outcomes.push(await this.reapBatch(db, batch, opts.dryRun === true));
+    }
+    return outcomes;
+  }
+
+  private static async reapBatch(
+    db: PrismaClient,
+    batch: {
+      id: string; batchRef: string; tenantId: string; groupId: string; lane: string;
+      status?: ImportBatchStatus;
+      queuedAt: Date | null; processingAt: Date | null;
+    },
+    dryRun: boolean,
+  ): Promise<ReapOutcome> {
+    const rows = await db.importRow.findMany({
+      where: { batchId: batch.id, status: { in: ["QUEUED", "PROCESSING"] } },
+      select: { rowNumber: true, normalizedInput: true },
+    });
+
+    // Nothing this batch created can predate its own start.
+    const since = batch.processingAt ?? batch.queuedAt ?? null;
+
+    let recovered = 0;
+    let abandoned = 0;
+    let inconclusive = 0;
+
+    for (const row of rows) {
+      const input = (row.normalizedInput ?? {}) as Record<string, unknown>;
+      const idNumber = typeof input.idNumber === "string" ? input.idNumber.trim() : "";
+
+      if (!idNumber) {
+        if (!dryRun) {
+          await db.importRow.updateMany({
+            where: { batchId: batch.id, rowNumber: row.rowNumber, status: { in: ["QUEUED", "PROCESSING"] } },
+            data: {
+              status: "UNKNOWN",
+              failureCode: "REAPED_INCONCLUSIVE",
+              failureMessage:
+                "The import stopped before this row reached a result, and the row carries no national ID " +
+                "to check against. Whether its record was created cannot be determined automatically.",
+              terminalAt: new Date(),
+            },
+          });
+        }
+        inconclusive += 1;
+        continue;
+      }
+
+      const found = batch.lane === "HR_ENDORSEMENT"
+        ? await this.findEndorsementFor(db, batch, idNumber, since)
+        : await this.findMemberFor(db, batch, idNumber, since);
+
+      if (found) {
+        if (!dryRun) {
+          await this.finishRow(db, batch.id, row.rowNumber, {
+            status: "ACCEPTED", entityType: found.entityType, entityId: found.id,
+          });
+        }
+        recovered += 1;
+      } else {
+        if (!dryRun) {
+          await this.finishRow(db, batch.id, row.rowNumber, {
+            status: "FAILED",
+            code: "ABANDONED",
+            message:
+              "The import stopped before this row was processed, and no matching record exists. " +
+              "Nothing was created for it.",
+          });
+        }
+        abandoned += 1;
+      }
+    }
+
+    // A dry run does every lookup and no write, so the counts above are real.
+    // The status is not: it is what the batch is NOW, because only `finalize`
+    // decides what it becomes and running it would be the write we are avoiding.
+    if (dryRun) {
+      return {
+        batchId: batch.id,
+        batchRef: batch.batchRef,
+        lane: batch.lane,
+        status: batch.status ?? "PROCESSING",
+        recovered,
+        abandoned,
+        inconclusive,
+      };
+    }
+
+    const snapshotAfter = await this.finalize(db, batch.id);
+    return {
+      batchId: batch.id,
+      batchRef: snapshotAfter.batchRef,
+      lane: batch.lane,
+      status: snapshotAfter.status,
+      recovered,
+      abandoned,
+      inconclusive,
+    };
+  }
+
+  private static async findMemberFor(
+    db: PrismaClient,
+    batch: { tenantId: string; groupId: string },
+    idNumber: string,
+    since: Date | null,
+  ): Promise<{ entityType: string; id: string } | null> {
+    const normalized = normalizeNationalId(idNumber);
+    if (!normalized) return null;
+
+    const member = await db.member.findFirst({
+      where: {
+        tenantId: batch.tenantId,
+        groupId: batch.groupId,
+        nationalIdNormalized: normalized,
+        ...(since ? { createdAt: { gte: since } } : {}),
+      },
+      select: { id: true },
+    });
+    return member ? { entityType: "MEMBER", id: member.id } : null;
+  }
+
+  private static async findEndorsementFor(
+    db: PrismaClient,
+    batch: { tenantId: string; groupId: string },
+    idNumber: string,
+    since: Date | null,
+  ): Promise<{ entityType: string; id: string } | null> {
+    // `changeDetails` stores the row's idNumber verbatim (see the HR lane's
+    // confirm action), so this matches raw rather than normalized.
+    const endorsement = await db.endorsement.findFirst({
+      where: {
+        tenantId: batch.tenantId,
+        groupId: batch.groupId,
+        changeDetails: { path: ["idNumber"], equals: idNumber },
+        ...(since ? { requestedDate: { gte: since } } : {}),
+      },
+      select: { id: true },
+    });
+    return endorsement ? { entityType: "ENDORSEMENT", id: endorsement.id } : null;
   }
 }
