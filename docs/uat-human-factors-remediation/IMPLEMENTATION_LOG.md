@@ -4192,10 +4192,19 @@ revoked (DEC-16).
   assignment still migrated: `1 migrated, 2 skipped`.
 - Release gate steps 1-5 green.
 
-### Open — the row already written
+### Closed — the row already written
 
-The production row created by P12.04e (`id` beginning `seed-step4-20260814-`)
-**still exists**. The fix stops the seed creating another; it does not remove
-that one. The account is deactivated so the row is inert, but it is now
-inconsistent with the rule this task establishes. Deleting it is a permission
-change and is the owner's call.
+**Deleted 2026-08-14** on the owner's instruction:
+`seed-step4-20260814-b800d535049e`, the `UNDERWRITER` assignment P12.04e had
+created on the deactivated UAT checker account. Removed in one transaction with
+assertions that the total returned to 120, that no `seed-step4-%` row remained,
+and that the account kept **exactly one** assignment — its deliberate
+`SENIOR_UNDERWRITER`.
+
+The closing check is the one that matters: **the fixed seed will not re-create
+it.** With P12.04f in place the account holds an active assignment, so step 4
+skips it — `step4_would_still_add` is 0. Fix and cleanup agree, which is what
+makes this finished rather than merely tidied.
+
+Production after: permissions 84 · roles 25 · grants 361 · assignments 120 ·
+SUPER_ADMIN 84/84 · the checker account holding `SENIOR_UNDERWRITER` alone.
