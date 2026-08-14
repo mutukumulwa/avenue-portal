@@ -4021,3 +4021,61 @@ the Supabase connection, and `.env` points at a local `aicare_uat`. The
 production figures above were obtained by generating the expected pairs from the
 seed and diffing them in SQL. Someone with the production connection string
 should run the script itself.
+
+## P12.04d-ops — The SUPER_ADMIN gap closed in production; the extras left open
+
+**Task:** P12.04d (operations) · **Decision:** DEC-16 · **Date:** 2026-08-14
+**No code change.** A production data repair, recorded here because a data
+change with no diff is the easiest thing in this engagement to lose.
+
+### What was repaired
+
+SUPER_ADMIN held **80 of 84** permissions. The four missing were the four added
+on 2026-08-14 — `member.duplicate.review`, `member.sensitive.reveal`,
+`network.analytics.read`, `support.operation.lookup` — so the seed run that
+created their `Permission` rows and their CUSTOMER_SERVICE/UNDERWRITER grants
+did not extend SUPER_ADMIN's, though the same loop covers it.
+
+Four `RolePermission` rows inserted in one transaction, with an assertion that
+aborted unless SUPER_ADMIN ended holding the **entire** catalogue and the total
+grant count moved by exactly four. A repair that overshoots is worse than the
+gap it closes.
+
+**After:** SUPER_ADMIN 84/84, permissions 84, grants 361 (was 357).
+
+`grantedById` is `drift-repair:2026-08-14-P12.04d`, **not** the
+`uat-bootstrap:eligibility-20260808-01` the neighbouring rows carry. Reusing
+that tag would have recorded these as granted by a run that did not grant them.
+The four repaired rows are therefore identifiable by that value alone.
+
+No behaviour changed: `ROLE_GRANTS` already gives SUPER_ADMIN `"*"` and
+`permitted()` matches the wildcard. The database now agrees with the code, which
+is the point — the wildcard was the only reason the gap did not matter, and it
+would not have covered the next one.
+
+### What was deliberately NOT touched — open for Medvex
+
+Seven grants that production gives and the seed does not:
+
+| Role | Extra grants | Count |
+|---|---|---|
+| `CUSTOMER_SERVICE` | `ANALYTICS:VIEW`, `BILLING:VIEW`, `CLAIM:VIEW`, `PREAUTH:VIEW` | 4 |
+| `UNDERWRITER` | `CLAIM:VIEW`, `PREAUTH:VIEW` | 2 |
+| `SENIOR_UNDERWRITER` | (one; identify with `--sql`) | 1 |
+
+All read-only permissions, so nothing alarming — but access **nobody currently
+approves**, most likely a seed bundle narrowed at some point while the rows
+stayed, since seeds are additive and delete nothing.
+
+The decision is per role and belongs to whoever owns the permission model:
+**either the seed should grant these — add them and the drift resolves — or the
+rows are stale and should go.** Deleting them is the more dangerous default: it
+removes access people may be using today, and `CLAIM:VIEW` for a customer
+service desk is entirely plausible as intended.
+
+This is why the live check prints **no SQL** for extra grants. Confirmed
+unchanged after the repair: CUSTOMER_SERVICE 14, UNDERWRITER 26,
+SENIOR_UNDERWRITER 37.
+
+Gate step 4b will keep failing a release run against production until these are
+resolved one way or the other, which is the intended pressure.
