@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { getCachedSession } from "@/lib/auth";
-import { validatePassword } from "@/lib/password-policy";
+import { validatePassword, PASSWORD_BCRYPT_COST } from "@/lib/password-policy";
 import { writeAudit } from "@/lib/audit";
 
 /**
@@ -47,7 +47,7 @@ export async function changePasswordAction(
   const reused = await bcrypt.compare(newPassword, user.passwordHash);
   if (reused) return { error: "Choose a password different from the temporary one." };
 
-  const passwordHash = await bcrypt.hash(newPassword, 12);
+  const passwordHash = await bcrypt.hash(newPassword, PASSWORD_BCRYPT_COST);
   await prisma.user.update({
     where: { id: user.id },
     // Clear the flag AND supersede the temporary-password session in one write.

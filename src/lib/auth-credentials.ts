@@ -32,6 +32,45 @@ export { LOCK_DURATION_MS, SIGN_IN_RECOVERY_GUIDANCE } from "@/lib/session-polic
 export const ATTEMPT_WINDOW_MS = 15 * 60_000; // D-9
 
 /**
+ * A bcrypt hash of 32 random bytes that were then discarded, at the SAME cost
+ * factor as a real user password.
+ *
+ * Compared against on every path that rejects before reaching a real hash, so
+ * that "no such account" and "account locked" cost what "wrong password" costs.
+ * Without it, a rejection returns in microseconds while a real account spends
+ * ~100 ms in bcrypt — a channel that answers "does this address have an account
+ * here" without a single distinguishable response body.
+ *
+ * The cost factor is the whole point and is easy to get wrong. `auth-challenge`
+ * carried a cost-**10** equaliser while the application hashes passwords at 12:
+ * roughly a quarter of the work, so it narrowed the gap without closing it and
+ * looked finished. `tests/lib/auth-timing.test.ts` pins this to
+ * PASSWORD_BCRYPT_COST so the two cannot drift apart again.
+ *
+ * Exported so there is exactly one of these. Two copies of a security constant
+ * is two chances to hardcode the wrong cost.
+ */
+export const TIMING_EQUALISER_HASH =
+  "$2a$12$1.GO7txLRXiqCB5TSd.1x..qqq/suEcfsU5cjdHU7xBRcohXq.79m";
+
+/**
+ * Spend the same time a real password comparison would, and discard the result.
+ *
+ * Deliberately spends CPU on a request that is already going to fail. An
+ * attacker can force this anyway by submitting any address that has no account,
+ * so declining to spend it on a locked account buys no protection — it only
+ * makes locked accounts identifiable by how fast they are refused.
+ */
+export async function equaliseRejectionTiming(password: string): Promise<void> {
+  try {
+    await bcrypt.compare(password, TIMING_EQUALISER_HASH);
+  } catch {
+    // A malformed input must not turn a rejection into an error; the compare
+    // exists only for its duration.
+  }
+}
+
+/**
  * Effective permission codes for a user (WP-2, decision D2-b).
  *
  * Enum-role baseline from the canonical catalog UNION the dynamic
@@ -231,6 +270,11 @@ export async function authorizeCredentials(credentials: CredentialInput): Promis
       // This lookup is audit-only and deliberately separate from the credential
       // query. A deactivated user must never authenticate, and the way to be
       // certain of that is to never load them into the path that could.
+      // Spend what a real comparison costs. Placed here, on the branch that
+      // previously returned in microseconds, this is the actual fix for the
+      // enumeration oracle.
+      await equaliseRejectionTiming(credentials.password as string);
+
       const deactivated = await findDeactivatedAccount(credentials.email as string);
       if (deactivated) {
         await recordInactiveAccountSignIn({
@@ -242,9 +286,16 @@ export async function authorizeCredentials(credentials: CredentialInput): Promis
     }
 
     // DEF-002 AC 2: an active temporary lock fails the login even with the
-    // correct password. Checked BEFORE bcrypt.compare so a locked account never
-    // spends a hash comparison.
+    // correct password. Checked BEFORE bcrypt.compare against the REAL hash, so
+    // a locked account is never told whether the password was right.
+    //
+    // It does spend an equalising compare. Returning instantly here would move
+    // the enumeration oracle rather than close it: once an unknown address
+    // costs ~100 ms, an instant refusal identifies a locked — therefore
+    // EXISTING — account. The CPU argument for skipping it does not hold,
+    // because the same attacker can force a compare with any unknown address.
     if (user.lockedUntil && user.lockedUntil > new Date()) {
+      await equaliseRejectionTiming(credentials.password as string);
       // UAT-HF P10.05. These attempts are deliberately NOT counted by the
       // throttle — counting them would let an attacker hold a victim's lock
       // open for ever — which also meant they were recorded nowhere at all.

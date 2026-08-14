@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { writeAudit } from "@/lib/audit";
-import { validatePassword } from "@/lib/password-policy";
+import { validatePassword, PASSWORD_BCRYPT_COST } from "@/lib/password-policy";
 
 export async function createMemberPortalUserAction(
   memberId: string,
@@ -29,7 +29,7 @@ export async function createMemberPortalUserAction(
   const existingEmail = await prisma.user.findFirst({ where: { tenantId: session.user.tenantId, email } });
   if (existingEmail) return { error: "A user with this email already exists." };
 
-  const passwordHash = await bcrypt.hash(password, 12);
+  const passwordHash = await bcrypt.hash(password, PASSWORD_BCRYPT_COST);
   const user = await prisma.user.create({
     data: {
       tenantId: session.user.tenantId,
@@ -73,7 +73,7 @@ export async function resetMemberPortalPasswordAction(
 
   await prisma.user.update({
     where: { id: user.id },
-    data: { passwordHash: await bcrypt.hash(password, 12), isActive: true },
+    data: { passwordHash: await bcrypt.hash(password, PASSWORD_BCRYPT_COST), isActive: true },
   });
 
   await writeAudit({

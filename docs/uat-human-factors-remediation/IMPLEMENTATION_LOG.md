@@ -3590,3 +3590,85 @@ have an account here". `evaluateSignInStep` already closes it with a
 `TIMING_EQUALISER` compare; `authorizeCredentials` does not. Pre-existing, not
 touched here because it changes auth timing behaviour and was not part of this
 decision.
+
+## P10.06 — The sign-in enumeration oracle
+
+**Task:** P10.06 · **Defects:** DEF-002 (adjacent) · **Owner decision:** 2026-08-14
+
+### The channel
+
+`authorizeCredentials` returned in microseconds when no account matched, while a
+real account spent ~100 ms inside bcrypt. Every response body was identical —
+D-13 held perfectly — and the wall clock answered anyway: submit an address,
+time the refusal, learn whether that person has an account here. Against a
+health scheme, membership *is* the sensitive fact.
+
+### The guard that was already there, and did not work
+
+`evaluateSignInStep` had a `TIMING_EQUALISER`: a dummy bcrypt hash compared
+against on the no-account path. It was **cost 10**. The application hashes user
+passwords at **cost 12** — roughly four times the work — so the equaliser
+narrowed the gap without closing it, and read as solved. A control that looks
+present is worse than a visible hole, because nobody re-examines it.
+
+### Fixing one path would have moved the oracle, not closed it
+
+Both files short-circuit a locked account *before* bcrypt, with a comment
+explaining that a locked account should never spend a hash comparison. Once an
+unknown address costs ~100 ms, that instant refusal identifies a locked — and
+therefore **existing** — account. The same channel, through a different door.
+
+The CPU argument for skipping it does not survive contact with the threat model:
+the same attacker can force a bcrypt compare by submitting any address that has
+no account, so declining to spend one on a locked account buys nothing. Both
+paths now spend an equalising compare, in both entry points.
+
+The compare is against the equaliser, never the account's real hash. Equalising
+is about duration; it must buy no information, and a real-hash compare on a
+locked account would leave a correct-password signal lying around for someone to
+later mistake for a result.
+
+### One constant, pinned by test
+
+- `PASSWORD_BCRYPT_COST` in `password-policy.ts`, and the six password-hashing
+  call sites **in `src/`** now use it instead of a literal `12`
+  (`scripts/uat/provision-live-uat-users.ts` also hashes at 12 and was left
+  alone — it is untracked work belonging to a parallel session). API keys, reset codes and
+  integration secrets stay at 10 — high entropy, deliberately, and not subject
+  to this control.
+- `TIMING_EQUALISER_HASH` exported once from `auth-credentials.ts`;
+  `auth-challenge.ts` imports it rather than keeping its own. Two copies of a
+  security constant is two chances to hardcode the wrong cost, which is exactly
+  what happened.
+
+### Verification
+
+- `tests/lib/auth-timing.test.ts` — 10 tests. The cost factor is pinned to
+  `PASSWORD_BCRYPT_COST`; no password call site may disagree with it; both
+  rejection paths in **both** entry points must spend a compare; a locked
+  account must never be compared against its real hash; the live path must still
+  compare against the real hash, so the equaliser cannot have replaced
+  authentication.
+- Timing is deliberately **not** asserted by wall clock. A clock assertion on a
+  shared CI box is flaky, and the property that matters — same cost factor, same
+  work — is exact.
+- Negative controls: a cost-10 equaliser fails the cost test (the original
+  defect, reproduced); an equaliser that is a hash of `"password"` fails the
+  match test.
+- One of these tests was worthless when first written: `vi.mock("bcryptjs")` is
+  hoisted above every import, so the "matches nothing" check was asking the
+  *mock* whether a guess matched. It passed even when the mock was flipped to
+  say every guess DID match. It now uses `vi.importActual`.
+- `tests/lib/auth-lockout.test.ts` — "a locked account fails WITHOUT a password
+  comparison" asserted a proxy that has become false. It now asserts what AC 2
+  actually means: the correct password does not admit a locked account, and its
+  real hash is never compared.
+- tsc clean · eslint clean · `next build` EXIT=0 · 4,146 tests green.
+
+### What this does not close
+
+Response-time equalisation only. The number of database round trips still
+differs between branches (an unknown address costs two lookups, a live account
+one), and a sufficiently precise attacker measuring at scale may still find
+signal. Rate limiting by source IP is the control for that, and it does not
+exist here.

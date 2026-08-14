@@ -3,7 +3,7 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { writeAudit } from "@/lib/audit";
-import { validatePassword } from "@/lib/password-policy";
+import { validatePassword, PASSWORD_BCRYPT_COST } from "@/lib/password-policy";
 import bcrypt from "bcryptjs";
 import { Prisma, type UserRole } from "@prisma/client";
 import { revalidatePath } from "next/cache";
@@ -109,7 +109,7 @@ export async function inviteUserAction(
     if (count !== fundGroupIds.length) return { error: "One or more selected schemes are not self-funded." };
   }
 
-  const passwordHash = await bcrypt.hash(password, 12);
+  const passwordHash = await bcrypt.hash(password, PASSWORD_BCRYPT_COST);
 
   // ELIG-GAP-005: create the user AND (for a provider user) its persona role +
   // branch scope atomically, so an invite never yields a half-provisioned
@@ -281,7 +281,7 @@ export async function resetUserPasswordAction(
   });
   if (!target) return { error: "User not found." };
 
-  const passwordHash = await bcrypt.hash(password, 12);
+  const passwordHash = await bcrypt.hash(password, PASSWORD_BCRYPT_COST);
 
   // WP-3.1 (DEF-005): an admin password reset must ALSO release the throttle —
   // previously the reset wrote only the hash + session bump, so a locked user

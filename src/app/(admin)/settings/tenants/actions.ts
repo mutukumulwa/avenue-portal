@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { writeAudit } from "@/lib/audit";
-import { validatePassword } from "@/lib/password-policy";
+import { validatePassword, PASSWORD_BCRYPT_COST } from "@/lib/password-policy";
 import { TenantProvisioningService } from "@/server/services/tenant-provisioning.service";
 import { resolvePlatformGate } from "./platform-gate";
 import bcrypt from "bcryptjs";
@@ -67,7 +67,7 @@ export async function createTenantAction(formData: FormData) {
       throw new Error(`${adminEmail} is already in use on this platform — logins resolve email globally.`);
     }
 
-    const passwordHash = await bcrypt.hash(adminPassword, 12);
+    const passwordHash = await bcrypt.hash(adminPassword, PASSWORD_BCRYPT_COST);
 
     // ── Atomic core: tenant + first admin in ONE nested create ──
     // The admin must exist BEFORE provisioning so seedRbac's migration step

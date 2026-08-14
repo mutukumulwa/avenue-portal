@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
-import { registerFailedAttempt } from "@/lib/auth-credentials";
+import { registerFailedAttempt, equaliseRejectionTiming } from "@/lib/auth-credentials";
 import { recordBlockedSignIn, recordInactiveAccountSignIn, findDeactivatedAccount } from "@/lib/auth-audit";
 
 /**
@@ -51,14 +51,13 @@ export type SignInStep =
   | "CODE_REQUIRED";
 
 /**
- * A bcrypt hash of a value nobody knows, compared against when no account
- * matched. Without it the "no such account" path returns in microseconds while
- * a real account spends ~100 ms in bcrypt — a timing channel that answers "does
- * this address have an account here" without a single distinguishable response
- * body. The existing `authorizeCredentials` has the same shape; closing it here
- * matters more, because this step is the cheap one an attacker would target.
+ * The timing equaliser moved to `auth-credentials.ts` and is now shared.
+ *
+ * The copy that lived here was a cost-**10** hash while the application hashes
+ * passwords at 12 — about a quarter of the work. It narrowed the gap it was
+ * written to close and looked finished, which is worse than an obvious hole.
+ * One constant, pinned to PASSWORD_BCRYPT_COST by test.
  */
-const TIMING_EQUALISER = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy";
 
 export async function evaluateSignInStep(email: string, password: string): Promise<SignInStep> {
   const user = await prisma.user.findFirst({
@@ -74,7 +73,7 @@ export async function evaluateSignInStep(email: string, password: string): Promi
   });
 
   if (!user) {
-    await bcrypt.compare(password, TIMING_EQUALISER);
+    await equaliseRejectionTiming(password);
     // UAT-HF P10.05. This step is the cheap one an attacker would target, so it
     // must leave the same trail as the full sign-in — a rail that records only
     // on the expensive path is a rail with a documented way round it. Same
@@ -88,11 +87,17 @@ export async function evaluateSignInStep(email: string, password: string): Promi
     return "REJECTED";
   }
 
-  // A live lock fails before bcrypt, exactly as authorizeCredentials does, so a
-  // locked account never spends a hash comparison. It also does NOT register a
-  // further failed attempt: the lock is already armed, and re-counting would
-  // let an attacker extend someone else's lock indefinitely by hammering it.
+  // A live lock fails before the REAL comparison, exactly as
+  // authorizeCredentials does, so a locked account is never told whether the
+  // password was right. It does NOT register a further failed attempt: the lock
+  // is already armed, and re-counting would let an attacker extend someone
+  // else's lock indefinitely by hammering it.
+  //
+  // It DOES spend an equalising compare. Without one, an instant refusal
+  // identifies a locked — therefore existing — account, which is the same
+  // enumeration channel this step's equaliser exists to close.
   if (user.lockedUntil && user.lockedUntil > new Date()) {
+    await equaliseRejectionTiming(password);
     await recordBlockedSignIn({
       userId: user.id,
       tenantId: user.tenantId,

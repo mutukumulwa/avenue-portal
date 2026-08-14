@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { randomInt } from "node:crypto";
 import { sendEmailNowBounded } from "@/lib/queue";
 import { rateLimit } from "@/lib/rate-limit";
-import { validatePassword } from "@/lib/password-policy";
+import { validatePassword, PASSWORD_BCRYPT_COST } from "@/lib/password-policy";
 
 /**
  * Password reset via emailed one-time code (Medvex spec §6 / R24 / gap H-02).
@@ -94,7 +94,7 @@ export class PasswordResetService {
         // old password dies. R3.3: a completed reset also clears the lockout
         // counter, so it is a valid recovery path for a locked-out account.
         data: {
-          passwordHash: await bcrypt.hash(newPassword, 12),
+          passwordHash: await bcrypt.hash(newPassword, PASSWORD_BCRYPT_COST),
           sessionVersion: { increment: 1 },
           failedLoginCount: 0,
           lockedUntil: null,

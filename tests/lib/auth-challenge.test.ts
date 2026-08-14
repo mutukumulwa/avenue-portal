@@ -47,7 +47,13 @@ vi.mock("@/lib/prisma", () => ({
     auditLog: { create: mocks.auditCreate, findFirst: mocks.auditFindFirst },
   },
 }));
-vi.mock("@/lib/auth-credentials", () => ({ registerFailedAttempt: mocks.registerFailedAttempt }));
+// Partial: `equaliseRejectionTiming` is kept REAL, because it is what spends
+// the bcrypt comparison the timing test below measures. Stubbing it would make
+// that test pass while the oracle it guards against was wide open.
+vi.mock("@/lib/auth-credentials", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/auth-credentials")>();
+  return { ...actual, registerFailedAttempt: mocks.registerFailedAttempt };
+});
 
 import { evaluateSignInStep } from "@/lib/auth-challenge";
 

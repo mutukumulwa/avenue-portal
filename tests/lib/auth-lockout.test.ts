@@ -43,6 +43,7 @@ import {
   authorizeCredentials,
   LOCK_DURATION_MS,
   ATTEMPT_WINDOW_MS,
+  TIMING_EQUALISER_HASH,
 } from "@/lib/auth-credentials";
 
 function baseUser(overrides: Record<string, unknown> = {}) {
@@ -225,7 +226,7 @@ describe("DEF-002 — brute-force lockout", () => {
     expect(prismaMock.auditLog.create).not.toHaveBeenCalled();
   });
 
-  it("a locked account fails WITHOUT a password comparison, even with the correct password (AC 2)", async () => {
+  it("a locked account fails even with the correct password, and is never told so (AC 2)", async () => {
     prismaMock.user.findFirst.mockResolvedValue(
       baseUser({ lockedUntil: new Date(Date.now() + 5 * 60_000) }),
     );
@@ -234,8 +235,16 @@ describe("DEF-002 — brute-force lockout", () => {
     const res = await authorizeCredentials({ email: "a@x.com", password: "correct" });
 
     expect(res).toBeNull();
-    expect(bcryptMock.compare).not.toHaveBeenCalled();
     expect(prismaMock.user.update).not.toHaveBeenCalled();
+
+    // This assertion used to read `compare` was never called at all. That was a
+    // proxy for AC 2, and it also made the account identifiable by how FAST it
+    // was refused: once an unknown address costs a bcrypt compare, an instant
+    // refusal marks a locked — therefore existing — account. A compare is now
+    // spent, against the equaliser, and never against the real hash.
+    const hashesCompared = bcryptMock.compare.mock.calls.map((c: unknown[]) => c[1]);
+    expect(hashesCompared).not.toContain("hash"); // the fixture account's real hash
+    expect(hashesCompared).toEqual([TIMING_EQUALISER_HASH]);
   });
 
   it("a successful login clears failedLoginCount and lockedUntil in one write", async () => {
@@ -342,6 +351,11 @@ describe("DEF-002 — brute-force lockout", () => {
     expect(res).toBeNull();
     expect(prismaMock.user.update).not.toHaveBeenCalled();
     expect(prismaMock.$queryRaw).not.toHaveBeenCalled();
-    expect(bcryptMock.compare).not.toHaveBeenCalled();
+    // A compare IS spent here now — against the equaliser, so that a rejected
+    // address costs what a real one does. Returning instantly was an
+    // enumeration oracle that no response body revealed.
+    expect(bcryptMock.compare.mock.calls.map((c: unknown[]) => c[1])).toEqual([
+      TIMING_EQUALISER_HASH,
+    ]);
   });
 });
