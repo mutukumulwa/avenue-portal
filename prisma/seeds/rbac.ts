@@ -53,7 +53,6 @@ export const PERMISSIONS: Array<{
   { code: "BILLING:APPROVE_SETTLEMENT",module: "BILLING", action: "APPROVE",           resource: "SETTLEMENT",  description: "Checker approval on provider settlement batches" },
   // BROKER
   { code: "BROKER:VIEW",              module: "BROKER", action: "VIEW",    resource: "BROKER",      description: "View broker records" },
-  { code: "BROKER:MANAGE",            module: "BROKER", action: "MANAGE",  resource: "BROKER",      description: "Manage broker profiles and KYC" },
   { code: "BROKER:APPROVE_COMMISSION",module: "BROKER", action: "APPROVE", resource: "COMMISSION",  description: "Approve and release commission payouts" },
   // GROUP
   { code: "GROUP:VIEW",    module: "GROUP", action: "VIEW",    resource: "GROUP", description: "View group/scheme records" },
@@ -64,7 +63,6 @@ export const PERMISSIONS: Array<{
   { code: "ANALYTICS:VIEW",           module: "ANALYTICS", action: "VIEW",   resource: "ANALYTICS",    description: "View standard analytics dashboards" },
   { code: "ANALYTICS:VIEW_PORTFOLIO", module: "ANALYTICS", action: "VIEW",   resource: "PORTFOLIO",    description: "View senior portfolio-level analytics" },
   { code: "ANALYTICS:VIEW_PARITY",    module: "ANALYTICS", action: "VIEW",   resource: "PARITY",       description: "View parity compliance dashboard (compliance-gated)" },
-  { code: "ANALYTICS:EXPORT",         module: "ANALYTICS", action: "EXPORT", resource: "ANALYTICS",    description: "Export analytics data" },
   // COMPLIANCE
   { code: "COMPLIANCE:VIEW_AUDIT_CHAIN", module: "COMPLIANCE", action: "VIEW", resource: "AUDIT_CHAIN", description: "Browse and verify the audit chain" },
   { code: "COMPLIANCE:VIEW_OVERRIDES",   module: "COMPLIANCE", action: "VIEW", resource: "OVERRIDES",   description: "View override records and patterns" },

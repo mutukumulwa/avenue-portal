@@ -3872,3 +3872,69 @@ table and queryable, which is the entire improvement over nothing.
   actor-less row inserted successfully, and `db push` reported *"already in
   sync"*.
 - Release gate steps 1-5 all green, including both database steps.
+
+## P12.04c — Remove two dead permissions, and correct what the drift check claims
+
+**Task:** P12.04c · **Decision:** DEC-16 · **Owner decision:** 2026-08-14
+
+`BROKER:MANAGE` and `ANALYTICS:EXPORT` were catalogued, checked nowhere in
+`src/`, and held by no role but SUPER_ADMIN. Surfaced by the drift check's first
+run; removed on the owner's instruction.
+
+Both confirmed dead before touching anything. The only `ANALYTICS:EXPORT`-looking
+hits in code are `NETWORK_ANALYTICS:EXPORT` — a **different string**, used as an
+audit *action* name, not a permission check.
+
+### The check was making a false claim, and production proved it
+
+It reported them "granted to **NO** role". Production showed both granted to
+SUPER_ADMIN. The cause: `prisma/seeds/rbac.ts` ends with
+
+```ts
+ROLE_PERMISSIONS["SUPER_ADMIN"] = ALL_PERMISSION_CODES;
+```
+
+a **computed** assignment the source parser cannot see, so every catalogued
+permission is held by SUPER_ADMIN in the database.
+
+The signal was still right — SUPER_ADMIN holds `"*"`, so a permission only it
+can hold is one no ordinary role can be given, which is the defect the check
+exists for. But the wording was false, and a check that says a false thing gets
+verified once against the database and then ignored for ever. It now reports
+"granted to no role except SUPER_ADMIN" and explains why that still matters.
+
+The report also now says that removing a code is a **two-part job**: dropping it
+from the catalogue stops the seed **recreating** it, but seeds are additive and
+delete nothing. Without that line the next person removes a code, sees the check
+go green, and leaves the rows in every environment.
+
+### Production
+
+Previewed first, then deleted in one transaction with an assertion that aborted
+unless exactly 84 permissions remained: 2 `RolePermission` rows (both
+SUPER_ADMIN) and 2 `Permission` rows. Verified after: **0 dead permissions, 0
+orphaned grants, 84 permissions, 357 role grants.** SUPER_ADMIN loses nothing
+real — it holds `"*"` in the code baseline regardless.
+
+### A finding this surfaced, NOT fixed here
+
+SUPER_ADMIN holds **80 of 84** permissions in production. The four missing are
+exactly the four added on 2026-08-14 — so the seed run that created those
+`Permission` rows, and their CUSTOMER_SERVICE/UNDERWRITER grants, did **not**
+extend SUPER_ADMIN's grants, despite the same loop covering it.
+
+Functionally harmless: `ROLE_GRANTS` gives SUPER_ADMIN `"*"`, and `permitted()`
+matches the wildcard, so no access is affected. But it is real drift between
+what the seed says it produces and what the database holds, and it is precisely
+the class the drift check **cannot** see: the check is static, and this needs a
+code-versus-database comparison. Left for the owner rather than patched
+silently, and it is the argument for building layer (c) of that check.
+
+### Verification
+
+- `tests/lib/rbac-drift-check.test.ts` — the two B-case tests now assert the
+  corrected wording, including that the message says nobody else can be given
+  it, and that the report mentions seeds never delete.
+- Drift check green: 84 catalogued, 83 held by a real role, 1 deliberately
+  unheld, no dead vocabulary remaining.
+- tsc clean · eslint clean · `next build` EXIT=0 · 4,181 tests green.

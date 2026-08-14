@@ -26,6 +26,21 @@
  *   C. every code a role grants exists in the catalogue
  *   D. every code in the runtime `ROLE_GRANTS` exists in the catalogue
  *
+ * ## "Granted to no role" means no role BUT SUPER_ADMIN
+ *
+ * `prisma/seeds/rbac.ts` ends with `ROLE_PERMISSIONS["SUPER_ADMIN"] =
+ * ALL_PERMISSION_CODES` — a computed assignment, not a literal, so the parsing
+ * below cannot see it. Every catalogued permission is therefore held by
+ * SUPER_ADMIN in the database, and an earlier wording of this check said
+ * "granted to NO role", which was simply false: production showed both flagged
+ * codes granted to SUPER_ADMIN.
+ *
+ * The signal is still the right one — SUPER_ADMIN holds `*`, so a permission
+ * only it can hold is a permission no ordinary role can be given, which is the
+ * defect this exists to catch. But the report has to say the true thing, or the
+ * first person to check the database concludes the check is broken and stops
+ * reading it.
+ *
  * B distinguishes two cases, because they are not equally serious:
  *
  *   unheld AND checked in code   a feature nobody can reach. FAILS.
@@ -132,8 +147,9 @@ for (const code of catalogue) {
   if (code in ALLOWED_UNHELD) continue;
   if (srcBlob.includes(`"${code}"`)) {
     findings.push(
-      `prisma/seeds\n      "${code}" is CHECKED in src/ but granted to NO role.\n` +
-        `      Whoever needs that surface cannot reach it. Grant it, or record why\n` +
+      `prisma/seeds\n      "${code}" is CHECKED in src/ but granted to no role except SUPER_ADMIN.\n` +
+        `      SUPER_ADMIN holds "*", so nobody else can be given it — whoever needs\n` +
+        `      that surface cannot reach it. Grant it to a real role, or record why\n` +
         `      not in ALLOWED_UNHELD in this script.`,
     );
   } else {
@@ -169,13 +185,16 @@ for (const m of grantsBody.matchAll(/"([a-z]+\.[a-z_]+\.[a-z_]+|[A-Z_]+:[A-Z_]+)
 // ── Report ──────────────────────────────────────────────────────────────────
 console.log("\nRBAC drift check\n");
 console.log(`  catalogue permissions   ${catalogue.size}`);
-console.log(`  granted by some role    ${[...catalogue].filter((c) => granted.has(c)).length}`);
+console.log(`  held by a real role     ${[...catalogue].filter((c) => granted.has(c)).length}`);
 console.log(`  deliberately unheld     ${Object.keys(ALLOWED_UNHELD).length}`);
 
 if (unusedButDefined.length > 0) {
-  console.log(`\n  ${unusedButDefined.length} defined but never checked or granted (not a failure):`);
+  console.log(`\n  ${unusedButDefined.length} defined, checked nowhere, held by nobody but SUPER_ADMIN (not a failure):`);
   for (const c of unusedButDefined) console.log(`    · ${c}`);
   console.log("    Dead vocabulary — remove them, or a surface is missing that should use them.");
+  console.log("    Removing one also needs its Permission and RolePermission rows deleted in");
+  console.log("    each environment: dropping it from the catalogue stops the seed RECREATING");
+  console.log("    it, but seeds are additive and never delete.");
 }
 
 if (findings.length === 0) {

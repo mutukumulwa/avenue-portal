@@ -118,7 +118,11 @@ export function guard() { return SENSITIVE_REVEAL_PERMISSION; }
   });
 });
 
-describe("B — a catalogued permission that no role holds", () => {
+describe("B — a catalogued permission no ORDINARY role holds", () => {
+  // Not "no role at all": `prisma/seeds/rbac.ts` assigns SUPER_ADMIN
+  // ALL_PERMISSION_CODES in a computed statement the parser cannot see, so
+  // every catalogued permission is held by SUPER_ADMIN in the database. The
+  // check's earlier wording claimed otherwise and production disproved it.
   const UNGRANTED = `export const PERMISSIONS = [
   { code: "member.read.basic", description: "d" },
   { code: "provider.preauth.cancel", description: "d" },
@@ -134,16 +138,23 @@ export const ROLE_PERMISSIONS = {
     fixture({ rbac: UNGRANTED, srcFile: `const P = "provider.preauth.cancel";\n` });
     const { code, out } = runCheck();
     expect(code).toBe(1);
-    expect(out).toMatch(/CHECKED in src\/ but granted to NO role/);
+    expect(out).toMatch(/CHECKED in src\/ but granted to no role except SUPER_ADMIN/);
+    // The message must be TRUE, or the first person who checks the database
+    // concludes the tool is broken and stops reading it.
+    expect(out).toMatch(/nobody else can be given it/);
   });
 
   it("reports but does NOT fail when nothing checks it", () => {
-    // BROKER:MANAGE and ANALYTICS:EXPORT are this case in the real repository.
+    // BROKER:MANAGE and ANALYTICS:EXPORT were this case until 2026-08-14, when
+    // they were removed from the catalogue and deleted from production.
     // Failing a release over an unused string is how a check gets silenced.
     fixture({ rbac: UNGRANTED });
     const { code, out } = runCheck();
     expect(code).toBe(0);
-    expect(out).toMatch(/defined but never checked or granted \(not a failure\)/);
+    expect(out).toMatch(/defined, checked nowhere, held by nobody but SUPER_ADMIN \(not a failure\)/);
+    // Removing one is a two-part job, and the report has to say so: seeds are
+    // additive, so dropping a code stops it being RECREATED but deletes nothing.
+    expect(out).toMatch(/seeds are additive and never delete/);
     expect(out).toMatch(/provider\.preauth\.cancel/);
   });
 
