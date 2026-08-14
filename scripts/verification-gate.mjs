@@ -167,6 +167,20 @@ const STEPS = [
     ].join(" && "),
   },
   {
+    // Setup, not a check — but a step rather than a line chained onto step 4,
+    // because when seeding breaks that is its own finding and should not read
+    // as a migration or a drift problem.
+    //
+    // Without it, step 4b compares the catalogue against the empty database
+    // step 4 just built and reports all 84 permissions missing. CI run #49 did
+    // exactly that. See scripts/gate-seed-rbac.ts for what this makes 4b mean.
+    id: "4a",
+    name: "Seed the gate database — an RBAC baseline for 4b to check",
+    phase: "release",
+    db: true,
+    cmd: "npx tsx scripts/gate-seed-rbac.ts",
+  },
+  {
     // UAT-HF P12.04d — layer (c) of the RBAC drift check. Step 2b reads SOURCE
     // and belongs at pre-push; it cannot see a database that disagrees with
     // correct code. On 2026-08-14 production held 80 of 84 permissions for
@@ -174,6 +188,13 @@ const STEPS = [
     // Only the wildcard in ROLE_GRANTS kept that from mattering.
     //
     // Read-only. It prints remediation SQL and never runs it.
+    //
+    // What it ASKS depends on which database it is pointed at. Against
+    // production it asks whether the deployed database still matches the code —
+    // the question above. Against the gate's database, seeded by step 4a, it
+    // asks whether `seedRbac` produces what the catalogue declares. That is the
+    // weaker question and still a real one: the production incident began as a
+    // seed run that created some rows and not others.
     id: "4b",
     name: "RBAC live drift — the database holds what the seed says it should",
     phase: "release",
