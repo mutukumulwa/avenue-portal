@@ -4,7 +4,6 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { MembersService } from "@/server/services/members.service";
 import { prisma } from "@/lib/prisma";
 import { writeAudit } from "@/lib/audit";
-import { Prisma } from "@prisma/client";
 import { createHash } from "crypto";
 import Papa from "papaparse";
 import { normalizeNationalId } from "@/lib/normalize";
@@ -18,6 +17,7 @@ import {
   type MemberImportRow,
 } from "@/server/services/member-import-preflight.service";
 import { calendarDateFromUtcDate, parseCalendarDate } from "@/lib/calendar-date";
+import { MemberImportJobService } from "@/server/services/member-import-job.service";
 
 export type ParsedRow = MemberImportRow;
 
@@ -35,11 +35,6 @@ export type ParseResult = {
   preflightDate?: string;
   error?: string;
 };
-
-/** True when a P2002 unique-constraint violation bubbled up (any driver shape). */
-function isP2002(e: unknown): boolean {
-  return (e as { code?: string })?.code === "P2002";
-}
 
 export async function parseImportAction(
   _prev: ParseResult | null,
@@ -143,6 +138,8 @@ export type ImportResult = {
   alreadyImported?: boolean;
   /** The persisted ImportBatch id (reject list is stored on it). */
   batchId?: string;
+  batchRef?: string;
+  status?: string;
   error?: string;
 };
 
@@ -214,17 +211,19 @@ export async function confirmImportAction(
   }
   const failed: ImportResult["failed"] = [];
   const serverValid: MemberImportRow[] = [];
+  const jobRows = preflight.rows.map((row) => ({ ...row }));
   for (const [index, r] of preflight.rows.entries()) {
     const wasRejectedAtPreview = Boolean(previewRows[index]?.error);
     if (r.error) {
+      const error = wasRejectedAtPreview ? r.error : `Preflight changed since preview — ${r.error}`;
+      jobRows[index].error = error;
       failed.push({
         row: r.row,
         name: `${r.firstName} ${r.lastName}`.trim(),
-        error: wasRejectedAtPreview
-          ? r.error
-          : `Preflight changed since preview — ${r.error}`,
+        error,
       });
     } else if (wasRejectedAtPreview) {
+      jobRows[index].error = "Preflight changed since preview — this row now appears valid. Re-upload and review it before committing.";
       failed.push({
         row: r.row,
         name: `${r.firstName} ${r.lastName}`.trim(),
@@ -241,60 +240,41 @@ export async function confirmImportAction(
     .update(`MEMBERS_ADMIN\u0000${tenantId}\u0000${groupId}\u0000${canonicalMemberImportContent(preflight.rows, "MEMBERS_ADMIN")}`)
     .digest("hex");
 
-  const existing = await prisma.importBatch.findUnique({
-    where: { tenantId_idempotencyKey: { tenantId, idempotencyKey } },
-    select: { id: true, importedCount: true, rejects: true },
+  const reservation = await MemberImportJobService.reserve(prisma, {
+    tenantId, groupId, lane: "MEMBERS_ADMIN", idempotencyKey, fileName,
+    createdBy: session.user.id, rows: jobRows,
   });
-  if (existing) {
-    return {
-      imported: existing.importedCount,
-      failed: (existing.rejects as ImportResult["failed"]) ?? [],
-      alreadyImported: true,
-      batchId: existing.id,
-    };
-  }
-
-  // Check replay BEFORE refusing the now-conflicting rows: after a successful
-  // first import, those national IDs correctly exist in the database. That is
-  // evidence of the prior result, not a reason to hide it on repeat confirm.
-  if (serverValid.length === 0) {
-    return { imported: 0, failed, error: "No valid rows to import — nothing was created." };
-  }
-
-  // Reserve the batch (claims the idempotency key). A concurrent identical confirm
-  // loses the race on the unique and returns the winner's recorded result.
-  let batchId: string;
-  try {
-    const batch = await prisma.importBatch.create({
-      data: { tenantId, groupId, lane: "MEMBERS_ADMIN", idempotencyKey, fileName, totalRows: preflight.rows.length, createdBy: session.user.id },
-      select: { id: true },
-    });
-    batchId = batch.id;
-  } catch (err) {
-    if (isP2002(err)) {
-      const winner = await prisma.importBatch.findUnique({
-        where: { tenantId_idempotencyKey: { tenantId, idempotencyKey } },
-        select: { id: true, importedCount: true, rejects: true },
-      });
-      if (winner) {
-        return {
-          imported: winner.importedCount,
-          failed: (winner.rejects as ImportResult["failed"]) ?? [],
-          alreadyImported: true,
-          batchId: winner.id,
-        };
-      }
+  if (!reservation.created) {
+    if (["SUCCEEDED", "PARTIAL", "FAILED"].includes(reservation.job.status)) {
+      return { imported: reservation.job.imported, failed: reservation.job.failed, alreadyImported: true,
+        batchId: reservation.job.id, batchRef: reservation.job.batchRef, status: reservation.job.status };
     }
-    throw err;
+    return { imported: reservation.job.imported, failed: reservation.job.failed,
+      batchId: reservation.job.id, batchRef: reservation.job.batchRef, status: reservation.job.status,
+      error: `Import ${reservation.job.batchRef} is ${reservation.job.status.toLowerCase()}; its outcome is not being replayed as complete.` };
+  }
+  const batchId = reservation.job.id;
+  if (serverValid.length === 0) {
+    const completed = await MemberImportJobService.finalize(prisma, batchId);
+    return { imported: 0, failed: completed.failed, batchId, batchRef: completed.batchRef,
+      status: completed.status, error: "No valid rows to import — nothing was created." };
+  }
+  if (!await MemberImportJobService.claim(prisma, batchId)) {
+    return { imported: 0, failed, batchId, batchRef: reservation.job.batchRef,
+      status: reservation.job.status,
+      error: `Import ${reservation.job.batchRef} could not be claimed for processing.` };
   }
 
-  let imported = 0;
+  // No local success counter: `finalize` derives the count from the rows this
+  // function marks ACCEPTED, and a second tally kept alongside it can only ever
+  // drift from the ledger that is now the record.
 
   // ── Pass 1: PRINCIPAL rows. Map normalized National ID → created member id. ──
   const principalMap = new Map<string, string>();
   for (const row of serverValid.filter((r) => r.relationship === "PRINCIPAL")) {
+    let member: { id: string };
     try {
-      const { member } = await MembersService.createMember(tenantId, {
+      ({ member } = await MembersService.createMember(tenantId, {
         groupId,
         firstName: row.firstName,
         lastName: row.lastName,
@@ -304,13 +284,18 @@ export async function confirmImportAction(
         phone: row.phone || undefined,
         email: row.email || undefined,
         relationship: "PRINCIPAL",
-      });
-      imported++;
-      const key = row.idNumber?.trim() ? normalizeNationalId(row.idNumber) : "";
-      if (key) principalMap.set(key, member.id);
+      }));
     } catch (err) {
-      failed.push({ row: row.row, name: `${row.firstName} ${row.lastName}`.trim(), error: (err as Error).message });
+      const message = (err as Error).message;
+      failed.push({ row: row.row, name: `${row.firstName} ${row.lastName}`.trim(), error: message });
+      await MemberImportJobService.finishRow(prisma, batchId, row.row, { status: "FAILED", code: "MEMBER_CREATE_FAILED", message });
+      continue;
     }
+    await MemberImportJobService.finishRow(prisma, batchId, row.row, {
+      status: "ACCEPTED", entityType: "MEMBER", entityId: member.id,
+    });
+    const key = row.idNumber?.trim() ? normalizeNationalId(row.idNumber) : "";
+    if (key) principalMap.set(key, member.id);
   }
 
   // ── Pass 2: dependants, linked to a principal IN THE IMPORT'S GROUP. ──
@@ -339,11 +324,16 @@ export async function confirmImportAction(
           ? `Principal with National ID "${row.principalIdNumber}" was not found in this group — dependant not imported.`
           : `No principalIdNumber supplied for this ${row.relationship} — dependant not imported.`,
       });
+      // PRINCIPAL_NOT_FOUND, not PRINCIPAL_CREATE_FAILED: nothing was created and
+      // nothing failed to create. The principal is simply absent from this group,
+      // which is a different thing to look for when reading the ledger back.
+      await MemberImportJobService.finishRow(prisma, batchId, row.row, { status: "FAILED", code: "PRINCIPAL_NOT_FOUND", message: failed.at(-1)!.error });
       continue;
     }
 
+    let member: { id: string };
     try {
-      await MembersService.createMember(tenantId, {
+      ({ member } = await MembersService.createMember(tenantId, {
         groupId,
         firstName: row.firstName,
         lastName: row.lastName,
@@ -354,26 +344,28 @@ export async function confirmImportAction(
         email: row.email || undefined,
         relationship: row.relationship as "SPOUSE" | "CHILD" | "PARENT" | "SIBLING",
         principalId,
-      });
-      imported++;
+      }));
     } catch (err) {
-      failed.push({ row: row.row, name: `${row.firstName} ${row.lastName}`.trim(), error: (err as Error).message });
+      const message = (err as Error).message;
+      failed.push({ row: row.row, name: `${row.firstName} ${row.lastName}`.trim(), error: message });
+      await MemberImportJobService.finishRow(prisma, batchId, row.row, { status: "FAILED", code: "MEMBER_CREATE_FAILED", message });
+      continue;
     }
+    await MemberImportJobService.finishRow(prisma, batchId, row.row, { status: "ACCEPTED", entityType: "MEMBER", entityId: member.id });
   }
 
-  // Finalize the ledger — persist counts + the durable reject list.
-  await prisma.importBatch.update({
-    where: { id: batchId },
-    data: { importedCount: imported, failedCount: failed.length, rejects: failed as unknown as Prisma.InputJsonValue },
-  });
+  const completed = await MemberImportJobService.finalize(prisma, batchId);
 
   await writeAudit({
     userId: session.user.id,
     action: "MEMBERS_BULK_IMPORTED",
     module: "MEMBERS",
-    description: `Bulk import: ${imported} members added to ${preflight.groupName}. ${failed.length} failed.`,
-    metadata: { groupId, imported, failed: failed.length, batchId },
+    // Both halves read from the ledger. They used to disagree by construction:
+    // the sentence counted rows and the metadata summed `recordCount`, which is
+    // 1 per row today and exists so that it need not stay that way.
+    description: `Bulk import: ${completed.imported} members added to ${preflight.groupName}. ${completed.failed.length} failed.`,
+    metadata: { groupId, imported: completed.imported, failed: completed.failed.length, batchId, batchRef: completed.batchRef },
   });
 
-  return { imported, failed, batchId };
+  return { imported: completed.imported, failed: completed.failed, batchId, batchRef: completed.batchRef, status: completed.status };
 }

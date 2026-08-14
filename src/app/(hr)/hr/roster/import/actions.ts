@@ -3,7 +3,6 @@
 import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { writeAudit } from "@/lib/audit";
-import { Prisma } from "@prisma/client";
 import { createHash } from "crypto";
 import Papa from "papaparse";
 import type { Gender, MemberRelationship } from "@prisma/client";
@@ -18,6 +17,7 @@ import {
   type MemberImportRow,
 } from "@/server/services/member-import-preflight.service";
 import { calendarDateFromUtcDate, parseCalendarDate } from "@/lib/calendar-date";
+import { MemberImportJobService } from "@/server/services/member-import-job.service";
 
 export type ParsedRow = MemberImportRow;
 
@@ -131,6 +131,8 @@ export type ImportResult = {
   failed: { row: number; name: string; error: string }[];
   alreadyImported?: boolean;
   batchId?: string;
+  batchRef?: string;
+  status?: string;
   error?: string;
 };
 
@@ -201,17 +203,19 @@ export async function confirmHRImportAction(
   }
   const failed: ImportResult["failed"] = [];
   const serverValid: MemberImportRow[] = [];
+  const jobRows = preflight.rows.map((row) => ({ ...row }));
   for (const [index, r] of preflight.rows.entries()) {
     const wasRejectedAtPreview = Boolean(previewRows[index]?.error);
     if (r.error) {
+      const error = wasRejectedAtPreview ? r.error : `Preflight changed since preview — ${r.error}`;
+      jobRows[index].error = error;
       failed.push({
         row: r.row,
         name: `${r.firstName} ${r.lastName}`.trim(),
-        error: wasRejectedAtPreview
-          ? r.error
-          : `Preflight changed since preview — ${r.error}`,
+        error,
       });
     } else if (wasRejectedAtPreview) {
+      jobRows[index].error = "Preflight changed since preview — this row now appears valid. Re-upload and review it before committing.";
       failed.push({
         row: r.row,
         name: `${r.firstName} ${r.lastName}`.trim(),
@@ -227,50 +231,32 @@ export async function confirmHRImportAction(
     .update(`HR_ENDORSEMENT\u0000${tenantId}\u0000${groupId}\u0000${canonicalMemberImportContent(preflight.rows, "HR_ENDORSEMENT")}`)
     .digest("hex");
 
-  const existing = await prisma.importBatch.findUnique({
-    where: { tenantId_idempotencyKey: { tenantId, idempotencyKey } },
-    select: { id: true, importedCount: true, rejects: true },
-  });
-  if (existing) {
-    return {
-      imported: existing.importedCount,
-      failed: (existing.rejects as ImportResult["failed"]) ?? [],
-      alreadyImported: true,
-      batchId: existing.id,
-    };
-  }
-
-
   // The first submission may have created endorsements whose later approval
   // created these members. Replay the durable result before treating those
   // newly-existing identities as a fresh import failure.
-  if (serverValid.length === 0) {
-    return { imported: 0, failed, error: "No valid rows to submit — nothing was created." };
-  }
-
-  let batchId: string;
-  try {
-    const batch = await prisma.importBatch.create({
-      data: { tenantId, groupId, lane: "HR_ENDORSEMENT", idempotencyKey, fileName, totalRows: preflight.rows.length, createdBy: session.user.id },
-      select: { id: true },
-    });
-    batchId = batch.id;
-  } catch (err) {
-    if (isP2002(err)) {
-      const winner = await prisma.importBatch.findUnique({
-        where: { tenantId_idempotencyKey: { tenantId, idempotencyKey } },
-        select: { id: true, importedCount: true, rejects: true },
-      });
-      if (winner) {
-        return {
-          imported: winner.importedCount,
-          failed: (winner.rejects as ImportResult["failed"]) ?? [],
-          alreadyImported: true,
-          batchId: winner.id,
-        };
-      }
+  const reservation = await MemberImportJobService.reserve(prisma, {
+    tenantId, groupId, lane: "HR_ENDORSEMENT", idempotencyKey, fileName,
+    createdBy: session.user.id, rows: jobRows,
+  });
+  if (!reservation.created) {
+    if (["SUCCEEDED", "PARTIAL", "FAILED"].includes(reservation.job.status)) {
+      return { imported: reservation.job.imported, failed: reservation.job.failed, alreadyImported: true,
+        batchId: reservation.job.id, batchRef: reservation.job.batchRef, status: reservation.job.status };
     }
-    throw err;
+    return { imported: reservation.job.imported, failed: reservation.job.failed,
+      batchId: reservation.job.id, batchRef: reservation.job.batchRef, status: reservation.job.status,
+      error: `Import ${reservation.job.batchRef} is ${reservation.job.status.toLowerCase()}; its outcome is not being replayed as complete.` };
+  }
+  const batchId = reservation.job.id;
+  if (serverValid.length === 0) {
+    const completed = await MemberImportJobService.finalize(prisma, batchId);
+    return { imported: 0, failed: completed.failed, batchId, batchRef: completed.batchRef,
+      status: completed.status, error: "No valid rows to submit — nothing was created." };
+  }
+  if (!await MemberImportJobService.claim(prisma, batchId)) {
+    return { imported: 0, failed, batchId, batchRef: reservation.job.batchRef,
+      status: reservation.job.status,
+      error: `Import ${reservation.job.batchRef} could not be claimed for processing.` };
   }
 
   // ── WP-B4: sequential END-YYYY-NNNNN numbering. Replaces the old random
@@ -290,7 +276,8 @@ export async function confirmHRImportAction(
   let nextSeq = Number.parseInt(startNumber.slice(startNumber.lastIndexOf("-") + 1), 10);
   if (!Number.isFinite(nextSeq)) nextSeq = 1;
 
-  let imported = 0;
+  // No local success counter — see the note on the admin lane: `finalize` counts
+  // the rows marked ACCEPTED, and a parallel tally can only drift from it.
   for (const row of serverValid) {
     const changeDetails = {
       firstName: row.firstName,
@@ -308,10 +295,11 @@ export async function confirmHRImportAction(
 
     let ok = false;
     let lastError = "";
+    let endorsementId: string | undefined;
     for (let attempt = 0; attempt < 50 && !ok; attempt++) {
       const endorsementNumber = `${yearPrefix}${String(nextSeq).padStart(5, "0")}`;
       try {
-        await prisma.endorsement.create({
+        const endorsement = await prisma.endorsement.create({
           data: {
             tenantId,
             groupId,
@@ -325,6 +313,7 @@ export async function confirmHRImportAction(
         });
         nextSeq++;
         ok = true;
+        endorsementId = endorsement.id;
       } catch (err) {
         // Only the endorsementNumber unique can collide here — advance and retry.
         if (isP2002(err)) { nextSeq++; continue; }
@@ -333,23 +322,29 @@ export async function confirmHRImportAction(
       }
     }
 
-    if (ok) imported++;
-    else failed.push({ row: row.row, name: `${row.firstName} ${row.lastName}`.trim(), error: lastError || "Could not allocate a unique endorsement number — please retry." });
+    if (ok) {
+      await MemberImportJobService.finishRow(prisma, batchId, row.row, {
+        status: "ACCEPTED", entityType: "ENDORSEMENT", entityId: endorsementId,
+      });
+    }
+    else {
+      const message = lastError || "Could not allocate a unique endorsement number — please retry.";
+      failed.push({ row: row.row, name: `${row.firstName} ${row.lastName}`.trim(), error: message });
+      await MemberImportJobService.finishRow(prisma, batchId, row.row, { status: "FAILED", code: "ENDORSEMENT_CREATE_FAILED", message });
+    }
   }
 
-  await prisma.importBatch.update({
-    where: { id: batchId },
-    data: { importedCount: imported, failedCount: failed.length, rejects: failed as unknown as Prisma.InputJsonValue },
-  });
+  const completed = await MemberImportJobService.finalize(prisma, batchId);
 
   // WP-3.5G: audit the (previously silent) HR bulk-import run.
   await writeAudit({
     userId: session.user.id,
     action: "HR_MEMBERS_BULK_IMPORTED",
     module: "MEMBERS",
-    description: `HR bulk import: ${imported} addition request(s) created, ${failed.length} failed.`,
-    metadata: { groupId, imported, failed: failed.length, batchId },
+    // Both halves read from the ledger — see the note on the admin lane's audit.
+    description: `HR bulk import: ${completed.imported} addition request(s) created, ${completed.failed.length} failed.`,
+    metadata: { groupId, imported: completed.imported, failed: completed.failed.length, batchId, batchRef: completed.batchRef },
   });
 
-  return { imported, failed, batchId };
+  return { imported: completed.imported, failed: completed.failed, batchId, batchRef: completed.batchRef, status: completed.status };
 }

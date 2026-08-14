@@ -200,9 +200,11 @@ export function HRMemberImportClient() {
       {importResult && (
         <div className="space-y-4">
           <div className="bg-white border border-[#EEEEEE] rounded-lg p-6 shadow-sm space-y-3">
-            <div className="flex items-center gap-2 text-[#28A745]">
-              <CheckCircle size={20} />
-              <h2 className="font-bold text-lg font-heading">Requests Submitted</h2>
+            <div className={`flex items-center gap-2 ${importResult.error ? "text-[#DC3545]" : "text-[#28A745]"}`}>
+              {importResult.error ? <XCircle size={20} /> : <CheckCircle size={20} />}
+              <h2 className="font-bold text-lg font-heading">
+                {importResult.error ? "Submission status" : "Requests submitted"}
+              </h2>
             </div>
             {importResult.error ? (
               <p className="text-[#DC3545] text-sm font-semibold">{importResult.error}</p>
@@ -219,6 +221,12 @@ export function HRMemberImportClient() {
                 <Info size={14} className="mt-0.5 shrink-0" />
                 <span>This file was already submitted for this group — no duplicate requests were created (showing the original result).</span>
               </div>
+            )}
+            {importResult.batchRef && (
+              <p className="text-xs text-brand-text-muted">
+                Import reference: <strong className="font-mono text-brand-text-heading">{importResult.batchRef}</strong>
+                {importResult.status ? ` · ${importResult.status}` : ""}
+              </p>
             )}
             <div className="pt-2">
                <Link href="/hr/endorsements" className="inline-block px-5 py-2.5 bg-brand-indigo text-white font-semibold rounded-full text-sm hover:bg-brand-secondary transition-colors">
