@@ -117,6 +117,65 @@ const INTEGRATION_ADMIN = [
 ]; // scoped API keys + integration delivery/errors. No clinical/finance unless separately granted.
 
 /**
+ * UAT-HF DEC-15 — the whole facility, as one grant.
+ *
+ * The six personas above model a provider with six kinds of staff. A meeting
+ * with a provider on 2026-08-13 established the actual shape: **one or two
+ * people**, doing all of it. Asking an administrator to assemble that from six
+ * bundles — through a UI that cannot grant a role at all (DEC-16) — is how the
+ * permission model becomes something people work around rather than with.
+ *
+ * So this is deliberately **every provider permission**, including the two that
+ * warrant naming out loud:
+ *
+ *   `provider.users.manage`     they administer their own staff — for a
+ *                               single-operator clinic, that is themselves
+ *   `provider.api_keys.manage`  and their own integration credentials
+ *
+ * ## Why breadth here is not the same as privilege
+ *
+ * These grant ACTION only. Provider and branch scope is applied separately by
+ * `ProviderAccessService` and is **independent of role** (spec D4 §0.4), so a
+ * facility administrator with all 22 permissions still cannot see one row
+ * belonging to another provider. The containment is the scope, not the bundle.
+ *
+ * ## What it does NOT collapse
+ *
+ * No maker/checker pair lives in this catalogue. `provider.profile.change_request`
+ * *requests* a change that the TPA approves; bank-change verification and
+ * activation are TPA-side permissions and are not here. So one person holding
+ * everything on this list cannot approve their own anything — which is the
+ * property that makes a composite role safe to offer at all, and the reason
+ * DEC-15's harder question (termination and fraud need a checker the provider
+ * does not have) is NOT answered by this role.
+ *
+ * `provider.preauth.cancel` is included, and it is worth noting that it appears
+ * in **no other role**. It has been in the catalogue with no holder, so nobody
+ * could cancel a pre-authorisation — the same "permission nobody can hold"
+ * defect this branch fixed for four others.
+ */
+const FACILITY_ADMIN = [
+  // eligibility + PA, front desk through clinical
+  "provider.eligibility.read",
+  "provider.preauth.read", "provider.preauth.create",
+  "provider.preauth.respond", "provider.preauth.cancel",
+  // claims, end to end
+  "provider.claim.read", "provider.claim.create", "provider.claim.respond",
+  "provider.claim.withdraw", "provider.claim.correct", "provider.claim.reconsider",
+  "provider.case.read",
+  // money
+  "provider.settlement.read", "provider.settlement.export",
+  "provider.payment_query.manage",
+  "provider.contract.read",
+  "provider.performance.read",
+  // running the facility
+  "provider.profile.read", "provider.profile.change_request",
+  "provider.users.manage",
+  "provider.api_keys.manage",
+  "provider.integrations.manage",
+];
+
+/**
  * Temporary backward-compatible role for existing provider users (spec F1.1
  * step 4). It reflects what a provider user can reach TODAY (eligibility,
  * claims view/create, cases, settlement view, API keys, PA via API) so that
@@ -141,6 +200,7 @@ export const PROVIDER_ROLE_PERMISSIONS: Record<string, string[]> = {
   PROVIDER_FINANCE: FINANCE,
   PROVIDER_ADMIN: PROVIDER_ADMIN,
   PROVIDER_INTEGRATION_ADMIN: INTEGRATION_ADMIN,
+  PROVIDER_FACILITY_ADMIN: FACILITY_ADMIN,
   PROVIDER_LEGACY: LEGACY,
 };
 

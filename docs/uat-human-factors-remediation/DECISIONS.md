@@ -282,6 +282,22 @@ the audit trail depends on them. The fix is a role model that can express "this
 person does everything at this facility" as *one* grant — a composite or
 facility-admin role — rather than expecting an operator to assemble it.
 
+**Partly addressed:** `PROVIDER_FACILITY_ADMIN` now exists — all 22 provider
+permissions in one assignable role, live in production. Breadth is not privilege
+here: provider and branch scope are applied by `ProviderAccessService`
+independently of role (spec D4 §0.4), so a facility administrator still cannot
+read one row belonging to another provider. The containment is the scope, not
+the bundle. No maker/checker pair lives in the provider catalogue —
+`profile.change_request` is a *request* the TPA approves — so one person holding
+everything cannot approve their own anything.
+
+**Still open, and this role does NOT answer it:** the member-lifecycle
+transitions that require a checker who is not the maker (termination, fraud,
+breach, lapse reinstatement). With one or two staff there is no second person.
+Someone must decide whether such providers are refused those actions or the TPA
+supplies the checker. A composite provider role cannot resolve a separation
+requirement on the TPA side of the boundary.
+
 ---
 
 ### DEC-16 — The permissioning module cannot express a shortfall
