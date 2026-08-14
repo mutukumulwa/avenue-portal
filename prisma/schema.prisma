@@ -5417,7 +5417,21 @@ model AuditLog {
   /// audit-log page does. The hash chain is unaffected — it hashes the metadata
   /// payload only, never userId.
   userId        String?
-  user          User?    @relation(fields: [userId], references: [id])
+  // `onDelete: Restrict` is EXPLICIT here, and load-bearing.
+  //
+  // Prisma's DEFAULT referential action depends on optionality: Restrict while
+  // this relation was required, SetNull the moment P10.08 made it optional.
+  // Nothing in that migration said so — it ran `ALTER COLUMN "userId" DROP NOT
+  // NULL` and nothing else — so every database still has ON DELETE RESTRICT
+  // while this schema had quietly started asking for ON DELETE SET NULL. The
+  // verification gate's step 4 caught it on 2026-08-14, and it was the only
+  // drift in the schema.
+  //
+  // Restrict is also the behaviour we want: a user who has done anything at all
+  // cannot be deleted out from under their audit trail. Do not remove this
+  // attribute to "tidy up" — deleting it does not restore a default, it flips
+  // one, and the change would be invisible in review.
+  user          User?    @relation(fields: [userId], references: [id], onDelete: Restrict)
   tenantId      String?
   action        String
   module        String
