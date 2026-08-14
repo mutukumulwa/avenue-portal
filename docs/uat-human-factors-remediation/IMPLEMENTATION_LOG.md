@@ -4079,3 +4079,54 @@ SENIOR_UNDERWRITER 37.
 
 Gate step 4b will keep failing a release run against production until these are
 resolved one way or the other, which is the intended pressure.
+
+## P12.04e-ops — seedRbac run against production: one row
+
+**Task:** P12.04e (operations) · **Date:** 2026-08-14 · **No code change.**
+
+### Steps 1-3 were provably a no-op
+
+Checked before writing anything, by set comparison rather than counts:
+permissions in code but not the database, in the database but not the code, and
+the same both ways for roles — **all four empty**. 84 permissions and 25 roles,
+identical sets. Every grant the seed would upsert already existed.
+
+So the seed had exactly one thing to do: step 4, the `User.role` →
+`UserRoleAssignment` migration.
+
+### It applied to exactly one user, and that user is instructive
+
+`uat.uat-hf-20260811-01.senior-underwriter-checker@example.invalid` —
+**deactivated**, `User.role` = `UNDERWRITER`, and holding an **active
+`SENIOR_UNDERWRITER` assignment** created during the UAT run on 2026-08-11 to
+make it a *checker*. The enum column was never updated to match.
+
+Step 4 treats `User.role` as authoritative, so it added `UNDERWRITER` alongside
+the deliberate `SENIOR_UNDERWRITER`. On this account that is inert — it is
+deactivated, cannot authenticate, and an attempt against it now writes
+`AUTH_SIGN_IN_INACTIVE` (P10.05). Applied as the seed would have, and the row is
+identifiable: its id begins `seed-step4-20260814-`.
+
+### The finding underneath it
+
+**`seedRbac` step 4 can re-add a role that a deliberate assignment superseded.**
+Where somebody was moved from maker to checker by assigning a different role
+without changing `User.role`, re-running the seed grants the original role back
+— collapsing, on that account, the separation the move created.
+
+This is the sibling of the revocation bug already fixed in this branch (the seed
+resurrecting revoked assignments). Same root: the seed treating a stale column
+as truth and re-granting from it.
+
+**No live account is exposed today**, and that was checked rather than assumed:
+the only other mismatches are 34 active users whose enum role is `PROVIDER_USER`,
+which is not in `ROLE_CODES`, so step 4 skips them entirely. The one affected
+account is deactivated. Recorded rather than fixed because the fix is a design
+decision — should step 4 skip a user who already holds any active assignment, or
+should `User.role` be reconciled when a role is assigned? — and it belongs with
+DEC-15/16 rather than being chosen here.
+
+### After
+
+permissions 84 · roles 25 · grants 361 · assignments **121** (was 120) ·
+step-4 work remaining **0** · SUPER_ADMIN 84/84.
