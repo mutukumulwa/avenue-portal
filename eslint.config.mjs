@@ -9,6 +9,12 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    // …and any PARKED build directory. `.next` is a symlink to a location off
+    // iCloud Drive (scripts/local-build-dir.mjs); when a previous real `.next`
+    // has to be moved aside it becomes `.next-preicloud-<pid>`, and an ignore
+    // anchored on the exact name does not cover it. Two such directories once
+    // contributed 24,508 errors to a repo-wide lint that reads as source.
+    ".next-*/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
