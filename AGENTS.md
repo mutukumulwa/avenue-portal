@@ -41,8 +41,24 @@ npx eslint <changed-files>
 ### Those three are not sufficient. Build before you push.
 
 ```bash
-SCHEMA_DEPLOY_MODE=skip npx next build
+npm run build:local
 ```
+
+That wrapper exists because **this repository lives in iCloud Drive**, and a
+production build writes ~2 GB across ~50k files into `.next`. iCloud syncs all of
+it, and on 2026-08-13 that produced: `next build` hanging after its version
+banner at 0% CPU for 63 minutes (twice), iCloud conflict copies *inside* `.next`
+(`cache 4`, `server 2`, `static 2`, `types 4`), a `.next` so wedged that `ls`
+blocked and `rm -rf` made no progress in 14 minutes, and `vitest` hanging at its
+RUN banner because it globs the project root.
+
+`npm run build:local` points `.next` at `~/Library/Caches/avenue-portal/`, which
+iCloud does not sync, and then builds. **27 seconds, reliably.** `distDir` cannot
+do this — the vendored docs say it "should not leave your project directory", and
+the project directory *is* the iCloud directory. `npm run build` is unchanged and
+is still what Vercel runs, so nothing about the deployed build is affected.
+
+Run `npm run build:dir -- --status` to check where the output currently goes.
 
 Some rules exist only in SWC and the Next compiler, so typecheck, lint and tests **all pass on code
 that cannot be built**. The one that shipped a broken `main` on 2026-08-13: a `"use server"` module

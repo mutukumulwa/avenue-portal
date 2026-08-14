@@ -77,7 +77,10 @@ const STEPS = [
     id: "3b",
     name: "next build — the gate the plan's list omits (see header)",
     phase: "pre-push",
-    cmd: "SCHEMA_DEPLOY_MODE=skip npx next build",
+    // `npm run build:local` first points `.next` at a directory outside
+    // iCloud Drive. Without that this step hung at 0% CPU for 63 minutes
+    // on 2026-08-13 — see scripts/local-build-dir.mjs.
+    cmd: "npm run build:local",
   },
   {
     id: "4",
