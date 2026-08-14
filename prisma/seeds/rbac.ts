@@ -89,6 +89,14 @@ export const PERMISSIONS: Array<{
   // REPORT
   { code: "REPORT:VIEW",     module: "REPORT", action: "VIEW",     resource: "REPORT", description: "View reports" },
   { code: "REPORT:GENERATE", module: "REPORT", action: "GENERATE", resource: "REPORT", description: "Generate and download reports" },
+
+  // ── UAT-HF remediation (DEC-14) ───────────────────────────────────────────
+  // Dotted codes, matching the constants the runtime actually checks. See the
+  // note in src/lib/authz/catalog.ts for why they are not MODULE:ACTION.
+  { code: "member.sensitive.reveal",  module: "MEMBER",   action: "REVEAL", resource: "SENSITIVE_FIELD",   description: "Unmask a member's ID number or phone (audited reveal)" },
+  { code: "member.duplicate.review",  module: "MEMBER",   action: "REVIEW", resource: "DUPLICATE",         description: "Resolve a duplicate-identity match to a named member (audited)" },
+  { code: "network.analytics.read",   module: "PROVIDER", action: "VIEW",   resource: "NETWORK_ANALYTICS", description: "Read provider network performance analytics" },
+  { code: "support.operation.lookup", module: "SETTINGS", action: "VIEW",   resource: "OPERATION",         description: "Look up another user's operation receipt for support" },
 ];
 
 // PNOS F1.1: merge the provider permission catalog additively (before
@@ -101,6 +109,7 @@ PERMISSIONS.push(...PROVIDER_PERMISSIONS);
 // parity suite asserts catalog ≡ seed). SENIOR_UNDERWRITER spreads this list and
 // correctly loses the same two grants.
 const UNDERWRITER_PERMS = [
+  "network.analytics.read",
   "QUOTATION:VIEW", "QUOTATION:CREATE", "QUOTATION:ISSUE", "QUOTATION:DECLINE", "QUOTATION:WITHDRAW",
   "UNDERWRITING:VIEW", "UNDERWRITING:ASSESS", "UNDERWRITING:RECORD_DECISION", "UNDERWRITING:DECLINE",
   "MEMBER:VIEW", "MEMBER:CREATE", "MEMBER:AMEND", "MEMBER:REINSTATE",
@@ -174,6 +183,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
   // Keep in lockstep with ROLE_GRANTS in src/lib/authz/catalog.ts; the parity
   // suite (tests/security/authz-parity.test.ts) fails the build if they differ.
   CUSTOMER_SERVICE: [
+    "member.sensitive.reveal", "member.duplicate.review",
     "MEMBER:VIEW", "MEMBER:CREATE", "MEMBER:AMEND", "MEMBER:REINSTATE",
     "GROUP:VIEW",
     "OVERRIDE:REQUEST",

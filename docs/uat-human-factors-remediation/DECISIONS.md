@@ -231,6 +231,89 @@ it, and P00.04 exists precisely to make schema deployment reproducible. B is a d
 lower-cost answer if the timeline will not carry A. C should be rejected — it is the status quo
 that produced the finding.
 
+### DEC-14 — Who holds the four new permissions
+**Status:** **PROVISIONAL — for UAT only. Medvex must agree this before production.**
+**Decided by:** Claude, at the owner's request, on 2026-08-14.
+
+The remediation added four permissions and granted them to nobody. They existed
+only as string constants beside their call sites — absent from both
+`ROLE_GRANTS` and `prisma/seeds/rbac.ts` — so `permitted()` could never match
+them and only `SUPER_ADMIN`'s `*` satisfied them. **A permission no role can
+hold is a feature nobody can reach**, which is why the duplicate-review surface
+and the support lookup were unusable by anyone but a super admin.
+
+| Permission | Granted to | Reasoning |
+|---|---|---|
+| `member.sensitive.reveal` | `CUSTOMER_SERVICE` | The desk that verifies a caller's identity is the one that needs the unmask. Already audited per DEC-10, so the control is the record, not the withholding. |
+| `member.duplicate.review` | `CUSTOMER_SERVICE` | The same desk hits the hard conflict during enrolment. Giving it to a role that never enrols would leave the operator ringing a colleague — the exact gap P05.04 was written to close. |
+| `network.analytics.read` | `UNDERWRITER` | Network performance is a commercial/contracting question, not a claims one. |
+| `support.operation.lookup` | **nobody** | Deliberately left to `SUPER_ADMIN`'s wildcard. It shows other users' operations; until somebody owns "support", widening it would be guessing at an audience. |
+
+**Why this is provisional.** Three of the four are privacy reveals. Who may
+unmask a member's national ID is a policy question for Medvex, not an
+implementation detail, and I was asked to unblock UAT rather than to settle it.
+
+---
+
+### DEC-15 — The permission model assumes staffing that providers do not have
+**Status:** **OPEN — product decision, raised 2026-08-14 by the owner.**
+
+A provider meeting on 2026-08-13 established that a typical provider will have
+**one or two people** touching this system. The RBAC model assumes an enterprise
+with distinct actors — separate claims, underwriting, finance, member-ops and
+customer-service roles, plus maker/checker separation between them.
+
+For most providers those roles **collapse into one person**. That is not a
+configuration problem to be solved per-tenant; it is a mismatch between the
+model and the market, and it has two consequences worth separating:
+
+**Maker/checker becomes theoretical.** Several flows on this branch require a
+checker who is not the maker — termination, fraud/breach, lapse reinstatement.
+With two staff, that is one specific colleague; with one, it is nobody. DEC-03's
+separation is correct as policy and unimplementable at that staffing level.
+Someone has to decide whether such providers are refused those actions, or the
+TPA supplies the checker.
+
+**The catalogue is the wrong shape.** Twenty-four roles and eighty-six
+permissions is a vocabulary for an organisation with twenty-four job titles.
+
+**This is not a reason to weaken the checks.** The permissions are correct and
+the audit trail depends on them. The fix is a role model that can express "this
+person does everything at this facility" as *one* grant — a composite or
+facility-admin role — rather than expecting an operator to assemble it.
+
+---
+
+### DEC-16 — The permissioning module cannot express a shortfall
+**Status:** **OPEN — engineering gap, found 2026-08-14 while acting on DEC-14.**
+
+The owner reported difficulty using the permissioning UI. That is the surface
+behaving as built, and the finding is specific.
+
+**From the admin UI you can:**
+* revoke a role assignment (`revokeAssignmentAction`)
+* assign **one** provider duty role, and only while inviting a new user
+
+**You cannot:**
+* grant a role to a user who already exists
+* create a role
+* change which permissions a role holds
+* grant a single permission to a single person
+
+So every permissioning shortfall — including DEC-14, which is four rows in a
+catalogue — requires a code change, a review and a deploy. For a product whose
+role shapes vary per provider (DEC-15), that puts an engineer in the path of
+routine operational configuration.
+
+**Why it matters more than it looks.** The 82 permissions, 24 roles and 334
+grants in production came from a seed. Nothing in the product can adjust them.
+The first time a real provider needs a shape the seed did not anticipate, the
+answer today is a pull request.
+
+**Not fixed here.** Building role administration is a feature, not a
+remediation task, and it needs DEC-15 settled first — there is no point building
+a UI for a role model that is about to change shape.
+
 ---
 
 ## 3. Amendments

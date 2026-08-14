@@ -39,6 +39,26 @@ export const ALL_PERMISSIONS = "*";
  * Mirrors prisma/seeds/rbac.ts ROLE_PERMISSIONS, with the decision-D1 Branch A
  * amendment applied to CUSTOMER_SERVICE.
  */
+/**
+ * UAT-HF — the four permissions the remediation added (DEC-14).
+ *
+ * These are declared here as well as checked in code because `permitted()` is an
+ * exact string match against this catalogue. Until now they appeared ONLY as
+ * string constants beside their call sites, which meant no role could hold them
+ * and only SUPER_ADMIN's `*` satisfied them. A permission that no role can be
+ * granted is a feature nobody can reach.
+ *
+ * The dotted form is kept rather than converted to the `MODULE:ACTION` style
+ * used by the other 82. Converting would edit the privacy checks in
+ * `sensitive-detail.ts`, `identity-match.service.ts` and two others mid-UAT, and
+ * a typo there fails OPEN on a reveal. The inconsistency is cosmetic; the risk
+ * of changing it now is not. Normalise it deliberately, later.
+ */
+export const SENSITIVE_REVEAL = "member.sensitive.reveal";
+export const DUPLICATE_REVIEW = "member.duplicate.review";
+export const NETWORK_ANALYTICS = "network.analytics.read";
+export const SUPPORT_LOOKUP = "support.operation.lookup";
+
 export const ROLE_GRANTS: Record<UserRole, readonly string[]> = {
   SUPER_ADMIN: [ALL_PERMISSIONS],
 
@@ -64,6 +84,7 @@ export const ROLE_GRANTS: Record<UserRole, readonly string[]> = {
   // Aggregate analytics (ANALYTICS:VIEW) and view-only billing are retained —
   // both are enum-guarded surfaces, not claim data.
   UNDERWRITER: [
+    NETWORK_ANALYTICS,
     "QUOTATION:VIEW", "QUOTATION:CREATE", "QUOTATION:ISSUE", "QUOTATION:DECLINE", "QUOTATION:WITHDRAW",
     "UNDERWRITING:VIEW", "UNDERWRITING:ASSESS", "UNDERWRITING:RECORD_DECISION", "UNDERWRITING:DECLINE",
     "MEMBER:VIEW", "MEMBER:CREATE", "MEMBER:AMEND", "MEMBER:REINSTATE",
@@ -88,6 +109,7 @@ export const ROLE_GRANTS: Record<UserRole, readonly string[]> = {
    * claim detail, so it may need scoping or removal.
    */
   CUSTOMER_SERVICE: [
+    SENSITIVE_REVEAL, DUPLICATE_REVIEW,
     "MEMBER:VIEW", "MEMBER:CREATE", "MEMBER:AMEND", "MEMBER:REINSTATE",
     "GROUP:VIEW",
     "OVERRIDE:REQUEST",
