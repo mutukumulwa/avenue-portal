@@ -174,8 +174,23 @@ export class ClaimDecisionService {
       }
     }
 
-    // FFS fallback: standalone tariff schedule (pre-engine behaviour preserved).
-    const { contract, lines: rates } = await ClaimsService.resolveClaimContractRates(tenantId, claimId);
+    // FFS fallback: the contract tariff schedule, read exactly as the engine
+    // reads it (Family Hospital UAT plan P01.03 — standalone rows are no longer
+    // an implicit pricing fallback).
+    const { contract, lines: rates, contractResolution } = await ClaimsService.resolveClaimContractRates(tenantId, claimId);
+    if (contractResolution?.reasonCode === "CON-010") {
+      // Several active contracts match and nothing may pick one silently: fail
+      // closed with a deterministic 0 until the contract question is resolved or
+      // a documented PAY_ABOVE_CONTRACT_RATE override is approved (P01.03 step 3).
+      return {
+        ceiling: 0,
+        source: "Multiple active contracts match this claim — resolve which contract applies before approving",
+        deterministic: true,
+        enginePayable: null,
+        contractNumber: null,
+        unpriced: true,
+      };
+    }
     if (rates.length > 0) {
       let ceiling = 0;
       let hasEnforceableLines = false;

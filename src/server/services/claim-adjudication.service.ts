@@ -148,7 +148,7 @@ export const claimAdjudicationService = {
     const { lines: rates } = await ProviderContractsService.resolveClaimLineRates(
       tenantId,
       claim.providerId,
-      claim.dateOfService,
+      claim.admissionDate ?? claim.dateOfService, // the engine's pricing date (P01.03)
       claim.claimLines.map(l => ({
         id: l.id,
         cptCode: l.cptCode,
@@ -157,6 +157,7 @@ export const claimAdjudicationService = {
         quantity: l.quantity,
       })),
       claim.member?.group?.clientId, // per-client tariff resolution (G5.4)
+      claim.providerBranchId,
     );
 
     // OBS-5: compare like-for-like. Only lines that resolved a contracted rate

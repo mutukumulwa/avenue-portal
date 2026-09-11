@@ -1,6 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma, PrismaClient, UnlistedServiceRule } from "@prisma/client";
-import { compareTariffPrecedence } from "./tariff-precedence";
+import {
+  loadCandidateTariffs,
+  normalizeServiceText,
+  selectTariffByCodeOrDescription,
+} from "./contract-engine/tariff-selection";
 
 type Tx = Prisma.TransactionClient | PrismaClient;
 
@@ -47,6 +51,12 @@ export interface ContractSummary {
 export interface ResolvedClaimRates {
   contract: ContractSummary | null;
   lines: ResolvedLineRate[];
+  /**
+   * How the contract was resolved — the contract engine's own stage 1–2
+   * (`ContractLifecycleService.precheck`). `CON-010` means several active
+   * contracts match: callers must fail closed, never pick one (plan P01.03).
+   */
+  contractResolution: { matched: boolean; reasonCode: string | null; message: string };
 }
 
 export class ProviderContractsService {
@@ -68,6 +78,20 @@ export class ProviderContractsService {
    * Resolve the contracted position for every line on a claim:
    * scheduled rate, exclusions, unlisted-service rule, preauth and quantity flags.
    * Read-only — does not write to the DB.
+   *
+   * Family Hospital UAT plan P01.03 — this resolver now reads EXACTLY what the
+   * contract engine reads, through the engine's own functions:
+   *   - the contract is the engine's stage 1–2 match (`precheck`: branch scope,
+   *     payer applicability, and CON-010 when several contracts match — which is
+   *     reported, never resolved by picking the latest);
+   *   - the candidate rows are `loadCandidateTariffs` — contract-bound only.
+   *     Standalone (`contractId = null`) rows are NOT an implicit pricing
+   *     fallback any more; they remain admin reference data;
+   *   - each line is matched by `selectTariffByCodeOrDescription` — code first
+   *     with the shared precedence (client-specific beats master, G5.4), then the
+   *     engine's normalised description (BD-04: an uncoded line still binds).
+   * So the approval ceiling, the PA gate and the tariff stamp can no longer
+   * disagree with the price adjudication applies.
    */
   static async resolveClaimLineRates(
     tenantId: string,
@@ -75,85 +99,26 @@ export class ProviderContractsService {
     dateOfService: Date,
     lines: { id: string; cptCode: string | null; description?: string | null; unitCost: number; quantity: number }[],
     clientId?: string | null,
+    /** The claim's branch; the engine scopes branch-specific rows by it. */
+    providerBranchId?: string | null,
   ): Promise<ResolvedClaimRates> {
-    const contract = await this.getActiveContract(tenantId, providerId, dateOfService);
+    // Dynamic import: contract-lifecycle.service imports this module.
+    const { ContractLifecycleService } = await import("./contract-lifecycle.service");
+    const match = await ContractLifecycleService.precheck({ tenantId, providerId, providerBranchId, clientId, pricingDate: dateOfService });
+    const contract = match.matched && match.contract
+      ? await prisma.providerContract.findUnique({ where: { id: match.contract.id } })
+      : null;
 
-    const cptCodes = lines.map(l => l.cptCode).filter(Boolean) as string[];
-
-    const tariffs = cptCodes.length
-      ? await prisma.providerTariff.findMany({
-          where: {
-            providerId,
-            cptCode: { in: cptCodes },
-            isActive: true,
-            effectiveFrom: { lte: dateOfService },
-            OR: [{ effectiveTo: null }, { effectiveTo: { gte: dateOfService } }],
-            // Only the governing contract's lines or standalone (legacy) lines apply —
-            // never rates belonging to a draft/expired/other contract.
-            AND: [
-              { OR: [{ contractId: contract?.id ?? "__none__" }, { contractId: null }] },
-              // Per-client tariff (G5.4): this client's negotiated rate OR the
-              // shared master rate (clientId null). Never another client's rate.
-              { OR: [{ clientId: clientId ?? null }, { clientId: null }] },
-            ],
-          },
-        })
+    const tariffs = contract
+      ? await loadCandidateTariffs(prisma, { contractId: contract.id, pricingDate: dateOfService, providerBranchId, clientId })
       : [];
-
-    // Best rate per code: client-specific beats master, then contract-scoped beats
-    // standalone, then tariff-type priority, then latest (WP-N2: the SAME shared
-    // comparator the contract engine uses, so both resolvers agree on overlap).
-    tariffs.sort(compareTariffPrecedence);
-    const tariffMap = new Map<string, (typeof tariffs)[number]>();
-    for (const t of tariffs) {
-      if (t.cptCode && !tariffMap.has(t.cptCode)) tariffMap.set(t.cptCode, t);
-    }
-
-    // BD-04: a contracted service billed WITHOUT its CPT must still bind to the
-    // tariff — otherwise a provider escapes the ceiling just by omitting the
-    // code. Match uncoded/unmatched lines by exact (case-insensitive) service
-    // description against the tariff's serviceName / standardDescription /
-    // providerDescription. Precedence below is identical to the CPT path
-    // (client-specific → contract-scoped → tariff-type → latest), so this is a
-    // deterministic resolution, not a guess.
-    const norm = (s?: string | null) => s?.trim().toLowerCase() ?? "";
-    const descTerms = Array.from(
-      new Set(lines.map(l => norm(l.description)).filter(d => d.length > 0)),
-    );
-    const descTariffs = descTerms.length
-      ? await prisma.providerTariff.findMany({
-          where: {
-            providerId,
-            isActive: true,
-            AND: [
-              { effectiveFrom: { lte: dateOfService } },
-              { OR: [{ effectiveTo: null }, { effectiveTo: { gte: dateOfService } }] },
-              { OR: [{ contractId: contract?.id ?? "__none__" }, { contractId: null }] },
-              { OR: [{ clientId: clientId ?? null }, { clientId: null }] },
-              {
-                OR: descTerms.flatMap(d => [
-                  { serviceName: { equals: d, mode: "insensitive" as const } },
-                  { standardDescription: { equals: d, mode: "insensitive" as const } },
-                  { providerDescription: { equals: d, mode: "insensitive" as const } },
-                ]),
-              },
-            ],
-          },
-        })
-      : [];
-    descTariffs.sort(compareTariffPrecedence);
-    const descTariffMap = new Map<string, (typeof descTariffs)[number]>();
-    for (const t of descTariffs) {
-      for (const key of [norm(t.serviceName), norm(t.standardDescription), norm(t.providerDescription)]) {
-        if (key && !descTariffMap.has(key)) descTariffMap.set(key, t);
-      }
-    }
 
     const exclusions = contract
       ? await prisma.providerContractExclusion.findMany({ where: { contractId: contract.id } })
       : [];
     const excludedCodes = new Set(exclusions.map(e => e.cptCode).filter(Boolean) as string[]);
-    const excludedNames = new Set(exclusions.map(e => e.serviceName.trim().toLowerCase()));
+    // The engine's normaliser, so an exclusion matches here iff it matches there.
+    const excludedNames = new Set(exclusions.map(e => normalizeServiceText(e.serviceName)));
 
     const unlistedRule = contract?.unlistedServiceRule ?? null;
     const unlistedPct = contract?.unlistedDiscountPct != null ? Number(contract.unlistedDiscountPct) : null;
@@ -172,15 +137,18 @@ export class ProviderContractsService {
       // 1. Contractual exclusion — not payable at this provider.
       const isExcluded =
         (l.cptCode && excludedCodes.has(l.cptCode)) ||
-        (l.description && excludedNames.has(l.description.trim().toLowerCase()));
+        (l.description && excludedNames.has(normalizeServiceText(l.description)));
       if (contract && isExcluded) {
         return { ...base, agreedRate: null, allowedUnit: 0, ruleApplied: "EXCLUDED" as const, variance: null, variancePct: null };
       }
 
-      // 2. On a tariff schedule — matched by CPT, else by exact service
+      // 2. On a tariff schedule — the engine's selection: code, else normalised
       //    description (BD-04: CPT-less lines still bind to the contracted rate).
-      const tariff =
-        (l.cptCode ? tariffMap.get(l.cptCode) : undefined) ?? descTariffMap.get(norm(l.description));
+      const tariff = selectTariffByCodeOrDescription(tariffs, {
+        cptCode: l.cptCode,
+        providerServiceCode: null,
+        description: l.description ?? "",
+      })?.tariff;
       if (tariff) {
         const agreedRate = Number(tariff.agreedRate);
         const variance = l.unitCost - agreedRate;
@@ -238,6 +206,7 @@ export class ProviderContractsService {
           }
         : null,
       lines: resolved,
+      contractResolution: { matched: !!contract, reasonCode: match.reasonCode ?? null, message: match.message },
     };
   }
 

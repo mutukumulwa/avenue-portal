@@ -200,7 +200,9 @@ export class ClaimsService {
       where: { id: claimId, tenantId },
       select: {
         dateOfService: true,
+        admissionDate: true,
         providerId: true,
+        providerBranchId: true,
         member: { select: { group: { select: { clientId: true } } } },
         claimLines: {
           orderBy: { lineNumber: "asc" },
@@ -208,12 +210,14 @@ export class ClaimsService {
         },
       },
     });
-    if (!claim) return { contract: null, lines: [] };
+    if (!claim) return { contract: null, lines: [], contractResolution: { matched: false, reasonCode: null, message: "Claim not found." } };
 
     return ProviderContractsService.resolveClaimLineRates(
       tenantId,
       claim.providerId,
-      claim.dateOfService,
+      // The engine prices on `admissionDate ?? dateOfService` (§6.1.1); so does
+      // this resolver now, so both evaluate the same contract window (P01.03).
+      claim.admissionDate ?? claim.dateOfService,
       claim.claimLines.map(l => ({
         id: l.id,
         cptCode: l.cptCode,
@@ -222,6 +226,7 @@ export class ClaimsService {
         quantity: l.quantity,
       })),
       claim.member?.group?.clientId, // per-client tariff resolution (G5.4)
+      claim.providerBranchId,
     );
   }
 

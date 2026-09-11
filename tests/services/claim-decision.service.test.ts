@@ -349,6 +349,17 @@ describe("PR-014 — contract price ceiling", () => {
     await expect(decide({ approvedAmount: 86000 })).resolves.toBeTruthy();
   });
 
+  it("P01.03: several matching contracts (CON-010) fail closed — a deterministic 0, never a silent pick", async () => {
+    claimsSvc.resolveClaimContractRates.mockResolvedValue({
+      contract: null,
+      lines: [{ lineId: "l1", cptCode: null, allowedUnit: null, quantity: 1, maxQuantityPerVisit: null, unitCost: 86000, requiresPreauth: false, quantityExceeded: false }],
+      contractResolution: { matched: false, reasonCode: "CON-010", message: "Multiple active contracts match — manual resolution required." },
+    });
+    const assessment = await ClaimDecisionService.assessCeiling(T, "clm1");
+    expect(assessment).toMatchObject({ ceiling: 0, deterministic: true, unpriced: true });
+    expect(assessment.source).toMatch(/Multiple active contracts/);
+  });
+
   it("BD-07 (FFS): an unpriced tariff line (allowedUnit null) contributes 0 — priced lines only", async () => {
     claimsSvc.resolveClaimContractRates.mockResolvedValue({
       contract: { contractNumber: "PC-2026-002", unlistedServiceRule: "REFER_FOR_REVIEW", unlistedDiscountPct: null },

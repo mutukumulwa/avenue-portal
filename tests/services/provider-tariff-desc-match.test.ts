@@ -15,8 +15,10 @@ const activeContract = {
   endDate: new Date("2030-01-01"),
 };
 
+// Family Hospital UAT P01.03: the resolver now takes its contract from the
+// engine's own precheck (findMany + include) and the full row by id.
 const db = vi.hoisted(() => ({
-  providerContract: { findFirst: vi.fn() },
+  providerContract: { findFirst: vi.fn(), findMany: vi.fn(), findUnique: vi.fn() },
   providerTariff: { findMany: vi.fn() },
   providerContractExclusion: { findMany: vi.fn(async () => []) },
 }));
@@ -34,7 +36,10 @@ const tariff = (over: Record<string, unknown>) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  db.providerContract.findFirst.mockResolvedValue(activeContract);
+  db.providerContract.findMany.mockResolvedValue([
+    { ...activeContract, branchScope: "ALL_BRANCHES", currentVersionId: "v1", contractBranches: [], applicability: [] },
+  ]);
+  db.providerContract.findUnique.mockResolvedValue(activeContract);
 });
 
 describe("resolveClaimLineRates — CPT-less description match (BD-04)", () => {
