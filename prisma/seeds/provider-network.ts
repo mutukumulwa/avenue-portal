@@ -117,6 +117,16 @@ export async function seedProviderNetwork(prisma: PrismaClient, tenantId: string
         },
       })
       await prisma.providerContract.update({ where: { id: contract.id }, data: { currentVersionId: v1.id } })
+      // Family Hospital UAT P01.03 / DEC-FH-X3: claims and pre-authorisations are
+      // priced only from rows attached to the applicable contract version —
+      // standalone rows are never a pricing fallback. So the seed rate schedule
+      // carries this provider's seeded rates (created standalone by prisma/seed.ts),
+      // attached exactly as an operator attaches an imported price list. Only when
+      // this run creates the contract: an existing database is never rewritten.
+      await prisma.providerTariff.updateMany({
+        where: { providerId: provider.id, contractId: null, versionId: null },
+        data: { contractId: contract.id, versionId: v1.id },
+      })
       result.contractsCreated++
     }
 

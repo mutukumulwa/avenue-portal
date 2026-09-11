@@ -11,7 +11,11 @@
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import "@testing-library/jest-dom/vitest";
-import { render, screen, fireEvent, waitFor, cleanup, within } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, cleanup, within, configure } from "@testing-library/react";
+
+// Several debounced searches per test: allow for a loaded CI machine (the full
+// suite runs ~460 files in parallel), not only for an idle one.
+configure({ asyncUtilTimeout: 5000 });
 
 const capture = vi.hoisted(() => ({ resolveCaseContextAction: vi.fn(), searchDiagnosesAction: vi.fn(), searchServiceCatalogAction: vi.fn() }));
 vi.mock("@/app/provider/capture-actions", () => capture);

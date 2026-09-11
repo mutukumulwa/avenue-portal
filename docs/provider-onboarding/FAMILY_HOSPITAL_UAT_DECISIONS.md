@@ -150,3 +150,50 @@ The shared case resolver refuses a service date later than Kampala today for cla
 eligibility (the existing rule). A pre-authorisation is requested for a planned service, and the
 pre-auth intake has always accepted a later expected date, so for `PREAUTH` the resolver accepts
 it too. No new upper bound is introduced (none existed).
+
+**DEC-FH-X3 addendum (P05 verification, 2026-09-11).** The repository's own seed was inconsistent
+with this rule: `prisma/seed.ts` creates each seeded provider's rates standalone, and
+`prisma/seeds/provider-network.ts` then gives the provider an ACTIVE "Seed Rate Schedule" contract
+with no rates on it. Under the rule, claims at those providers are "under an active contract but
+unpriced" and the decision's contract enforcement refuses them — which is what six real-database
+autopilot tests hit. The provider-network seed now attaches the provider's standalone rates to the
+seed contract's V1 when (and only when) it creates that contract. An existing database is never
+rewritten; production was not seeded with the provider-network seed (DEC-FH-X3's production
+measurement: five of the six seed-era providers have no active contract).
+
+### 4.6 DEC-FH-X6 — what a facility administrator may grant (plan P05.04 step 3)
+
+The acceptance says a provider administrator cannot "grant a stronger persona". The strict reading —
+"only personas whose every permission the administrator holds" — would stop the Admin persona
+(users, API keys, profile change requests; no claims or finance) from onboarding billers and front
+desk staff, which F1.5 designed it to do and its real-database tests assert. Applied instead: a
+persona may be granted only if every **administrative** permission it carries
+(`provider.users.manage`, `provider.api_keys.manage`, `provider.integrations.manage`,
+`provider.profile.change_request`) is held by the granting administrator. So an Admin can invite
+front desk, clinicians, billers, finance staff and other Admins, but not an Integration Admin or a
+Facility Admin; a Facility Admin can grant every persona. The same rule now guards "Add a role" on
+the Users page (`assertGrantablePersona`). A facility administrator also can only assign branches
+they can act at themselves, and can only touch their own facility's provider users.
+
+Residual, stated plainly: an Admin can still create a biller account, as F1.5 intends — a reviewer
+who wants "never grant a permission you lack" should change the Admin persona or this rule.
+
+### 4.7 DEC-FH-X7 — invitation rate limits (plan P05.01 step 5; executor defaults)
+
+Counted in the database over the last hour, so they hold across serverless instances: at most 30
+invitations or resends per administrator, 5 setup links per account, and 5 per email address
+(across tenants — the address is kept only as a SHA-256 hash). A self-service "send me a new link"
+request counts against the account and the address, never against an administrator. Adjustable in
+`INVITATION_RATE_LIMITS`.
+
+### 4.8 DEC-FH-X8 — a new setup link replaces the account's secret (plan P05.01 step 5)
+
+Sending a setup link to an account that has not been set up (its holder never chose a password)
+revokes every older unused link **and** replaces the account's password hash with a new random value
+nobody sees, bumping the session version. So a temporary password handed out under the old process
+stops working the moment a setup link is sent.
+
+This matters for Family Healthcare: the two exposed temporary passwords (P00.02, owner: "not yet")
+stay valid until someone sends those two staff members a setup link. Sending it (P08.04 step 9,
+which needs the owner's approval anyway) performs the P00.02 containment as a side effect — the
+owner should know that before approving the invitations.

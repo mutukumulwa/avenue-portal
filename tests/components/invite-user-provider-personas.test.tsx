@@ -9,6 +9,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 // dropdown the operator actually sees.
 vi.mock("@/app/(admin)/settings/actions", () => ({
   inviteUserAction: vi.fn(async () => ({ ok: true })),
+  resendInvitationAction: vi.fn(async () => ({ ok: true })),
 }));
 
 import { InviteUserModal } from "@/app/(admin)/settings/InviteUserModal";

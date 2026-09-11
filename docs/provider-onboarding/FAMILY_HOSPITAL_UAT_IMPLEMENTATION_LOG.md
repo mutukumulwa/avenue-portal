@@ -56,7 +56,7 @@ Status values: `NOT_STARTED` · `IN_PROGRESS` · `DONE` · `BLOCKED (<gate>)` ·
 | P02.01 Provider case-context resolver | DONE | see §3 | |
 | P02.02 Member resolution surface | DONE | see §3 | the eligibility link itself is switched in P04.04 |
 | P02.03 Provider-scoped service catalogue | DONE | see §3 | behind provider-scoped flag `providerTariffCatalog`, default OFF (P08.04 step 6) |
-| P02.04 Revalidate selected tariffs on submit | DONE | see §3 | claims (eee198c) + pre-auth/amendment (P04 commit); migration not yet applied to any shared database |
+| P02.04 Revalidate selected tariffs on submit | DONE | see §3 | claims (eee198c) + pre-auth/amendment (2c73ad5); migration not yet applied to any shared database |
 | P03.01 Provider member field | DONE | see §3 | |
 | P03.02 Diagnosis combobox | DONE | see §3 | |
 | P03.03 Category-first service combobox | DONE | see §3 | |
@@ -67,10 +67,10 @@ Status values: `NOT_STARTED` · `IN_PROGRESS` · `DONE` · `BLOCKED (<gate>)` ·
 | P04.03 New and amended pre-auth | DONE | see §3 | DEC-FH-X4, DEC-FH-X5 |
 | P04.04 Eligibility | DONE | see §3 | |
 | P04.05 Terminology completeness | DONE | see §3 | DEC-FH-03 = no source: report only, production run saved |
-| P05.01 Account-setup token | NOT_STARTED | | |
-| P05.02 Deliver invitations | NOT_STARTED | | |
-| P05.03 Complete account setup | NOT_STARTED | | |
-| P05.04 One canonical invitation service | NOT_STARTED | | |
+| P05.01 Account-setup token | DONE | see §3 | migration `20260911000200` not yet applied to a shared database; DEC-FH-X7/X8 |
+| P05.02 Deliver invitations | DONE | see §3 | production SMTP + `NEXT_PUBLIC_APP_URL` unverified (P08.04 step 3) |
+| P05.03 Complete account setup | DONE | see §3 | |
+| P05.04 One canonical invitation service | DONE | see §3 | DEC-FH-X6 |
 | P06 Provider navigation | NOT_STARTED | | |
 | P07.01 Clean up affected claims/pre-auths | NOT_STARTED | | DEC-FH-04 + production approval |
 | P07.02 Fresh Family UAT fixtures | NOT_STARTED | | |
@@ -508,7 +508,7 @@ Reviewer/sign-off:       pending (provider UX review, P08.04 step 1)
 ```text
 Task ID:                 P04.01
 Defects covered:         FH-02, FH-04, FH-05, FH-06, FH-07, FH-09, FH-10, FH-12
-Starting/ending SHA:     eee198c → P04 commit
+Starting/ending SHA:     eee198c → 2c73ad5
 Files changed:           src/app/provider/claims/new/{page.tsx,ProviderClaimForm.tsx,actions.ts},
                          src/server/services/provider-claim-capture.service.ts (new, server-only),
                          src/components/provider/claim-form-support.ts (new),
@@ -557,7 +557,7 @@ Reviewer/sign-off:       pending
 ```text
 Task ID:                 P04.02
 Defects covered:         FH-02, FH-05, FH-06, FH-07, FH-11 (correction/resubmission path), FH-12
-Starting/ending SHA:     eee198c → P04 commit
+Starting/ending SHA:     eee198c → 2c73ad5
 Files changed:           src/app/provider/claims/[id]/correct/{page.tsx,CorrectClaimForm.tsx,actions.ts},
                          src/app/provider/claims/[id]/resubmit/{page.tsx,actions.ts},
                          src/server/services/provider-claim-seed.ts (new, server-only),
@@ -600,7 +600,7 @@ Reviewer/sign-off:       pending
 ```text
 Task ID:                 P04.03
 Defects covered:         FH-02, FH-04, FH-05, FH-06, FH-07, FH-10, FH-11 (pre-auth path), FH-12
-Starting/ending SHA:     eee198c → P04 commit
+Starting/ending SHA:     eee198c → 2c73ad5
 Files changed:           src/app/provider/preauth/new/{page.tsx,ProviderPreauthForm.tsx,actions.ts},
                          src/app/provider/preauth/[id]/{AmendPreauthForm.tsx,actions.ts,page.tsx},
                          src/server/services/provider-preauth-capture.service.ts (new, server-only),
@@ -645,7 +645,7 @@ Reviewer/sign-off:       pending
 ```text
 Task ID:                 P04.04
 Defects covered:         FH-09, FH-12 (labels), the eligibility → claim hand-off
-Starting/ending SHA:     eee198c → P04 commit
+Starting/ending SHA:     eee198c → 2c73ad5
 Files changed:           src/app/provider/eligibility/{page.tsx,EligibilityCheckForm.tsx}
 Schema migration/backfill: none
 Automated tests added/changed: tests/components/provider-eligibility-form.test.tsx (5)
@@ -669,7 +669,7 @@ provider-scoped, re-resolved by P02) instead of `?memberId=`.
 ```text
 Task ID:                 P04.05
 Defects covered:         FH-14
-Starting/ending SHA:     eee198c → P04 commit
+Starting/ending SHA:     eee198c → 2c73ad5
 Files changed:           scripts/reports/icd-terminology-coverage.ts (new)
 Schema migration/backfill: none — no import (DEC-FH-03)
 Read-only preflight artifact: evidence/P04.05-icd-coverage-2026-09-11T08-57-15-411Z.{md,json}
@@ -703,3 +703,101 @@ Reviewer/sign-off:       pending
 - Full suite at this point: `npx vitest run` → 369 files passed / 88 skipped; 4,686 tests passed /
   599 skipped (the skipped suites need a test database — run in P08.01/P08.02).
 
+### P05 — Invitations replace the temporary-password handoff
+
+```text
+Task IDs:                P05.01–P05.04
+Defects covered:         FH-01
+Starting/ending SHA:     2c73ad5 → P05 commit
+Files changed:           prisma/schema.prisma (AccountSetupInvitation + AccountSetupDeliveryStatus),
+                         prisma/migrations/20260911000200_account_setup_invitation/,
+                         src/server/services/account-invitation.service.ts (new, server-only),
+                         src/server/services/provider-user-admin.service.ts (assertGrantablePersona),
+                         src/server/services/notification.service.ts (no fallback transport),
+                         src/lib/queue.ts (sendEmailBounded + safe failure classes),
+                         src/lib/public-origin.ts (new),
+                         src/app/(auth)/account-setup/{page.tsx,AccountSetupForm.tsx,actions.ts} (new),
+                         src/app/(auth)/login/page.tsx ("account set up" notice),
+                         src/app/(admin)/settings/{actions.ts,InviteUserModal.tsx,page.tsx},
+                         src/app/provider/users/{actions.ts,page.tsx,ProviderUsersManager.tsx},
+                         src/components/users/InvitationStatus.tsx (new),
+                         tests/audit-coverage/catalogue.ts
+Schema migration/backfill: ADDITIVE — a new enum and a new empty table (indexes, FKs ON DELETE
+                         RESTRICT). No existing row changes. Generated with prisma migrate diff
+                         against a throwaway database carrying every earlier migration; applied
+                         there with `prisma migrate deploy`; the post-apply diff is empty.
+Automated tests added/changed: tests/integration/account-invitation.integration.test.ts (9, real DB),
+                         tests/actions/account-invitation-actions.test.ts (9),
+                         tests/components/account-setup-form.test.tsx (5),
+                         tests/components/invitation-admin-ui.test.tsx (5),
+                         tests/lib/public-origin.test.ts (4), tests/services/notification-transport.test.ts (3),
+                         tests/lib/send-email-bounded.test.ts (+7),
+                         tests/components/invite-user-provider-personas.test.tsx (mock gains the resend action)
+Commands and results:    typecheck clean; eslint clean; full default suite 374 files / 4,719 tests
+                         passed (608 skipped); account-invitation integration 9/9 and the F1.5
+                         provider-user-admin DB suite 6/6 against the throwaway database
+Browser scenarios and evidence paths: P08.03
+Feature/config changes:  none in code; DEPLOYMENT REQUIREMENTS: SMTP_HOST (+ SMTP_PORT, SMTP_USER,
+                         SMTP_PASS as the relay needs) and NEXT_PUBLIC_APP_URL (https) must be set —
+                         without them every invitation is created and recorded FAILED (CONFIG /
+                         ORIGIN) and can be resent once configured
+Data mutations and operation IDs: none outside throwaway databases
+Rollback tested:         not yet (deployment sequence, P08)
+Residual risk:           (1) the TPA "Reset password" modal still lets an administrator choose a
+                         temporary password — outside P05's named scope, left as is and flagged;
+                         (2) DEC-FH-X6's Admin-can-create-a-biller residual; (3) sending a link to
+                         the two exposed Family accounts invalidates their temporary passwords
+                         (DEC-FH-X8) — the P00.02 containment happens then, not before
+Reviewer/sign-off:       pending (schema/security review, P08.04 step 1)
+```
+
+- **Token and account (P05.01).** 256-bit random token, base64url, only its SHA-256 stored (unique
+  index); 24-hour expiry (DEC-FH-05); single use enforced by a conditional update, so two parallel
+  submissions cannot both succeed. A new account's password is a bcrypt(12) hash of 32 random bytes
+  nobody sees, with `mustChangePassword`; account, persona, branches, invitation and the
+  `USER_INVITED` audit row are one transaction. Duplicate address: inside the administrator's scope
+  the existing account and its pending state are shown with a resend; a facility administrator
+  learns nothing about an address used by another facility or by TPA staff. Resend revokes older
+  unused links and replaces the account's secret (DEC-FH-X8), rate-limited (DEC-FH-X7).
+- **Delivery (P05.02).** After commit, one message to that person, bounded at 8 s, built from
+  `NEXT_PUBLIC_APP_URL` (or `NEXTAUTH_URL`) only — never a request header — with the token in the
+  URL fragment. The Mailtrap / `test-user` / `test-pass` fallback is gone: without `SMTP_HOST` a send
+  is an explicit `EmailConfigurationError` (the test runner alone gets a JSON transport). Status
+  PENDING → SENT / FAILED with attempts, last attempt and a safe class (CONFIG, ORIGIN, AUTH,
+  CONNECTION, TIMEOUT, REJECTED, UNKNOWN); a mail server's own error text is never logged or stored
+  (`sendEmailNowBounded`, used by password reset, now logs the class only — it logged the raw message,
+  which can carry an address). The administrator sees "User created; invitation delivery failed —
+  resend." Telemetry: `invitation_delivery`, `invitation_activation`.
+- **Setup (P05.03).** `/account-setup#token=…`: the client reads the token, removes the fragment with
+  `history.replaceState` before anything else, keeps the token in a ref (never state, a field or the
+  HTML), asks the server yes/no, then posts password + confirmation with the token. The server checks
+  again and, in one transaction, sets the password, clears `mustChangePassword`, spends the link,
+  revokes its siblings, bumps `sessionVersion`, clears lockout counters and writes
+  `ACCOUNT_SETUP_COMPLETED`; the redirect to `/login?setup=done` is outside every try/catch. Used,
+  replaced, expired, altered, suspended-account and cross-tenant links all get one message and a
+  "send me a new link" form, which answers identically whatever the address and re-issues only for
+  accounts already invited through this service.
+- **Surfaces (P05.04).** TPA Settings: no password field, "Send invitation", outcome shown, and for
+  every account not yet set up its link state (sent/failed with reason/expired) and "Resend link".
+  Facility Users page: "Invite a staff member" (personas and branches the administrator may grant —
+  DEC-FH-X6), the same state and resend per account. Both call `AccountInvitationService`.
+
+**Real-database verification (P08.01 groundwork, 2026-09-11).** On a throwaway Postgres 17 with
+every migration applied and `prisma/seed.ts` run, all 97 opt-in suites (`AUTOPILOT_TEST_DB`):
+
+- first run: 6 failures only on this branch — autopilot execution/breaker tests refused by contract
+  enforcement because the seed's providers had an active contract with no rates attached (their
+  rates were standalone). Fixed in the seed, not the tests (DEC-FH-X3 addendum).
+- after the seed fix: 90 files / 593 tests pass; 16 tests in 6 files fail, and **the same 16 fail
+  on the baseline commit `3fa0159`** (a detached checkout of it, with the same factory fix below, run
+  against a database migrated to this branch's head and seeded with the seed as it was):
+  claim-intake API (8), autopilot campaign S4/S5 (2), offline sync isolation (1), pre-auth intake (3),
+  provider eligibility (1), RBAC catalogue (1). Pre-existing; not touched here.
+- test infrastructure fix: `tests/factories/provider-network.ts` created two schemes under one client
+  without `nameNormalized`, so every factory-based opt-in suite failed at setup on the unique
+  `(clientId, nameNormalized)`; it now computes the value as every scheme create path does.
+
+- seed fix: `prisma/seeds/provider-network.ts` (DEC-FH-X3 addendum).
+- test robustness: the four capture-form component suites run several debounced searches per test and
+  one timed out once under the full parallel run (never alone); they now allow 5 s per async wait
+  (`configure({ asyncUtilTimeout: 5000 })`). No assertion changed.

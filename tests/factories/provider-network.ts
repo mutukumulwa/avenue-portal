@@ -26,6 +26,7 @@
  */
 import { randomUUID } from "crypto";
 import type { PrismaClient } from "@prisma/client";
+import { normalizeLegalName } from "@/lib/normalize";
 
 export type ProviderWorld = Awaited<ReturnType<typeof buildProviderWorld>>;
 
@@ -78,7 +79,10 @@ export async function buildProviderWorld(prisma: Prisma, opts: BuildOptions = {}
   async function mkGroup(tenantId: string, clientId: string, packageId: string, name: string) {
     return prisma.group.create({
       data: {
-        tenantId, clientId, packageId, name: `${name} ${token}`,
+        // nameNormalized is unique per client (@@unique([clientId, nameNormalized]));
+        // every scheme create path computes it, and so must the factory, or the
+        // second scheme of a client collides on the empty default.
+        tenantId, clientId, packageId, name: `${name} ${token}`, nameNormalized: normalizeLegalName(`${name} ${token}`),
         contactPersonName: "Ops Lead", contactPersonPhone: "+256700000000", contactPersonEmail: `ops.${token}@example.test`,
         contributionRate: 50_000, effectiveDate: past(365), renewalDate: future(30), status: "ACTIVE",
       },

@@ -4,7 +4,9 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { InviteUserModal } from "./InviteUserModal";
 import { ResetPasswordModal } from "./ResetPasswordModal";
 import { ROLE_PERMISSIONS, STAFF_ROLES, isPortalRole } from "@/lib/constants";
-import { updateUserAccessAction } from "./actions";
+import { resendInvitationAction, updateUserAccessAction } from "./actions";
+import { AccountInvitationService } from "@/server/services/account-invitation.service";
+import { InvitationStatus } from "@/components/users/InvitationStatus";
 
 export default async function SettingsPage() {
   const session = await requireRole(ROLES.ADMIN_ONLY);
@@ -16,7 +18,7 @@ export default async function SettingsPage() {
   const [users, groups, brokers, fundGroups, providers] = await Promise.all([
     prisma.user.findMany({
       where: { tenantId },
-      select: { id: true, firstName: true, lastName: true, email: true, role: true, isActive: true, lastLoginAt: true },
+      select: { id: true, firstName: true, lastName: true, email: true, role: true, isActive: true, lastLoginAt: true, mustChangePassword: true },
       orderBy: { createdAt: "desc" },
     }),
     prisma.group.findMany({ where: { tenantId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
@@ -30,6 +32,11 @@ export default async function SettingsPage() {
       orderBy: { name: "asc" },
     }),
   ]);
+
+  // Family Hospital UAT P05.04 step 2: accounts not yet set up show their
+  // setup-link state and a resend (never the link itself).
+  const pendingIds = users.filter((u) => u.mustChangePassword).map((u) => u.id);
+  const invitations = await AccountInvitationService.stateFor(tenantId, pendingIds);
 
   const roleColor = (role: string) => {
     switch (role) {
@@ -94,9 +101,22 @@ export default async function SettingsPage() {
                   </td>
                   <td className="px-5 py-3">{u.lastLoginAt ? new Date(u.lastLoginAt).toLocaleDateString("en-UG") : "Never"}</td>
                   <td className="px-5 py-3">
-                    <span className={`px-3 py-1 text-[10px] font-bold uppercase rounded-full ${u.isActive ? "bg-[#28A745]/10 text-[#28A745]" : "bg-[#DC3545]/10 text-[#DC3545]"}`}>
-                      {u.isActive ? "Active" : "Inactive"}
+                    <span className={`px-3 py-1 text-[10px] font-bold uppercase rounded-full ${u.isActive ? (u.mustChangePassword ? "bg-[#FFC107]/15 text-[#856404]" : "bg-[#28A745]/10 text-[#28A745]") : "bg-[#DC3545]/10 text-[#DC3545]"}`}>
+                      {u.isActive ? (u.mustChangePassword ? "Not set up" : "Active") : "Inactive"}
                     </span>
+                    {u.mustChangePassword && u.isActive && (() => {
+                      const inv = invitations.get(u.id);
+                      return (
+                        <div className="mt-1">
+                          <InvitationStatus
+                            userId={u.id}
+                            canResend
+                            resendAction={resendInvitationAction}
+                            state={inv ? { status: inv.status, issuedAt: inv.issuedAt.toISOString(), lastAttemptAt: inv.lastAttemptAt?.toISOString() ?? null, expiresAt: inv.expiresAt.toISOString(), failureClass: inv.failureClass } : null}
+                          />
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex flex-wrap items-center gap-2">

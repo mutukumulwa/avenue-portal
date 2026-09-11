@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import { ProviderAccessService } from "@/server/services/provider-access.service";
 import { PROVIDER_ROLE_LABELS } from "@/components/layouts/provider-nav-model";
 import { PROVIDER_PERSONA_ROLE_CODES } from "@/../prisma/seeds/provider-rbac";
+import { PROVIDER_ADMINISTRATIVE_PERMISSIONS } from "@/server/services/provider-user-admin.service";
+import { AccountInvitationService } from "@/server/services/account-invitation.service";
 import { ProviderUsersManager } from "./ProviderUsersManager";
 
 /**
@@ -21,7 +23,7 @@ export default async function ProviderUsersPage() {
     prisma.user.findMany({
       where: { tenantId: ctx.tenantId, providerId: ctx.providerId, role: "PROVIDER_USER" },
       select: {
-        id: true, firstName: true, lastName: true, email: true, isActive: true,
+        id: true, firstName: true, lastName: true, email: true, isActive: true, mustChangePassword: true,
         roleAssignments: {
           where: { isActive: true, status: "ACTIVE" },
           select: { role: { select: { code: true } } },
@@ -40,13 +42,23 @@ export default async function ProviderUsersPage() {
     }),
     prisma.role.findMany({
       where: { tenantId: ctx.tenantId, code: { in: [...PROVIDER_PERSONA_ROLE_CODES] }, isActive: true },
-      select: { code: true },
+      select: { code: true, permissions: { select: { permission: { select: { code: true } } } } },
     }),
   ]);
 
+  // Family Hospital UAT P05.04 step 3 / DEC-FH-X6: only personas that carry no
+  // administrative access this administrator lacks are offered (the service
+  // refuses the rest anyway), and only branches the administrator can act at.
   const personaRoles = roles
     .filter((r) => PROVIDER_PERSONA_ROLE_CODES.includes(r.code))
+    .filter((r) =>
+      r.permissions.every(
+        (p) => !(PROVIDER_ADMINISTRATIVE_PERMISSIONS as readonly string[]).includes(p.permission.code) || ctx.permissions.includes(p.permission.code),
+      ),
+    )
     .map((r) => ({ code: r.code, label: PROVIDER_ROLE_LABELS[r.code] ?? r.code }));
+  const assignableBranches = branches.filter((b) => ctx.allowedProviderBranchIds.includes(b.id));
+  const invitations = await AccountInvitationService.stateFor(ctx.tenantId, users.filter((u) => u.mustChangePassword).map((u) => u.id));
 
   const rows = users.map((u) => ({
     id: u.id,
@@ -58,6 +70,12 @@ export default async function ProviderUsersPage() {
     isSelf: u.id === ctx.actorId,
     roles: u.roleAssignments.map((a) => ({ code: a.role.code, label: PROVIDER_ROLE_LABELS[a.role.code] ?? a.role.code })),
     branchNames: u.providerBranchAssignments.map((b) => b.providerBranch.name),
+    // Not set up yet: the account holder has not chosen their own password.
+    pending: u.mustChangePassword,
+    invitation: (() => {
+      const inv = invitations.get(u.id);
+      return inv ? { status: inv.status, issuedAt: inv.issuedAt.toISOString(), lastAttemptAt: inv.lastAttemptAt?.toISOString() ?? null, expiresAt: inv.expiresAt.toISOString(), failureClass: inv.failureClass } : null;
+    })(),
   }));
 
   return (
@@ -70,7 +88,7 @@ export default async function ProviderUsersPage() {
         </div>
       </div>
 
-      <ProviderUsersManager users={rows} branches={branches} personaRoles={personaRoles} />
+      <ProviderUsersManager users={rows} branches={assignableBranches} personaRoles={personaRoles} />
     </div>
   );
 }

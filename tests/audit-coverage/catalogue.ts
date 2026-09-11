@@ -24,6 +24,12 @@ export const KNOWN_AUDITING_TOKENS = [
   "ProviderUserAdminService.", // ELIG-GAP-005 F1.5 — every role/branch/suspend/reactivate mutation writes PROVIDER_USER_* audit internally
   "DeliveryRetryService.manualRetry(", // PNOS F9.6/F9.8 — writes INTEGRATION_DELIVERY:MANUAL_RETRY audit internally
   "runClaimIntake(", // shared claim-intake path — chain-audits CLAIM:INTAKE_ACCEPTED internally
+  // Family Hospital UAT P05 — the canonical invitation service writes USER_INVITED, ACCOUNT_SETUP_LINK_SENT /
+  // _DELIVERY_FAILED / _RESENT / _REQUESTED and ACCOUNT_SETUP_COMPLETED rows itself (in the same transaction as the change).
+  "AccountInvitationService.invite(",
+  "AccountInvitationService.resend(",
+  "AccountInvitationService.completeSetup(",
+  "AccountInvitationService.requestNewLink(",
   "reimbursementService.submit(", // F5.6 — appends REIMBURSEMENT:SUBMITTED + canonical intake audit internally
   "auditLifecycleReason(", // UAT-HF P07.03 — local helper wrapping writeAudit; records the REQUIRED reason for every cover-changing member action (DEF-040/DEF-059)
   "auditPolicy(", // F6.5 — local helper wrapping auditChainService.append for the policy console
@@ -101,6 +107,8 @@ export const AUDIT_EXCLUSIONS: Record<string, string> = {
   "provider/capture-actions.ts:searchServiceCatalogAction":
     "READ_ONLY — the facility's own price-list search; throttled enumeration writes PROVIDER_CATALOGUE_SEARCH_THROTTLED",
   "provider/capture-actions.ts:searchDiagnosesAction": "READ_ONLY — ICD-10 terminology search; no business state",
+  "(auth)/account-setup/actions.ts:checkSetupLinkAction":
+    "READ_ONLY — answers whether a one-time setup link can be used (yes/no); spending it is audited by completeAccountSetupAction",
   "(auth)/reset/actions.ts:confirmResetAction": "PRE_EXISTING_GAP — audit wiring pending",
   "(auth)/reset/actions.ts:requestResetAction": "PRE_EXISTING_GAP — audit wiring pending",
   // WP-3.5G: confirmHRImportAction + addMemberEndorsementAction now call writeAudit —

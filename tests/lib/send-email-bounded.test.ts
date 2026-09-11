@@ -12,7 +12,7 @@ vi.mock("@/server/services/notification.service", () => ({
   NotificationService: notifMock,
 }));
 
-import { sendEmailNowBounded } from "@/lib/queue";
+import { classifyEmailError, sendEmailBounded, sendEmailNowBounded } from "@/lib/queue";
 
 describe("sendEmailNowBounded", () => {
   it("resolves { delivered:false } when the dispatch never settles (timeout wins)", async () => {
@@ -41,5 +41,24 @@ describe("sendEmailNowBounded", () => {
     await expect(
       sendEmailNowBounded({ to: "a@x.com", subject: "s", body: "b" }, 1000),
     ).resolves.toEqual({ delivered: false });
+  });
+});
+
+
+describe("Family Hospital UAT P05.02 — a failed send has a SAFE class, never provider text", () => {
+  it.each([
+    [Object.assign(new Error("SMTP is not configured"), { name: "EmailConfigurationError" }), "CONFIG"],
+    [new Error("email-timeout"), "TIMEOUT"],
+    [Object.assign(new Error("Invalid login: 535"), { code: "EAUTH" }), "AUTH"],
+    [Object.assign(new Error("connect ECONNREFUSED"), { code: "ECONNECTION" }), "CONNECTION"],
+    [Object.assign(new Error("550 5.1.1 <someone@x> unknown"), { responseCode: 550 }), "REJECTED"],
+    [new Error("weird"), "UNKNOWN"],
+  ])("%s → %s", (err, cls) => {
+    expect(classifyEmailError(err)).toBe(cls);
+  });
+
+  it("sendEmailBounded reports the class and never throws", async () => {
+    notifMock.executeEmailDispatch.mockRejectedValue(Object.assign(new Error("550 5.1.1 <someone@x> unknown"), { responseCode: 550 }));
+    await expect(sendEmailBounded({ to: "a@x.com", subject: "s", body: "b" }, 1000)).resolves.toEqual({ delivered: false, failureClass: "REJECTED" });
   });
 });

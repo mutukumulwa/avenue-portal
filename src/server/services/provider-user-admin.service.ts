@@ -47,17 +47,60 @@ async function audit(db: Db, args: { actorId: string; tenantId: string; action: 
   });
 }
 
-/** Target must exist in the actor's tenant AND be bound to the actor's provider. */
+/**
+ * Target must exist in the actor's tenant, be bound to the actor's provider AND
+ * be a provider user — a facility administrator never touches a TPA staff or
+ * other portal account (Family Hospital UAT P05.04 step 3, "modification of
+ * protected platform roles").
+ */
 async function loadOwnedTarget(db: Db, ctx: ProviderAccessContext, targetUserId: string) {
   const target = await db.user.findFirst({
     where: { id: targetUserId, tenantId: ctx.tenantId },
-    select: { id: true, providerId: true, isActive: true },
+    select: { id: true, providerId: true, isActive: true, role: true },
   });
   if (!target) throw new ProviderUserAdminError("NOT_FOUND", "No such user");
-  if (target.providerId !== ctx.providerId) {
+  if (target.providerId !== ctx.providerId || target.role !== "PROVIDER_USER") {
     throw new ProviderUserAdminError("FORBIDDEN_PROVIDER", "User belongs to another provider");
   }
   return target;
+}
+
+/**
+ * The administrative permissions of the provider catalogue — the ones that let a
+ * holder change who can do what, or connect systems.
+ */
+export const PROVIDER_ADMINISTRATIVE_PERMISSIONS = [
+  "provider.users.manage",
+  "provider.api_keys.manage",
+  "provider.integrations.manage",
+  "provider.profile.change_request",
+] as const;
+
+/**
+ * Family Hospital UAT P05.04 step 3 / DEC-FH-X6 — no administrative escalation.
+ *
+ * A persona may be granted by a provider actor only if every ADMINISTRATIVE
+ * permission it carries is one the actor already holds: an Admin can onboard
+ * front-desk, clinical, billing and finance staff (F1.5's design) and other
+ * Admins, but cannot mint an Integration Admin or a Facility Admin — the
+ * "stronger persona" the plan's acceptance forbids. Returns the role id.
+ */
+export async function assertGrantablePersona(db: Db, ctx: ProviderAccessContext, roleCode: string): Promise<string> {
+  if (!PROVIDER_PERSONA_ROLE_CODES.includes(roleCode)) {
+    throw new ProviderUserAdminError("FORBIDDEN_ROLE", `Not a grantable provider persona role: ${roleCode}`);
+  }
+  const role = await db.role.findUnique({
+    where: { tenantId_code: { tenantId: ctx.tenantId, code: roleCode } },
+    select: { id: true, isActive: true, permissions: { select: { permission: { select: { code: true } } } } },
+  });
+  if (!role || !role.isActive) throw new ProviderUserAdminError("ROLE_NOT_AVAILABLE", "Role not available in tenant");
+  const stronger = role.permissions
+    .map((p) => p.permission.code)
+    .filter((code) => (PROVIDER_ADMINISTRATIVE_PERMISSIONS as readonly string[]).includes(code) && !ctx.permissions.includes(code));
+  if (stronger.length > 0) {
+    throw new ProviderUserAdminError("FORBIDDEN_ROLE", "You cannot grant a role with administrative access you do not hold yourself.");
+  }
+  return role.id;
 }
 
 /** Active users in a provider who hold provider.users.manage via any active role. */
@@ -80,12 +123,9 @@ export const ProviderUserAdminService = {
    */
   async assignRole(ctx: ProviderAccessContext, input: { targetUserId: string; roleCode: string }, db: Db = prisma) {
     ProviderAccessService.requirePermission(ctx, MANAGE);
-    if (!PROVIDER_PERSONA_ROLE_CODES.includes(input.roleCode)) {
-      throw new ProviderUserAdminError("FORBIDDEN_ROLE", `Not a grantable provider persona role: ${input.roleCode}`);
-    }
+    const roleId = await assertGrantablePersona(db, ctx, input.roleCode);
     const target = await loadOwnedTarget(db, ctx, input.targetUserId);
-    const role = await db.role.findUnique({ where: { tenantId_code: { tenantId: ctx.tenantId, code: input.roleCode } } });
-    if (!role || !role.isActive) throw new ProviderUserAdminError("ROLE_NOT_AVAILABLE", "Role not available in tenant");
+    const role = { id: roleId };
 
     const existing = await db.userRoleAssignment.findFirst({
       where: { userId: target.id, roleId: role.id, tenantId: ctx.tenantId, isActive: true, status: "ACTIVE" },

@@ -75,6 +75,9 @@ function LoginForm() {
   // expired idle session back here it carries ?reason=expired. Surface WHY the
   // user is looking at the sign-in screen instead of dropping them here silently.
   const sessionExpired = searchParams.get("reason") === SESSION_EXPIRED_REASON;
+  // Family Hospital UAT P05.03: the one-time setup page lands here once the
+  // account holder has set their own password.
+  const setupDone = searchParams.get("setup") === "done";
 
   /** Field-level validation. Deliberately says nothing about account existence. */
   const validate = () => {
@@ -245,6 +248,11 @@ function LoginForm() {
             {/* DEF-010: idle-timeout notice. Distinct from a failed sign-in — it
                 explains that the previous session expired, not that credentials
                 were wrong. */}
+            {setupDone && !error && (
+              <div role="status" className="mb-4 rounded-lg border border-[#28A745]/30 bg-[#28A745]/10 px-4 py-3 text-sm text-[#1E7B34]">
+                Your account is set up. Sign in with your email address and the password you just chose.
+              </div>
+            )}
             {sessionExpired && !error && (
               <div
                 role="status"

@@ -4,15 +4,42 @@ import * as nodemailer from "nodemailer";
 
 type Channel = "EMAIL" | "SMS" | "BOTH";
 
-// Pre-configured transport bound to the generic SMTP variables
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || "smtp.mailtrap.io",
-  port: parseInt(process.env.SMTP_PORT || "2525", 10),
-  auth: {
-    user: process.env.SMTP_USER || "test-user",
-    pass: process.env.SMTP_PASS || "test-pass",
-  },
-});
+/**
+ * Family Hospital UAT plan P05.02 step 3 — there is no fallback mail server.
+ *
+ * This transport used to fall back to `smtp.mailtrap.io` with the credentials
+ * `test-user` / `test-pass` whenever SMTP_HOST was unset, so a production
+ * deployment without mail configuration "sent" every message into a sandbox —
+ * or failed in a way nobody could see — and reported success. A missing
+ * SMTP_HOST is now an explicit configuration failure, which the callers record
+ * (an invitation is marked FAILED with class CONFIG and can be resent).
+ *
+ * Under the test runner only (NODE_ENV=test), an unconfigured transport is a
+ * JSON transport that delivers nothing anywhere.
+ */
+export class EmailConfigurationError extends Error {
+  constructor() {
+    super("SMTP is not configured");
+    this.name = "EmailConfigurationError";
+  }
+}
+
+function transporter(): nodemailer.Transporter {
+  const host = process.env.SMTP_HOST?.trim();
+  if (!host) {
+    if (process.env.NODE_ENV === "test") return nodemailer.createTransport({ jsonTransport: true });
+    throw new EmailConfigurationError();
+  }
+  const port = Number.parseInt(process.env.SMTP_PORT ?? "", 10);
+  const user = process.env.SMTP_USER?.trim();
+  const pass = process.env.SMTP_PASS;
+  return nodemailer.createTransport({
+    host,
+    // 587 (submission) when unset; never Mailtrap's 2525.
+    port: Number.isFinite(port) ? port : 587,
+    ...(user && pass ? { auth: { user, pass } } : {}),
+  });
+}
 
 export class NotificationService {
   /**
@@ -26,7 +53,7 @@ export class NotificationService {
    * Internal mechanism triggered by the Worker
    */
   static async executeEmailDispatch(payload: { to: string; subject: string; body: string; html?: string; correspondenceId?: string }) {
-    await transporter.sendMail({
+    await transporter().sendMail({
       from: process.env.EMAIL_FROM || '"Medvex" <noreply@medvex.co.ug>',
       to: payload.to,
       subject: payload.subject,

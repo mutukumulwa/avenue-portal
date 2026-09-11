@@ -284,25 +284,58 @@ export async function enqueueEmail(payload: { to: string; subject: string; body:
 }
 
 /**
+ * Family Hospital UAT plan P05.02 steps 5–6 — why a send failed, as a SAFE class.
+ * A mail server's own error text can carry the recipient address (and more), so
+ * it is never logged or stored; only this class is.
+ */
+export type EmailFailureClass = "CONFIG" | "AUTH" | "CONNECTION" | "TIMEOUT" | "REJECTED" | "UNKNOWN";
+
+export function classifyEmailError(err: unknown): EmailFailureClass {
+  if (err instanceof Error && err.name === "EmailConfigurationError") return "CONFIG";
+  if (err instanceof Error && err.message === "email-timeout") return "TIMEOUT";
+  const code = (err as { code?: unknown } | null)?.code;
+  const responseCode = (err as { responseCode?: unknown } | null)?.responseCode;
+  if (code === "EAUTH") return "AUTH";
+  if (code === "ECONNECTION" || code === "ETIMEDOUT" || code === "ESOCKET" || code === "EDNS" || code === "ECONNREFUSED") return "CONNECTION";
+  if (code === "EENVELOPE" || code === "EMESSAGE" || (typeof responseCode === "number" && responseCode >= 500)) return "REJECTED";
+  return "UNKNOWN";
+}
+
+/**
  * DEF-003: send a transactional email inline, bypassing BullMQ/Redis (which is
  * not provisioned and does not fit Vercel serverless). Bounded so a slow or
- * unreachable SMTP host can never hang the request. Never throws.
+ * unreachable SMTP host can never hang the request. Never throws; a failure
+ * comes back with its safe class.
  */
+export async function sendEmailBounded(
+  payload: { to: string; subject: string; body: string; html?: string },
+  timeoutMs = 8000, // D-16
+): Promise<{ delivered: true } | { delivered: false; failureClass: EmailFailureClass }> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const { NotificationService } = await import("@/server/services/notification.service");
+    await Promise.race([
+      NotificationService.executeEmailDispatch(payload),
+      new Promise((_, rej) => {
+        timer = setTimeout(() => rej(new Error("email-timeout")), timeoutMs);
+      }),
+    ]);
+    return { delivered: true };
+  } catch (err) {
+    return { delivered: false, failureClass: classifyEmailError(err) };
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+/** The original boolean form (password reset and others). Logs the class only. */
 export async function sendEmailNowBounded(
   payload: { to: string; subject: string; body: string; html?: string },
   timeoutMs = 8000, // D-16
 ): Promise<{ delivered: boolean }> {
-  const { NotificationService } = await import("@/server/services/notification.service");
-  try {
-    await Promise.race([
-      NotificationService.executeEmailDispatch(payload),
-      new Promise((_, rej) => setTimeout(() => rej(new Error("email-timeout")), timeoutMs)),
-    ]);
-    return { delivered: true };
-  } catch (err) {
-    console.error("[reset] bounded email send failed:", (err as Error).message);
-    return { delivered: false };
-  }
+  const result = await sendEmailBounded(payload, timeoutMs);
+  if (!result.delivered) console.error("[email] bounded send failed:", result.failureClass);
+  return { delivered: result.delivered };
 }
 
 /**

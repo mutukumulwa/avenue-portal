@@ -23,6 +23,7 @@ model Tenant {
   updatedAt    DateTime @updatedAt
 
   users                          User[]
+  accountSetupInvitations        AccountSetupInvitation[]
   groups                         Group[]
   members                        Member[]
   packages                       Package[]
@@ -390,6 +391,7 @@ model User {
   webAuthnEnrollmentApprovals WebAuthnEnrollmentApproval[]     @relation("WebAuthnEnrollmentApprovedBy")
   reinstatementDecisions      MembershipReinstatementRequest[]
   passwordResetTokens         PasswordResetToken[]
+  accountSetupInvitations     AccountSetupInvitation[]
   issuedOfflineAuths          OfflineWorkAuthorization[]       @relation("OfflineAuthIssuer")
   openedCases                 ClinicalCase[]                   @relation("CaseOpenedBy")
   closedCases                 ClinicalCase[]                   @relation("CaseClosedBy")
@@ -411,6 +413,54 @@ model PasswordResetToken {
   createdAt DateTime  @default(now())
 
   @@index([userId])
+}
+
+// Family Hospital UAT plan P05.01 — an account-setup invitation (one-time link).
+//
+// Replaces "the administrator types a temporary password and passes it on"
+// (FH-01: two live passwords went out in one CC'd email). The invitee sets their
+// own password through a link that works once, expires, and is delivered to them
+// individually. Only a one-way hash of the link's token is stored; the token
+// itself exists in the email and in the invitee's browser, nowhere else.
+enum AccountSetupDeliveryStatus {
+  PENDING // created; delivery not yet attempted (or in flight)
+  SENT // the mail server accepted the message
+  FAILED // delivery failed; the account stays pending and can be resent
+}
+
+model AccountSetupInvitation {
+  id               String                     @id @default(cuid())
+  tenantId         String
+  tenant           Tenant                     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  userId           String
+  user             User                       @relation(fields: [userId], references: [id], onDelete: Restrict)
+  // Scope: the facility for a provider user; null for TPA staff and other portal users.
+  providerId       String?
+  // SHA-256 (hex) of the raw token. The raw token is never stored or logged.
+  tokenHash        String                     @unique
+  // SHA-256 (hex) of the normalised address it was sent to — per-address rate
+  // limiting without a second copy of the email address.
+  emailHash        String
+  expiresAt        DateTime
+  usedAt           DateTime?
+  revokedAt        DateTime?
+  revokedReason    String? // SUPERSEDED | ACCOUNT_SET_UP
+  // INVITE (created with the account) | RESEND (an administrator) | SELF_SERVICE (the invitee asked for a new link)
+  issuedVia        String
+  // The administrator who issued it; null for a self-service request.
+  invitedById      String?
+  deliveryStatus   AccountSetupDeliveryStatus @default(PENDING)
+  deliveryAttempts Int                        @default(0)
+  lastAttemptAt    DateTime?
+  deliveredAt      DateTime?
+  // A safe failure class (CONFIG | ORIGIN | AUTH | CONNECTION | TIMEOUT | REJECTED | UNKNOWN) — never provider text.
+  failureClass     String?
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+
+  @@index([tenantId, userId, createdAt])
+  @@index([invitedById, createdAt])
+  @@index([emailHash, createdAt])
 }
 
 // ─── GROUPS / ORGANIZATIONS ─────────────────────────────
@@ -3626,9 +3676,9 @@ model ProviderTariff {
   isActive      Boolean   @default(true) // Never delete — deactivate instead
   createdAt     DateTime  @default(now())
 
-  mappingMemories ServiceMappingMemory[]
+  mappingMemories    ServiceMappingMemory[]
   /// Claim lines captured against this row (Family Hospital UAT P02.04).
-  capturedClaimLines ClaimLine[] @relation("ClaimLineSelectedTariff")
+  capturedClaimLines ClaimLine[]            @relation("ClaimLineSelectedTariff")
 
   @@index([providerId])
   @@index([providerId, cptCode])

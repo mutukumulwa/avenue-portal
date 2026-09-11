@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { ProviderAccessService, isProviderAccessError } from "@/server/services/provider-access.service";
 import { ProviderUserAdminService, ProviderUserAdminError } from "@/server/services/provider-user-admin.service";
+import { AccountInvitationService } from "@/server/services/account-invitation.service";
 
 /**
  * ELIG-GAP-005 — provider self-service user administration.
@@ -50,6 +51,12 @@ export async function manageProviderUserAction(_prev: Result, formData: FormData
         await ProviderUserAdminService.reactivateUser(ctx, { targetUserId });
         return revalidate("User reactivated.");
       }
+      case "resend": {
+        // Family Hospital UAT P05.04 step 2 — a new setup link; older ones stop working.
+        const res = await AccountInvitationService.resend({ kind: "PROVIDER", ctx }, targetUserId);
+        if (!res.ok) return { error: res.message };
+        return revalidate(res.message);
+      }
       default:
         return { error: "Unknown action." };
     }
@@ -63,3 +70,32 @@ function revalidate(ok: string): Result {
   revalidatePath("/provider/users");
   return { ok };
 }
+
+/**
+ * Family Hospital UAT plan P05.04 — a facility administrator invites its own
+ * staff through the SAME canonical AccountInvitationService the TPA uses. The
+ * service allows only this facility, provider personas without administrative
+ * access the administrator lacks, and branches the administrator can act at;
+ * the invitee sets their own password from a one-time link.
+ */
+type InviteResult = { error?: string; ok?: boolean; message?: string; deliveryFailed?: boolean; resendUserId?: string } | null;
+
+export async function inviteProviderUserAction(_prev: InviteResult, formData: FormData): Promise<InviteResult> {
+  const { ctx } = await ProviderAccessService.resolveUserContext();
+  const text = (name: string) => String(formData.get(name) ?? "");
+  const res = await AccountInvitationService.invite(
+    { kind: "PROVIDER", ctx },
+    {
+      email: text("email"),
+      firstName: text("firstName"),
+      lastName: text("lastName"),
+      role: "PROVIDER_USER",
+      providerRoleCode: text("providerRoleCode") || null,
+      providerBranchIds: formData.getAll("providerBranchIds").map(String).filter(Boolean),
+    },
+  );
+  revalidatePath("/provider/users");
+  if (!res.ok) return { error: res.message, ...(res.existing?.canResend ? { resendUserId: res.existing.userId } : {}) };
+  return { ok: true, message: res.message, deliveryFailed: res.delivery === "FAILED" };
+}
+

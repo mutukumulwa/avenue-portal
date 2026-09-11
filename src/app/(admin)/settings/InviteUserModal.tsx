@@ -2,9 +2,17 @@
 
 import { useActionState, useState } from "react";
 import { useRouter } from "next/navigation";
-import { inviteUserAction } from "./actions";
+import { inviteUserAction, resendInvitationAction } from "./actions";
 import { X } from "lucide-react";
 import { MemberSearchPicker } from "@/components/ui/MemberSearchPicker";
+
+/*
+ * Family Hospital UAT plan P05.04 step 1 — no administrator-chosen password.
+ * The modal used to ask for a "Temporary Password" that the administrator then
+ * had to pass on (FH-01: two went out in one CC'd email). It now sends a
+ * one-time setup link to the person being invited; the result says whether the
+ * email left, and a failed delivery can be resent.
+ */
 
 const ROLES = [
   { value: "CLAIMS_OFFICER",  label: "Claims Officer"  },
@@ -50,23 +58,24 @@ export function InviteUserModal({ groups = [], brokers = [], fundGroups = [], pr
   // facility's branches. Reset the branch selection when the facility changes.
   const [selectedProviderId, setSelectedProviderId] = useState("");
   const selectedProvider = providers.find((p) => p.id === selectedProviderId);
-  // OBS-1: on a successful invite, close the modal and refresh so the Users &
-  // Access list re-renders immediately (previously it stayed blank until
-  // reload). Handled in the action callback, not an effect, so there is no
-  // render-phase setState (react-hooks/set-state-in-effect).
+  // OBS-1: refresh on success so the Users & Access list shows the new account at
+  // once. The modal stays open on the outcome — sent, or created-but-not-
+  // delivered — so the administrator sees which one happened (P05.02 step 7).
   const [state, action, pending] = useActionState(
-    async (prev: { error?: string; ok?: boolean } | null, formData: FormData) => {
+    async (prev: Awaited<ReturnType<typeof inviteUserAction>> | null, formData: FormData) => {
       const res = await inviteUserAction(prev, formData);
-      if (res.ok) {
-        setOpen(false);
-        setSelectedRole("");
-        setSelectedProviderId("");
-        router.refresh();
-      }
+      if (res.ok) router.refresh();
       return res;
     },
     null,
   );
+  const [resendState, resendAction, resendPending] = useActionState(resendInvitationAction, null);
+
+  function close() {
+    setOpen(false);
+    setSelectedRole("");
+    setSelectedProviderId("");
+  }
 
   return (
     <>
@@ -81,7 +90,7 @@ export function InviteUserModal({ groups = [], brokers = [], fundGroups = [], pr
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6 relative max-h-[90vh] overflow-y-auto">
             <button
-              onClick={() => setOpen(false)}
+              onClick={close}
               aria-label="Close invite user dialog"
               className="absolute top-4 right-4 text-brand-text-muted hover:text-brand-text-heading"
             >
@@ -91,11 +100,39 @@ export function InviteUserModal({ groups = [], brokers = [], fundGroups = [], pr
             <h2 className="text-lg font-bold text-brand-text-heading font-heading mb-4">Invite User</h2>
 
             {state?.error && (
-              <div className="mb-4 px-4 py-2.5 bg-[#DC3545]/10 text-[#DC3545] text-sm rounded-lg">
+              <div role="alert" className="mb-4 px-4 py-2.5 bg-[#DC3545]/10 text-[#DC3545] text-sm rounded-lg">
                 {state.error}
+                {state.resendUserId && (
+                  <form action={resendAction} className="mt-2">
+                    <input type="hidden" name="userId" value={state.resendUserId} />
+                    <button type="submit" disabled={resendPending} className="text-xs font-semibold text-brand-indigo underline disabled:opacity-50">
+                      {resendPending ? "Sending…" : "Send a new setup link"}
+                    </button>
+                  </form>
+                )}
+                {resendState?.message && <p role="status" className="mt-1 text-xs text-brand-text-body">{resendState.message}</p>}
+                {resendState?.error && <p role="alert" className="mt-1 text-xs">{resendState.error}</p>}
               </div>
             )}
 
+            {state?.ok ? (
+              <div className="space-y-4">
+                <div
+                  role="status"
+                  className={`px-4 py-2.5 text-sm rounded-lg ${state.deliveryFailed ? "bg-[#FFC107]/15 text-[#856404]" : "bg-[#28A745]/10 text-[#1E7B34]"}`}
+                >
+                  {state.message}
+                  {state.deliveryFailed && (
+                    <p className="mt-1 text-xs">The account is waiting to be set up. Use &ldquo;Resend link&rdquo; in the users list once mail is working.</p>
+                  )}
+                </div>
+                <div className="flex justify-end">
+                  <button type="button" onClick={close} className="px-5 py-2 text-sm font-semibold bg-brand-indigo hover:bg-brand-secondary text-white rounded-full transition-colors">
+                    Done
+                  </button>
+                </div>
+              </div>
+            ) : (
             <form action={action} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -211,20 +248,19 @@ export function InviteUserModal({ groups = [], brokers = [], fundGroups = [], pr
                   <p className="text-[10px] text-brand-text-muted mt-1">Hold Command/Ctrl to select multiple schemes.</p>
                 </div>
               )}
-              <div>
-                <label className="block text-xs font-bold text-brand-text-muted uppercase mb-1">Temporary Password</label>
-                <input name="password" type="password" minLength={10} required className="w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo" />
-                <p className="text-[10px] text-brand-text-muted mt-1">Min. 10 characters incl. an uppercase letter, a lowercase letter and a digit. User should change on first login.</p>
-              </div>
+              <p className="text-[11px] text-brand-text-muted">
+                The person receives their own one-time link to set a password. It works once and expires in 24 hours. You never see or choose their password.
+              </p>
               <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setOpen(false)} className="px-4 py-2 text-sm text-brand-text-body border border-[#EEEEEE] rounded-full hover:bg-[#F8F9FA] transition-colors">
+                <button type="button" onClick={close} className="px-4 py-2 text-sm text-brand-text-body border border-[#EEEEEE] rounded-full hover:bg-[#F8F9FA] transition-colors">
                   Cancel
                 </button>
                 <button type="submit" disabled={pending} className="px-5 py-2 text-sm font-semibold bg-brand-indigo hover:bg-brand-secondary text-white rounded-full transition-colors disabled:opacity-60">
-                  {pending ? "Inviting…" : "Create User"}
+                  {pending ? "Sending…" : "Send invitation"}
                 </button>
               </div>
             </form>
+            )}
           </div>
         </div>
       )}
