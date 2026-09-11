@@ -225,3 +225,37 @@ full set measured 1,058 px as one row; a 1024 px window leaves 992 px for it, so
 used there. The desktop row may wrap rather than overflow if a user's font settings make it wider
 than measured. A provider UX reviewer (P08.04 step 1) may rename or regroup; the
 grouping is one table in `provider-nav-model.ts` and the tests derive from it.
+
+### 4.10 DEC-FH-X10 — an operator withdrawal path for trial records (plan P07.01 step 2)
+
+The plan says: withdraw through the supported withdrawal action "when status/policy permits", else
+use "the approved operator void or corrective lifecycle path; do not update status directly". The
+four claims are RECEIVED. Status permits withdrawal, but the only withdrawal action was the
+provider's own (a facility user holding `provider.claim.withdraw`), and there is no operator path
+out of RECEIVED that is not a decision: VOID is reachable only from INCURRED or a decided status.
+Running the provider action as a facility user would put a facility employee's name on a Medvex
+cleanup; deciding the claims (DECLINED) would count them as adjudicated.
+
+Applied: `ClaimWithdrawalService.withdrawAsOperator` — the provider withdrawal's own transaction
+(lifecycle authority, status-guarded compare-and-swap, lifecycle log, the facility's outbox event,
+hash-chained `CLAIM:WITHDRAW` audit) behind a different gate: an active TPA claims-operations user of
+the tenant, re-read from the database, and a reason from `OPERATOR_WITHDRAWAL_REASONS`, a closed set
+never offered to providers (today only `TEST_DATA_INCORRECT_TARIFF`). The log says "Operator
+withdrawal"; the audit payload carries `initiatedBy: "OPERATOR"`. No UI — it is called only by
+`scripts/family-hospital-trial-record-cleanup.ts`. It is new code, so it is part of the
+schema/security review (P08.04 step 1) before it runs against production.
+
+The pre-authorisation needs nothing new: the admin pre-auth page's canonical `cancelPreAuth` already
+takes an operator. Pre-auth cancellation has no reason catalogue (the reason is free text); the
+cleanup records the code `TEST_DATA_INCORRECT_TARIFF` as that text.
+
+### 4.11 DEC-FH-X11 — withdrawn claims in all-status totals (plan P07.01 step 5) — OPEN
+
+After the cleanup the four claims count nowhere as pending, approved or paid, and provider
+performance scores already exclude withdrawn claims. They do still count — as declined claims
+always have — in totals that take every status: the facility dashboard's "Total claims", the TPA
+dashboard's "Claims This Month" (until 2026-10-10), its monthly volume and billed charts, and the
+billed base of its loss ratio (UGX-labelled 33,900 in total). Those totals count submissions, not
+valid transactions, so no trial conclusion rests on them; but "Total claims 4" on Family's dashboard
+will look like activity. Excluding WITHDRAWN and SUPERSEDED claims from those totals is a
+product-wide change to metric definitions and is left to the owner.

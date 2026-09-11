@@ -63,3 +63,18 @@ describe("F5.6 providerCanWithdraw", () => {
     expect(providerCanWithdraw(ctx(), { ...base, settlementBatchId: "s1" })).toBe(false);
   });
 });
+
+/**
+ * Family Hospital UAT plan P07.01 (DEC-FH-04) — the operator-only reasons are a
+ * separate closed set: never offered to a provider, and never accepted from one.
+ */
+describe("P07.01 operator withdrawal reasons", () => {
+  it("TEST_DATA_INCORRECT_TARIFF is an operator reason and is not in the provider picker", async () => {
+    const catalog = await import("@/server/services/claim-withdrawal/catalog");
+    expect(catalog.normalizeOperatorWithdrawalReason(" test_data_incorrect_tariff ")).toBe("TEST_DATA_INCORRECT_TARIFF");
+    expect(catalog.listWithdrawalReasons().map((r) => r.code)).not.toContain("TEST_DATA_INCORRECT_TARIFF");
+    expect(catalog.normalizeWithdrawalReason("TEST_DATA_INCORRECT_TARIFF")).toBeNull(); // a provider cannot use it
+    expect(catalog.normalizeOperatorWithdrawalReason("SUBMITTED_IN_ERROR")).toBeNull(); // nor an operator a provider reason
+    expect(catalog.normalizeOperatorWithdrawalReason(undefined)).toBeNull();
+  });
+});

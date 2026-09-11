@@ -1,0 +1,48 @@
+{
+  "mode": "dry-run",
+  "scope": {
+    "tenantId": "cmr3ae8v30000nlvqxrqlfn38",
+    "providerId": "cmssrwr31000033vqpue454ou"
+  },
+  "reason": "TEST_DATA_INCORRECT_TARIFF",
+  "inspection": {
+    "tenantId": "cmr3ae8v30000nlvqxrqlfn38",
+    "providerId": "cmssrwr31000033vqpue454ou",
+    "claims": [
+      {
+        "id": "cmtvq6mk4000104jq28uwpa1y",
+        "number": "CLM-2026-00308",
+        "status": "RECEIVED",
+        "action": "WITHDRAW"
+      },
+      {
+        "id": "cmtvqiaia000n04jqy8r3kdk2",
+        "number": "CLM-2026-00309",
+        "status": "RECEIVED",
+        "action": "WITHDRAW"
+      },
+      {
+        "id": "cmtvr409l000104l558ysm0rk",
+        "number": "CLM-2026-00310",
+        "status": "RECEIVED",
+        "action": "WITHDRAW"
+      },
+      {
+        "id": "cmtvriwim000n04l5zopta221",
+        "number": "CLM-2026-00311",
+        "status": "RECEIVED",
+        "action": "WITHDRAW"
+      }
+    ],
+    "preauths": [
+      {
+        "id": "cmtvsylrm000004jtq5g4d4uo",
+        "number": "PA-2026-00007",
+        "status": "UNDER_REVIEW",
+        "action": "CANCEL"
+      }
+    ],
+    "unexpected": [],
+    "refusals": []
+  }
+}

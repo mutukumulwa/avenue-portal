@@ -1,0 +1,239 @@
+{
+  "generatedAt": "2026-09-11T10:54:03.750Z",
+  "pricingDate": "2026-09-11",
+  "contract": {
+    "id": "cmtclkbiy00005kvqphfr7xiz",
+    "number": "PC-2026-202",
+    "status": "ACTIVE",
+    "currency": "UGX",
+    "taxInclusive": "INCLUSIVE",
+    "unlistedServiceRule": "REFER_FOR_REVIEW"
+  },
+  "candidateRows": 4424,
+  "members": [
+    {
+      "member": "•••• 0001",
+      "memberId": "cmtcl1omj0003wbvqw7ylm7nx",
+      "status": "ACTIVE",
+      "coverStart": "2026-08-01",
+      "coverEnd": null,
+      "eligibility": {
+        "resultCode": "ELIGIBLE",
+        "reasonCode": "ACTIVE",
+        "found": true
+      },
+      "contract": "PC-2026-202",
+      "contractReason": null
+    },
+    {
+      "member": "•••• 0005",
+      "memberId": "cmtcl1r2u000bwbvqwrnewqoq",
+      "status": "ACTIVE",
+      "coverStart": "2026-08-01",
+      "coverEnd": null,
+      "eligibility": {
+        "resultCode": "ELIGIBLE",
+        "reasonCode": "ACTIVE",
+        "found": true
+      },
+      "contract": "PC-2026-202",
+      "contractReason": null
+    },
+    {
+      "member": "•••• 0007",
+      "memberId": "cmtcl1sj1000fwbvqf227bbve",
+      "status": "ACTIVE",
+      "coverStart": "2026-08-01",
+      "coverEnd": null,
+      "eligibility": {
+        "resultCode": "ELIGIBLE",
+        "reasonCode": "ACTIVE",
+        "found": true
+      },
+      "contract": "PC-2026-202",
+      "contractReason": null
+    }
+  ],
+  "services": [
+    {
+      "area": "Consultation",
+      "tariffId": "cmtcjm9qi00004yvq0bhl38o9",
+      "inScope": true,
+      "serviceName": "General Doctor Consult",
+      "taxonomy": "CONSULTATION",
+      "lineCategory": "CONSULTATION",
+      "unit": "PER_CONSULTATION",
+      "currency": "UGX",
+      "rateType": "FIXED",
+      "contractedUnitRate": "25000",
+      "expectedContractedForOneUnit": "25000",
+      "requiresPreauth": false,
+      "effectiveFrom": "2026-08-28",
+      "engine": {
+        "status": "SELECTABLE",
+        "method": "DESCRIPTION",
+        "resolvesToSelf": true
+      }
+    },
+    {
+      "area": "Laboratory",
+      "tariffId": "cmtcjmh67025s4yvqwb49g6yn",
+      "inScope": true,
+      "serviceName": "Full Blood Count / Complete Blood Count",
+      "taxonomy": "LABORATORY",
+      "lineCategory": "LABORATORY",
+      "unit": "PER_ITEM",
+      "currency": "UGX",
+      "rateType": "FIXED",
+      "contractedUnitRate": "22000",
+      "expectedContractedForOneUnit": "22000",
+      "requiresPreauth": false,
+      "effectiveFrom": "2026-08-28",
+      "engine": {
+        "status": "SELECTABLE",
+        "method": "DESCRIPTION",
+        "resolvesToSelf": true
+      }
+    },
+    {
+      "area": "Imaging",
+      "tariffId": "cmtcjm9ql00434yvq967r1yv8",
+      "inScope": true,
+      "serviceName": "X-Ray: Chest PA/AP",
+      "taxonomy": "RADIOLOGY",
+      "lineCategory": "IMAGING",
+      "unit": "PER_ITEM",
+      "currency": "UGX",
+      "rateType": "FIXED",
+      "contractedUnitRate": "60000",
+      "expectedContractedForOneUnit": "60000",
+      "requiresPreauth": false,
+      "effectiveFrom": "2026-08-28",
+      "engine": {
+        "status": "SELECTABLE",
+        "method": "DESCRIPTION",
+        "resolvesToSelf": true
+      }
+    },
+    {
+      "area": "Pharmacy",
+      "tariffId": "cmtcjm9qo00b74yvqvfzswz8y",
+      "inScope": true,
+      "serviceName": "Paracetamol 500Mg (Fremol)",
+      "taxonomy": "PHARMACY_DRUGS",
+      "lineCategory": "PHARMACY",
+      "unit": "PER_ITEM",
+      "currency": "UGX",
+      "rateType": "FIXED",
+      "contractedUnitRate": "250",
+      "expectedContractedForOneUnit": "250",
+      "requiresPreauth": false,
+      "effectiveFrom": "2026-08-28",
+      "engine": {
+        "status": "SELECTABLE",
+        "method": "DESCRIPTION",
+        "resolvesToSelf": true
+      }
+    },
+    {
+      "area": "Procedure",
+      "tariffId": "cmtwmk8510003xavq5da22kb6",
+      "inScope": true,
+      "serviceName": "Excision of Dermatosis papulosa nigra (less than 5 lesions)",
+      "taxonomy": "PROCEDURE",
+      "lineCategory": "PROCEDURE",
+      "unit": "PER_PROCEDURE",
+      "currency": "UGX",
+      "rateType": "FIXED",
+      "contractedUnitRate": "270000",
+      "expectedContractedForOneUnit": "270000",
+      "requiresPreauth": false,
+      "effectiveFrom": "2026-08-28",
+      "engine": {
+        "status": "SELECTABLE",
+        "method": "DESCRIPTION",
+        "resolvesToSelf": true
+      }
+    },
+    {
+      "area": "Inpatient bed",
+      "tariffId": "cmtcjm9qj00064yvqmqqkefo5",
+      "inScope": true,
+      "serviceName": "Bed Fee – SEMI PRIVATE",
+      "taxonomy": "IP_SERVICES",
+      "lineCategory": "OTHER",
+      "unit": "PER_DAY",
+      "currency": "UGX",
+      "rateType": "FIXED",
+      "contractedUnitRate": "65000",
+      "expectedContractedForOneUnit": "65000",
+      "requiresPreauth": false,
+      "effectiveFrom": "2026-08-28",
+      "engine": {
+        "status": "SELECTABLE",
+        "method": "DESCRIPTION",
+        "resolvesToSelf": true
+      }
+    },
+    {
+      "area": "Maternity package",
+      "tariffId": "cmtcjmi5g02j24yvqfqpemiat",
+      "inScope": true,
+      "serviceName": "Normal delivery | General room",
+      "taxonomy": "CONTRACT_PACKAGE",
+      "lineCategory": "OTHER",
+      "unit": "PER_EPISODE",
+      "currency": "UGX",
+      "rateType": "FIXED",
+      "contractedUnitRate": "680000",
+      "expectedContractedForOneUnit": "680000",
+      "requiresPreauth": false,
+      "effectiveFrom": "2026-08-28",
+      "engine": {
+        "status": "SELECTABLE",
+        "method": "DESCRIPTION",
+        "resolvesToSelf": true
+      }
+    }
+  ],
+  "unlisted": {
+    "description": "Physiotherapy session",
+    "engineMatch": null,
+    "rowsContainingFirstWord": 0,
+    "contractRule": "REFER_FOR_REVIEW",
+    "expected": "accepted with a typed description and billed price, labelled \"Not in contracted tariff — manual review\"; no contracted rate and no global CPT price"
+  },
+  "actors": [
+    {
+      "userId": "cmsss2cx60000devql25r1mlu",
+      "personas": [
+        "PROVIDER_FACILITY_ADMIN"
+      ],
+      "isActive": true,
+      "setUp": true,
+      "lastSignIn": "2026-09-10T17:28:14.519Z",
+      "branches": 1
+    },
+    {
+      "userId": "cmtcjniby00006fvqk38dm52i",
+      "personas": [
+        "PROVIDER_BILLER"
+      ],
+      "isActive": true,
+      "setUp": false,
+      "lastSignIn": null,
+      "branches": 1
+    },
+    {
+      "userId": "cmtcllhjh00006zvqul8552tl",
+      "personas": [
+        "PROVIDER_FRONT_DESK"
+      ],
+      "isActive": true,
+      "setUp": false,
+      "lastSignIn": null,
+      "branches": 1
+    }
+  ],
+  "problems": []
+}

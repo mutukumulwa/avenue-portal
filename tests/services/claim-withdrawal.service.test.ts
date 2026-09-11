@@ -255,6 +255,97 @@ describe.skipIf(!URL_SET)("F5.5 ClaimWithdrawalService (opt-in DB)", () => {
     });
   });
 
+  // ── Family Hospital UAT P07.01 — operator withdrawal (DEC-FH-04) ────────────
+  describe("P07.01 withdrawAsOperator", () => {
+    const operators: Record<string, string> = {};
+    const opCmd = (claimId: string, over: Partial<{ reasonCode: string; note: string }> = {}) => ({ claimId, reasonCode: "TEST_DATA_INCORRECT_TARIFF", ...over });
+    const alpha = () => ({ tenantId: world.tenants.alpha.id, actorId: operators.claims });
+
+    beforeAll(async () => {
+      const mk = async (key: string, tenantId: string, role: "CLAIMS_OFFICER" | "FINANCE_OFFICER", isActive = true) => {
+        const u = await prisma.user.create({
+          data: { tenantId, role, email: `${key}.${world.token}@tpa.test`, passwordHash: "x", firstName: key, lastName: "Operator", isActive },
+        });
+        operators[key] = u.id;
+      };
+      await mk("claims", world.tenants.alpha.id, "CLAIMS_OFFICER");
+      await mk("finance", world.tenants.alpha.id, "FINANCE_OFFICER");
+      await mk("inactive", world.tenants.alpha.id, "CLAIMS_OFFICER", false);
+      await mk("beta", world.tenants.beta.id, "CLAIMS_OFFICER");
+    });
+    // The operators' audit rows would block the world's user teardown (AuditLog.userId).
+    afterAll(async () => {
+      await prisma.auditLog.deleteMany({ where: { userId: { in: Object.values(operators) } } });
+    });
+
+    it("a claims operator withdraws another provider's RECEIVED claim: log, audit and outbox say so, and a replay does nothing", async () => {
+      const claim = await world.createClaim({ providerId: world.providers.b.id, status: "RECEIVED" });
+      const res = await Svc.withdrawAsOperator(alpha(), opCmd(claim.id, { note: "P07.01 test" }));
+      expect(res).toMatchObject({ claimId: claim.id, providerId: world.providers.b.id, fromStatus: "RECEIVED", status: "WITHDRAWN", reasonCode: "TEST_DATA_INCORRECT_TARIFF", alreadyWithdrawn: false });
+      expect((await prisma.claim.findUnique({ where: { id: claim.id }, select: { status: true } }))!.status).toBe("WITHDRAWN");
+
+      const log = await prisma.adjudicationLog.findFirst({ where: { claimId: claim.id, action: "WITHDRAWN" } });
+      expect(log).toMatchObject({ userId: operators.claims, fromStatus: "RECEIVED", toStatus: "WITHDRAWN" });
+      expect(log!.notes).toBe("Operator withdrawal — Trial record priced from the wrong tariff: P07.01 test");
+      const audit = await prisma.auditLog.findMany({ where: { tenantId: world.tenants.alpha.id, entityId: claim.id, action: "CLAIM:WITHDRAW" } });
+      expect(audit).toHaveLength(1);
+      expect(audit[0].userId).toBe(operators.claims);
+      expect(JSON.stringify(audit[0], (_k, v) => (typeof v === "bigint" ? v.toString() : v))).toContain('"initiatedBy":"OPERATOR"');
+      const outbox = await prisma.notificationOutbox.findMany({ where: { tenantId: world.tenants.alpha.id, dedupeKey: `claim-withdrawn:${claim.id}` } });
+      expect(outbox).toHaveLength(1);
+      expect(outbox[0].providerId).toBe(world.providers.b.id); // the facility sees its claim withdrawn
+
+      const replay = await Svc.withdrawAsOperator(alpha(), opCmd(claim.id));
+      expect(replay).toMatchObject({ alreadyWithdrawn: true, fromStatus: "WITHDRAWN" });
+      expect(await logCount(claim.id)).toBe(1);
+      expect(await auditCount(claim.id)).toBe(1);
+      expect(await outboxCount(claim.id)).toBe(1);
+    });
+
+    it("refuses anyone who is not an active claims operator of the tenant (OPERATOR_REQUIRED) and writes nothing", async () => {
+      const claim = await world.createClaim({ providerId: world.providers.a.id, status: "RECEIVED" });
+      const tenantId = world.tenants.alpha.id;
+      const actors = [
+        world.users.a.admin.id, // a provider user — even its own facility's claim
+        operators.finance, // TPA staff without a claims-operations role
+        operators.inactive, // a deactivated claims officer
+        operators.beta, // a claims officer of another tenant
+        "no-such-user",
+      ];
+      for (const actorId of actors) {
+        const err = await Svc.withdrawAsOperator({ tenantId, actorId }, opCmd(claim.id)).catch((e) => e);
+        expect(err, actorId).toBeInstanceOf(ClaimWithdrawalError);
+        expect(err.code, actorId).toBe("OPERATOR_REQUIRED");
+      }
+      // an operator of another tenant, in their own tenant, cannot reach this tenant's claim
+      const cross = await Svc.withdrawAsOperator({ tenantId: world.tenants.beta.id, actorId: operators.beta }, opCmd(claim.id)).catch((e) => e);
+      expect(cross.code).toBe("NOT_FOUND");
+      expect((await prisma.claim.findUnique({ where: { id: claim.id }, select: { status: true } }))!.status).toBe("RECEIVED");
+      expect(await logCount(claim.id)).toBe(0);
+      expect(await auditCount(claim.id)).toBe(0);
+      expect(await outboxCount(claim.id)).toBe(0);
+    });
+
+    it("accepts only operator reasons, and the provider path never accepts them", async () => {
+      const claim = await world.createClaim({ providerId: world.providers.a.id, status: "RECEIVED" });
+      const opErr = await Svc.withdrawAsOperator(alpha(), opCmd(claim.id, { reasonCode: "SUBMITTED_IN_ERROR" })).catch((e) => e);
+      expect(opErr.code).toBe("INVALID_REASON");
+      const providerErr = await Svc.withdraw(ctx(), cmd(claim.id, { reasonCode: "TEST_DATA_INCORRECT_TARIFF" })).catch((e) => e);
+      expect(providerErr.code).toBe("INVALID_REASON");
+      expect((await prisma.claim.findUnique({ where: { id: claim.id }, select: { status: true } }))!.status).toBe("RECEIVED");
+    });
+
+    it("refuses a decided claim and a claim carrying a money fact, like the provider path", async () => {
+      const decided = await world.createClaim({ providerId: world.providers.a.id, status: "APPROVED" });
+      expect((await Svc.withdrawAsOperator(alpha(), opCmd(decided.id)).catch((e) => e)).code).toBe("NOT_WITHDRAWABLE");
+      const withMoney = await world.createClaim({ providerId: world.providers.a.id, status: "RECEIVED" });
+      await prisma.claim.update({ where: { id: withMoney.id }, data: { decidedAt: new Date() } });
+      expect((await Svc.withdrawAsOperator(alpha(), opCmd(withMoney.id)).catch((e) => e)).code).toBe("HAS_FINANCIAL_EFFECT");
+      expect(await logCount(decided.id)).toBe(0);
+      expect(await logCount(withMoney.id)).toBe(0);
+    });
+  });
+
   // ── zero money / hold mutation ─────────────────────────────────────────────
   it("mutates zero money/hold — no usage, holds, vouchers, fund movements or amounts", async () => {
     const claim = await world.createClaim({ providerId: world.providers.a.id, status: "RECEIVED", memberId: world.members.alpha.id });

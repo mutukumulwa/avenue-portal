@@ -72,8 +72,8 @@ Status values: `NOT_STARTED` · `IN_PROGRESS` · `DONE` · `BLOCKED (<gate>)` ·
 | P05.03 Complete account setup | DONE | see §3 | |
 | P05.04 One canonical invitation service | DONE | see §3 | DEC-FH-X6 |
 | P06 Provider navigation | DONE | see §3 | DEC-FH-X9 (grouping, for provider UX review) |
-| P07.01 Clean up affected claims/pre-auths | NOT_STARTED | | DEC-FH-04 + production approval |
-| P07.02 Fresh Family UAT fixtures | NOT_STARTED | | |
+| P07.01 Clean up affected claims/pre-auths | READY — production apply awaits approval (P08.04 step 8) | see §3 | DEC-FH-04, DEC-FH-X10; DEC-FH-X11 open |
+| P07.02 Fresh Family UAT fixtures | DONE (verified read-only); two actors await setup links (P08.04 step 9) | see §3 | |
 | P08.01 Automated coverage | NOT_STARTED | | |
 | P08.02 Local verification | NOT_STARTED | | |
 | P08.03 Browser verification matrix | NOT_STARTED | | |
@@ -128,7 +128,7 @@ invitation reaches them individually. The old email is not forwarded. The correc
 address is the one already on the account (confirmed by the facility on 2026-08-29 and 2026-09-10).
 
 Also noted for the owner: plaintext copies of the two exposed passwords exist on the operator's
-machine (`~/family-healthcare-{shinah,linet}-temp-password.txt`, mode 0600). They become dead values
+machine (two `~/family-healthcare-*-temp-password.txt` files, mode 0600). They become dead values
 after containment; deleting them is the owner's call.
 
 ### P00.03 — Freeze unreliable UAT records
@@ -807,7 +807,7 @@ every migration applied and `prisma/seed.ts` run, all 97 opt-in suites (`AUTOPIL
 ```text
 Task IDs:                P06
 Defects covered:         FH-08
-Starting/ending SHA:     43d3a02 → P06 commit
+Starting/ending SHA:     43d3a02 → 53b70cd
 Files changed:           src/components/layouts/provider-nav-model.ts (groups as the information
                          architecture; resolveActiveProviderNavHref),
                          src/components/layouts/ProviderNav.tsx (rewritten),
@@ -902,3 +902,121 @@ closed the menu, left focus on "Finance", marked it `aria-current="true"` and Se
 The dev server ran against the throwaway database `fh_gate_head2`, where one seeded provider user was
 given the facility-administrator persona and its provider the contract-view flag — no shared or
 production data was touched.
+
+### P07.01 — Withdraw and cancel the trial records (prepared; production apply pending)
+
+```text
+Task ID:                 P07.01
+Defects covered:         FH-13 (records), FH-02 (their prices)
+Starting/ending SHA:     53b70cd → P07 commit
+Files changed:           src/server/services/claim-withdrawal/{catalog.ts,service.ts} (operator path,
+                         DEC-FH-X10), scripts/family-hospital-trial-record-cleanup.ts (new),
+                         scripts/lib/family-trial-record-cleanup.ts (new),
+                         scripts/lib/family-hospital-reviewed.ts (the reviewed P00.03 set)
+Schema migration/backfill: none
+Read-only preflight artifact: evidence/P07.01-dry-run-2026-09-11T10-43-51-208Z.{md,json}
+Automated tests added/changed: tests/services/claim-withdrawal.service.test.ts (+4, real DB),
+                         tests/services/claim-withdrawal-policy.test.ts (+1),
+                         tests/scripts/family-trial-record-cleanup.test.ts (2, real DB)
+Commands and results:    [PROD, read-only] reconciliation SELECT (Supabase SQL) → the P00.03 set is
+                           unchanged: CLM-2026-00308…00311 RECEIVED, no decision, no money record,
+                           no fund movement, no lifecycle log; PA-2026-00007 UNDER_REVIEW, no hold;
+                           no other Family claim or pre-auth
+                         [PROD, read-only] DATABASE_URL=<session pooler> npx tsx
+                           scripts/family-hospital-trial-record-cleanup.ts → exit 0,
+                           "--apply would proceed": 4 × WITHDRAW, 1 × CANCEL
+                         throwaway DB (fh_gate_head2): claim-withdrawal suite 25/25,
+                           cleanup suite 2/2; typecheck and eslint clean
+Browser scenarios and evidence paths: n/a
+Feature/config changes:  none
+Data mutations and operation IDs: none in production yet
+Rollback tested:         n/a — withdrawal and cancellation are terminal by design; nothing is deleted
+Residual risk:           the operator path is new code and must pass review before it writes to
+                         production (DEC-FH-X10); all-status totals keep counting the records
+                         (DEC-FH-X11, open)
+Reviewer/sign-off:       pending — owner approval for the production apply
+```
+
+- **Path.** Claims: `ClaimWithdrawalService.withdrawAsOperator` (DEC-FH-X10). Pre-auth: the canonical
+  `preauthAdjudicationService.cancelPreAuth`, the admin page's action. Reason on every record:
+  `TEST_DATA_INCORRECT_TARIFF`. Never a direct status write; nothing deleted.
+- **Safety.** The script acts on the reviewed ids only and refuses — before writing — if any of them
+  moved, carries money, or if Family holds any record the set does not name. The operator must be an
+  active user of the tenant with a claims-operations **and** clinical role. An operation receipt keyed
+  by the batch ref replays a finished run; every step is itself idempotent, so a failed run can be
+  re-run safely. The JSON/Markdown record lists before/after status, operation id, operator, reason,
+  and the audit and lifecycle rows — record ids only, no patient data.
+- **To apply (after approval):**
+
+  ```text
+  DATABASE_URL=<session pooler> npx tsx scripts/family-hospital-trial-record-cleanup.ts \
+    --apply --batch-ref FH-P0701-<yyyymmdd> --operator-user-id cmr3aezx7000mnlvqgoljdyqi
+  ```
+
+  then re-run the dry run (every record ALREADY_DONE) and the P00.03 register moves to "withdrawn /
+  cancelled".
+- **Step 5 (what still counts them).** Checked in code: after the apply they are not pending anywhere
+  (TPA "Pending claims"/"Pending pre-auths", facility "Awaiting adjudication"), not approved, not paid,
+  and provider performance scores already exclude WITHDRAWN. All-status totals still include them —
+  see DEC-FH-X11.
+
+### P07.02 — Fresh Family UAT fixtures
+
+```text
+Task ID:                 P07.02
+Defects covered:         FH-13 (rerun baseline)
+Starting/ending SHA:     53b70cd → P07 commit
+Files changed:           scripts/reports/family-hospital-uat-fixtures.ts (new),
+                         scripts/lib/family-hospital-reviewed.ts (FAMILY_P0702_FIXTURES);
+                         test data in seven capture test files and one source comment now use a
+                         fictitious member ("Amani Testmember", TST-2026-…) instead of a trial
+                         member's name and numbers
+Schema migration/backfill: none
+Read-only preflight artifact: evidence/P07.02-uat-fixtures-2026-09-11T10-54-03-750Z.{md,json}
+Automated tests added/changed: none new (the eight renamed-data files pass: 70 tests)
+Commands and results:    [PROD, no persisted change] DATABASE_URL=<session pooler> npx tsx
+                           scripts/reports/family-hospital-uat-fixtures.ts → exit 0, every fixture
+                           verified. Direct reads ran in a SET TRANSACTION READ ONLY transaction; the
+                           eligibility service (which records each check) ran inside a transaction
+                           the script always rolls back — [PROD, read-only] afterwards: 0 eligibility
+                           checks and 0 shadow samples persisted
+Browser scenarios and evidence paths: P08.03
+Feature/config changes:  none
+Data mutations and operation IDs: none
+Rollback tested:         n/a
+Residual risk:           the biller and front-desk accounts are not set up until they receive a
+                         setup link (P08.04 step 9, owner approval; also performs P00.02's
+                         containment, DEC-FH-X8); price-list search on the capture forms stays off
+                         for Family until `providerTariffCatalog` is enabled (P08.04 step 6)
+Reviewer/sign-off:       pending
+```
+
+Verified on 2026-09-11 (Kampala) at Family's branch, against contract PC-2026-202 (ACTIVE, UGX, tax
+inclusive, unlisted rule REFER_FOR_REVIEW; 4,424 rows in the engine's candidate set):
+
+- **Members.** The three the plan names — all ACTIVE, cover from 2026-08-01, **ELIGIBLE** through
+  `ProviderEligibilityService.check`, and the engine's contract pre-check matches PC-2026-202 for
+  each. (Masked numbers and ids only in the evidence.)
+- **Services** — expected values from the tariff rows; the engine resolves each service to its own
+  row (SELECTABLE); every row is FIXED, UGX, no discount/markup, no pre-auth flag:
+
+  | Area | Service (price-list name) | Line category | Unit | Contracted rate |
+  |---|---|---|---|---|
+  | Consultation | General Doctor Consult | CONSULTATION | per consultation | UGX 25,000 |
+  | Laboratory | Full Blood Count / Complete Blood Count | LABORATORY | per item | UGX 22,000 |
+  | Imaging | X-Ray: Chest PA/AP | IMAGING | per item | UGX 60,000 |
+  | Pharmacy | Paracetamol 500Mg (Fremol) | PHARMACY | per item | UGX 250 |
+  | Procedure | Excision of Dermatosis papulosa nigra (less than 5 lesions) — a P01.02 replacement row | PROCEDURE | per procedure | UGX 270,000 |
+  | Inpatient bed | Bed Fee – SEMI PRIVATE | OTHER | per day | UGX 65,000 |
+  | Maternity | Normal delivery \| General room (package) | OTHER | per episode | UGX 680,000 |
+
+  For a line billed at a different price, the contracted rate above is what the claim must carry,
+  and the difference is the recorded variance (P02.04).
+- **Unlisted.** "Physiotherapy session" matches no row (none contains "physiotherapy"); under
+  REFER_FOR_REVIEW (DEC-FH-01) it is accepted with a typed description and billed price, marked "not
+  in contracted tariff — manual review", with no contracted rate and no CPT price.
+- **Actors.** One account per role, each with Family's branch: facility administrator (set up),
+  biller and front desk (**not set up** — they need individual setup links).
+- **No patient PII in fixtures.** The evidence carries masked numbers and opaque ids. The capture
+  component tests had used a trial member's name and numbers, as stored in production, as sample
+  data; they now use a fictitious member.

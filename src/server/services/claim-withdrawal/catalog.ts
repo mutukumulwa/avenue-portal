@@ -42,3 +42,22 @@ export function listWithdrawalReasons(): Array<{ code: ClaimWithdrawalReasonCode
     label: CLAIM_WITHDRAWAL_REASONS[code],
   }));
 }
+
+/**
+ * Family Hospital UAT plan P07.01 (DEC-FH-04) — reasons only a TPA claims
+ * operator may record, through `ClaimWithdrawalService.withdrawAsOperator`. A
+ * separate closed set so none of them is ever offered to a provider:
+ * `listWithdrawalReasons` above is unchanged.
+ */
+export const OPERATOR_WITHDRAWAL_REASONS = {
+  TEST_DATA_INCORRECT_TARIFF: "Trial record priced from the wrong tariff",
+} as const;
+
+export type OperatorWithdrawalReasonCode = keyof typeof OPERATOR_WITHDRAWAL_REASONS;
+
+/** As `normalizeWithdrawalReason`, for the operator-only set. */
+export function normalizeOperatorWithdrawalReason(code: unknown): OperatorWithdrawalReasonCode | null {
+  if (typeof code !== "string") return null;
+  const up = code.trim().toUpperCase();
+  return Object.prototype.hasOwnProperty.call(OPERATOR_WITHDRAWAL_REASONS, up) ? (up as OperatorWithdrawalReasonCode) : null;
+}
