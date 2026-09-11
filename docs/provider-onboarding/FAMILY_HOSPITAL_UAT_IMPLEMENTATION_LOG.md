@@ -56,7 +56,7 @@ Status values: `NOT_STARTED` · `IN_PROGRESS` · `DONE` · `BLOCKED (<gate>)` ·
 | P02.01 Provider case-context resolver | DONE | see §3 | |
 | P02.02 Member resolution surface | DONE | see §3 | the eligibility link itself is switched in P04.04 |
 | P02.03 Provider-scoped service catalogue | DONE | see §3 | behind provider-scoped flag `providerTariffCatalog`, default OFF (P08.04 step 6) |
-| P02.04 Revalidate selected tariffs on submit | DONE | see §3 | claims (eee198c) + pre-auth/amendment (2c73ad5); migration not yet applied to any shared database |
+| P02.04 Revalidate selected tariffs on submit | DONE | see §3 | claims (eee198c) + pre-auth/amendment (2c73ad5); migration `20260911000100` applied to production 2026-09-11 12:29 UTC (P08.04 step 4) |
 | P03.01 Provider member field | DONE | see §3 | |
 | P03.02 Diagnosis combobox | DONE | see §3 | |
 | P03.03 Category-first service combobox | DONE | see §3 | |
@@ -67,7 +67,7 @@ Status values: `NOT_STARTED` · `IN_PROGRESS` · `DONE` · `BLOCKED (<gate>)` ·
 | P04.03 New and amended pre-auth | DONE | see §3 | DEC-FH-X4, DEC-FH-X5 |
 | P04.04 Eligibility | DONE | see §3 | |
 | P04.05 Terminology completeness | DONE | see §3 | DEC-FH-03 = no source: report only, production run saved |
-| P05.01 Account-setup token | DONE | see §3 | migration `20260911000200` not yet applied to a shared database; DEC-FH-X7/X8 |
+| P05.01 Account-setup token | DONE | see §3 | migration `20260911000200` applied to production 2026-09-11 12:29 UTC; DEC-FH-X7/X8 |
 | P05.02 Deliver invitations | DONE | see §3 | production SMTP + `NEXT_PUBLIC_APP_URL` unverified (P08.04 step 3) |
 | P05.03 Complete account setup | DONE | see §3 | |
 | P05.04 One canonical invitation service | DONE | see §3 | DEC-FH-X6 |
@@ -77,7 +77,7 @@ Status values: `NOT_STARTED` · `IN_PROGRESS` · `DONE` · `BLOCKED (<gate>)` ·
 | P08.01 Automated coverage | DONE | see §3 | every mandatory case mapped to a test; gaps filled (88276513) |
 | P08.02 Local verification | DONE | see §3 | typecheck · vitest · eslint · build:local all pass on 88276513 |
 | P08.03 Browser verification matrix | PARTIAL — navigation row done; signed-in rows need a human sign-in | see §3 | the executor does not type passwords; runs at P08.04 step 7 |
-| P08.04 Deployment sequence | READY — runbook and read-only preflights done; every production step awaits approval | see §3 | reviews + production approval |
+| P08.04 Deployment sequence | IN PROGRESS — steps 4–5 done 2026-09-11 (owner: "push to main"); steps 1–3 and 6–9 open | see §3 | reviews, SMTP, flag, P07.01 apply, invites — each awaits the owner |
 | P08.05 Rollback | DONE (documented; P01.02 rollback rehearsed) | see §3 | |
 
 ---
@@ -1155,6 +1155,36 @@ Alerts to configure in the log platform (not in code): repeated `invitation_deli
 5. **Record:** incident note with correlation ids, affected provider, user-safe wording — no
    passwords, tokens or patient data.
 6. **P07.01 is terminal by design** (WITHDRAWN / CANCELLED); it is not rolled back.
+
+**Executed 2026-09-11 (owner instruction "push to main"):**
+
+```text
+Step 4  git push origin HEAD:main — fast-forward 3fa01593..fa145975 (13 commits)
+        Vercel production deployment dpl_FLLdKPm6RE4Bvtj6cVucJ88nAg12, READY 12:31:52 UTC,
+        aliased to avenue-portal.vercel.app. Build log: [db-sync] SCHEMA_DEPLOY_MODE="migrate" →
+        prisma migrate deploy → "Applying migration 20260911000100_claim_line_selected_tariff",
+        "Applying migration 20260911000200_account_setup_invitation", "All migrations have been
+        successfully applied"; next build "Compiled successfully" (the same bullmq warning as local).
+        [PROD, read-only] _prisma_migrations: both finished 12:29:39 / 12:29:40 UTC, not rolled
+        back; ClaimLine.selectedProviderTariffId + index + FK present (64 lines, unchanged);
+        AccountSetupInvitation table + unique token-hash index + 2 FKs present, 0 rows.
+        Smoke: /login 200, /account-setup 200 ("Set up your account — Medvex"),
+        /provider/dashboard 307 → /login, /api/health {"ok":true,"db":"up","version":"fa14597"}
+        (workerFresh:false — the background worker has not reported since 2026-07-28; invitation
+        mail is sent directly, not through it). Vercel runtime errors since the deploy: none.
+        GitHub: brand guard passed on fa14597; verification gate started.
+Step 5  [PROD, read-only] scripts/reports/family-hospital-tariff-preflight.ts --expected-logical 4424
+        → PASS on G1–G6, 4,424 logical services (evidence/P01.01-preflight-2026-09-11T12-30-26-196Z)
+        [PROD, read-only] P07.01 dry run after the deploy → unchanged, "--apply would proceed"
+```
+
+Not done, and recorded as such: step 1 — the owner chose to deploy without the separate
+schema/security, pricing and UX reviews; step 2 — no backup was taken separately (both migrations
+only add a nullable column and a new table; nothing existing was rewritten); step 3 — production
+SMTP and `NEXT_PUBLIC_APP_URL` are still unverified. **Consequence now live:** the TPA "Invite user"
+form no longer sets a password, so until step 3 is done every new account is created with a FAILED
+setup-link delivery and can only be finished with Resend once mail works. Steps 6–9 still await the
+owner.
 
 ### Provider communication (plan §12) — drafted, not sent
 
