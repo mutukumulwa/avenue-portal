@@ -1,6 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { ContractLifecycleService } from "../contract-lifecycle.service";
-import { compareTariffPrecedenceWithBranch } from "../tariff-precedence";
+import {
+  dayBounds,
+  loadCandidateTariffs,
+  normalizeServiceText,
+  selectTariffByCodeOrDescription,
+} from "./tariff-selection";
 import type {
   EngineClaimContext,
   EngineClaimResult,
@@ -23,22 +28,10 @@ function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
-/**
- * Calendar-day bounds for effectivity windows. Claims carry date-only service
- * dates (midnight) while rules/tariffs are stamped with creation timestamps —
- * a rule captured at 07:15 must still govern services dated that same day, so
- * "effective from" compares against end-of-day and "effective to" against
- * start-of-day (PR-026 root cause).
- */
-function dayBounds(d: Date): { startOfDay: Date; endOfDay: Date } {
-  const startOfDay = new Date(d); startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(d); endOfDay.setHours(23, 59, 59, 999);
-  return { startOfDay, endOfDay };
-}
-
-function normalize(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
-}
+// `dayBounds` (PR-026) and the description normaliser now live in
+// ./tariff-selection so every tariff reader shares them (Family Hospital UAT
+// plan P01.03). The engine's behaviour is unchanged — the code moved verbatim.
+const normalize = normalizeServiceText;
 
 /** Dice coefficient over word-bigrams — cheap, deterministic string similarity. */
 function similarity(a: string, b: string): number {
@@ -156,22 +149,15 @@ export class ContractEngine {
     trace.push({ stage: "VALIDITY", outcome: "OK", detail: `status ${contract.status}` });
 
     // Load candidate tariff lines effective on the pricing date for this contract
-    // (branch-specific or network-wide), plus mapping memories.
+    // (branch-specific or network-wide), plus mapping memories. The query is the
+    // shared `candidateTariffWhere` + WP-N2 order, so the provider catalogue and
+    // the legacy rate resolver see exactly this set (P01.03).
     const { startOfDay, endOfDay } = dayBounds(pricingDate);
-    const tariffs = await prisma.providerTariff.findMany({
-      where: {
-        contractId: contract.id,
-        isActive: true,
-        effectiveFrom: { lte: endOfDay },
-        OR: [{ effectiveTo: null }, { effectiveTo: { gte: startOfDay } }],
-        AND: [
-          { OR: [{ branchId: ctx.providerBranchId ?? undefined }, { branchId: null }] },
-          { OR: [{ clientId: ctx.clientId ?? null }, { clientId: null }] },
-        ],
-      },
-      // WP-N2: a deterministic DB order so overlap can never let row order decide
-      // the price (the per-line selection re-sorts with the shared comparator).
-      orderBy: [{ effectiveFrom: "desc" }, { id: "asc" }],
+    const tariffs = await loadCandidateTariffs(prisma, {
+      contractId: contract.id,
+      pricingDate,
+      providerBranchId: ctx.providerBranchId,
+      clientId: ctx.clientId,
     });
     const memories = await prisma.serviceMappingMemory.findMany({
       where: { tenantId: ctx.tenantId, OR: [{ contractId: contract.id }, { contractId: null }], tariffId: { in: tariffs.map(t => t.id) } },
@@ -358,23 +344,13 @@ export class ContractEngine {
     // 1. Code match. WP-N2: branch-specific beats network, then the SAME shared
     //    precedence the legacy resolver uses (client → contract → type → latest →
     //    id) — deterministic even when two rows overlap for the same code.
-    const byCode = tariffs
-      .filter(t => (line.cptCode && t.cptCode === line.cptCode) || (line.providerServiceCode && t.providerServiceCode === line.providerServiceCode))
-      .sort(compareTariffPrecedenceWithBranch);
-    if (byCode.length > 0) {
-      tariff = byCode[0];
-      method = "CODE";
-    }
-
-    // 2. Exact normalized description match.
-    if (!tariff) {
-      const nd = normalize(line.description);
-      const exact = tariffs.find(t =>
-        normalize(t.serviceName) === nd ||
-        (t.standardDescription && normalize(t.standardDescription) === nd) ||
-        (t.providerDescription && normalize(t.providerDescription) === nd),
-      );
-      if (exact) { tariff = exact; method = "DESCRIPTION"; }
+    // 2. Exact normalized description match (first row in candidate order).
+    //    Both steps are the shared `selectTariffByCodeOrDescription` (P01.03), so
+    //    the provider catalogue can prove which row a line will price against.
+    const direct = selectTariffByCodeOrDescription(tariffs, line);
+    if (direct) {
+      tariff = direct.tariff;
+      method = direct.method;
     }
 
     // 3. Mapping memory (maker-confirmed) then fuzzy (auto-usable only if memory-confirmed).

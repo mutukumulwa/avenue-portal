@@ -1,0 +1,960 @@
+{
+  "batchRef": "FH-P0102-20260911",
+  "contractId": "cmtclkbiy00005kvqphfr7xiz",
+  "currency": "UGX",
+  "taxInclusive": "INCLUSIVE",
+  "groups": [
+    {
+      "key": "excision of dermatosis papulosa nigra 5 lesions",
+      "disposition": "DISTINCT_BY_SYMBOL",
+      "reason": "Names differ only in \"<\"/\">\", which the engine discards: different services. Symbols written as words.",
+      "rows": [
+        {
+          "id": "cmtcjm9qk00164yvqhj4o41qb",
+          "serviceName": "Excision of Dermatosis papulosa nigra (>5 lesions)",
+          "agreedRate": "500000",
+          "unit": null,
+          "categoryId": "sc_87569e209e78411934380b",
+          "sourceFingerprint": "779e7a832cbf733e5bec67f46f24dd07b3027dd028d245439efe8697dd4406d7"
+        },
+        {
+          "id": "cmtcjm9qk00174yvq0yaju8yq",
+          "serviceName": "Excision of Dermatosis papulosa nigra (<5 lesions)",
+          "agreedRate": "270000",
+          "unit": null,
+          "categoryId": "sc_87569e209e78411934380b",
+          "sourceFingerprint": "2539016e219a0cc5129cf61e13ccb2b14a5f63746bfa9987ac05039ac88f5f75"
+        }
+      ],
+      "keepIds": [],
+      "deactivateIds": [
+        "cmtcjm9qk00164yvqhj4o41qb",
+        "cmtcjm9qk00174yvq0yaju8yq"
+      ],
+      "replacements": [
+        {
+          "supersedesId": "cmtcjm9qk00164yvqhj4o41qb",
+          "serviceName": "Excision of Dermatosis papulosa nigra (more than 5 lesions)",
+          "providerDescription": "Excision of Dermatosis papulosa nigra (more than 5 lesions)",
+          "fingerprint": "f94d8c1b8bd0fe82b8371d73fe64f73ed7e86dde929c07b4c8e38ea12f7c4627"
+        },
+        {
+          "supersedesId": "cmtcjm9qk00174yvq0yaju8yq",
+          "serviceName": "Excision of Dermatosis papulosa nigra (less than 5 lesions)",
+          "providerDescription": "Excision of Dermatosis papulosa nigra (less than 5 lesions)",
+          "fingerprint": "47182fd58416adea650ea45bf31ae6487706dfd5c74ef274192d12d3d1126858"
+        }
+      ]
+    },
+    {
+      "key": "normal delivery semi private room",
+      "disposition": "EQUIVALENT_DUPLICATE",
+      "reason": "Same pricing terms; keep the row the engine already selects so adjudication is unchanged.",
+      "rows": [
+        {
+          "id": "cmtcjm9qk001z4yvqco2ahekd",
+          "serviceName": "Normal delivery | Semi-private room",
+          "agreedRate": "800000",
+          "unit": null,
+          "categoryId": "sc_87569e209e78411934380b",
+          "sourceFingerprint": "7d6075a7840f25951514ac0e160b030fc3d999733f211b61197cc0a7db5db82a"
+        },
+        {
+          "id": "cmtcjmi5g02j34yvqqfhhk311",
+          "serviceName": "Normal delivery | Semi-private room",
+          "agreedRate": "800000",
+          "unit": null,
+          "categoryId": "cmso8aiuf005us9vqvdlknv32",
+          "sourceFingerprint": "7d28b2965694d3b7db31279a1cf7ac1c3bd12dfc5c9a0c088cf79dbd5c29bf30"
+        }
+      ],
+      "keepIds": [
+        "cmtcjm9qk001z4yvqco2ahekd"
+      ],
+      "deactivateIds": [
+        "cmtcjmi5g02j34yvqqfhhk311"
+      ],
+      "replacements": []
+    },
+    {
+      "key": "normal delivery private room",
+      "disposition": "EQUIVALENT_DUPLICATE",
+      "reason": "Same pricing terms; keep the row the engine already selects so adjudication is unchanged.",
+      "rows": [
+        {
+          "id": "cmtcjm9qk00204yvq2qneut9m",
+          "serviceName": "Normal Delivery | Private room",
+          "agreedRate": "1200000",
+          "unit": null,
+          "categoryId": "sc_87569e209e78411934380b",
+          "sourceFingerprint": "f636b450fc971f93fe0ef8a41ff54ab2355c1942586edd46cbd9834e16b59a29"
+        },
+        {
+          "id": "cmtcjmi5g02j44yvqk12mgdnp",
+          "serviceName": "Normal Delivery | Private room",
+          "agreedRate": "1200000",
+          "unit": null,
+          "categoryId": "cmso8aiuf005us9vqvdlknv32",
+          "sourceFingerprint": "117333233e1f49cd3a980b73d53c4406c247f9c722274ed78998706d9d1b0278"
+        }
+      ],
+      "keepIds": [
+        "cmtcjm9qk00204yvq2qneut9m"
+      ],
+      "deactivateIds": [
+        "cmtcjmi5g02j44yvqk12mgdnp"
+      ],
+      "replacements": []
+    },
+    {
+      "key": "surgical extraction",
+      "disposition": "TRUE_DUPLICATE",
+      "reason": "Same service at different prices; facility rule (2026-08-29, reconfirmed 2026-09-10): use the lower price.",
+      "rows": [
+        {
+          "id": "cmtcjm9qn007x4yvqsl4qhisv",
+          "serviceName": "Surgical Extraction",
+          "agreedRate": "200000",
+          "unit": null,
+          "categoryId": "sc_2ca3da677f22bdbf07d09e",
+          "sourceFingerprint": "bee326795bd358b48d9b96f45d85ecafa6ea2f5223d7c622f8a66fdcc3e5654b"
+        },
+        {
+          "id": "cmtcjm9qn007y4yvqljhquvzg",
+          "serviceName": "Surgical Extraction -",
+          "agreedRate": "150000",
+          "unit": null,
+          "categoryId": "sc_2ca3da677f22bdbf07d09e",
+          "sourceFingerprint": "7fb1d4d0d0a9c8687d89e2ea042ada91d89034ab31ea07e47b785e8cc23b4bd4"
+        }
+      ],
+      "keepIds": [
+        "cmtcjm9qn007y4yvqljhquvzg"
+      ],
+      "deactivateIds": [
+        "cmtcjm9qn007x4yvqsl4qhisv"
+      ],
+      "replacements": []
+    },
+    {
+      "key": "azithromycin 500mg",
+      "disposition": "DISTINCT_BY_UNIT",
+      "reason": "Different prices and different recorded units: different products. Names now carry the unit; the lower-price rule does not apply.",
+      "rows": [
+        {
+          "id": "cmtcjmd1900g14yvqvxl843ei",
+          "serviceName": "Azithromycin 500Mg",
+          "agreedRate": "70000",
+          "unit": "Vial",
+          "categoryId": "cmso8al8w006bs9vqusyq1epz",
+          "sourceFingerprint": "faf7271d3a1851334a2e48a6ea483747f7a805a45f3785b0c222175022abdf89"
+        },
+        {
+          "id": "cmtcjmd1a00i64yvqn3bfa16z",
+          "serviceName": "Azithromycin 500Mg",
+          "agreedRate": "4807",
+          "unit": "Tab",
+          "categoryId": "cmso8al8w006bs9vqusyq1epz",
+          "sourceFingerprint": "b7af7aa0d68b504fadc984df788e171152ec4094943d2c37f36bbdbf74b6241c"
+        }
+      ],
+      "keepIds": [],
+      "deactivateIds": [
+        "cmtcjmd1900g14yvqvxl843ei",
+        "cmtcjmd1a00i64yvqn3bfa16z"
+      ],
+      "replacements": [
+        {
+          "supersedesId": "cmtcjmd1900g14yvqvxl843ei",
+          "serviceName": "Azithromycin 500Mg (Vial)",
+          "providerDescription": "Azithromycin 500Mg (Vial)",
+          "fingerprint": "7f2d344e1081ab8b09b7f2a6d72507168cffe17a7aaecfb8db7401b747defc1b"
+        },
+        {
+          "supersedesId": "cmtcjmd1a00i64yvqn3bfa16z",
+          "serviceName": "Azithromycin 500Mg (Tab)",
+          "providerDescription": "Azithromycin 500Mg (Tab)",
+          "fingerprint": "bfd686df7414b9bc4ce08b4e2a95873db193d44dfb71247a34d7d7a56bdaa708"
+        }
+      ]
+    },
+    {
+      "key": "rabeprazole 20mg rabeloc",
+      "disposition": "DISTINCT_BY_UNIT",
+      "reason": "Different prices and different recorded units: different products. Names now carry the unit; the lower-price rule does not apply.",
+      "rows": [
+        {
+          "id": "cmtcjme9s00yu4yvqvsq7brrb",
+          "serviceName": "Rabeprazole 20Mg (Rabeloc)",
+          "agreedRate": "45540",
+          "unit": "Vial",
+          "categoryId": "cmso8al8w006bs9vqusyq1epz",
+          "sourceFingerprint": "bf001ea974413e4dedb117f267a27af024e2cd9d946579f8408a957129a77b27"
+        },
+        {
+          "id": "cmtcjme9t01164yvq6mdlfzht",
+          "serviceName": "Rabeprazole 20Mg (Rabeloc)",
+          "agreedRate": "1540",
+          "unit": "Tab",
+          "categoryId": "cmso8al8w006bs9vqusyq1epz",
+          "sourceFingerprint": "5c93c69c2bc6dd0ab6a941cefb45e5eeee2270ba69897f2874f53e68ff5bc803"
+        }
+      ],
+      "keepIds": [],
+      "deactivateIds": [
+        "cmtcjme9s00yu4yvqvsq7brrb",
+        "cmtcjme9t01164yvq6mdlfzht"
+      ],
+      "replacements": [
+        {
+          "supersedesId": "cmtcjme9s00yu4yvqvsq7brrb",
+          "serviceName": "Rabeprazole 20Mg (Rabeloc) (Vial)",
+          "providerDescription": "Rabeprazole 20Mg (Rabeloc) (Vial)",
+          "fingerprint": "861a599e7f716126b894f51fe0198e651066e7031e831bffa17cecfb3a0f4108"
+        },
+        {
+          "supersedesId": "cmtcjme9t01164yvq6mdlfzht",
+          "serviceName": "Rabeprazole 20Mg (Rabeloc) (Tab)",
+          "providerDescription": "Rabeprazole 20Mg (Rabeloc) (Tab)",
+          "fingerprint": "11176af1ad7b493836e97c85cb56003e7c76c9a907148e8be7205155d6b678d2"
+        }
+      ]
+    },
+    {
+      "key": "beclomethasone nasal spray",
+      "disposition": "EQUIVALENT_DUPLICATE",
+      "reason": "Same pricing terms; keep the row the engine already selects so adjudication is unchanged.",
+      "rows": [
+        {
+          "id": "cmtcjme9t012q4yvqn7tfqu46",
+          "serviceName": "Beclomethasone Nasal Spray*",
+          "agreedRate": "27000",
+          "unit": "Piece",
+          "categoryId": "cmso8al8w006bs9vqusyq1epz",
+          "sourceFingerprint": "3b28318c91c07c416b4c0fb50900c458a952fd444c29d0efab1b13fd41b7d90b"
+        },
+        {
+          "id": "cmtcjme9u014a4yvqebcpzr29",
+          "serviceName": "Beclomethasone Nasal Spray***",
+          "agreedRate": "27000",
+          "unit": "Piece",
+          "categoryId": "cmso8al8w006bs9vqusyq1epz",
+          "sourceFingerprint": "e3180d807b75993ad3b901b8cb65c3dfcf118b8c7ccc15e48de3326c5dfc0fd3"
+        }
+      ],
+      "keepIds": [
+        "cmtcjme9t012q4yvqn7tfqu46"
+      ],
+      "deactivateIds": [
+        "cmtcjme9u014a4yvqebcpzr29"
+      ],
+      "replacements": []
+    },
+    {
+      "key": "voluven 6",
+      "disposition": "EQUIVALENT_DUPLICATE",
+      "reason": "Same pricing terms; keep the row the engine already selects so adjudication is unchanged.",
+      "rows": [
+        {
+          "id": "cmtcjmh67023b4yvq4sxk2diw",
+          "serviceName": "Voluven 6%",
+          "agreedRate": "94875",
+          "unit": "Pkt",
+          "categoryId": "cmso8al8w006bs9vqusyq1epz",
+          "sourceFingerprint": "ab4de5436fbd5ec3b956dd6ec191d39d279f635a446f68f17d6d35521888bf0f"
+        },
+        {
+          "id": "cmtcjmj5c031u4yvqfurq9do1",
+          "serviceName": "Voluven 6%",
+          "agreedRate": "94875",
+          "unit": "Pkt",
+          "categoryId": "cmso8ale0006cs9vqx3w83zb1",
+          "sourceFingerprint": "81a6877d8b6734c33679ee7af55609dffa6025f090899f45022b93dd5c527885"
+        }
+      ],
+      "keepIds": [
+        "cmtcjmh67023b4yvq4sxk2diw"
+      ],
+      "deactivateIds": [
+        "cmtcjmj5c031u4yvqfurq9do1"
+      ],
+      "replacements": []
+    },
+    {
+      "key": "kabiven central infusion 1900kcal 2053ml",
+      "disposition": "EQUIVALENT_DUPLICATE",
+      "reason": "Same pricing terms; keep the row the engine already selects so adjudication is unchanged.",
+      "rows": [
+        {
+          "id": "cmtcjmh67023c4yvq6ge6u41b",
+          "serviceName": "Kabiven Central Infusion 1900Kcal 2053Ml",
+          "agreedRate": "569250",
+          "unit": "Bottle",
+          "categoryId": "cmso8al8w006bs9vqusyq1epz",
+          "sourceFingerprint": "f2ccd7c21bae149bbd11a2e77a008cb0ee1359188285acb3767f73a138082e06"
+        },
+        {
+          "id": "cmtcjmj5c031v4yvqckbu7ftw",
+          "serviceName": "Kabiven Central Infusion 1900Kcal 2053Ml",
+          "agreedRate": "569250",
+          "unit": "Bottle",
+          "categoryId": "cmso8ale0006cs9vqx3w83zb1",
+          "sourceFingerprint": "2427695279c2d49f54b308ad6b7a75d5e2172ff4282ad310a63dc3a8efa49f16"
+        }
+      ],
+      "keepIds": [
+        "cmtcjmh67023c4yvq6ge6u41b"
+      ],
+      "deactivateIds": [
+        "cmtcjmj5c031v4yvqckbu7ftw"
+      ],
+      "replacements": []
+    },
+    {
+      "key": "haemaccel 3 5 colloidal infusion 500ml",
+      "disposition": "EQUIVALENT_DUPLICATE",
+      "reason": "Same pricing terms; keep the row the engine already selects so adjudication is unchanged.",
+      "rows": [
+        {
+          "id": "cmtcjmh67023d4yvq5rv395bs",
+          "serviceName": "Haemaccel 3.5% Colloidal Infusion 500Ml",
+          "agreedRate": "88000",
+          "unit": "Bottle",
+          "categoryId": "cmso8al8w006bs9vqusyq1epz",
+          "sourceFingerprint": "5412a7ec43a92c959e0f18d7baa0abff35e7163738f41a227043312a2013ec0f"
+        },
+        {
+          "id": "cmtcjmj5c031w4yvqybdyroqr",
+          "serviceName": "Haemaccel 3.5% Colloidal Infusion 500Ml",
+          "agreedRate": "88000",
+          "unit": "Bottle",
+          "categoryId": "cmso8ale0006cs9vqx3w83zb1",
+          "sourceFingerprint": "50d66ff397a52fbd03975bac5d2c1b69eaa9f0f3c601b40cdb9d2cda3376f146"
+        }
+      ],
+      "keepIds": [
+        "cmtcjmh67023d4yvq5rv395bs"
+      ],
+      "deactivateIds": [
+        "cmtcjmj5c031w4yvqybdyroqr"
+      ],
+      "replacements": []
+    },
+    {
+      "key": "kabiven central infusion smorf",
+      "disposition": "EQUIVALENT_DUPLICATE",
+      "reason": "Same pricing terms; keep the row the engine already selects so adjudication is unchanged.",
+      "rows": [
+        {
+          "id": "cmtcjmh67023e4yvqunujaw96",
+          "serviceName": "Kabiven Central Infusion (Smorf)",
+          "agreedRate": "300000",
+          "unit": "Pkt",
+          "categoryId": "cmso8al8w006bs9vqusyq1epz",
+          "sourceFingerprint": "18a34e5bc1e4ab9af69473b3fb7043848b48f1fea16c90515ac06aff929f9f9e"
+        },
+        {
+          "id": "cmtcjmj5c031x4yvqthib2ndf",
+          "serviceName": "Kabiven Central Infusion (Smorf)",
+          "agreedRate": "300000",
+          "unit": "Pkt",
+          "categoryId": "cmso8ale0006cs9vqx3w83zb1",
+          "sourceFingerprint": "2891a4d5a2dc2d0bbf5210c9673fd8b47aaf970a0c2f095d1c8b504bffa16e37"
+        }
+      ],
+      "keepIds": [
+        "cmtcjmh67023e4yvqunujaw96"
+      ],
+      "deactivateIds": [
+        "cmtcjmj5c031x4yvqthib2ndf"
+      ],
+      "replacements": []
+    },
+    {
+      "key": "kabiven peripheral infusion smorf",
+      "disposition": "EQUIVALENT_DUPLICATE",
+      "reason": "Same pricing terms; keep the row the engine already selects so adjudication is unchanged.",
+      "rows": [
+        {
+          "id": "cmtcjmh67023f4yvq10vnj9p9",
+          "serviceName": "Kabiven Peripheral Infusion (Smorf)",
+          "agreedRate": "300000",
+          "unit": "Pkt",
+          "categoryId": "cmso8al8w006bs9vqusyq1epz",
+          "sourceFingerprint": "80f1269aa3d12c7371bb8bc6184f53bc614954dc15d13f27b1fed5d017f5f07b"
+        },
+        {
+          "id": "cmtcjmj5c031y4yvqgcki03g9",
+          "serviceName": "Kabiven Peripheral Infusion (Smorf)",
+          "agreedRate": "300000",
+          "unit": "Pkt",
+          "categoryId": "cmso8ale0006cs9vqx3w83zb1",
+          "sourceFingerprint": "1d2fd0faa1977ce7b63896ac4a278d97dba44654e927aba0e79d1a928614d821"
+        }
+      ],
+      "keepIds": [
+        "cmtcjmh67023f4yvq10vnj9p9"
+      ],
+      "deactivateIds": [
+        "cmtcjmj5c031y4yvqgcki03g9"
+      ],
+      "replacements": []
+    },
+    {
+      "key": "darrows half strength 500ml",
+      "disposition": "EQUIVALENT_DUPLICATE",
+      "reason": "Same pricing terms; keep the row the engine already selects so adjudication is unchanged.",
+      "rows": [
+        {
+          "id": "cmtcjmh67023g4yvqcjta6jp7",
+          "serviceName": "Darrows Half Strength 500Ml",
+          "agreedRate": "6325",
+          "unit": "Bottle",
+          "categoryId": "cmso8al8w006bs9vqusyq1epz",
+          "sourceFingerprint": "190d434d655e747b2178a01d707ce737416e6c390c53e695cc756a3c03ce1f83"
+        },
+        {
+          "id": "cmtcjmj5c031z4yvqmo764tyk",
+          "serviceName": "Darrows Half Strength 500Ml",
+          "agreedRate": "6325",
+          "unit": "Bottle",
+          "categoryId": "cmso8ale0006cs9vqx3w83zb1",
+          "sourceFingerprint": "f1ecb07c376d2d65a27b59c9b9bcfa1043d4a1776632c5f72577ba7023f9a23b"
+        }
+      ],
+      "keepIds": [
+        "cmtcjmh67023g4yvqcjta6jp7"
+      ],
+      "deactivateIds": [
+        "cmtcjmj5c031z4yvqmo764tyk"
+      ],
+      "replacements": []
+    },
+    {
+      "key": "dextrose 50",
+      "disposition": "EQUIVALENT_DUPLICATE",
+      "reason": "Same pricing terms; keep the row the engine already selects so adjudication is unchanged.",
+      "rows": [
+        {
+          "id": "cmtcjmh67023h4yvq8mazmdpu",
+          "serviceName": "Dextrose 50%",
+          "agreedRate": "8855",
+          "unit": "Bottle",
+          "categoryId": "cmso8al8w006bs9vqusyq1epz",
+          "sourceFingerprint": "1943b97839475c7ffe736e325771deafb5ad620ec641e86a5cbf134c7a1bfba6"
+        },
+        {
+          "id": "cmtcjmj5c03204yvqwy6i5mfl",
+          "serviceName": "Dextrose 50%",
+          "agreedRate": "8855",
+          "unit": "Bottle",
+          "categoryId": "cmso8ale0006cs9vqx3w83zb1",
+          "sourceFingerprint": "bad41d1b9239905c2c60263e067e646a09a74212ce9d696aa516fbdda21c31e6"
+        }
+      ],
+      "keepIds": [
+        "cmtcjmh67023h4yvq8mazmdpu"
+      ],
+      "deactivateIds": [
+        "cmtcjmj5c03204yvqwy6i5mfl"
+      ],
+      "replacements": []
+    },
+    {
+      "key": "dextrose 5 500ml",
+      "disposition": "EQUIVALENT_DUPLICATE",
+      "reason": "Same pricing terms; keep the row the engine already selects so adjudication is unchanged.",
+      "rows": [
+        {
+          "id": "cmtcjmh67023i4yvqsvb5f8th",
+          "serviceName": "Dextrose 5% 500Ml",
+          "agreedRate": "7590",
+          "unit": "Bottle",
+          "categoryId": "cmso8al8w006bs9vqusyq1epz",
+          "sourceFingerprint": "c5ef384982a3852b512beaa642b4d5e0cb263635aeaed1e41a090608553d76de"
+        },
+        {
+          "id": "cmtcjmj5c03214yvq5ivwzwd0",
+          "serviceName": "Dextrose 5% 500Ml",
+          "agreedRate": "7590",
+          "unit": "Bottle",
+          "categoryId": "cmso8ale0006cs9vqx3w83zb1",
+          "sourceFingerprint": "1e97dee289848c4eef0bded40a52d92c4e3f4f35cf4741cfbff969746a75dd15"
+        }
+      ],
+      "keepIds": [
+        "cmtcjmh67023i4yvqsvb5f8th"
+      ],
+      "deactivateIds": [
+        "cmtcjmj5c03214yvq5ivwzwd0"
+      ],
+      "replacements": []
+    },
+    {
+      "key": "frebin energy fibre junior",
+      "disposition": "EQUIVALENT_DUPLICATE",
+      "reason": "Same pricing terms; keep the row the engine already selects so adjudication is unchanged.",
+      "rows": [
+        {
+          "id": "cmtcjmh67023j4yvqb7fsxc8m",
+          "serviceName": "Frebin Energy Fibre Junior",
+          "agreedRate": "82111",
+          "unit": "Pkt",
+          "categoryId": "cmso8al8w006bs9vqusyq1epz",
+          "sourceFingerprint": "6fe0d769fc5cac155306cad8c7de99e8846b602e50845d95343ae3aa3213b7aa"
+        },
+        {
+          "id": "cmtcjmj5c03224yvqhrbkhs39",
+          "serviceName": "Frebin Energy Fibre Junior",
+          "agreedRate": "82111",
+          "unit": "Pkt",
+          "categoryId": "cmso8ale0006cs9vqx3w83zb1",
+          "sourceFingerprint": "9f9fdb69dc0cb557e8c1d15fc7069b48ec067591704a43e370745cc79c3015e7"
+        }
+      ],
+      "keepIds": [
+        "cmtcjmh67023j4yvqb7fsxc8m"
+      ],
+      "deactivateIds": [
+        "cmtcjmj5c03224yvqhrbkhs39"
+      ],
+      "replacements": []
+    },
+    {
+      "key": "gelatin polyeline 3 5 500ml",
+      "disposition": "EQUIVALENT_DUPLICATE",
+      "reason": "Same pricing terms; keep the row the engine already selects so adjudication is unchanged.",
+      "rows": [
+        {
+          "id": "cmtcjmh67023k4yvqoaqrewqd",
+          "serviceName": "Gelatin + Polyeline 3.5% 500Ml",
+          "agreedRate": "40833",
+          "unit": "Bottle",
+          "categoryId": "cmso8al8w006bs9vqusyq1epz",
+          "sourceFingerprint": "c310e25a21f1ce6411d741da16e225af8f7da65d616b77ae247a8941f0dd0428"
+        },
+        {
+          "id": "cmtcjmj5c03234yvqagb055rx",
+          "serviceName": "Gelatin + Polyeline 3.5% 500Ml",
+          "agreedRate": "40833",
+          "unit": "Bottle",
+          "categoryId": "cmso8ale0006cs9vqx3w83zb1",
+          "sourceFingerprint": "381893fbd20b9cc3196c33b3b4b248b51e617b641abfc37e311511f6d9a3ac63"
+        }
+      ],
+      "keepIds": [
+        "cmtcjmh67023k4yvqoaqrewqd"
+      ],
+      "deactivateIds": [
+        "cmtcjmj5c03234yvqagb055rx"
+      ],
+      "replacements": []
+    },
+    {
+      "key": "rheosorbilact 200ml",
+      "disposition": "EQUIVALENT_DUPLICATE",
+      "reason": "Same pricing terms; keep the row the engine already selects so adjudication is unchanged.",
+      "rows": [
+        {
+          "id": "cmtcjmh67023l4yvqa4x15uz3",
+          "serviceName": "Rheosorbilact 200Ml",
+          "agreedRate": "35000",
+          "unit": "Bottle",
+          "categoryId": "cmso8al8w006bs9vqusyq1epz",
+          "sourceFingerprint": "6660f6d4377b8314d071715a7d0f39c5be1bced58ffa1937ae8a03b6d934ce0c"
+        },
+        {
+          "id": "cmtcjmj5c03244yvqj65ly2gv",
+          "serviceName": "Rheosorbilact 200Ml",
+          "agreedRate": "35000",
+          "unit": "Bottle",
+          "categoryId": "cmso8ale0006cs9vqx3w83zb1",
+          "sourceFingerprint": "6bdb1f18d4e2ed05fad2dc965bde7b47191bfaebd95b39b49d1701c89110a0a1"
+        }
+      ],
+      "keepIds": [
+        "cmtcjmh67023l4yvqa4x15uz3"
+      ],
+      "deactivateIds": [
+        "cmtcjmj5c03244yvqj65ly2gv"
+      ],
+      "replacements": []
+    },
+    {
+      "key": "sodium chloride 0 9 500ml normal saline apdl",
+      "disposition": "EQUIVALENT_DUPLICATE",
+      "reason": "Same pricing terms; keep the row the engine already selects so adjudication is unchanged.",
+      "rows": [
+        {
+          "id": "cmtcjmh67023m4yvq0qvx9bvn",
+          "serviceName": "Sodium Chloride 0.9% 500Ml (Normal Saline) Apdl",
+          "agreedRate": "7590",
+          "unit": "Bottle",
+          "categoryId": "cmso8al8w006bs9vqusyq1epz",
+          "sourceFingerprint": "e961861e0219b898c7952e180efe966e22f1876783c67174ce14f2e04b7e3116"
+        },
+        {
+          "id": "cmtcjmj5c03254yvqbwej6d97",
+          "serviceName": "Sodium Chloride 0.9% 500Ml (Normal Saline) Apdl",
+          "agreedRate": "7590",
+          "unit": "Bottle",
+          "categoryId": "cmso8ale0006cs9vqx3w83zb1",
+          "sourceFingerprint": "e12f82ce4d97b7cf8fde33ea9b722754a9dce15f0da9ae63df8aa9ac20eed8e7"
+        }
+      ],
+      "keepIds": [
+        "cmtcjmh67023m4yvq0qvx9bvn"
+      ],
+      "deactivateIds": [
+        "cmtcjmj5c03254yvqbwej6d97"
+      ],
+      "replacements": []
+    },
+    {
+      "key": "decasan 500ml",
+      "disposition": "EQUIVALENT_DUPLICATE",
+      "reason": "Same pricing terms; keep the row the engine already selects so adjudication is unchanged.",
+      "rows": [
+        {
+          "id": "cmtcjmh67023n4yvqio8ca5jq",
+          "serviceName": "Decasan 500Ml",
+          "agreedRate": "51000",
+          "unit": "Bottle",
+          "categoryId": "cmso8al8w006bs9vqusyq1epz",
+          "sourceFingerprint": "8a62099f9ffcc650f5ab2d4dd123a52613b68b20593d71c0c901d7107db8cc96"
+        },
+        {
+          "id": "cmtcjmj5c03264yvquib4csgw",
+          "serviceName": "Decasan 500Ml",
+          "agreedRate": "51000",
+          "unit": "Bottle",
+          "categoryId": "cmso8ale0006cs9vqx3w83zb1",
+          "sourceFingerprint": "c191ef6c6bd8bdcb53b9d58dc8282858df5ee517ee4a34b13c80dc13c6a604df"
+        }
+      ],
+      "keepIds": [
+        "cmtcjmh67023n4yvqio8ca5jq"
+      ],
+      "deactivateIds": [
+        "cmtcjmj5c03264yvquib4csgw"
+      ],
+      "replacements": []
+    },
+    {
+      "key": "sodium chloride 0 9 200ml",
+      "disposition": "EQUIVALENT_DUPLICATE",
+      "reason": "Same pricing terms; keep the row the engine already selects so adjudication is unchanged.",
+      "rows": [
+        {
+          "id": "cmtcjmh67023o4yvqjgt0op61",
+          "serviceName": "Sodium Chloride 0.9% 200Ml",
+          "agreedRate": "9488",
+          "unit": "Piece",
+          "categoryId": "cmso8al8w006bs9vqusyq1epz",
+          "sourceFingerprint": "5ee2ade6fc225f79c177fa15f072b82191d871ad342bc2327d5792fdb39f13e8"
+        },
+        {
+          "id": "cmtcjmj5c03274yvqo00o4n6a",
+          "serviceName": "Sodium Chloride 0.9% 200Ml",
+          "agreedRate": "9488",
+          "unit": "Piece",
+          "categoryId": "cmso8ale0006cs9vqx3w83zb1",
+          "sourceFingerprint": "294e6229c9af3a900875c2cdda5acc30c2de6546cb4f1a2fcbaaaf10f0895334"
+        }
+      ],
+      "keepIds": [
+        "cmtcjmh67023o4yvqjgt0op61"
+      ],
+      "deactivateIds": [
+        "cmtcjmj5c03274yvqo00o4n6a"
+      ],
+      "replacements": []
+    },
+    {
+      "key": "rheosorbilact 400ml",
+      "disposition": "EQUIVALENT_DUPLICATE",
+      "reason": "Same pricing terms; keep the row the engine already selects so adjudication is unchanged.",
+      "rows": [
+        {
+          "id": "cmtcjmh67023p4yvqtweet2v3",
+          "serviceName": "Rheosorbilact 400Ml",
+          "agreedRate": "27800",
+          "unit": "Bottle",
+          "categoryId": "cmso8al8w006bs9vqusyq1epz",
+          "sourceFingerprint": "18ea70b7dccc099ac51377a159690ecdfc4aaf1b9bd9c54d966e1c8f54a414ed"
+        },
+        {
+          "id": "cmtcjmj5c03284yvq31rji3lo",
+          "serviceName": "Rheosorbilact 400Ml",
+          "agreedRate": "27800",
+          "unit": "Bottle",
+          "categoryId": "cmso8ale0006cs9vqx3w83zb1",
+          "sourceFingerprint": "c6dd6751b3e631345ac4839c2c290ff3b29bc15c5d60aee50170e8916dfda874"
+        }
+      ],
+      "keepIds": [
+        "cmtcjmh67023p4yvqtweet2v3"
+      ],
+      "deactivateIds": [
+        "cmtcjmj5c03284yvq31rji3lo"
+      ],
+      "replacements": []
+    },
+    {
+      "key": "decasan 1l",
+      "disposition": "EQUIVALENT_DUPLICATE",
+      "reason": "Same pricing terms; keep the row the engine already selects so adjudication is unchanged.",
+      "rows": [
+        {
+          "id": "cmtcjmh67023q4yvqzsg1h5up",
+          "serviceName": "Decasan 1L",
+          "agreedRate": "53000",
+          "unit": "Bottle",
+          "categoryId": "cmso8al8w006bs9vqusyq1epz",
+          "sourceFingerprint": "b227ff4991182a3016fbcdd4f9715629280ed116fd0797267e0174ea4d0ebbc2"
+        },
+        {
+          "id": "cmtcjmj5c03294yvqn2iunone",
+          "serviceName": "Decasan 1L",
+          "agreedRate": "53000",
+          "unit": "Bottle",
+          "categoryId": "cmso8ale0006cs9vqx3w83zb1",
+          "sourceFingerprint": "c66ccaa5e3bfa3d59fb51d9eac7a074a3f418bdda0b5b2c4b092931db82d128e"
+        }
+      ],
+      "keepIds": [
+        "cmtcjmh67023q4yvqzsg1h5up"
+      ],
+      "deactivateIds": [
+        "cmtcjmj5c03294yvqn2iunone"
+      ],
+      "replacements": []
+    },
+    {
+      "key": "dextrose 10 250ml",
+      "disposition": "EQUIVALENT_DUPLICATE",
+      "reason": "Same pricing terms; keep the row the engine already selects so adjudication is unchanged.",
+      "rows": [
+        {
+          "id": "cmtcjmh67023r4yvqjasel2xf",
+          "serviceName": "Dextrose 10% 250Ml",
+          "agreedRate": "7590",
+          "unit": "Bottle",
+          "categoryId": "cmso8al8w006bs9vqusyq1epz",
+          "sourceFingerprint": "93fb66d18d90e6c07f7312718fb93e6363f8d419a03d41c202751101f6957495"
+        },
+        {
+          "id": "cmtcjmj5c032a4yvqcxuhs493",
+          "serviceName": "Dextrose 10% 250Ml",
+          "agreedRate": "7590",
+          "unit": "Bottle",
+          "categoryId": "cmso8ale0006cs9vqx3w83zb1",
+          "sourceFingerprint": "1a465302b3a0678f811e37235fbeb82d739411939fd91a8e9e454b8ca190013b"
+        }
+      ],
+      "keepIds": [
+        "cmtcjmh67023r4yvqjasel2xf"
+      ],
+      "deactivateIds": [
+        "cmtcjmj5c032a4yvqcxuhs493"
+      ],
+      "replacements": []
+    },
+    {
+      "key": "diben tube feeds 500ml",
+      "disposition": "EQUIVALENT_DUPLICATE",
+      "reason": "Same pricing terms; keep the row the engine already selects so adjudication is unchanged.",
+      "rows": [
+        {
+          "id": "cmtcjmh67023s4yvqjzsh5x29",
+          "serviceName": "Diben Tube Feeds 500Ml",
+          "agreedRate": "60000",
+          "unit": "Pkt",
+          "categoryId": "cmso8al8w006bs9vqusyq1epz",
+          "sourceFingerprint": "8a4c34f8e692d4b2b04b223374146460fd8cad875fe97b5a02e38fc6748b33c5"
+        },
+        {
+          "id": "cmtcjmj5c032b4yvq0t4wsxp0",
+          "serviceName": "Diben Tube Feeds 500Ml",
+          "agreedRate": "60000",
+          "unit": "Pkt",
+          "categoryId": "cmso8ale0006cs9vqx3w83zb1",
+          "sourceFingerprint": "1fef28d8c3b67a719b96bb917d053cd45bced431e5730c47a25189f1801f06b8"
+        }
+      ],
+      "keepIds": [
+        "cmtcjmh67023s4yvqjzsh5x29"
+      ],
+      "deactivateIds": [
+        "cmtcjmj5c032b4yvq0t4wsxp0"
+      ],
+      "replacements": []
+    },
+    {
+      "key": "ringers lactate hartman s soln 500ml",
+      "disposition": "EQUIVALENT_DUPLICATE",
+      "reason": "Same pricing terms; keep the row the engine already selects so adjudication is unchanged.",
+      "rows": [
+        {
+          "id": "cmtcjmh67023t4yvqgwif14hb",
+          "serviceName": "Ringers Lactate (Hartman'S Soln.) 500Ml",
+          "agreedRate": "8855",
+          "unit": "Ltr",
+          "categoryId": "cmso8al8w006bs9vqusyq1epz",
+          "sourceFingerprint": "13958accb46da477205d592d7f608ef03c094d9817998c9ae58f7809cc8eae25"
+        },
+        {
+          "id": "cmtcjmj5c032c4yvq9ug72ewr",
+          "serviceName": "Ringers Lactate (Hartman'S Soln.) 500Ml",
+          "agreedRate": "8855",
+          "unit": "Ltr",
+          "categoryId": "cmso8ale0006cs9vqx3w83zb1",
+          "sourceFingerprint": "76968ed6e8347b94a764cf3648b801fcad320599f0a3e3908f916fc09e92be89"
+        }
+      ],
+      "keepIds": [
+        "cmtcjmh67023t4yvqgwif14hb"
+      ],
+      "deactivateIds": [
+        "cmtcjmj5c032c4yvq9ug72ewr"
+      ],
+      "replacements": []
+    },
+    {
+      "key": "iv giving set",
+      "disposition": "EQUIVALENT_DUPLICATE",
+      "reason": "Same pricing terms; keep the row the engine already selects so adjudication is unchanged.",
+      "rows": [
+        {
+          "id": "cmtcjmh67023u4yvqkaw30du8",
+          "serviceName": "Iv Giving Set",
+          "agreedRate": "3416",
+          "unit": "Piece",
+          "categoryId": "cmso8al8w006bs9vqusyq1epz",
+          "sourceFingerprint": "ad16bac6eed8103823260ee1a502741f2004cce7027d7377ebeebd6533bab4c0"
+        },
+        {
+          "id": "cmtcjmj5c032f4yvqaqsxg7bi",
+          "serviceName": "Iv Giving Set",
+          "agreedRate": "3416",
+          "unit": "Piece",
+          "categoryId": "cmso8ale0006cs9vqx3w83zb1",
+          "sourceFingerprint": "a628f1309ad9dad4c2776ccadbb0ecf5c54769db057a383451ebcab6bc2ef97b"
+        }
+      ],
+      "keepIds": [
+        "cmtcjmh67023u4yvqkaw30du8"
+      ],
+      "deactivateIds": [
+        "cmtcjmj5c032f4yvqaqsxg7bi"
+      ],
+      "replacements": []
+    },
+    {
+      "key": "iv giving set burette",
+      "disposition": "EQUIVALENT_DUPLICATE",
+      "reason": "Same pricing terms; keep the row the engine already selects so adjudication is unchanged.",
+      "rows": [
+        {
+          "id": "cmtcjmh67023v4yvqb1nx1owz",
+          "serviceName": "Iv Giving Set Burette",
+          "agreedRate": "7337",
+          "unit": "Piece",
+          "categoryId": "cmso8al8w006bs9vqusyq1epz",
+          "sourceFingerprint": "0201f72d9777fc18a8c41620608a3efa0856b6107d4987f0e2648f04765b2c6d"
+        },
+        {
+          "id": "cmtcjmj5c032g4yvq0w447hne",
+          "serviceName": "Iv Giving Set Burette",
+          "agreedRate": "7337",
+          "unit": "Piece",
+          "categoryId": "cmso8ale0006cs9vqx3w83zb1",
+          "sourceFingerprint": "c32f1ee2833b1ddebea68d10146f7209a4b6c019b8c86b117e23385a45a54e93"
+        }
+      ],
+      "keepIds": [
+        "cmtcjmh67023v4yvqb1nx1owz"
+      ],
+      "deactivateIds": [
+        "cmtcjmj5c032g4yvq0w447hne"
+      ],
+      "replacements": []
+    },
+    {
+      "key": "sodium chloride 0 9 100ml",
+      "disposition": "EQUIVALENT_DUPLICATE",
+      "reason": "Same pricing terms; keep the row the engine already selects so adjudication is unchanged.",
+      "rows": [
+        {
+          "id": "cmtcjmh67023w4yvq4snrtdda",
+          "serviceName": "Sodium Chloride 0.9% 100Ml",
+          "agreedRate": "9488",
+          "unit": "Piece",
+          "categoryId": "cmso8al8w006bs9vqusyq1epz",
+          "sourceFingerprint": "4aae89b4f6cb27d6ef257e9b2f0eb5283b721dc933177db7561a49ffec198fc2"
+        },
+        {
+          "id": "cmtcjmj5c032l4yvqu7h31grl",
+          "serviceName": "Sodium Chloride 0.9% 100Ml",
+          "agreedRate": "9488",
+          "unit": "Piece",
+          "categoryId": "cmso8ale0006cs9vqx3w83zb1",
+          "sourceFingerprint": "a2b6181ba34d33bab4452617e5838b9e13dc1fcabc38c43488d16a9932bd77df"
+        }
+      ],
+      "keepIds": [
+        "cmtcjmh67023w4yvq4snrtdda"
+      ],
+      "deactivateIds": [
+        "cmtcjmj5c032l4yvqu7h31grl"
+      ],
+      "replacements": []
+    },
+    {
+      "key": "neogen locking head screw 3 5mm 14mm",
+      "disposition": "TRUE_DUPLICATE",
+      "reason": "Same service at different prices; facility rule (2026-08-29, reconfirmed 2026-09-10): use the lower price.",
+      "rows": [
+        {
+          "id": "cmtcjmi5h02ov4yvqpy25yvv6",
+          "serviceName": "Neogen Locking Head Screw 3.5Mm(14Mm)",
+          "agreedRate": "143000",
+          "unit": "Piece",
+          "categoryId": "cmso8ale0006cs9vqx3w83zb1",
+          "sourceFingerprint": "64624c5eba325e5e302a1c8ff37e2038caf99ec2c2a2611abb0e470b60812bb5"
+        },
+        {
+          "id": "cmtcjmj5902ru4yvqqiuppqhv",
+          "serviceName": "Neogen Locking Head Screw 3.5Mm (14Mm)",
+          "agreedRate": "132000",
+          "unit": "Piece",
+          "categoryId": "cmso8ale0006cs9vqx3w83zb1",
+          "sourceFingerprint": "81fe7ea8779762b9f6fbc7062de6641da2f656ea7d674bea5802fcd8af26183e"
+        }
+      ],
+      "keepIds": [
+        "cmtcjmj5902ru4yvqqiuppqhv"
+      ],
+      "deactivateIds": [
+        "cmtcjmi5h02ov4yvqpy25yvv6"
+      ],
+      "replacements": []
+    }
+  ],
+  "totals": {
+    "candidateRows": 4451,
+    "groups": 30,
+    "deactivate": 33,
+    "create": 6,
+    "activeAfter": 4424,
+    "logicalServicesAfter": 4424,
+    "unresolvedGroups": 0
+  },
+  "postStateCheck": {
+    "selectable": 4424,
+    "shadowed": 0,
+    "ambiguous": 0,
+    "descriptionKeyCollisions": 0
+  },
+  "manifestHash": "78982cfa5be38e2d9216c1e3aedb07339eb525ab611897716014009becc8079a"
+}
