@@ -55,7 +55,7 @@ Status values: `NOT_STARTED` · `IN_PROGRESS` · `DONE` · `BLOCKED (<gate>)` ·
 | P01.03 Standalone-tariff semantics | DONE | see §3 | readers aligned; four-reader parity test green |
 | P02.01 Provider case-context resolver | DONE | see §3 | |
 | P02.02 Member resolution surface | DONE | see §3 | the eligibility link itself is switched in P04.04 |
-| P02.03 Provider-scoped service catalogue | DONE | see §3 | behind provider-scoped flag `providerTariffCatalog`, default OFF (P08.04 step 6) |
+| P02.03 Provider-scoped service catalogue | DONE | see §3 | flag `providerTariffCatalog` switched ON for Family only, 2026-09-11 12:49 UTC (P08.04 step 6) |
 | P02.04 Revalidate selected tariffs on submit | DONE | see §3 | claims (eee198c) + pre-auth/amendment (2c73ad5); migration `20260911000100` applied to production 2026-09-11 12:29 UTC (P08.04 step 4) |
 | P03.01 Provider member field | DONE | see §3 | |
 | P03.02 Diagnosis combobox | DONE | see §3 | |
@@ -77,7 +77,7 @@ Status values: `NOT_STARTED` · `IN_PROGRESS` · `DONE` · `BLOCKED (<gate>)` ·
 | P08.01 Automated coverage | DONE | see §3 | every mandatory case mapped to a test; gaps filled (88276513) |
 | P08.02 Local verification | DONE | see §3 | typecheck · vitest · eslint · build:local all pass on 88276513 |
 | P08.03 Browser verification matrix | PARTIAL — navigation row done; signed-in rows need a human sign-in | see §3 | the executor does not type passwords; runs at P08.04 step 7 |
-| P08.04 Deployment sequence | IN PROGRESS — steps 4–5 done 2026-09-11 (owner: "push to main"); steps 1–3 and 6–9 open | see §3 | reviews, SMTP, flag, P07.01 apply, invites — each awaits the owner |
+| P08.04 Deployment sequence | IN PROGRESS — steps 4–6 done 2026-09-11 (owner-approved); steps 1–3 and 7–9 open | see §3 | reviews, SMTP, P07.01 apply, invites — each awaits the owner |
 | P08.05 Rollback | DONE (documented; P01.02 rollback rehearsed) | see §3 | |
 
 ---
@@ -1141,7 +1141,10 @@ Alerts to configure in the log platform (not in code): repeated `invitation_deli
 
 ### P08.05 — Rollback (none of it re-enables KES-as-UGX pricing)
 
-1. **Catalogue problem:** remove Family from `tariffCatalogProviderIds`. Capture falls back to the
+1. **Catalogue problem:** remove Family from `tariffCatalogProviderIds` —
+   `npx tsx scripts/provider-access-flag.ts --tenant-id cmr3ae8v30000nlvqxrqlfn38 --provider-id
+   cmssrwr31000033vqpue454ou --flag tariffCatalog --disable --apply --operator-user-id <id> --reason
+   "<incident>"`. Capture falls back to the
    description-first manual price path ("contract rate unavailable — manual review"); no global
    price returns. If that path is also unsafe, pause Family's capture (provider status), not the
    code.
@@ -1178,12 +1181,23 @@ Step 5  [PROD, read-only] scripts/reports/family-hospital-tariff-preflight.ts --
         [PROD, read-only] P07.01 dry run after the deploy → unchanged, "--apply would proceed"
 ```
 
+Step 6  (owner-approved in chat) scripts/provider-access-flag.ts --tenant-id cmr3ae8v30000nlvqxrqlfn38
+        --provider-id cmssrwr31000033vqpue454ou --flag tariffCatalog --enable --apply
+        --operator-user-id cmr3aezx7000mnlvqgoljdyqi --reason "…preflight PASS…; owner approved"
+        → changed: [] → [Family]; read back through ProviderAccessSettingsService: live for Family.
+        [PROD, read-only] Tenant.config.providerAccess = {"tariffCatalogProviderIds":[Family]} and
+        the tenant's other settings untouched; audit row cmtwye41z000003vq4bnl5jc4
+        PROVIDER_ACCESS_FLAG_CHANGED by the operator, hash-chained. Takes effect without a deploy;
+        every other facility is unchanged (no tenant-wide flag). Undo: the same command with
+        --disable. Before this there was no way to set the flag but a hand-written JSON update —
+        the script (with tests/scripts/provider-access-flag.test.ts) makes it one audited step.
+
 Not done, and recorded as such: step 1 — the owner chose to deploy without the separate
 schema/security, pricing and UX reviews; step 2 — no backup was taken separately (both migrations
 only add a nullable column and a new table; nothing existing was rewritten); step 3 — production
 SMTP and `NEXT_PUBLIC_APP_URL` are still unverified. **Consequence now live:** the TPA "Invite user"
 form no longer sets a password, so until step 3 is done every new account is created with a FAILED
-setup-link delivery and can only be finished with Resend once mail works. Steps 6–9 still await the
+setup-link delivery and can only be finished with Resend once mail works. Steps 7–9 still await the
 owner.
 
 ### Provider communication (plan §12) — drafted, not sent
@@ -1205,7 +1219,7 @@ It is not to be sent until the owner approves it and P08.04 steps 3–9 have mad
 | No CPT `averageCost` auto-price / KES-as-UGX | **PASS** in code (consistency ratchet); live after deploy |
 | Direct claim entry resolves a typed trial member and revalidates | **PASS** in tests; browser pending |
 | Diagnosis search by text/code, no price | **PASS** in tests; 200-code limit disclosed (DEC-FH-03) |
-| Category filters Family description search; codes optional | **PASS** in tests; live after step 6 |
+| Category filters Family description search; codes optional | **PASS** in tests; live for Family since 12:49 UTC (step 6) |
 | `600,000` accepted and persisted | **PASS** in tests |
 | Kampala date default, correct around UTC midnight | **PASS** in tests |
 | Inpatient/surgical benefits from one list | **PASS** in tests |
