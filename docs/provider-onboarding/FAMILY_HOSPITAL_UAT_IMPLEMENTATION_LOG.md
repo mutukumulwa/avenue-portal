@@ -49,7 +49,7 @@ Status values: `NOT_STARTED` · `IN_PROGRESS` · `DONE` · `BLOCKED (<gate>)` ·
 |---|---|---|---|
 | P00.01 Implementation record | DONE | see §3 | this file + decisions file |
 | P00.02 Credential containment | BLOCKED (owner: "not yet", 2026-09-11) | | exposed accounts identified; two exposed passwords remain valid by owner decision — release gate §13.1 open |
-| P00.03 Freeze unreliable UAT records | DONE | see §3 | 4 claims + 1 pre-auth frozen, register marked, UAT paused |
+| P00.03 Freeze unreliable UAT records | DONE | see §3 | 4 claims + 1 pre-auth frozen, register marked; withdrawn/cancelled by P07.01 on 2026-09-11 |
 | P01.01 Read-only tariff preflight | DONE | see §3 | production result **NO-GO (G2)** → P01.02 required |
 | P01.02 Attach/reimport safely | DONE | see §3 | owner approved 2026-09-11; applied to production, receipt `cmtwmk5920000xavq6zrbs74p`; production preflight now PASS |
 | P01.03 Standalone-tariff semantics | DONE | see §3 | readers aligned; four-reader parity test green |
@@ -72,12 +72,12 @@ Status values: `NOT_STARTED` · `IN_PROGRESS` · `DONE` · `BLOCKED (<gate>)` ·
 | P05.03 Complete account setup | DONE | see §3 | |
 | P05.04 One canonical invitation service | DONE | see §3 | DEC-FH-X6 |
 | P06 Provider navigation | DONE | see §3 | DEC-FH-X9 (grouping, for provider UX review) |
-| P07.01 Clean up affected claims/pre-auths | READY — production apply awaits approval (P08.04 step 8) | see §3 | DEC-FH-04, DEC-FH-X10; DEC-FH-X11 open |
+| P07.01 Clean up affected claims/pre-auths | DONE — applied to production 2026-09-11 13:08 UTC, operation receipt `cmtwz26hw0000azvq4z9v45gv` | see §3 | DEC-FH-04, DEC-FH-X10; DEC-FH-X11 open |
 | P07.02 Fresh Family UAT fixtures | DONE (verified read-only); two actors await setup links (P08.04 step 9) | see §3 | |
 | P08.01 Automated coverage | DONE | see §3 | every mandatory case mapped to a test; gaps filled (88276513) |
 | P08.02 Local verification | DONE | see §3 | typecheck · vitest · eslint · build:local all pass on 88276513 |
 | P08.03 Browser verification matrix | PARTIAL — navigation row done; signed-in rows need a human sign-in | see §3 | the executor does not type passwords; runs at P08.04 step 7 |
-| P08.04 Deployment sequence | IN PROGRESS — steps 4–6 done 2026-09-11 (owner-approved); steps 1–3 and 7–9 open | see §3 | reviews, SMTP, P07.01 apply, invites — each awaits the owner |
+| P08.04 Deployment sequence | IN PROGRESS — steps 4–6 and 8 done 2026-09-11 (owner-approved); steps 1–3, 7 and 9 open | see §3 | reviews, SMTP, browser smoke, invites — each awaits the owner |
 | P08.05 Rollback | DONE (documented; P01.02 rollback rehearsed) | see §3 | |
 
 ---
@@ -960,6 +960,25 @@ Reviewer/sign-off:       pending — owner approval for the production apply
   and provider performance scores already exclude WITHDRAWN. All-status totals still include them —
   see DEC-FH-X11.
 
+**Applied 2026-09-11 (owner-approved in chat):**
+
+```text
+[PROD, write] DATABASE_URL=<session pooler> npx tsx scripts/family-hospital-trial-record-cleanup.ts \
+  --apply --batch-ref FH-P0701-20260911 --operator-user-id cmr3aezx7000mnlvqgoljdyqi
+→ exit 0, APPLIED; operation receipt cmtwz26hw0000azvq4z9v45gv (SUCCEEDED, WITHDRAWN:4;CANCELLED:1)
+  CLM-2026-00308 … 00311  RECEIVED → WITHDRAWN   (lifecycle logs cmtwz27ip…, cmtwz2957…, cmtwz2aoy…,
+                                                   cmtwz2c8o…; audit CLAIM:WITHDRAW cmtwz285h…,
+                                                   cmtwz29pf…, cmtwz2b9c…, cmtwz2csw…)
+  PA-2026-00007           UNDER_REVIEW → CANCELLED (audit PREAUTH:CANCELLED cmtwz2dns…)
+  Record: evidence/P07.01-applied-2026-09-11T13-08-21-633Z.{md,json} (full ids)
+[PROD, read-only] afterwards: the 4 claims WITHDRAWN, never decided, approved 0; the pre-auth
+  CANCELLED; 0 fund movements, 0 benefit holds; 4 CLAIM_WITHDRAWN in-app notices queued for the
+  facility; Family now has 0 pending claims and 0 pending pre-auths. Nothing was deleted.
+```
+
+Step 5 (what still counts them): pending counts (TPA and facility dashboards) no longer include
+them; all-status totals still do — DEC-FH-X11, open.
+
 ### P07.02 — Fresh Family UAT fixtures
 
 ```text
@@ -1224,7 +1243,7 @@ It is not to be sent until the owner approves it and P08.04 steps 3–9 have mad
 | Kampala date default, correct around UTC midnight | **PASS** in tests |
 | Inpatient/surgical benefits from one list | **PASS** in tests |
 | Navigation at all widths, keyboard, touch, 200 % | **PASS** (P06 browser run) |
-| Old claims/pre-auths withdrawn/cancelled with history | **READY** — step 8 |
+| Old claims/pre-auths withdrawn/cancelled with history | **PASS** — 4 withdrawn, 1 cancelled, nothing deleted (step 8, 13:08 UTC) |
 | Typecheck, tests, lint, build | **PASS** (P08.02) |
 | Internal browser smoke tests | **Open** — step 7 |
 | Family's users complete UAT; Abel signs off | **Open** — after the rerun |

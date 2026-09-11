@@ -1,0 +1,197 @@
+{
+  "mode": "apply",
+  "scope": {
+    "tenantId": "cmr3ae8v30000nlvqxrqlfn38",
+    "providerId": "cmssrwr31000033vqpue454ou"
+  },
+  "outcome": "APPLIED",
+  "operationId": "cmtwz26hw0000azvq4z9v45gv",
+  "batchRef": "FH-P0701-20260911",
+  "operatorUserId": "cmr3aezx7000mnlvqgoljdyqi",
+  "reason": "TEST_DATA_INCORRECT_TARIFF",
+  "steps": [
+    {
+      "kind": "claim",
+      "id": "cmtvq6mk4000104jq28uwpa1y",
+      "number": "CLM-2026-00308",
+      "fromStatus": "RECEIVED",
+      "toStatus": "WITHDRAWN",
+      "effect": "WITHDRAWN"
+    },
+    {
+      "kind": "claim",
+      "id": "cmtvqiaia000n04jqy8r3kdk2",
+      "number": "CLM-2026-00309",
+      "fromStatus": "RECEIVED",
+      "toStatus": "WITHDRAWN",
+      "effect": "WITHDRAWN"
+    },
+    {
+      "kind": "claim",
+      "id": "cmtvr409l000104l558ysm0rk",
+      "number": "CLM-2026-00310",
+      "fromStatus": "RECEIVED",
+      "toStatus": "WITHDRAWN",
+      "effect": "WITHDRAWN"
+    },
+    {
+      "kind": "claim",
+      "id": "cmtvriwim000n04l5zopta221",
+      "number": "CLM-2026-00311",
+      "fromStatus": "RECEIVED",
+      "toStatus": "WITHDRAWN",
+      "effect": "WITHDRAWN"
+    },
+    {
+      "kind": "preauth",
+      "id": "cmtvsylrm000004jtq5g4d4uo",
+      "number": "PA-2026-00007",
+      "fromStatus": "UNDER_REVIEW",
+      "toStatus": "CANCELLED",
+      "effect": "CANCELLED"
+    }
+  ],
+  "before": {
+    "tenantId": "cmr3ae8v30000nlvqxrqlfn38",
+    "providerId": "cmssrwr31000033vqpue454ou",
+    "claims": [
+      {
+        "id": "cmtvq6mk4000104jq28uwpa1y",
+        "number": "CLM-2026-00308",
+        "status": "RECEIVED",
+        "action": "WITHDRAW"
+      },
+      {
+        "id": "cmtvqiaia000n04jqy8r3kdk2",
+        "number": "CLM-2026-00309",
+        "status": "RECEIVED",
+        "action": "WITHDRAW"
+      },
+      {
+        "id": "cmtvr409l000104l558ysm0rk",
+        "number": "CLM-2026-00310",
+        "status": "RECEIVED",
+        "action": "WITHDRAW"
+      },
+      {
+        "id": "cmtvriwim000n04l5zopta221",
+        "number": "CLM-2026-00311",
+        "status": "RECEIVED",
+        "action": "WITHDRAW"
+      }
+    ],
+    "preauths": [
+      {
+        "id": "cmtvsylrm000004jtq5g4d4uo",
+        "number": "PA-2026-00007",
+        "status": "UNDER_REVIEW",
+        "action": "CANCEL"
+      }
+    ],
+    "unexpected": [],
+    "refusals": []
+  },
+  "after": {
+    "tenantId": "cmr3ae8v30000nlvqxrqlfn38",
+    "providerId": "cmssrwr31000033vqpue454ou",
+    "claims": [
+      {
+        "id": "cmtvq6mk4000104jq28uwpa1y",
+        "number": "CLM-2026-00308",
+        "status": "WITHDRAWN",
+        "action": "ALREADY_DONE"
+      },
+      {
+        "id": "cmtvqiaia000n04jqy8r3kdk2",
+        "number": "CLM-2026-00309",
+        "status": "WITHDRAWN",
+        "action": "ALREADY_DONE"
+      },
+      {
+        "id": "cmtvr409l000104l558ysm0rk",
+        "number": "CLM-2026-00310",
+        "status": "WITHDRAWN",
+        "action": "ALREADY_DONE"
+      },
+      {
+        "id": "cmtvriwim000n04l5zopta221",
+        "number": "CLM-2026-00311",
+        "status": "WITHDRAWN",
+        "action": "ALREADY_DONE"
+      }
+    ],
+    "preauths": [
+      {
+        "id": "cmtvsylrm000004jtq5g4d4uo",
+        "number": "PA-2026-00007",
+        "status": "CANCELLED",
+        "action": "ALREADY_DONE"
+      }
+    ],
+    "unexpected": [],
+    "refusals": []
+  },
+  "auditEvents": [
+    {
+      "id": "cmtwz285h0003azvq1j8ta3s5",
+      "action": "CLAIM:WITHDRAW",
+      "entityId": "cmtvq6mk4000104jq28uwpa1y",
+      "userId": "cmr3aezx7000mnlvqgoljdyqi",
+      "createdAt": "2026-09-11T13:08:25.925Z"
+    },
+    {
+      "id": "cmtwz29pf0006azvqwtrm3mvd",
+      "action": "CLAIM:WITHDRAW",
+      "entityId": "cmtvqiaia000n04jqy8r3kdk2",
+      "userId": "cmr3aezx7000mnlvqgoljdyqi",
+      "createdAt": "2026-09-11T13:08:27.939Z"
+    },
+    {
+      "id": "cmtwz2b9c0009azvqxrql2p2g",
+      "action": "CLAIM:WITHDRAW",
+      "entityId": "cmtvr409l000104l558ysm0rk",
+      "userId": "cmr3aezx7000mnlvqgoljdyqi",
+      "createdAt": "2026-09-11T13:08:29.952Z"
+    },
+    {
+      "id": "cmtwz2csw000cazvq39nho7vn",
+      "action": "CLAIM:WITHDRAW",
+      "entityId": "cmtvriwim000n04l5zopta221",
+      "userId": "cmr3aezx7000mnlvqgoljdyqi",
+      "createdAt": "2026-09-11T13:08:31.952Z"
+    },
+    {
+      "id": "cmtwz2dns000dazvqsl1mmgf5",
+      "action": "PREAUTH:CANCELLED",
+      "entityId": "cmtvsylrm000004jtq5g4d4uo",
+      "userId": "cmr3aezx7000mnlvqgoljdyqi",
+      "createdAt": "2026-09-11T13:08:33.064Z"
+    }
+  ],
+  "lifecycleLogs": [
+    {
+      "id": "cmtwz27ip0001azvq756feuye",
+      "claimId": "cmtvq6mk4000104jq28uwpa1y",
+      "userId": "cmr3aezx7000mnlvqgoljdyqi",
+      "createdAt": "2026-09-11T13:08:25.105Z"
+    },
+    {
+      "id": "cmtwz29570004azvqi7vvtuqd",
+      "claimId": "cmtvqiaia000n04jqy8r3kdk2",
+      "userId": "cmr3aezx7000mnlvqgoljdyqi",
+      "createdAt": "2026-09-11T13:08:27.211Z"
+    },
+    {
+      "id": "cmtwz2aoy0007azvqex3fc956",
+      "claimId": "cmtvr409l000104l558ysm0rk",
+      "userId": "cmr3aezx7000mnlvqgoljdyqi",
+      "createdAt": "2026-09-11T13:08:29.218Z"
+    },
+    {
+      "id": "cmtwz2c8o000aazvq1p8vj6jx",
+      "claimId": "cmtvriwim000n04l5zopta221",
+      "userId": "cmr3aezx7000mnlvqgoljdyqi",
+      "createdAt": "2026-09-11T13:08:31.224Z"
+    }
+  ]
+}
