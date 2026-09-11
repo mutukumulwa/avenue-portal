@@ -199,3 +199,46 @@ describe("canonicalizeLines — unlisted services (DEC-FH-01)", () => {
     expect(await ProviderServiceCatalogService.canonicalizeLines(ctx(), [unlisted({ description: "<b>x</b>" })])).toMatchObject({ ok: false });
   });
 });
+
+describe("canonicalizeLines — P04.02 historical lines of the earlier claim", () => {
+  // Stored line 1 of the earlier claim: its description happens to be a listed name.
+  const STORED = [
+    { lineNumber: 1, serviceCategory: "LABORATORY" as const, description: "Full Blood Count", cptCode: "85025", quantity: 1, unitCost: new Prisma.Decimal("30000"), selectedProviderTariffId: null },
+    { lineNumber: 2, serviceCategory: "OTHER" as const, description: "Tariff-linked", cptCode: null, quantity: 1, unitCost: new Prisma.Decimal("1"), selectedProviderTariffId: "a-fbc" },
+  ];
+  const carried = (currency = "UGX") => ({ carried: { currency, lines: STORED } });
+  const hist = (over: Record<string, unknown> = {}) =>
+    ({ selectedProviderTariffId: null, serviceCategory: "LABORATORY", description: "Full Blood Count", quantity: "1", billedUnitPrice: "30000", historicalLineNumber: 1, ...over }) as never;
+
+  it("an unchanged historical line is carried exactly as stored — not re-priced, not refused as a listed name", async () => {
+    const r = await ProviderServiceCatalogService.canonicalizeLines(ctx(), [hist()], carried());
+    expect(r).toEqual({
+      ok: true,
+      lines: [{ serviceCategory: "LABORATORY", description: "Full Blood Count", cptCode: "85025", quantity: 1, unitCost: "30000", billedAmount: "30000", selectedProviderTariffId: null, tariffRate: null, currency: "UGX", unlisted: true }],
+      totalBilled: "30000",
+      currency: "UGX",
+    });
+  });
+
+  it("a changed one is judged afresh — here it must be selected from the price list", async () => {
+    const r = await ProviderServiceCatalogService.canonicalizeLines(ctx(), [hist({ billedUnitPrice: "31000" })], carried());
+    expect(r).toMatchObject({ ok: false, fieldErrors: { "lines.0.service": expect.stringMatching(/on your price list/) } });
+  });
+
+  it("the server compares with the STORED line — the browser cannot claim a line is unchanged", async () => {
+    for (const over of [{ description: "Full Blood Count (repeat)" }, { quantity: "2" }, { serviceCategory: "OTHER" }, { historicalLineNumber: 9 }]) {
+      const r = await ProviderServiceCatalogService.canonicalizeLines(ctx(), [hist({ ...over, description: (over as { description?: string }).description ?? "Full Blood Count", billedUnitPrice: "30000" })], carried());
+      if (r.ok) expect(r.lines[0].cptCode).toBeNull(); // not carried: no stored code rides along
+    }
+  });
+
+  it("a stored line that was linked to the price list is never carried by number", async () => {
+    const r = await ProviderServiceCatalogService.canonicalizeLines(ctx(), [hist({ historicalLineNumber: 2, serviceCategory: "OTHER", description: "Tariff-linked", billedUnitPrice: "1" })], carried());
+    if (r.ok) expect(r.lines[0].cptCode).toBeNull();
+  });
+
+  it("an earlier claim in another currency cannot be carried — the price must be entered again", async () => {
+    const r = await ProviderServiceCatalogService.canonicalizeLines(ctx(), [hist()], carried("KES"));
+    expect(r).toMatchObject({ ok: false, fieldErrors: { "lines.0.billedUnitPrice": expect.stringMatching(/billed in KES; this claim is in UGX/) } });
+  });
+});

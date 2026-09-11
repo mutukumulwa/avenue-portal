@@ -25,6 +25,7 @@ import {
   type ExclusionExceptionLogic,
 } from "./eligibility/rules";
 import { resolveProviderRule } from "@/lib/provider-precedence";
+import type { NormalizedProcedure } from "./preauth-intake/contract";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
@@ -118,8 +119,13 @@ export const preauthAdjudicationService = {
     pass("ELIGIBILITY_ACTIVE");
 
     // ── Gate 2: Provider eligible under the member's package ──
-    const procedures = pa.procedures as Array<{ code: string }>;
-    const procedureCodes = procedures.map((p) => p.code);
+    // Family Hospital UAT P04.03 (DEC-FH-X4): the canonical intake stores
+    // `cptCode` (preauth-intake/contract.ts); only the old amendment writer
+    // stored `code`. Read both, so the code-based gates below see every PA.
+    const procedures = Array.isArray(pa.procedures) ? (pa.procedures as Array<{ code?: unknown; cptCode?: unknown }>) : [];
+    const procedureCodes = procedures
+      .map((p) => (typeof p.cptCode === "string" ? p.cptCode : typeof p.code === "string" ? p.code : ""))
+      .filter((c) => c.length > 0);
 
     // Check PackageProviderEligibility rules (D-02)
     const member = await prisma.member.findUnique({
@@ -826,8 +832,14 @@ export const preauthAdjudicationService = {
     tenantId: string,
     requestedById: string,
     additionalData: {
-      additionalCost: number;
-      additionalProcedures: Array<{ code: string; description: string }>;
+      /** Family Hospital UAT P04.03: decimal text from the provider capture path (never a float). */
+      additionalCost: number | string;
+      /**
+       * The canonical intake's procedure shape (preauth-intake/contract.ts
+       * `NormalizedProcedure`, with server-built provenance) — or the legacy
+       * `{ code, description }` shape.
+       */
+      additionalProcedures: Array<{ code: string; description: string }> | NormalizedProcedure[];
       clinicalNotes?: string;
     },
   ) {

@@ -57,14 +57,49 @@ export interface CaptureLineState {
   billedUnitPrice: string;
   /**
    * P04.02 — a line carried from an earlier claim that is not linked to a
-   * current tariff row. Kept exactly as it was until the user changes it.
+   * current tariff row. Kept exactly as it was until the user changes it; any
+   * real change turns it into an ordinary unlisted line, judged afresh.
    */
   historical?: boolean;
+  /** P04.02 — the earlier claim's line number, sent so the server can check "unchanged". */
+  historicalLineNumber?: number;
 }
 
 export function newLine(serviceCategory: ClaimLineCategory = "CONSULTATION"): CaptureLineState {
   const key = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
   return { key, serviceCategory, selected: null, unlisted: false, description: "", quantity: "1", billedUnitPrice: "" };
+}
+
+/**
+ * What a line's selection was priced against. When a newly resolved case has a
+ * different basis (another contract version, currency or branch), selections
+ * made under the old one are cleared — the form must not carry a row the new
+ * contract may not have (§8.2 item 3).
+ */
+export function pricingBasis(context: CaseContextDTO): string {
+  return [context.contract?.id ?? "", context.contract?.versionId ?? "", context.currency ?? "", context.branch.id].join("|");
+}
+
+/** Drop every price-list selection; unlisted descriptions, quantities and prices stay. */
+export function clearSelections(lines: CaptureLineState[]): CaptureLineState[] {
+  return lines.map((l) => (l.selected ? { ...l, selected: null } : l));
+}
+
+/** The id of the control a line-level error should link to (error summaries). */
+export function lineElementId(line: CaptureLineState, field: "service" | "quantity" | "billedUnitPrice" | "description" | "category"): string {
+  const base = `line-${line.key}`;
+  switch (field) {
+    case "category":
+      return `${base}-cat`;
+    case "quantity":
+      return `${base}-qty`;
+    case "billedUnitPrice":
+      return `${base}-price`;
+    case "description":
+      return `${base}-desc`;
+    case "service":
+      return line.unlisted || line.historical ? `${base}-desc` : `${base}-svc`;
+  }
 }
 
 /** Serialise for submission: the tariff id is the only pricing input sent. */
@@ -75,7 +110,23 @@ export function toCaptureLineInputs(lines: CaptureLineState[]): CaptureLineInput
     description: l.selected && !l.unlisted ? undefined : l.description,
     quantity: l.quantity.trim(),
     billedUnitPrice: canonicalMoney(l.billedUnitPrice) ?? l.billedUnitPrice.trim(),
+    ...(l.historical && l.historicalLineNumber ? { historicalLineNumber: l.historicalLineNumber } : {}),
   }));
+}
+
+/** Decimal-safe total of every line that has a valid quantity and price. */
+export function linesTotal(lines: CaptureLineState[]): Decimal {
+  let sum = new Decimal(0);
+  for (const l of lines) {
+    const t = lineTotal(l);
+    if (t) sum = sum.plus(t);
+  }
+  return sum;
+}
+
+/** Whether two money texts differ in value (re-formatting "1000" as "1,000" is no change). */
+function moneyChanged(a: string, b: string): boolean {
+  return (canonicalMoney(a) ?? a.trim()) !== (canonicalMoney(b) ?? b.trim());
 }
 
 function lineTotal(l: CaptureLineState): Decimal | null {
@@ -116,14 +167,7 @@ export function ServiceLineEditor({
   const update = (index: number, patch: Partial<CaptureLineState>) =>
     onChange(lines.map((l, i) => (i === index ? { ...l, ...patch } : l)));
 
-  const total = useMemo(() => {
-    let sum = new Decimal(0);
-    for (const l of lines) {
-      const t = lineTotal(l);
-      if (t) sum = sum.plus(t);
-    }
-    return sum;
-  }, [lines]);
+  const total = useMemo(() => linesTotal(lines), [lines]);
 
   const priceLabel = mode === "estimate" ? "Estimated unit cost" : "Billed unit price";
 
@@ -217,6 +261,12 @@ function LineRow({
   // box: whether the price list is searchable is only known from the case.
   const describeUnlisted = line.unlisted || line.historical || (!!context && !catalogue);
 
+  // Search results belong to ONE case and ONE category: a change of either is a
+  // new search box (remounted below), so no result from the old case survives.
+  const searchKey = context
+    ? [line.serviceCategory, context.memberRef, context.branch.id, context.serviceDate, context.benefitCategory, context.contract?.versionId ?? ""].join("|")
+    : `${line.serviceCategory}|none`;
+
   const search = useCallback(
     async (query: string): Promise<SearchOutcome<ServiceSearchRow>> => {
       if (!context) return { ok: false, message: "Find the member first." };
@@ -249,6 +299,10 @@ function LineRow({
 
   const total = lineTotal(line);
   const selected = line.selected && !line.unlisted ? line.selected : null;
+  // A real change to a carried historical line makes it an ordinary unlisted
+  // line (description kept), which the server judges afresh (P04.02 step 2).
+  const edit = (patch: Partial<CaptureLineState>, changed: boolean) =>
+    onUpdate(line.historical && changed ? { ...patch, historical: false, unlisted: true } : patch);
 
   return (
     <li className="rounded-lg border border-[#EEEEEE] p-3" aria-label={`Line ${n}`}>
@@ -264,7 +318,7 @@ function LineRow({
             onChange={(e) => {
               const next = e.target.value as ClaimLineCategory;
               // Changing category clears a selection that belongs to another one.
-              onUpdate({ serviceCategory: next, selected: line.selected && line.selected.category !== next ? null : line.selected });
+              edit({ serviceCategory: next, selected: line.selected && line.selected.category !== next ? null : line.selected }, next !== line.serviceCategory);
             }}
             className={CAPTURE_INPUT}
           >
@@ -280,6 +334,9 @@ function LineRow({
             <div>
               <label htmlFor={`${base}-desc`} className={CAPTURE_LABEL}>
                 Line {n} service description<span aria-hidden="true"> *</span>
+                {line.historical ? (
+                  <span className="ml-2 rounded bg-[#F0F0F0] px-1.5 py-0.5 text-[10px] font-semibold normal-case text-brand-text-body">Historical / unlisted</span>
+                ) : null}
               </label>
               <input
                 id={`${base}-desc`}
@@ -288,7 +345,7 @@ function LineRow({
                 maxLength={500}
                 aria-invalid={errors[lineFieldKey(index, "description")] || errors[lineFieldKey(index, "service")] ? true : undefined}
                 aria-describedby={`${base}-desc-hint`}
-                onChange={(e) => onUpdate({ description: e.target.value, historical: false })}
+                onChange={(e) => edit({ description: e.target.value }, e.target.value !== line.description)}
                 className={CAPTURE_INPUT}
                 placeholder="Describe the service as it appears on your bill"
               />
@@ -310,9 +367,9 @@ function LineRow({
           ) : (
             <div>
               <AsyncCombobox<ServiceSearchRow>
-                // A new category is a new search: remounting drops the old text,
-                // results and any reply still in flight.
-                key={line.serviceCategory}
+                // A new category or case is a new search: remounting drops the
+                // old text, results and any reply still in flight.
+                key={searchKey}
                 id={`${base}-svc`}
                 label={`Line ${n} service`}
                 required
@@ -383,7 +440,10 @@ function LineRow({
             disabled={disabled}
             aria-invalid={errors[lineFieldKey(index, "quantity")] ? true : undefined}
             aria-describedby={errors[lineFieldKey(index, "quantity")] ? `${base}-qty-err` : undefined}
-            onChange={(e) => onUpdate({ quantity: e.target.value.replace(/[^\d]/g, "").slice(0, 6) })}
+            onChange={(e) => {
+              const next = e.target.value.replace(/[^\d]/g, "").slice(0, 6);
+              edit({ quantity: next }, next !== line.quantity);
+            }}
             className={CAPTURE_INPUT}
           />
           {errors[lineFieldKey(index, "quantity")] ? (
@@ -402,7 +462,7 @@ function LineRow({
             disabled={disabled}
             error={errors[lineFieldKey(index, "billedUnitPrice")]}
             hint={selected ? "Suggested from your contract; change it if you bill a different amount." : undefined}
-            onChange={(v) => onUpdate({ billedUnitPrice: v })}
+            onChange={(v) => edit({ billedUnitPrice: v }, moneyChanged(v, line.billedUnitPrice))}
           />
         </div>
 

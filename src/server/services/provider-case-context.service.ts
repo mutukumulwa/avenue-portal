@@ -126,7 +126,10 @@ function validateCommon(ctx: ProviderAccessContext, input: { purpose: unknown; s
   if (!serviceDate) {
     return fail("INVALID", "Enter a valid service date.", correlationId, { fieldErrors: { serviceDate: "Enter a valid service date." } });
   }
-  if (isFutureServiceDate(serviceDate)) {
+  // A claim or an eligibility check is for a service already given; a
+  // pre-authorisation is requested for a PLANNED one, so its expected date may
+  // be later than today (the pre-auth intake has always accepted that).
+  if (purpose !== "PREAUTH" && isFutureServiceDate(serviceDate)) {
     return fail("INVALID", FUTURE_SERVICE_DATE_ERROR, correlationId, { fieldErrors: { serviceDate: FUTURE_SERVICE_DATE_ERROR } });
   }
   if (!isProviderBenefit(input.benefitCategory)) {

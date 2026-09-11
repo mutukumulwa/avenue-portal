@@ -11,7 +11,8 @@
  * number beyond what the user typed. The member is referred to by an opaque
  * reference once resolved.
  */
-import type { BenefitCategory, ClaimLineCategory } from "@prisma/client";
+import type { BenefitCategory, ClaimLineCategory, ServiceType } from "@prisma/client";
+import type { MutationFailure } from "@/lib/mutation-contract";
 
 /** Which capture a request serves — it decides the permission required. */
 export type CapturePurpose = "CLAIM" | "CLAIM_CORRECTION" | "PREAUTH" | "ELIGIBILITY";
@@ -182,8 +183,83 @@ export interface CaptureLineInput {
   quantity: number | string;
   /** What the facility bills per unit — canonical decimal text. */
   billedUnitPrice: string;
+  /**
+   * P04.02 — this is line N of the earlier claim, not linked to the price list
+   * and (the form says) unchanged. The server checks that against the stored
+   * line; only a line that really is unchanged is carried as it was.
+   */
+  historicalLineNumber?: number;
 }
 
 /** Field-level error keys, so forms can focus the right control. */
 export const lineFieldKey = (index: number, field: "service" | "quantity" | "billedUnitPrice" | "description" | "category") =>
   `lines.${index}.${field}`;
+
+// ─── Claim capture submissions (P04.01 / P04.02) ─────────────────────────────
+
+/**
+ * What a provider claim form submits. Nothing here is authority: the server
+ * re-resolves the case from `context`, re-reads every selected tariff and the
+ * diagnosis, and derives tenant, provider, actor and currency itself.
+ */
+export interface ClaimCaptureSubmission {
+  /** The form's draft id — the intake idempotency key (letters, digits, `._:-`). */
+  idempotencyKey: string;
+  context: CaseContextRef;
+  /**
+   * The contract version the form was priced against. When the fresh
+   * resolution finds another one, the case is stale and the claim is refused.
+   */
+  expectedContractVersionId: string | null;
+  serviceType: ServiceType;
+  attendingDoctor?: string;
+  diagnosisCode: string;
+  lines: CaptureLineInput[];
+}
+
+/** A correction (F5.8) or resubmission (F5.10) of an earlier claim of this facility. */
+export interface ClaimReplacementCaptureSubmission extends ClaimCaptureSubmission {
+  predecessorClaimId: string;
+  reason?: string;
+}
+
+/**
+ * What a correction or resubmission action returns when it does not redirect:
+ * a refusal, with `refresh` when the earlier claim changed state underneath
+ * the form (decided, replaced, past its deadline) so the page re-evaluates.
+ */
+export type ReplacementSubmitResult = (MutationFailure & { refresh?: boolean }) | void;
+
+/** Top-level field keys of the claim forms (line keys come from `lineFieldKey`). */
+export const CLAIM_FIELDS = ["member", "serviceDate", "benefitCategory", "serviceType", "attendingDoctor", "diagnosis", "lines"] as const;
+export type ClaimField = (typeof CLAIM_FIELDS)[number];
+
+// ─── Pre-authorisation capture submissions (P04.03) ──────────────────────────
+
+/**
+ * A new pre-authorisation request. Each line's `billedUnitPrice` is the
+ * facility's ESTIMATED unit cost — suggested from the contracted rate, always
+ * editable, and stored apart from it (P04.03 step 3).
+ */
+export interface PreauthCaptureSubmission {
+  idempotencyKey: string;
+  context: CaseContextRef;
+  expectedContractVersionId: string | null;
+  serviceType: ServiceType;
+  diagnosisCode: string;
+  lines: CaptureLineInput[];
+  clinicalNotes?: string;
+}
+
+/**
+ * Additional services on an APPROVED pre-authorisation. The member, date,
+ * benefit, service type and diagnoses are the parent's — the server fixes them;
+ * `context` only carries the branch and lets the server check it is current.
+ */
+export interface PreauthAmendmentCaptureSubmission {
+  parentPreAuthId: string;
+  context: CaseContextRef;
+  expectedContractVersionId: string | null;
+  lines: CaptureLineInput[];
+  clinicalNotes?: string;
+}

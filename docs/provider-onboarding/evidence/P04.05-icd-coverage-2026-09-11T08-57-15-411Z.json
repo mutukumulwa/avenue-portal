@@ -1,0 +1,259 @@
+{
+  "kind": "FH_P04_05_ICD_COVERAGE",
+  "generatedAt": "2026-09-11T08:57:15.410Z",
+  "verdict": "NOT COMPLETE — 200 codes deployed with no source or version metadata. Complete ICD-10 coverage must not be claimed.",
+  "totals": {
+    "rows": 200,
+    "distinctThreeCharacterCategories": 181,
+    "withStandardCharge": 200,
+    "withoutChapterCode": 200
+  },
+  "metadata": {
+    "columns": [
+      "code",
+      "description",
+      "category",
+      "chapterCode",
+      "standardCharge"
+    ],
+    "provenanceOrLifecycleColumns": [],
+    "activeState": "no active/inactive column — every row is live"
+  },
+  "repositorySeed": {
+    "seedCodes": 200,
+    "deployedInSeed": 200,
+    "deployedNotInSeed": [],
+    "seedNotDeployed": []
+  },
+  "representative": {
+    "total": 22,
+    "exact": 20,
+    "sameCategory": 21,
+    "rows": [
+      {
+        "code": "B54",
+        "label": "Malaria, unspecified",
+        "exact": true,
+        "catalogueDescription": "Malaria, unspecified",
+        "sameCategory": true
+      },
+      {
+        "code": "B50.9",
+        "label": "Plasmodium falciparum malaria, unspecified",
+        "exact": true,
+        "catalogueDescription": "Plasmodium falciparum malaria, unspecified",
+        "sameCategory": true
+      },
+      {
+        "code": "A09",
+        "label": "Infectious gastroenteritis / diarrhoea",
+        "exact": true,
+        "catalogueDescription": "Infectious gastroenteritis and colitis, unspecified",
+        "sameCategory": true
+      },
+      {
+        "code": "A01.0",
+        "label": "Typhoid fever",
+        "exact": true,
+        "catalogueDescription": "Typhoid fever",
+        "sameCategory": true
+      },
+      {
+        "code": "J06.9",
+        "label": "Acute upper respiratory infection, unspecified",
+        "exact": true,
+        "catalogueDescription": "Acute upper respiratory infection, unspecified",
+        "sameCategory": true
+      },
+      {
+        "code": "J18.9",
+        "label": "Pneumonia, unspecified",
+        "exact": true,
+        "catalogueDescription": "Pneumonia, unspecified organism",
+        "sameCategory": true
+      },
+      {
+        "code": "N39.0",
+        "label": "Urinary tract infection, site not specified",
+        "exact": true,
+        "catalogueDescription": "Urinary tract infection, site not specified",
+        "sameCategory": true
+      },
+      {
+        "code": "K29.7",
+        "label": "Gastritis, unspecified",
+        "exact": true,
+        "catalogueDescription": "Gastritis, unspecified",
+        "sameCategory": true
+      },
+      {
+        "code": "I10",
+        "label": "Essential (primary) hypertension",
+        "exact": true,
+        "catalogueDescription": "Essential hypertension",
+        "sameCategory": true
+      },
+      {
+        "code": "E11.9",
+        "label": "Type 2 diabetes mellitus without complications",
+        "exact": true,
+        "catalogueDescription": "Type 2 diabetes mellitus, unspecified",
+        "sameCategory": true
+      },
+      {
+        "code": "B20",
+        "label": "HIV disease",
+        "exact": true,
+        "catalogueDescription": "Human immunodeficiency virus disease (HIV)",
+        "sameCategory": true
+      },
+      {
+        "code": "A15.0",
+        "label": "Tuberculosis of lung",
+        "exact": true,
+        "catalogueDescription": "Tuberculosis of lung, confirmed by sputum microscopy",
+        "sameCategory": true
+      },
+      {
+        "code": "D50.9",
+        "label": "Iron deficiency anaemia, unspecified",
+        "exact": true,
+        "catalogueDescription": "Iron deficiency anaemia, unspecified",
+        "sameCategory": true
+      },
+      {
+        "code": "R50.9",
+        "label": "Fever, unspecified",
+        "exact": false,
+        "catalogueDescription": null,
+        "sameCategory": false
+      },
+      {
+        "code": "Z34.9",
+        "label": "Supervision of normal pregnancy, unspecified",
+        "exact": true,
+        "catalogueDescription": "Encounter for supervision of normal pregnancy, unspecified",
+        "sameCategory": true
+      },
+      {
+        "code": "O80",
+        "label": "Single spontaneous delivery",
+        "exact": true,
+        "catalogueDescription": "Encounter for full-term uncomplicated delivery",
+        "sameCategory": true
+      },
+      {
+        "code": "O82",
+        "label": "Delivery by caesarean section",
+        "exact": true,
+        "catalogueDescription": "Encounter for caesarean delivery",
+        "sameCategory": true
+      },
+      {
+        "code": "K35.8",
+        "label": "Acute appendicitis, other and unspecified",
+        "exact": false,
+        "catalogueDescription": null,
+        "sameCategory": true
+      },
+      {
+        "code": "L03.9",
+        "label": "Cellulitis, unspecified",
+        "exact": true,
+        "catalogueDescription": "Cellulitis, unspecified",
+        "sameCategory": true
+      },
+      {
+        "code": "H10.9",
+        "label": "Conjunctivitis, unspecified",
+        "exact": true,
+        "catalogueDescription": "Conjunctivitis, unspecified",
+        "sameCategory": true
+      },
+      {
+        "code": "K02.9",
+        "label": "Dental caries, unspecified",
+        "exact": true,
+        "catalogueDescription": "Dental caries, unspecified",
+        "sameCategory": true
+      },
+      {
+        "code": "M54.5",
+        "label": "Low back pain",
+        "exact": true,
+        "catalogueDescription": "Low back pain",
+        "sameCategory": true
+      }
+    ]
+  },
+  "duplicates": {
+    "codeCollisions": [],
+    "duplicateDescriptions": []
+  },
+  "categories": [
+    {
+      "category": "Infectious",
+      "count": 29
+    },
+    {
+      "category": "Injury & Trauma",
+      "count": 19
+    },
+    {
+      "category": "Digestive",
+      "count": 16
+    },
+    {
+      "category": "Circulatory",
+      "count": 15
+    },
+    {
+      "category": "Respiratory",
+      "count": 14
+    },
+    {
+      "category": "Preventive",
+      "count": 14
+    },
+    {
+      "category": "Musculoskeletal",
+      "count": 13
+    },
+    {
+      "category": "Genitourinary",
+      "count": 13
+    },
+    {
+      "category": "Pregnancy",
+      "count": 13
+    },
+    {
+      "category": "Endocrine",
+      "count": 10
+    },
+    {
+      "category": "Neoplasms",
+      "count": 9
+    },
+    {
+      "category": "Mental health",
+      "count": 9
+    },
+    {
+      "category": "Eye disorders",
+      "count": 8
+    },
+    {
+      "category": "Neurological",
+      "count": 7
+    },
+    {
+      "category": "Dermatology",
+      "count": 7
+    },
+    {
+      "category": "Dental",
+      "count": 4
+    }
+  ]
+}

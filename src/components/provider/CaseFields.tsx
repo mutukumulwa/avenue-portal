@@ -36,8 +36,11 @@ export function ServiceDateField({
   label?: string;
   value: string;
   onChange: (value: string) => void;
-  /** Kampala today (YYYY-MM-DD), from the server. */
-  max: string;
+  /**
+   * Kampala today (YYYY-MM-DD), from the server — for a service already given.
+   * Omitted for a pre-authorisation, whose expected date may be planned ahead.
+   */
+  max?: string;
   error?: string;
   hint?: string;
   required?: boolean;

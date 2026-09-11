@@ -2,13 +2,19 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { ProviderAccessService } from "@/server/services/provider-access.service";
+import { isProviderAccessError, ProviderAccessService } from "@/server/services/provider-access.service";
 import { providerPermits } from "@/components/layouts/provider-nav-model";
 import { PreauthReadService } from "@/server/services/preauth-read.service";
 import { preauthAdjudicationService } from "@/server/services/preauth-adjudication.service";
 import { getSystemActorId } from "@/server/services/system-actor.service";
 import { ClaimsService } from "@/server/services/claims.service";
 import { writeAudit } from "@/lib/audit";
+import { mutationFail, type MutationFailure } from "@/lib/mutation-contract";
+import { operatingTodayISO } from "@/lib/service-date";
+import type { PreauthAmendmentCaptureSubmission } from "@/lib/provider-capture-contract";
+import { TRPCError } from "@trpc/server";
+import { ProviderClaimCaptureService } from "@/server/services/provider-claim-capture.service";
+import { amendmentProcedures, clinicalNotesOf } from "@/server/services/provider-preauth-capture.service";
 import { PROVIDER_CANCELLABLE_STATUSES } from "./constants";
 
 export async function cancelProviderPreauthAction(
@@ -41,50 +47,66 @@ export async function cancelProviderPreauthAction(
   revalidatePath(`/provider/preauth/${preAuthId}`);
 }
 
-export interface ProviderAmendInput {
-  parentPreAuthId: string;
-  additionalCost: number;
-  additionalProcedureCode?: string;
-  additionalProcedureDescription: string;
-  clinicalNotes?: string;
-}
-
 // A mid-treatment amendment requests ADDITIONAL cost/procedures against an already
 // APPROVED PA. There is no dedicated provider.preauth.amend permission — an amendment
 // is a linked follow-up REQUEST, so it is gated on provider.preauth.create (ASSUMPTION,
 // flagged; a dedicated amend permission could be added if the plan intends one).
-export async function amendProviderPreauthAction(
-  input: ProviderAmendInput,
-): Promise<{ error?: string } | void> {
-  const { ctx } = await ProviderAccessService.resolveUserContext();
+//
+// Family Hospital UAT plan P04.03: the additional services are captured like a new
+// request — from the facility's price list, re-read here for the parent's member,
+// date and benefit (fixed by the SERVER from the parent, never from the form), with
+// each estimate parsed as a decimal. They are stored in the pre-auth intake's own
+// procedure shape with server-built provenance; the additional cost is decimal text.
+export async function amendProviderPreauthAction(input: PreauthAmendmentCaptureSubmission): Promise<MutationFailure | void> {
+  let access;
+  try {
+    access = await ProviderAccessService.resolveUserContext();
+  } catch (err) {
+    if (isProviderAccessError(err)) return mutationFail("FORBIDDEN", { message: "You do not have permission to amend pre-authorisations." });
+    throw err;
+  }
+  const { ctx } = access;
   if (!providerPermits(ctx.permissions, "provider.preauth.create")) {
-    return { error: "You do not have permission to amend pre-authorizations." };
+    return mutationFail("FORBIDDEN", { message: "You do not have permission to amend pre-authorisations." });
   }
 
-  const parentId = (input.parentPreAuthId ?? "").trim();
-  if (!parentId) return { error: "Missing pre-authorization." };
-  const additionalCost = Number(input.additionalCost);
-  if (!(additionalCost > 0)) return { error: "Enter a valid additional cost." };
-  if (!input.additionalProcedureDescription?.trim()) return { error: "Describe the additional service." };
+  const parentId = typeof input?.parentPreAuthId === "string" ? input.parentPreAuthId.trim() : "";
+  if (!parentId) return mutationFail("VALIDATION", { message: "Missing pre-authorisation." });
 
   // Ownership + state via the F3.10 scoped read: the parent must be this facility's AND
   // APPROVED (createPaAmendment enforces APPROVED too, but this gives a friendly error
   // and blocks cross-provider amendment — the canonical method is only tenant-scoped).
   const parent = await PreauthReadService.getById({ tenantId: ctx.tenantId, providerId: ctx.providerId }, parentId);
-  if (!parent) return { error: "Pre-authorization not found." };
-  if (parent.status !== "APPROVED") return { error: "Only an approved pre-authorization can be amended." };
+  if (!parent) return mutationFail("VALIDATION", { message: "Pre-authorisation not found." });
+  if (parent.status !== "APPROVED") return mutationFail("CONFLICT", { message: "Only an approved pre-authorisation can be amended." });
+
+  const notes = clinicalNotesOf(input.clinicalNotes);
+  if (!notes.ok) return notes.failure;
+  const prep = await ProviderClaimCaptureService.prepareLines(ctx, input, {
+    purpose: "PREAUTH",
+    fixed: {
+      memberId: parent.memberId,
+      branchId: null,
+      serviceDate: operatingTodayISO(parent.expectedDateOfService ?? new Date()),
+      benefitCategory: parent.benefitCategory,
+    },
+  });
+  if (!prep.ok) return prep.failure;
 
   let amendment: { id: string };
   try {
     // Canonical amendment creator: a new PA-AMD linked to the parent (parentPreAuthId),
     // inheriting member/provider/benefit; not a bespoke create.
     amendment = await preauthAdjudicationService.createPaAmendment(parentId, ctx.tenantId, ctx.actorId, {
-      additionalCost,
-      additionalProcedures: [{ code: input.additionalProcedureCode || "", description: input.additionalProcedureDescription }],
-      clinicalNotes: input.clinicalNotes,
+      additionalCost: prep.prepared.totalBilled,
+      additionalProcedures: amendmentProcedures(prep.prepared.lines),
+      clinicalNotes: notes.value,
     });
   } catch (e) {
-    return { error: (e as Error).message || "The amendment could not be created." };
+    if (e instanceof TRPCError && (e.code === "BAD_REQUEST" || e.code === "NOT_FOUND")) {
+      return mutationFail("CONFLICT", { message: e.message });
+    }
+    return mutationFail("UNKNOWN_OUTCOME", { message: "We could not confirm whether the amendment was created. Check this pre-authorisation before trying again." });
   }
 
   // Decide the amendment through the SAME canonical pipeline as every rail (the
@@ -96,6 +118,7 @@ export async function amendProviderPreauthAction(
     /* deferred — amendment is durable and visible */
   }
 
+  revalidatePath(`/provider/preauth/${parentId}`);
   redirect(`/provider/preauth/${amendment.id}`);
 }
 

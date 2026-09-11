@@ -12,19 +12,43 @@
  * DEF-079: submitting used GET, so the number entered went into the URL, the
  * browser history of a shared desk machine, the access log and the Referer of
  * anything the page then linked to. It now posts through a Server Action.
+ *
+ * Family Hospital UAT plan P04.04 (FH-09): the service date field was blank —
+ * the server silently read blank as "today" — so the operator could not see
+ * which day cover was checked for. It now shows the Kampala operating date the
+ * SERVER computed, and keeps the date and benefit after an input error or a
+ * failed request. The "File a claim" hand-off carries only the eligibility
+ * check's id, which the claim page re-resolves (P02.02 step 5).
  */
 import { useActionState } from "react";
 import Link from "next/link";
 import { AlertCircle, CheckCircle2, Search, ShieldAlert, XCircle } from "lucide-react";
 import { EXAMPLES } from "@/lib/locale-config";
+import { isControlFlowError } from "@/lib/mutation-contract";
+import { PROVIDER_BENEFIT_OPTIONS } from "@/lib/provider-benefit-options";
 import { checkEligibilityAction } from "./actions";
-import { BENEFIT_OPTIONS, EMPTY_ELIGIBILITY_STATE, MAX_MEMBER_LEN, type EligibilityCheckState } from "./contract";
+import { EMPTY_ELIGIBILITY_STATE, MAX_MEMBER_LEN, type EligibilityCheckState } from "./contract";
 
-export function EligibilityCheckForm({ memberNumberExample }: { memberNumberExample?: string }) {
-  const [state, formAction, pending] = useActionState<EligibilityCheckState, FormData>(
-    checkEligibilityAction,
-    EMPTY_ELIGIBILITY_STATE,
-  );
+/**
+ * A request that never came back is reported as "could not check" — not a
+ * crash that wipes the form — and the date and benefit stay as entered. The
+ * lookup only reads, so trying again is safe.
+ */
+async function checkOrUnavailable(previous: EligibilityCheckState, formData: FormData): Promise<EligibilityCheckState> {
+  try {
+    return await checkEligibilityAction(previous, formData);
+  } catch (err) {
+    if (isControlFlowError(err)) throw err;
+    return {
+      ...EMPTY_ELIGIBILITY_STATE,
+      unavailable: true,
+      submitted: { serviceDate: String(formData.get("serviceDate") ?? ""), benefit: String(formData.get("benefit") ?? "") },
+    };
+  }
+}
+
+export function EligibilityCheckForm({ memberNumberExample, today }: { memberNumberExample?: string; today: string }) {
+  const [state, formAction, pending] = useActionState<EligibilityCheckState, FormData>(checkOrUnavailable, EMPTY_ELIGIBILITY_STATE);
 
   const result = state.result;
   const eligible = result?.resultCode === "ELIGIBLE";
@@ -59,24 +83,32 @@ export function EligibilityCheckForm({ memberNumberExample }: { memberNumberExam
             id="elig-date"
             name="serviceDate"
             type="date"
-            defaultValue={state.submitted?.serviceDate ?? ""}
-            className="rounded-lg border border-[#EEEEEE] px-3 py-2 text-sm focus:border-brand-indigo focus:outline-none"
+            // The Kampala date computed on the server, visible; after a submit, the
+            // date that was entered (React resets the form to its defaults).
+            defaultValue={state.submitted?.serviceDate || today}
+            aria-describedby="elig-date-hint"
+            className="rounded-lg border border-[#EEEEEE] px-3 py-2 text-sm focus:border-brand-indigo focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-indigo/60"
           />
+          <p id="elig-date-hint" className="mt-1 text-[11px] text-brand-text-muted">Kampala date. Today is filled in.</p>
         </div>
         <div>
           <label htmlFor="elig-benefit" className="mb-1 block text-[11px] font-bold uppercase text-brand-text-muted">
             Benefit
           </label>
           <select
+            // React resets a form after its action, and a <select> resets to the
+            // option chosen when it MOUNTED (a later defaultValue does not move it).
+            // Remounting on the submitted benefit keeps the operator's choice.
+            key={state.submitted?.benefit ?? ""}
             id="elig-benefit"
             name="benefit"
             defaultValue={state.submitted?.benefit ?? ""}
             className="rounded-lg border border-[#EEEEEE] px-3 py-2 text-sm focus:border-brand-indigo focus:outline-none"
           >
             <option value="">Any</option>
-            {BENEFIT_OPTIONS.map((b) => (
-              <option key={b} value={b}>
-                {b.replace(/_/g, " ")}
+            {PROVIDER_BENEFIT_OPTIONS.map((b) => (
+              <option key={b.value} value={b.value}>
+                {b.label}
               </option>
             ))}
           </select>
@@ -181,10 +213,12 @@ export function EligibilityCheckForm({ memberNumberExample }: { memberNumberExam
             )}
           </dl>
           <div className="px-5 pb-4 text-xs text-brand-text-muted">{result.disclaimer}</div>
-          {eligible && result.memberId && (
+          {eligible && result.checkId && (
             <div className="px-5 pb-5">
+              {/* P04.04: only the check's opaque, expiring id — never a member number
+                  or member id — and the claim page re-resolves it (P02.02). */}
               <Link
-                href={`/provider/claims/new?memberId=${result.memberId}`}
+                href={`/provider/claims/new?from=${encodeURIComponent(result.checkId)}`}
                 className="inline-flex items-center gap-1.5 rounded-full bg-brand-indigo px-5 py-2 text-sm font-semibold text-white hover:bg-brand-secondary"
               >
                 File a claim for this member →

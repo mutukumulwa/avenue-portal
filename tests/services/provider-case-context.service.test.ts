@@ -108,6 +108,13 @@ describe("resolve — authorisation and input", () => {
     expect(result).toMatchObject({ outcome: "INVALID", fieldErrors: { serviceDate: expect.stringMatching(/future/i) } });
   });
 
+  it("a pre-authorisation may name a planned (future) date — the pre-auth intake always accepted one", async () => {
+    const future = new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10);
+    const { result } = await ProviderCaseContextService.resolve(ctx(), request({ purpose: "PREAUTH", serviceDate: future }));
+    expect(result.outcome).toBe("RESOLVED");
+    expect(eligibility.check).toHaveBeenCalledWith(expect.objectContaining({ serviceDate: parseServiceDate(future) }));
+  });
+
   it("refuses CUSTOM, which providers are not offered (DEC-FH-02)", async () => {
     const { result } = await ProviderCaseContextService.resolve(ctx(), request({ benefitCategory: "CUSTOM" }));
     expect(result).toMatchObject({ outcome: "INVALID", fieldErrors: { benefitCategory: expect.any(String) } });

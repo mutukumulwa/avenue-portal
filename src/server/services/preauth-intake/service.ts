@@ -6,9 +6,10 @@ import { ProviderEntitlementService } from "../provider-entitlement.service";
 import { BenefitUsageService } from "../benefit-usage.service";
 import { appendPreauthEvent } from "./events";
 import {
-  normalizePreauth, validatePreauth, resolveProviderId, preauthRequestHash,
+  normalizePreauth, validatePreauth, resolveProviderId, preauthRequestHash, withProcedureProvenance,
   PREAUTH_CONTRACT_VERSION,
   type PreauthCallerContext, type PreauthSubmissionV1, type PreauthIntakeResult, type NormalizedPreauthV1,
+  type PreauthProcedureProvenance,
 } from "./contract";
 
 /**
@@ -79,10 +80,24 @@ async function resolveMember(db: Db, ctx: PreauthCallerContext, n: NormalizedPre
 }
 
 export const PreauthIntakeService = {
-  async submit(ctx: PreauthCallerContext, submission: PreauthSubmissionV1, deps: PreauthIntakeDeps, db: Db = prisma): Promise<PreauthIntakeResult> {
+  /**
+   * `trusted.procedureProvenance` (Family Hospital UAT P02.04) is built by the
+   * provider capture path on the server after re-reading each selected tariff;
+   * it joins the stored procedure snapshot and the request hash. It is never
+   * taken from `submission`.
+   */
+  async submit(
+    ctx: PreauthCallerContext,
+    submission: PreauthSubmissionV1,
+    deps: PreauthIntakeDeps,
+    db: Db = prisma,
+    trusted: { procedureProvenance?: readonly PreauthProcedureProvenance[] } = {},
+  ): Promise<PreauthIntakeResult> {
     const now = new Date();
     const requestId = ctx.requestId ?? randomUUID();
-    const { normalized, dateInvalid } = normalizePreauth(submission);
+    const parsed = normalizePreauth(submission);
+    const dateInvalid = parsed.dateInvalid;
+    const normalized = trusted.procedureProvenance ? withProcedureProvenance(parsed.normalized, trusted.procedureProvenance) : parsed.normalized;
     const requestHash = preauthRequestHash(ctx, normalized);
     const providerId = resolveProviderId(ctx, normalized).providerId;
     // fall back to the content hash so a caller that omits an idempotency key

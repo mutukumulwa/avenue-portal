@@ -2,57 +2,53 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { redirect } from "next/navigation";
 import { ProviderAccessService } from "@/server/services/provider-access.service";
-import { ProviderEntitlementService } from "@/server/services/provider-entitlement.service";
+import { ProviderCaseContextService } from "@/server/services/provider-case-context.service";
 import { providerPermits } from "@/components/layouts/provider-nav-model";
-import { prisma } from "@/lib/prisma";
+import { operatingTodayISO } from "@/lib/service-date";
 import { ProviderClaimForm } from "./ProviderClaimForm";
 
-export default async function ProviderNewClaim({
-  searchParams,
-}: {
-  searchParams: Promise<{ memberId?: string }>;
-}) {
-  // ELIG-GAP-020: this page previously ran on requireProvider() alone (identity,
-  // no permission). Filing a claim now requires provider.claim.create (fail-closed
-  // after Phase 2).
+/**
+ * Family Hospital UAT plan P04.01 — the provider "File a claim" page.
+ *
+ * It no longer preloads 500 ICD-10 codes and 500 CPT codes with their global
+ * average costs into the page (FH-02, FH-05): diagnoses and the facility's own
+ * services are searched on demand. The default service date is the Kampala
+ * operating date computed here, on the server (FH-09).
+ *
+ * The eligibility result links here with `?from=<eligibility check id>` — an
+ * opaque, expiring evidence reference, never a member number or member id
+ * (plan §4 rule 5, P02.02 step 5). It is read under this user's tenant and
+ * provider and then re-resolved like any other lookup; a foreign, stale or
+ * malformed reference simply starts an empty form.
+ */
+export default async function ProviderNewClaim({ searchParams }: { searchParams: Promise<{ from?: string }> }) {
+  // ELIG-GAP-020: filing a claim requires provider.claim.create.
   const { ctx, provider } = await ProviderAccessService.resolveUserContext();
   if (!providerPermits(ctx.permissions, "provider.claim.create")) redirect("/unauthorized");
-  const { memberId } = await searchParams;
+  const { from } = await searchParams;
 
-  const [icd, cpt, prefill] = await Promise.all([
-    prisma.iCD10Code.findMany({ select: { code: true, description: true }, orderBy: { code: "asc" }, take: 500 }),
-    prisma.cPTCode.findMany({ select: { code: true, description: true, averageCost: true, serviceCategory: true }, orderBy: { code: "asc" }, take: 500 }),
-    // ELIG-GAP-024: entitlement-scope the prefill so a foreign/uncovered memberId
-    // resolves to null (no member number / name prefill). entitledMemberWhere is
-    // deny-by-default; the only `id`-bearing return is its impossible sentinel.
-    memberId
-      ? prisma.member.findFirst({ where: { id: memberId, tenantId: ctx.tenantId, ...(await ProviderEntitlementService.entitledMemberWhere(ctx.providerId)) }, select: { memberNumber: true, firstName: true, lastName: true } })
-      : null,
-  ]);
-
+  const today = operatingTodayISO();
+  const handoff = from ? await ProviderCaseContextService.handoffFromEligibilityCheck(ctx, from) : null;
   const operational = provider.contractStatus === "ACTIVE";
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="max-w-4xl space-y-6">
       <div className="flex items-center gap-3">
-        <Link href="/provider/claims" className="text-brand-text-muted hover:text-brand-text-heading" aria-label="Back to claims"><ArrowLeft size={20} /></Link>
+        <Link href="/provider/claims" className="text-brand-text-muted hover:text-brand-text-heading" aria-label="Back to claims">
+          <ArrowLeft size={20} aria-hidden="true" />
+        </Link>
         <div>
-          <h1 className="text-2xl font-bold text-brand-text-heading font-heading">File a claim</h1>
-          <p className="text-brand-text-muted text-sm">Capture an outpatient encounter for adjudication by the TPA.</p>
+          <h1 className="font-heading text-2xl font-bold text-brand-text-heading">File a claim</h1>
+          <p className="text-sm text-brand-text-muted">Capture an encounter for adjudication by the TPA.</p>
         </div>
       </div>
 
       {!operational ? (
-        <div className="rounded-lg bg-[#FFF8E1] border border-[#FFC107]/50 px-4 py-3 text-sm font-semibold text-[#856404]">
+        <div className="rounded-lg border border-[#FFC107]/50 bg-[#FFF8E1] px-4 py-3 text-sm font-semibold text-[#856404]">
           This facility&apos;s contract is {provider.contractStatus} — claims can only be filed against an ACTIVE contract.
         </div>
       ) : (
-        <ProviderClaimForm
-          icdOptions={icd.map((d) => ({ code: d.code, description: d.description }))}
-          cptOptions={cpt.map((c) => ({ code: c.code, description: c.description, averageCost: Number(c.averageCost ?? 0), category: c.serviceCategory }))}
-          prefillMemberNumber={prefill?.memberNumber ?? ""}
-          prefillMemberName={prefill ? `${prefill.firstName} ${prefill.lastName}` : ""}
-        />
+        <ProviderClaimForm today={today} handoff={handoff} />
       )}
     </div>
   );

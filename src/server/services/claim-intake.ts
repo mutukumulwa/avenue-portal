@@ -63,6 +63,12 @@ export type DirectEntryOutcome =
       billedAmount: number;
       outcome: SubmitResult["outcome"];
       replayed: boolean;
+      /**
+       * Family Hospital UAT P04.01 — the receipt's state. A replay of a receipt
+       * that never produced a claim (FAILED, or still PROCESSING) returns
+       * `ok: true` with no claim; callers must not present that as a filed claim.
+       */
+      receiptState: SubmitResult["receiptState"];
     }
   | { ok: false; code: string; error: string };
 
@@ -187,6 +193,7 @@ export async function runClaimIntake(
       billedAmount,
       outcome: result.outcome,
       replayed: result.replayed,
+      receiptState: result.receiptState,
     };
   } catch (err) {
     const e = IntakeError.from(err);

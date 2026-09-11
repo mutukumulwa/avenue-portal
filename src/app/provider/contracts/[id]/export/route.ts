@@ -3,6 +3,7 @@ import { ProviderAccessService } from "@/server/services/provider-access.service
 import { ProviderAccessSettingsService } from "@/server/services/provider-access-settings.service";
 import { ProviderContractViewService } from "@/server/services/provider-contract-view/service";
 import { writeAudit } from "@/lib/audit";
+import { operatingTodayISO } from "@/lib/service-date";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +46,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         version: evidence.version,
         rowCount: evidence.rowCount,
         contractNumber: evidence.contractNumber,
-        serviceDate: serviceDate.toISOString().slice(0, 10),
+        serviceDate: operatingTodayISO(serviceDate), // the Kampala calendar day (§7 dates)
         checksum: evidence.checksum,
       },
     });

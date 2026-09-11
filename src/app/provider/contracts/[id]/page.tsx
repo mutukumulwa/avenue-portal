@@ -6,6 +6,7 @@ import { ProviderAccessService, isProviderAccessError } from "@/server/services/
 import { ProviderAccessSettingsService } from "@/server/services/provider-access-settings.service";
 import { ProviderContractViewService, CONTRACT_VIEW_PERMISSION } from "@/server/services/provider-contract-view/service";
 import { formatStoredDate } from "@/lib/calendar-date";
+import { operatingTodayISO } from "@/lib/service-date";
 
 /**
  * PNOS F7.3 — provider contract detail + effective rate schedule.
@@ -70,7 +71,9 @@ export default async function ProviderContractDetail({
   // never a crash site — but it rendered a bare "Invalid Date" and hard-coded a
   // locale format outside the P01.05 helpers. Both now go through one path.
   const fmtDate = (v: Date | string | null) => formatStoredDate(v == null ? null : new Date(v));
-  const dateInput = serviceDate.toISOString().slice(0, 10);
+  // Family Hospital UAT §7 (dates): the Kampala calendar day, not the UTC one —
+  // between 00:00 and 03:00 in Kampala the UTC date is still yesterday.
+  const dateInput = operatingTodayISO(serviceDate);
   const canExport = ProviderAccessService.hasPermission(ctx, CONTRACT_VIEW_PERMISSION);
   const cond = header.conditional;
 

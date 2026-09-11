@@ -226,6 +226,24 @@ export type CanonicalizeResult =
   | { ok: true; lines: CanonicalLine[]; totalBilled: string; currency: string | null }
   | { ok: false; message: string; fieldErrors: Record<string, string> };
 
+/**
+ * P04.02 — a stored line of the claim being corrected or resubmitted, read by
+ * the server (never from the request). An unchanged line that is not linked
+ * to the price list is carried exactly as it was: its description, codes and
+ * billed price are not re-priced or replaced (plan P04.02 steps 2–3).
+ */
+export interface CarriedLine {
+  lineNumber: number;
+  serviceCategory: ClaimLineCategory;
+  description: string;
+  cptCode: string | null;
+  quantity: number;
+  unitCost: Prisma.Decimal | string;
+  selectedProviderTariffId: string | null;
+}
+
+const sameText = (a: string, b: string) => a.trim().replace(/\s+/g, " ") === b.trim().replace(/\s+/g, " ");
+
 const HTML_RE = /<\s*[a-zA-Z/!]/;
 
 export const ProviderServiceCatalogService = {
@@ -295,8 +313,13 @@ export const ProviderServiceCatalogService = {
    * again". Name, category, codes, contracted rate and currency come from the
    * row; the facility's billed price and quantity are validated and preserved.
    */
-  async canonicalizeLines(context: TrustedCaseContext, lines: CaptureLineInput[]): Promise<CanonicalizeResult> {
+  async canonicalizeLines(
+    context: TrustedCaseContext,
+    lines: CaptureLineInput[],
+    opts: { carried?: { currency: string | null; lines: CarriedLine[] } } = {},
+  ): Promise<CanonicalizeResult> {
     const fieldErrors: Record<string, string> = {};
+    const carried = new Map((opts.carried?.lines ?? []).map((l) => [l.lineNumber, l]));
     if (!Array.isArray(lines) || lines.length === 0) {
       return { ok: false, message: "Add at least one service line.", fieldErrors: { lines: "Add at least one service line." } };
     }
@@ -328,6 +351,42 @@ export const ProviderServiceCatalogService = {
       }
 
       const tariffId = typeof line.selectedProviderTariffId === "string" && line.selectedProviderTariffId ? line.selectedProviderTariffId : null;
+
+      // P04.02 — the earlier claim's line, carried as it was when it really is
+      // unchanged. Anything edited is judged below like any other line.
+      const prior = !tariffId && typeof line.historicalLineNumber === "number" ? carried.get(line.historicalLineNumber) : undefined;
+      if (prior && prior.selectedProviderTariffId === null) {
+        const sameCurrency = !!context.currency && (opts.carried?.currency ?? "").toUpperCase() === context.currency.toUpperCase();
+        const unchanged =
+          prior.serviceCategory === line.serviceCategory &&
+          sameText(prior.description, typeof line.description === "string" ? line.description : "") &&
+          quantity === prior.quantity &&
+          price.ok &&
+          price.value.eq(new Prisma.Decimal(prior.unitCost.toString()));
+        if (unchanged && !sameCurrency) {
+          fieldErrors[lineFieldKey(i, "billedUnitPrice")] =
+            `The earlier claim was billed in ${opts.carried?.currency ?? "another currency"}; this claim is in ${context.currency ?? "the contract's currency"}. Enter this line's price again.`;
+          return;
+        }
+        if (unchanged && price.ok) {
+          const billed = new Prisma.Decimal(quantity).times(price.value).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+          total = total.plus(billed);
+          canonical.push({
+            serviceCategory: prior.serviceCategory,
+            description: prior.description,
+            cptCode: prior.cptCode,
+            quantity,
+            unitCost: toCanonicalMoney(price.value),
+            billedAmount: toCanonicalMoney(billed),
+            selectedProviderTariffId: null,
+            tariffRate: null,
+            currency: context.currency,
+            unlisted: true,
+          });
+          return;
+        }
+      }
+
       if (tariffId) {
         const row = index?.byId.get(tariffId);
         const reject = (message: string, code: string) => {

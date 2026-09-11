@@ -1,256 +1,286 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+/**
+ * F5.8 correction / F5.10 resubmission — rebuilt on the shared provider capture
+ * controls under Family Hospital UAT plan P04.02.
+ *
+ * Kept from F5.8/F5.10: the earlier claim is never edited in place; member and
+ * branch are fixed to the earlier claim (the server takes them from it, never
+ * from this form); a reason can be given; submission needs an explicit
+ * confirmation and cannot happen twice; a stale earlier claim refreshes the page.
+ *
+ * Changed (P04.02): no global CPT or ICD list is loaded into the page — the
+ * diagnosis is searched and services come from the facility's own price list,
+ * exactly as on a new claim. Lines are seeded from the earlier claim's STORED
+ * data: a line captured from the price list shows its stored name and rate; any
+ * other line is marked "Historical / unlisted" and is carried exactly as it was
+ * unless the user changes it (then it is judged afresh against the contract for
+ * the correction's service date). Historical prices are never silently replaced.
+ */
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Save, AlertCircle, Lock } from "lucide-react";
-import { correctProviderClaimAction, type CorrectClaimInput } from "./actions";
-import type { ServiceType, BenefitCategory, ClaimLineCategory } from "@prisma/client";
+import type { BenefitCategory, ServiceType } from "@prisma/client";
+import { Lock, Save } from "lucide-react";
+import Decimal from "decimal.js";
+import { correctProviderClaimAction } from "./actions";
+import { ErrorSummary } from "@/components/forms/ErrorSummary";
+import { MutationOutcome } from "@/components/forms/MutationOutcome";
+import { ProviderMemberField, type MemberFieldChange } from "@/components/provider/ProviderMemberField";
+import { BenefitSelect, ServiceDateField, ServiceTypeSelect } from "@/components/provider/CaseFields";
+import { DiagnosisCombobox } from "@/components/provider/DiagnosisCombobox";
+import { ServiceLineEditor, clearSelections, lineElementId, linesTotal, pricingBasis, toCaptureLineInputs, type CaptureLineState } from "@/components/provider/ServiceLineEditor";
+import { claimFieldLabels, disabledLinesReason, firstErrors } from "@/components/provider/claim-form-support";
+import { CAPTURE_BUTTON_PRIMARY, CAPTURE_ERROR, CAPTURE_HINT, CAPTURE_INPUT, CAPTURE_LABEL } from "@/components/provider/capture-styles";
+import { isControlFlowError, mutationFail, type MutationFailure } from "@/lib/mutation-contract";
+import { newOperationId } from "@/lib/correlation";
+import { EXAMPLES } from "@/lib/locale-config";
+import { formatGroupedAmount } from "@/lib/money";
+import {
+  contextRefFrom,
+  type ClaimReplacementCaptureSubmission,
+  type DiagnosisOption,
+  type ReplacementSubmitResult,
+} from "@/lib/provider-capture-contract";
 
-/** The correction/resubmission action shape (both share the F5.7 replacement full-form contract). */
-export type ReplacementSubmitAction = (input: CorrectClaimInput) => Promise<{ error?: string; refresh?: boolean } | void>;
+/** The correction/resubmission action shape (both share the F5.7 replacement contract). */
+export type ReplacementSubmitAction = (input: ClaimReplacementCaptureSubmission) => Promise<ReplacementSubmitResult>;
 
-interface IcdOption { code: string; description: string }
-interface CptOption { code: string; description: string; averageCost: number; category: string }
-
-interface Line {
-  serviceCategory: ClaimLineCategory;
-  description: string;
-  cptCode: string;
-  quantity: number;
-  unitCost: number;
-}
-
-export interface CorrectionPrefill {
-  memberNumber: string;
-  memberName: string;
+/** Built on the server from the earlier claim (src/server/services/provider-claim-seed.ts). */
+export interface CorrectionSeed {
+  member: { memberRef: string; branchId: string | null; displayName: string };
   branchName: string | null;
   serviceType: ServiceType;
   benefitCategory: BenefitCategory;
-  dateOfService: string;
+  serviceDate: string;
   attendingDoctor: string;
-  primaryDiagnosisCode: string;
-  originalBilled: number;
+  diagnosis: DiagnosisOption | null;
+  lines: CaptureLineState[];
+  originalBilled: string;
   currency: string;
-  lines: Line[];
 }
 
-const inputCls = "w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo";
-const roCls = "w-full border border-[#EEEEEE] bg-[#F7F7F7] rounded-lg px-3 py-2 text-sm text-brand-text-muted";
-const labelCls = "text-[11px] font-bold text-brand-text-muted uppercase block mb-1";
-
-const SERVICE_TYPES: ServiceType[] = ["OUTPATIENT", "INPATIENT", "DAY_CASE", "EMERGENCY"];
-const BENEFITS: BenefitCategory[] = ["OUTPATIENT", "DENTAL", "OPTICAL", "MATERNITY", "CHRONIC_DISEASE", "MENTAL_HEALTH", "WELLNESS_PREVENTIVE"];
-const LINE_CATS: ClaimLineCategory[] = ["CONSULTATION", "LABORATORY", "PHARMACY", "IMAGING", "PROCEDURE", "OTHER"];
+const IDS = {
+  member: "cf-member",
+  serviceDate: "cf-dos",
+  benefitCategory: "cf-benefit",
+  serviceType: "cf-stype",
+  attendingDoctor: "cf-doctor",
+  diagnosis: "cf-diag",
+  lines: "cf-lines",
+} as const;
 
 export function CorrectClaimForm({
   predecessorClaimId,
   predecessorNumber,
-  prefill,
-  icdOptions,
-  cptOptions,
+  today,
+  seed,
   mode = "correct",
   submitAction = correctProviderClaimAction,
 }: {
   predecessorClaimId: string;
   predecessorNumber: string;
-  prefill: CorrectionPrefill;
-  icdOptions: IcdOption[];
-  cptOptions: CptOption[];
+  /** Kampala today (YYYY-MM-DD), from the server. */
+  today: string;
+  seed: CorrectionSeed;
   /** "correct" (F5.8, supersedes a pre-decision claim) or "resubmit" (F5.10, links a new claim while the original stays declined). */
   mode?: "correct" | "resubmit";
   submitAction?: ReplacementSubmitAction;
 }) {
-  const copy = mode === "resubmit"
-    ? { verb: "resubmission", reasonLabel: "Reason for resubmission (optional)", totalLabel: "Resubmitted total", submit: "Submit resubmission", submitting: "Submitting resubmission…" }
-    : { verb: "correction", reasonLabel: "Reason for correction (optional)", totalLabel: "Corrected total", submit: "Submit correction", submitting: "Submitting correction…" };
-  const today = new Date().toISOString().split("T")[0];
-  const [serviceType, setServiceType] = useState<ServiceType>(prefill.serviceType);
-  const [benefitCategory, setBenefitCategory] = useState<BenefitCategory>(prefill.benefitCategory);
-  const [dateOfService, setDateOfService] = useState(prefill.dateOfService);
-  const [attendingDoctor, setAttendingDoctor] = useState(prefill.attendingDoctor);
-  const [diagCode, setDiagCode] = useState(prefill.primaryDiagnosisCode);
+  const copy =
+    mode === "resubmit"
+      ? { verb: "resubmission", reasonLabel: "Reason for resubmission (optional)", totalLabel: "Resubmitted total", submit: "Submit resubmission", submitting: "Submitting resubmission…" }
+      : { verb: "correction", reasonLabel: "Reason for correction (optional)", totalLabel: "Corrected total", submit: "Submit correction", submitting: "Submitting correction…" };
+
+  const [serviceDate, setServiceDate] = useState(seed.serviceDate);
+  const [benefitCategory, setBenefitCategory] = useState<BenefitCategory>(seed.benefitCategory);
+  const [serviceType, setServiceType] = useState<ServiceType>(seed.serviceType);
+  const [attendingDoctor, setAttendingDoctor] = useState(seed.attendingDoctor);
+  const [diagnosis, setDiagnosis] = useState<DiagnosisOption | null>(seed.diagnosis);
+  const [lines, setLines] = useState<CaptureLineState[]>(seed.lines);
   const [reason, setReason] = useState("");
-  const [lines, setLines] = useState<Line[]>(prefill.lines.length ? prefill.lines : [{ serviceCategory: "CONSULTATION", description: "", cptCode: "", quantity: 1, unitCost: 0 }]);
   const [confirmed, setConfirmed] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [caseState, setCaseState] = useState<MemberFieldChange>({ context: null, outcome: null });
+  const [failure, setFailure] = useState<MutationFailure | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // A stable draft id for THIS correction — the idempotency key, so a double click
+  // or a retry after an unknown outcome replays instead of filing twice.
+  const [draftId, setDraftId] = useState(() => newOperationId());
+  const basis = useRef<string | null>(null);
+  const inFlight = useRef(false);
   const router = useRouter();
-  // A stable draft id for THIS correction — the idempotency key, so a double-click /
-  // back-refresh replays the same receipt instead of filing a second correction.
-  const [draftId] = useState(() => crypto.randomUUID());
 
-  const total = useMemo(() => lines.reduce((s, l) => s + Math.max(1, l.quantity) * (l.unitCost || 0), 0), [lines]);
-  const delta = total - prefill.originalBilled;
+  const resolved = caseState.outcome === "RESOLVED" ? caseState.context : null;
+  const errors = firstErrors(failure);
+  const total = linesTotal(lines);
+  const original = new Decimal(seed.originalBilled);
+  const delta = total.minus(original);
 
-  function updateLine(i: number, patch: Partial<Line>) {
-    setLines((prev) => prev.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
-  }
-  function applyCpt(i: number, code: string) {
-    const hit = cptOptions.find((c) => c.code === code);
-    if (hit) {
-      updateLine(i, {
-        cptCode: hit.code,
-        description: lines[i].description || hit.description,
-        unitCost: lines[i].unitCost || hit.averageCost,
-        serviceCategory: LINE_CATS.includes(hit.category as ClaimLineCategory) ? (hit.category as ClaimLineCategory) : lines[i].serviceCategory,
-      });
-    } else {
-      updateLine(i, { cptCode: code });
+  function onCase(change: MemberFieldChange) {
+    setCaseState(change);
+    if (change.outcome === "RESOLVED" && change.context) {
+      const next = pricingBasis(change.context);
+      if (basis.current !== null && basis.current !== next && lines.some((l) => l.selected)) {
+        setLines(clearSelections);
+        setNotice("The patient's contract changed for this date, so the services chosen from the price list were cleared. Search for them again.");
+      }
+      basis.current = next;
     }
   }
 
   function submit() {
-    if (!confirmed || pending) return;
-    setError(null);
-    const diag = icdOptions.find((d) => d.code === diagCode);
+    if (!confirmed || pending || inFlight.current) return;
+    setNotice(null);
+    const local: Record<string, string[]> = {};
+    if (!resolved) local.member = [caseState.outcome ? "The patient's cover must be confirmed for this date before filing." : "Waiting for the patient's cover to be confirmed."];
+    if (!diagnosis) local.diagnosis = ["Choose the primary diagnosis."];
+    if (!resolved || !diagnosis) {
+      setFailure(mutationFail("VALIDATION", { message: `The ${copy.verb} was not submitted. Correct the items listed.`, fieldErrors: local }));
+      return;
+    }
+    const payload: ClaimReplacementCaptureSubmission = {
+      predecessorClaimId,
+      reason: reason.trim() || undefined,
+      idempotencyKey: draftId,
+      context: contextRefFrom("CLAIM_CORRECTION", resolved),
+      expectedContractVersionId: resolved.contract?.versionId ?? null,
+      serviceType,
+      attendingDoctor: attendingDoctor.trim() || undefined,
+      diagnosisCode: diagnosis.code,
+      lines: toCaptureLineInputs(lines),
+    };
+    inFlight.current = true;
+    setFailure(null);
     startTransition(async () => {
-      const res = await submitAction({
-        predecessorClaimId,
-        idempotencyKey: draftId,
-        reason: reason.trim() || undefined,
-        serviceType,
-        benefitCategory,
-        dateOfService,
-        attendingDoctor: attendingDoctor || undefined,
-        primaryDiagnosis: { code: diagCode, description: diag?.description ?? "" },
-        lineItems: lines,
-      });
-      // On success the action redirects; only an error result returns here.
-      if (res?.error) {
-        setError(res.error);
-        if (res.refresh) router.refresh();
+      try {
+        const res = await submitAction(payload);
+        // On success the action redirects; only a refusal returns here.
+        if (res && !res.ok) {
+          setFailure(res);
+          if (res.kind !== "UNKNOWN_OUTCOME") setDraftId(newOperationId());
+          if (res.refresh) router.refresh();
+        }
+      } catch (err) {
+        if (isControlFlowError(err)) throw err;
+        setFailure(mutationFail("UNKNOWN_OUTCOME", { operationId: draftId }));
+      } finally {
+        inFlight.current = false;
       }
     });
   }
 
+  const labels = claimFieldLabels(lines);
+  const elementId = (field: string) => {
+    const m = /^lines\.(\d+)\.(service|quantity|billedUnitPrice|description|category)$/.exec(field);
+    if (m) {
+      const line = lines[Number(m[1])];
+      return line ? lineElementId(line, m[2] as Parameters<typeof lineElementId>[1]) : IDS.lines;
+    }
+    return IDS[field as keyof typeof IDS] ?? IDS.lines;
+  };
+  const currency = resolved?.currency ?? seed.currency;
+
   return (
-    <div className="bg-white border border-[#EEEEEE] rounded-lg p-6 space-y-6">
-      <div className="rounded-lg bg-[#FFF8E1] border border-[#FFC107]/40 px-4 py-3 text-xs text-[#856404]">
+    <div className="space-y-6 rounded-lg border border-[#EEEEEE] bg-white p-6">
+      <div className="rounded-lg border border-[#FFC107]/40 bg-[#FFF8E1] px-4 py-3 text-xs text-[#856404]">
         {mode === "resubmit" ? (
-          <>You are filing a <strong>resubmission</strong> of declined claim <strong>{predecessorNumber}</strong>. Submitting creates a new claim
-          for fresh adjudication — the original decline is kept, unchanged, in your submission history. It is not editable in place.</>
+          <>
+            You are filing a <strong>resubmission</strong> of declined claim <strong>{predecessorNumber}</strong>. Submitting creates a new claim for fresh
+            adjudication — the original decline is kept, unchanged, in your submission history. It is not editable in place.
+          </>
         ) : (
-          <>You are filing a <strong>correction</strong> of claim <strong>{predecessorNumber}</strong>. Submitting creates a new claim and
-          supersedes the original — the original is kept, unchanged, in your submission history. It is not editable in place.</>
+          <>
+            You are filing a <strong>correction</strong> of claim <strong>{predecessorNumber}</strong>. Submitting creates a new claim and supersedes the
+            original — the original is kept, unchanged, in your submission history. It is not editable in place.
+          </>
         )}
       </div>
 
-      {error && (
-        <div className="flex items-start gap-2 bg-[#DC3545]/5 border border-[#DC3545]/30 text-[#DC3545] rounded-lg px-4 py-3 text-sm" role="alert">
-          <AlertCircle size={16} className="shrink-0 mt-0.5" /> <span>{error}</span>
-        </div>
-      )}
+      <ErrorSummary failure={failure} fieldOrder={Object.keys(labels)} fieldLabels={labels} fieldElementId={elementId} />
+      <MutationOutcome result={failure} checkHref={`/provider/claims/${predecessorClaimId}`} />
 
-      <div>
-        <h3 className="font-bold text-brand-text-heading font-heading border-b border-[#EEEEEE] pb-2 mb-4">Patient &amp; encounter</h3>
-        <div className="grid md:grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="cf-member" className={labelCls}>Member / card number <Lock size={10} className="inline -mt-0.5" /></label>
-            <input id="cf-member" value={prefill.memberNumber} readOnly disabled aria-describedby="cf-member-note" className={roCls} />
-            <p id="cf-member-note" className="text-[11px] text-brand-text-muted mt-1">{prefill.memberName} · a {copy.verb} cannot move the claim to another member.</p>
+      <section aria-labelledby="cf-patient-heading">
+        <h2 id="cf-patient-heading" className="mb-4 border-b border-[#EEEEEE] pb-2 font-heading font-bold text-brand-text-heading">
+          Patient &amp; encounter
+        </h2>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div id={IDS.member} tabIndex={-1} className="md:col-span-2">
+            <ProviderMemberField
+              purpose="CLAIM_CORRECTION"
+              serviceDate={serviceDate}
+              benefitCategory={benefitCategory}
+              onChange={onCase}
+              fieldError={errors.member}
+              memberNumberExample={EXAMPLES.memberNumber}
+              fixedMember={seed.member}
+            />
+            <p className={CAPTURE_HINT}>
+              <Lock size={10} className="-mt-0.5 inline" aria-hidden="true" /> A {copy.verb} cannot move the claim to another member
+              {seed.branchName ? <> or away from branch <strong>{seed.branchName}</strong></> : null}.
+            </p>
           </div>
+          <ServiceDateField id={IDS.serviceDate} value={serviceDate} max={today} onChange={setServiceDate} error={errors.serviceDate} />
+          <BenefitSelect id={IDS.benefitCategory} value={benefitCategory} onChange={(v) => v && setBenefitCategory(v)} error={errors.benefitCategory} />
+          <ServiceTypeSelect id={IDS.serviceType} value={serviceType} onChange={setServiceType} />
           <div>
-            <label htmlFor="cf-branch" className={labelCls}>Branch <Lock size={10} className="inline -mt-0.5" /></label>
-            <input id="cf-branch" value={prefill.branchName ?? "—"} readOnly disabled className={roCls} />
-          </div>
-          <div>
-            <label htmlFor="cf-dos" className={labelCls}>Date of service *</label>
-            <input id="cf-dos" type="date" max={today} value={dateOfService} onChange={(e) => setDateOfService(e.target.value)} className={inputCls} />
-          </div>
-          <div>
-            <label htmlFor="cf-stype" className={labelCls}>Service type *</label>
-            <select id="cf-stype" value={serviceType} onChange={(e) => setServiceType(e.target.value as ServiceType)} className={inputCls}>
-              {SERVICE_TYPES.map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="cf-benefit" className={labelCls}>Benefit *</label>
-            <select id="cf-benefit" value={benefitCategory} onChange={(e) => setBenefitCategory(e.target.value as BenefitCategory)} className={inputCls}>
-              {BENEFITS.map((b) => <option key={b} value={b}>{b.replace(/_/g, " ")}</option>)}
-            </select>
-          </div>
-          <div>
-            <label htmlFor="cf-doctor" className={labelCls}>Attending clinician</label>
-            <input id="cf-doctor" value={attendingDoctor} onChange={(e) => setAttendingDoctor(e.target.value)} placeholder="Dr. Name" className={inputCls} />
+            <label htmlFor={IDS.attendingDoctor} className={CAPTURE_LABEL}>Attending clinician</label>
+            <input
+              id={IDS.attendingDoctor}
+              value={attendingDoctor}
+              maxLength={200}
+              autoComplete="off"
+              aria-invalid={errors.attendingDoctor ? true : undefined}
+              onChange={(e) => setAttendingDoctor(e.target.value)}
+              placeholder={EXAMPLES.practitionerName}
+              className={CAPTURE_INPUT}
+            />
+            {errors.attendingDoctor ? <p className={CAPTURE_ERROR} role="alert">{errors.attendingDoctor}</p> : null}
           </div>
           <div className="md:col-span-2">
-            <label htmlFor="cf-diag" className={labelCls}>Primary diagnosis (ICD-10) *</label>
-            <select id="cf-diag" value={diagCode} onChange={(e) => setDiagCode(e.target.value)} className={inputCls}>
-              <option value="">Select diagnosis…</option>
-              {icdOptions.map((d) => <option key={d.code} value={d.code}>{d.code} — {d.description}</option>)}
-            </select>
+            <DiagnosisCombobox id={IDS.diagnosis} purpose="CLAIM_CORRECTION" value={diagnosis} onChange={setDiagnosis} error={errors.diagnosis} />
           </div>
         </div>
-      </div>
+      </section>
+
+      <section aria-labelledby="cf-lines-heading">
+        <h2 id="cf-lines-heading" className="mb-4 border-b border-[#EEEEEE] pb-2 font-heading font-bold text-brand-text-heading">
+          <span id={IDS.lines} tabIndex={-1}>Services</span>
+        </h2>
+        {notice ? <p role="status" className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-xs text-amber-900">{notice}</p> : null}
+        <ServiceLineEditor
+          purpose="CLAIM_CORRECTION"
+          context={resolved}
+          lines={lines}
+          onChange={setLines}
+          errors={errors}
+          disabledReason={disabledLinesReason(caseState) ?? "Confirming the patient's cover for this date…"}
+        />
+        <p className="mt-2 text-right text-[11px] text-brand-text-muted">
+          {copy.totalLabel} {currency} {formatGroupedAmount(total.toString())} · was {seed.currency} {formatGroupedAmount(seed.originalBilled)}
+          {!delta.isZero() ? <> · {delta.isPositive() ? "+" : "−"}{currency} {formatGroupedAmount(delta.abs().toString())}</> : null}
+        </p>
+      </section>
 
       <div>
-        <div className="flex items-center justify-between border-b border-[#EEEEEE] pb-2 mb-4">
-          <h3 className="font-bold text-brand-text-heading font-heading">Service lines</h3>
-          <button type="button" onClick={() => setLines((p) => [...p, { serviceCategory: "OTHER", description: "", cptCode: "", quantity: 1, unitCost: 0 }])} className="flex items-center gap-1 text-xs font-semibold text-brand-indigo">
-            <Plus size={13} /> Add line
-          </button>
-        </div>
-        <datalist id="cf-cpt-list">
-          {cptOptions.map((c) => <option key={c.code} value={c.code}>{c.description}</option>)}
-        </datalist>
-        <div className="space-y-2">
-          {lines.map((l, i) => (
-            <div key={i} className="grid grid-cols-12 gap-2 items-end border border-[#F0F0F0] rounded-lg p-2">
-              <div className="col-span-3">
-                <label className={labelCls}>Category</label>
-                <select aria-label={`Line ${i + 1} category`} value={l.serviceCategory} onChange={(e) => updateLine(i, { serviceCategory: e.target.value as ClaimLineCategory })} className={inputCls}>
-                  {LINE_CATS.map((c) => <option key={c} value={c}>{c}</option>)}
-                </select>
-              </div>
-              <div className="col-span-4">
-                <label className={labelCls}>Description *</label>
-                <input aria-label={`Line ${i + 1} description`} value={l.description} onChange={(e) => updateLine(i, { description: e.target.value })} placeholder="Service description" className={inputCls} />
-              </div>
-              <div className="col-span-2">
-                <label className={labelCls}>CPT</label>
-                <input aria-label={`Line ${i + 1} CPT`} list="cf-cpt-list" value={l.cptCode} onChange={(e) => applyCpt(i, e.target.value)} placeholder="e.g. 99213" className={inputCls} />
-              </div>
-              <div className="col-span-1">
-                <label className={labelCls}>Qty</label>
-                <input aria-label={`Line ${i + 1} quantity`} type="number" min={1} value={l.quantity} onChange={(e) => updateLine(i, { quantity: parseInt(e.target.value) || 1 })} className={inputCls} />
-              </div>
-              <div className="col-span-1">
-                <label className={labelCls}>Unit</label>
-                <input aria-label={`Line ${i + 1} unit cost`} type="number" min={0} value={l.unitCost} onChange={(e) => updateLine(i, { unitCost: parseFloat(e.target.value) || 0 })} className={inputCls} />
-              </div>
-              <div className="col-span-1 flex justify-end">
-                {lines.length > 1 && (
-                  <button type="button" aria-label={`Remove line ${i + 1}`} onClick={() => setLines((p) => p.filter((_, idx) => idx !== i))} className="p-1.5 text-brand-text-muted hover:text-[#DC3545]"><Trash2 size={14} /></button>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="flex justify-between items-center pt-3 mt-2 border-t border-[#EEEEEE]">
-          <span className="text-xs font-bold uppercase text-brand-text-muted">{copy.totalLabel}</span>
-          <span className="text-right">
-            <span className="text-lg font-bold text-brand-indigo">{prefill.currency} {total.toLocaleString("en-UG")}</span>
-            <span className="block text-[11px] text-brand-text-muted">
-              was {prefill.currency} {prefill.originalBilled.toLocaleString("en-UG")}
-              {delta !== 0 && <> · {delta > 0 ? "+" : "−"}{prefill.currency} {Math.abs(delta).toLocaleString("en-UG")}</>}
-            </span>
-          </span>
-        </div>
-      </div>
-
-      <div>
-        <label htmlFor="cf-reason" className={labelCls}>{copy.reasonLabel}</label>
-        <input id="cf-reason" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={280} placeholder="e.g. corrected a mis-keyed unit cost (no clinical detail)" className={inputCls} />
+        <label htmlFor="cf-reason" className={CAPTURE_LABEL}>{copy.reasonLabel}</label>
+        <input
+          id="cf-reason"
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          maxLength={280}
+          placeholder="e.g. corrected a mis-keyed unit price (no clinical detail)"
+          className={CAPTURE_INPUT}
+        />
       </div>
 
       <label className="flex items-start gap-2 text-sm text-brand-text-body">
         <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} className="mt-0.5" />
-        <span>I confirm the member, branch, dates, codes, quantities and charges above are correct for this claim.</span>
+        <span>I confirm the member, branch, dates, diagnosis, services, quantities and charges above are correct for this claim.</span>
       </label>
 
       <div className="flex justify-end">
-        <button type="button" onClick={submit} disabled={pending || !confirmed} className="flex items-center gap-2 bg-brand-indigo hover:bg-brand-secondary text-white px-6 py-2.5 rounded-full font-semibold disabled:opacity-50">
-          <Save size={16} /> {pending ? copy.submitting : copy.submit}
+        <button type="button" onClick={submit} disabled={pending || !confirmed} className={CAPTURE_BUTTON_PRIMARY}>
+          <Save size={16} aria-hidden="true" /> {pending ? copy.submitting : copy.submit}
         </button>
       </div>
     </div>

@@ -1,71 +1,73 @@
 "use server";
 
+/**
+ * F5.8 — provider claim-correction server action, on the Family Hospital UAT
+ * plan P04.02 capture contract.
+ *
+ * Still a thin adapter over the F5.7 canonical `ClaimReplacementService`, which
+ * does the real authorization (permission + provider ownership + branch),
+ * DERIVES member and provider from the earlier claim, atomically supersedes it,
+ * creates the linked child and audits. What changed: the corrected content is no
+ * longer taken from the browser as rates and codes. `ProviderClaimCaptureService`
+ * re-resolves the case for the earlier claim's member (never the form's), for
+ * the correction's service date; re-reads the diagnosis; re-reads every selected
+ * tariff; and carries an unchanged historical line exactly as stored. The
+ * command then carries the case currency, the server-built line provenance and
+ * the resolved branch (used only when the earlier claim has none).
+ *
+ * `"use server"`: async function exports only (AGENTS.md).
+ */
 import { redirect } from "next/navigation";
-import { ProviderAccessService } from "@/server/services/provider-access.service";
+import { revalidatePath } from "next/cache";
+import { mutationFail } from "@/lib/mutation-contract";
+import type { ClaimReplacementCaptureSubmission, ReplacementSubmitResult } from "@/lib/provider-capture-contract";
 import { providerPermits } from "@/components/layouts/provider-nav-model";
+import { isProviderAccessError, ProviderAccessService } from "@/server/services/provider-access.service";
 import { ClaimReplacementService, isClaimReplacementError } from "@/server/services/claim-replacement/service";
 import { CORRECT_PERMISSION } from "@/server/services/claim-replacement/policy";
-import type { ServiceType, BenefitCategory, ClaimLineCategory } from "@prisma/client";
+import { ProviderClaimCaptureService } from "@/server/services/provider-claim-capture.service";
+import { replacementCommand, replacementFailure } from "@/server/services/provider-claim-replacement-support";
 
-export interface CorrectClaimInput {
-  predecessorClaimId: string;
-  idempotencyKey: string; // the form's draft UUID — replays across retry/refresh
-  reason?: string;
-  serviceType: ServiceType;
-  benefitCategory: BenefitCategory;
-  dateOfService: string;
-  attendingDoctor?: string;
-  primaryDiagnosis: { code: string; description: string };
-  lineItems: { serviceCategory: ClaimLineCategory; cptCode: string; description: string; quantity: number; unitCost: number }[];
-}
-
-/**
- * F5.8 — provider claim-correction server action. A thin adapter over the F5.7 canonical
- * ClaimReplacementService, which does the real authorization (permission + provider
- * ownership + branch), DERIVES member/provider/branch from the predecessor (they can NEVER
- * be altered by this form — the input carries only correctable content), atomically
- * supersedes the predecessor and creates the linked child, and audits. This action adds the
- * friendly early permission gate, maps domain errors, and (for a stale/decided predecessor)
- * signals a refresh so the correct page re-evaluates instead of retrying blindly.
- */
-export async function correctProviderClaimAction(
-  input: CorrectClaimInput,
-): Promise<{ error?: string; refresh?: boolean } | void> {
-  const { ctx } = await ProviderAccessService.resolveUserContext();
+export async function correctProviderClaimAction(input: ClaimReplacementCaptureSubmission): Promise<ReplacementSubmitResult> {
+  let access;
+  try {
+    access = await ProviderAccessService.resolveUserContext();
+  } catch (err) {
+    if (isProviderAccessError(err)) return mutationFail("FORBIDDEN", { message: "You do not have permission to correct claims." });
+    throw err;
+  }
+  const { ctx } = access;
   if (!providerPermits(ctx.permissions, CORRECT_PERMISSION)) {
-    return { error: "You do not have permission to correct claims." };
+    return mutationFail("FORBIDDEN", { message: "You do not have permission to correct claims." });
   }
 
-  const predecessorClaimId = (input.predecessorClaimId ?? "").trim();
-  if (!predecessorClaimId) return { error: "Missing claim." };
-  if (!input.primaryDiagnosis?.code) return { error: "Add a primary diagnosis." };
-  const lines = (input.lineItems ?? []).filter((l) => l.description?.trim() && Number(l.unitCost) > 0);
-  if (lines.length === 0) return { error: "Add at least one service line with an amount." };
+  const predecessor = await ProviderClaimCaptureService.predecessor(ctx, input?.predecessorClaimId);
+  if (!predecessor) return { ...mutationFail("CONFLICT", { message: "This claim is no longer available to correct." }), refresh: true };
+
+  const prep = await ProviderClaimCaptureService.prepare(ctx, input, {
+    purpose: "CLAIM_CORRECTION",
+    fixed: { memberId: predecessor.memberId, branchId: predecessor.providerBranchId },
+    carried: { currency: predecessor.currency, lines: predecessor.lines },
+  });
+  if (!prep.ok) return prep.failure;
+
+  const command = replacementCommand(ctx, predecessor.id, input, prep.prepared);
+  if (!command.ok) return command.failure;
 
   let claimId: string;
   try {
-    const res = await ClaimReplacementService.replace(ctx, {
-      tenantId: ctx.tenantId,
-      predecessorClaimId,
-      idempotencyKey: input.idempotencyKey,
-      reason: input.reason,
-      serviceType: input.serviceType,
-      benefitCategory: input.benefitCategory,
-      dateOfService: input.dateOfService,
-      attendingDoctor: input.attendingDoctor,
-      diagnoses: [{ code: input.primaryDiagnosis.code, description: input.primaryDiagnosis.description, standardCharge: null, isPrimary: true }],
-      lineItems: lines.map((l) => {
-        const qty = Math.max(1, Number(l.quantity) || 1);
-        const unit = Number(l.unitCost) || 0;
-        return { serviceCategory: l.serviceCategory, cptCode: l.cptCode ?? "", description: l.description, icdCode: input.primaryDiagnosis.code, quantity: qty, unitCost: unit, billedAmount: qty * unit };
-      }),
-    });
+    const res = await ClaimReplacementService.replace(ctx, command.command);
     claimId = res.claimId;
   } catch (e) {
-    const stale = isClaimReplacementError(e) && ["NOT_CORRECTABLE", "HAS_FINANCIAL_EFFECT", "NOT_FOUND"].includes(e.code);
-    return { error: (e as Error).message || "The claim could not be corrected.", refresh: stale || undefined };
+    return replacementFailure(e, {
+      isDomainError: isClaimReplacementError,
+      staleCodes: ["NOT_CORRECTABLE", "HAS_FINANCIAL_EFFECT", "NOT_FOUND"],
+      fallback: "The claim could not be corrected.",
+    });
   }
 
   // Success ⇒ the child is the new current claim; land on it (banner via ?corrected=1).
+  revalidatePath("/provider/claims");
+  revalidatePath(`/provider/claims/${predecessor.id}`);
   redirect(`/provider/claims/${claimId}?corrected=1`);
 }

@@ -56,17 +56,17 @@ Status values: `NOT_STARTED` · `IN_PROGRESS` · `DONE` · `BLOCKED (<gate>)` ·
 | P02.01 Provider case-context resolver | DONE | see §3 | |
 | P02.02 Member resolution surface | DONE | see §3 | the eligibility link itself is switched in P04.04 |
 | P02.03 Provider-scoped service catalogue | DONE | see §3 | behind provider-scoped flag `providerTariffCatalog`, default OFF (P08.04 step 6) |
-| P02.04 Revalidate selected tariffs on submit | IN_PROGRESS | see §3 | claim paths + schema done; pre-auth snapshot lands with P04.03; migration not yet applied to any shared database |
+| P02.04 Revalidate selected tariffs on submit | DONE | see §3 | claims (eee198c) + pre-auth/amendment (P04 commit); migration not yet applied to any shared database |
 | P03.01 Provider member field | DONE | see §3 | |
 | P03.02 Diagnosis combobox | DONE | see §3 | |
 | P03.03 Category-first service combobox | DONE | see §3 | |
 | P03.04 Shared money input | DONE | see §3 | |
 | P03.05 Shared date and benefit fields | DONE | see §3 | "every form reads the list" is guarded with P04 |
-| P04.01 New claim | NOT_STARTED | | |
-| P04.02 Correction and resubmission | NOT_STARTED | | |
-| P04.03 New and amended pre-auth | NOT_STARTED | | |
-| P04.04 Eligibility | NOT_STARTED | | |
-| P04.05 Terminology completeness | NOT_STARTED | | DEC-FH-03 |
+| P04.01 New claim | DONE | see §3 | |
+| P04.02 Correction and resubmission | DONE | see §3 | |
+| P04.03 New and amended pre-auth | DONE | see §3 | DEC-FH-X4, DEC-FH-X5 |
+| P04.04 Eligibility | DONE | see §3 | |
+| P04.05 Terminology completeness | DONE | see §3 | DEC-FH-03 = no source: report only, production run saved |
 | P05.01 Account-setup token | NOT_STARTED | | |
 | P05.02 Deliver invitations | NOT_STARTED | | |
 | P05.03 Complete account setup | NOT_STARTED | | |
@@ -271,7 +271,7 @@ Rollback (if ever needed): --rollback --batch-ref FH-P0102-20260911 --operator-u
 ```text
 Task ID:                 P01.03
 Defects covered:         FH-02, FH-03 (one reader for every pricing surface)
-Starting/ending SHA:     2374ab6 → 5442e19 (readers), P02/P03 commit (parity test)
+Starting/ending SHA:     2374ab6 → 5442e19 (readers), eee198c (parity test)
 Files changed:           src/server/services/contract-engine/{tariff-selection,engine}.ts,
                          src/server/services/provider-contracts.service.ts,
                          src/server/services/claims.service.ts, claim-adjudication.service.ts,
@@ -311,7 +311,7 @@ Reviewer/sign-off:       pending
 ```text
 Task ID:                 P02.01
 Defects covered:         FH-04, FH-02 (currency comes from the contract), FH-12 (benefit validated)
-Starting/ending SHA:     2267607 → P02/P03 commit
+Starting/ending SHA:     2267607 → eee198c
 Files changed:           src/server/services/provider-case-context.service.ts (server-only),
                          src/lib/provider-capture-contract.ts (client-safe types),
                          src/lib/provider-benefit-options.ts
@@ -346,7 +346,7 @@ reference that is re-resolved like any other.
 ```text
 Task ID:                 P02.02
 Defects covered:         FH-04
-Starting/ending SHA:     2267607 → P02/P03 commit
+Starting/ending SHA:     2267607 → eee198c
 Files changed:           src/app/provider/capture-actions.ts ("use server": resolveCaseContextAction,
                          searchServiceCatalogAction, searchDiagnosesAction — async exports only),
                          src/server/services/capture-telemetry.ts,
@@ -371,7 +371,7 @@ purpose, outcome, reason code, duration, counts) — never a member number, name
 ```text
 Task ID:                 P02.03
 Defects covered:         FH-02, FH-06, FH-07 (server side)
-Starting/ending SHA:     2267607 → P02/P03 commit
+Starting/ending SHA:     2267607 → eee198c
 Files changed:           src/server/services/provider-service-catalog.service.ts (server-only),
                          src/server/services/provider-access-settings.service.ts (flag),
                          src/lib/tariff-display.ts (unit label; the "Unit: Vial" parser, moved
@@ -410,7 +410,7 @@ state — and never with a global price.
 ```text
 Task ID:                 P02.04
 Defects covered:         FH-02, FH-07 (authority)
-Starting/ending SHA:     2267607 → P02/P03 commit
+Starting/ending SHA:     2267607 → eee198c
 Files changed:           prisma/schema.prisma, prisma/migrations/20260911000100_claim_line_selected_tariff/,
                          src/server/services/provider-service-catalog.service.ts (canonicalizeLines),
                          src/server/services/claim-intake.ts, claim-intake/persist.ts,
@@ -456,7 +456,7 @@ regenerate before its own tests).
 ```text
 Task IDs:                P03.01–P03.05
 Defects covered:         FH-04, FH-05, FH-06, FH-07, FH-09 (control), FH-10, FH-12
-Starting/ending SHA:     2267607 → P02/P03 commit
+Starting/ending SHA:     2267607 → eee198c
 Files changed:           src/components/provider/{ProviderMemberField,AsyncCombobox,DiagnosisCombobox,
                          ServiceLineEditor,CaseFields,capture-styles}.tsx/.ts,
                          src/components/forms/MoneyInput.tsx, src/lib/money.ts,
@@ -502,3 +502,204 @@ Reviewer/sign-off:       pending (provider UX review, P08.04 step 1)
 - **Date and benefit (P03.05):** the date field shows the server's Kampala date and uses it as `max`;
   the test pins 21:00–23:59 UTC, where the old `toISOString()` default showed yesterday. One benefit
   list derived from the enum (CUSTOM hidden, DEC-FH-02) with the admin form's labels.
+
+### P04.01 — New claim
+
+```text
+Task ID:                 P04.01
+Defects covered:         FH-02, FH-04, FH-05, FH-06, FH-07, FH-09, FH-10, FH-12
+Starting/ending SHA:     eee198c → P04 commit
+Files changed:           src/app/provider/claims/new/{page.tsx,ProviderClaimForm.tsx,actions.ts},
+                         src/server/services/provider-claim-capture.service.ts (new, server-only),
+                         src/components/provider/claim-form-support.ts (new),
+                         src/components/provider/{ServiceLineEditor,ProviderMemberField}.tsx,
+                         src/lib/provider-capture-contract.ts, src/server/services/claim-intake.ts
+Schema migration/backfill: none (uses eee198c's column)
+Automated tests added/changed: tests/services/provider-claim-capture.service.test.ts (21),
+                         tests/actions/provider-claim-submit-action.test.ts (7),
+                         tests/components/provider-claim-form.test.tsx (7)
+Commands and results:    typecheck clean; eslint clean on changed files; suites green
+Browser scenarios and evidence paths: P08.03
+Feature/config changes:  none
+Data mutations and operation IDs: none
+Residual risk:           the page shows the price-list search only when providerTariffCatalog is on
+                         for the facility (default OFF, P08.04 step 6); until then lines are
+                         described and priced by hand, labelled "Contract rate unavailable —
+                         manual review"
+Reviewer/sign-off:       pending
+```
+
+- **Page:** no ICD/CPT preload; the default date is `operatingTodayISO()` computed on the server;
+  `?from=<eligibility check id>` is read under the user's tenant and provider and re-resolved (the
+  old `?memberId=` prefill is gone).
+- **Form:** member field, Kampala date, benefit list, service type, clinician, diagnosis search,
+  category-first service lines, error summary linking every field (line errors link to the
+  line's own control). Services open only for an eligible, resolved case; a new case on another
+  contract/branch clears price-list selections with a notice; search boxes remount per case so no
+  result from an old case survives. Submission is locked while pending; the draft key (an
+  `op_…` operation id) is renewed after any refusal that saved nothing and kept after an unknown
+  outcome, so a retry replays rather than files twice.
+- **Action:** `ProviderClaimCaptureService.prepare` re-resolves the case for purpose CLAIM (the
+  browser cannot choose the purpose), refuses anything but RESOLVED (§8.2 item 4: an ineligible
+  member, a member not in the facility's scope, a contract other than the one the form priced
+  with), re-reads the diagnosis from the catalogue and canonicalises every line. The decimal
+  duplicate soft-block (BD-02) stays. `runClaimIntake` gets the server's member, branch, benefit,
+  date, currency and line provenance. A replay of a receipt that produced no claim is no longer
+  shown as a filed claim (`receiptState` is now part of the intake outcome). Success revalidates
+  the claims list and dashboard and redirects with the claim number — no member reference in any
+  URL.
+- Kept: ELIG-GAP-019 (a number typed before hydration) moved into the shared member field;
+  ELIG-GAP-020 (permission before any lookup); the example member number is the illustrative
+  `EXAMPLES.memberNumber` (the old claim form still showed a real client's format, DEF-057).
+
+### P04.02 — Claim correction and resubmission
+
+```text
+Task ID:                 P04.02
+Defects covered:         FH-02, FH-05, FH-06, FH-07, FH-11 (correction/resubmission path), FH-12
+Starting/ending SHA:     eee198c → P04 commit
+Files changed:           src/app/provider/claims/[id]/correct/{page.tsx,CorrectClaimForm.tsx,actions.ts},
+                         src/app/provider/claims/[id]/resubmit/{page.tsx,actions.ts},
+                         src/server/services/provider-claim-seed.ts (new, server-only),
+                         src/server/services/provider-claim-replacement-support.ts (new, server-only),
+                         src/server/services/provider-service-catalog.service.ts (carried lines)
+Schema migration/backfill: none
+Automated tests added/changed: tests/actions/provider-claim-correct-action.test.ts (rewritten, 8),
+                         tests/actions/provider-claim-resubmit-action.test.ts (rewritten, 4),
+                         tests/components/provider-correct-claim-form.test.tsx (rewritten, 6),
+                         tests/services/provider-claim-seed.test.ts (3),
+                         tests/services/claim-replacement-submission.test.ts (3),
+                         tests/services/provider-service-catalog.service.test.ts (+5 carried-line cases)
+Commands and results:    typecheck clean; suites green
+Feature/config changes:  none
+Data mutations and operation IDs: none
+Residual risk:           a correction of a claim whose member is no longer eligible on the
+                         claim's date is refused, like any submission (§8.2 item 4)
+Reviewer/sign-off:       pending
+```
+
+- The three pinned suites were rewritten to the new contract with their F5.8/F5.10 invariants
+  kept: the member and provider are never passed to the replacement services (they come from the
+  earlier claim); the case is re-resolved for the **earlier claim's** member whatever the form
+  sends; confirmation, double-click safety and refresh-on-stale are unchanged. The one invariant
+  changed on purpose: the command now carries `providerBranchId` — the branch the SERVER resolved,
+  which the services use only when the earlier claim has none (a replacement never changes an
+  existing branch; `claim-replacement-submission.test.ts`).
+- Lines are seeded from immutable stored data (`provider-claim-seed.ts`): a price-list line as its
+  stored selection (name and captured rate); every other line — every claim filed before this
+  change — as **"Historical / unlisted"**. An unchanged historical line is sent as "line N,
+  unchanged"; the server compares it with the stored line and carries it exactly as it was (no
+  re-pricing, stored codes kept). Any real change turns it into an ordinary unlisted line judged
+  afresh for the new date and contract; re-formatting "1000" as "1,000" is not a change. An
+  earlier claim in another currency cannot be carried — the price must be entered again.
+- Errors: unknown failures are UNKNOWN_OUTCOME (never the raw text, which the old actions returned);
+  a reused draft key is a conflict; a stale earlier claim refreshes the page.
+
+### P04.03 — New and amended pre-authorisation
+
+```text
+Task ID:                 P04.03
+Defects covered:         FH-02, FH-04, FH-05, FH-06, FH-07, FH-10, FH-11 (pre-auth path), FH-12
+Starting/ending SHA:     eee198c → P04 commit
+Files changed:           src/app/provider/preauth/new/{page.tsx,ProviderPreauthForm.tsx,actions.ts},
+                         src/app/provider/preauth/[id]/{AmendPreauthForm.tsx,actions.ts,page.tsx},
+                         src/server/services/provider-preauth-capture.service.ts (new, server-only),
+                         src/server/services/preauth-intake/{contract,service}.ts,
+                         src/server/services/preauth-adjudication.service.ts,
+                         src/server/services/provider-case-context.service.ts (DEC-FH-X5),
+                         src/components/provider/CaseFields.tsx (date `max` optional)
+Schema migration/backfill: none (provenance lives in the PA's procedures JSON snapshot)
+Automated tests added/changed: tests/actions/provider-preauth-action.test.ts (rewritten, 8),
+                         tests/actions/provider-preauth-amend-action.test.ts (rewritten, 8),
+                         tests/components/provider-preauth-form.test.tsx (3),
+                         tests/services/preauth-intake-provenance.test.ts (4),
+                         tests/services/preauth-procedure-codes-gate.test.ts (3),
+                         tests/services/provider-case-context.service.test.ts (+1)
+Commands and results:    typecheck clean; suites green
+Feature/config changes:  none
+Data mutations and operation IDs: none
+Residual risk:           amendments still have no server-side idempotency (unchanged; the form
+                         locks while pending)
+Reviewer/sign-off:       pending
+```
+
+- The form uses the same member field, benefit list, diagnosis search and money parsing as a
+  claim; each requested service is priced from the price list in ESTIMATE mode — the contracted
+  rate is suggested, the estimate stays editable, and both are shown separately. "600,000" is
+  600000 (the old `<input type="number">` read it as empty, so the estimate was 0 — FH-10).
+- The action submits through the canonical `PreauthIntakeService` on PROVIDER_PORTAL with the
+  member id the server resolved, decimal-text procedures and estimate, and the procedure
+  provenance (`selectedProviderTariffId`, `contractedUnitRate`, `currency`) as a new **trusted**
+  argument — the intake builds procedures from known fields only, so a payload cannot inject
+  provenance (tested). A refused request comes back as field errors, and the form renews its
+  draft key: before, a corrected resend with the same key was an uncaught
+  `PreauthIntakeConflict`.
+- Amendments are prepared for the parent's member, date and benefit (fixed by the server) and
+  stored in the intake's procedure shape with the same provenance; the additional cost is decimal
+  text. That made the auto-decision's `p.code`-only reader visibly wrong — DEC-FH-X4.
+- The PA detail page shows stored decimals (no float rounding), the snapshot's currency, and the
+  contracted rate apart from the estimate.
+
+### P04.04 — Eligibility
+
+```text
+Task ID:                 P04.04
+Defects covered:         FH-09, FH-12 (labels), the eligibility → claim hand-off
+Starting/ending SHA:     eee198c → P04 commit
+Files changed:           src/app/provider/eligibility/{page.tsx,EligibilityCheckForm.tsx}
+Schema migration/backfill: none
+Automated tests added/changed: tests/components/provider-eligibility-form.test.tsx (5)
+Commands and results:    suites green (the existing action suite unchanged and green)
+Feature/config changes:  none
+Data mutations and operation IDs: none
+Residual risk:           none identified
+Reviewer/sign-off:       pending
+```
+
+The server's behaviour is untouched (plan step 3). The date box shows `operatingTodayISO()` from
+the server with a "Kampala date" hint; the entered date and benefit survive an input error or a
+request that never came back (the latter is shown as "could not check", not a crash). The benefit
+select had a latent reset bug — React resets a form after its action and a `<select>` returns to
+the option chosen at mount — fixed by remounting on the submitted value. Benefit labels come from
+the canonical module. "File a claim" now links `?from=<check id>` (opaque, expiring, tenant- and
+provider-scoped, re-resolved by P02) instead of `?memberId=`.
+
+### P04.05 — Terminology completeness (DEC-FH-03: no approved source)
+
+```text
+Task ID:                 P04.05
+Defects covered:         FH-14
+Starting/ending SHA:     eee198c → P04 commit
+Files changed:           scripts/reports/icd-terminology-coverage.ts (new)
+Schema migration/backfill: none — no import (DEC-FH-03)
+Read-only preflight artifact: evidence/P04.05-icd-coverage-2026-09-11T08-57-15-411Z.{md,json}
+Automated tests added/changed: none (report script; run locally then on production)
+Commands and results:    local aicare_uat → same verdict;
+                         [PROD, read-only] DATABASE_URL=<session pooler> npx tsx
+                           scripts/reports/icd-terminology-coverage.ts --out docs/provider-onboarding/evidence
+                           → exit 0. 200 rows; no source, version or active/inactive column; all
+                           200 codes are exactly the repository demo seed (prisma/seed.ts); 181
+                           three-character categories; no duplicate codes or descriptions;
+                           representative set: 20 of 22 exact (B54 present; R50.9 and K35.8 absent)
+Feature/config changes:  none
+Data mutations and operation IDs: none
+Residual risk:           the facility will not find codes outside the 200-code demo set; per
+                         DEC-FH-03 this is disclosed for this UAT round (provider communication,
+                         P08 / plan §12) and complete ICD-10 coverage is not claimed
+Reviewer/sign-off:       pending
+```
+
+### P04 — also changed
+
+- `src/app/provider/contracts/[id]/{page.tsx,export/route.ts}`: the provider contract view (dark
+  behind `providerContractView`) derived its default "rates as at" date with
+  `toISOString().slice(0, 10)` — the UTC day. Now `operatingTodayISO()` (plan §7 "Dates: all
+  provider form defaults").
+- `tests/consistency/provider-capture-forms.test.ts` (14): the P04 phase acceptance as a ratchet —
+  no provider page or component touches `CPTCode`/`averageCost`, preloads ICD codes, renders a
+  native diagnosis select/datalist, keeps its own benefit array, derives a calendar date with
+  `toISOString()`, or puts `?memberId=`/`?memberNumber=` in a URL; every capture form uses the
+  shared member field, line editor and (where it has one) the diagnosis combobox.
+- Full suite at this point: `npx vitest run` → 369 files passed / 88 skipped; 4,686 tests passed /
+  599 skipped (the skipped suites need a test database — run in P08.01/P08.02).
+

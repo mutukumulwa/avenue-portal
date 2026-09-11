@@ -11,6 +11,8 @@ import { FileClaimButton } from "./FileClaimButton";
 import { GopButton } from "./GopButton";
 import { buildGopData } from "./gop-artifact";
 import { PROVIDER_CANCELLABLE_STATUSES } from "./constants";
+import { formatGroupedAmount } from "@/lib/money";
+import { operatingTodayISO } from "@/lib/service-date";
 
 // Module scope, not defined inside the page component: a component created during
 // render gets a new identity every render, so React unmounts and remounts it
@@ -24,8 +26,11 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
     );
 }
 
-function money(n: number | null | undefined) {
-  return `UGX ${Math.round(Number(n ?? 0)).toLocaleString("en-UG")}`;
+// Family Hospital UAT P04.03: amounts are shown as the stored decimals (never
+// rounded through a float), in the currency the request was priced in when the
+// procedure snapshot carries one. The portal's tenant currency is UGX.
+function money(n: { toString(): string } | number | string | null | undefined, currency = "UGX") {
+  return `${currency} ${formatGroupedAmount(String(n ?? 0))}`;
 }
 function fmtDate(v: Date | null | undefined) {
   return v ? new Date(v).toLocaleDateString("en-UG", { day: "2-digit", month: "short", year: "numeric" }) : "—";
@@ -58,7 +63,11 @@ export default async function ProviderPreauthDetail({ params }: { params: Promis
   const gop = buildGopData(pa); // non-null only for an APPROVED PA with an issued GOP
   const events = await listPreauthEvents(pa.id);
   const diagnoses = (pa.diagnoses as Array<{ icdCode?: string; code?: string; description?: string; isPrimary?: boolean }>) ?? [];
-  const procedures = (pa.procedures as Array<{ cptCode?: string; description?: string; quantity?: number; unitCost?: number; total?: number }>) ?? [];
+  const procedures = (Array.isArray(pa.procedures) ? pa.procedures : []) as Array<{
+    cptCode?: string | null; code?: string; description?: string; quantity?: number; unitCost?: string | number; total?: string | number;
+    contractedUnitRate?: string | null; currency?: string | null;
+  }>;
+  const currency = procedures.find((p) => p.currency)?.currency ?? "UGX";
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -75,7 +84,14 @@ export default async function ProviderPreauthDetail({ params }: { params: Promis
         <div className="flex flex-wrap justify-end gap-2">
           {gop && <GopButton data={gop} />}
           {canFileClaim && <FileClaimButton preAuthId={pa.id} />}
-          {canAmend && <AmendPreauthForm parentPreAuthId={pa.id} />}
+          {canAmend && (
+            <AmendPreauthForm
+              parentPreAuthId={pa.id}
+              member={{ memberRef: pa.memberId, displayName: `${pa.member.firstName} ${pa.member.lastName}` }}
+              serviceDate={operatingTodayISO(pa.expectedDateOfService ?? new Date())}
+              benefitCategory={pa.benefitCategory}
+            />
+          )}
           {canCancel && <CancelPreauthButton preAuthId={pa.id} />}
         </div>
       )}
@@ -84,8 +100,8 @@ export default async function ProviderPreauthDetail({ params }: { params: Promis
         <Field label="Service type" value={pa.serviceType} />
         <Field label="Benefit" value={pa.benefitCategory.replace(/_/g, " ")} />
         <Field label="Expected date" value={fmtDate(pa.expectedDateOfService)} />
-        <Field label="Estimated cost" value={money(Number(pa.estimatedCost))} />
-        <Field label="Approved amount" value={pa.approvedAmount != null ? money(Number(pa.approvedAmount)) : "—"} />
+        <Field label="Estimated cost" value={money(pa.estimatedCost, currency)} />
+        <Field label="Approved amount" value={pa.approvedAmount != null ? money(pa.approvedAmount, currency) : "—"} />
         <Field label="GOP number" value={pa.gopNumber ?? "—"} />
         <Field label="Valid from" value={fmtDate(pa.validFrom)} />
         <Field label="Valid until" value={fmtDate(pa.validUntil)} />
@@ -110,12 +126,25 @@ export default async function ProviderPreauthDetail({ params }: { params: Promis
           <h2 className="text-sm font-bold text-brand-text-heading mb-3">Requested services</h2>
           {procedures.length === 0 ? <p className="text-sm text-brand-text-muted">None recorded.</p> : (
             <ul className="space-y-1.5 text-sm">
-              {procedures.map((p, i) => (
-                <li key={i} className="flex justify-between gap-2">
-                  <span>{p.cptCode ? <span className="font-mono text-xs text-brand-indigo mr-1">{p.cptCode}</span> : null}{p.description}</span>
-                  <span className="font-mono text-xs">{money(p.total ?? p.unitCost)}</span>
-                </li>
-              ))}
+              {procedures.map((p, i) => {
+                const code = p.cptCode ?? p.code;
+                return (
+                  <li key={i} className="flex justify-between gap-2">
+                    <span>
+                      {code ? <span className="font-mono text-xs text-brand-indigo mr-1">{code}</span> : null}
+                      {p.description}
+                      {p.quantity && p.quantity > 1 ? <span className="text-xs text-brand-text-muted"> × {p.quantity}</span> : null}
+                      {p.contractedUnitRate ? (
+                        <span className="block text-[11px] text-brand-text-muted">Contracted rate {money(p.contractedUnitRate, p.currency ?? currency)} per unit</span>
+                      ) : null}
+                    </span>
+                    <span className="font-mono text-xs">
+                      <span className="sr-only">Estimate </span>
+                      {money(p.total ?? p.unitCost, p.currency ?? currency)}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

@@ -61,7 +61,50 @@ export interface PreauthSubmissionV1 {
 }
 
 export interface NormalizedDiagnosis { code: string | null; description: string; isPrimary: boolean }
-export interface NormalizedProcedure { cptCode: string | null; description: string; quantity: number; unitCost: string; total: string }
+export interface NormalizedProcedure {
+  cptCode: string | null;
+  description: string;
+  quantity: number;
+  unitCost: string;
+  total: string;
+  /**
+   * Family Hospital UAT plan P02.04 step 5 — capture provenance, built by the
+   * SERVER after it re-read the selected tariff row: which row, its contracted
+   * unit rate and the case currency. Never read from the request payload —
+   * `normalizePreauth` builds procedures from known fields only, so a caller
+   * cannot inject these.
+   */
+  selectedProviderTariffId?: string | null;
+  contractedUnitRate?: string | null;
+  currency?: string | null;
+}
+
+/** Server-built provenance for one procedure, in submission order. */
+export interface PreauthProcedureProvenance {
+  selectedProviderTariffId: string | null;
+  contractedUnitRate: string | null;
+  currency: string | null;
+}
+
+/**
+ * Attach server-built provenance to the normalized procedures (by position).
+ * The counts must agree — provenance for a procedure that normalization dropped
+ * would attach to the wrong line.
+ */
+export function withProcedureProvenance(n: NormalizedPreauthV1, provenance: readonly PreauthProcedureProvenance[]): NormalizedPreauthV1 {
+  if (provenance.length !== n.procedures.length) {
+    throw new Error("Pre-authorisation procedure provenance does not match the procedures.");
+  }
+  return {
+    ...n,
+    procedures: n.procedures.map((p, i) => ({
+      ...p,
+      selectedProviderTariffId: provenance[i].selectedProviderTariffId,
+      contractedUnitRate: provenance[i].contractedUnitRate,
+      currency: provenance[i].currency,
+    })),
+  };
+}
 
 export interface NormalizedPreauthV1 {
   contractVersion: typeof PREAUTH_CONTRACT_VERSION;

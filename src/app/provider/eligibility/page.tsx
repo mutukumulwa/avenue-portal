@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { UserCheck } from "lucide-react";
 import { ProviderAccessService } from "@/server/services/provider-access.service";
 import { providerPermits } from "@/components/layouts/provider-nav-model";
+import { operatingTodayISO } from "@/lib/service-date";
 import { EligibilityCheckForm } from "./EligibilityCheckForm";
 
 /**
@@ -37,7 +38,8 @@ export default async function ProviderEligibility() {
         </p>
       </div>
 
-      <EligibilityCheckForm />
+      {/* Family Hospital UAT P04.04: the visible default date is the Kampala operating date, computed here. */}
+      <EligibilityCheckForm today={operatingTodayISO()} />
     </div>
   );
 }

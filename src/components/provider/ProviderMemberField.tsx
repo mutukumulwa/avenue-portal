@@ -43,6 +43,7 @@ export function ProviderMemberField({
   memberNumberExample,
   handoff,
   fixedMember,
+  inputId: inputIdProp,
 }: {
   purpose: CapturePurpose;
   serviceDate: string;
@@ -55,9 +56,11 @@ export function ProviderMemberField({
   handoff?: { memberRef: string; branchId: string | null } | null;
   /** Correction / amendment: the member is fixed; re-resolve on every change of date or benefit. */
   fixedMember?: { memberRef: string; branchId: string | null; displayName: string } | null;
+  /** A stable id for the number box, so an error summary can link to it. */
+  inputId?: string;
 }) {
   const autoId = useId();
-  const inputId = `member-${autoId}`;
+  const inputId = inputIdProp ?? `member-${autoId}`;
   const statusId = `${inputId}-status`;
   const [memberNumber, setMemberNumber] = useState("");
   const [memberRef, setMemberRef] = useState<string | null>(fixedMember?.memberRef ?? handoff?.memberRef ?? null);
@@ -69,7 +72,17 @@ export function ProviderMemberField({
   const seq = useRef(0);
   const lastKey = useRef<string | null>(null);
   const messageRef = useRef<HTMLParagraphElement>(null);
+  const numberRef = useRef<HTMLInputElement>(null);
   const focusOnResult = useRef(false);
+
+  // ELIG-GAP-019 (kept from the old claim form): recover a number typed into
+  // the box BEFORE React hydrated — a fast clerk on a slow device. Without
+  // this, hydrating the controlled input discards those keystrokes.
+  useEffect(() => {
+    const typed = numberRef.current?.value;
+    if (typed && typed !== memberNumber) setMemberNumber(typed);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount only, by design
+  }, []);
 
   const emit = useCallback((ctx: CaseContextDTO | null, outcome: CaseContextOutcome | null) => onChange({ context: ctx, outcome }), [onChange]);
 
@@ -210,6 +223,7 @@ export function ProviderMemberField({
           </label>
           <div className="flex gap-2">
             <input
+              ref={numberRef}
               id={inputId}
               value={memberNumber}
               maxLength={64}

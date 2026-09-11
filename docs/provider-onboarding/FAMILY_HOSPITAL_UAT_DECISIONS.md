@@ -126,3 +126,27 @@ standalone. Standalone rows stay in the database as admin reference data.
 When several active contracts match a claim (CON-010) the ceiling now fails closed — a
 deterministic 0 with the message "Multiple active contracts match this claim — resolve which
 contract applies before approving" — instead of the resolver silently taking the newest contract.
+
+### 4.4 DEC-FH-X4 — the pre-auth auto-decision reads procedure codes in both stored shapes (plan P04.03)
+
+The canonical pre-auth intake stores each procedure as `{ cptCode, description, quantity,
+unitCost, total }` (`preauth-intake/contract.ts`); the old provider amendment writer stored
+`{ code, description }`. The auto-decision (`preauthAdjudicationService.runAutoDecision`) read
+only `p.code`, so for every PA created through the intake — provider portal, API, admin, member
+app — its procedure codes were never screened: the never-auto list (gate 7) and the
+procedure/service-code exclusion and referral rules (gates 3.5 and 4.5) could not fire.
+
+P04.03 makes amendments use the intake's shape (with the capture provenance the plan requires),
+which would have made amendment codes invisible too. The reader now takes `cptCode`, else
+`code`. Effect: decisions can only become **more careful** — a coded PA can now be routed to a
+human (never-auto list) or declined (a procedure exclusion) where before it passed; nothing is
+approved that was not approved before (`ALWAYS_AUTO_PROCEDURE_CODES` is declared but unused).
+Family's price list carries no codes, so Family PAs are unaffected. Test:
+`tests/services/preauth-procedure-codes-gate.test.ts`.
+
+### 4.5 DEC-FH-X5 — a pre-authorisation may name a planned date (plan P04.03)
+
+The shared case resolver refuses a service date later than Kampala today for claims and
+eligibility (the existing rule). A pre-authorisation is requested for a planned service, and the
+pre-auth intake has always accepted a later expected date, so for `PREAUTH` the resolver accepts
+it too. No new upper bound is introduced (none existed).

@@ -1,155 +1,196 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Save, AlertCircle } from "lucide-react";
+/**
+ * Family Hospital UAT plan P04.03 — "Request pre-authorisation", rebuilt on the
+ * shared provider capture controls (FH-02, FH-04, FH-05, FH-06, FH-07, FH-10,
+ * FH-12).
+ *
+ * Same member lookup, benefit list, diagnosis search and money parser as a
+ * claim. Requested services come from the facility's own price list inside a
+ * category; picking one suggests its contracted rate as the ESTIMATE, which stays
+ * editable and is shown apart from the contracted rate. "600,000" is 600000.
+ * The expected date may be today or a planned later day.
+ *
+ * A refused request keeps every value, focuses the error summary, and renews
+ * the draft key, so the corrected request can be sent (before, the same key with
+ * new content was an idempotency conflict and could never be resent).
+ */
+import { useRef, useState, useTransition } from "react";
+import type { BenefitCategory, ServiceType } from "@prisma/client";
+import { Save } from "lucide-react";
 import { submitProviderPreauthAction } from "./actions";
-import type { ServiceType, BenefitCategory } from "@prisma/client";
+import { ErrorSummary } from "@/components/forms/ErrorSummary";
+import { MutationOutcome } from "@/components/forms/MutationOutcome";
+import { ProviderMemberField, type MemberFieldChange } from "@/components/provider/ProviderMemberField";
+import { BenefitSelect, ServiceDateField, ServiceTypeSelect } from "@/components/provider/CaseFields";
+import { DiagnosisCombobox } from "@/components/provider/DiagnosisCombobox";
+import { ServiceLineEditor, clearSelections, lineElementId, newLine, pricingBasis, toCaptureLineInputs, type CaptureLineState } from "@/components/provider/ServiceLineEditor";
+import { claimFieldLabels, disabledLinesReason, firstErrors } from "@/components/provider/claim-form-support";
+import { CAPTURE_BUTTON_PRIMARY, CAPTURE_ERROR, CAPTURE_INPUT, CAPTURE_LABEL } from "@/components/provider/capture-styles";
+import { isControlFlowError, mutationFail, type MutationFailure } from "@/lib/mutation-contract";
+import { newOperationId } from "@/lib/correlation";
+import { EXAMPLES } from "@/lib/locale-config";
+import { contextRefFrom, type DiagnosisOption, type PreauthCaptureSubmission } from "@/lib/provider-capture-contract";
 
-interface IcdOption { code: string; description: string }
-interface CptOption { code: string; description: string; averageCost: number }
+const IDS = {
+  member: "pa-member",
+  serviceDate: "pa-date",
+  benefitCategory: "pa-benefit",
+  serviceType: "pa-stype",
+  diagnosis: "pa-diagnosis",
+  lines: "pa-lines",
+  clinicalNotes: "pa-notes",
+} as const;
 
-const inputCls = "w-full border border-[#EEEEEE] rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand-indigo";
-const labelCls = "text-[11px] font-bold text-brand-text-muted uppercase block mb-1";
-
-const SERVICE_TYPES: ServiceType[] = ["OUTPATIENT", "INPATIENT", "DAY_CASE", "EMERGENCY"];
-const BENEFITS: BenefitCategory[] = ["OUTPATIENT", "INPATIENT", "DENTAL", "OPTICAL", "MATERNITY", "SURGICAL", "CHRONIC_DISEASE", "MENTAL_HEALTH", "WELLNESS_PREVENTIVE"];
-
-export function ProviderPreauthForm({
-  icdOptions,
-  cptOptions,
-  prefillMemberNumber,
-}: {
-  icdOptions: IcdOption[];
-  cptOptions: CptOption[];
-  prefillMemberNumber: string;
-}) {
-  const today = new Date().toISOString().split("T")[0];
-  const [memberNumber, setMemberNumber] = useState(prefillMemberNumber);
-  const [serviceType, setServiceType] = useState<ServiceType>("OUTPATIENT");
+export function ProviderPreauthForm({ today }: { today: string }) {
+  const [serviceDate, setServiceDate] = useState(today);
   const [benefitCategory, setBenefitCategory] = useState<BenefitCategory>("OUTPATIENT");
-  const [expectedDate, setExpectedDate] = useState(today);
-  const [diagCode, setDiagCode] = useState("");
-  const [diagDesc, setDiagDesc] = useState("");
-  const [procCode, setProcCode] = useState("");
-  const [procDesc, setProcDesc] = useState("");
-  const [estimatedCost, setEstimatedCost] = useState(0);
+  const [serviceType, setServiceType] = useState<ServiceType>("OUTPATIENT");
+  const [diagnosis, setDiagnosis] = useState<DiagnosisOption | null>(null);
+  const [lines, setLines] = useState<CaptureLineState[]>(() => [{ ...newLine("PROCEDURE"), key: "first" }]);
   const [clinicalNotes, setClinicalNotes] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const [caseState, setCaseState] = useState<MemberFieldChange>({ context: null, outcome: null });
+  const [failure, setFailure] = useState<MutationFailure | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
-  // A stable draft id for THIS form instance — the idempotency key so a
-  // double-click / back-refresh replays the same receipt (D26) instead of a dup.
-  const [draftId] = useState(() => crypto.randomUUID());
+  const [draftId, setDraftId] = useState(() => newOperationId());
+  const basis = useRef<string | null>(null);
+  const inFlight = useRef(false);
 
-  function applyDiag(code: string) {
-    setDiagCode(code);
-    const hit = icdOptions.find((d) => d.code === code);
-    if (hit && !diagDesc) setDiagDesc(hit.description);
-  }
-  function applyProc(code: string) {
-    setProcCode(code);
-    const hit = cptOptions.find((c) => c.code === code);
-    if (hit) {
-      if (!procDesc) setProcDesc(hit.description);
-      if (!estimatedCost && hit.averageCost) setEstimatedCost(hit.averageCost);
+  const resolved = caseState.outcome === "RESOLVED" ? caseState.context : null;
+  const errors = firstErrors(failure);
+
+  function onCase(change: MemberFieldChange) {
+    setCaseState(change);
+    if (change.outcome === "RESOLVED" && change.context) {
+      const next = pricingBasis(change.context);
+      if (basis.current !== null && basis.current !== next && lines.some((l) => l.selected)) {
+        setLines(clearSelections);
+        setNotice("The patient's contract or branch changed, so the services chosen from the price list were cleared. Search for them again.");
+      }
+      basis.current = next;
     }
   }
 
   function submit() {
-    setError(null);
+    if (pending || inFlight.current) return;
+    setNotice(null);
+    const local: Record<string, string[]> = {};
+    if (!resolved) local.member = [caseState.outcome ? "This member cannot be pre-authorised as shown. Resolve the member first." : "Find the member first."];
+    if (!diagnosis) local.diagnosis = ["Choose the primary diagnosis."];
+    if (!resolved || !diagnosis) {
+      setFailure(mutationFail("VALIDATION", { message: "The pre-authorisation was not submitted. Correct the items listed.", fieldErrors: local }));
+      return;
+    }
+    const payload: PreauthCaptureSubmission = {
+      idempotencyKey: draftId,
+      context: contextRefFrom("PREAUTH", resolved),
+      expectedContractVersionId: resolved.contract?.versionId ?? null,
+      serviceType,
+      diagnosisCode: diagnosis.code,
+      lines: toCaptureLineInputs(lines),
+      clinicalNotes: clinicalNotes.trim() || undefined,
+    };
+    inFlight.current = true;
+    setFailure(null);
     startTransition(async () => {
-      const res = await submitProviderPreauthAction({
-        idempotencyKey: draftId,
-        memberNumber,
-        serviceType,
-        benefitCategory,
-        expectedDateOfService: expectedDate,
-        diagnosisCode: diagCode,
-        diagnosisDescription: diagDesc,
-        procedureCode: procCode,
-        procedureDescription: procDesc,
-        estimatedCost,
-        clinicalNotes,
-      });
-      if (res?.error) setError(res.error);
-      // success redirects server-side
+      try {
+        const res = await submitProviderPreauthAction(payload);
+        if (res && !res.ok) {
+          setFailure(res);
+          // Refused ⇒ nothing was stored under a new request: renew the key so the
+          // corrected request is a new one. Unknown ⇒ keep it, so a retry replays.
+          if (res.kind !== "UNKNOWN_OUTCOME") setDraftId(newOperationId());
+        }
+      } catch (err) {
+        if (isControlFlowError(err)) throw err;
+        setFailure(mutationFail("UNKNOWN_OUTCOME", { operationId: draftId }));
+      } finally {
+        inFlight.current = false;
+      }
     });
   }
 
+  const labels = { ...claimFieldLabels(lines, "estimate"), serviceDate: "Expected date of service", clinicalNotes: "Clinical notes" };
+  const elementId = (field: string) => {
+    const m = /^lines\.(\d+)\.(service|quantity|billedUnitPrice|description|category)$/.exec(field);
+    if (m) {
+      const line = lines[Number(m[1])];
+      return line ? lineElementId(line, m[2] as Parameters<typeof lineElementId>[1]) : IDS.lines;
+    }
+    return IDS[field as keyof typeof IDS] ?? IDS.lines;
+  };
+
   return (
-    <div className="space-y-5 bg-white border border-[#EEEEEE] rounded-lg p-5">
-      {error && (
-        <div className="flex items-start gap-2 rounded-lg bg-[#FDECEA] border border-[#DC3545]/30 px-4 py-3 text-sm font-semibold text-[#DC3545]" role="alert">
-          <AlertCircle size={16} className="mt-0.5 shrink-0" /> <span>{error}</span>
-        </div>
-      )}
+    <div className="space-y-6 rounded-lg border border-[#EEEEEE] bg-white p-6">
+      <ErrorSummary failure={failure} fieldOrder={Object.keys(labels)} fieldLabels={labels} fieldElementId={elementId} />
+      <MutationOutcome result={failure} checkHref="/provider/preauth" />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className={labelCls}>Member / card number</label>
-          <input className={inputCls} value={memberNumber} onChange={(e) => setMemberNumber(e.target.value)} placeholder="e.g. NWSC-2026-01234" />
+      <section aria-labelledby="pa-patient-heading">
+        <h2 id="pa-patient-heading" className="mb-4 border-b border-[#EEEEEE] pb-2 font-heading font-bold text-brand-text-heading">
+          Patient &amp; request
+        </h2>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="md:col-span-2">
+            <ProviderMemberField
+              inputId={IDS.member}
+              purpose="PREAUTH"
+              serviceDate={serviceDate}
+              benefitCategory={benefitCategory}
+              onChange={onCase}
+              fieldError={errors.member}
+              memberNumberExample={EXAMPLES.memberNumber}
+            />
+          </div>
+          <ServiceDateField
+            id={IDS.serviceDate}
+            label="Expected date of service"
+            hint="Kampala date. Today is filled in; change it to the planned day if the service is later."
+            value={serviceDate}
+            onChange={setServiceDate}
+            error={errors.serviceDate}
+          />
+          <BenefitSelect id={IDS.benefitCategory} value={benefitCategory} onChange={(v) => v && setBenefitCategory(v)} error={errors.benefitCategory} />
+          <ServiceTypeSelect id={IDS.serviceType} value={serviceType} onChange={setServiceType} />
+          <div className="md:col-span-2">
+            <DiagnosisCombobox id={IDS.diagnosis} purpose="PREAUTH" value={diagnosis} onChange={setDiagnosis} error={errors.diagnosis} />
+          </div>
         </div>
-        <div>
-          <label className={labelCls}>Expected date of service</label>
-          <input type="date" className={inputCls} value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} />
-        </div>
-        <div>
-          <label className={labelCls}>Service type</label>
-          <select className={inputCls} value={serviceType} onChange={(e) => setServiceType(e.target.value as ServiceType)}>
-            {SERVICE_TYPES.map((s) => <option key={s} value={s}>{s.replace(/_/g, " ")}</option>)}
-          </select>
-        </div>
-        <div>
-          <label className={labelCls}>Benefit</label>
-          <select className={inputCls} value={benefitCategory} onChange={(e) => setBenefitCategory(e.target.value as BenefitCategory)}>
-            {BENEFITS.map((b) => <option key={b} value={b}>{b.replace(/_/g, " ")}</option>)}
-          </select>
-        </div>
-      </div>
+      </section>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label className={labelCls}>Diagnosis (ICD)</label>
-          <input className={inputCls} list="icd-codes" value={diagCode} onChange={(e) => applyDiag(e.target.value)} placeholder="ICD-10 code" />
-          <datalist id="icd-codes">
-            {icdOptions.slice(0, 500).map((d) => <option key={d.code} value={d.code}>{d.description}</option>)}
-          </datalist>
-        </div>
-        <div className="md:col-span-2">
-          <label className={labelCls}>Diagnosis description</label>
-          <input className={inputCls} value={diagDesc} onChange={(e) => setDiagDesc(e.target.value)} placeholder="Clinical impression" />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div>
-          <label className={labelCls}>Procedure (CPT, optional)</label>
-          <input className={inputCls} list="cpt-codes" value={procCode} onChange={(e) => applyProc(e.target.value)} placeholder="CPT code" />
-          <datalist id="cpt-codes">
-            {cptOptions.slice(0, 500).map((c) => <option key={c.code} value={c.code}>{c.description}</option>)}
-          </datalist>
-        </div>
-        <div>
-          <label className={labelCls}>Requested service</label>
-          <input className={inputCls} value={procDesc} onChange={(e) => setProcDesc(e.target.value)} placeholder="e.g. MRI brain" />
-        </div>
-        <div>
-          <label className={labelCls}>Estimated cost (UGX)</label>
-          <input type="number" min={0} className={inputCls} value={estimatedCost || ""} onChange={(e) => setEstimatedCost(Number(e.target.value))} />
-        </div>
-      </div>
+      <section aria-labelledby="pa-lines-heading">
+        <h2 id="pa-lines-heading" className="mb-4 border-b border-[#EEEEEE] pb-2 font-heading font-bold text-brand-text-heading">
+          <span id={IDS.lines} tabIndex={-1}>Requested services</span>
+        </h2>
+        {notice ? <p role="status" className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-xs text-amber-900">{notice}</p> : null}
+        <ServiceLineEditor
+          purpose="PREAUTH"
+          mode="estimate"
+          context={resolved}
+          lines={lines}
+          onChange={setLines}
+          errors={errors}
+          disabledReason={disabledLinesReason(caseState)}
+        />
+      </section>
 
       <div>
-        <label className={labelCls}>Clinical notes (optional)</label>
-        <textarea className={`${inputCls} min-h-[80px]`} value={clinicalNotes} onChange={(e) => setClinicalNotes(e.target.value)} placeholder="Supporting clinical justification" />
+        <label htmlFor={IDS.clinicalNotes} className={CAPTURE_LABEL}>Clinical notes (optional)</label>
+        <textarea
+          id={IDS.clinicalNotes}
+          value={clinicalNotes}
+          maxLength={2000}
+          aria-invalid={errors.clinicalNotes ? true : undefined}
+          onChange={(e) => setClinicalNotes(e.target.value)}
+          placeholder="Supporting clinical justification"
+          className={`${CAPTURE_INPUT} min-h-[80px]`}
+        />
+        {errors.clinicalNotes ? <p className={CAPTURE_ERROR} role="alert">{errors.clinicalNotes}</p> : null}
       </div>
 
       <div className="flex justify-end">
-        <button
-          onClick={submit}
-          disabled={pending}
-          className="flex items-center gap-1.5 rounded-full bg-brand-indigo px-5 py-2 text-sm font-semibold text-white hover:bg-brand-secondary disabled:opacity-60"
-        >
-          <Save size={15} /> {pending ? "Submitting…" : "Submit pre-authorization"}
+        <button type="button" onClick={submit} disabled={pending} className={CAPTURE_BUTTON_PRIMARY}>
+          <Save size={16} aria-hidden="true" /> {pending ? "Submitting…" : "Submit pre-authorisation"}
         </button>
       </div>
     </div>
