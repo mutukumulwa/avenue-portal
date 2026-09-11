@@ -20,7 +20,7 @@ import { ServiceLineEditor, newLine, toCaptureLineInputs, type CaptureLineState 
 import type { CaseContextDTO, ServiceSearchRow } from "@/lib/provider-capture-contract";
 
 const CONTEXT: CaseContextDTO = {
-  memberRef: "mem-1", displayName: "Julius Mugerwa", maskedMemberNumber: "•••• 0001",
+  memberRef: "mem-1", displayName: "Amani Testmember", maskedMemberNumber: "•••• 0001",
   eligibility: { eligible: true, reasonCode: "ELIGIBLE", message: "Covered on this date." },
   schemeName: null, packageName: null, branch: { id: "br-main", name: "Main" },
   contract: { id: "con-1", number: "PC-2026-202", versionId: "ver-1" }, currency: "UGX",

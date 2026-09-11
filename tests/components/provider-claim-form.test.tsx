@@ -22,7 +22,7 @@ import { mutationFail } from "@/lib/mutation-contract";
 import type { CaseContextDTO } from "@/lib/provider-capture-contract";
 
 const DTO: CaseContextDTO = {
-  memberRef: "mem-1", displayName: "Julius Mugerwa", maskedMemberNumber: "•••• 0001",
+  memberRef: "mem-1", displayName: "Amani Testmember", maskedMemberNumber: "•••• 0001",
   eligibility: { eligible: true, reasonCode: "ELIGIBLE", message: "Covered on this date." },
   schemeName: "Provider Onboarding Trial Scheme", packageName: "Medvex Premier", branch: { id: "br-main", name: "Main" },
   contract: { id: "con-fh", number: "PC-2026-202", versionId: "ver-fh" }, currency: "UGX",
@@ -44,9 +44,9 @@ beforeEach(() => {
 });
 
 async function findMember() {
-  fireEvent.change(screen.getByLabelText(/Member \/ card number/), { target: { value: "MTC-2026-00001" } });
+  fireEvent.change(screen.getByLabelText(/Member \/ card number/), { target: { value: "TST-2026-00001" } });
   fireEvent.click(screen.getByRole("button", { name: /Find member/ }));
-  await waitFor(() => expect(screen.getByText("Julius Mugerwa")).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText("Amani Testmember")).toBeInTheDocument());
 }
 
 async function chooseDiagnosis() {
@@ -105,7 +105,7 @@ describe("ProviderClaimForm", () => {
       diagnosisCode: "B54",
       lines: [{ selectedProviderTariffId: "t-fbc", serviceCategory: "LABORATORY", description: undefined, quantity: "1", billedUnitPrice: "30000" }],
     });
-    expect(JSON.stringify(payload)).not.toMatch(/MTC-2026-00001|Julius|25000|UGX/);
+    expect(JSON.stringify(payload)).not.toMatch(/TST-2026-00001|Amani|25000|UGX/);
   });
 
   it("keeps every value after a refusal, links line errors, and renews the key only when nothing was saved", async () => {
@@ -122,7 +122,7 @@ describe("ProviderClaimForm", () => {
     const summary = await screen.findByRole("alert", { name: /with this form/ });
     expect(within(summary).getByRole("link", { name: /Line 1 service: This service is no longer/ })).toHaveAttribute("href", expect.stringMatching(/^#line-first-svc$/));
     // Nothing typed was lost.
-    expect(screen.getByText("Julius Mugerwa")).toBeInTheDocument();
+    expect(screen.getByText("Amani Testmember")).toBeInTheDocument();
     expect(screen.getByText("B54")).toBeInTheDocument();
     expect(screen.getByText("Full Blood Count")).toBeInTheDocument();
 
@@ -160,7 +160,7 @@ describe("ProviderClaimForm", () => {
       correlationId: "c",
     });
     render(<ProviderClaimForm today="2026-09-11" handoff={null} />);
-    fireEvent.change(screen.getByLabelText(/Member \/ card number/), { target: { value: "MTC-2026-00005" } });
+    fireEvent.change(screen.getByLabelText(/Member \/ card number/), { target: { value: "TST-2026-00005" } });
     fireEvent.click(screen.getByRole("button", { name: /Find member/ }));
     await waitFor(() => expect(screen.getByText("Not eligible on this date")).toBeInTheDocument());
     expect(screen.getByText(/not eligible on this date, so services cannot be added/)).toBeInTheDocument();
@@ -171,7 +171,7 @@ describe("ProviderClaimForm", () => {
 
   it("an eligibility hand-off resolves on arrival with its own date and benefit", async () => {
     render(<ProviderClaimForm today="2026-09-11" handoff={{ memberRef: "mem-1", branchId: "br-main", serviceDate: "2026-09-10", benefitCategory: "INPATIENT" }} />);
-    await waitFor(() => expect(screen.getByText("Julius Mugerwa")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Amani Testmember")).toBeInTheDocument());
     expect(capture.resolveCaseContextAction).toHaveBeenCalledWith(expect.objectContaining({ purpose: "CLAIM", memberRef: "mem-1", serviceDate: "2026-09-10", benefitCategory: "INPATIENT" }));
     expect((screen.getByLabelText(/Date of service/) as HTMLInputElement).value).toBe("2026-09-10");
   });

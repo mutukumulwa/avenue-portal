@@ -14,7 +14,7 @@ import { replacementSeed, type ReplacementSeedSource } from "@/server/services/p
 
 const claim = (over: Partial<ReplacementSeedSource> = {}): ReplacementSeedSource => ({
   memberId: "mem-1",
-  member: { firstName: "Julius", lastName: "Mugerwa" },
+  member: { firstName: "Amani", lastName: "Testmember" },
   providerBranchId: "br-1",
   providerBranch: { name: "Main" },
   serviceType: "OUTPATIENT",
@@ -65,7 +65,7 @@ describe("replacementSeed", () => {
 
   it("keeps the member and branch fixed and the Kampala service date", async () => {
     const seed = await replacementSeed(claim());
-    expect(seed.member).toEqual({ memberRef: "mem-1", branchId: "br-1", displayName: "Julius Mugerwa" });
+    expect(seed.member).toEqual({ memberRef: "mem-1", branchId: "br-1", displayName: "Amani Testmember" });
     expect(seed.branchName).toBe("Main");
     expect(seed.serviceDate).toBe("2026-09-10");
     expect(seed.originalBilled).toBe("55000");

@@ -68,7 +68,7 @@ export type ResolvedCase = { result: CaseContextResult; trusted: TrustedCaseCont
 
 const MEMBER_NUMBER_RE = /^[A-Za-z0-9][A-Za-z0-9\-/. ]{0,63}$/;
 
-/** "MTC-2026-00001" → "•••• 0001". Shows enough to confirm the card, no more. */
+/** "TST-2026-00001" → "•••• 0001". Shows enough to confirm the card, no more. */
 export function maskMemberNumber(memberNumber: string): string {
   const compact = memberNumber.replace(/\s+/g, "");
   return compact.length <= 4 ? "••••" : `•••• ${compact.slice(-4)}`;

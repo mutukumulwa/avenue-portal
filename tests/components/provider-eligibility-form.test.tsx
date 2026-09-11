@@ -15,7 +15,7 @@ import { EMPTY_ELIGIBILITY_STATE } from "@/app/provider/eligibility/contract";
 
 const ELIGIBLE = {
   found: true, resultCode: "ELIGIBLE", memberId: "mem-1",
-  member: { firstName: "Julius", lastName: "Mugerwa", memberNumber: "MTC-2026-00001" },
+  member: { firstName: "Amani", lastName: "Testmember", memberNumber: "TST-2026-00001" },
   schemeName: "Provider Onboarding Trial Scheme", packageName: "Medvex Premier", requiresPreauth: false,
   safeExplanation: "", serviceDate: "2026-09-10", displayValidUntil: "", enforcementApplied: false, checkId: "chk_abc123def456",
   disclaimer: "This is a point-in-time eligibility check, not a guarantee of payment.",
@@ -57,7 +57,7 @@ describe("EligibilityCheckForm", () => {
   it("a request that never came back says 'could not check' and keeps the date", async () => {
     action.checkEligibilityAction.mockRejectedValue(new TypeError("Failed to fetch"));
     render(<EligibilityCheckForm today="2026-09-11" />);
-    fireEvent.change(screen.getByLabelText(/Member \/ card number/), { target: { value: "MTC-2026-00001" } });
+    fireEvent.change(screen.getByLabelText(/Member \/ card number/), { target: { value: "TST-2026-00001" } });
     fireEvent.change(date(), { target: { value: "2026-09-02" } });
     check();
     await screen.findByText(/We could not check cover just now/);
@@ -67,7 +67,7 @@ describe("EligibilityCheckForm", () => {
   it("hands off to a claim with the check's id only — no member number or id in the link", async () => {
     action.checkEligibilityAction.mockResolvedValue({ ...EMPTY_ELIGIBILITY_STATE, result: ELIGIBLE, submitted: { serviceDate: "2026-09-10", benefit: "" } });
     render(<EligibilityCheckForm today="2026-09-11" />);
-    fireEvent.change(screen.getByLabelText(/Member \/ card number/), { target: { value: "MTC-2026-00001" } });
+    fireEvent.change(screen.getByLabelText(/Member \/ card number/), { target: { value: "TST-2026-00001" } });
     check();
     const link = await screen.findByRole("link", { name: /File a claim for this member/ });
     expect(link).toHaveAttribute("href", "/provider/claims/new?from=chk_abc123def456");

@@ -22,7 +22,7 @@ import { mutationFail } from "@/lib/mutation-contract";
 import type { CaseContextDTO } from "@/lib/provider-capture-contract";
 
 const DTO: CaseContextDTO = {
-  memberRef: "mem-1", displayName: "Julius Mugerwa", maskedMemberNumber: "•••• 0001",
+  memberRef: "mem-1", displayName: "Amani Testmember", maskedMemberNumber: "•••• 0001",
   eligibility: { eligible: true, reasonCode: "ELIGIBLE", message: "Covered on this date." }, schemeName: null, packageName: null,
   branch: { id: "br-main", name: "Main" }, contract: { id: "con-fh", number: "PC-2026-202", versionId: "ver-fh" }, currency: "UGX",
   serviceDate: "2026-09-11", benefitCategory: "OUTPATIENT", catalogueEnabled: true,
@@ -42,9 +42,9 @@ beforeEach(() => {
 });
 
 async function fillCase() {
-  fireEvent.change(screen.getByLabelText(/Member \/ card number/), { target: { value: "MTC-2026-00001" } });
+  fireEvent.change(screen.getByLabelText(/Member \/ card number/), { target: { value: "TST-2026-00001" } });
   fireEvent.click(screen.getByRole("button", { name: /Find member/ }));
-  await waitFor(() => expect(screen.getByText("Julius Mugerwa")).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText("Amani Testmember")).toBeInTheDocument());
   fireEvent.change(screen.getByRole("combobox", { name: /Primary diagnosis/ }), { target: { value: "cyst" } });
   const dx = await screen.findByRole("listbox", { name: /Primary diagnosis/ });
   await waitFor(() => expect(within(dx).getAllByRole("option")).toHaveLength(1));

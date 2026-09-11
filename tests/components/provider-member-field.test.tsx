@@ -15,7 +15,7 @@ import type { CaseContextDTO } from "@/lib/provider-capture-contract";
 
 const DTO: CaseContextDTO = {
   memberRef: "mem-1",
-  displayName: "Julius Mugerwa",
+  displayName: "Amani Testmember",
   maskedMemberNumber: "•••• 0001",
   eligibility: { eligible: true, reasonCode: "ELIGIBLE", message: "Covered on this date." },
   schemeName: "Provider Onboarding Trial Scheme",
@@ -43,23 +43,23 @@ describe("ProviderMemberField", () => {
   it("resolves a typed number on 'Find member' and shows the name, masked number and cover", async () => {
     actions.resolveCaseContextAction.mockResolvedValue({ outcome: "RESOLVED", context: DTO, correlationId: "c" });
     const { onChange } = setup();
-    fireEvent.change(screen.getByLabelText(/Member \/ card number/), { target: { value: "MTC-2026-00001" } });
+    fireEvent.change(screen.getByLabelText(/Member \/ card number/), { target: { value: "TST-2026-00001" } });
     fireEvent.click(screen.getByRole("button", { name: /Find member/ }));
-    await waitFor(() => expect(screen.getByText("Julius Mugerwa")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Amani Testmember")).toBeInTheDocument());
     expect(screen.getByText("•••• 0001")).toBeInTheDocument();
     expect(screen.getByText("Covered on this date")).toBeInTheDocument();
-    expect(actions.resolveCaseContextAction).toHaveBeenCalledWith(expect.objectContaining({ purpose: "CLAIM", memberNumber: "MTC-2026-00001", serviceDate: "2026-09-11", benefitCategory: "OUTPATIENT" }));
+    expect(actions.resolveCaseContextAction).toHaveBeenCalledWith(expect.objectContaining({ purpose: "CLAIM", memberNumber: "TST-2026-00001", serviceDate: "2026-09-11", benefitCategory: "OUTPATIENT" }));
     expect(onChange).toHaveBeenLastCalledWith({ context: DTO, outcome: "RESOLVED" });
     // The member number is never put into the address bar.
-    expect(window.location.href).not.toContain("MTC-2026-00001");
+    expect(window.location.href).not.toContain("TST-2026-00001");
   });
 
   it("one lookup is exactly one call — a successful result does not trigger another", async () => {
     actions.resolveCaseContextAction.mockResolvedValue({ outcome: "RESOLVED", context: DTO, correlationId: "c" });
     setup();
-    fireEvent.change(screen.getByLabelText(/Member \/ card number/), { target: { value: "MTC-2026-00001" } });
+    fireEvent.change(screen.getByLabelText(/Member \/ card number/), { target: { value: "TST-2026-00001" } });
     fireEvent.click(screen.getByRole("button", { name: /Find member/ }));
-    await waitFor(() => expect(screen.getByText("Julius Mugerwa")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Amani Testmember")).toBeInTheDocument());
     await new Promise((r) => setTimeout(r, 50));
     expect(actions.resolveCaseContextAction).toHaveBeenCalledTimes(1);
   });
@@ -68,7 +68,7 @@ describe("ProviderMemberField", () => {
     actions.resolveCaseContextAction.mockResolvedValue({ outcome: "RESOLVED", context: DTO, correlationId: "c" });
     setup();
     const input = screen.getByLabelText(/Member \/ card number/);
-    fireEvent.change(input, { target: { value: "MTC-2026-00001" } });
+    fireEvent.change(input, { target: { value: "TST-2026-00001" } });
     fireEvent.blur(input);
     await waitFor(() => expect(actions.resolveCaseContextAction).toHaveBeenCalledTimes(1));
   });
@@ -81,7 +81,7 @@ describe("ProviderMemberField", () => {
       correlationId: "c",
     });
     const { onChange } = setup();
-    fireEvent.change(screen.getByLabelText(/Member \/ card number/), { target: { value: "MTC-2026-00005" } });
+    fireEvent.change(screen.getByLabelText(/Member \/ card number/), { target: { value: "TST-2026-00005" } });
     fireEvent.click(screen.getByRole("button", { name: /Find member/ }));
     await waitFor(() => expect(screen.getByText("Not eligible on this date")).toBeInTheDocument());
     expect(screen.getByText("Cover lapsed before this date.")).toBeInTheDocument();
@@ -91,7 +91,7 @@ describe("ProviderMemberField", () => {
   it("a not-found result is announced and takes focus after an explicit lookup", async () => {
     actions.resolveCaseContextAction.mockResolvedValue({ outcome: "NOT_FOUND", message: "No member found for that number. Check the card and try again.", fieldErrors: { memberNumber: "No member found." }, correlationId: "c" });
     setup();
-    fireEvent.change(screen.getByLabelText(/Member \/ card number/), { target: { value: "MTC-2026-99999" } });
+    fireEvent.change(screen.getByLabelText(/Member \/ card number/), { target: { value: "TST-2026-99999" } });
     fireEvent.click(screen.getByRole("button", { name: /Find member/ }));
     await waitFor(() => expect(screen.getByText("No member found.")).toBeInTheDocument());
     expect(document.activeElement?.textContent).toContain("No member found.");
@@ -101,11 +101,11 @@ describe("ProviderMemberField", () => {
   it("a change of service date makes the resolved case stale", async () => {
     actions.resolveCaseContextAction.mockResolvedValue({ outcome: "RESOLVED", context: DTO, correlationId: "c" });
     const { onChange, rerender } = setup();
-    fireEvent.change(screen.getByLabelText(/Member \/ card number/), { target: { value: "MTC-2026-00001" } });
+    fireEvent.change(screen.getByLabelText(/Member \/ card number/), { target: { value: "TST-2026-00001" } });
     fireEvent.click(screen.getByRole("button", { name: /Find member/ }));
-    await waitFor(() => expect(screen.getByText("Julius Mugerwa")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Amani Testmember")).toBeInTheDocument());
     rerender(<ProviderMemberField purpose="CLAIM" serviceDate="2026-09-10" benefitCategory="OUTPATIENT" onChange={onChange} memberNumberExample="ABC-2026-00001" />);
-    expect(screen.queryByText("Julius Mugerwa")).not.toBeInTheDocument();
+    expect(screen.queryByText("Amani Testmember")).not.toBeInTheDocument();
     expect(screen.getByText(/changed\. Find the member again/)).toBeInTheDocument();
     expect(onChange).toHaveBeenLastCalledWith({ context: null, outcome: null });
   });
@@ -114,11 +114,11 @@ describe("ProviderMemberField", () => {
     actions.resolveCaseContextAction.mockResolvedValue({ outcome: "RESOLVED", context: DTO, correlationId: "c" });
     const { onChange } = setup();
     const input = screen.getByLabelText(/Member \/ card number/);
-    fireEvent.change(input, { target: { value: "MTC-2026-00001" } });
+    fireEvent.change(input, { target: { value: "TST-2026-00001" } });
     fireEvent.click(screen.getByRole("button", { name: /Find member/ }));
-    await waitFor(() => expect(screen.getByText("Julius Mugerwa")).toBeInTheDocument());
-    fireEvent.change(input, { target: { value: "MTC-2026-0000" } });
-    expect(screen.queryByText("Julius Mugerwa")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Amani Testmember")).toBeInTheDocument());
+    fireEvent.change(input, { target: { value: "TST-2026-0000" } });
+    expect(screen.queryByText("Amani Testmember")).not.toBeInTheDocument();
     expect(onChange).toHaveBeenLastCalledWith({ context: null, outcome: null });
   });
 
@@ -129,20 +129,20 @@ describe("ProviderMemberField", () => {
       .mockResolvedValueOnce({ outcome: "RESOLVED", context: { ...DTO, displayName: "Sylvia Nakato", memberRef: "mem-5" }, correlationId: "c" });
     setup();
     const input = screen.getByLabelText(/Member \/ card number/);
-    fireEvent.change(input, { target: { value: "MTC-2026-00001" } });
+    fireEvent.change(input, { target: { value: "TST-2026-00001" } });
     fireEvent.click(screen.getByRole("button", { name: /Find member/ }));
-    fireEvent.change(input, { target: { value: "MTC-2026-00005" } });
+    fireEvent.change(input, { target: { value: "TST-2026-00005" } });
     fireEvent.click(screen.getByRole("button", { name: /Find member/ }));
     await waitFor(() => expect(screen.getByText("Sylvia Nakato")).toBeInTheDocument());
     await act(async () => releaseOld({ outcome: "RESOLVED", context: DTO, correlationId: "c" }));
-    expect(screen.queryByText("Julius Mugerwa")).not.toBeInTheDocument();
+    expect(screen.queryByText("Amani Testmember")).not.toBeInTheDocument();
     expect(screen.getByText("Sylvia Nakato")).toBeInTheDocument();
   });
 
   it("resolves an eligibility hand-off reference on mount without any number in the page", async () => {
     actions.resolveCaseContextAction.mockResolvedValue({ outcome: "RESOLVED", context: DTO, correlationId: "c" });
     setup({ handoff: { memberRef: "mem-1", branchId: "br-main" } });
-    await waitFor(() => expect(screen.getByText("Julius Mugerwa")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Amani Testmember")).toBeInTheDocument());
     expect(actions.resolveCaseContextAction).toHaveBeenCalledWith(expect.objectContaining({ memberRef: "mem-1", memberNumber: undefined, branchId: "br-main" }));
   });
 
@@ -151,11 +151,11 @@ describe("ProviderMemberField", () => {
       .mockResolvedValueOnce({ outcome: "BRANCH_REQUIRED", message: "Choose the branch where the patient is being seen.", branches: [{ id: "br-a", name: "A" }, { id: "br-b", name: "B" }], correlationId: "c" })
       .mockResolvedValueOnce({ outcome: "RESOLVED", context: { ...DTO, branch: { id: "br-b", name: "B" } }, correlationId: "c" });
     setup();
-    fireEvent.change(screen.getByLabelText(/Member \/ card number/), { target: { value: "MTC-2026-00001" } });
+    fireEvent.change(screen.getByLabelText(/Member \/ card number/), { target: { value: "TST-2026-00001" } });
     fireEvent.click(screen.getByRole("button", { name: /Find member/ }));
     const branch = await screen.findByLabelText(/Branch where the patient is seen/);
     fireEvent.change(branch, { target: { value: "br-b" } });
-    await waitFor(() => expect(screen.getByText("Julius Mugerwa")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Amani Testmember")).toBeInTheDocument());
     expect(actions.resolveCaseContextAction).toHaveBeenLastCalledWith(expect.objectContaining({ branchId: "br-b" }));
   });
 });

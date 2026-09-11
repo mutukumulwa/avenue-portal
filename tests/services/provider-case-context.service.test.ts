@@ -46,7 +46,7 @@ const ctx = (over: Partial<ProviderAccessContext> = {}): ProviderAccessContext =
 const today = operatingTodayISO();
 const request = (over: Record<string, unknown> = {}) => ({
   purpose: "CLAIM" as const,
-  memberNumber: "MTC-2026-00001",
+  memberNumber: "TST-2026-00001",
   branchId: null,
   serviceDate: today,
   benefitCategory: "OUTPATIENT" as const,
@@ -58,7 +58,7 @@ function eligibleCheck(over: Record<string, unknown> = {}) {
     found: true,
     resultCode: "ELIGIBLE",
     memberId: "mem-1",
-    member: { firstName: "Julius", lastName: "Mugerwa", memberNumber: "MTC-2026-00001" },
+    member: { firstName: "Amani", lastName: "Testmember", memberNumber: "TST-2026-00001" },
     schemeName: "Provider Onboarding Trial Scheme",
     packageName: "Medvex Premier",
     decision: { reasonCode: "ELIGIBLE", memberSafeExplanation: "Cover is active.", operatorGuidance: "" },
@@ -79,7 +79,7 @@ beforeEach(() => {
 
 describe("helpers", () => {
   it("masks all but the last four characters", () => {
-    expect(maskMemberNumber("MTC-2026-00001")).toBe("•••• 0001");
+    expect(maskMemberNumber("TST-2026-00001")).toBe("•••• 0001");
     expect(maskMemberNumber("12")).toBe("••••");
   });
   it("parses only real YYYY-MM-DD dates, to UTC midnight", () => {
@@ -154,7 +154,7 @@ describe("resolve — member resolution (plan §8.2)", () => {
     if (result.outcome !== "RESOLVED") return;
     expect(result.context).toEqual({
       memberRef: "mem-1",
-      displayName: "Julius Mugerwa",
+      displayName: "Amani Testmember",
       maskedMemberNumber: "•••• 0001",
       eligibility: { eligible: true, reasonCode: "ELIGIBLE", message: "Covered on this date." },
       schemeName: "Provider Onboarding Trial Scheme",
@@ -169,18 +169,18 @@ describe("resolve — member resolution (plan §8.2)", () => {
     });
     // Nothing identifying beyond the minimum crosses to the browser.
     const serialised = JSON.stringify(result);
-    expect(serialised).not.toContain("MTC-2026-00001");
+    expect(serialised).not.toContain("TST-2026-00001");
     expect(trusted).toMatchObject({ memberId: "mem-1", clientId: "client-1", branchId: "br-main", contractId: "con-1", currency: "UGX", eligible: true });
   });
 
   it("passes the session's branch and the requested date to the eligibility service", async () => {
     await ProviderCaseContextService.resolve(ctx(), request());
-    expect(eligibility.check).toHaveBeenCalledWith(expect.objectContaining({ memberNumber: "MTC-2026-00001", providerBranchId: "br-main", benefitCategory: "OUTPATIENT", serviceDate: new Date(`${today}T00:00:00Z`) }));
+    expect(eligibility.check).toHaveBeenCalledWith(expect.objectContaining({ memberNumber: "TST-2026-00001", providerBranchId: "br-main", benefitCategory: "OUTPATIENT", serviceDate: new Date(`${today}T00:00:00Z`) }));
   });
 
   it("an unknown number and an out-of-entitlement number read identically", async () => {
     eligibility.check.mockResolvedValue({ found: false, resultCode: "NOT_ELIGIBLE", decision: { reasonCode: "NOT_FOUND" } });
-    const absent = (await ProviderCaseContextService.resolve(ctx(), request({ memberNumber: "MTC-2026-99999" }))).result;
+    const absent = (await ProviderCaseContextService.resolve(ctx(), request({ memberNumber: "TST-2026-99999" }))).result;
     const foreign = (await ProviderCaseContextService.resolve(ctx({ providerId: "prov-other" }), request())).result;
     expect(absent.outcome).toBe("NOT_FOUND");
     expect(foreign.outcome).toBe("NOT_FOUND");
@@ -200,7 +200,7 @@ describe("resolve — member resolution (plan §8.2)", () => {
     const { result, trusted } = await ProviderCaseContextService.resolve(ctx(), request());
     expect(result.outcome).toBe("INELIGIBLE");
     if (result.outcome === "INELIGIBLE") {
-      expect(result.context.displayName).toBe("Julius Mugerwa");
+      expect(result.context.displayName).toBe("Amani Testmember");
       expect(result.context.eligibility).toEqual({ eligible: false, reasonCode: "NOT_YET_ENROLLED", message: "Not enrolled on this date. Check the service date." });
     }
     expect(trusted?.eligible).toBe(false);
