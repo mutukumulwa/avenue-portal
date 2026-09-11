@@ -20,6 +20,7 @@ vi.mock("next/navigation", () => ({ redirect: nav.redirect }));
 vi.mock("next/cache", () => ({ revalidatePath: nav.revalidatePath }));
 
 import { inviteUserAction, resendInvitationAction } from "@/app/(admin)/settings/actions";
+import { requireRole } from "@/lib/rbac";
 import { inviteProviderUserAction, manageProviderUserAction } from "@/app/provider/users/actions";
 import { checkSetupLinkAction, completeAccountSetupAction, requestNewSetupLinkAction } from "@/app/(auth)/account-setup/actions";
 
@@ -71,6 +72,39 @@ describe("Facility Users → Invite a staff member", () => {
     svc.resend.mockResolvedValue({ ok: true, message: "A new setup link was sent. It expires in 24 hours." });
     expect(await manageProviderUserAction(null, form({ _op: "resend", targetUserId: "u1" }))).toEqual({ ok: "A new setup link was sent. It expires in 24 hours." });
     expect(svc.resend).toHaveBeenCalledWith({ kind: "PROVIDER", ctx: providerCtx.ctx }, "u1");
+  });
+});
+
+describe("P08.01 — refusals and failed deliveries on both surfaces", () => {
+  it("TPA invite and resend are for administrators only: the guard's redirect propagates and nothing is sent", async () => {
+    const denied = Object.assign(new Error("NEXT_REDIRECT"), { digest: "NEXT_REDIRECT;replace;/unauthorized;307;" });
+    vi.mocked(requireRole).mockRejectedValueOnce(denied).mockRejectedValueOnce(denied);
+    await expect(inviteUserAction(null, form({ email: "g@x.test", firstName: "G", lastName: "A", role: "CLAIMS_OFFICER" }))).rejects.toThrow("NEXT_REDIRECT");
+    await expect(resendInvitationAction(null, form({ userId: "u5" }))).rejects.toThrow("NEXT_REDIRECT");
+    expect(svc.invite).not.toHaveBeenCalled();
+    expect(svc.resend).not.toHaveBeenCalled();
+  });
+
+  it("a facility user without provider.users.manage is refused by the service, and the refusal is what they see", async () => {
+    svc.invite.mockResolvedValue({ ok: false, code: "FORBIDDEN", message: "You do not have permission to invite staff." });
+    expect(await inviteProviderUserAction(null, form({ email: "a@b.test", firstName: "A", lastName: "B", providerRoleCode: "PROVIDER_BILLER", providerBranchIds: "br-1" }))).toEqual({ error: "You do not have permission to invite staff." });
+    svc.resend.mockResolvedValue({ ok: false, code: "FORBIDDEN", message: "You do not have permission to invite staff." });
+    expect(await manageProviderUserAction(null, form({ _op: "resend", targetUserId: "u1" }))).toEqual({ error: "You do not have permission to invite staff." });
+  });
+
+  it("another facility's user cannot be re-invited: the facility-scoped lookup finds nothing", async () => {
+    svc.resend.mockResolvedValue({ ok: false, code: "NOT_FOUND", message: "User not found." });
+    expect(await manageProviderUserAction(null, form({ _op: "resend", targetUserId: "user-of-another-facility" }))).toEqual({ error: "User not found." });
+    expect(svc.resend).toHaveBeenCalledWith({ kind: "PROVIDER", ctx: providerCtx.ctx }, "user-of-another-facility");
+  });
+
+  it("a failed delivery is reported as such on the facility invite and on both resends", async () => {
+    svc.invite.mockResolvedValue({ ok: true, userId: "u1", invitationId: "i1", delivery: "FAILED", failureClass: "CONNECTION", expiresAt: new Date(), message: "User created; invitation delivery failed — resend." });
+    expect(await inviteProviderUserAction(null, form({ email: "a@b.test", firstName: "A", lastName: "B", providerRoleCode: "PROVIDER_BILLER", providerBranchIds: "br-1" }))).toEqual({ ok: true, message: "User created; invitation delivery failed — resend.", deliveryFailed: true });
+    const resent = { ok: true, userId: "u1", invitationId: "i2", delivery: "FAILED", failureClass: "TIMEOUT", expiresAt: new Date(), message: "A new setup link was created, but delivery failed — resend." };
+    svc.resend.mockResolvedValue(resent);
+    expect(await resendInvitationAction(null, form({ userId: "u1" }))).toEqual({ ok: true, message: resent.message });
+    expect(await manageProviderUserAction(null, form({ _op: "resend", targetUserId: "u1" }))).toEqual({ ok: resent.message });
   });
 });
 

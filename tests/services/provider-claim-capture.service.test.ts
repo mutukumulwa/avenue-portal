@@ -131,6 +131,49 @@ describe("ProviderClaimCaptureService.prepare", () => {
   });
 });
 
+/**
+ * P08.01 (case 29) — a pre-authorisation amendment's lines are revalidated like
+ * a new request's, against the PARENT's member, date and benefit (fixed by the
+ * server), never the form's.
+ */
+describe("ProviderClaimCaptureService.prepareLines — amendment revalidation", () => {
+  const PARENT = { memberId: "mem-1", branchId: null, serviceDate: "2026-09-20", benefitCategory: "SURGICAL" as const };
+  const amendInput = (over: Record<string, unknown> = {}) => ({
+    context: { purpose: "PREAUTH", memberRef: "mem-OTHER", branchId: "br-main", serviceDate: "2030-01-01", benefitCategory: "OUTPATIENT" },
+    expectedContractVersionId: "ver-fh",
+    lines: [{ selectedProviderTariffId: "t-exc", serviceCategory: "PROCEDURE", quantity: "1", billedUnitPrice: "600,000" }],
+    ...over,
+  });
+
+  it("re-resolves the parent's case — not the form's member, date or benefit — and rebuilds the lines from the price list", async () => {
+    const r = await ProviderClaimCaptureService.prepareLines(CTX, amendInput(), { purpose: "PREAUTH", fixed: PARENT });
+    expect(r.ok).toBe(true);
+    expect(svc.resolve).toHaveBeenCalledWith(CTX, { purpose: "PREAUTH", memberRef: "mem-1", branchId: "br-main", serviceDate: "2026-09-20", benefitCategory: "SURGICAL" });
+    expect(svc.canonicalizeLines).toHaveBeenCalledWith(TRUSTED, amendInput().lines, {});
+  });
+
+  it("a service that left the price list refuses the amendment on that line", async () => {
+    svc.canonicalizeLines.mockResolvedValue({ ok: false, message: "x", fieldErrors: { "lines.0.service": "This service is no longer on your price list for this date. Select the service again." } });
+    const r = await ProviderClaimCaptureService.prepareLines(CTX, amendInput(), { purpose: "PREAUTH", fixed: PARENT });
+    if (r.ok) throw new Error("expected failure");
+    expect(r.failure.kind).toBe("VALIDATION");
+    expect(r.failure.fieldErrors?.["lines.0.service"]).toEqual(["This service is no longer on your price list for this date. Select the service again."]);
+  });
+
+  it("a changed contract version is a conflict and nothing is rebuilt", async () => {
+    const r = await ProviderClaimCaptureService.prepareLines(CTX, amendInput({ expectedContractVersionId: "ver-OLD" }), { purpose: "PREAUTH", fixed: PARENT });
+    expect(r.ok ? null : r.failure.kind).toBe("CONFLICT");
+    expect(svc.canonicalizeLines).not.toHaveBeenCalled();
+  });
+
+  it("a member no longer eligible on the parent's date refuses", async () => {
+    svc.resolve.mockResolvedValue({ result: { outcome: "INELIGIBLE", context: DTO, message: "Cover lapsed before this date.", correlationId: "cor-3" }, trusted: { ...TRUSTED, eligible: false } });
+    const r = await ProviderClaimCaptureService.prepareLines(CTX, amendInput(), { purpose: "PREAUTH", fixed: PARENT });
+    expect(r.ok ? null : r.failure.kind).toBe("VALIDATION");
+    expect(svc.canonicalizeLines).not.toHaveBeenCalled();
+  });
+});
+
 describe("caseFailure — the resolver's outcomes as form outcomes", () => {
   it.each([
     [{ outcome: "NOT_FOUND", message: "No member found for that number. Check the card and try again.", correlationId: "c" }, "VALIDATION", "member"],

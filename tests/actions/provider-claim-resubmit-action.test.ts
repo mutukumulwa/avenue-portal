@@ -14,7 +14,7 @@ const rctx = vi.hoisted(() => ({
 }));
 vi.mock("@/server/services/provider-access.service", () => ({
   ProviderAccessService: { resolveUserContext: vi.fn(async () => rctx) },
-  isProviderAccessError: () => false,
+  isProviderAccessError: (e: unknown) => (e as { name?: string } | null)?.name === "ProviderAccessError",
 }));
 
 class FakeResubmissionError extends Error {
@@ -37,6 +37,7 @@ vi.mock("next/navigation", () => ({ redirect: nav.redirect }));
 vi.mock("next/cache", () => ({ revalidatePath: nav.revalidatePath }));
 
 import { resubmitProviderClaimAction } from "@/app/provider/claims/[id]/resubmit/actions";
+import { ProviderAccessService } from "@/server/services/provider-access.service";
 import type { ClaimReplacementCaptureSubmission } from "@/lib/provider-capture-contract";
 
 const PREDECESSOR = { id: "pred-1", memberId: "mem-1", providerBranchId: null, currency: "UGX", lines: [] };
@@ -105,5 +106,28 @@ describe("F5.10 resubmitProviderClaimAction", () => {
     const res = await resubmitProviderClaimAction(input);
     expect(res).toMatchObject({ kind: "CONFLICT" });
     expect(res && "refresh" in res ? res.refresh : undefined).toBeUndefined();
+  });
+
+  // ── P08.01: unauthenticated, not a provider user, another facility ─────────
+  it("an unauthenticated caller gets the framework's sign-in redirect — nothing is read or filed", async () => {
+    vi.mocked(ProviderAccessService.resolveUserContext).mockRejectedValueOnce(Object.assign(new Error("NEXT_REDIRECT"), { digest: "NEXT_REDIRECT;replace;/login;307;" }));
+    await expect(resubmitProviderClaimAction(input)).rejects.toThrow("NEXT_REDIRECT");
+    expect(capture.predecessor).not.toHaveBeenCalled();
+    expect(submit).not.toHaveBeenCalled();
+  });
+
+  it("a signed-in account that is not a provider user is refused", async () => {
+    vi.mocked(ProviderAccessService.resolveUserContext).mockRejectedValueOnce(Object.assign(new Error("no"), { name: "ProviderAccessError" }));
+    expect(await resubmitProviderClaimAction(input)).toMatchObject({ ok: false, kind: "FORBIDDEN" });
+    expect(submit).not.toHaveBeenCalled();
+  });
+
+  it("another facility's claim is not found through the session's scope — refused with a refresh, nothing filed", async () => {
+    capture.predecessor.mockResolvedValueOnce(null);
+    const res = await resubmitProviderClaimAction({ ...input, predecessorClaimId: "claim-of-another-facility" });
+    expect(res).toMatchObject({ ok: false, kind: "CONFLICT", refresh: true });
+    expect(capture.predecessor).toHaveBeenCalledWith(rctx.ctx, "claim-of-another-facility");
+    expect(capture.prepare).not.toHaveBeenCalled();
+    expect(submit).not.toHaveBeenCalled();
   });
 });

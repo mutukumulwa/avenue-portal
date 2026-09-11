@@ -212,3 +212,48 @@ describe("P03.03 the decision carries what the run said was missing", () => {
     expect(decision.network.inNetwork).toBe(false);
   });
 });
+
+/**
+ * Family Hospital UAT plan P08.01 (regression) — trial-member eligibility. The
+ * facility's first eligibility failures were a Medvex data defect: the trial
+ * members' package versions were not pinned (fixed 2026-09-09, confirmed by the
+ * facility). Pinned — as the three plan members are, verified through this
+ * service against production in P07.02 — a trial member whose cover began on
+ * 2026-08-01 is ELIGIBLE on 2026-09-11. Unpinned, the evaluator fails closed.
+ */
+describe("P08.01 trial-member eligibility", () => {
+  const COVER_START = new Date("2026-08-01T00:00:00.000Z");
+  const trialMember = (over: Record<string, unknown> = {}) => ({
+    ...member("ACTIVE"),
+    memberNumber: "TST-2026-00001",
+    enrollmentDate: COVER_START,
+    coverStartDate: COVER_START,
+    group: { name: "Trial scheme", status: "ACTIVE", clientId: "c-trial", effectiveDate: COVER_START, renewalDate: new Date("2027-07-31T00:00:00.000Z"), client: { status: "ACTIVE" } },
+    ...over,
+  });
+  const at = (iso: string) => ProviderEligibilityService.check({ ctx, memberNumber: "TST-2026-00001", serviceDate: new Date(`${iso}T00:00:00.000Z`) });
+
+  beforeEach(() => {
+    db.memberCoveragePeriod.findMany.mockResolvedValue([{ startDate: COVER_START, endDate: null }]);
+  });
+
+  it("a pinned trial member is ELIGIBLE on the Kampala date of the rerun", async () => {
+    db.member.findFirst.mockResolvedValue(trialMember());
+    const r = await at("2026-09-11");
+    expect(r).toMatchObject({ found: true, resultCode: "ELIGIBLE" });
+    expect(r.decision.reasonCode).toBe("ACTIVE");
+  });
+
+  it("the 2026-09-09 defect — an unpinned trial member — fails closed, never a silent ELIGIBLE", async () => {
+    db.member.findFirst.mockResolvedValue(trialMember({ packageVersionId: null }));
+    const r = await at("2026-09-11");
+    expect(r.resultCode).not.toBe("ELIGIBLE");
+    expect(r.decision.reasonCode).toBe("NOT_YET_ENROLLED");
+  });
+
+  it("before the trial cover started, the same member is not eligible", async () => {
+    db.member.findFirst.mockResolvedValue(trialMember());
+    const r = await at("2026-07-31");
+    expect(r.resultCode).not.toBe("ELIGIBLE");
+  });
+});

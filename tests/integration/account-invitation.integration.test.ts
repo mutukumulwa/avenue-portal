@@ -214,6 +214,24 @@ describe.skipIf(!URL_SET)("P05 AccountInvitationService (opt-in DB)", () => {
     expect(await svc.invite({ kind: "PROVIDER", ctx: facilityAdminCtx }, { ...base, email: email("fa2"), providerRoleCode: "PROVIDER_FACILITY_ADMIN", providerBranchIds: [world.branches.a1.id] })).toMatchObject({ ok: true });
   });
 
+  it("P08.01: a facility user without provider.users.manage can neither invite nor resend", async () => {
+    const role = await prisma.role.findFirstOrThrow({ where: { tenantId, code: "PROVIDER_BILLER" } });
+    const biller = world.users.a.biller.id;
+    await prisma.userRoleAssignment.create({ data: { userId: biller, roleId: role.id, tenantId, isActive: true, status: "ACTIVE", makerId: biller, checkerId: biller } });
+    await prisma.providerUserBranchAssignment.create({ data: { tenantId, providerId: world.providers.a.id, userId: biller, providerBranchId: world.branches.a1.id, createdBy: biller } });
+    const billerCtx = await AccessSvc.buildUserContext({ userId: biller, tenantId, providerId: world.providers.a.id });
+    expect(billerCtx.permissions).not.toContain("provider.users.manage");
+
+    const before = await prisma.accountSetupInvitation.count({ where: { tenantId } });
+    const to = email("nope");
+    expect(await svc.invite({ kind: "PROVIDER", ctx: billerCtx }, { firstName: "N", lastName: "O", role: "PROVIDER_USER", email: to, providerRoleCode: "PROVIDER_FRONT_DESK", providerBranchIds: [world.branches.a1.id] })).toMatchObject({ ok: false, code: "FORBIDDEN" });
+    const pending = await svc.invite({ kind: "PROVIDER", ctx: facilityAdminCtx }, { firstName: "P", lastName: "Q", role: "PROVIDER_USER", email: email("pending"), providerRoleCode: "PROVIDER_FRONT_DESK", providerBranchIds: [world.branches.a1.id] });
+    expect(pending).toMatchObject({ ok: true });
+    expect(await svc.resend({ kind: "PROVIDER", ctx: billerCtx }, (pending as { userId: string }).userId)).toMatchObject({ ok: false, code: "FORBIDDEN" });
+    expect(await prisma.user.count({ where: { email: to } })).toBe(0);
+    expect(await prisma.accountSetupInvitation.count({ where: { tenantId } })).toBe(before + 1); // only the facility admin's
+  });
+
   it("an address already in use: useful inside the provider, silent about anyone else", async () => {
     const to = email("dupe");
     const first = await svc.invite({ kind: "PROVIDER", ctx: adminCtx }, { email: to, firstName: "D", lastName: "U", role: "PROVIDER_USER", providerRoleCode: "PROVIDER_BILLER", providerBranchIds: [world.branches.a1.id] });

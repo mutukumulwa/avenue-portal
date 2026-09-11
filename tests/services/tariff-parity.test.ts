@@ -43,6 +43,11 @@ const DECOYS: Row[] = [
   tariff("z1-standalone", "General Doctor Consult", "1000", "cat-consult", { contractId: null, versionId: null }),
   tariff("z2-other-contract", "Full Blood Count", "9999", "cat-lab", { contractId: "con-other" }),
   tariff("z3-inactive", "Azithromycin 500Mg (Tab)", "1", "cat-drugs", { isActive: false }),
+  // P08.01 — out of scope by date, branch and provider:
+  tariff("z4-expired", "Full Blood Count", "18000", "cat-lab", { effectiveTo: new Date("2026-09-10T00:00:00Z") }),
+  tariff("z5-future", "General Doctor Consult", "30000", "cat-consult", { effectiveFrom: new Date("2026-09-12T00:00:00Z") }),
+  tariff("z6-other-branch", "Bed Fee – PRIVATE", "90000", "cat-ip", { branchId: "br-other", unitOfMeasure: "PER_DAY" }),
+  tariff("z7-other-provider", "Full Blood Count", "11000", "cat-lab", { providerId: "prov-other", contractId: "con-other-prov", versionId: "ver-other-prov" }),
 ];
 const ALL = [...DECOYS, ...FAMILY];
 
@@ -137,6 +142,13 @@ describe.each(EXPECTED)("parity for $name", ({ id, name, rate, category, query }
     if (!search.ok) return;
     const shown = search.rows.find((r) => r.tariffId === id);
     expect(shown).toMatchObject({ serviceName: name, unitRate: rate, currency: "UGX", selectable: true });
+    // P08.01 (DTO minimisation): exactly the documented row, nothing internal —
+    // no contract/version/branch/client ids, no notes, no source reference.
+    expect(Object.keys(shown!).sort()).toEqual([
+      "category", "cptCode", "currency", "effectiveFrom", "providerServiceCode", "requiresPreauth",
+      "selectable", "serviceName", "tariffId", "taxonomyName", "unavailableReason", "unitLabel", "unitRate",
+    ]);
+    expect(Object.keys(search).sort()).toEqual(["hasMore", "ok", "otherCategoryMatches", "rows", "total"]);
 
     // 2. Submit-time canonicalisation (what the claim line stores).
     const canon = await ProviderServiceCatalogService.canonicalizeLines(context, [
@@ -163,20 +175,36 @@ describe.each(EXPECTED)("parity for $name", ({ id, name, rate, category, query }
 });
 
 describe("decoys never surface or price", () => {
-  it("the standalone, other-contract and inactive rows are absent from every search", async () => {
-    for (const [category, query] of [["CONSULTATION", "consult"], ["LABORATORY", "blood"], ["PHARMACY", "azith"]] as const) {
+  it("the standalone, other-contract, inactive, expired, future-dated, other-branch and other-provider rows are absent from every search", async () => {
+    for (const [category, query] of [["CONSULTATION", "consult"], ["LABORATORY", "blood"], ["PHARMACY", "azith"], ["OTHER", "bed fee"]] as const) {
       const r = await ProviderServiceCatalogService.search(context, { category, query });
       expect(r.ok && r.rows.map((x) => x.tariffId).filter((x) => x.startsWith("z"))).toEqual([]);
     }
   });
 
   it("a selected decoy id is rejected at submit — it is not in the engine's candidate set", async () => {
-    for (const id of ["z1-standalone", "z2-other-contract", "z3-inactive"]) {
+    for (const id of ["z1-standalone", "z2-other-contract", "z3-inactive", "z4-expired", "z5-future", "z6-other-branch", "z7-other-provider"]) {
       const r = await ProviderServiceCatalogService.canonicalizeLines(context, [
         { selectedProviderTariffId: id, serviceCategory: "CONSULTATION", quantity: 1, billedUnitPrice: "1000" },
       ]);
       expect(r).toMatchObject({ ok: false, fieldErrors: { "lines.0.service": expect.stringMatching(/select the service again/i) } });
     }
+  });
+});
+
+describe("P08.01 — the date and branch of the case decide what is in scope", () => {
+  it("the day after the expired row lapses and the day before the future row starts, only the Family row is offered", async () => {
+    const r = await ProviderServiceCatalogService.search(context, { category: "LABORATORY", query: "blood" });
+    expect(r.ok && r.rows.map((x) => x.tariffId)).toEqual(["t4-fbc"]);
+    const before = await ProviderServiceCatalogService.search({ ...context, serviceDate: new Date("2026-09-09T00:00:00Z"), serviceDateIso: "2026-09-09" }, { category: "LABORATORY", query: "blood" });
+    // On the 9th both rows were effective: both are candidates, and — one name at two
+    // rates — neither may be selected (the engine could not tell them apart).
+    expect(before.ok && before.rows.map((x) => [x.tariffId, x.selectable]).sort()).toEqual([["t4-fbc", false], ["z4-expired", false]]);
+  });
+
+  it("a row for another branch is offered at that branch only", async () => {
+    const here = await ProviderServiceCatalogService.search(context, { category: "OTHER", query: "bed fee" });
+    expect(here.ok && here.rows.map((x) => x.tariffId)).toEqual(["t5-bed"]);
   });
 });
 

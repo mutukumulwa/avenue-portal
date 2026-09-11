@@ -17,7 +17,7 @@ const access = vi.hoisted(() => ({
 }));
 vi.mock("@/server/services/provider-access.service", () => ({
   ProviderAccessService: { resolveUserContext: vi.fn(async () => access.value) },
-  isProviderAccessError: () => false,
+  isProviderAccessError: (e: unknown) => (e as { name?: string } | null)?.name === "ProviderAccessError",
 }));
 
 const prep = vi.hoisted(() => ({ prepare: vi.fn() }));
@@ -37,6 +37,7 @@ vi.mock("next/navigation", () => ({ redirect: nav.redirect }));
 vi.mock("next/cache", () => ({ revalidatePath: nav.revalidatePath }));
 
 import { submitProviderClaimAction } from "@/app/provider/claims/new/actions";
+import { ProviderAccessService } from "@/server/services/provider-access.service";
 import { mutationFail } from "@/lib/mutation-contract";
 import type { ClaimCaptureSubmission } from "@/lib/provider-capture-contract";
 
@@ -144,5 +145,45 @@ describe("submitProviderClaimAction", () => {
     intake.runClaimIntake.mockResolvedValueOnce({ ok: true, claimId: "", claimNumber: null, receiptId: "r", correlationId: "c", billedAmount: 0, outcome: "PROCESSING", replayed: true, receiptState: "PROCESSING" });
     expect(await submitProviderClaimAction(INPUT)).toMatchObject({ kind: "UNKNOWN_OUTCOME" });
     expect(nav.redirect).not.toHaveBeenCalled();
+  });
+
+  // ── P08.01: unauthenticated, not a provider user, another facility ─────────
+  it("an unauthenticated caller gets the framework's sign-in redirect — nothing is looked up or filed", async () => {
+    vi.mocked(ProviderAccessService.resolveUserContext).mockRejectedValueOnce(Object.assign(new Error("NEXT_REDIRECT"), { digest: "NEXT_REDIRECT;replace;/login;307;" }));
+    await expect(submitProviderClaimAction(INPUT)).rejects.toThrow("NEXT_REDIRECT");
+    expect(prep.prepare).not.toHaveBeenCalled();
+    expect(intake.runClaimIntake).not.toHaveBeenCalled();
+  });
+
+  it("a signed-in account that is not a provider user is refused, not redirected", async () => {
+    vi.mocked(ProviderAccessService.resolveUserContext).mockRejectedValueOnce(Object.assign(new Error("not a provider user"), { name: "ProviderAccessError" }));
+    expect(await submitProviderClaimAction(INPUT)).toMatchObject({ ok: false, kind: "FORBIDDEN" });
+    expect(prep.prepare).not.toHaveBeenCalled();
+  });
+
+  it("scope is the session's: a body naming another facility changes nothing, and a foreign branch is refused", async () => {
+    const spoofed = { ...INPUT, providerId: "prov-OTHER", tenantId: "t-OTHER", context: { ...INPUT.context, branchId: "br-OTHER" } } as unknown as ClaimCaptureSubmission;
+    prep.prepare.mockResolvedValueOnce({ ok: false, failure: mutationFail("VALIDATION", { fieldErrors: { branch: ["Choose one of your own branches."] } }) });
+    expect(await submitProviderClaimAction(spoofed)).toMatchObject({ ok: false, kind: "VALIDATION" });
+    expect(prep.prepare.mock.calls[0][0]).toBe(access.value.ctx); // the session's provider, never the body's
+    expect(intake.runClaimIntake).not.toHaveBeenCalled();
+
+    await submitProviderClaimAction(spoofed); // prepared from the session's case
+    const [caller, data] = intake.runClaimIntake.mock.calls[0];
+    expect(caller).toMatchObject({ tenantId: "t1", providerId: "prov-fh" });
+    expect(data).toMatchObject({ providerId: "prov-fh", providerBranchId: "br-main" });
+  });
+
+  it("the claim's currency is the contract's: a currency, rate or unit price in the body is not what is filed", async () => {
+    const tampered = {
+      ...INPUT,
+      currency: "KES",
+      lines: [{ ...INPUT.lines[0], currency: "KES", unitRate: "1", tariffRate: "1", contractedUnitRate: "1" }],
+    } as unknown as ClaimCaptureSubmission;
+    await submitProviderClaimAction(tampered);
+    const [, data, opts] = intake.runClaimIntake.mock.calls[0];
+    expect(data.currency).toBe("UGX"); // PREPARED.trusted.currency, from the contract
+    expect(data.lineItems[0]).toMatchObject({ unitCost: "120000", billedAmount: "360000" }); // the server's canonical line
+    expect(opts.origin.lineProvenance[0]).toEqual({ lineNumber: 1, selectedProviderTariffId: "t-bed", tariffRate: "120000" }); // re-read from the row
   });
 });

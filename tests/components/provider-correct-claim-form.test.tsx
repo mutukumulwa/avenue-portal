@@ -130,4 +130,23 @@ describe("F5.8 CorrectClaimForm", () => {
     const lines = screen.getByRole("list", { name: "Service lines" });
     expect(within(lines).getAllByRole("listitem")).toHaveLength(1);
   });
+
+  // ── P08.01 (case 40): the resubmission page is this form in "resubmit" mode ──
+  it("in resubmit mode it says so and files through the resubmission action, with the same shared rules", async () => {
+    const resubmit = vi.fn().mockResolvedValue(undefined);
+    render(<CorrectClaimForm mode="resubmit" submitAction={resubmit} predecessorClaimId="pred-1" predecessorNumber="CLM-1" today="2026-09-11" seed={seed} />);
+    await waitFor(() => expect(screen.getByText("•••• 0001")).toBeInTheDocument());
+    expect(capture.resolveCaseContextAction).toHaveBeenCalledWith(expect.objectContaining({ purpose: "CLAIM_CORRECTION", memberRef: "mem-1" }));
+    expect(screen.getByLabelText("Reason for resubmission (optional)")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/CPT/)).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Reason for resubmission (optional)"), { target: { value: "attached the missing invoice" } });
+    fireEvent.click(screen.getByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: /Submit resubmission/ }));
+    await waitFor(() => expect(resubmit).toHaveBeenCalledTimes(1));
+    expect(action).not.toHaveBeenCalled(); // not the correction action
+    const arg = resubmit.mock.calls[0][0];
+    expect(arg).toMatchObject({ predecessorClaimId: "pred-1", reason: "attached the missing invoice" });
+    expect(arg.lines).toEqual([{ selectedProviderTariffId: null, serviceCategory: "CONSULTATION", description: "Consultation visit", quantity: "1", billedUnitPrice: "1000", historicalLineNumber: 1 }]);
+    expect(JSON.stringify(arg)).not.toContain("Test Member");
+  });
 });

@@ -158,4 +158,45 @@ describe("ProviderMemberField", () => {
     await waitFor(() => expect(screen.getByText("Amani Testmember")).toBeInTheDocument());
     expect(actions.resolveCaseContextAction).toHaveBeenLastCalledWith(expect.objectContaining({ branchId: "br-b" }));
   });
+
+  // ── P08.01: loading, forbidden, unavailable and no-contract states ─────────
+  it("says it is looking while the lookup runs", async () => {
+    let release!: (v: unknown) => void;
+    actions.resolveCaseContextAction.mockImplementation(() => new Promise((r) => { release = r; }));
+    setup();
+    fireEvent.change(screen.getByLabelText(/Member \/ card number/), { target: { value: "TST-2026-00001" } });
+    fireEvent.click(screen.getByRole("button", { name: /Find member/ }));
+    expect(await screen.findByText("Looking up the member…")).toBeInTheDocument();
+    await act(async () => release({ outcome: "RESOLVED", context: DTO, correlationId: "c" }));
+    expect(screen.queryByText("Looking up the member…")).not.toBeInTheDocument();
+  });
+
+  it("a forbidden lookup says so in words and hands the form no member", async () => {
+    actions.resolveCaseContextAction.mockResolvedValue({ outcome: "FORBIDDEN", message: "You do not have permission to do this.", correlationId: "c" });
+    const { onChange } = setup();
+    fireEvent.change(screen.getByLabelText(/Member \/ card number/), { target: { value: "TST-2026-00001" } });
+    fireEvent.click(screen.getByRole("button", { name: /Find member/ }));
+    expect(await screen.findByText("You do not have permission to do this.")).toBeInTheDocument();
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ context: null, outcome: "FORBIDDEN" }));
+    expect(screen.queryByText("Amani Testmember")).not.toBeInTheDocument();
+  });
+
+  it("an unreachable server is 'temporarily unavailable', never 'not found'", async () => {
+    actions.resolveCaseContextAction.mockRejectedValue(new Error("network down"));
+    const { onChange } = setup();
+    fireEvent.change(screen.getByLabelText(/Member \/ card number/), { target: { value: "TST-2026-00001" } });
+    fireEvent.click(screen.getByRole("button", { name: /Find member/ }));
+    expect(await screen.findByText("Member lookup is temporarily unavailable. Try again shortly.")).toBeInTheDocument();
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ context: null, outcome: "UNAVAILABLE" }));
+    expect(screen.queryByText(/No member found/)).not.toBeInTheDocument();
+  });
+
+  it("a member with no usable contract is shown with the reason, not as covered", async () => {
+    actions.resolveCaseContextAction.mockResolvedValue({ outcome: "NO_ACTIVE_CONTRACT", context: { ...DTO, contract: null }, message: "This facility has no active contract covering this member on this date.", correlationId: "c" });
+    const { onChange } = setup();
+    fireEvent.change(screen.getByLabelText(/Member \/ card number/), { target: { value: "TST-2026-00001" } });
+    fireEvent.click(screen.getByRole("button", { name: /Find member/ }));
+    expect(await screen.findByText("This facility has no active contract covering this member on this date.")).toBeInTheDocument();
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ outcome: "NO_ACTIVE_CONTRACT" }));
+  });
 });

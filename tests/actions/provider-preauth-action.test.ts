@@ -22,7 +22,7 @@ const rctx = vi.hoisted(() => ({ ctx: { tenantId: "t1", providerId: "prov-1", ac
 
 vi.mock("@/server/services/provider-access.service", () => ({
   ProviderAccessService: { resolveUserContext: vi.fn(async () => rctx) },
-  isProviderAccessError: () => false,
+  isProviderAccessError: (e: unknown) => (e as { name?: string } | null)?.name === "ProviderAccessError",
 }));
 
 const redirectMock = vi.hoisted(() =>
@@ -65,6 +65,7 @@ vi.mock("@/server/services/provider-claim-capture.service", async (orig) => {
 });
 
 import { submitProviderPreauthAction } from "@/app/provider/preauth/new/actions";
+import { ProviderAccessService } from "@/server/services/provider-access.service";
 import { PreauthIntakeService, PreauthIntakeConflict } from "@/server/services/preauth-intake/service";
 import { mutationFail } from "@/lib/mutation-contract";
 import type { PreauthCaptureSubmission } from "@/lib/provider-capture-contract";
@@ -167,5 +168,31 @@ describe("F3.9 provider PA submission → canonical PROVIDER_PORTAL intake (P04.
     const res = await submitProviderPreauthAction(INPUT);
     expect(res).toMatchObject({ kind: "UNKNOWN_OUTCOME" });
     expect(JSON.stringify(res)).not.toContain("ECONNREFUSED");
+  });
+
+  // ── P08.01: unauthenticated, not a provider user, another facility ─────────
+  it("an unauthenticated caller gets the framework's sign-in redirect — nothing prepared or submitted", async () => {
+    vi.mocked(ProviderAccessService.resolveUserContext).mockRejectedValueOnce(Object.assign(new Error("NEXT_REDIRECT_SIGNIN"), { digest: "NEXT_REDIRECT;replace;/login;307;" }));
+    await expect(submitProviderPreauthAction(INPUT)).rejects.toThrow("NEXT_REDIRECT_SIGNIN");
+    expect(capture.prepare).not.toHaveBeenCalled();
+    expect(PreauthIntakeService.submit).not.toHaveBeenCalled();
+  });
+
+  it("a signed-in account that is not a provider user is refused", async () => {
+    vi.mocked(ProviderAccessService.resolveUserContext).mockRejectedValueOnce(Object.assign(new Error("no"), { name: "ProviderAccessError" }));
+    expect(await submitProviderPreauthAction(INPUT)).toMatchObject({ ok: false, kind: "FORBIDDEN" });
+    expect(PreauthIntakeService.submit).not.toHaveBeenCalled();
+  });
+
+  it("scope is the session's: a body naming another facility changes nothing, and a foreign branch is refused", async () => {
+    const spoofed = { ...INPUT, providerId: "prov-OTHER", tenantId: "t-OTHER", context: { ...INPUT.context, branchId: "br-OTHER" } } as unknown as PreauthCaptureSubmission;
+    capture.prepare.mockResolvedValueOnce({ ok: false, failure: mutationFail("VALIDATION", { fieldErrors: { branch: ["Choose one of your own branches."] } }) });
+    expect(await submitProviderPreauthAction(spoofed)).toMatchObject({ kind: "VALIDATION" });
+    expect(capture.prepare.mock.calls[0][0]).toBe(rctx.ctx);
+    expect(PreauthIntakeService.submit).not.toHaveBeenCalled();
+
+    await expect(submitProviderPreauthAction(spoofed)).rejects.toThrow("NEXT_REDIRECT");
+    expect(cap.submitArgs!.ctx).toMatchObject({ tenantId: "t1", providerId: "prov-1", providerBranchId: "br-1" });
+    expect(cap.submitArgs!.submission.providerId).toBeUndefined();
   });
 });
