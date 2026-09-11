@@ -74,11 +74,11 @@ Status values: `NOT_STARTED` · `IN_PROGRESS` · `DONE` · `BLOCKED (<gate>)` ·
 | P06 Provider navigation | DONE | see §3 | DEC-FH-X9 (grouping, for provider UX review) |
 | P07.01 Clean up affected claims/pre-auths | READY — production apply awaits approval (P08.04 step 8) | see §3 | DEC-FH-04, DEC-FH-X10; DEC-FH-X11 open |
 | P07.02 Fresh Family UAT fixtures | DONE (verified read-only); two actors await setup links (P08.04 step 9) | see §3 | |
-| P08.01 Automated coverage | NOT_STARTED | | |
-| P08.02 Local verification | NOT_STARTED | | |
-| P08.03 Browser verification matrix | NOT_STARTED | | |
-| P08.04 Deployment sequence | NOT_STARTED | | reviews + production approval |
-| P08.05 Rollback | NOT_STARTED | | |
+| P08.01 Automated coverage | DONE | see §3 | every mandatory case mapped to a test; gaps filled (88276513) |
+| P08.02 Local verification | DONE | see §3 | typecheck · vitest · eslint · build:local all pass on 88276513 |
+| P08.03 Browser verification matrix | PARTIAL — navigation row done; signed-in rows need a human sign-in | see §3 | the executor does not type passwords; runs at P08.04 step 7 |
+| P08.04 Deployment sequence | READY — runbook and read-only preflights done; every production step awaits approval | see §3 | reviews + production approval |
+| P08.05 Rollback | DONE (documented; P01.02 rollback rehearsed) | see §3 | |
 
 ---
 
@@ -908,7 +908,7 @@ production data was touched.
 ```text
 Task ID:                 P07.01
 Defects covered:         FH-13 (records), FH-02 (their prices)
-Starting/ending SHA:     53b70cd → P07 commit
+Starting/ending SHA:     53b70cd → 295d9ea
 Files changed:           src/server/services/claim-withdrawal/{catalog.ts,service.ts} (operator path,
                          DEC-FH-X10), scripts/family-hospital-trial-record-cleanup.ts (new),
                          scripts/lib/family-trial-record-cleanup.ts (new),
@@ -965,7 +965,7 @@ Reviewer/sign-off:       pending — owner approval for the production apply
 ```text
 Task ID:                 P07.02
 Defects covered:         FH-13 (rerun baseline)
-Starting/ending SHA:     53b70cd → P07 commit
+Starting/ending SHA:     53b70cd → 295d9ea
 Files changed:           scripts/reports/family-hospital-uat-fixtures.ts (new),
                          scripts/lib/family-hospital-reviewed.ts (FAMILY_P0702_FIXTURES);
                          test data in seven capture test files and one source comment now use a
@@ -1020,3 +1020,171 @@ inclusive, unlisted rule REFER_FOR_REVIEW; 4,424 rows in the engine's candidate 
 - **No patient PII in fixtures.** The evidence carries masked numbers and opaque ids. The capture
   component tests had used a trial member's name and numbers, as stored in production, as sample
   data; they now use a fictitious member.
+
+### P06 — addendum: a way home when the bar fails (plan §9)
+
+Plan §9.1 lists "navigation render errors" among the structured events; nothing emitted one.
+`ProviderNavBoundary` (dd26506) wraps the provider bar in the layout: if the bar throws, the page
+keeps the brand, Dashboard and Logout in its place, and the failure is reported once — to the
+browser console like every boundary, and through `reportNavigationRenderErrorAction` as a
+`navigation_render_error` log event carrying the session's opaque ids and the framework digest only
+(anything else the browser sends is dropped). Tests: tests/components/provider-nav-boundary.test.tsx
+(2), tests/actions/report-navigation-render-error.test.ts (3); audit catalogue entry READ_ONLY.
+
+### P08.01 — Required automated coverage
+
+```text
+Task ID:                 P08.01
+Defects covered:         all FH-xx (test evidence)
+Starting/ending SHA:     295d9ea → 88276513
+Files changed:           tests only (+ the P06 addendum above)
+Automated tests added/changed: see the list below
+Commands and results:    each changed file green on its own; full default suite 380 files / 4,786 tests
+Reviewer/sign-off:       pending
+```
+
+Every mandatory case in the plan's P08.01 table was mapped to an existing test (file and `it`
+title), with the security rule "an adjacent cross-tenant/provider case" and the mutation rule "a
+failed delivery/validation or stale-data case" checked per path. The gaps found, and what now
+covers them:
+
+| Gap | Now covered by |
+|---|---|
+| Unauthenticated callers (no test at all) | capture lookups, claim submit, resubmission, pre-auth submit: the sign-in redirect propagates and nothing runs; TPA invite/resend: the role guard's redirect propagates |
+| Capture lookup actions untested at the action layer | tests/actions/provider-capture-actions.test.ts — non-provider → FORBIDDEN; session scope; only typed, named fields reach the services; the service's DTO passes through unchanged |
+| Trial-member eligibility (none) | eligibility-decision-parity: pinned trial member ELIGIBLE on the rerun date; the 2026-09-09 unpinned defect fails closed; not eligible before cover began |
+| Setup token hash/expiry/replay only in the DB suite | tests/services/account-invitation-token.test.ts — SHA-256 lookup only; malformed token refused before lookup; expired/used/revoked/suspended/set-up/cross-tenant rows all refused; spent link writes nothing |
+| Tariff search by date/branch/provider | tariff-parity: expired, future-dated, other-branch and other-provider rows absent from search and refused at submit; on a date both rows were effective the ambiguity blocks both |
+| SUB/RES/PA lacked a cross-facility case | a body naming another facility changes nothing; a foreign branch or claim is refused |
+| Invitation actions: wrong permission; failed delivery on facility invite/resend | action tests + real-DB test (a biller cannot invite or resend) |
+| Catalogue DTO checked only loosely | exact row and result keys asserted |
+| Currency mismatch at intake | the filed claim takes the contract's currency and the server's canonical line whatever the body says (the canonicaliser's refusal of a foreign-currency row was already covered) |
+| Amendment revalidation; amend form; member-field states; resubmit UI | prepareLines tests (parent's case, stale tariff, changed version, ineligible); AmendPreauthForm (3); member field loading/forbidden/unavailable/no-contract; correction form in resubmit mode |
+
+Two form tests now wait for the submit button to leave "Submitting…" before clicking again; one had
+failed once under the full parallel run (never alone) because the outcome rendered a moment before
+the pending state cleared. No assertion changed.
+
+### P08.02 — Mandatory local verification (HEAD 88276513)
+
+```text
+npm run typecheck                                   → exit 0
+npx vitest run                                      → 380 files passed, 90 skipped (opt-in DB);
+                                                      4,786 tests passed, 615 skipped
+npx eslint <147 files changed since 3fa0159>        → 0 errors, 5 warnings — the same 5 warnings
+                                                      exist on 3fa0159 (unused vars in
+                                                      claim-adjudication/preauth-adjudication services,
+                                                      one unused eslint-disable in a test)
+SCHEMA_DEPLOY_MODE=skip npm run build:local         → exit 0, "Compiled successfully"; the one
+                                                      compile warning is bullmq's dynamic require,
+                                                      present on 3fa0159
+Opt-in real-DB suites (fresh Postgres 17, every migration + prisma/seed.ts, files run one at a
+time): 91 files / 599 tests passed; 16 tests in 6 files fail — exactly the 16 that fail on the
+baseline 3fa0159 (P05 entry). A parallel run on another fresh database showed 14 more failures in
+seven files, every one of which passes when run on its own: those suites share the seeded tenant
+and race each other (claim-number and processing-run uniqueness); not caused by this branch.
+The account-invitation suite gained one test afterwards: 10/10.
+```
+
+`build:local` writes to ~/Library/Caches/avenue-portal/next-build, the same directory the main
+checkout's `.next` points at. After the last build the worktree's `.next` link was removed and the
+generated route types this branch's builds left there (`types/app`, `types/validator.ts`,
+`types/routes.d.ts`) were deleted, so the main checkout's typecheck does not pick up this branch's
+routes; the next build or dev run in the main checkout regenerates them.
+
+### P08.03 — Browser verification matrix
+
+| Actor | Scenario | Status |
+|---|---|---|
+| Facility admin | Every provider destination at all target widths | **Done** (P06): 320–1920 and two 200 % zoom sizes, measured by script; keyboard, Escape, outside press, focus return |
+| Platform admin | Invite a Family biller; successful and failed mail; resend | **Not run** — needs a signed-in platform administrator |
+| Family admin | Invite front desk; attempt cross-provider / stronger persona | **Not run** — needs a signed-in facility administrator |
+| Front desk | Each trial member with the blank-initial date | **Not run** — needs a signed-in front-desk user |
+| Biller | Typed member; diagnosis by code and text; category + partial description; billed ≠ contracted; unlisted; `600,000`; correction/resubmission | **Not run** — needs a signed-in biller |
+
+Why: signing in means typing a password into the login form, which this executor does not do on
+anyone's behalf — not even for a local test account. The automated suites cover each row's
+behaviour (component, action and real-DB tests above), but the plan asks for the browser. These rows
+run at P08.04 step 7 with internal accounts, by a person who signs in — the executor can drive the
+rest of each scenario once signed in, in the in-app browser against a local server and a throwaway
+database. Evidence rule for the run (plan P08.03): no names, member numbers, emails, tokens or
+credentials in screenshots.
+
+### P08.04 — Deployment sequence (runbook; nothing below has been run against production)
+
+Read-only preflight already done (2026-09-11):
+
+- `_prisma_migrations` on production ends at `20260814002000_audit_log_nullable_actor`, the last
+  migration this branch inherits; its two new migrations are pending and additive —
+  `20260911000100_claim_line_selected_tariff` (nullable column + index + FK; ClaimLine has 64 rows)
+  and `20260911000200_account_setup_invitation` (new enum + new table). Neither object exists yet.
+- `origin/main` (3fa0159) is an ancestor of the branch: a fast-forward merge.
+- `SCHEMA_DEPLOY_MODE=migrate` is live in Vercel (2026-08-14), so the build applies the two
+  migrations with `prisma migrate deploy`.
+
+| Step | What | Needs |
+|---|---|---|
+| 1 | Reviews: schema/security (the two migrations, DEC-FH-X10's operator withdrawal, invitations and setup tokens, the new Server Actions), contract/pricing (catalogue, canonicaliser, provenance, DEC-FH-X3), provider UX (capture forms, navigation DEC-FH-X9) | human reviewers |
+| 2 | Supabase backup/PITR point noted; re-run the read-only migration check above | owner |
+| 3 | Vercel production env: `SMTP_HOST` (+ `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`), `EMAIL_FROM`, `NEXT_PUBLIC_APP_URL=https://<production origin>`; then one invitation to a controlled internal address must arrive and its link must work | owner (secrets); approval to send the test mail |
+| 4 | Merge the branch into `main` (fast-forward) and let Vercel deploy with `SCHEMA_DEPLOY_MODE=migrate`; confirm the build log applied exactly the two migrations and `_prisma_migrations` shows them finished | approval |
+| 5 | P01.01 preflight against production (read-only) — must still PASS | — |
+| 6 | Tenant `config.providerAccess.tariffCatalogProviderIds += Family`, through the settings change the flag is designed for, only after step 5 passes | approval |
+| 7 | Browser matrix (P08.03) with internal accounts | a person signs in |
+| 8 | P07.01 apply (`--apply --batch-ref FH-P0701-<yyyymmdd> --operator-user-id cmr3aezx7000mnlvqgoljdyqi`), then the dry run again | approval |
+| 9 | Invite the Family biller and front desk individually from Settings (this also retires their exposed temporary passwords — DEC-FH-X8, the P00.02 containment); confirm receipt without asking for any password | approval (sends email to the facility) |
+
+§9 support notes: invitation state is on TPA Settings and the facility Users page (sent / failed with
+reason / expired, with Resend); the tariff state is `scripts/reports/family-hospital-tariff-preflight.ts`.
+Alerts to configure in the log platform (not in code): repeated `invitation_delivery` with
+`deliveryStatus: FAILED`, and any `stale_tariff_rejected` / `catalogue_ambiguity` spike.
+
+### P08.05 — Rollback (none of it re-enables KES-as-UGX pricing)
+
+1. **Catalogue problem:** remove Family from `tariffCatalogProviderIds`. Capture falls back to the
+   description-first manual price path ("contract rate unavailable — manual review"); no global
+   price returns. If that path is also unsafe, pause Family's capture (provider status), not the
+   code.
+2. **Setup-link defect:** revoke unused invitations (`revokedAt`, reason) — never delete; activated
+   accounts go through the normal suspension/session-revocation path.
+3. **Tariff data:** `npx tsx scripts/family-hospital-tariff-remediation.ts --rollback --batch-ref
+   FH-P0102-20260911 --operator-user-id <id>` — rehearsed; restores exactly the 33 prior rows and
+   retires the 6 replacements, deletes nothing.
+4. **Application:** promote the previous Vercel deployment. The two migrations are additive and stay
+   (the old code ignores the new column and table); no audit, receipt or invitation row is reversed.
+5. **Record:** incident note with correlation ids, affected provider, user-safe wording — no
+   passwords, tokens or patient data.
+6. **P07.01 is terminal by design** (WITHDRAWN / CANCELLED); it is not rolled back.
+
+### Provider communication (plan §12) — drafted, not sent
+
+`FAMILY_HOSPITAL_RERUN_MESSAGE_DRAFT.md` covers the §12 checklist (setup links instead of the old
+passwords, description-and-category search without codes, reviewed UGX prices, the withdrawn trial
+records, the member dataset, the five workflows, the outstanding policy answers and bill sample),
+plus the 200-code diagnosis limit (DEC-FH-03) and the Surgical Extraction pair to confirm (P01.02).
+It is not to be sent until the owner approves it and P08.04 steps 3–9 have made it true.
+
+### Release gates (plan §13) — status on 2026-09-11
+
+| Gate | Status |
+|---|---|
+| Exposed passwords invalidated | **Open** — owner "not yet"; closes at P08.04 step 9 (DEC-FH-X8) |
+| Individual accounts; truthful invites; replay/expiry proven | Accounts exist; invitation behaviour proven in tests; delivery awaits SMTP (step 3) |
+| Read-only tariff preflight | **PASS** on production after P01.02 |
+| Catalogue and engine select the same tariff/rate for every fixture | **PASS** (parity tests; P07.02 engine resolution on production data) |
+| No CPT `averageCost` auto-price / KES-as-UGX | **PASS** in code (consistency ratchet); live after deploy |
+| Direct claim entry resolves a typed trial member and revalidates | **PASS** in tests; browser pending |
+| Diagnosis search by text/code, no price | **PASS** in tests; 200-code limit disclosed (DEC-FH-03) |
+| Category filters Family description search; codes optional | **PASS** in tests; live after step 6 |
+| `600,000` accepted and persisted | **PASS** in tests |
+| Kampala date default, correct around UTC midnight | **PASS** in tests |
+| Inpatient/surgical benefits from one list | **PASS** in tests |
+| Navigation at all widths, keyboard, touch, 200 % | **PASS** (P06 browser run) |
+| Old claims/pre-auths withdrawn/cancelled with history | **READY** — step 8 |
+| Typecheck, tests, lint, build | **PASS** (P08.02) |
+| Internal browser smoke tests | **Open** — step 7 |
+| Family's users complete UAT; Abel signs off | **Open** — after the rerun |
+
+**Verdict: NO-GO for a Family rerun today** — the open gates are the credential containment, the
+deployment itself (steps 1–6), the internal browser smoke run, and the P07.01 cleanup. Each is an
+owner-approved or human step; nothing further is blocked on code.
