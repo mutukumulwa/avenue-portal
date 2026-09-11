@@ -39,6 +39,18 @@ export interface ProviderAccessSettings {
   providerContractView: boolean;
   /** per-provider allow-list — contract view is ON for these providers even if the global flag is off */
   contractViewProviderIds: string[];
+  /**
+   * Family Hospital UAT plan P08.04 step 6 — provider tariff search and
+   * tariff-priced capture lines (`providerTariffCatalog`), DEFAULT OFF. A
+   * facility's capture forms search its contracted price list only when this is
+   * on for the tenant (global) or the provider (allow-list). It is enabled for a
+   * facility only after the P01.01 tariff preflight passes against production.
+   * When off, lines are captured description-first at a manually entered price
+   * ("contract rate unavailable — manual review") — never at a global average.
+   */
+  providerTariffCatalog: boolean;
+  /** per-provider allow-list — tariff search is ON for these providers even if the global flag is off */
+  tariffCatalogProviderIds: string[];
 }
 
 export const PROVIDER_ACCESS_DEFAULTS: ProviderAccessSettings = {
@@ -48,6 +60,8 @@ export const PROVIDER_ACCESS_DEFAULTS: ProviderAccessSettings = {
   remittanceV2ProviderIds: [],
   providerContractView: false,
   contractViewProviderIds: [],
+  providerTariffCatalog: false,
+  tariffCatalogProviderIds: [],
 };
 
 export const ProviderAccessSettingsService = {
@@ -70,6 +84,10 @@ export const ProviderAccessSettingsService = {
       providerContractView: raw.providerContractView === true,
       contractViewProviderIds: Array.isArray(raw.contractViewProviderIds)
         ? raw.contractViewProviderIds.filter((x): x is string => typeof x === "string")
+        : [],
+      providerTariffCatalog: raw.providerTariffCatalog === true,
+      tariffCatalogProviderIds: Array.isArray(raw.tariffCatalogProviderIds)
+        ? raw.tariffCatalogProviderIds.filter((x): x is string => typeof x === "string")
         : [],
     };
   },
@@ -103,5 +121,14 @@ export const ProviderAccessSettingsService = {
   async isContractViewEnabled(tenantId: string, providerId: string, db: Db = prisma): Promise<boolean> {
     const s = await this.get(tenantId, db);
     return s.providerContractView || s.contractViewProviderIds.includes(providerId);
+  },
+
+  /**
+   * Family Hospital UAT P08.04 step 6 — may this facility search and price from
+   * its contracted tariff? DEFAULT false (see `providerTariffCatalog`).
+   */
+  async isTariffCatalogEnabled(tenantId: string, providerId: string, db: Db = prisma): Promise<boolean> {
+    const s = await this.get(tenantId, db);
+    return s.providerTariffCatalog || s.tariffCatalogProviderIds.includes(providerId);
   },
 } as const;

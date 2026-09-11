@@ -131,7 +131,11 @@ export const ClaimResubmissionService = {
 
           // 6b. Create the resubmission through the canonical intake — a FULL new adjudication
           //     (fresh RECEIVED claim + processing run; NO inheritance of pricing/approval/decline).
-          const result = await ClaimIntakeService.submitWithinTransaction(tx, { context, normalized, receiptId, requestHash, origin: {} });
+          const result = await ClaimIntakeService.submitWithinTransaction(tx, {
+            context, normalized, receiptId, requestHash,
+            // P02.04: server-built capture provenance (never from the request body).
+            origin: command.lineProvenance?.length ? { lineProvenance: command.lineProvenance } : {},
+          });
           if (result.kind !== "CREATED") {
             throw new ClaimResubmissionError("IDEMPOTENCY_CONFLICT", "This resubmission resolved to an existing claim — reopen it instead.");
           }

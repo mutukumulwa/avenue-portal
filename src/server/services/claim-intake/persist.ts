@@ -40,6 +40,14 @@ export interface PersistOrigin {
   reimbursement?: { bankName?: string | null; accountNo?: string | null; mpesaPhone?: string | null };
   /** External reference for B2B idempotency continuity (unique per tenant+provider). */
   externalRef?: string | null;
+  /**
+   * Family Hospital UAT P02.04 — capture provenance per line, built by the
+   * SERVER after it re-read each selected tariff (never taken from a request
+   * body; the canonical envelope has no field for it). Keyed by the normalized
+   * 1-based `lineNumber`. `tariffRate` is the contracted unit rate captured
+   * from the selected row, as canonical decimal text.
+   */
+  lineProvenance?: Array<{ lineNumber: number; selectedProviderTariffId: string | null; tariffRate: string | null }>;
 }
 
 export interface PersistInput {
@@ -122,6 +130,18 @@ export async function persistClaimWithinTransaction(tx: Tx, input: PersistInput)
 
   // 4. Create the claim + lines with full provenance.
   const total = new Decimal(n.totalBilled);
+  // P02.04: server-built capture provenance, matched to lines by number. A
+  // number that is not on the claim is a programming error in the adapter —
+  // fail the whole write rather than attach a tariff to the wrong line.
+  const provenance = new Map((origin.lineProvenance ?? []).map((p) => [p.lineNumber, p]));
+  for (const lineNumber of provenance.keys()) {
+    if (!n.lines.some((l) => l.lineNumber === lineNumber)) {
+      throw IntakeError.validation(
+        [{ path: "lines", code: "PROVENANCE_MISMATCH", message: "Line provenance does not match the submitted lines.", severity: "ERROR" }],
+        "The service lines changed while this claim was being submitted. Please submit it again.",
+      );
+    }
+  }
   const claim = await tx.claim.create({
     data: {
       tenantId: ctx.tenantId,
@@ -180,6 +200,12 @@ export async function persistClaimWithinTransaction(tx: Tx, input: PersistInput)
           quantity: l.quantity,
           unitCost: new Decimal(l.unitCost),
           billedAmount: new Decimal(l.billedAmount),
+          ...(provenance.has(l.lineNumber)
+            ? {
+                selectedProviderTariffId: provenance.get(l.lineNumber)!.selectedProviderTariffId,
+                tariffRate: provenance.get(l.lineNumber)!.tariffRate === null ? null : new Decimal(provenance.get(l.lineNumber)!.tariffRate!),
+              }
+            : {}),
         })),
       },
     },

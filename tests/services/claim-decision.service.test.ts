@@ -153,6 +153,27 @@ const decide = (over: Partial<any> = {}) =>
     ...over,
   });
 
+describe("Family Hospital UAT P02.04 — decision-time tariff stamping keeps the capture snapshot", () => {
+  it("stamps lines without a selected tariff and leaves captured lines' tariffRate alone", async () => {
+    claimsSvc.resolveClaimContractRates.mockResolvedValue({
+      contract: { contractNumber: "PC-2026-202", unlistedServiceRule: "REFER_FOR_REVIEW", unlistedDiscountPct: null },
+      lines: [
+        { lineId: "l1", cptCode: null, agreedRate: 2000, allowedUnit: 2000, quantity: 1, maxQuantityPerVisit: null, unitCost: 2000, requiresPreauth: false, quantityExceeded: false },
+        { lineId: "l2", cptCode: null, agreedRate: 1600, allowedUnit: 1600, quantity: 1, maxQuantityPerVisit: null, unitCost: 1600, requiresPreauth: false, quantityExceeded: false },
+      ],
+      contractResolution: { matched: true, reasonCode: null, message: "Matched" },
+    });
+    db.claimLine.findMany.mockImplementation(async (args: MockDbArgs) =>
+      (args.where as Record<string, unknown>)?.selectedProviderTariffId ? [{ id: "l1" }] : [],
+    );
+    await decide();
+    const stamps = db.claimLine.update.mock.calls
+      .map((c: unknown[]) => c[0] as { where: { id: string }; data: Record<string, unknown> })
+      .filter((c: { data: Record<string, unknown> }) => "tariffRate" in c.data);
+    expect(stamps).toEqual([{ where: { id: "l2" }, data: { tariffRate: 1600 } }]);
+  });
+});
+
 describe("PR-016 — benefit usage consumption", () => {
   it("creates the usage row (upsert) for a member with no existing rows", async () => {
     await decide();

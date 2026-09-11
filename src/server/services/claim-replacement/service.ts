@@ -186,7 +186,11 @@ export const ClaimReplacementService = {
           }
 
           // 6b. Create the corrected claim through the canonical intake (transaction-aware).
-          const result = await ClaimIntakeService.submitWithinTransaction(tx, { context, normalized, receiptId, requestHash, origin: {} });
+          const result = await ClaimIntakeService.submitWithinTransaction(tx, {
+            context, normalized, receiptId, requestHash,
+            // P02.04: server-built capture provenance (never from the request body).
+            origin: command.lineProvenance?.length ? { lineProvenance: command.lineProvenance } : {},
+          });
           if (result.kind !== "CREATED") {
             // A null-strong-fingerprint correction cannot legitimately strong-link; treat as a conflict.
             throw new ClaimReplacementError("IDEMPOTENCY_CONFLICT", "This correction resolved to an existing claim — reopen it instead.");

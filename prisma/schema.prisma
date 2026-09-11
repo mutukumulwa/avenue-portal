@@ -2806,10 +2806,20 @@ model ClaimLine {
   quantityApproved     Int? // payable quantity after caps
   ruleTrace            Json? // machine-readable per-stage engine trace (§6)
 
+  // ── Capture provenance (Family Hospital UAT plan P02.04) ──
+  // The provider tariff row the facility SELECTED when capturing this line,
+  // re-read server-side at submit. `tariffRate` holds that row's contracted unit
+  // rate as captured; `unitCost` is what the facility billed. Deliberately NOT
+  // `matchedRuleId`: that is the contract engine's adjudication outcome. null =
+  // an unlisted line, a legacy line, or a rail that does not select tariffs.
+  selectedProviderTariffId String?
+  selectedProviderTariff   ProviderTariff? @relation("ClaimLineSelectedTariff", fields: [selectedProviderTariffId], references: [id], onDelete: Restrict)
+
   @@index([claimId])
   @@index([contractId])
   @@index([reasonCodeId])
   @@index([serviceCategoryId])
+  @@index([selectedProviderTariffId])
 }
 
 model AdjudicationLog {
@@ -3617,6 +3627,8 @@ model ProviderTariff {
   createdAt     DateTime  @default(now())
 
   mappingMemories ServiceMappingMemory[]
+  /// Claim lines captured against this row (Family Hospital UAT P02.04).
+  capturedClaimLines ClaimLine[] @relation("ClaimLineSelectedTariff")
 
   @@index([providerId])
   @@index([providerId, cptCode])

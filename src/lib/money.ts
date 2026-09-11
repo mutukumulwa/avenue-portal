@@ -44,17 +44,27 @@ export interface ParseMoneyOptions {
   blankIsZero?: boolean;
 }
 
-/** Digits, one optional decimal point, optional comma grouping. Nothing else. */
-const SUPPORTED_GRAMMAR = /^-?\d{1,3}(,\d{3})*(\.\d+)?$|^-?\d+(\.\d+)?$/;
+/**
+ * Digits, one optional decimal point, and optional thousands grouping by comma
+ * OR by a space (Family Hospital UAT FH-10 / P03.04: "600 000" and the
+ * no-break spaces an en-UG formatter emits are normal Ugandan ways to write an
+ * amount). A group separator must be used consistently and every group after
+ * the first must have exactly three digits — so a typo like "60,0000" is
+ * rejected rather than silently read as 600,000. Nothing else.
+ */
+const GROUP_SPACES = "[ \\u00A0\\u202F]";
+const SUPPORTED_GRAMMAR = new RegExp(
+  `^-?\\d{1,3}(,\\d{3})+(\\.\\d+)?$|^-?\\d{1,3}(${GROUP_SPACES}\\d{3})+(\\.\\d+)?$|^-?\\d+(\\.\\d+)?$`,
+);
 
 /** "300k", "1.2m", "5bn" — the exact shape that silently became 300. */
-const MAGNITUDE_SUFFIX = /^-?[\d.,]+\s*(k|m|bn|b|thousand|million|billion)$/i;
+const MAGNITUDE_SUFFIX = /^-?[\d.,\s]+\s*(k|m|bn|b|thousand|million|billion)$/i;
 
 /** Guard against absurd values reaching a Decimal column. */
 const MAX_DIGITS = 15;
 
 /** The grammar, in the words a form should show the user. */
-export const MONEY_INPUT_HINT = "Numbers only, e.g. 300000 or 300,000. Do not use 'k' or 'm'.";
+export const MONEY_INPUT_HINT = "Numbers only, e.g. 300000, 300,000 or 300 000. Do not use 'k' or 'm'.";
 
 const FAILURE_MESSAGE: Record<MoneyParseFailure, string> = {
   EMPTY: "Enter an amount.",
@@ -107,7 +117,7 @@ export function parseMoney(input: unknown, options: ParseMoneyOptions = {}): Mon
 
   if (!SUPPORTED_GRAMMAR.test(text)) return failure("NOT_A_NUMBER");
 
-  const unGrouped = text.replace(/,/g, "");
+  const unGrouped = text.replace(/[,\s]/g, ""); // \s covers U+00A0 and U+202F
   const [, decimals = ""] = unGrouped.split(".");
   if (decimals.length > maxDecimals) return failure("TOO_MANY_DECIMALS");
 
@@ -146,6 +156,34 @@ export function formatMoneyReadback(value: Decimal | number | string, currency: 
     minimumFractionDigits: hasFraction ? 2 : 0,
     maximumFractionDigits: hasFraction ? 2 : 0,
   }).format(decimal.toNumber());
+}
+
+/**
+ * Family Hospital UAT P03.04 — the canonical decimal text a form submits:
+ * no grouping, no exponent, no trailing fractional zeros ("600000", "1540.5").
+ * The server re-parses it; it is never read with `Number()`.
+ */
+export function toCanonicalMoney(value: Decimal): string {
+  return value.toFixed();
+}
+
+/**
+ * Family Hospital UAT P03.04 — group an amount for display on blur, en-UG style
+ * ("600,000", "1,540.50"), WITHOUT converting to a binary float: the integer
+ * digits are grouped as text, so a 15-digit amount formats exactly.
+ */
+export function formatGroupedAmount(value: Decimal | string): string {
+  let decimal: Decimal;
+  try {
+    decimal = value instanceof Prisma.Decimal ? value : new Prisma.Decimal(value);
+  } catch {
+    return String(value);
+  }
+  const negative = decimal.isNegative();
+  const fixed = decimal.abs().toFixed(decimal.isInteger() ? 0 : 2);
+  const [int, frac] = fixed.split(".");
+  const grouped = int.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return `${negative ? "-" : ""}${grouped}${frac ? `.${frac}` : ""}`;
 }
 
 // ── percentages ─────────────────────────────────────────────────────────────

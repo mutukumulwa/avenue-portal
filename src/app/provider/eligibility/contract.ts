@@ -17,21 +17,19 @@
  * in one place.
  */
 
+import type { BenefitCategory } from "@prisma/client";
 import type { EligibilitySafeResult } from "@/server/services/provider-eligibility.service";
+import { PROVIDER_BENEFIT_OPTIONS } from "@/lib/provider-benefit-options";
 
 export const MAX_MEMBER_LEN = 64;
 
-/** The allow-list the UI offers AND accepts (ELIG-GAP-008). */
-export const BENEFIT_OPTIONS = [
-  "OUTPATIENT",
-  "INPATIENT",
-  "MATERNITY",
-  "DENTAL",
-  "OPTICAL",
-  "MENTAL_HEALTH",
-  "LAST_EXPENSE",
-  "WELLNESS_PREVENTIVE",
-] as const;
+/**
+ * The allow-list the UI offers AND accepts (ELIG-GAP-008) — now the ONE
+ * provider benefit list (Family Hospital UAT FH-12 / P03.05) instead of an
+ * eight-value copy that omitted SURGICAL, CHRONIC_DISEASE and others the claim
+ * and pre-auth forms offered.
+ */
+export const BENEFIT_OPTIONS: readonly BenefitCategory[] = PROVIDER_BENEFIT_OPTIONS.map((o) => o.value);
 
 export interface EligibilityCheckState {
   /** Field-level input problem; the lookup did not run. */

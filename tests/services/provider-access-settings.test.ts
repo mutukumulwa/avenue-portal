@@ -77,6 +77,26 @@ describe("ProviderAccessSettingsService — F7.3 contract-view flag", () => {
   });
 });
 
+describe("ProviderAccessSettingsService — Family Hospital UAT P08.04.6 tariff-catalogue flag", () => {
+  it("defaults OFF and only `=== true` enables it", () => {
+    expect(PROVIDER_ACCESS_DEFAULTS.providerTariffCatalog).toBe(false);
+    expect(PROVIDER_ACCESS_DEFAULTS.tariffCatalogProviderIds).toEqual([]);
+    expect(ProviderAccessSettingsService.parse({ providerAccess: { providerTariffCatalog: "yes" } }).providerTariffCatalog).toBe(false);
+    expect(ProviderAccessSettingsService.parse({ providerAccess: { tariffCatalogProviderIds: ["p1", 3, "p2"] } }).tariffCatalogProviderIds).toEqual(["p1", "p2"]);
+  });
+  it("isTariffCatalogEnabled: OFF by default, global-on, or per-provider allow-list", async () => {
+    expect(await ProviderAccessSettingsService.isTariffCatalogEnabled("t1", "pA", fakeDb({}))).toBe(false);
+    expect(await ProviderAccessSettingsService.isTariffCatalogEnabled("t1", "pZ", fakeDb({ providerAccess: { providerTariffCatalog: true } }))).toBe(true);
+    const allow = fakeDb({ providerAccess: { tariffCatalogProviderIds: ["pA"] } });
+    expect(await ProviderAccessSettingsService.isTariffCatalogEnabled("t1", "pA", allow)).toBe(true);
+    expect(await ProviderAccessSettingsService.isTariffCatalogEnabled("t1", "pB", allow)).toBe(false);
+  });
+  it("is independent of the contract-view flag", async () => {
+    const db = fakeDb({ providerAccess: { providerContractView: true } });
+    expect(await ProviderAccessSettingsService.isTariffCatalogEnabled("t1", "pA", db)).toBe(false);
+  });
+});
+
 describe("ProviderAccessSettingsService.isEntitlementEnforced (F1.11 gate, mirror)", () => {
   it("off by default; global or per-provider enables", async () => {
     expect(await ProviderAccessSettingsService.isEntitlementEnforced("t1", "pA", fakeDb({}))).toBe(false);

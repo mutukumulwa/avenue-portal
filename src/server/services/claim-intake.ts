@@ -1,8 +1,10 @@
 import { randomUUID } from "node:crypto";
+import Decimal from "decimal.js";
 import { prisma } from "@/lib/prisma";
 import { ClaimIntakeService, type SubmitResult } from "@/server/services/claim-intake/intake.service";
 import { IntakeError } from "@/server/services/claim-intake/errors";
 import type { CallerIdentity } from "@/server/services/claim-intake/context";
+import type { PersistOrigin } from "@/server/services/claim-intake/persist";
 import type { ServiceType, BenefitCategory, ClaimLineCategory } from "@prisma/client";
 
 export interface IntakeLineItem {
@@ -11,8 +13,9 @@ export interface IntakeLineItem {
   description: string;
   icdCode: string;
   quantity: number;
-  unitCost: number;
-  billedAmount: number;
+  /** Decimal text from the provider capture path (P03.04), or a number from older rails. */
+  unitCost: number | string;
+  billedAmount: number | string;
 }
 
 export interface IntakeDiagnosis {
@@ -34,6 +37,11 @@ export interface ClaimIntakeInput {
   attendingDoctor?: string;
   diagnoses: IntakeDiagnosis[];
   lineItems: IntakeLineItem[];
+  /**
+   * Family Hospital UAT P02.01 — the case's one currency, resolved on the
+   * server from the contract. Omitted by rails that let intake resolve it.
+   */
+  currency?: string;
 }
 
 /**
@@ -97,6 +105,7 @@ function toSubmission(data: ClaimIntakeInput, idempotencyKey: string) {
       unitCost: l.unitCost,
       billedAmount: l.billedAmount,
     })),
+    ...(data.currency ? { currency: data.currency } : {}),
   };
 }
 
@@ -154,11 +163,14 @@ export async function processAcceptedRunInline(claimId: string): Promise<void> {
 export async function runClaimIntake(
   caller: DirectEntryCaller,
   data: ClaimIntakeInput,
-  opts: { idempotencyKey: string },
+  opts: { idempotencyKey: string; origin?: PersistOrigin },
 ): Promise<DirectEntryOutcome> {
-  const billedAmount = data.lineItems.reduce((s, l) => s + l.billedAmount, 0);
+  // Decimal sum: money never goes through binary floating point (plan §4 rule 12).
+  const billedAmount = data.lineItems.reduce((s, l) => s.plus(new Decimal(String(l.billedAmount))), new Decimal(0)).toNumber();
   try {
-    const result = await ClaimIntakeService.submit(callerIdentity(caller), toSubmission(data, opts.idempotencyKey));
+    const result = await ClaimIntakeService.submit(callerIdentity(caller), toSubmission(data, opts.idempotencyKey), {
+      ...(opts.origin ? { origin: opts.origin } : {}),
+    });
 
     // A freshly ACCEPTED claim is decided in-request when possible; a REPLAY/LINK
     // already has (or is getting) its decision — never double-process.

@@ -26,6 +26,7 @@
  * No database access here: the CLI loads rows and applies the manifest.
  */
 import { createHash } from "node:crypto";
+import { recordedUnitFromNotes } from "../../src/lib/tariff-display";
 import {
   normalizeServiceText,
   pricingTermsKey,
@@ -88,11 +89,8 @@ export interface RemediationManifest {
   manifestHash: string;
 }
 
-/** "Unit: Vial" → "Vial" (the load wrote the facility's Unit column this way). */
-export function recordedUnit(notes: string | null): string | null {
-  const m = notes?.match(/(?:^|;|\s)Unit:\s*([^;]+?)\s*(?:;|$)/i);
-  return m ? m[1].trim() : null;
-}
+/** "Unit: Vial" → "Vial" — the one parser, shared with the provider catalogue. */
+export const recordedUnit = (notes: string | null): string | null => recordedUnitFromNotes(notes);
 
 /** "<" and ">" as words, so the engine's normaliser keeps them apart. */
 export function spellComparisonSymbols(name: string): string {

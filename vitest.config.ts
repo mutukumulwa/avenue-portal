@@ -23,6 +23,12 @@ export default defineConfig({
     exclude: [...configDefaults.exclude, '**/.claude/worktrees/**', '**/.next*/**'],
     alias: {
       '@': resolve(__dirname, './src'),
+      // `import "server-only"` marks a module unfit for a client bundle. Next
+      // resolves it itself (to an empty module in the server layer, a build
+      // error in the client layer — node_modules/next/dist/build/
+      // create-compiler-aliases.js). Vitest has no such layer, so give tests the
+      // same empty module the server gets. Family Hospital UAT P02.01.
+      'server-only': resolve(__dirname, './node_modules/next/dist/compiled/server-only/empty.js'),
     },
   },
 })

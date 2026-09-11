@@ -52,16 +52,16 @@ Status values: `NOT_STARTED` · `IN_PROGRESS` · `DONE` · `BLOCKED (<gate>)` ·
 | P00.03 Freeze unreliable UAT records | DONE | see §3 | 4 claims + 1 pre-auth frozen, register marked, UAT paused |
 | P01.01 Read-only tariff preflight | DONE | see §3 | production result **NO-GO (G2)** → P01.02 required |
 | P01.02 Attach/reimport safely | DONE | see §3 | owner approved 2026-09-11; applied to production, receipt `cmtwmk5920000xavq6zrbs74p`; production preflight now PASS |
-| P01.03 Standalone-tariff semantics | IN_PROGRESS | see §3 | readers aligned; catalogue parity test lands with P02.03 |
-| P02.01 Provider case-context resolver | NOT_STARTED | | |
-| P02.02 Member resolution surface | NOT_STARTED | | |
-| P02.03 Provider-scoped service catalogue | NOT_STARTED | | |
-| P02.04 Revalidate selected tariffs on submit | NOT_STARTED | | |
-| P03.01 Provider member field | NOT_STARTED | | |
-| P03.02 Diagnosis combobox | NOT_STARTED | | |
-| P03.03 Category-first service combobox | NOT_STARTED | | |
-| P03.04 Shared money input | NOT_STARTED | | |
-| P03.05 Shared date and benefit fields | NOT_STARTED | | |
+| P01.03 Standalone-tariff semantics | DONE | see §3 | readers aligned; four-reader parity test green |
+| P02.01 Provider case-context resolver | DONE | see §3 | |
+| P02.02 Member resolution surface | DONE | see §3 | the eligibility link itself is switched in P04.04 |
+| P02.03 Provider-scoped service catalogue | DONE | see §3 | behind provider-scoped flag `providerTariffCatalog`, default OFF (P08.04 step 6) |
+| P02.04 Revalidate selected tariffs on submit | IN_PROGRESS | see §3 | claim paths + schema done; pre-auth snapshot lands with P04.03; migration not yet applied to any shared database |
+| P03.01 Provider member field | DONE | see §3 | |
+| P03.02 Diagnosis combobox | DONE | see §3 | |
+| P03.03 Category-first service combobox | DONE | see §3 | |
+| P03.04 Shared money input | DONE | see §3 | |
+| P03.05 Shared date and benefit fields | DONE | see §3 | "every form reads the list" is guarded with P04 |
 | P04.01 New claim | NOT_STARTED | | |
 | P04.02 Correction and resubmission | NOT_STARTED | | |
 | P04.03 New and amended pre-auth | NOT_STARTED | | |
@@ -205,7 +205,8 @@ Files changed:           scripts/family-hospital-tariff-remediation.ts,
                          scripts/uat/family-tariff-rehearsal-copy.ts
 Schema migration/backfill: none (data only; production apply NOT yet run)
 Read-only preflight artifact: evidence/P01.02-manifest-FH-P0102-20260911.{md,json}
-Automated tests added/changed: tests/scripts/family-tariff-remediation-plan.test.ts (11)
+Automated tests added/changed: tests/scripts/family-tariff-remediation-plan.test.ts (10; an earlier
+                         revision of this entry said 11 — the file has always had 10)
 Commands and results:    [PROD, read-only] dry run --batch-ref FH-P0102-20260911 → exit 0,
                            manifest SHA-256 78982cfa5be38e2d9216c1e3aedb07339eb525ab611897716014009becc8079a:
                            30 groups (25 EQUIVALENT_DUPLICATE, 2 TRUE_DUPLICATE, 2 DISTINCT_BY_UNIT,
@@ -265,9 +266,30 @@ Rollback (if ever needed): --rollback --batch-ref FH-P0102-20260911 --operator-u
   (rehearsed; restores exactly the 33 prior rows and retires the 6 replacements, deletes nothing).
 ```
 
-### P01.03 — Standalone-tariff semantics (in progress)
+### P01.03 — Standalone-tariff semantics
 
-Done so far (tests: 32 impacted unit suites green, 306 passed / 21 skipped real-DB):
+```text
+Task ID:                 P01.03
+Defects covered:         FH-02, FH-03 (one reader for every pricing surface)
+Starting/ending SHA:     2374ab6 → 5442e19 (readers), P02/P03 commit (parity test)
+Files changed:           src/server/services/contract-engine/{tariff-selection,engine}.ts,
+                         src/server/services/provider-contracts.service.ts,
+                         src/server/services/claims.service.ts, claim-adjudication.service.ts,
+                         claim-decision.service.ts; tests/services/tariff-parity.test.ts
+Schema migration/backfill: none
+Read-only preflight artifact: n/a
+Automated tests added/changed: provider-tariff-desc-match (BD-04) re-pointed at the engine path with
+                         unchanged assertions; provider-tariff-client (G5.4) moved to contract-bound
+                         rows + 2 cases (standalone never prices; CON-010 reported, not picked);
+                         claim-decision.service + CON-010 case; tariff-parity (8, new)
+Commands and results:    npm run typecheck → clean; 32 impacted unit suites green at 5442e19
+Browser scenarios and evidence paths: n/a
+Feature/config changes:  none
+Data mutations and operation IDs: none
+Rollback tested:         n/a (code only)
+Residual risk:           DEC-FH-X3 — 28 standalone rows of 6 seed providers no longer price any claim
+Reviewer/sign-off:       pending
+```
 
 - The engine's candidate query, day bounds, normaliser and code/description selection moved
   verbatim into `contract-engine/tariff-selection.ts`; `engine.ts` calls them (30 existing engine and
@@ -277,10 +299,206 @@ Done so far (tests: 32 impacted unit suites green, 306 passed / 21 skipped real-
   claim's branch and `admissionDate ?? dateOfService`. It reports `contractResolution`.
 - `ClaimDecisionService.assessCeiling` fails closed on CON-010 (deterministic 0 with a specific
   message). Impact recorded as DEC-FH-X3.
-- Tests: `provider-tariff-desc-match` (BD-04) re-pointed at the engine path with unchanged
-  assertions; `provider-tariff-client` (G5.4) moved from standalone to contract-bound rows, plus two
-  new cases (standalone never prices; CON-010 reported, not picked); `claim-decision.service` gains
-  the CON-010 case.
+- `tests/services/tariff-parity.test.ts` feeds one fixture — five Family rows plus three decoys with
+  the same service names (a standalone row, a row on another contract, an inactive row) — to the
+  provider catalogue, the submit-time canonicaliser, `ProviderContractsService.resolveClaimLineRates`
+  and `ContractEngine`, through a mock database that evaluates the engine's real `where` clauses. All
+  four select the same row at the same rate; no decoy surfaces in search or is accepted at submit; a
+  billed price above the contracted rate is kept while the contracted rate is re-read from the row.
 
-Remaining: the cross-reader parity test including the provider catalogue (P02.03) and the stored
-capture snapshot (P02.04).
+### P02.01 — Provider case-context resolver
+
+```text
+Task ID:                 P02.01
+Defects covered:         FH-04, FH-02 (currency comes from the contract), FH-12 (benefit validated)
+Starting/ending SHA:     2267607 → P02/P03 commit
+Files changed:           src/server/services/provider-case-context.service.ts (server-only),
+                         src/lib/provider-capture-contract.ts (client-safe types),
+                         src/lib/provider-benefit-options.ts
+Schema migration/backfill: none
+Automated tests added/changed: tests/services/provider-case-context.service.test.ts (23)
+Commands and results:    npm run typecheck → clean; suite green
+Feature/config changes:  none
+Data mutations and operation IDs: none (each resolve writes the same ProviderEligibilityCheck evidence
+                         row the eligibility screen writes — no new kind of record)
+Rollback tested:         n/a (code only)
+Residual risk:           none identified beyond P08 review
+Reviewer/sign-off:       pending
+```
+
+What it does, in the plan's order: permission per purpose (claim / correction / pre-auth /
+eligibility); tenant, provider, actor and branches from the session only; branch chosen among the
+user's allowed branches (auto when there is one, `BRANCH_REQUIRED` when several, `FORBIDDEN`
+otherwise); service date strict `YYYY-MM-DD`, never after the Kampala operating date; member by exact
+normalised number inside the entitlement scope; eligibility through `ProviderEligibilityService.check`;
+contract through `ContractLifecycleService.precheck` with the member's client. Outcomes are distinct:
+`RESOLVED`, `NOT_FOUND` (identical for "no such member" and "not yours" — nothing to enumerate),
+`INELIGIBLE` (shown, cannot proceed), `AMBIGUOUS_CONTRACT` (CON-010), `NO_ACTIVE_CONTRACT`,
+`FORBIDDEN`, `BRANCH_REQUIRED`, `INVALID` (date or benefit), `UNAVAILABLE`. The DTO carries an opaque member reference, name, masked
+number (last four), eligibility state and reason, scheme/package names, branch, contract/version,
+currency, service date, benefit, whether the price list is searchable, and the unlisted-service
+policy — no DOB, phone, email, address or diagnoses. `handoffFromEligibilityCheck` turns an
+eligibility check id (own tenant + provider, ELIGIBLE, under 24 h old, allowed branch) into a
+reference that is re-resolved like any other.
+
+### P02.02 — Member resolution without identifiers in URLs
+
+```text
+Task ID:                 P02.02
+Defects covered:         FH-04
+Starting/ending SHA:     2267607 → P02/P03 commit
+Files changed:           src/app/provider/capture-actions.ts ("use server": resolveCaseContextAction,
+                         searchServiceCatalogAction, searchDiagnosesAction — async exports only),
+                         src/server/services/capture-telemetry.ts,
+                         tests/audit-coverage/catalogue.ts (the three actions are READ_ONLY)
+Schema migration/backfill: none
+Automated tests added/changed: covered by the resolver suite and tests/components/provider-member-field
+Commands and results:    typecheck clean; audit-coverage suite green
+Feature/config changes:  none
+Data mutations and operation IDs: none
+Residual risk:           the eligibility page's "File a claim" link still carries ?memberId= until P04.04
+Reviewer/sign-off:       pending
+```
+
+Server Actions are POSTs; the member number travels in the request body only. Every action
+re-authenticates and rebuilds the provider context (`ProviderAccessService.resolveUserContext`); a
+`ProviderAccessError` becomes a safe `FORBIDDEN` result, and Next's redirect is re-thrown. Telemetry is
+one structured line per call with a whitelist of keys (correlation id, tenant/provider/actor ids,
+purpose, outcome, reason code, duration, counts) — never a member number, name or query text.
+
+### P02.03 — Provider-scoped service catalogue
+
+```text
+Task ID:                 P02.03
+Defects covered:         FH-02, FH-06, FH-07 (server side)
+Starting/ending SHA:     2267607 → P02/P03 commit
+Files changed:           src/server/services/provider-service-catalog.service.ts (server-only),
+                         src/server/services/provider-access-settings.service.ts (flag),
+                         src/lib/tariff-display.ts (unit label; the "Unit: Vial" parser, moved
+                         verbatim from the P01.02 planner — same regex, so the manifest is unchanged),
+                         scripts/lib/family-tariff-remediation-plan.ts (delegates to it)
+Schema migration/backfill: none
+Automated tests added/changed: tests/services/provider-service-catalog.service.test.ts (21),
+                         tests/services/provider-access-settings.test.ts (+3),
+                         tests/services/provider-eligibility.service.test.ts (parse shape gains the
+                         two new flag fields)
+Commands and results:    typecheck clean; suites green
+Feature/config changes:  NEW Tenant.config.providerAccess.providerTariffCatalog (global) and
+                         tariffCatalogProviderIds (allow-list) — default OFF, not set anywhere yet
+Data mutations and operation IDs: none
+Residual risk:           the index is cached per server instance for 60 s (never on submit, which
+                         always re-reads); a deactivation shows in search within a minute
+Reviewer/sign-off:       pending
+```
+
+Rows come from `loadCandidateTariffs` — the engine's own query — and are judged by the shared
+`TariffResolutionIndex`: a row the engine would shadow or cannot tell apart is listed but
+unselectable, with the reason; a missing rate, a non-FIXED/PER_DIEM rate type or a currency other than
+the contract's is unselectable too. Search needs two meaningful characters, is inside the chosen
+category, matches description first and code second, ranks deterministically and caps at 20 (50
+max). When nothing matches in the category the response names the categories where it did match. No
+`CPTCode.averageCost` is read. 120 searches a minute per user (the repository's in-memory limiter, so
+per server instance); beyond that the action refuses and writes one
+`PROVIDER_CATALOGUE_SEARCH_THROTTLED` audit row per window, not one per keystroke.
+
+With the flag OFF (today, everywhere) the catalogue refuses searches and the case says so: lines are
+captured by description with "Contract rate unavailable — manual review" — the plan's P08.05 rollback
+state — and never with a global price.
+
+### P02.04 — Revalidate every selected tariff on submission (claims done; pre-auth with P04.03)
+
+```text
+Task ID:                 P02.04
+Defects covered:         FH-02, FH-07 (authority)
+Starting/ending SHA:     2267607 → P02/P03 commit
+Files changed:           prisma/schema.prisma, prisma/migrations/20260911000100_claim_line_selected_tariff/,
+                         src/server/services/provider-service-catalog.service.ts (canonicalizeLines),
+                         src/server/services/claim-intake.ts, claim-intake/persist.ts,
+                         claim-replacement/{submission,service}.ts, claim-resubmission/submit.service.ts,
+                         claim-decision.service.ts
+Schema migration/backfill: ADDITIVE — ClaimLine.selectedProviderTariffId TEXT NULL, index, FK →
+                         ProviderTariff ON DELETE RESTRICT. No backfill (existing lines stay null =
+                         "not captured from the price list"). Generated with prisma migrate diff
+                         against a throwaway database carrying every earlier migration. NOT applied
+                         to the local shared database or production; production sizing read-only:
+                         64 ClaimLine rows.
+Automated tests added/changed: claim-intake-persist (+3), claim-decision.service (+1),
+                         provider-service-catalog (canonicaliser cases), tariff-parity
+Commands and results:    npx prisma generate; typecheck clean; suites green
+Feature/config changes:  none
+Data mutations and operation IDs: none
+Rollback tested:         not yet — the migration is rehearsed with the P08 deployment sequence
+Residual risk:           see "shared Prisma client" below
+Reviewer/sign-off:       pending (schema/security review, P08.04 step 1)
+```
+
+`canonicalizeLines` re-reads every selected tariff id inside the case's contract/version, branch,
+client and date, and takes name, category, codes, contracted rate and currency from that row; a
+stale, inactive, expired, future, foreign, wrong-category, wrong-currency or unselectable id is a
+field error "Select the service again". An unlisted line is allowed only where the contract's policy
+allows one (REFER_FOR_REVIEW), needs a plain description, carries no tariff id and no contracted rate,
+and — when the catalogue is on — may not be the exact name of a listed service. The billed quantity and
+unit price are kept as typed (decimal-validated). Intake persists `selectedProviderTariffId` and the
+captured rate in the existing `tariffRate` snapshot through server-built `PersistOrigin` provenance
+(a line number the claim does not have is refused); decision-time tariff stamping leaves captured lines
+alone. `runClaimIntake` now sums decimals (no float), passes the case currency and the provenance;
+replacement and resubmission accept the same.
+
+**Shared Prisma client (side effect to know about).** This worktree's `node_modules` is a symlink to
+the main checkout's, so `npx prisma generate` here also regenerated the main checkout's client with
+the new `ClaimLine` column. Until the migration is applied to a database, code in the main checkout
+that reads `ClaimLine` rows from a database without the column fails with "column does not exist".
+Running `npx prisma generate` in the main checkout restores its client (and this worktree must then
+regenerate before its own tests).
+
+### P03 — Shared provider form controls
+
+```text
+Task IDs:                P03.01–P03.05
+Defects covered:         FH-04, FH-05, FH-06, FH-07, FH-09 (control), FH-10, FH-12
+Starting/ending SHA:     2267607 → P02/P03 commit
+Files changed:           src/components/provider/{ProviderMemberField,AsyncCombobox,DiagnosisCombobox,
+                         ServiceLineEditor,CaseFields,capture-styles}.tsx/.ts,
+                         src/components/forms/MoneyInput.tsx, src/lib/money.ts,
+                         src/server/services/provider-diagnosis-search.service.ts,
+                         src/app/provider/eligibility/contract.ts (reads the canonical benefit list),
+                         vitest.config.ts ("server-only" resolves to Next's empty module in tests)
+Schema migration/backfill: none
+Automated tests added/changed: tests/components/provider-member-field (10), provider-diagnosis-combobox
+                         (8), provider-service-line-editor (11), provider-money-input (8),
+                         provider-case-fields (9); tests/lib/money (+ grouping/canonical/format
+                         cases, 55 total), provider-benefit-options (3);
+                         tests/services/provider-diagnosis-search.service (8)
+Commands and results:    typecheck clean; eslint clean on every changed file (one pre-existing
+                         warning in provider-access-settings.test.ts); the 15 P01–P03 suites: 253
+                         passed; the wider impacted set (claims, contract engine, pre-auth intake,
+                         provider services, audit coverage, scripts): 1,030 passed / 326 skipped
+                         (real-database suites that self-skip without a test database)
+Feature/config changes:  none
+Data mutations and operation IDs: none
+Residual risk:           none of these controls is on a page yet — P04 wires them
+Reviewer/sign-off:       pending (provider UX review, P08.04 step 1)
+```
+
+- **Member field (P03.01):** states empty, resolving, eligible, ineligible, not found, stale,
+  unavailable, forbidden-safe, branch-required — each in words, not colour; result in an `aria-live`
+  region; the error takes focus after an explicit lookup. Looks up on "Find member" or on leaving the
+  box with a plausible number, never per keystroke; a date or benefit change makes the case stale; a
+  superseded reply is ignored. Testing found a real defect in the first cut — a successful lookup
+  re-ran the mount-time lookup (a second evidence row); fixed, with a regression test.
+- **Diagnosis combobox (P03.02):** one shared WAI-ARIA combobox (`AsyncCombobox`) — two characters,
+  debounce, request sequence guard, arrows/Home/End/Enter/Escape, clear button; code, description and
+  category only. The server searches `ICD10Code` by every word across code, description and category,
+  selects no price column, caps at 20, and re-validates the code at submit.
+- **Service line editor (P03.03):** category → search inside it → read-only unit/codes → quantity →
+  billed price (suggested from the contract, editable) → contracted rate (a separate fact) → line
+  total and pre-authorisation warning. A category change remounts the search and clears a selection
+  from another category; an unselectable row is visible but disabled; "Service not on the price list"
+  gives a description-first line labelled for manual review. The submission shape is the tariff id,
+  category, quantity and billed price — never a rate, name or currency.
+- **Money (P03.04):** `600000`, `600,000`, `600 000` (space, NBSP, narrow NBSP) accepted consistently;
+  mixed or wrong grouping, negatives, letters, too many decimals refused with a reason; formatted
+  `en-UG` on blur; invalid text left as typed; canonical decimal string for submission.
+- **Date and benefit (P03.05):** the date field shows the server's Kampala date and uses it as `max`;
+  the test pins 21:00–23:59 UTC, where the old `toISOString()` default showed yesterday. One benefit
+  list derived from the enum (CUSTOM hidden, DEC-FH-02) with the admin form's labels.

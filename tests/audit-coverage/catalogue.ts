@@ -91,6 +91,16 @@ export const AUDIT_EXCLUSIONS: Record<string, string> = {
   // record for this surface.
   "provider/eligibility/actions.ts:checkEligibilityAction":
     "READ_ONLY — eligibility is a lookup; the service records its own ProviderEligibilityCheck evidence row (actor, provider, member, service date, result)",
+  // Family Hospital UAT P02.02 / P02.03 / P03.02 — the provider capture lookups.
+  // Reads only. Member resolution goes through ProviderEligibilityService.check,
+  // which records its own ProviderEligibilityCheck evidence row; catalogue and
+  // diagnosis search write nothing per keystroke by design (plan §9.5) — only an
+  // abnormal-enumeration throttle writes an audit row.
+  "provider/capture-actions.ts:resolveCaseContextAction":
+    "READ_ONLY — member/cover lookup; the eligibility service records its own ProviderEligibilityCheck evidence row",
+  "provider/capture-actions.ts:searchServiceCatalogAction":
+    "READ_ONLY — the facility's own price-list search; throttled enumeration writes PROVIDER_CATALOGUE_SEARCH_THROTTLED",
+  "provider/capture-actions.ts:searchDiagnosesAction": "READ_ONLY — ICD-10 terminology search; no business state",
   "(auth)/reset/actions.ts:confirmResetAction": "PRE_EXISTING_GAP — audit wiring pending",
   "(auth)/reset/actions.ts:requestResetAction": "PRE_EXISTING_GAP — audit wiring pending",
   // WP-3.5G: confirmHRImportAction + addMemberEndorsementAction now call writeAudit —

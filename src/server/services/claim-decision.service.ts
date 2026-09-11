@@ -692,9 +692,18 @@ export class ClaimDecisionService {
       }
 
       // Tariff stamping (audit trail) — contract-aware resolution.
+      // Family Hospital UAT P02.04: a line captured against a selected tariff
+      // already holds the contracted rate as CAPTURED; overwriting it here would
+      // erase the difference between "rate at capture" and anything later, which
+      // is exactly the provenance the plan asks to keep. Stamp the rest only.
+      const captured = await tx.claimLine.findMany({
+        where: { claimId, selectedProviderTariffId: { not: null } },
+        select: { id: true },
+      });
+      const capturedIds = new Set(captured.map((c) => c.id));
       const resolved = await ClaimsService.resolveClaimContractRates(tenantId, claimId);
       for (const line of resolved.lines) {
-        if (line.agreedRate !== null) {
+        if (line.agreedRate !== null && !capturedIds.has(line.lineId)) {
           await tx.claimLine.update({ where: { id: line.lineId }, data: { tariffRate: line.agreedRate } });
         }
       }

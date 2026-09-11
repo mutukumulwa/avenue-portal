@@ -96,3 +96,32 @@ describe("F3.3 — persistClaimWithinTransaction", () => {
     expect(r).toEqual({ kind: "STRONG_LINK", claimId: "clm-old", claimNumber: "CLM-2026-00003" });
   });
 });
+
+describe("Family Hospital UAT P02.04 — capture provenance", () => {
+  const lines = (tx: unknown) =>
+    ((tx as { claim: { create: { mock: { calls: unknown[][] } } } }).claim.create.mock.calls[0][0] as { data: { claimLines: { create: Array<Record<string, unknown>> } } }).data.claimLines.create;
+
+  it("stamps the selected tariff and captured rate on exactly the matching line", async () => {
+    const tx = mockTx();
+    await persistClaimWithinTransaction(tx, input({ origin: { lineProvenance: [{ lineNumber: 2, selectedProviderTariffId: "tariff-fbc", tariffRate: "25000" }] } }));
+    const [l1, l2] = lines(tx);
+    expect(l1).not.toHaveProperty("selectedProviderTariffId");
+    expect(l2.selectedProviderTariffId).toBe("tariff-fbc");
+    expect((l2.tariffRate as { toString(): string }).toString()).toBe("25000");
+    expect((l2.unitCost as { toString(): string }).toString()).toBe("2000"); // billed is kept apart
+  });
+
+  it("records an unlisted line's provenance as explicitly no tariff and no contracted rate", async () => {
+    const tx = mockTx();
+    await persistClaimWithinTransaction(tx, input({ origin: { lineProvenance: [{ lineNumber: 1, selectedProviderTariffId: null, tariffRate: null }] } }));
+    expect(lines(tx)[0]).toMatchObject({ selectedProviderTariffId: null, tariffRate: null });
+  });
+
+  it("refuses provenance for a line the claim does not have", async () => {
+    const tx = mockTx();
+    await expect(
+      persistClaimWithinTransaction(tx, input({ origin: { lineProvenance: [{ lineNumber: 7, selectedProviderTariffId: "x", tariffRate: "1" }] } })),
+    ).rejects.toMatchObject({ kind: "VALIDATION" });
+    expect((tx as { claim: { create: { mock: { calls: unknown[] } } } }).claim.create.mock.calls).toHaveLength(0);
+  });
+});

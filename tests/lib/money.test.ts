@@ -176,3 +176,58 @@ describe("P01.05 parsePercent — the DEF-021 defence", () => {
     expect(absent.ok).toBe(false);
   });
 });
+
+// ─── Family Hospital UAT FH-10 / P03.04 ─────────────────────────────────────
+// The facility typed "600,000" into a pre-authorisation estimate and was told
+// "Enter a valid estimated cost." — a native number input hands "" to the form
+// for any grouped text. These are the plan's accepted and rejected examples.
+import { formatGroupedAmount, toCanonicalMoney } from "@/lib/money";
+
+describe("FH-10 parseMoney — Ugandan grouping", () => {
+  it.each([
+    ["600000", "600000"],
+    ["600,000", "600000"],
+    ["600 000", "600000"],
+    ["600\u00A0000", "600000"], // no-break space (what an en-UG formatter can emit)
+    ["600\u202F000", "600000"], // narrow no-break space
+    ["1,540.50", "1540.5"],
+    ["UGX 600 000", "600000"],
+    ["12 345 678", "12345678"],
+  ])("accepts %j as %s", (input, expected) => {
+    expect(value(input)).toBe(expected);
+  });
+
+  it.each([
+    ["-600000", "NEGATIVE"],
+    ["six hundred", "NOT_A_NUMBER"],
+    ["", "EMPTY"],
+    ["600000.123", "TOO_MANY_DECIMALS"],
+    ["1234567890123456", "TOO_LARGE"],
+    ["60,0000", "NOT_A_NUMBER"], // a grouping typo is refused, never read as 600,000
+    ["6,00,000", "NOT_A_NUMBER"],
+    ["600,000 000", "NOT_A_NUMBER"], // mixed separators
+    ["600 000k", "MAGNITUDE_SUFFIX"],
+  ])("rejects %j (%s)", (input, reason) => {
+    const r = parseMoney(input);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.reason).toBe(reason);
+  });
+
+  it("rejects NaN and Infinity passed as numbers", () => {
+    expect(parseMoney(Number.NaN).ok).toBe(false);
+    expect(parseMoney(Number.POSITIVE_INFINITY).ok).toBe(false);
+  });
+});
+
+describe("FH-10 canonical and display helpers", () => {
+  it("submits canonical decimal text — no grouping, no exponent", () => {
+    expect(toCanonicalMoney(new Prisma.Decimal("600000.00"))).toBe("600000");
+    expect(toCanonicalMoney(new Prisma.Decimal("1e21"))).toBe("1000000000000000000000");
+  });
+  it("groups for display without going through a float", () => {
+    expect(formatGroupedAmount("600000")).toBe("600,000");
+    expect(formatGroupedAmount("1540.5")).toBe("1,540.50");
+    expect(formatGroupedAmount("999999999999999")).toBe("999,999,999,999,999"); // 15 digits, exact
+    expect(formatGroupedAmount("50.6")).toBe("50.60");
+  });
+});
