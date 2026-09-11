@@ -5,6 +5,7 @@ import {
   RiskTier,
 } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { countsInTotals } from "@/lib/claim-totals";
 
 type RefreshRange = {
   tenantId?: string;
@@ -257,12 +258,24 @@ export class AnalyticsRefreshService {
       orderBy: { dateOfService: "asc" },
     });
 
+    // DEC-FH-X11: every analytics figure is a total, so a withdrawn or superseded
+    // claim has no encounter facts — and loses any written before it left the
+    // totals. Everything built from the facts (MLR, scorecards, risk, renewals,
+    // alerts, the analytics reports) follows. The claim itself is untouched.
     let upserted = 0;
+    const outOfTotals: string[] = [];
     for (const claim of claims) {
+      if (!countsInTotals(claim)) {
+        outOfTotals.push(claim.id);
+        continue;
+      }
       upserted += await this.upsertEncounterFactsForClaim(claim, caseMixByFamily);
     }
+    const removed = outOfTotals.length > 0
+      ? (await prisma.analyticsEncounterFact.deleteMany({ where: { sourceClaimId: { in: outOfTotals } } })).count
+      : 0;
 
-    return { claims: claims.length, facts: upserted };
+    return { claims: claims.length, facts: upserted, removed };
   }
 
   private static async upsertEncounterFactsForClaim(

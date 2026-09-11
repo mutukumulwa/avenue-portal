@@ -2,6 +2,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure, superAdminProcedure } from "../trpc";
 import { prisma } from "@/lib/prisma";
+import { COUNTED_IN_TOTALS } from "@/lib/claim-totals";
 import { ServiceCategoryService } from "@/server/services/service-category.service";
 import { addTariffSchema, detectTariffOverlap } from "@/lib/validation/tariff";
 
@@ -9,7 +10,8 @@ export const providersRouter = createTRPCRouter({
   getAll: protectedProcedure.query(async ({ ctx }) => {
     return prisma.provider.findMany({
       where: { tenantId: ctx.tenantId },
-      include: { _count: { select: { claims: true, preauths: true } } },
+      // DEC-FH-X11: claim counts leave out withdrawn and superseded claims.
+      include: { _count: { select: { claims: { where: COUNTED_IN_TOTALS }, preauths: true } } },
       orderBy: { name: "asc" },
     });
   }),
@@ -21,7 +23,7 @@ export const providersRouter = createTRPCRouter({
         where: { id: input.id, tenantId: ctx.tenantId },
         include: {
           tariffs: { orderBy: { effectiveFrom: "desc" } },
-          _count: { select: { claims: true, preauths: true } },
+          _count: { select: { claims: { where: COUNTED_IN_TOTALS }, preauths: true } },
         },
       });
     }),

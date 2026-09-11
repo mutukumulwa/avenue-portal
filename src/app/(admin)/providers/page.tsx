@@ -5,6 +5,7 @@ import { PlusCircle } from "lucide-react";
 import Link from "next/link";
 import { ProvidersTable } from "./ProvidersTable";
 import { Pagination } from "@/components/ui/Pagination";
+import { COUNTED_IN_TOTALS } from "@/lib/claim-totals";
 
 const PROVIDER_TYPES = ["HOSPITAL", "CLINIC", "PHARMACY", "LABORATORY", "DENTAL", "OPTICAL", "REHABILITATION"] as const;
 const PROVIDER_TIERS = ["OWN", "PARTNER", "PANEL"] as const;
@@ -45,7 +46,7 @@ export default async function ProvidersPage({
   const [providers, total, tierGroups] = await Promise.all([
     prisma.provider.findMany({
       where,
-      include: { _count: { select: { claims: true } } },
+      include: { _count: { select: { claims: { where: COUNTED_IN_TOTALS } } } }, // DEC-FH-X11
       orderBy: { name: "asc" },
       take: PAGE_SIZE,
       skip: (page - 1) * PAGE_SIZE,

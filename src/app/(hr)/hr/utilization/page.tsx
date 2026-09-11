@@ -2,6 +2,7 @@ import { requireRole, ROLES } from "@/lib/rbac";
 import { prisma } from "@/lib/prisma";
 import { notFound } from "next/navigation";
 import { Activity, ShieldCheck, FileText, AlertTriangle } from "lucide-react";
+import { COUNTED_IN_TOTALS } from "@/lib/claim-totals";
 
 export default async function HRUtilizationPage() {
   const session = await requireRole(ROLES.HR);
@@ -15,11 +16,13 @@ export default async function HRUtilizationPage() {
     where: { id: groupId, tenantId: session.user.tenantId }
   });
 
-  // 2. Aggregate all claim amounts for this group
+  // 2. Aggregate all claim amounts for this group. DEC-FH-X11: a withdrawn or
+  // superseded claim is never one of the group's claims or spend.
   const claimAgg = await prisma.claim.aggregate({
     where: {
       tenantId: session.user.tenantId,
-      member: { groupId }
+      member: { groupId },
+      ...COUNTED_IN_TOTALS,
     },
     _count: true,
     _sum: {
@@ -33,7 +36,8 @@ export default async function HRUtilizationPage() {
     by: ["benefitCategory"],
     where: {
       tenantId: session.user.tenantId,
-      member: { groupId }
+      member: { groupId },
+      ...COUNTED_IN_TOTALS,
     },
     _count: true,
     _sum: { approvedAmount: true }

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Download } from "lucide-react";
 import { ExportPDFButton } from "@/components/pdf/ExportPDFButton";
+import { COUNTED_IN_TOTALS, countsInTotals } from "@/lib/claim-totals";
 
 const REPORT_TITLES: Record<string, string> = {
   // Existing
@@ -74,9 +75,11 @@ function reportGroupWhere(scope?: AnalyticsAccessScope) {
 
 async function getClaimsData(tenantId: string): Promise<ReportResult> {
   // Summary from tenant-wide aggregates (not the capped table sample); the table
-  // stays bounded and the CSV export is full.
-  const [agg, rows] = await Promise.all([
-    prisma.claim.aggregate({ where: { tenantId }, _count: { _all: true }, _sum: { billedAmount: true, approvedAmount: true } }),
+  // stays bounded and the CSV export is full. DEC-FH-X11: the summary counts no
+  // withdrawn or superseded claim; the table and its record count still list them.
+  const [agg, recordCount, rows] = await Promise.all([
+    prisma.claim.aggregate({ where: { tenantId, ...COUNTED_IN_TOTALS }, _count: { _all: true }, _sum: { billedAmount: true, approvedAmount: true } }),
+    prisma.claim.count({ where: { tenantId } }),
     prisma.claim.findMany({
       where: { tenantId },
       select: {
@@ -89,11 +92,11 @@ async function getClaimsData(tenantId: string): Promise<ReportResult> {
       take: 100,
     }),
   ]);
-  const totalCount = agg._count._all;
+  const countedClaims = agg._count._all;
   const total = Number(agg._sum.billedAmount ?? 0);
   const approved = Number(agg._sum.approvedAmount ?? 0);
   const kpis = [
-    { label: "Total Claims",        value: totalCount.toLocaleString() },
+    { label: "Total Claims",        value: countedClaims.toLocaleString() },
     { label: "Total Billed (UGX)",  value: total.toLocaleString() },
     { label: "Total Approved (UGX)",value: approved.toLocaleString() },
     { label: "Loss Ratio",          value: total > 0 ? `${((approved / total) * 100).toFixed(1)}%` : "—" },
@@ -109,7 +112,7 @@ async function getClaimsData(tenantId: string): Promise<ReportResult> {
     r.status.replace(/_/g, " "),
     new Date(r.createdAt).toLocaleDateString("en-UG"),
   ]);
-  return { kpis, headers, data, totalCount };
+  return { kpis, headers, data, totalCount: recordCount };
 }
 
 async function getMembershipData(tenantId: string): Promise<ReportResult> {
@@ -590,11 +593,13 @@ async function getAdmissionsData(tenantId: string): Promise<ReportResult> {
   // all. Source admissions from ClinicalCase (billed = the case's accrued total)
   // plus direct inpatient claims that never opened a case (caseId: null). Counts
   // + billed are full-tenant via aggregates; the list shows the 200 most recent.
-  const [caseAgg, directAgg, caseProviders, directProviders, caseRows, directRows] = await Promise.all([
+  // DEC-FH-X11: a withdrawn or superseded direct claim is listed but not totalled.
+  const [caseAgg, directAgg, directRecords, caseProviders, directProviders, caseRows, directRows] = await Promise.all([
     prisma.clinicalCase.aggregate({ where: { tenantId }, _count: { _all: true }, _sum: { accruedAmount: true } }),
-    prisma.claim.aggregate({ where: { tenantId, serviceType: "INPATIENT", caseId: null }, _count: { _all: true }, _sum: { billedAmount: true } }),
+    prisma.claim.aggregate({ where: { tenantId, serviceType: "INPATIENT", caseId: null, ...COUNTED_IN_TOTALS }, _count: { _all: true }, _sum: { billedAmount: true } }),
+    prisma.claim.count({ where: { tenantId, serviceType: "INPATIENT", caseId: null } }),
     prisma.clinicalCase.findMany({ where: { tenantId }, distinct: ["providerId"], select: { providerId: true } }),
-    prisma.claim.findMany({ where: { tenantId, serviceType: "INPATIENT", caseId: null }, distinct: ["providerId"], select: { providerId: true } }),
+    prisma.claim.findMany({ where: { tenantId, serviceType: "INPATIENT", caseId: null, ...COUNTED_IN_TOTALS }, distinct: ["providerId"], select: { providerId: true } }),
     prisma.clinicalCase.findMany({
       where: { tenantId },
       select: {
@@ -617,7 +622,8 @@ async function getAdmissionsData(tenantId: string): Promise<ReportResult> {
     }),
   ]);
 
-  const totalCount     = caseAgg._count._all + directAgg._count._all;
+  const admissions     = caseAgg._count._all + directAgg._count._all;
+  const totalCount     = caseAgg._count._all + directRecords;
   const totalBilled    = Number(caseAgg._sum.accruedAmount ?? 0) + Number(directAgg._sum.billedAmount ?? 0);
   const uniqueProviders = new Set([...caseProviders, ...directProviders].map((p) => p.providerId)).size;
   const losOf = (adm: Date | null, dis: Date | null, stored?: number | null): number | null => {
@@ -628,20 +634,20 @@ async function getAdmissionsData(tenantId: string): Promise<ReportResult> {
   const merged = [
     ...caseRows.map((c) => ({
       ref: c.caseNumber, adm: c.admissionDate, dis: c.dischargeDate, los: losOf(c.admissionDate, c.dischargeDate),
-      billed: Number(c.accruedAmount), status: c.status,
+      billed: Number(c.accruedAmount), status: c.status, counted: true,
       who: `${c.member.firstName} ${c.member.lastName} (${c.member.memberNumber})`, group: c.member.group.name, provider: c.provider.name,
     })),
     ...directRows.map((r) => ({
       ref: r.claimNumber, adm: r.admissionDate, dis: r.dischargeDate, los: losOf(r.admissionDate, r.dischargeDate, r.lengthOfStay),
-      billed: Number(r.billedAmount), status: r.status,
+      billed: Number(r.billedAmount), status: r.status, counted: countsInTotals(r),
       who: `${r.member.firstName} ${r.member.lastName} (${r.member.memberNumber})`, group: r.member.group.name, provider: r.provider.name,
     })),
   ].sort((a, b) => (b.adm ? new Date(b.adm).getTime() : 0) - (a.adm ? new Date(a.adm).getTime() : 0)).slice(0, 200);
-  const losVals = merged.map((r) => r.los).filter((n): n is number => n != null);
+  const losVals = merged.filter((r) => r.counted).map((r) => r.los).filter((n): n is number => n != null);
   const avgLOS = losVals.length ? losVals.reduce((s, n) => s + n, 0) / losVals.length : 0;
 
   const kpis = [
-    { label: "Total Admissions",    value: totalCount.toLocaleString() },
+    { label: "Total Admissions",    value: admissions.toLocaleString() },
     { label: "Total Billed (UGX)",  value: totalBilled.toLocaleString() },
     { label: "Avg Length of Stay",  value: `${avgLOS.toFixed(1)} days` },
     { label: "Unique Providers",    value: uniqueProviders.toLocaleString() },
@@ -662,9 +668,11 @@ async function getAdmissionsData(tenantId: string): Promise<ReportResult> {
 }
 
 async function getAdmissionVisitsData(tenantId: string): Promise<ReportResult> {
-  const [agg, distinctMembers, rows] = await Promise.all([
-    prisma.claim.aggregate({ where: { tenantId, serviceType: "OUTPATIENT" }, _count: { _all: true }, _sum: { billedAmount: true } }),
-    prisma.claim.findMany({ where: { tenantId, serviceType: "OUTPATIENT" }, distinct: ["memberId"], select: { memberId: true } }),
+  // DEC-FH-X11: withdrawn and superseded claims are listed but not totalled.
+  const [agg, recordCount, distinctMembers, rows] = await Promise.all([
+    prisma.claim.aggregate({ where: { tenantId, serviceType: "OUTPATIENT", ...COUNTED_IN_TOTALS }, _count: { _all: true }, _sum: { billedAmount: true } }),
+    prisma.claim.count({ where: { tenantId, serviceType: "OUTPATIENT" } }),
+    prisma.claim.findMany({ where: { tenantId, serviceType: "OUTPATIENT", ...COUNTED_IN_TOTALS }, distinct: ["memberId"], select: { memberId: true } }),
     prisma.claim.findMany({
       where: { tenantId, serviceType: "OUTPATIENT" },
       select: {
@@ -677,12 +685,12 @@ async function getAdmissionVisitsData(tenantId: string): Promise<ReportResult> {
       take: 300,
     }),
   ]);
-  const totalCount  = agg._count._all;
+  const visits      = agg._count._all;
   const totalBilled = Number(agg._sum.billedAmount ?? 0);
   const uniqueMembers = distinctMembers.length;
-  const avgVisits = uniqueMembers > 0 ? totalCount / uniqueMembers : 0;
+  const avgVisits = uniqueMembers > 0 ? visits / uniqueMembers : 0;
   const kpis = [
-    { label: "Total OPD Visits",   value: totalCount.toLocaleString() },
+    { label: "Total OPD Visits",   value: visits.toLocaleString() },
     { label: "Unique Members",     value: uniqueMembers.toLocaleString() },
     { label: "Avg Visits / Member",value: avgVisits.toFixed(1) },
     { label: "Total Billed (UGX)", value: totalBilled.toLocaleString() },
@@ -698,7 +706,7 @@ async function getAdmissionVisitsData(tenantId: string): Promise<ReportResult> {
     Number(r.billedAmount).toLocaleString(),
     r.status.replace(/_/g, " "),
   ]);
-  return { kpis, headers, data, totalCount };
+  return { kpis, headers, data, totalCount: recordCount };
 }
 
 // ── TRANCHE 2: Financial ──────────────────────────────────────────────────────
@@ -750,8 +758,10 @@ async function getLossRatioData(tenantId: string): Promise<ReportResult> {
 }
 
 async function getClaimsExperienceData(tenantId: string): Promise<ReportResult> {
+  // Every figure here is a total, so DEC-FH-X11 keeps withdrawn and superseded
+  // claims out of the whole report (the claims report still lists them).
   const claims = await prisma.claim.findMany({
-    where: { tenantId },
+    where: { tenantId, ...COUNTED_IN_TOTALS },
     select: {
       billedAmount: true, approvedAmount: true, status: true,
       benefitCategory: true, serviceType: true,
@@ -941,15 +951,17 @@ async function getExclusionRejectedData(tenantId: string) {
   // NW-D03: line-aware — includes excluded/declined lines inside approved &
   // partially-approved claims, not just wholly-declined claims.
   const rows = await getExclusionRejectionRows(tenantId);
+  // DEC-FH-X11: withdrawn and superseded claims stay in the table, not the totals.
+  const counted = rows.filter(r => r.inTotals);
   const byReason = new Map<string, number>();
-  rows.forEach(r => {
+  counted.forEach(r => {
     const reason = r.reason?.split(" — ")[0] || "OTHER";
     byReason.set(reason, (byReason.get(reason) ?? 0) + 1);
   });
   const topReason = [...byReason.entries()].sort((a, b) => b[1] - a[1])[0];
   const kpis = [
-    { label: "Total Excluded/Declined", value: rows.length.toLocaleString() },
-    { label: "Total Disallowed (UGX)",  value: rows.reduce((s, r) => s + r.disallowed, 0).toLocaleString() },
+    { label: "Total Excluded/Declined", value: counted.length.toLocaleString() },
+    { label: "Total Disallowed (UGX)",  value: counted.reduce((s, r) => s + r.disallowed, 0).toLocaleString() },
     { label: "Top Decline Reason",      value: topReason ? `${topReason[0]} (${topReason[1]})` : "—" },
     { label: "Unique Reason Codes",     value: byReason.size.toLocaleString() },
   ];
@@ -1553,8 +1565,9 @@ async function getComparisonServicesData(tenantId: string): Promise<ReportResult
   // Group claim lines by CPT code to compare contracted vs billed vs approved.
   // Aggregate over all lines (the per-CPT comparison is only meaningful over the
   // full set); the displayed table is bounded by the number of distinct CPTs.
+  // DEC-FH-X11: lines of withdrawn or superseded claims are not averaged.
   const lines = await prisma.claimLine.findMany({
-    where: { claim: { tenantId } },
+    where: { claim: { tenantId, ...COUNTED_IN_TOTALS } },
     select: {
       cptCode: true, description: true,
       billedAmount: true, approvedAmount: true, tariffRate: true,

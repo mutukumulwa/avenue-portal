@@ -978,6 +978,8 @@ Reviewer/sign-off:       pending — owner approval for the production apply
 
 Step 5 (what still counts them): pending counts (TPA and facility dashboards) no longer include
 them; all-status totals still do — DEC-FH-X11, open.
+*Later the same day:* the owner decided DEC-FH-X11 and it was implemented — see its section at the
+end of this log.
 
 ### P07.02 — Fresh Family UAT fixtures
 
@@ -1251,3 +1253,71 @@ It is not to be sent until the owner approves it and P08.04 steps 3–9 have mad
 **Verdict: NO-GO for a Family rerun today** — the open gates are the credential containment, the
 deployment itself (steps 1–6), the internal browser smoke run, and the P07.01 cleanup. Each is an
 owner-approved or human step; nothing further is blocked on code.
+
+**Update 2026-09-11, after the deploy (steps 4–6) and the P07.01 apply (step 8):** those two gates
+are closed. Still open: the credential containment (P00.02; the owner's last answer here is
+"not yet"), the internal browser smoke run (step 7), and Family's UAT and sign-off. Step 3 is still
+not done: until production mail is verified, every new TPA invitation records a FAILED delivery.
+
+---
+
+## DEC-FH-X11 — withdrawn and superseded claims out of totals (owner decision, 2026-09-11)
+
+Owner, in chat: "dont think they should count in totals given that they have been withdrawn. they
+should be in logs", then "also exclude superseded claims from totals". Rule and reasoning:
+`FAMILY_HOSPITAL_UAT_DECISIONS.md` §4.11; one definition, `src/lib/claim-totals.ts`.
+
+**Inventory.** A read-only sweep of every claim count, sum, average and ratio in `src/` found 32
+places that took every status. Each was classed TOTAL (changed), LOG (unchanged: lists, detail and
+timeline pages, recent activity, per-status buckets, case slices, rejection rows, the claims CSV),
+OPERATIONAL (unchanged: work queues, paging, analytics access scoping, the double-capture gate,
+resubmission eligibility, intake fingerprint links, contract re-sweep) or RISK (unchanged: fraud
+rules, velocity and split-billing checks, the pre-auth fraud gate). Settlement-batch and fund-
+deduction figures cannot contain these claims (both statuses are pre-decision only).
+
+**Changed — each now leaves WITHDRAWN and SUPERSEDED claims out:**
+
+| Surface | Figures |
+|---|---|
+| TPA dashboard | Claims This Month, the monthly volume and billed/approved charts, the loss ratio. Pending Claims and recent activity unchanged. |
+| Facility dashboard | Total claims, paid to date. Recent claims unchanged. |
+| TPA claims list | The Total card, which says "Excludes N withdrawn or superseded". Rows, paging and "N claims" keep every claim; a status filter that asks for WITHDRAWN counts them. |
+| Reports (page and CSV) | Claims Summary KPIs (the record count still counts every claim); Admissions (count, billed, providers, average stay); OPD visits (visits, members, average, billed); Claims Experience; Service Cost Comparison; Exclusion & Rejected KPIs (its rows still list them). |
+| `reports.claimsSummary` (tRPC), weekly report job | Count, billed, approved, paid, loss ratio, by category. `byStatus` and the claim list keep every claim. |
+| Analytics | No encounter facts are written for them, and facts written before a claim left the totals are deleted on the next refresh — so MLR snapshots, provider scorecards, risk profiles, renewals, alerts and the five analytics reports follow. The claim is untouched. |
+| Contract analytics | Claims by contract, short-paid, amendment backlog, leakage, turnaround. Queue load (a work count) unchanged. |
+| Average-cost pool reconciliation | The claim count and billed total of a new computation. No reconciliation exists on production, so nothing recorded changes. |
+| Claim counts | HR utilization (count, approved spend, loss ratio, by category), self-funded scheme claims, member page, provider page and providers list, contract "Claims priced", and the providers/contracts tRPC reads. |
+| Member app | Care-history totals and counts (every encounter still listed). |
+| Inpatient case reconciliation | Approved, paid and outstanding to date, member share, slice count (every slice still listed). |
+
+Also corrected on the way: the member page's "Total Claims" was the length of the 20-claim list it
+shows, so it never exceeded 20; it is now a count of the member's claims.
+
+**Evidence.**
+
+```text
+local throwaway Postgres (seeded, 791 claims; nothing written — one rolled-back transaction)
+  moved 2 received/under-review claims to WITHDRAWN and SUPERSEDED, re-ran the dashboard SQL and
+  the Prisma filters: Claims This Month 791 → 789, monthly volume Σ 791 → 789, loss-ratio billed
+  base and the claims aggregate −88,400 (exactly the two claims' billed), record count 791 → 791,
+  a provider's filtered _count 225 → 223; after rollback 0 such rows.
+npm run typecheck                              → exit 0
+npx vitest run (full)                          → 385 files passed, 90 skipped; 4,824 tests passed
+  new: tests/lib/claim-totals.test.ts (3), tests/services/claim-totals.test.ts (9),
+       tests/consistency/claim-totals-surfaces.test.tsx (19: each page's figure read off the
+       rendered page), tests/consistency/claim-totals-dashboard.test.ts (3),
+       tests/services/contract-analytics.test.ts (+1)
+  with the rule emptied (no excluded statuses) 22 of those fail; restored.
+npx eslint <changed files>                     → 0 errors (4 warnings, all already in those files)
+SCHEMA_DEPLOY_MODE=skip npm run build:local    → exit 0, compiled successfully (only the known
+                                                 bullmq and workspace-lockfile warnings)
+```
+
+**What moves on production.** Production holds four such claims — Family's trial records
+CLM-2026-00308…00311, WITHDRAWN, UGX 33,900 billed, 0 approved — and no superseded claim. After the
+deploy: Family's "Total claims" 4 → 0; the TPA dashboard's Claims This Month, the September volume
+and billed bars and the loss-ratio billed base drop by those four; the claims list's Total card
+drops by four and says so; Family's claim count on the provider pages drops by four. The four stay
+in every list, report table, export and timeline. Analytics are unaffected today (no facts were ever
+written for these claims; the last refresh was 2026-07-28, when the worker last ran).

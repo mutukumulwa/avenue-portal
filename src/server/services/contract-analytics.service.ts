@@ -1,9 +1,12 @@
 import { prisma } from "@/lib/prisma";
+import { COUNTED_IN_TOTALS } from "@/lib/claim-totals";
 
 // ─── CONTRACT ANALYTICS (spec §15, Phase 5) ──────────────────────────────────
 // Datasets keyed by (contractId, contractVersionId, ruleRef, reasonCode) — all
 // derivable because per-line provenance is persisted (§5.13). Pure computation
 // helpers are separated from the DB queries so the arithmetic is unit-tested.
+// DEC-FH-X11: the datasets are totals, so no withdrawn or superseded claim is in
+// them; queue load is a work count and keeps every queued claim.
 
 // ── Pure helpers ──
 
@@ -51,7 +54,7 @@ export class ContractAnalyticsService {
   static async claimsByContract(tenantId: string) {
     const grouped = await prisma.claimLine.groupBy({
       by: ["contractId"],
-      where: { contractId: { not: null }, claim: { tenantId } },
+      where: { contractId: { not: null }, claim: { tenantId, ...COUNTED_IN_TOTALS } },
       _count: { _all: true },
       _sum: { billedAmount: true, payerLiability: true, shortfallAmount: true, disallowedAmount: true, providerWriteOff: true },
     });
@@ -74,7 +77,7 @@ export class ContractAnalyticsService {
   /** Dataset 3 — short-paid (PRC-001) volume + shortfall total. */
   static async shortPaidSummary(tenantId: string) {
     const rows = await prisma.claimLine.aggregate({
-      where: { reasonCode: { code: "PRC-001" }, claim: { tenantId } },
+      where: { reasonCode: { code: "PRC-001" }, claim: { tenantId, ...COUNTED_IN_TOTALS } },
       _count: { _all: true },
       _sum: { shortfallAmount: true },
     });
@@ -85,7 +88,7 @@ export class ContractAnalyticsService {
   static async amendmentBacklog(tenantId: string): Promise<BacklogRow[]> {
     const grouped = await prisma.claimLine.groupBy({
       by: ["description"],
-      where: { reasonCode: { code: { in: ["SVC-002", "PRC-002"] } }, claim: { tenantId } },
+      where: { reasonCode: { code: { in: ["SVC-002", "PRC-002"] } }, claim: { tenantId, ...COUNTED_IN_TOTALS } },
       _count: { _all: true },
       _sum: { billedAmount: true },
     });
@@ -123,9 +126,9 @@ export class ContractAnalyticsService {
   /** Dataset 14 — turnaround impact: auto-adjudicated share + averages. */
   static async turnaround(tenantId: string) {
     const [total, auto, tat] = await Promise.all([
-      prisma.claim.count({ where: { tenantId } }),
-      prisma.claim.count({ where: { tenantId, autoAdjDecision: "AUTO_APPROVE" } }),
-      prisma.claim.aggregate({ where: { tenantId, turnaroundDays: { not: null } }, _avg: { turnaroundDays: true } }),
+      prisma.claim.count({ where: { tenantId, ...COUNTED_IN_TOTALS } }),
+      prisma.claim.count({ where: { tenantId, autoAdjDecision: "AUTO_APPROVE", ...COUNTED_IN_TOTALS } }),
+      prisma.claim.aggregate({ where: { tenantId, turnaroundDays: { not: null }, ...COUNTED_IN_TOTALS }, _avg: { turnaroundDays: true } }),
     ]);
     return {
       totalClaims: total,
@@ -156,7 +159,7 @@ export class ContractAnalyticsService {
   /** Dataset 8 — provider leakage: unlisted pay-as-billed spend (no contracted ceiling). */
   static async providerLeakage(tenantId: string) {
     const agg = await prisma.claimLine.aggregate({
-      where: { matchedRuleType: "UNLISTED_PAY_AS_BILLED", claim: { tenantId } },
+      where: { matchedRuleType: "UNLISTED_PAY_AS_BILLED", claim: { tenantId, ...COUNTED_IN_TOTALS } },
       _count: { _all: true },
       _sum: { payerLiability: true },
     });

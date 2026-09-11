@@ -6,6 +6,7 @@ import type { ClaimStatus, ServiceType } from "@prisma/client";
 import { PlusCircle, ArrowRight, FileSearch, ShieldAlert, Clock } from "lucide-react";
 import Link from "next/link";
 import { measureAsync } from "@/lib/perf";
+import { CLAIM_STATUSES_OUT_OF_TOTALS } from "@/lib/claim-totals";
 
 const PAGE_SIZE = 50;
 
@@ -50,6 +51,9 @@ export default async function ClaimsPage({
 
   const totalPages = Math.max(1, Math.ceil(counts.total / PAGE_SIZE));
   const n = (keys: string[]) => keys.reduce((s, k) => s + (counts.byStatus[k] ?? 0), 0);
+  // DEC-FH-X11: the list (and its paging) shows every claim, but the Total card
+  // leaves out withdrawn and superseded ones — unless the filter asks for them.
+  const leftOut = status ? 0 : n([...CLAIM_STATUSES_OUT_OF_TOTALS]);
 
   const filterQuery = (over: Record<string, string | undefined>) => {
     const q = new URLSearchParams();
@@ -98,15 +102,19 @@ export default async function ClaimsPage({
       {/* Summary cards — computed via groupBy, correct on every page */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Total", count: counts.total, color: "bg-brand-indigo" },
+          {
+            label: "Total", count: counts.total - leftOut, color: "bg-brand-indigo",
+            note: leftOut > 0 ? `Excludes ${leftOut} withdrawn or superseded` : undefined,
+          },
           { label: "Awaiting Capture", count: n(["INCURRED", "RECEIVED"]), color: "bg-[#6C757D]" },
           { label: "In Review", count: n(["CAPTURED", "UNDER_REVIEW"]), color: "bg-[#17A2B8]" },
           { label: "Approved", count: n(["APPROVED", "PARTIALLY_APPROVED"]), color: "bg-[#28A745]" },
-        ].map((s) => (
+        ].map((s: { label: string; count: number; color: string; note?: string }) => (
           <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-lg p-4 shadow-sm">
             <p className="text-xs text-brand-text-muted font-bold uppercase">{s.label}</p>
             <p className="text-2xl font-bold text-brand-text-heading mt-1">{s.count}</p>
             <div className={`h-1 w-12 rounded ${s.color} mt-2`} />
+            {s.note && <p className="mt-2 text-xs text-brand-text-muted">{s.note}</p>}
           </div>
         ))}
       </div>

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { countsInTotals } from "@/lib/claim-totals";
 
 /**
  * Exclusion & Rejected report source (NW-D03).
@@ -20,6 +21,8 @@ export interface RejectionRow {
   reason: string;
   disallowed: number;
   decidedAt: Date | null;
+  /** False for a withdrawn or superseded claim: listed, never totalled (DEC-FH-X11). */
+  inTotals: boolean;
 }
 
 // F5.3: WITHDRAWN + SUPERSEDED never contribute value (withdrawn = abandoned; superseded
@@ -73,6 +76,7 @@ export async function getExclusionRejectionRows(tenantId: string): Promise<Rejec
     reason: r.declineReasonCode ?? r.declineNotes ?? "—",
     disallowed: Number(r.billedAmount),
     decidedAt: r.decidedAt,
+    inTotals: countsInTotals(r),
   }));
 
   const lineRows: RejectionRow[] = rejectedLines.map((l) => ({
@@ -85,6 +89,7 @@ export async function getExclusionRejectionRows(tenantId: string): Promise<Rejec
     reason: l.declineReason ?? l.reasonCode?.code ?? "Disallowed",
     disallowed: Number(l.disallowedAmount) > 0 ? Number(l.disallowedAmount) : Number(l.billedAmount),
     decidedAt: l.claim.decidedAt,
+    inTotals: true, // the claim is not wholly declined, so never withdrawn or superseded
   }));
 
   return [...claimRows, ...lineRows].sort(

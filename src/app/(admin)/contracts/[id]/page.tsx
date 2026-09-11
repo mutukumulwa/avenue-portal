@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, AlertTriangle, CheckCircle2, FileSignature, GitBranch, Pencil } from "lucide-react";
 import { ContractLifecycleService } from "@/server/services/contract-lifecycle.service";
+import { COUNTED_IN_TOTALS } from "@/lib/claim-totals";
 import { PendingButton } from "@/components/ui/PendingButton";
 import { ManagePanel } from "./ManagePanel";
 import { FeeSchedule } from "./FeeSchedule";
@@ -102,7 +103,7 @@ export default async function ContractDetailPage({
       applicability: { where: { isActive: true }, include: { client: { select: { name: true } } } },
       contractBranches: { include: { branch: { select: { name: true } } } },
       versions: { orderBy: { versionNumber: "desc" } },
-      _count: { select: { tariffLines: true, claims: true } },
+      _count: { select: { tariffLines: true, claims: { where: COUNTED_IN_TOTALS } } }, // DEC-FH-X11
     },
   });
   if (!c) notFound();

@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import { prisma } from "@/lib/prisma";
+import { countsInTotals } from "@/lib/claim-totals";
 import { parseClaimSubmissionV1 } from "./claim-intake/schema";
 import { normalizeSubmission } from "./claim-intake/normalize";
 import { resolveIntakeContext } from "./claim-intake/context";
@@ -827,10 +828,12 @@ export class CaseService {
     const billedToDate = entries.reduce((s, e) => s + num(e.totalAmount), 0); // B
     const billedOnSlices = entries.filter((e) => e.billedInClaimId).reduce((s, e) => s + num(e.totalAmount), 0);
     const unbilledResidual = billedToDate - billedOnSlices;
-    const approvedToDate = claims.reduce((s, cl) => s + num(cl.approvedAmount), 0); // U / provider payable pre-settlement
-    const paidToDate = claims.filter((cl) => isSettled(cl.settlementBatch)).reduce((s, cl) => s + num(cl.approvedAmount), 0); // S
+    // DEC-FH-X11: a withdrawn or superseded slice stays in `slices` but is in no total.
+    const counted = claims.filter(countsInTotals);
+    const approvedToDate = counted.reduce((s, cl) => s + num(cl.approvedAmount), 0); // U / provider payable pre-settlement
+    const paidToDate = counted.filter((cl) => isSettled(cl.settlementBatch)).reduce((s, cl) => s + num(cl.approvedAmount), 0); // S
     const outstanding = approvedToDate - paidToDate; // P not yet settled
-    const memberShare = claims.reduce((s, cl) => s + num(cl.memberLiability), 0);
+    const memberShare = counted.reduce((s, cl) => s + num(cl.memberLiability), 0);
     // Residual guarantee: episode PA/GOP approved not yet utilised (H).
     const remainingGuarantee = pas
       .filter((pa) => ["APPROVED", "ATTACHED"].includes(pa.status))
@@ -846,7 +849,7 @@ export class CaseService {
       outstanding,
       memberShare,
       remainingGuarantee,
-      sliceCount: claims.filter((cl) => cl.isInterimBill).length,
+      sliceCount: counted.filter((cl) => cl.isInterimBill).length,
       slices: claims.map((cl) => ({
         id: cl.id,
         claimNumber: cl.claimNumber,

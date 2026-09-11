@@ -4,10 +4,17 @@ import Link from "next/link";
 import { Users, Building2, Receipt, FileText, TrendingUp, Clock } from "lucide-react";
 import { ClaimsTrendChart, PremiumVsClaimsChart, LossRatioGauge } from "@/components/dashboard/DashboardCharts";
 import { measureAsync } from "@/lib/perf";
+import { Prisma } from "@prisma/client";
+import { CLAIM_STATUSES_OUT_OF_TOTALS } from "@/lib/claim-totals";
 
 type MonthlyClaimRow = { month: string; claims: bigint };
 type MonthlyMoneyRow = { month: string; claims: bigint; billed: number; approved: number };
 type LRRow = { billed: number; approved: number };
+
+// DEC-FH-X11: a withdrawn or superseded claim is listed (recent activity keeps
+// it) but never totalled — volumes, billed/approved and the loss ratio skip it.
+const COUNTED = Prisma.sql`status::text NOT IN (${Prisma.join([...CLAIM_STATUSES_OUT_OF_TOTALS])})`;
+const COUNTED_C = Prisma.sql`c.status::text NOT IN (${Prisma.join([...CLAIM_STATUSES_OUT_OF_TOTALS])})`;
 
 /**
  * DEF-003 (S1): the dashboard used to admit every ANY_STAFF role and then run
@@ -51,7 +58,7 @@ export default async function DashboardPage() {
           ? prisma.$queryRaw<{ pendingClaims: number; recentClaims: number }[]>`
               SELECT
                 (SELECT COUNT(*)::int FROM "Claim" WHERE "tenantId" = ${tenantId} AND status IN ('RECEIVED','UNDER_REVIEW')) AS "pendingClaims",
-                (SELECT COUNT(*)::int FROM "Claim" WHERE "tenantId" = ${tenantId} AND "createdAt" >= ${thirtyDaysAgo}) AS "recentClaims"
+                (SELECT COUNT(*)::int FROM "Claim" WHERE "tenantId" = ${tenantId} AND "createdAt" >= ${thirtyDaysAgo} AND ${COUNTED}) AS "recentClaims"
             `
           : Promise.resolve([]),
 
@@ -79,6 +86,7 @@ export default async function DashboardPage() {
               FROM "Claim" c
               WHERE c."tenantId" = ${tenantId}
                 AND c."createdAt" >= NOW() - INTERVAL '12 months'
+                AND ${COUNTED_C}
               GROUP BY DATE_TRUNC('month', c."createdAt")
               ORDER BY DATE_TRUNC('month', c."createdAt")
             `
@@ -94,6 +102,7 @@ export default async function DashboardPage() {
               FROM "Claim" c
               WHERE c."tenantId" = ${tenantId}
                 AND c."createdAt" >= NOW() - INTERVAL '12 months'
+                AND ${COUNTED_C}
               GROUP BY DATE_TRUNC('month', c."createdAt")
               ORDER BY DATE_TRUNC('month', c."createdAt")
             `
@@ -105,7 +114,7 @@ export default async function DashboardPage() {
                 COALESCE(SUM("billedAmount")::float,   0) AS billed,
                 COALESCE(SUM("approvedAmount")::float, 0) AS approved
               FROM "Claim"
-              WHERE "tenantId" = ${tenantId}
+              WHERE "tenantId" = ${tenantId} AND ${COUNTED}
             `
           : Promise.resolve([]),
 

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { countsInTotals } from "@/lib/claim-totals";
 import { policyNotesForCategory } from "@/lib/member-policy-copy";
 import { BenefitUsageService } from "./benefit-usage.service";
 
@@ -855,14 +856,18 @@ export class MemberAppService {
       };
     });
 
-    const visibleEncounters = encounters.filter((encounter) => !encounter.masked);
+    // DEC-FH-X11: every encounter is listed, but a withdrawn or superseded claim
+    // is in no total or count.
+    const counted = new Set(claims.filter(countsInTotals).map((claim) => claim.id));
+    const countedEncounters = encounters.filter((encounter) => counted.has(encounter.id));
+    const visibleEncounters = countedEncounters.filter((encounter) => !encounter.masked);
     const summary = {
       totalBilled: visibleEncounters.reduce((sum, encounter) => sum + (encounter.billedAmount ?? 0), 0),
       planApproved: visibleEncounters.reduce((sum, encounter) => sum + (encounter.planApprovedAmount ?? 0), 0),
       planPaid: visibleEncounters.reduce((sum, encounter) => sum + (encounter.planPaidAmount ?? 0), 0),
       memberShare: visibleEncounters.reduce((sum, encounter) => sum + (encounter.memberShare ?? 0), 0),
-      encounterCount: encounters.length,
-      privateEncounterCount: encounters.filter((encounter) => encounter.masked).length,
+      encounterCount: countedEncounters.length,
+      privateEncounterCount: countedEncounters.filter((encounter) => encounter.masked).length,
     };
 
     const familyOptions = isPrincipalViewer

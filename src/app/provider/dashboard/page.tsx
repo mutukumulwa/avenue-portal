@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ProviderAccessService } from "@/server/services/provider-access.service";
 import { prisma } from "@/lib/prisma";
 import { FilePlus2, UserCheck, FileText, Banknote } from "lucide-react";
+import { COUNTED_IN_TOTALS } from "@/lib/claim-totals";
 
 function money(n: number) {
   return `UGX ${Math.round(n).toLocaleString("en-UG")}`;
@@ -41,8 +42,10 @@ export default async function ProviderDashboard() {
       orderBy: { createdAt: "desc" },
       take: 8,
     }),
+    // DEC-FH-X11: a withdrawn or superseded claim stays in "Recent claims" but
+    // is not one of the facility's total claims.
     prisma.claim.aggregate({
-      where: { tenantId, providerId: provider.id },
+      where: { tenantId, providerId: provider.id, ...COUNTED_IN_TOTALS },
       _sum: { billedAmount: true, approvedAmount: true, paidAmount: true },
       _count: { _all: true },
     }),

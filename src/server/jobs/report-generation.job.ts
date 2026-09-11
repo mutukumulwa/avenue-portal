@@ -7,6 +7,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import { countsInTotals } from "@/lib/claim-totals";
 import { overrideService } from "../services/override.service";
 import { AnalyticsService } from "../services/analytics.service";
 import { pdfService } from "../services/pdf.service";
@@ -29,10 +30,12 @@ export async function runReportGenerationJob() {
         select: { status: true, billedAmount: true, approvedAmount: true },
       });
 
+      // DEC-FH-X11: withdrawn and superseded claims keep their byStatus count only.
+      const counted = claims.filter(countsInTotals);
       const claimsSummary = {
-        total: claims.length,
-        totalBilled: claims.reduce((s, c) => s + Number(c.billedAmount), 0),
-        totalApproved: claims.reduce((s, c) => s + Number(c.approvedAmount), 0),
+        total: counted.length,
+        totalBilled: counted.reduce((s, c) => s + Number(c.billedAmount), 0),
+        totalApproved: counted.reduce((s, c) => s + Number(c.approvedAmount), 0),
         byStatus: claims.reduce<Record<string, number>>((acc, c) => {
           acc[c.status] = (acc[c.status] ?? 0) + 1;
           return acc;

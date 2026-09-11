@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { auditChainService } from "./audit-chain.service";
 import { computeReconciliation } from "./contract-analytics.service";
+import { COUNTED_IN_TOTALS } from "@/lib/claim-totals";
 
 // ─── AVERAGE-COST RECONCILIATION (spec §15.12 / §16 Phase 5) ─────────────────
 // Computes the recovery for an average-cost pool over a period (Old Mutual
@@ -14,11 +15,14 @@ export class ContractReconciliationService {
     tenantId: string,
     input: { poolId: string; contractId?: string; periodStart: Date; periodEnd: Date; agreedAverage: number; computedById?: string },
   ) {
+    // DEC-FH-X11: a withdrawn claim was never a cost to the pool and a superseded
+    // one is carried by its correction, so neither is in the count or the total.
     const claims = await prisma.claim.aggregate({
       where: {
         tenantId,
         avgCostPoolId: input.poolId,
         dateOfService: { gte: input.periodStart, lte: input.periodEnd },
+        ...COUNTED_IN_TOTALS,
       },
       _count: { _all: true },
       _sum: { billedAmount: true },

@@ -64,6 +64,14 @@ describe("ContractReconciliationService (finance maker-checker)", () => {
     expect(recon.status).toBe("COMPUTED");
   });
 
+  it("DEC-FH-X11: the pool's claim count and billed total leave out withdrawn and superseded claims", async () => {
+    await ContractReconciliationService.compute("t", {
+      poolId: "OM-Q1", periodStart: new Date("2025-01-01"), periodEnd: new Date("2025-03-31"), agreedAverage: 4000,
+    });
+    const args = db.claim.aggregate.mock.calls[0] as unknown as [{ where: { status?: unknown } }];
+    expect(args[0].where.status).toEqual({ notIn: ["WITHDRAWN", "SUPERSEDED"] });
+  });
+
   it("blocks approval by the same person who computed it (segregation of duties)", async () => {
     db.contractReconciliation.findUnique.mockResolvedValue({ id: "rec1", status: "COMPUTED", computedById: "u1", recovery: 10000 });
     await expect(ContractReconciliationService.approve("t", "rec1", "u1")).rejects.toThrow(/Segregation of duties/);

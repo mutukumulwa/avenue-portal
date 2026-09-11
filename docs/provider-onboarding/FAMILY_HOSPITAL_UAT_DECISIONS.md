@@ -56,6 +56,7 @@ recorded; update the row, never delete it.
 | P00.02 | Invalidate the two still-valid exposed temporary passwords (biller, front desk) now? | **Not yet.** They remain valid; P00.02 stays an open release blocker (plan §13, first gate). |
 | P01.02 | When to apply manifest `FH-P0102-20260911` (SHA-256 `78982cfa…079a`) to production? | **Apply now**, then re-run the preflight on production. |
 | DEC-FH-03 | Is there an approved ICD-10 release to load? | **None yet** — disclose the 200-code limit. |
+| DEC-FH-X11 | Should withdrawn claims count in all-status totals? | "dont think they should count in totals given that they have been withdrawn. they should be in logs", then "also exclude superseded claims from totals". Implemented — §4.11. |
 
 ## 4. Decisions surfaced by execution (not in the plan's gate list)
 
@@ -249,7 +250,7 @@ The pre-authorisation needs nothing new: the admin pre-auth page's canonical `ca
 takes an operator. Pre-auth cancellation has no reason catalogue (the reason is free text); the
 cleanup records the code `TEST_DATA_INCORRECT_TARIFF` as that text.
 
-### 4.11 DEC-FH-X11 — withdrawn claims in all-status totals (plan P07.01 step 5) — OPEN
+### 4.11 DEC-FH-X11 — withdrawn claims in all-status totals (plan P07.01 step 5) — DECIDED 2026-09-11 (owner)
 
 After the cleanup the four claims count nowhere as pending, approved or paid, and provider
 performance scores already exclude withdrawn claims. They do still count — as declined claims
@@ -259,3 +260,24 @@ billed base of its loss ratio (UGX-labelled 33,900 in total). Those totals count
 valid transactions, so no trial conclusion rests on them; but "Total claims 4" on Family's dashboard
 will look like activity. Excluding WITHDRAWN and SUPERSEDED claims from those totals is a
 product-wide change to metric definitions and is left to the owner.
+
+**Owner decision (in chat, 2026-09-11):** "dont think they should count in totals given that they
+have been withdrawn. they should be in logs" — and then "also exclude superseded claims from
+totals".
+
+**Rule applied** (`src/lib/claim-totals.ts`, one definition shared by every surface): a WITHDRAWN or
+SUPERSEDED claim is shown wherever claims are listed — lists, detail pages, timelines and audit,
+recent activity, per-status buckets, case slices, rejection rows, the claims CSV — and is in no
+total: counts, billed/approved/paid sums, averages, ratios, KPI cards, charts, report summaries and
+analytics. A withdrawn claim was abandoned before any decision; a superseded one is carried by the
+correction that replaced it, so counting both would count one visit twice. DECLINED and VOID claims
+still count: they were decided. The platform already drew this line for money bases (PNOS F5.3 put
+both statuses in the rejection report's "never contributes value" set; provider performance leaves
+them out); this extends it to every total.
+
+Where the line falls when a figure is both: the TPA claims list's paging and "N claims" keep every
+row, its Total card leaves them out and says how many; a status filter that asks for WITHDRAWN shows
+and counts them. Queues, duplicate and resubmission checks, intake fingerprint links, access
+scoping and fraud rules are not totals and are unchanged — a withdraw-and-refile pattern is a fraud
+signal. Pre-authorisation counts are unchanged: the decision is about claims. The surfaces and the
+evidence are in the implementation log (DEC-FH-X11).

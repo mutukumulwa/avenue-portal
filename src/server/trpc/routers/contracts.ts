@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { ContractLifecycleService } from "@/server/services/contract-lifecycle.service";
 import { ProviderContractsService } from "@/server/services/provider-contracts.service";
 import type { Prisma } from "@prisma/client";
+import { COUNTED_IN_TOTALS } from "@/lib/claim-totals";
 
 // Zod mirrors of the Prisma enums (kept local to avoid importing enum values at
 // the router boundary; validated against the DB type on write).
@@ -90,7 +91,7 @@ export const contractsRouter = createTRPCRouter({
           sourceDocuments: true,
           versions: { orderBy: { versionNumber: "desc" } },
           tariffLines: { where: { isActive: true }, orderBy: { effectiveFrom: "desc" } },
-          _count: { select: { tariffLines: true, claims: true } },
+          _count: { select: { tariffLines: true, claims: { where: COUNTED_IN_TOTALS } } }, // DEC-FH-X11
         },
       });
     }),

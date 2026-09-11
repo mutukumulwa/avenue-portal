@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { countsInTotals } from "@/lib/claim-totals";
 
 const STATUS_COLOR: Record<string, string> = {
   APPROVED:           "bg-[#28A745]/10 text-[#28A745]",
@@ -51,6 +52,7 @@ export default async function FundClaimsPage({ params }: { params: Promise<{ gro
   const totalPending  = claims.filter(c => ["RECEIVED","CAPTURED","UNDER_REVIEW","INCURRED"].includes(c.status))
     .reduce((s, c) => s + Number(c.billedAmount), 0);
   const declined      = claims.filter(c => c.status === "DECLINED").length;
+  // DEC-FH-X11: the table lists withdrawn and superseded claims; "Total Claims" does not count them.
 
   // Identify categories on hold
   const heldCats = group.selfFundedAccount?.heldCategories ?? [];
@@ -70,7 +72,7 @@ export default async function FundClaimsPage({ params }: { params: Promise<{ gro
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: "Total Claims",         value: claims.length.toString(),             color: "text-brand-indigo" },
+          { label: "Total Claims",         value: claims.filter(countsInTotals).length.toString(), color: "text-brand-indigo" },
           { label: "Paid from Fund (UGX)", value: totalApproved.toLocaleString("en-UG"),color: "text-[#DC3545]"    },
           { label: "Pending (UGX)",        value: totalPending.toLocaleString("en-UG"), color: "text-[#856404]"    },
           { label: "Declined",             value: declined.toString(),                  color: "text-[#6C757D]"    },

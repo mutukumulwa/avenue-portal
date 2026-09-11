@@ -5,6 +5,7 @@ import { ROLES, type UserRole } from "@/lib/authz/roles";
 import { prisma } from "@/lib/prisma";
 import { getExclusionRejectionRows } from "@/server/services/report-exclusions";
 import { csvSafeCell } from "@/lib/csv-safe";
+import { COUNTED_IN_TOTALS } from "@/lib/claim-totals";
 
 /**
  * Report types that scope their own query by the caller's analytics group access
@@ -443,8 +444,9 @@ async function fetchReportData(
     }
 
     case "claims-experience": {
+      // DEC-FH-X11: all totals — withdrawn and superseded claims are left out.
       const claims = await prisma.claim.findMany({
-        where: { tenantId },
+        where: { tenantId, ...COUNTED_IN_TOTALS },
         select: { billedAmount: true, approvedAmount: true, status: true, benefitCategory: true,
           member: { select: { group: { select: { name: true } } } } },
       });
@@ -879,7 +881,7 @@ async function fetchReportData(
 
     case "comparison-services": {
       const lines = await prisma.claimLine.findMany({
-        where: { claim: { tenantId } },
+        where: { claim: { tenantId, ...COUNTED_IN_TOTALS } }, // DEC-FH-X11
         select: { cptCode: true, description: true, billedAmount: true, approvedAmount: true, tariffRate: true },
         take: 5000,
       });

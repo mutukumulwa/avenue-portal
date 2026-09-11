@@ -26,6 +26,7 @@ import { PortalLoginPanel } from "./PortalLoginPanel";
 import { BranchEnrollmentPanel } from "./webauthn/BranchEnrollmentPanel";
 import QRCode from "react-qr-code";
 import { memberAddressLines } from "@/lib/member-address";
+import { COUNTED_IN_TOTALS } from "@/lib/claim-totals";
 
 export default async function MemberDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requireRole(ROLES.MEMBER_OPS);
@@ -118,6 +119,9 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
         take: 30,
       },
       user: { select: { email: true, isActive: true } },
+      // DEC-FH-X11: "Total Claims" counts every claim but withdrawn and superseded
+      // ones (the list above is only the latest 20, so it cannot be the count).
+      _count: { select: { claims: { where: COUNTED_IN_TOTALS } } },
     },
   });
 
@@ -380,7 +384,7 @@ export default async function MemberDetailPage({ params }: { params: Promise<{ i
             { label: "Annual Limit (UGX)", value: totalLimit.toLocaleString(), color: "text-brand-indigo" },
             { label: `Utilised (UGX)${totalHeld > 0 ? ` +${totalHeld.toLocaleString()} reserved` : ""}`, value: totalUsed.toLocaleString(), color: "text-[#FFC107]" },
             { label: "Remaining (UGX)", value: totalRemaining.toLocaleString(), color: "text-[#28A745]" },
-            { label: "Total Claims", value: member.claims.length.toString(), color: "text-[#17A2B8]" },
+            { label: "Total Claims", value: member._count.claims.toString(), color: "text-[#17A2B8]" },
           ].map(s => (
             <div key={s.label} className="bg-white border border-[#EEEEEE] rounded-[8px] p-4 shadow-sm">
               <p className="text-xs text-brand-text-muted font-bold uppercase">{s.label}</p>

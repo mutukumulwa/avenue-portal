@@ -10,6 +10,7 @@ import { ProviderPractitionersCard } from "./ProviderPractitionersCard";
 import { ProviderAdminCard } from "./ProviderAdminCard";
 import { ProviderBranchesCard } from "./ProviderBranchesCard";
 import { calendarInputValue } from "@/lib/calendar-date";
+import { COUNTED_IN_TOTALS } from "@/lib/claim-totals";
 
 export default async function ProviderDetailPage({
   params,
@@ -44,7 +45,8 @@ export default async function ProviderDetailPage({
         take: 20,
         include: { member: { select: { firstName: true, lastName: true, memberNumber: true } } },
       },
-      _count: { select: { claims: true, preauths: true } },
+      // DEC-FH-X11: withdrawn and superseded claims are listed, not counted.
+      _count: { select: { claims: { where: COUNTED_IN_TOTALS }, preauths: true } },
     },
   });
 

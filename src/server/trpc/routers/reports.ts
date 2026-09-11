@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, reportsProcedure } from "../trpc";
 import { prisma } from "@/lib/prisma";
+import { countsInTotals } from "@/lib/claim-totals";
 
 const dateRangeInput = z.object({
   from: z.string(),
@@ -28,9 +29,12 @@ export const reportsRouter = createTRPCRouter({
         },
       });
 
-      const totalBilled = claims.reduce((s, c) => s + Number(c.billedAmount), 0);
-      const totalApproved = claims.reduce((s, c) => s + Number(c.approvedAmount), 0);
-      const totalPaid = claims.reduce((s, c) => s + Number(c.paidAmount), 0);
+      // DEC-FH-X11: a withdrawn or superseded claim keeps its byStatus bucket and
+      // its place in `claims`, but counts in no total.
+      const counted = claims.filter(countsInTotals);
+      const totalBilled = counted.reduce((s, c) => s + Number(c.billedAmount), 0);
+      const totalApproved = counted.reduce((s, c) => s + Number(c.approvedAmount), 0);
+      const totalPaid = counted.reduce((s, c) => s + Number(c.paidAmount), 0);
       const lossRatio = totalBilled > 0 ? (totalApproved / totalBilled) * 100 : 0;
 
       const byStatus = claims.reduce<Record<string, number>>((acc, c) => {
@@ -38,12 +42,12 @@ export const reportsRouter = createTRPCRouter({
         return acc;
       }, {});
 
-      const byCategory = claims.reduce<Record<string, number>>((acc, c) => {
+      const byCategory = counted.reduce<Record<string, number>>((acc, c) => {
         acc[c.benefitCategory] = (acc[c.benefitCategory] ?? 0) + Number(c.billedAmount);
         return acc;
       }, {});
 
-      return { totalClaims: claims.length, totalBilled, totalApproved, totalPaid, lossRatio, byStatus, byCategory, claims };
+      return { totalClaims: counted.length, totalBilled, totalApproved, totalPaid, lossRatio, byStatus, byCategory, claims };
     }),
 
   // 2. Membership Report
