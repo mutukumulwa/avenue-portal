@@ -119,3 +119,18 @@ h1, h2, h3, h4, h5, h6 {
   z-index: 5;
   background-color: #e6e7e8;
 }
+
+/* ── Provider header offset (Family Hospital UAT plan P06) ─────────
+   The provider header is sticky: one 57 px row below `xl`, two rows
+   (106 px) from `xl` up. A jump to "#field" (the error summary's links)
+   or a focus move would otherwise land the field UNDER it — hidden,
+   which WCAG 2.4.11 forbids. The offset also clears the one-line label
+   above the field. Scoped to the provider shell. */
+html:has([data-provider-shell]) {
+  scroll-padding-top: 5.5rem;
+}
+@media (min-width: 80rem) {
+  html:has([data-provider-shell]) {
+    scroll-padding-top: 8.5rem;
+  }
+}

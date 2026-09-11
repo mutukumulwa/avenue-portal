@@ -197,3 +197,31 @@ This matters for Family Healthcare: the two exposed temporary passwords (P00.02,
 stay valid until someone sends those two staff members a setup link. Sending it (P08.04 step 9,
 which needs the owner's approval anyway) performs the P00.02 containment as a side effect — the
 owner should know that before approving the invitations.
+
+### 4.9 DEC-FH-X9 — how the provider destinations are grouped (plan P06)
+
+P06 fixes four direct destinations (Dashboard, Eligibility, Claims, Pre-authorisations) and asks for
+the rest in task-labelled menus "such as Finance, Contracts & Services, Reports, and
+Administration", with identity/profile/logout in an account menu. The plan's example names are used
+for the groups they fit; the three destinations they do not cover share one more menu:
+
+| Group | Destinations |
+|---|---|
+| Direct links | Dashboard, Eligibility, Claims, Pre-auth |
+| Care & claims | Inbox (information requests), Cases (inpatient), New Claim |
+| Finance | Settlements, Payment queries |
+| Contracts & Services | Contracts (still behind the `contractView` flag) |
+| Reports | Performance |
+| Administration | Users, API Keys, Integrations |
+| Account menu | identity, Facility profile, Logout |
+
+"Profile" is the facility's profile (trading name, branches, masked bank details), not the signed-in
+person's, so in the personal account menu it is labelled **Facility profile**. A group with no
+permitted destination is not shown; nothing a user may open is hidden.
+
+Layout: the brand and the account menu share the top row with nothing else. From 1280 px (`xl`) the
+destinations take a second row; below it they are behind one Menu button. A facility administrator's
+full set measured 1,058 px as one row; a 1024 px window leaves 992 px for it, so the compact menu is
+used there. The desktop row may wrap rather than overflow if a user's font settings make it wider
+than measured. A provider UX reviewer (P08.04 step 1) may rename or regroup; the
+grouping is one table in `provider-nav-model.ts` and the tests derive from it.

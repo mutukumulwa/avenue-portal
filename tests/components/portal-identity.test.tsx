@@ -6,7 +6,7 @@
  * fund portals.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 
 vi.mock("next-auth/react", () => ({ signOut: vi.fn() }));
@@ -43,16 +43,24 @@ describe("DEF-001 — signed-in identity in every portal shell", () => {
   });
 
   it("ProviderNav falls back to the generic Provider persona when no persona role is resolved (prod pre-seed / D-20)", () => {
-    render(<ProviderNav providerName="Nakasero Hospital" items={[]} actorName={NAME} />);
-    expect(screen.getAllByLabelText("Signed-in user").length).toBeGreaterThan(0);
-    expect(screen.getAllByText(NAME).length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Provider").length).toBeGreaterThan(0);
+    render(<ProviderNav providerName="Nakasero Hospital" groups={[]} actorName={NAME} />);
+    // Family Hospital UAT P06: the identity lives in the account menu, whose
+    // button shows the name and persona without being opened…
+    const account = screen.getByRole("button", { name: /Jane Doe/ });
+    expect(account).toBeVisible();
+    expect(account).toHaveTextContent(NAME);
+    expect(account).toHaveTextContent("Provider");
+    // …and whose panel carries the shared identity block with the facility.
+    fireEvent.click(account);
+    expect(screen.getByLabelText("Signed-in user")).toBeVisible();
+    expect(screen.getByLabelText("Signed-in user")).toHaveTextContent("Nakasero Hospital");
   });
 
   it("DEF-002: ProviderNav shows the REAL persona label when one is threaded in (not the generic 'Provider')", () => {
     render(
-      <ProviderNav providerName="Nakasero Hospital" items={[]} actorName={NAME} roleLabel="Biller" />,
+      <ProviderNav providerName="Nakasero Hospital" groups={[]} actorName={NAME} roleLabel="Biller" />,
     );
+    expect(screen.getByRole("button", { name: /Jane Doe/ })).toHaveTextContent("Biller");
     expect(screen.getAllByText(NAME).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Biller").length).toBeGreaterThan(0);
     // The generic label must be gone once a persona is known.
@@ -72,7 +80,7 @@ describe("DEF-001 — signed-in identity in every portal shell", () => {
       const roleLabel = resolveProviderPersonaLabel([code]);
       expect(roleLabel).toBe(label);
       const { unmount } = render(
-        <ProviderNav providerName="Nakasero Hospital" items={[]} actorName={NAME} roleLabel={roleLabel} />,
+        <ProviderNav providerName="Nakasero Hospital" groups={[]} actorName={NAME} roleLabel={roleLabel} />,
       );
       expect(screen.getAllByText(label).length).toBeGreaterThan(0);
       unmount();

@@ -71,7 +71,7 @@ Status values: `NOT_STARTED` · `IN_PROGRESS` · `DONE` · `BLOCKED (<gate>)` ·
 | P05.02 Deliver invitations | DONE | see §3 | production SMTP + `NEXT_PUBLIC_APP_URL` unverified (P08.04 step 3) |
 | P05.03 Complete account setup | DONE | see §3 | |
 | P05.04 One canonical invitation service | DONE | see §3 | DEC-FH-X6 |
-| P06 Provider navigation | NOT_STARTED | | |
+| P06 Provider navigation | DONE | see §3 | DEC-FH-X9 (grouping, for provider UX review) |
 | P07.01 Clean up affected claims/pre-auths | NOT_STARTED | | DEC-FH-04 + production approval |
 | P07.02 Fresh Family UAT fixtures | NOT_STARTED | | |
 | P08.01 Automated coverage | NOT_STARTED | | |
@@ -708,7 +708,7 @@ Reviewer/sign-off:       pending
 ```text
 Task IDs:                P05.01–P05.04
 Defects covered:         FH-01
-Starting/ending SHA:     2c73ad5 → P05 commit
+Starting/ending SHA:     2c73ad5 → 43d3a02
 Files changed:           prisma/schema.prisma (AccountSetupInvitation + AccountSetupDeliveryStatus),
                          prisma/migrations/20260911000200_account_setup_invitation/,
                          src/server/services/account-invitation.service.ts (new, server-only),
@@ -801,3 +801,104 @@ every migration applied and `prisma/seed.ts` run, all 97 opt-in suites (`AUTOPIL
 - test robustness: the four capture-form component suites run several debounced searches per test and
   one timed out once under the full parallel run (never alone); they now allow 5 s per async wait
   (`configure({ asyncUtilTimeout: 5000 })`). No assertion changed.
+
+### P06 — Provider navigation
+
+```text
+Task IDs:                P06
+Defects covered:         FH-08
+Starting/ending SHA:     43d3a02 → P06 commit
+Files changed:           src/components/layouts/provider-nav-model.ts (groups as the information
+                         architecture; resolveActiveProviderNavHref),
+                         src/components/layouts/ProviderNav.tsx (rewritten),
+                         src/app/provider/layout.tsx (passes groups, not a flattened row),
+                         src/app/globals.css (scroll offset under the sticky provider header)
+Schema migration/backfill: none
+Automated tests added/changed: tests/components/provider-nav.test.tsx (16, new),
+                         tests/components/provider-nav-model.test.ts (+5, incl. every permission
+                         combination), tests/components/portal-identity.test.tsx (provider cases
+                         follow the identity into the account menu)
+Commands and results:    typecheck clean; eslint clean on the changed files;
+                         `npx vitest run tests/components tests/consistency` → 43 files / 401 tests passed
+Browser scenarios and evidence paths: below (Chromium in the Browser pane; measured with scripts,
+                         not by eye)
+Feature/config changes:  none
+Data mutations and operation IDs: throwaway database only (a persona assignment and the contract-view
+                         flag for one seeded provider in fh_gate_head2 — see "Browser run")
+Rollback tested:         not applicable (presentation only; revert the commit)
+Residual risk:           keyboard activation of a menu button with Enter/Space could not be
+                         injected by the browser tool (its key events carry no text, so no native
+                         button fires); the buttons are native <button>s and every other key path
+                         (Tab, Escape, arrows) was exercised in the browser. Grouping awaits provider
+                         UX review (DEC-FH-X9).
+Reviewer/sign-off:       pending (provider UX review, P08.04 step 1)
+```
+
+- **Cause.** Every destination (15 for a facility administrator with contracts on), the identity block
+  and Logout sat in one fixed-height `flex` row with no wrapping beside the brand; with that many items
+  the row ran over the brand and Dashboard could not be clicked. Below 768 px the same items became a
+  horizontally scrolling strip under the logo.
+- **Information architecture.** Direct links: Dashboard, Eligibility, Claims, Pre-auth. Menus: Care &
+  claims (Inbox, Cases, New Claim), Finance, Contracts & Services, Reports, Administration. Account
+  menu: identity (name, persona, facility), Facility profile, Logout (DEC-FH-X9). The grouping is one
+  table in the model — `computeProviderNav` still filters by exact permission (fail-closed) and the
+  `contractView` flag, and emits a group only when it has an item. The browser still receives only
+  `{key, label, href, iconKey}`; routes stay server-authorized.
+- **Layout.** The brand and account menu share the top row with nothing else; the account button
+  shows name and persona at every width (DEF-001/002) and truncates rather than pushing. From 1280 px
+  a second row holds the direct links and menus (it may wrap, never overflow). Below 1280 px one Menu
+  button opens a panel listing every group as a labelled section — nothing is laid out beneath the
+  logo — capped to the viewport and scrolling inside itself.
+- **Behaviour.** Disclosure pattern (button + list of links, `aria-expanded`/`aria-controls`). One
+  disclosure open at a time. Escape closes and returns focus to its button; a press outside closes;
+  tabbing out closes (a blur with no destination is ignored, because Safari does not focus clicked
+  controls); choosing an entry closes and returns focus to the button; navigating closes whatever is
+  open (the open state records the path it was opened on, like the P11.02 drawer). Up/Down/Home/End
+  move within an open panel. Visible focus ring on every control. Current page: the longest matching
+  destination gets `aria-current="page"` (or `"true"` on a page beneath it) and its menu button is
+  marked and highlighted.
+- **Sticky-header offset.** The header is 57 px (compact) or 106 px (desktop) and sticky, so an error
+  summary's `#field` jump or a focus move would land a field under it. `scroll-padding-top` is now
+  5.5 rem / 8.5 rem on pages with the provider header only (`html:has([data-provider-shell])`).
+  Measured: the jumped-to field lands at 136 px under a 106 px header (1280 px) and at 88 px under
+  57 px (360 px).
+- **Model tests.** A facility administrator gets exactly the table above and all 15 destinations;
+  over **every** combination of the 13 permissions × the contract flag (16,384 cases) each permitted
+  route is in exactly one group, no group is empty, nothing permitted is missing, and group order and
+  labels come from the one table. Active-destination resolution: detail pages, `New Claim` over
+  `Claims`, segment boundaries, and hidden destinations.
+- **Component tests.** Brand and Dashboard are separate links; four direct links and five closed
+  menus; every destination reachable from exactly one place; Escape/outside/tab-away; arrow keys;
+  one menu at a time; choosing closes and returns focus; navigation closes; current page and its menu
+  marked; account menu identity, Facility profile and Logout; compact panel lists every group and
+  returns focus; a biller sees no empty menu; no permission code reaches the markup.
+
+**Browser run (2026-09-11, Chromium, Next dev server on this branch).** Signing in needs a password
+typed into the login form, which this executor does not do, so the run used a temporary page (never
+committed, deleted after) that mounts `ProviderNav` in a layout exactly as `src/app/provider/layout.tsx`
+does, with the facility administrator's computed groups (all 15 destinations, contracts on), a
+48-character facility name and a 34-character user name — the widest realistic case. At each width a
+script checked: document wider than the viewport; any two of Menu/brand/account (and their contents)
+overlapping; any bar item or menu entry outside the viewport, clipped, overlapping another, or covered
+at its centre (`elementFromPoint`); Dashboard and brand each clickable; every menu's panel inside the
+viewport.
+
+| Width × height | Mode | Result |
+|---|---|---|
+| 1920 × 1080 | two rows | no overflow, no overlap, 9 bar items on one line, 6 panels inside the viewport |
+| 1440 × 900 | two rows | same |
+| 1280 × 800 | two rows | same (row 1,058 px of 1,233 px available) |
+| 1024 × 768 | compact | no overflow, no overlap; Menu panel (14 entries) and account panel inside |
+| 768 × 1024 | compact | first run: the account button overflowed by 4 px (it kept its width inside a shrinking box) — **fixed** (the box is now a flex container, so the name truncates); re-run clean |
+| 360 × 740 | compact | first look: "Medvex" ran into the account button (the brand shrank below its mark) — **fixed** (the mark never shrinks below `sm`; the avatar gives way instead); re-run clean; every panel entry ≥ 44 px tall; the panel scrolls to its last entry |
+| 320 × 640 | compact | clean |
+| 640 × 400 and 960 × 540 (a 1280 × 800 and a 1920 × 1080 screen at 200 % zoom) | compact | clean; the Menu panel fills to the viewport bottom and scrolls; the account panel fits |
+
+Keyboard and pointer, in the browser: Escape closed "Care & claims" and returned focus to its button
+with the teal focus ring (`:focus-visible` true); with the menu open, Tab went Inbox → Cases → New
+Claim and the next Tab moved to "Finance" and closed it; choosing Finance → Settlements navigated,
+closed the menu, left focus on "Finance", marked it `aria-current="true"` and Settlements
+`aria-current="page"`; a pointer press on the page closed an open menu and a press inside it did not.
+The dev server ran against the throwaway database `fh_gate_head2`, where one seeded provider user was
+given the facility-administrator persona and its provider the contract-view flag — no shared or
+production data was touched.

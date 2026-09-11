@@ -13,7 +13,9 @@ import {
   computeProviderNav,
   flattenProviderNav,
   providerPermits,
+  resolveActiveProviderNavHref,
   PROVIDER_NAV_DEFINITIONS,
+  PROVIDER_NAV_GROUPS,
 } from "@/components/layouts/provider-nav-model";
 import { PROVIDER_ROLE_PERMISSIONS } from "@/../prisma/seeds/provider-rbac";
 
@@ -135,5 +137,84 @@ describe("F3.8 providerPermits (page-access guard)", () => {
   it("ELIG-GAP-004: denies a zero-permission user and a user with only unrelated perms (fail-closed)", () => {
     expect(providerPermits([], "provider.preauth.read")).toBe(false);
     expect(providerPermits(["CLAIM:VIEW", "MEMBER:VIEW"], "provider.preauth.read")).toBe(false);
+  });
+});
+
+/**
+ * Family Hospital UAT plan P06 (FH-08) — the grouping is the bar's information
+ * architecture: four direct links, task-labelled menus, the account menu. The
+ * plan's acceptance: each route belongs to exactly one visible group, and
+ * permission filtering never leaves an empty group — without hiding anything
+ * the user may open.
+ */
+describe("P06 grouped provider navigation", () => {
+  const WITH_CONTRACTS = { flags: { contractView: true } };
+
+  it("a facility administrator (the most destinations) gets four direct links, five task menus and the account menu", () => {
+    const groups = computeProviderNav(PROVIDER_ROLE_PERMISSIONS.PROVIDER_FACILITY_ADMIN, WITH_CONTRACTS);
+    expect(groups.map((g) => [g.group, g.label, g.presentation, g.items.map((i) => i.key)])).toEqual([
+      ["primary", "Main", "direct", ["dashboard", "eligibility", "claims", "preauth"]],
+      ["care", "Care & claims", "menu", ["inbox", "cases", "new-claim"]],
+      ["finance", "Finance", "menu", ["settlements", "payment-queries"]],
+      ["contracts", "Contracts & Services", "menu", ["contracts"]],
+      ["reports", "Reports", "menu", ["performance"]],
+      ["administration", "Administration", "menu", ["users", "api-keys", "integrations"]],
+      ["account", "Account", "account", ["profile"]],
+    ]);
+    // Nothing the facility administrator may open is left out.
+    expect(flattenProviderNav(groups).map((i) => i.href).sort()).toEqual(PROVIDER_NAV_DEFINITIONS.map((d) => d.href).sort());
+  });
+
+  it("Dashboard, Eligibility, Claims and Pre-auth are the direct destinations; the facility profile is in the account menu", () => {
+    const direct = PROVIDER_NAV_DEFINITIONS.filter((d) => PROVIDER_NAV_GROUPS[d.group].presentation === "direct").map((d) => d.href);
+    expect(direct).toEqual(["/provider/dashboard", "/provider/eligibility", "/provider/claims", "/provider/preauth"]);
+    const account = PROVIDER_NAV_DEFINITIONS.filter((d) => PROVIDER_NAV_GROUPS[d.group].presentation === "account").map((d) => d.href);
+    expect(account).toEqual(["/provider/profile"]);
+  });
+
+  it("for EVERY combination of permissions and the contract flag: each permitted route is in exactly one group, and no group is empty", () => {
+    const codes = [...new Set(PROVIDER_NAV_DEFINITIONS.map((d) => d.requiredPermission).filter(Boolean) as string[])];
+    const order = Object.keys(PROVIDER_NAV_GROUPS);
+    let combinations = 0;
+    for (let mask = 0; mask < 1 << codes.length; mask++) {
+      const perms = codes.filter((_, i) => mask & (1 << i));
+      for (const contractView of [false, true]) {
+        combinations++;
+        const groups = computeProviderNav(perms, { flags: { contractView } });
+        const permitted = PROVIDER_NAV_DEFINITIONS.filter(
+          (d) => (!d.flagKey || contractView) && (!d.requiredPermission || perms.includes(d.requiredPermission)),
+        ).map((d) => d.href);
+        const shown = groups.flatMap((g) => g.items.map((i) => i.href));
+        if (groups.some((g) => g.items.length === 0)) throw new Error(`empty group for [${perms.join(",")}]`);
+        if (new Set(shown).size !== shown.length) throw new Error(`a route is in two groups for [${perms.join(",")}]`);
+        if ([...shown].sort().join() !== [...permitted].sort().join()) throw new Error(`permitted ≠ shown for [${perms.join(",")}]`);
+        // canonical group order, each group once, labels/presentations from the one table
+        const keys = groups.map((g) => g.group);
+        expect(keys).toEqual(order.filter((k) => keys.includes(k as never)));
+        for (const g of groups) expect([g.label, g.presentation]).toEqual([PROVIDER_NAV_GROUPS[g.group].label, PROVIDER_NAV_GROUPS[g.group].presentation]);
+        expect(groups[0]).toMatchObject({ group: "primary" }); // Dashboard needs no permission
+      }
+    }
+    expect(combinations).toBe(2 ** codes.length * 2);
+  });
+
+  it("a front-desk user gets no empty Finance/Administration menu", () => {
+    const groups = computeProviderNav(PROVIDER_ROLE_PERMISSIONS.PROVIDER_FRONT_DESK);
+    expect(groups.map((g) => g.group)).toEqual(["primary", "care", "account"]);
+  });
+
+  it("the active destination is the longest matching route, so detail pages light their parent and New Claim wins over Claims", () => {
+    const hrefs = PROVIDER_NAV_DEFINITIONS.map((d) => d.href);
+    expect(resolveActiveProviderNavHref("/provider/dashboard", hrefs)).toBe("/provider/dashboard");
+    expect(resolveActiveProviderNavHref("/provider/claims", hrefs)).toBe("/provider/claims");
+    expect(resolveActiveProviderNavHref("/provider/claims/clm-1/correct", hrefs)).toBe("/provider/claims");
+    expect(resolveActiveProviderNavHref("/provider/claims/new", hrefs)).toBe("/provider/claims/new");
+    expect(resolveActiveProviderNavHref("/provider/preauth/new", hrefs)).toBe("/provider/preauth");
+    expect(resolveActiveProviderNavHref("/provider/inbox/req-1", hrefs)).toBe("/provider/inbox");
+    // a segment boundary is required, and an unlisted page lights nothing
+    expect(resolveActiveProviderNavHref("/provider/claimsx", hrefs)).toBeNull();
+    expect(resolveActiveProviderNavHref("/provider/documents/doc-1", hrefs)).toBeNull();
+    // only what the user can see is a candidate: without New Claim, its page lights Claims
+    expect(resolveActiveProviderNavHref("/provider/claims/new", ["/provider/claims"])).toBe("/provider/claims");
   });
 });

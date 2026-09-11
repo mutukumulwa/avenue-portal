@@ -11,9 +11,35 @@
  * ONLY routes that already exist are listed. The §10.1 target adds Pre-auth,
  * Inbox, Payment queries, Contracts, Performance, Profile, Users, Integrations
  * — those are added by their own F3–F9 packages, never enabled early here.
+ *
+ * Family Hospital UAT plan P06 (FH-08) — the grouping is the information
+ * architecture the bar renders, not a sort order to flatten. All fifteen
+ * destinations in one fixed, non-wrapping row ran over the brand and made
+ * Dashboard unclickable. Now the four highest-frequency destinations are
+ * direct links; the rest sit in task-labelled menus; the facility profile
+ * sits in the account menu beside identity and logout. Every destination
+ * belongs to exactly one group, and a group with no permitted item is not
+ * emitted — so nothing authorized is hidden and no menu is ever empty.
  */
 
-export type ProviderNavGroupKey = "Home" | "Care" | "Claims" | "Finance" | "Network" | "Administration";
+/**
+ * Where a destination is reached from. `primary` renders as direct links,
+ * `account` inside the account menu, and every other group as one menu.
+ */
+export type ProviderNavGroupKey = "primary" | "care" | "finance" | "contracts" | "reports" | "administration" | "account";
+
+export type ProviderNavPresentation = "direct" | "menu" | "account";
+
+/** The label and presentation of each group, in the order the bar renders them. */
+export const PROVIDER_NAV_GROUPS: Readonly<Record<ProviderNavGroupKey, { label: string; presentation: ProviderNavPresentation }>> = {
+  primary: { label: "Main", presentation: "direct" },
+  care: { label: "Care & claims", presentation: "menu" },
+  finance: { label: "Finance", presentation: "menu" },
+  contracts: { label: "Contracts & Services", presentation: "menu" },
+  reports: { label: "Reports", presentation: "menu" },
+  administration: { label: "Administration", presentation: "menu" },
+  account: { label: "Account", presentation: "account" },
+};
 
 export type ProviderNavIconKey =
   | "dashboard" | "inbox" | "eligibility" | "cases" | "preauth" | "claims" | "new-claim" | "settlements" | "contracts" | "performance" | "profile" | "users" | "api-keys" | "integrations";
@@ -38,27 +64,30 @@ export interface ProviderNavDefinition {
   flagKey?: ProviderNavFlagKey;
 }
 
-/** Existing provider routes only, in target-group order (§10.1). */
+/** Existing provider routes only, in the order the bar renders them. */
 export const PROVIDER_NAV_DEFINITIONS: ProviderNavDefinition[] = [
-  { key: "dashboard", label: "Dashboard", href: "/provider/dashboard", iconKey: "dashboard", group: "Home" },
-  { key: "inbox", label: "Inbox", href: "/provider/inbox", iconKey: "inbox", group: "Home", requiredPermission: "provider.preauth.read" },
-  { key: "eligibility", label: "Eligibility", href: "/provider/eligibility", iconKey: "eligibility", group: "Care", requiredPermission: "provider.eligibility.read" },
-  { key: "cases", label: "Cases", href: "/provider/cases", iconKey: "cases", group: "Care", requiredPermission: "provider.case.read" },
-  { key: "preauth", label: "Pre-auth", href: "/provider/preauth", iconKey: "preauth", group: "Care", requiredPermission: "provider.preauth.read" },
-  { key: "claims", label: "Claims", href: "/provider/claims", iconKey: "claims", group: "Claims", requiredPermission: "provider.claim.read" },
-  { key: "new-claim", label: "New Claim", href: "/provider/claims/new", iconKey: "new-claim", group: "Claims", requiredPermission: "provider.claim.create" },
-  { key: "settlements", label: "Settlements", href: "/provider/settlements", iconKey: "settlements", group: "Finance", requiredPermission: "provider.settlement.read" },
-  { key: "payment-queries", label: "Payment queries", href: "/provider/payment-queries", iconKey: "settlements", group: "Finance", requiredPermission: "provider.payment_query.manage" },
+  // P06: the highest-frequency destinations stay direct.
+  { key: "dashboard", label: "Dashboard", href: "/provider/dashboard", iconKey: "dashboard", group: "primary" },
+  { key: "eligibility", label: "Eligibility", href: "/provider/eligibility", iconKey: "eligibility", group: "primary", requiredPermission: "provider.eligibility.read" },
+  { key: "claims", label: "Claims", href: "/provider/claims", iconKey: "claims", group: "primary", requiredPermission: "provider.claim.read" },
+  { key: "preauth", label: "Pre-auth", href: "/provider/preauth", iconKey: "preauth", group: "primary", requiredPermission: "provider.preauth.read" },
+  // F4.7 — information requests awaiting the facility's answer.
+  { key: "inbox", label: "Inbox", href: "/provider/inbox", iconKey: "inbox", group: "care", requiredPermission: "provider.preauth.read" },
+  { key: "cases", label: "Cases", href: "/provider/cases", iconKey: "cases", group: "care", requiredPermission: "provider.case.read" },
+  { key: "new-claim", label: "New Claim", href: "/provider/claims/new", iconKey: "new-claim", group: "care", requiredPermission: "provider.claim.create" },
+  { key: "settlements", label: "Settlements", href: "/provider/settlements", iconKey: "settlements", group: "finance", requiredPermission: "provider.settlement.read" },
+  { key: "payment-queries", label: "Payment queries", href: "/provider/payment-queries", iconKey: "settlements", group: "finance", requiredPermission: "provider.payment_query.manage" },
   // F7.3 — gated behind `contractView` (F7.1 §10 sign-off): hidden until the flag is on, even for a permitted user.
-  { key: "contracts", label: "Contracts", href: "/provider/contracts", iconKey: "contracts", group: "Network", requiredPermission: "provider.contract.read", flagKey: "contractView" },
+  { key: "contracts", label: "Contracts", href: "/provider/contracts", iconKey: "contracts", group: "contracts", requiredPermission: "provider.contract.read", flagKey: "contractView" },
   // F8.5 — advisory performance dashboard (perm-gated, no flag).
-  { key: "performance", label: "Performance", href: "/provider/performance", iconKey: "performance", group: "Network", requiredPermission: "provider.performance.read" },
-  // F7.6 — read-only profile + change-request tracker (perm-gated, no flag).
-  { key: "profile", label: "Profile", href: "/provider/profile", iconKey: "profile", group: "Administration", requiredPermission: "provider.profile.read" },
+  { key: "performance", label: "Performance", href: "/provider/performance", iconKey: "performance", group: "reports", requiredPermission: "provider.performance.read" },
   // ELIG-GAP-005 — provider self-service user administration (F1.5 service, now with a UI).
-  { key: "users", label: "Users", href: "/provider/users", iconKey: "users", group: "Administration", requiredPermission: "provider.users.manage" },
-  { key: "api-keys", label: "API Keys", href: "/provider/api-keys", iconKey: "api-keys", group: "Administration", requiredPermission: "provider.api_keys.manage" },
-  { key: "integrations", label: "Integrations", href: "/provider/integrations", iconKey: "integrations", group: "Administration", requiredPermission: "provider.integrations.manage" },
+  { key: "users", label: "Users", href: "/provider/users", iconKey: "users", group: "administration", requiredPermission: "provider.users.manage" },
+  { key: "api-keys", label: "API Keys", href: "/provider/api-keys", iconKey: "api-keys", group: "administration", requiredPermission: "provider.api_keys.manage" },
+  { key: "integrations", label: "Integrations", href: "/provider/integrations", iconKey: "integrations", group: "administration", requiredPermission: "provider.integrations.manage" },
+  // F7.6 — read-only profile + change-request tracker (perm-gated, no flag).
+  // It is the FACILITY's profile, so in the personal account menu it says so.
+  { key: "profile", label: "Facility profile", href: "/provider/profile", iconKey: "profile", group: "account", requiredPermission: "provider.profile.read" },
 ];
 
 /**
@@ -122,10 +151,12 @@ export interface ProviderNavItemView {
 
 export interface ProviderNavGroupView {
   group: ProviderNavGroupKey;
+  label: string;
+  presentation: ProviderNavPresentation;
   items: ProviderNavItemView[];
 }
 
-const GROUP_ORDER: ProviderNavGroupKey[] = ["Home", "Care", "Claims", "Finance", "Network", "Administration"];
+const GROUP_ORDER = Object.keys(PROVIDER_NAV_GROUPS) as ProviderNavGroupKey[];
 
 function toView(d: ProviderNavDefinition): ProviderNavItemView {
   return { key: d.key, label: d.label, href: d.href, iconKey: d.iconKey };
@@ -158,12 +189,28 @@ export function computeProviderNav(permissions: string[], opts: { flags?: Partia
     arr.push(toView(d));
     byGroup.set(d.group, arr);
   }
-  return GROUP_ORDER.filter((g) => byGroup.has(g)).map((g) => ({ group: g, items: byGroup.get(g)! }));
+  return GROUP_ORDER.filter((g) => byGroup.has(g)).map((g) => ({ group: g, ...PROVIDER_NAV_GROUPS[g], items: byGroup.get(g)! }));
 }
 
-/** Flatten the grouped nav into an ordered item list (for the horizontal bar). */
+/** Flatten the grouped nav into an ordered item list. */
 export function flattenProviderNav(groups: ProviderNavGroupView[]): ProviderNavItemView[] {
   return groups.flatMap((g) => g.items);
+}
+
+/**
+ * P06 — which destination the current page belongs to: the longest visible href
+ * that is the pathname or a path-segment prefix of it. One entry is ever lit,
+ * detail pages included (/provider/claims/abc → Claims, /provider/claims/new →
+ * New Claim), and the menu holding it can show that it contains the current
+ * page. The AdminSidebar resolves its active entry the same way.
+ */
+export function resolveActiveProviderNavHref(pathname: string, hrefs: readonly string[]): string | null {
+  let best: string | null = null;
+  for (const href of hrefs) {
+    const matches = pathname === href || pathname.startsWith(`${href}/`);
+    if (matches && (best === null || href.length > best.length)) best = href;
+  }
+  return best;
 }
 
 /**
