@@ -19,6 +19,7 @@ import { isProviderAccessError, ProviderAccessService, type ProviderAccessContex
 import { ProviderCaseContextService } from "@/server/services/provider-case-context.service";
 import { ProviderServiceCatalogService } from "@/server/services/provider-service-catalog.service";
 import { ProviderDiagnosisSearchService } from "@/server/services/provider-diagnosis-search.service";
+import { captureEvent } from "@/server/services/capture-telemetry";
 import type {
   CaseContextRequest,
   CaseContextResult,
@@ -75,4 +76,26 @@ export async function searchDiagnosesAction(input: { purpose: string; query: str
   if (!ctx) return { ok: false, code: "FORBIDDEN", message: "You do not have permission to do this.", correlationId: randomUUID() };
   const raw = asObject(input);
   return ProviderDiagnosisSearchService.search(ctx, { purpose: raw.purpose, query: raw.query });
+}
+
+/**
+ * Family Hospital UAT plan §9 / P06 — the provider bar's error boundary reports a
+ * render failure here, so it reaches the server log as a structured, secret-free
+ * `navigation_render_error` event. Scope comes from the session; the only thing
+ * accepted from the browser is the framework's opaque error digest, and only in
+ * its known shape. It writes a log line and nothing else.
+ */
+export async function reportNavigationRenderErrorAction(input: { digest?: unknown }): Promise<void> {
+  const ctx = await providerContext();
+  if (!ctx) return;
+  const raw = asObject(input).digest;
+  const digest = typeof raw === "string" && /^[A-Za-z0-9_-]{1,64}$/.test(raw) ? raw : null;
+  captureEvent("navigation_render_error", {
+    correlationId: randomUUID(),
+    tenantId: ctx.tenantId,
+    providerId: ctx.providerId,
+    actorId: ctx.actorId,
+    outcome: "FALLBACK_RENDERED",
+    code: digest,
+  });
 }

@@ -94,7 +94,7 @@ describe("ProviderPreauthForm", () => {
     fireEvent.click(screen.getByRole("button", { name: /Submit pre-authorisation/ }));
     const summary = await screen.findByRole("alert", { name: /with this form/ });
     expect(within(summary).getByRole("link", { name: /Benefit: This benefit is not in the member's package/ })).toHaveAttribute("href", "#pa-benefit");
-    fireEvent.click(screen.getByRole("button", { name: /Submit pre-authorisation/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Submit pre-authorisation/ }));
     await waitFor(() => expect(submit.submitProviderPreauthAction).toHaveBeenCalledTimes(2));
     const [first, second] = submit.submitProviderPreauthAction.mock.calls.map((c) => c[0].idempotencyKey);
     expect(second).not.toBe(first);

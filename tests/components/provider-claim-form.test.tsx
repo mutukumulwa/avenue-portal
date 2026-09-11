@@ -126,10 +126,12 @@ describe("ProviderClaimForm", () => {
     expect(screen.getByText("B54")).toBeInTheDocument();
     expect(screen.getByText("Full Blood Count")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: /Submit claim/ }));
+    // Wait for the button to come back from "Submitting…" — under a loaded full-suite
+    // run the outcome can render a moment before the pending state clears.
+    fireEvent.click(await screen.findByRole("button", { name: /Submit claim/ }));
     await waitFor(() => expect(submit.submitProviderClaimAction).toHaveBeenCalledTimes(2));
     await screen.findByText(/We could not confirm whether this was saved/);
-    fireEvent.click(screen.getByRole("button", { name: /Submit claim/ }));
+    fireEvent.click(await screen.findByRole("button", { name: /Submit claim/ }));
     await waitFor(() => expect(submit.submitProviderClaimAction).toHaveBeenCalledTimes(3));
 
     const keys = submit.submitProviderClaimAction.mock.calls.map((c) => c[0].idempotencyKey);

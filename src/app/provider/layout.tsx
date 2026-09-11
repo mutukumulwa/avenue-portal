@@ -1,4 +1,5 @@
 import { ProviderNav } from "@/components/layouts/ProviderNav";
+import { ProviderNavBoundary } from "@/components/layouts/ProviderNavBoundary";
 import { ProviderAccessService } from "@/server/services/provider-access.service";
 import { ProviderAccessSettingsService } from "@/server/services/provider-access-settings.service";
 import { computeProviderNav, resolveProviderPersonaLabel } from "@/components/layouts/provider-nav-model";
@@ -26,7 +27,9 @@ export default async function ProviderLayout({ children }: { children: React.Rea
 
   return (
     <div className="min-h-screen bg-[#F8F9FA]">
-      <ProviderNav providerName={provider.name} groups={navGroups} actorName={session.user.name ?? null} roleLabel={roleLabel} />
+      <ProviderNavBoundary>
+        <ProviderNav providerName={provider.name} groups={navGroups} actorName={session.user.name ?? null} roleLabel={roleLabel} />
+      </ProviderNavBoundary>
       <main className="max-w-6xl mx-auto px-4 py-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
         {children}
       </main>

@@ -107,6 +107,8 @@ export const AUDIT_EXCLUSIONS: Record<string, string> = {
   "provider/capture-actions.ts:searchServiceCatalogAction":
     "READ_ONLY — the facility's own price-list search; throttled enumeration writes PROVIDER_CATALOGUE_SEARCH_THROTTLED",
   "provider/capture-actions.ts:searchDiagnosesAction": "READ_ONLY — ICD-10 terminology search; no business state",
+  "provider/capture-actions.ts:reportNavigationRenderErrorAction":
+    "READ_ONLY — P06/§9: writes one structured navigation_render_error log line; no business state",
   "(auth)/account-setup/actions.ts:checkSetupLinkAction":
     "READ_ONLY — answers whether a one-time setup link can be used (yes/no); spending it is audited by completeAccountSetupAction",
   "(auth)/reset/actions.ts:confirmResetAction": "PRE_EXISTING_GAP — audit wiring pending",
