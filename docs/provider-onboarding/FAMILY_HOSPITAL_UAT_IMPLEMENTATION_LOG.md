@@ -48,10 +48,10 @@ Status values: `NOT_STARTED` · `IN_PROGRESS` · `DONE` · `BLOCKED (<gate>)` ·
 | Task | Status | Commit | Notes |
 |---|---|---|---|
 | P00.01 Implementation record | DONE | see §3 | this file + decisions file |
-| P00.02 Credential containment | READY — awaits approval | | exposed accounts identified; production mutation needs explicit approval |
+| P00.02 Credential containment | BLOCKED (owner: "not yet", 2026-09-11) | | exposed accounts identified; two exposed passwords remain valid by owner decision — release gate §13.1 open |
 | P00.03 Freeze unreliable UAT records | DONE | see §3 | 4 claims + 1 pre-auth frozen, register marked, UAT paused |
 | P01.01 Read-only tariff preflight | DONE | see §3 | production result **NO-GO (G2)** → P01.02 required |
-| P01.02 Attach/reimport safely | IN_PROGRESS | see §3 | manifest reviewed-ready; rehearsal proven; production apply awaits approval |
+| P01.02 Attach/reimport safely | DONE | see §3 | owner approved 2026-09-11; applied to production, receipt `cmtwmk5920000xavq6zrbs74p`; production preflight now PASS |
 | P01.03 Standalone-tariff semantics | IN_PROGRESS | see §3 | readers aligned; catalogue parity test lands with P02.03 |
 | P02.01 Provider case-context resolver | NOT_STARTED | | |
 | P02.02 Member resolution surface | NOT_STARTED | | |
@@ -239,10 +239,30 @@ Browser scenarios and evidence paths: n/a
 Feature/config changes:  none
 Data mutations and operation IDs: disposable database only. Production: none.
 Rollback tested:         YES — on the disposable database, steps 6–8 above
-Residual risk:           production apply requires the owner's review of the manifest (hash above)
-                         and explicit approval; the Surgical Extraction pair is applied under the
-                         blanket lower-price rule but should be confirmed with the facility
-Reviewer/sign-off:       pending
+Residual risk:           the Surgical Extraction pair is applied under the blanket lower-price rule
+                         and should be confirmed with the facility (provider communication, §12)
+Reviewer/sign-off:       owner approved the production apply in session, 2026-09-11
+```
+
+**Production apply (owner-approved 2026-09-11):**
+
+```text
+[PROD, write] DATABASE_URL=<session pooler> npx tsx scripts/family-hospital-tariff-remediation.ts \
+  --apply --batch-ref FH-P0102-20260911 \
+  --manifest-hash 78982cfa5be38e2d9216c1e3aedb07339eb525ab611897716014009becc8079a \
+  --operator-user-id cmr3aezx7000mnlvqgoljdyqi     (the Medvex operations admin account)
+→ exit 0, APPLIED; OperationReceipt cmtwmk5920000xavq6zrbs74p (SUCCEEDED / APPLIED);
+  6 created, 33 deactivated; in-transaction post-state validation passed.
+  Output: evidence/P01.02-production-apply.json
+[PROD, read-only] preflight re-run → evidence/P01.01-preflight-2026-09-11T07-19-05-633Z.{md,json}
+  → exit 0, PASS on G1–G6: 4,451 original rows (4,418 selectable + 33 superseded, retained
+  inactive) + 6 replacements = 4,424 logical services; 0 description-key collisions.
+[PROD, read-only] independent SQL check → 4,457 rows / 4,424 active; the 6 replacements active at
+  their original rates (Azithromycin 500Mg (Tab) 4,807 / (Vial) 70,000; Rabeprazole 20Mg (Rabeloc)
+  (Tab) 1,540 / (Vial) 45,540; Excision … (less than 5 lesions) 270,000 / (more than 5 lesions)
+  500,000); 40 audit rows for the batch (6 + 33 + 1); receipt SUCCEEDED; 0 active name collisions.
+Rollback (if ever needed): --rollback --batch-ref FH-P0102-20260911 --operator-user-id <id>
+  (rehearsed; restores exactly the 33 prior rows and retires the 6 replacements, deletes nothing).
 ```
 
 ### P01.03 — Standalone-tariff semantics (in progress)

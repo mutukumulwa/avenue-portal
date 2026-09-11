@@ -45,9 +45,17 @@ recorded; update the row, never delete it.
 |---|---|---|---|
 | DEC-FH-01 | May a provider submit an unlisted service? | **Default applied** (no owner answer yet) | Yes — only where the contract's existing policy permits it (`unlistedServiceRule ≠ REJECT`). Family's contract is `REFER_FOR_REVIEW`, so an unlisted line is shown as "not in contracted tariff — manual review", needs a typed description and a billed price, and never receives a contracted rate. |
 | DEC-FH-02 | Show `CUSTOM` as a benefit choice? | **Default applied** | Hidden from provider forms; every other `BenefitCategory` value is offered from one shared list. |
-| DEC-FH-03 | Approved ICD source/version and licensing | **STOPPED — needs owner** (licensing authority) | No complete ICD-10 source has been supplied or licensed. The deployed catalogue is the 200-code demo subset (verified 2026-09-11). P04.05 ships the read-only coverage report and discloses the limit; the import is not built against an unapproved source. |
+| DEC-FH-03 | Approved ICD source/version and licensing | **Owner answered 2026-09-11: no approved source yet** | No complete ICD-10 source is licensed. The deployed catalogue stays the 200-code demo subset (verified 2026-09-11). P04.05 ships the search control and the read-only coverage report, and the 200-code limit is disclosed to the facility for this UAT round. No import is built against an unapproved source. |
 | DEC-FH-04 | Treatment of existing broken UAT claims/pre-auths | **Default recorded; execution needs production approval** | Withdraw/cancel with reason `TEST_DATA_INCORRECT_TARIFF`, retaining full audit history. Records enumerated in P00.03. Mutation happens only in P07 through supported lifecycle actions. |
 | DEC-FH-05 | Setup-link lifetime | **Default applied** | 24 hours; a resend invalidates every older unused link for that user. |
+
+### 3.1 Owner answers on production-affecting steps (2026-09-11, in session)
+
+| Step | Question | Answer |
+|---|---|---|
+| P00.02 | Invalidate the two still-valid exposed temporary passwords (biller, front desk) now? | **Not yet.** They remain valid; P00.02 stays an open release blocker (plan §13, first gate). |
+| P01.02 | When to apply manifest `FH-P0102-20260911` (SHA-256 `78982cfa…079a`) to production? | **Apply now**, then re-run the preflight on production. |
+| DEC-FH-03 | Is there an approved ICD-10 release to load? | **None yet** — disclose the 200-code limit. |
 
 ## 4. Decisions surfaced by execution (not in the plan's gate list)
 
